@@ -167,24 +167,33 @@ jobs:
     name: release / propagate website
     runs-on: ubuntu-latest
     needs: publish
-    if: ${{ secrets.X07_BOT_TOKEN != '' }}
+    env:
+      X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
     steps:
+      - name: Skip (missing X07_BOT_TOKEN)
+        if: ${{ env.X07_BOT_TOKEN == '' }}
+        run: echo "X07_BOT_TOKEN is not set; skipping website propagation."
+
       - name: Checkout (x07)
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Checkout (x07-website)
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
           repository: x07lang/x07-website
           path: x07-website
-          token: ${{ secrets.X07_BOT_TOKEN }}
+          token: ${{ env.X07_BOT_TOKEN }}
 
       - name: Update versions.json
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         working-directory: x07-website
         run: |
           set -euo pipefail
@@ -193,46 +202,57 @@ jobs:
           python3 ../scripts/open_pr_website_update.py --tag "$tag" --release-base-url "$base"
 
       - name: Open PR
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.X07_BOT_TOKEN }}
+          token: ${{ env.X07_BOT_TOKEN }}
           path: x07-website
           branch: bot/release-${{ github.ref_name }}
-          commit-message: release: website versions for ${{ github.ref_name }}
-          title: release: website versions for ${{ github.ref_name }}
+          commit-message: "release: website versions for ${{ github.ref_name }}"
+          title: "release: website versions for ${{ github.ref_name }}"
           body: Automated update from x07 release ${{ github.ref_name }}.
 
   propagate-index:
     name: release / propagate index
     runs-on: ubuntu-latest
     needs: publish
-    if: ${{ secrets.X07_BOT_TOKEN != '' }}
+    env:
+      X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
     steps:
+      - name: Skip (missing X07_BOT_TOKEN)
+        if: ${{ env.X07_BOT_TOKEN == '' }}
+        run: echo "X07_BOT_TOKEN is not set; skipping index propagation."
+
       - name: Checkout (x07)
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Checkout (x07-index)
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
           repository: x07lang/x07-index
           path: x07-index
-          token: ${{ secrets.X07_BOT_TOKEN }}
+          token: ${{ env.X07_BOT_TOKEN }}
 
       - name: Update index/config.json (canonicalize)
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         working-directory: x07-index
         run: python3 ../scripts/open_pr_index_update.py
 
       - name: Open PR
+        if: ${{ env.X07_BOT_TOKEN != '' }}
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.X07_BOT_TOKEN }}
+          token: ${{ env.X07_BOT_TOKEN }}
           path: x07-index
           branch: bot/release-${{ github.ref_name }}
-          commit-message: release: index config update for ${{ github.ref_name }}
-          title: release: index config update for ${{ github.ref_name }}
+          commit-message: "release: index config update for ${{ github.ref_name }}"
+          title: "release: index config update for ${{ github.ref_name }}"
           body: Automated update from x07 release ${{ github.ref_name }}.
