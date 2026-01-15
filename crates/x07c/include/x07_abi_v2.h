@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // ABI v2 value layouts for the X07 C backend.
-// Normative spec: docs/spec/abi/abi-v2.md
+// Normative spec: dev-docs/x07-internal-docs/spec/abi/abi-v2.md
 
 typedef struct {
   uint8_t* ptr;
@@ -69,4 +69,3 @@ typedef struct {
 } ev_allocator_v1_t;
 
 #endif
-

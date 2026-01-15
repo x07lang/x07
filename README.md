@@ -15,7 +15,7 @@ This repository currently contains:
 
 ## Repository layout
 
-- `docs/`: design documents and implementation notes
+- `docs/`: end-user docs (x07lang.org source)
 - `crates/`: Rust workspace (compiler + deterministic runner)
 - `benchmarks/`: benchmark suites + fixtures
 - `scripts/bench/`: benchmark/curriculum tooling

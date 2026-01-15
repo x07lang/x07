@@ -6,7 +6,7 @@ pub fn guide_md() -> String {
     out.push_str("# Language Guide (x07AST JSON)\n\n");
     out.push_str("IMPORTANT:\n");
     out.push_str("- Output ONLY one JSON object (no preamble).\n");
-    out.push_str("- Do NOT use Markdown code fences.\n");
+    out.push_str("- Do NOT wrap the JSON in Markdown code fences.\n");
     out.push_str("- Do NOT output extra prose.\n");
     out.push_str("- Must satisfy x07AST schema_version `");
     out.push_str(X07AST_SCHEMA_VERSION);
@@ -60,9 +60,13 @@ pub fn guide_md() -> String {
 
     out.push_str("## Examples\n\n");
     out.push_str("Echo (returns input):\n");
+    out.push_str("```json\n");
     out.push_str("{\"schema_version\":\"");
     out.push_str(X07AST_SCHEMA_VERSION);
-    out.push_str("\",\"kind\":\"entry\",\"module_id\":\"main\",\"imports\":[],\"decls\":[],\"solve\":[\"view.to_bytes\",\"input\"]}\n\n");
+    out.push_str(
+        "\",\"kind\":\"entry\",\"module_id\":\"main\",\"imports\":[],\"decls\":[],\"solve\":[\"view.to_bytes\",\"input\"]}\n",
+    );
+    out.push_str("```\n\n");
     out.push_str("Arity reminder:\n");
     out.push_str("- `if` is `[\"if\", cond, then, else]`\n");
     out.push_str("- `for` is `[\"for\", i, start, end, body]`\n");

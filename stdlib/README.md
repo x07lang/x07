@@ -7,7 +7,7 @@ Built-in package shipped with the compiler:
 - `stdlib/std/0.1.1/` (modules under `modules/`)
   - includes pure helpers (`std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.text.ascii`, `std.text.utf8`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.result`, `std.option`, `std.path`) and world-scoped I/O (`std.io`, `std.io.bufread`, `std.fs`, `std.rr`, `std.kv`)
 
-See `docs/spec/modules-packages.md` for how modules are resolved and how to use `(import ...)`.
+See `docs/packages/index.md` for package and workspace basics.
 
 ## Stdlib import sources
 

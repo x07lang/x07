@@ -15,7 +15,7 @@ Track B model:
 - The runner (`crates/x07-host-runner`) compiles the C to a native executable and runs it deterministically.
 - The standalone OS runner (`crates/x07-os-runner`) compiles+runs programs in standalone-only worlds (`run-os*`), which are not used by benchmark suites.
 
-Execution details and solver ABI: `docs/spec/x07-c-backend.md`.
+Execution details and solver ABI: `../dev-docs/x07-internal-docs/spec/x07-c-backend.md`.
 
 ## Stdlib and builtins (canonical surface)
 
@@ -54,14 +54,14 @@ Execution details and solver ABI: `docs/spec/x07-c-backend.md`.
   - `std.btree_map` / `std.btree_set`: ordered u32 collections (binary search + packed bytes storage).
   - `std.deque_u32`: growable ring-buffer deque for u32.
   - `std.heap_u32`: min-heap priority queue for u32.
-  - Collection emitters: `std.*.emit_*` functions return canonical deterministic encodings (hash emitters canonicalize by sorting). Spec: `docs/spec/stdlib-emitters-v1.md`.
+  - Collection emitters: `std.*.emit_*` functions return canonical deterministic encodings (hash emitters canonicalize by sorting). Spec: `../dev-docs/x07-internal-docs/spec/stdlib-emitters-v1.md`.
   - `std.bitset`: dense bitset with `intersection_count`.
   - `std.slab`: handle-based pool for u32 values.
   - `std.lru_cache`: fixed-capacity LRU cache for u32 keys/values (`peek_u32_opt`/`peek_u32_or` + `touch_u32` + `put_u32`; mutating ops return updated bytes).
 
 ## Types + ABI (stable surface)
 
-- ABI v2 docs: `docs/spec/abi/` and header `crates/x07c/include/x07_abi_v2.h`.
+- ABI v2 docs: `../dev-docs/x07-internal-docs/spec/abi/` and header `crates/x07c/include/x07_abi_v2.h`.
 - Type annotations are supported in `defn` signatures for:
   - `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `result_i32`, `result_bytes`, `iface`.
   - Standalone-only raw pointers: `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`.

@@ -4,7 +4,7 @@
 This repository contains Track B scaffolding, a deterministic native runner, a compiler, and deterministic benchmark suites (H1/H2) that cover ABI/types plus stdlib parity across capability worlds.
 
 ## Project Structure & Module Organization
-- `docs/`: design docs and implementation notes
+- `docs/`: end-user documentation (x07lang.org source)
 - `crates/`: Rust workspace crates (compiler + runner)
 - `benchmarks/`: benchmark suites + deterministic fixtures
 - `scripts/bench/`: benchmark/curriculum tooling
@@ -46,7 +46,7 @@ This repository contains Track B scaffolding, a deterministic native runner, a c
 ## Coding Style & Naming Conventions
 - Docs: keep changes small, use descriptive headings, and include concrete examples/paths where helpful.
 - Rust: `rustfmt`-clean and clippy-clean; crates follow the `x07-*` naming pattern.
-- Interfaces: keep the solver ABI stable (see `docs/spec/x07-c-backend.md`) and keep execution deterministic and resource-bounded.
+- Interfaces: keep the solver ABI stable (see `crates/x07c/include/x07_abi_v2.h`) and keep execution deterministic and resource-bounded.
 
 ## Testing Guidelines
 Prefer deterministic tests: no real network, fixed seeds, and explicit resource limits. Keep tests close to the module they cover (e.g., `crates/x07-host-runner/tests/`).
