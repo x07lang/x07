@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "src/is_match.x07.json",
+  "module_roots": [
+    "src"
+  ],
+  "dependencies": [
+    {
+      "name": "ext-regex",
+      "version": "0.2.0",
+      "path": "pkgs/ext-regex"
+    }
+  ],
+  "lockfile": "x07.lock.json"
+}

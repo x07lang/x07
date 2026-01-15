@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.lock@0.2.0",
+  "dependencies": [
+    {
+      "name": "ext-regex",
+      "version": "0.2.0",
+      "path": "pkgs/ext-regex",
+      "package_manifest_sha256": "4772f670b28c58161d160def99a7927c80f9e5920ce5fafd9556e51306db13b7",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.regex": "d512f16ebcbabec73f88c1bd42e7b9ae55e985a296fcaf85641b489a1a5596df",
+        "ext.regex.tests": "1c08fca2810b00ce17510895f54ac379e10dd58b8cace37e121d523033b9a2eb"
+      }
+    }
+  ]
+}

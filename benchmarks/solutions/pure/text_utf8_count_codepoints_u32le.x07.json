@@ -1,0 +1,1 @@
+{"decls":[],"imports":["std.text.utf8"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.1.0","solve":["begin",["let","c",["std.text.utf8.count_codepoints_or_neg1","input"]],["if",["<","c",0],["codec.write_u32_le",-1],["codec.write_u32_le","c"]]]}

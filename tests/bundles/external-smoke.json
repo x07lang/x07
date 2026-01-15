@@ -1,0 +1,19 @@
+{
+  "bundle_id": "external-smoke@0.1.0",
+  "description": "Smoke tests for pure external packages (error, url, toml, ini, csv, json, yaml).",
+  "pre_score_canaries": [],
+  "score_suites": [],
+  "test_manifests": [
+    "packages/ext/x07-ext-error/0.1.0/tests/tests.json",
+    "packages/ext/x07-ext-url-rs/0.1.0/tests/tests.json",
+    "packages/ext/x07-ext-toml-rs/0.1.0/tests/tests.json",
+    "packages/ext/x07-ext-ini-rs/0.1.0/tests/tests.json",
+    "packages/ext/x07-ext-csv-rs/0.1.0/tests/tests.json",
+    "packages/ext/x07-ext-json-rs/0.1.0/tests/tests.json",
+    "packages/ext/x07-ext-yaml-rs/0.1.0/tests/tests.json"
+  ],
+  "notes": {
+    "determinism_tier": "pure",
+    "expected_worlds": ["solve-pure"]
+  }
+}

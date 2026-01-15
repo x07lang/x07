@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "expected_b64": "T0s=",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "notes": ["Smoke: ext-fs v1 core ops (run-os)."],
+  "program_x07json": "tests/external_os/fs_smoke_ok/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/ext-fs@0.1.0/run-os",
+  "world": "run-os"
+}
+

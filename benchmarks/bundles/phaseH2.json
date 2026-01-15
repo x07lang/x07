@@ -1,0 +1,17 @@
+{
+  "bundle_id": "phaseH2@0.1.0",
+  "description": "Stdlib parity suite (H2) across pure and deterministic fixture worlds.",
+  "pre_score_canaries": [
+    "benchmarks/solve-full/phaseH2-smoke.json",
+    "benchmarks/solve-pure/emitters-v1-suite.json"
+  ],
+  "score_suites": [
+    "benchmarks/solve-pure/phaseH2-suite.json",
+    "benchmarks/solve-pure/phaseH2-collections-suite.json",
+    "benchmarks/solve-fs/phaseH2-suite.json",
+    "benchmarks/solve-rr/phaseH2-suite.json",
+    "benchmarks/solve-kv/phaseH2-suite.json",
+    "benchmarks/solve-full/phaseH2-suite.json"
+  ],
+  "debug_suites": []
+}

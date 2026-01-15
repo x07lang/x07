@@ -1,0 +1,10 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "appkit",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": [
+    "appkit.vec"
+  ]
+}
+

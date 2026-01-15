@@ -1,0 +1,38 @@
+name: Policy
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  governance:
+    name: policy / governance-files-present
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check governance files
+        run: python3 scripts/check_governance_files.py
+
+  trademarks:
+    name: policy / trademark-policy-present
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check trademark policy
+        run: test -f TRADEMARKS.md
+
+  release-docs:
+    name: policy / release-docs-present
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check release docs
+        run: |
+          set -euo pipefail
+          test -f docs/releases.md
+          test -f docs/versioning.md
+          test -f docs/stability.md
+

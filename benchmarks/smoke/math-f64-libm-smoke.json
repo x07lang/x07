@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "expected_b64": "T0s=",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "notes": [
+    "Requires native math backend builtins: math.f64.{sqrt,sin,cos,exp,log}_v1"
+  ],
+  "program_x07json": "tests/external_os/math_f64_libm_smoke/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/math-f64-libm@0.1.0",
+  "world": "run-os"
+}

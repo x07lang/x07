@@ -1,0 +1,18 @@
+[package]
+name = "x07import-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+syn = { version = "2", features = ["full", "parsing", "extra-traits"] }
+x07-contracts = { path = "../x07-contracts" }
+
+[dev-dependencies]
+tempfile = "3"
+x07-host-runner = { path = "../x07-host-runner" }
+x07c = { path = "../x07c" }
+x07-worlds = { path = "../x07-worlds" }

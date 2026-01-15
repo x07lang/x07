@@ -1,0 +1,13 @@
+{
+  "cases": [
+    {
+      "expected_b64": "T0s=",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "program_x07json": "tests/external_pure/math_f64_api_smoke/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/math-f64-api@0.1.0",
+  "world": "solve-pure"
+}

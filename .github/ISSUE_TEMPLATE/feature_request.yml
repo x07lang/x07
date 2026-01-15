@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a new feature or a change to existing behavior.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What should be added or changed?
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this needed? What problem does it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What alternatives did you consider?
+    validations:
+      required: false
+  - type: checkboxes
+    id: rfc
+    attributes:
+      label: RFC requirement
+      options:
+        - label: This change likely requires an RFC (see governance/RFC-REQUIREMENTS.md).
+          required: false
+

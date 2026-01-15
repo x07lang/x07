@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07diag.schema.json",
+  "title": "X07 x07Diag v0.1.0",
+  "description": "Deterministic diagnostics format for X07 parsing, linting, compilation, and runtime gates. Designed for LLM repair loops (x07AST + JSON Patch).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "diagnostics"],
+  "properties": {
+    "schema_version": { "const": "x07.x07diag@0.1.0" },
+    "ok": { "type": "boolean", "default": true },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" },
+      "default": []
+    },
+    "meta": { "type": "object", "additionalProperties": true, "default": {} }
+  },
+  "$defs": {
+    "severity": {
+      "type": "string",
+      "enum": ["error", "warning", "info", "hint"]
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "parse",
+        "lint",
+        "rewrite",
+        "type",
+        "lower",
+        "codegen",
+        "link",
+        "run"
+      ]
+    },
+    "json_pointer": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 2048,
+      "description": "JSON Pointer (RFC 6901) to a node in x07AST. Empty string means the whole document."
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["line", "col"],
+      "properties": {
+        "line": { "type": "integer", "minimum": 1 },
+        "col": { "type": "integer", "minimum": 1 },
+        "offset": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "file": { "type": "string" },
+        "start": { "$ref": "#/$defs/position" },
+        "end": { "$ref": "#/$defs/position" }
+      }
+    },
+    "loc_x07ast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ptr"],
+      "properties": {
+        "kind": { "const": "x07ast" },
+        "ptr": { "$ref": "#/$defs/json_pointer" }
+      }
+    },
+    "loc_text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "span"],
+      "properties": {
+        "kind": { "const": "text" },
+        "span": { "$ref": "#/$defs/span" },
+        "snippet": { "type": "string", "maxLength": 2048 }
+      }
+    },
+    "location": {
+      "oneOf": [
+        { "$ref": "#/$defs/loc_x07ast" },
+        { "$ref": "#/$defs/loc_text" }
+      ]
+    },
+    "patch_op": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "path", "value"],
+          "properties": {
+            "op": { "const": "add" },
+            "path": { "$ref": "#/$defs/json_pointer" },
+            "value": {}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "path"],
+          "properties": {
+            "op": { "const": "remove" },
+            "path": { "$ref": "#/$defs/json_pointer" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "path", "value"],
+          "properties": {
+            "op": { "const": "replace" },
+            "path": { "$ref": "#/$defs/json_pointer" },
+            "value": {}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "path", "from"],
+          "properties": {
+            "op": { "const": "move" },
+            "path": { "$ref": "#/$defs/json_pointer" },
+            "from": { "$ref": "#/$defs/json_pointer" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "path", "from"],
+          "properties": {
+            "op": { "const": "copy" },
+            "path": { "$ref": "#/$defs/json_pointer" },
+            "from": { "$ref": "#/$defs/json_pointer" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "path", "value"],
+          "properties": {
+            "op": { "const": "test" },
+            "path": { "$ref": "#/$defs/json_pointer" },
+            "value": {}
+          }
+        }
+      ],
+      "description": "Single JSON Patch operation object (RFC 6902)."
+    },
+    "json_patch": { "type": "array", "items": { "$ref": "#/$defs/patch_op" } },
+    "quickfix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "patch"],
+      "properties": {
+        "kind": { "const": "json_patch" },
+        "patch": { "$ref": "#/$defs/json_patch" },
+        "note": { "type": "string", "maxLength": 512 }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "stage", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Z][A-Z0-9_-]*$"
+        },
+        "severity": { "$ref": "#/$defs/severity" },
+        "stage": { "$ref": "#/$defs/stage" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "loc": { "$ref": "#/$defs/location" },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        },
+        "related": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/location" },
+          "default": []
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        },
+        "quickfix": { "$ref": "#/$defs/quickfix" }
+      }
+    }
+  }
+}

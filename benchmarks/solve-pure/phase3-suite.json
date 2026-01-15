@@ -1,0 +1,34 @@
+{
+  "suite_id": "phase3-solve-pure@0.1.0",
+  "world": "solve-pure",
+  "tasks": [
+    {
+      "task_id": "echo",
+      "description": "Return the input bytes unchanged.",
+      "cases": [
+        { "input_b64": "", "expected_b64": "" },
+        { "input_b64": "YWJj", "expected_b64": "YWJj" },
+        { "input_b64": "AAEC", "expected_b64": "AAEC" }
+      ]
+    },
+    {
+      "task_id": "reverse3",
+      "description": "Input is always 3 bytes. Reverse the three bytes and return them.",
+      "cases": [
+        { "input_b64": "AQID", "expected_b64": "AwIB" },
+        { "input_b64": "BQD/", "expected_b64": "/wAF" },
+        { "input_b64": "AAAA", "expected_b64": "AAAA" }
+      ]
+    },
+    {
+      "task_id": "sort3",
+      "description": "Input is always 3 bytes. Sort the three bytes in ascending order and return them.",
+      "cases": [
+        { "input_b64": "AwEC", "expected_b64": "AQID" },
+        { "input_b64": "AgIB", "expected_b64": "AQIC" },
+        { "input_b64": "/wCA", "expected_b64": "AID/" }
+      ]
+    }
+  ]
+}
+

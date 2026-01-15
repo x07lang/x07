@@ -1,0 +1,2 @@
+# Enforce LF checkouts so x07import source_sha256 stays stable across platforms.
+* text=auto eol=lf

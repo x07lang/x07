@@ -1,0 +1,89 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.compress/inflate_raw_ok",
+      "world": "solve-pure",
+      "entry": "ext.compress.tests.test_inflate_raw_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.compress/zlib_ok",
+      "world": "solve-pure",
+      "entry": "ext.compress.tests.test_zlib_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.compress/gzip_ok",
+      "world": "solve-pure",
+      "entry": "ext.compress.tests.test_gzip_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.compress/err_output_limit",
+      "world": "solve-pure",
+      "entry": "ext.compress.tests.test_err_output_limit",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.compress/err_truncated",
+      "world": "solve-pure",
+      "entry": "ext.compress.tests.test_err_truncated",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.compress/err_checksum_mismatch",
+      "world": "solve-pure",
+      "entry": "ext.compress.tests.test_err_checksum_mismatch",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.zip/list_names_ok",
+      "world": "solve-pure",
+      "entry": "ext.zip.tests.test_list_names_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.zip/list_names_output_limit",
+      "world": "solve-pure",
+      "entry": "ext.zip.tests.test_list_names_output_limit",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.zip/extract_deflate_ok",
+      "world": "solve-pure",
+      "entry": "ext.zip.tests.test_extract_deflate_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.zip/extract_store_ok",
+      "world": "solve-pure",
+      "entry": "ext.zip.tests.test_extract_store_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.zip/err_not_found",
+      "world": "solve-pure",
+      "entry": "ext.zip.tests.test_err_not_found",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.zip/err_output_limit",
+      "world": "solve-pure",
+      "entry": "ext.zip.tests.test_err_output_limit",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.zip/err_checksum_mismatch",
+      "world": "solve-pure",
+      "entry": "ext.zip.tests.test_err_checksum_mismatch",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.zip/err_truncated",
+      "world": "solve-pure",
+      "entry": "ext.zip.tests.test_err_truncated",
+      "expect": "pass"
+    }
+  ]
+}

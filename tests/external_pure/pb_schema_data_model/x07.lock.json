@@ -1,0 +1,28 @@
+{
+  "schema_version": "x07.lock@0.2.0",
+  "dependencies": [
+    {
+      "name": "ext-pb-rs",
+      "version": "0.1.0",
+      "path": "pkgs/ext-pb-rs/0.1.0",
+      "package_manifest_sha256": "f1ef3c9fe1983fe8bbb74af74292183d2bc750191012beae2d75fc0c251a5884",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.pb.data_model": "82ab93fd3b72dd2dc333289606c32fc7a0bdffd3c5db72b8c8468dc49dcc07e7",
+        "ext.pb.tests": "4bc88f428a80d7fac6db66466961ac42f29a8f34ac74aad7effe93bbbce32ce9",
+        "ext.pb.wire": "f6f5fe4668a2830c03b0c417c830ccad551987fd7745973454678fe0ac0309ce"
+      }
+    },
+    {
+      "name": "ext-data-model",
+      "version": "0.1.0",
+      "path": "pkgs/ext-data-model/0.1.0",
+      "package_manifest_sha256": "f40011169979b7b700b051134a4b1fb7b2445da001b98392040019dbd9fe2ae5",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.data_model": "df50c123b2a2b5cc8c3a6581ed74b61ef89063ca23b9a793f57628d073ab71ac",
+        "ext.data_model.tests": "c8155a2c54a571763e252de9316a52022c536816d9be3063dabeef458f4444c3"
+      }
+    }
+  ]
+}

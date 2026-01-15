@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "expected_b64": "oKGworKx",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "notes": ["Smoke: ext-db sqlite pool max concurrency v1 (run-os-sandboxed)."],
+  "policy_json": "tests/external_os/db_smoke_policy/run-os-policy.db_smoke.json",
+  "program_x07json": "tests/external_os/db_pool_max_concurrency/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/ext-db@0.1.0/pool-max-concurrency/run-os-sandboxed",
+  "world": "run-os-sandboxed"
+}

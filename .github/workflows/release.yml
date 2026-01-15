@@ -1,0 +1,238 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-matrix:
+    name: release / build-matrix (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - macos-14
+          - windows-latest
+    env:
+      X07_PYTHON: python
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install deps (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+
+      - name: Install deps (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install openssl@3 pkg-config
+
+      - name: Set up MSYS2 (UCRT64, C toolchain + libs)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-curl
+            mingw-w64-ucrt-x86_64-sqlite3
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-pkgconf
+
+      - name: Add MSYS2 UCRT64 to PATH
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "${RUNNER_TEMP}\\\\msys64\\\\ucrt64\\\\bin" >> "$GITHUB_PATH"
+
+      - name: Select MSYS2 gcc for builds
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_temp_posix="${RUNNER_TEMP//\\//}"
+          gcc_path="${runner_temp_posix}/msys64/ucrt64/bin/gcc.exe"
+          if [[ ! -x "$gcc_path" ]]; then
+            echo "ERROR: expected MSYS2 gcc at: $gcc_path" >&2
+            exit 2
+          fi
+          echo "X07_CC=$gcc_path" >> "$GITHUB_ENV"
+
+      - name: CI gate
+        shell: bash
+        run: ./scripts/ci/check_all.sh
+
+      - name: Build release binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli
+
+      - name: Package binaries (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          out="dist/x07-${tag}-${{ runner.os }}.tar.gz"
+          mkdir -p dist
+          tar -czf "$out" -C target/release x07 x07c x07-host-runner x07-os-runner x07import-cli
+          echo "artifact_path=$out" >> "$GITHUB_ENV"
+
+      - name: Package binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $out = "dist/x07-$tag-Windows.zip"
+          $paths = @(
+            "target/release/x07.exe",
+            "target/release/x07c.exe",
+            "target/release/x07-host-runner.exe",
+            "target/release/x07-os-runner.exe",
+            "target/release/x07import-cli.exe"
+          )
+          Compress-Archive -Path $paths -DestinationPath $out -Force
+          "artifact_path=$out" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x07-${{ github.ref_name }}-${{ runner.os }}
+          path: ${{ env.artifact_path }}
+
+  publish:
+    name: release / publish
+    runs-on: ubuntu-latest
+    needs: build-matrix
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Build release manifest
+        run: python3 scripts/build_release_manifest.py --out dist/release-manifest.json
+
+      - name: Build skills pack
+        run: python3 scripts/build_skills_pack.py --out "dist/x07-skills-${{ github.ref_name }}.tar.gz"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/**/x07-*.tar.gz
+            dist/**/x07-*.zip
+            dist/release-manifest.json
+
+  propagate-website:
+    name: release / propagate website
+    runs-on: ubuntu-latest
+    needs: publish
+    if: ${{ secrets.X07_BOT_TOKEN != '' }}
+    steps:
+      - name: Checkout (x07)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Checkout (x07-website)
+        uses: actions/checkout@v4
+        with:
+          repository: x07lang/x07-website
+          path: x07-website
+          token: ${{ secrets.X07_BOT_TOKEN }}
+
+      - name: Update versions.json
+        working-directory: x07-website
+        run: |
+          set -euo pipefail
+          tag="${{ github.ref_name }}"
+          base="https://github.com/${{ github.repository }}/releases/download/${tag}"
+          python3 ../scripts/open_pr_website_update.py --tag "$tag" --release-base-url "$base"
+
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.X07_BOT_TOKEN }}
+          path: x07-website
+          branch: bot/release-${{ github.ref_name }}
+          commit-message: release: website versions for ${{ github.ref_name }}
+          title: release: website versions for ${{ github.ref_name }}
+          body: Automated update from x07 release ${{ github.ref_name }}.
+
+  propagate-index:
+    name: release / propagate index
+    runs-on: ubuntu-latest
+    needs: publish
+    if: ${{ secrets.X07_BOT_TOKEN != '' }}
+    steps:
+      - name: Checkout (x07)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Checkout (x07-index)
+        uses: actions/checkout@v4
+        with:
+          repository: x07lang/x07-index
+          path: x07-index
+          token: ${{ secrets.X07_BOT_TOKEN }}
+
+      - name: Update index/config.json (canonicalize)
+        working-directory: x07-index
+        run: python3 ../scripts/open_pr_index_update.py
+
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.X07_BOT_TOKEN }}
+          path: x07-index
+          branch: bot/release-${{ github.ref_name }}
+          commit-message: release: index config update for ${{ github.ref_name }}
+          title: release: index config update for ${{ github.ref_name }}
+          body: Automated update from x07 release ${{ github.ref_name }}.

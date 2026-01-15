@@ -1,0 +1,20 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "stdlib-os",
+  "version": "0.2.0",
+  "module_root": "modules",
+  "modules": [
+    "std.world.fs",
+    "std.world.env",
+    "std.world.time",
+    "std.world.process",
+    "std.world.net",
+    "std.os.env",
+    "std.os.time",
+    "std.os.process",
+    "std.os.process.req_v1",
+    "std.os.process.caps_v1",
+    "std.os.process_pool",
+    "std.os.net"
+  ]
+}

@@ -1,0 +1,1 @@
+{"decls":[],"imports":["std.fs","std.io","std.kv"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.1.0","solve":["begin",["let","b",["std.fs.read","input"]],["let","key",["view.to_bytes","input"]],["std.kv.set","key","b"],["std.kv.get","input"]]}

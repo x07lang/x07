@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "expected_b64": "T0s=",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "notes": ["Smoke: ext-fs v1 policy deny basics (run-os-sandboxed)."],
+  "policy_json": "tests/external_os/fs_policy_deny_smoke/run-os-policy.fs_policy_deny_smoke.json",
+  "program_x07json": "tests/external_os/fs_policy_deny_smoke/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/ext-fs@0.1.0/run-os-sandboxed-policy-deny",
+  "world": "run-os-sandboxed"
+}
+

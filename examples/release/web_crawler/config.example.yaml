@@ -1,0 +1,11 @@
+base_url: "https://example.com"
+max_depth: 1
+output_path: "target/web_crawler/urls.txt"
+
+# Optional tuning
+max_pages: 200
+max_concurrency: 8
+timeout_s: 10
+max_redirects: 5
+max_body_bytes: 262144
+max_links_per_page: 200

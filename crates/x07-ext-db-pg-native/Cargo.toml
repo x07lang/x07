@@ -1,0 +1,21 @@
+[package]
+name = "x07-ext-db-pg-native"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+name = "x07_ext_db_pg"
+crate-type = ["staticlib"]
+test = false
+doctest = false
+
+[dependencies]
+x07-ext-db-native-core = { path = "../x07-ext-db-native-core" }
+futures-util = "0.3.30"
+itoa = "1.0.11"
+once_cell = "1.19.0"
+ryu = "1.0.17"
+rustls-tokio-postgres = { version = "0.1.2", default-features = false, features = ["webpki-roots"] }
+tokio = { version = "1.37.0", features = ["rt", "time", "net"] }
+tokio-postgres = "0.7.15"

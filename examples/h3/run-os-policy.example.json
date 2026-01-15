@@ -1,0 +1,51 @@
+{
+  "schema_version": "x07.run-os-policy@0.1.0",
+  "policy_id": "example_readonly",
+  "limits": {
+    "cpu_ms": 5000,
+    "wall_ms": 6000,
+    "mem_bytes": 67108864,
+    "fds": 64,
+    "procs": 16
+  },
+  "fs": {
+    "enabled": true,
+    "read_roots": [
+      "./"
+    ],
+    "write_roots": [],
+    "deny_hidden": true
+  },
+  "net": {
+    "enabled": false,
+    "allow_dns": false,
+    "allow_tcp": false,
+    "allow_udp": false,
+    "allow_hosts": []
+  },
+  "env": {
+    "enabled": false,
+    "allow_keys": [],
+    "deny_keys": []
+  },
+  "time": {
+    "enabled": false,
+    "allow_monotonic": false,
+    "allow_wall_clock": false,
+    "allow_sleep": false,
+    "max_sleep_ms": 0,
+    "allow_local_tzid": false
+  },
+  "language": {
+    "allow_unsafe": false,
+    "allow_ffi": false
+  },
+  "process": {
+    "enabled": false,
+    "allow_spawn": false,
+    "max_live": 0,
+    "max_spawns": 0,
+    "allow_exec": false,
+    "allow_exit": false
+  }
+}

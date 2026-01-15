@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-db-postgres",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": ["std.db.pg", "std.db.pg.spec", "std.db.pg.pool"],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
+    "import_mode": "handwritten"
+  }
+}

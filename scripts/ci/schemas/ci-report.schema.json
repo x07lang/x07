@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "x07 ci report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "profile",
+    "timestamp",
+    "git_sha",
+    "ok",
+    "exit_code",
+    "artifacts_dir",
+    "jobs_dir",
+    "logs_dir",
+    "summary_path",
+    "jobs"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "run_id": { "type": "string" },
+    "profile": { "type": "string", "enum": ["dev", "pr", "nightly", "release"] },
+    "timestamp": { "type": "string" },
+    "git_sha": { "type": "string" },
+    "ok": { "type": "boolean" },
+    "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "artifacts_dir": { "type": "string" },
+    "jobs_dir": { "type": "string" },
+    "logs_dir": { "type": "string" },
+    "summary_path": { "type": "string" },
+    "jobs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "status",
+          "exit_code",
+          "duration_ms",
+          "cmd",
+          "log_path",
+          "job_report_path"
+        ],
+        "properties": {
+          "name": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pass", "fail", "infra", "nondeterminism", "contract"]
+          },
+          "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+          "duration_ms": { "type": "integer", "minimum": 0 },
+          "cmd": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          },
+          "log_path": { "type": "string" },
+          "job_report_path": { "type": "string" }
+        }
+      }
+    }
+  }
+}

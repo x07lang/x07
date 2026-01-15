@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "expected_b64": "T0s=",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "notes": ["Smoke: ext-db postgres v1 query+exec (run-os-sandboxed)."],
+  "policy_json": "tests/external_os/db_smoke_policy/run-os-policy.db_pg_smoke.json",
+  "program_x07json": "tests/external_os/db_pg_smoke_ok/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/ext-db@0.1.0/pg/run-os-sandboxed",
+  "world": "run-os-sandboxed"
+}

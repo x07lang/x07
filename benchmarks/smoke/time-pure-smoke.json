@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "expected_b64": "T0s=",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "notes": [
+    "Smoke: ext.time.{duration,rfc3339,civil} deterministic stack."
+  ],
+  "program_x07json": "tests/external_pure/time_smoke/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/ext-time@0.1.0/pure",
+  "world": "solve-pure"
+}

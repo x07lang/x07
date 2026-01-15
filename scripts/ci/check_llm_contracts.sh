@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root() {
+  cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd
+}
+
+root="$(repo_root)"
+cd "$root"
+
+./scripts/ci/check_tools.sh >/dev/null
+
+python_bin="${X07_PYTHON:-}"
+if [[ -z "${python_bin}" ]]; then
+  if [[ -x ".venv/bin/python" ]]; then
+    python_bin=".venv/bin/python"
+  else
+    python_bin="python3"
+  fi
+fi
+
+x07c_bin="${X07C_BIN:-}"
+if [[ -z "${x07c_bin}" ]]; then
+  x07c_bin="$(./scripts/ci/find_x07c.sh)"
+fi
+
+"$python_bin" - <<'PY'
+import json
+from pathlib import Path
+
+root = Path.cwd()
+
+schemas = [
+    root / "spec" / "x07ast.schema.json",
+    root / "spec" / "x07diag.schema.json",
+    root / "spec" / "x07patch.schema.json",
+    root / "spec" / "x07test.schema.json",
+]
+
+for p in schemas:
+    data = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit(f"schema must be a JSON object: {p}")
+
+print("ok: schemas parse")
+PY
+
+tmp_dir="$(mktemp -t x07_contracts_XXXXXX -d)"
+cleanup() { rm -rf "$tmp_dir"; }
+trap cleanup EXIT
+
+program="$tmp_dir/program.x07.json"
+patch="$tmp_dir/patch.json"
+
+cat >"$program" <<'JSON'
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "entry",
+  "module_id": "main",
+  "imports": [],
+  "decls": [],
+  "solve": ["bytes.alloc", 0]
+}
+JSON
+
+cat >"$patch" <<'JSON'
+[
+  {"op":"add","path":"/imports/-","value":"std.bytes"}
+]
+JSON
+
+"$x07c_bin" fmt --input "$program" --write >/dev/null
+"$x07c_bin" fmt --input "$program" --check >/dev/null
+"$x07c_bin" lint --input "$program" --world solve-pure >/dev/null
+"$x07c_bin" apply-patch --program "$program" --patch "$patch" --out "$program" >/dev/null
+"$x07c_bin" fmt --input "$program" --check >/dev/null
+"$x07c_bin" lint --input "$program" --world solve-pure >/dev/null
+
+echo "ok: llm contracts"

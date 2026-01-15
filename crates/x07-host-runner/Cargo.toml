@@ -1,0 +1,17 @@
+[package]
+name = "x07-host-runner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+clap = { version = "4", features = ["derive"] }
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+x07-contracts = { path = "../x07-contracts" }
+x07c = { path = "../x07c" }
+x07-worlds = { path = "../x07-worlds" }

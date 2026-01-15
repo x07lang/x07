@@ -1,0 +1,78 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Cargo home (local registry cache)
+/.cargo-home/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.eggs/
+
+# IDE and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment and secrets
+.env
+.env.local
+
+artifacts/*
+tmp/
+
+# OS helper binaries (built by scripts/build_os_helpers.sh)
+/deps/x07/x07-proc-echo
+/deps/x07/x07-proc-echo.exe
+/deps/x07/x07-proc-worker-frame-echo
+/deps/x07/x07-proc-worker-frame-echo.exe
+
+# Native math backend artifacts (built by scripts/build_ext_math.sh)
+/deps/x07/libx07_math.a
+/deps/x07/x07_math.lib
+/deps/x07/include/x07_math_abi_v1.h
+
+# Native time backend artifacts (built by scripts/build_ext_time.sh)
+/deps/x07/libx07_time.a
+/deps/x07/x07_time.lib
+/deps/x07/include/x07_time_abi_v1.h
+
+# Native ext-fs backend artifacts (built by scripts/build_ext_fs.sh)
+/deps/x07/libx07_ext_fs.a
+/deps/x07/x07_ext_fs.lib
+/deps/x07/include/x07_ext_fs_abi_v1.h
+
+# Native ext-regex backend artifacts (built by scripts/build_ext_regex.sh)
+/deps/x07/libx07_ext_regex.a
+/deps/x07/x07_ext_regex.lib
+/deps/x07/include/x07_ext_regex_abi_v1.h
+
+# Native ext-db-sqlite backend artifacts (built by scripts/build_ext_db_sqlite.sh)
+/deps/x07/libx07_ext_db_sqlite.a
+/deps/x07/x07_ext_db_sqlite.lib
+/deps/x07/include/x07_ext_db_sqlite_abi_v1.h
+
+# Native ext-db-pg backend artifacts (built by scripts/build_ext_db_pg.sh)
+/deps/x07/libx07_ext_db_pg.a
+/deps/x07/x07_ext_db_pg.lib
+/deps/x07/include/x07_ext_db_pg_abi_v1.h
+
+# Native ext-db-mysql backend artifacts (built by scripts/build_ext_db_mysql.sh)
+/deps/x07/libx07_ext_db_mysql.a
+/deps/x07/x07_ext_db_mysql.lib
+/deps/x07/include/x07_ext_db_mysql_abi_v1.h
+
+# Native ext-db-redis backend artifacts (built by scripts/build_ext_db_redis.sh)
+/deps/x07/libx07_ext_db_redis.a
+/deps/x07/x07_ext_db_redis.lib
+/deps/x07/include/x07_ext_db_redis_abi_v1.h
+perf-compare/rust_cargo/regex_replace/target/

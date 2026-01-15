@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.lock@0.2.0",
+  "dependencies": [
+    {
+      "name": "appkit",
+      "version": "0.1.0",
+      "path": "pkgs/appkit/0.1.0",
+      "package_manifest_sha256": "79b036de3a21f691a147302587e7ad771d3e2e68a2c33fe215739d943a74a64f",
+      "module_root": "modules",
+      "modules_sha256": {
+        "appkit.vec": "1d0c88e75ade916f012cfb5964d735c0cc5291fe2432c74888d2a035a9e88dab"
+      }
+    }
+  ]
+}

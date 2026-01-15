@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "std",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": [
+    "std.vec",
+    "std.slice",
+    "std.bytes",
+    "std.codec",
+    "std.parse",
+    "std.fmt",
+    "std.prng",
+    "std.text.ascii",
+    "std.text.utf8",
+    "std.regex-lite",
+    "std.json",
+    "std.csv",
+    "std.map",
+    "std.set",
+    "std.result",
+    "std.option",
+    "std.fs",
+    "std.rr",
+    "std.kv"
+  ]
+}

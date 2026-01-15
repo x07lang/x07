@@ -1,0 +1,64 @@
+{
+  "schema_version": "x07.lock@0.2.0",
+  "dependencies": [
+    {
+      "name": "ext-compress-rs",
+      "version": "0.1.0",
+      "path": "pkgs/ext-compress-rs/0.1.0",
+      "package_manifest_sha256": "b3fb9aee546001577343e8cf94bf35e36a62bc509abde8c4db7e08d0a3a49f12",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.compress": "333173d99ba9aa5b9374766705e5979fa930195d5d2f6dffb864f300312cf952",
+        "ext.compress.tests": "0e6b778f745659ab6ccdf3ed42f6558619a717268c0788b067d8ce5702ee29da",
+        "ext.zip": "11d76ba87761076dc754932066467f2f151f6bc5c8dc587870c3f1071943549d",
+        "ext.zip.tests": "009246742484ba4e38c4f093fb471c21f0a2926e7d461ef0f65fd096150e9e93"
+      }
+    },
+    {
+      "name": "ext-tar-rs",
+      "version": "0.1.0",
+      "path": "pkgs/ext-tar-rs/0.1.0",
+      "package_manifest_sha256": "7e650a50e92bcfae6806d501498151b5bc51a1976f0a623b8ad99d9c3ff9eef9",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.tar": "02c6d6f7a33b02771b0681502fd7cec8d8a757967fdf69a61db4c4a11bbfd91f",
+        "ext.tar.tests": "f61a64efcf6db261a470737c372c080bb95b93a421103ef07f86dd8429d5b9b8"
+      }
+    },
+    {
+      "name": "ext-crypto-rs",
+      "version": "0.1.0",
+      "path": "pkgs/ext-crypto-rs/0.1.0",
+      "package_manifest_sha256": "e846d0262298dc2a79025d543ea04c40c3c49823a9578fcbb0c0672ea1638005",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.crypto": "304f48630a8fd87851670194661ddfd90e181067513a6cdbec3672ce2dc934c4",
+        "ext.crypto.tests": "7cee062ebdb028e6cd019fd3f9f7cc3b1bfe8dd5d5faf158eb3bc224feb224b1"
+      }
+    },
+    {
+      "name": "ext-hex-rs",
+      "version": "0.1.0",
+      "path": "pkgs/ext-hex-rs/0.1.0",
+      "package_manifest_sha256": "dd4e802cc911a3994ec33076a546708a0abb6a4efe26ef18ef1e15b11a37b52b",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.hex": "919533f26bba9b13bea09de8cecf693bf7232a6141acc965ded636e1d395ac92",
+        "ext.hex.tests": "5c56cee7c0b90aff0d5308ec40534685628e695672a85d29a7e09d2c63519fbe"
+      }
+    },
+    {
+      "name": "ext-json-rs",
+      "version": "0.1.0",
+      "path": "pkgs/ext-json-rs/0.1.0",
+      "package_manifest_sha256": "9794e4ded28899bf6abf865decf68d86b573ef5a65cbf36a697f9d3ea7e63caa",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.json.canon": "495410e490db935b6397806d55e15831c92ecda24ea44de5ecd60ccad001fecc",
+        "ext.json.data_model": "bbc405e76e096df6d1e3619db09223066a46e33fd5afbf2508bbaae800323d89",
+        "ext.json.pointer": "5d62c8f3cc565de82e903a57de15773670572cf8cfaf8e6587b4f274be39d1ee",
+        "ext.json.tests": "c56869e1958182d0b58ea8d71313a503271945b9221c590cf0ae2e3c96027aa2"
+      }
+    }
+  ]
+}

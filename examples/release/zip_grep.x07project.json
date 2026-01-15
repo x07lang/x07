@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "zip_grep/src/main.x07.json",
+  "module_roots": ["zip_grep/src"],
+  "dependencies": [
+    { "name": "ext-compress-rs", "version": "0.1.0", "path": "pkgs/ext-compress-rs/0.1.0" },
+    { "name": "ext-crypto-rs", "version": "0.1.0", "path": "pkgs/ext-crypto-rs/0.1.0" },
+    { "name": "ext-hex-rs", "version": "0.1.0", "path": "pkgs/ext-hex-rs/0.1.0" }
+  ],
+  "lockfile": "zip_grep.lock.json"
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-zlib-c",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": [
+    "ext.zlib._ffi",
+    "ext.zlib"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
+    "import_mode": "ffi",
+    "ffi_libs": ["z"],
+    "capabilities": ["ffi", "unsafe"]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "default_latency_ticks": 0,
+  "entries": [
+    {
+      "key_b64": "VTc=",
+      "latency_ticks": 25,
+      "value_b64": "eyJpZCI6NywibmFtZSI6ImFsaWNlIiwic2NvcmUiOjEwfQ=="
+    },
+    {
+      "key_b64": "VTQy",
+      "latency_ticks": 25,
+      "value_b64": "eyJpZCI6NDIsIm5hbWUiOiJib2IiLCJzY29yZSI6MjB9"
+    },
+    {
+      "key_b64": "UElORw==",
+      "latency_ticks": 5,
+      "value_b64": "UE9ORw=="
+    },
+    {
+      "key_b64": "QQ==",
+      "latency_ticks": 25,
+      "value_b64": "eyJpZCI6NywibmFtZSI6ImFsaWNlIiwic2NvcmUiOjEwfQ=="
+    },
+    {
+      "key_b64": "Qg==",
+      "latency_ticks": 25,
+      "value_b64": "eyJpZCI6NDIsIm5hbWUiOiJib2IiLCJzY29yZSI6MjB9"
+    },
+    {
+      "key_b64": "Qw==",
+      "latency_ticks": 5,
+      "value_b64": "UE9ORw=="
+    }
+  ],
+  "format": "x07.kv.seed@0.1.0"
+}

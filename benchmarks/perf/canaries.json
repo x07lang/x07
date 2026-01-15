@@ -1,0 +1,268 @@
+{
+  "schema_version": "x07.perf_baseline@0.1.0",
+  "suites": {
+    "benchmarks/solve-full/phaseH2-smoke.json": {
+      "tasks": {
+        "full/cache_rr_bodies_in_kv_concat": {
+          "c_source_size": 128348,
+          "cases": [
+            {
+              "fuel_used": 300,
+              "heap_used": 3045,
+              "name": "AABA"
+            }
+          ],
+          "compile_fuel_used": 49943
+        },
+        "full/mini_app_report_v1": {
+          "c_source_size": 595958,
+          "cases": [
+            {
+              "fuel_used": 25625,
+              "heap_used": 4234,
+              "name": "full_app"
+            }
+          ],
+          "compile_fuel_used": 1419413
+        }
+      }
+    },
+    "benchmarks/solve-pure/emitters-v1-suite.json": {
+      "tasks": {
+        "pure/emitters_btree_map_emit_kv_u32le_u32le_sorted_by_key": {
+          "c_source_size": 137954,
+          "cases": [
+            {
+              "fuel_used": 880,
+              "heap_used": 76,
+              "name": "orderA"
+            },
+            {
+              "fuel_used": 902,
+              "heap_used": 76,
+              "name": "orderB"
+            },
+            {
+              "fuel_used": 1015,
+              "heap_used": 100,
+              "name": "last_wins"
+            }
+          ],
+          "compile_fuel_used": 98175
+        },
+        "pure/emitters_btree_set_emit_u32le_sorted_unique": {
+          "c_source_size": 126682,
+          "cases": [
+            {
+              "fuel_used": 1130,
+              "heap_used": 60,
+              "name": "dup_unsorted"
+            },
+            {
+              "fuel_used": 1128,
+              "heap_used": 60,
+              "name": "mix2"
+            }
+          ],
+          "compile_fuel_used": 73791
+        },
+        "pure/emitters_deque_rotate_left_u32le": {
+          "c_source_size": 141527,
+          "cases": [
+            {
+              "fuel_used": 1311,
+              "heap_used": 64,
+              "name": "k1_4"
+            },
+            {
+              "fuel_used": 2108,
+              "heap_used": 76,
+              "name": "k3_5"
+            },
+            {
+              "fuel_used": 614,
+              "heap_used": 40,
+              "name": "k0_2"
+            }
+          ],
+          "compile_fuel_used": 95161
+        },
+        "pure/emitters_hash_map_emit_kv_u32le_u32le_sorted_by_key": {
+          "c_source_size": 145782,
+          "cases": [
+            {
+              "fuel_used": 1047,
+              "heap_used": 256,
+              "name": "orderA"
+            },
+            {
+              "fuel_used": 1047,
+              "heap_used": 256,
+              "name": "orderB"
+            },
+            {
+              "fuel_used": 1072,
+              "heap_used": 264,
+              "name": "last_wins"
+            }
+          ],
+          "compile_fuel_used": 107695
+        },
+        "pure/emitters_hash_set_emit_u32le_sorted_unique": {
+          "c_source_size": 172200,
+          "cases": [
+            {
+              "fuel_used": 1175,
+              "heap_used": 296,
+              "name": "perm1"
+            },
+            {
+              "fuel_used": 1175,
+              "heap_used": 296,
+              "name": "perm2"
+            },
+            {
+              "fuel_used": 1201,
+              "heap_used": 424,
+              "name": "mix"
+            }
+          ],
+          "compile_fuel_used": 186568
+        },
+        "pure/emitters_heap_emit_u32le_sorted": {
+          "c_source_size": 145258,
+          "cases": [
+            {
+              "fuel_used": 3153,
+              "heap_used": 80,
+              "name": "perm4"
+            },
+            {
+              "fuel_used": 3153,
+              "heap_used": 80,
+              "name": "dups"
+            },
+            {
+              "fuel_used": 3069,
+              "heap_used": 80,
+              "name": "perm_dups"
+            }
+          ],
+          "compile_fuel_used": 111492
+        }
+      }
+    },
+    "benchmarks/solve-pure/phaseH1-smoke.json": {
+      "tasks": {
+        "canary/std_json_canonicalize_small": {
+          "c_source_size": 305320,
+          "cases": [
+            {
+              "fuel_used": 1222,
+              "heap_used": 128,
+              "name": "obj_sort1"
+            },
+            {
+              "fuel_used": 1362,
+              "heap_used": 144,
+              "name": "ws_obj_sort1"
+            }
+          ],
+          "compile_fuel_used": 714554
+        },
+        "canary/std_prng_x07rand32_v1_stream": {
+          "c_source_size": 123857,
+          "cases": [
+            {
+              "fuel_used": 1115,
+              "heap_used": 44,
+              "name": "seed1"
+            }
+          ],
+          "compile_fuel_used": 85141
+        },
+        "smoke/box_select_reverse": {
+          "c_source_size": 107076,
+          "cases": [
+            {
+              "fuel_used": 29,
+              "heap_used": 10,
+              "name": "mode0_abc"
+            },
+            {
+              "fuel_used": 71,
+              "heap_used": 13,
+              "name": "mode1_abc"
+            }
+          ],
+          "compile_fuel_used": 17101
+        },
+        "smoke/echo": {
+          "c_source_size": 101315,
+          "cases": [
+            {
+              "fuel_used": 11,
+              "heap_used": 8,
+              "name": "misc"
+            }
+          ],
+          "compile_fuel_used": 1669
+        },
+        "smoke/interface_dispatch_checksum_u8": {
+          "c_source_size": 104129,
+          "cases": [
+            {
+              "fuel_used": 58,
+              "heap_used": 5,
+              "name": "sum_123"
+            },
+            {
+              "fuel_used": 58,
+              "heap_used": 5,
+              "name": "xor_123"
+            }
+          ],
+          "compile_fuel_used": 10932
+        },
+        "smoke/result_try_gate": {
+          "c_source_size": 104721,
+          "cases": [
+            {
+              "fuel_used": 36,
+              "heap_used": 5,
+              "name": "flag0_ok"
+            },
+            {
+              "fuel_used": 29,
+              "heap_used": 3,
+              "name": "flag1_err"
+            }
+          ],
+          "compile_fuel_used": 6071
+        },
+        "smoke/vec_dup4": {
+          "c_source_size": 102378,
+          "cases": [
+            {
+              "fuel_used": 21,
+              "heap_used": 10,
+              "name": "ab"
+            }
+          ],
+          "compile_fuel_used": 3400
+        },
+        "smoke/view_extract_window": {
+          "c_source_size": 105454,
+          "cases": [
+            {
+              "fuel_used": 48,
+              "heap_used": 17,
+              "name": "2_3_abcdef"
+            }
+          ],
+          "compile_fuel_used": 14378
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "expected_b64": "T0s=",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "notes": [
+    "Smoke: ext.time.os now/sleep basic shape checks."
+  ],
+  "program_x07json": "tests/external_os/time_os_smoke/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/ext-time@0.1.0/run-os",
+  "world": "run-os"
+}

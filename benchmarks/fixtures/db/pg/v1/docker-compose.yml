@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  pg:
+    image: postgres:16.1
+    environment:
+      POSTGRES_USER: x07
+      POSTGRES_PASSWORD: x07
+      POSTGRES_DB: x07
+    ports:
+      - "5432:5432"

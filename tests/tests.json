@@ -1,0 +1,24 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "smoke/pure_i32_eq",
+      "world": "solve-pure",
+      "entry": "smoke_pure.pure_i32_eq",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/pure_xfail_demo",
+      "world": "solve-pure",
+      "entry": "smoke_pure.pure_xfail_demo",
+      "expect": "fail"
+    },
+    {
+      "id": "smoke/fs_read_hello",
+      "world": "solve-fs",
+      "entry": "smoke_fs.fs_read_hello",
+      "fixture_root": "fixtures/fs_smoke/root",
+      "expect": "pass"
+    }
+  ]
+}

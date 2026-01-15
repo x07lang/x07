@@ -1,0 +1,589 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "x07.run-os-policy@0.1.0",
+  "title": "X07 run-os-sandboxed policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "limits",
+    "fs",
+    "net",
+    "env",
+    "time",
+    "process"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "x07.run-os-policy@0.1.0"
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_.-]{1,64}$"
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cpu_ms",
+        "wall_ms",
+        "mem_bytes",
+        "fds",
+        "procs"
+      ],
+      "properties": {
+        "cpu_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600000
+        },
+        "wall_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600000
+        },
+        "mem_bytes": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 17179869184
+        },
+        "fds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "procs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "core_dumps": {
+          "type": "boolean"
+        }
+      }
+    },
+    "fs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "read_roots",
+        "write_roots",
+        "deny_hidden"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "read_roots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "maxItems": 128
+        },
+        "write_roots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "maxItems": 128
+        },
+        "deny_hidden": {
+          "type": "boolean"
+        },
+        "allow_symlinks": {
+          "type": "boolean"
+        },
+        "allow_mkdir": {
+          "type": "boolean"
+        },
+        "allow_remove": {
+          "type": "boolean"
+        },
+        "allow_rename": {
+          "type": "boolean"
+        },
+        "allow_walk": {
+          "type": "boolean"
+        },
+        "allow_glob": {
+          "type": "boolean"
+        },
+        "max_read_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "max_write_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "max_entries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "net": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "allow_dns",
+        "allow_tcp",
+        "allow_udp",
+        "allow_hosts"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow_dns": {
+          "type": "boolean"
+        },
+        "allow_tcp": {
+          "type": "boolean"
+        },
+        "allow_udp": {
+          "type": "boolean"
+        },
+        "allow_hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "host",
+              "ports"
+            ],
+            "properties": {
+              "host": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^[^;\\s]+$"
+              },
+              "ports": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "maxItems": 64
+              }
+            }
+          },
+          "maxItems": 256
+        }
+      }
+    },
+    "db": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "drivers"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "drivers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sqlite", "postgres", "mysql"],
+          "properties": {
+            "sqlite": {
+              "type": "boolean"
+            },
+            "postgres": {
+              "type": "boolean"
+            },
+            "mysql": {
+              "type": "boolean"
+            },
+            "redis": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "max_live_conns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024,
+          "default": 8
+        },
+        "max_queries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000,
+          "default": 1000
+        },
+        "connect_timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600000,
+          "default": 5000
+        },
+        "query_timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600000,
+          "default": 30000
+        },
+        "max_sql_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10485760,
+          "default": 1048576
+        },
+        "max_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000,
+          "default": 10000
+        },
+        "max_resp_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 134217728,
+          "default": 8388608
+        },
+        "sqlite": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow_paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "maxItems": 256,
+              "default": []
+            },
+            "readonly_only": {
+              "type": "boolean",
+              "default": false
+            },
+            "allow_create": {
+              "type": "boolean",
+              "default": false
+            },
+            "allow_in_memory": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "net": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow_dns": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "maxItems": 256,
+              "default": []
+            },
+            "allow_cidrs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "maxItems": 256,
+              "default": []
+            },
+            "allow_ports": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "maxItems": 256,
+              "default": []
+            },
+            "require_tls": {
+              "type": "boolean",
+              "default": true
+            },
+            "require_verify": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "allow_keys",
+        "deny_keys"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 256
+        },
+        "deny_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 256
+        }
+      }
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "allow_monotonic",
+        "allow_wall_clock",
+        "allow_sleep",
+        "max_sleep_ms",
+        "allow_local_tzid"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow_monotonic": {
+          "type": "boolean"
+        },
+        "allow_wall_clock": {
+          "type": "boolean"
+        },
+        "allow_sleep": {
+          "type": "boolean",
+          "description": "Allow os.time.sleep_ms_v1"
+        },
+        "max_sleep_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000,
+          "description": "Hard cap for os.time.sleep_ms_v1"
+        },
+        "allow_local_tzid": {
+          "type": "boolean",
+          "description": "Allow os.time.local_tzid_v1"
+        }
+      }
+    },
+    "language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow_unsafe",
+        "allow_ffi"
+      ],
+      "properties": {
+        "allow_unsafe": {
+          "type": "boolean",
+          "default": false
+        },
+        "allow_ffi": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "allow_spawn",
+        "max_live",
+        "max_spawns",
+        "allow_exec",
+        "allow_exit"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow_spawn": {
+          "type": "boolean"
+        },
+        "max_live": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "max_spawns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "allow_execs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "maxItems": 256
+        },
+        "allow_exec_prefixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "maxItems": 256,
+          "default": []
+        },
+        "allow_args_regex_lite": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 128,
+          "default": []
+        },
+        "allow_env_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 256,
+          "default": []
+        },
+        "allow_exec": {
+          "type": "boolean"
+        },
+        "allow_exit": {
+          "type": "boolean"
+        },
+        "max_exe_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1048576,
+          "default": 4096
+        },
+        "max_args": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024,
+          "default": 64
+        },
+        "max_arg_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1048576,
+          "default": 4096
+        },
+        "max_env": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024,
+          "default": 64
+        },
+        "max_env_key_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096,
+          "default": 256
+        },
+        "max_env_val_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1048576,
+          "default": 4096
+        },
+        "max_runtime_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600000,
+          "default": 0
+        },
+        "max_stdout_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 268435456
+        },
+        "max_stderr_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 268435456
+        },
+        "max_total_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 536870912
+        },
+        "max_stdin_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 268435456
+        },
+        "kill_on_drop": {
+          "type": "boolean",
+          "default": true
+        },
+        "kill_tree": {
+          "type": "boolean",
+          "default": true
+        },
+        "allow_cwd": {
+          "type": "boolean",
+          "default": false
+        },
+        "allow_cwd_roots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "maxItems": 128,
+          "default": []
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "src/main.x07.json",
+  "module_roots": [
+    "src"
+  ],
+  "dependencies": [
+    {
+      "name": "appkit",
+      "version": "0.1.0",
+      "path": "pkgs/appkit/0.1.0"
+    }
+  ],
+  "lockfile": "x07.lock.json"
+}

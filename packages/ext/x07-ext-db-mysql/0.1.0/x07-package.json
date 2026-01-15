@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-db-mysql",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": ["std.db.mysql", "std.db.mysql.spec", "std.db.mysql.pool"],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
+    "import_mode": "handwritten"
+  }
+}

@@ -1,0 +1,542 @@
+{
+  "suite_id": "phase4-holdout@0.1.0",
+  "tasks": [
+    {
+      "cases": [
+        {
+          "expected_b64": "AQ==",
+          "input_b64": ""
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "YQ=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "YWE="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "YWI="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "YWJiYQ=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "I3PqquJOdqS6TwtXZkk="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": ""
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "DEBBXME1bQgpMymRtBYY"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "yqHWvbiNHt3xX/uYJfpL8A=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "rgE15dOjW0kd"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "cDBsopZzrWOJ5LqbazKLNg=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "3rFHvYEC5nk="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "QEKpoh7RHJz8ItQ="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "IudK3lTU7q3OiLO/JOU="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "ToxW3fuFclybEBItdeg="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "GaUuNgWFxcQ="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "J8Rhag=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "rcxNOlme2eEF"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "3hC5gGIYKhwt6GsD"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "zpKV"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "yV/eAD51"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "wdEodb+sew=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "SQUhAFxP"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "HX6N5Ld51dATza3m8cCp"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "f/GmoVrea6yJ7PO81ebpzA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "6NLmZ4I5HTxhNw=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "fA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "vPiW"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "nBS5w2ZOz/DCqkbC3g=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "Ura4URA="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "X8TMWqsRSw=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "kg=="
+        }
+      ],
+      "description": "Output 1 byte 1 if input is a palindrome, else 0.",
+      "task_id": "palindrome_u8"
+    },
+    {
+      "cases": [
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AAA="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AwECAwIBAw=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "AwECAwIDAQ=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BwACAwIDAwQGAQIAAgUC"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "AwIBAAICAg=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "CgMFAQEAAgIFAAQIAwUBAAICBQQ="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BAMFAQMHAAMBBQAAAg=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "DAIFBAUFAgECAQEBAgEB"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "CgIEBAQFAQQEAgMHAgQEBQEEBA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "DgUCBAAEBQQAAQECAQMAAgQF"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AgQCAQI="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "DQECBAIBAQAEBQIEAQAGBAIBAQQB"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "DQQFAAAABQQABQUEAQMIAAAAAAUFBAE="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "CwIAAQQBAAUEBAQBAQI="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "DAQDAgQFAwAFAAEAAwMEBQA="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "CAMCAwMBAAIEAgMC"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "EAIFBQQDAgECAwIDAQMABQMGBQECAQMD"
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "CQQEAAMCAQECBQQCAAIE"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQECAAEEAgIE"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AAA="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "AAYBBQUDBQI="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BAMDBAECAwQ="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQUBBQ=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BgQBAgQAAAUEAQIAAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "AAYEAQIDAwM="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "CwQDAgQDAQQCAAUFBgMCAQUCAQ=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BAQEAAIEBAQAAg=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "DQACBQEDAwECBAUAAAAFAQUEAAA="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "CQMAAAIBAQMFAAQFAgUC"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "CgIBBAUCAQAEBAIGAQQFAAQC"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "CwUBAAIDAwEAAgQBBQECAAIE"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BAIDAQEEAgMBAQ=="
+        }
+      ],
+      "description": "Input: lenA (1 byte), A bytes, lenB (1 byte), B bytes. Output: 1 byte 1 if B is a subsequence of A, else 0.",
+      "task_id": "subsequence_u8"
+    },
+    {
+      "cases": [
+        {
+          "expected_b64": "",
+          "input_b64": "AA=="
+        },
+        {
+          "expected_b64": "YWJj",
+          "input_b64": "AGFiYw=="
+        },
+        {
+          "expected_b64": "YmNh",
+          "input_b64": "AWFiYw=="
+        },
+        {
+          "expected_b64": "YmNh",
+          "input_b64": "BGFiYw=="
+        },
+        {
+          "expected_b64": "dCM=",
+          "input_b64": "AnQj"
+        },
+        {
+          "expected_b64": "O053",
+          "input_b64": "DXc7Tg=="
+        },
+        {
+          "expected_b64": "pscapSc5wgjq",
+          "input_b64": "BqUnOcII6qbHGg=="
+        },
+        {
+          "expected_b64": "88m6S4a4i3R3sRxx8hhsVA==",
+          "input_b64": "AxhsVPPJukuGuIt0d7EccfI="
+        },
+        {
+          "expected_b64": "cmlrmUoEQi9y1xL1",
+          "input_b64": "AHJpa5lKBEIvctcS9Q=="
+        },
+        {
+          "expected_b64": "XMn8O6ylDsB7cyE=",
+          "input_b64": "Cfw7rKUOwHtzIVzJ"
+        },
+        {
+          "expected_b64": "FyDn+gdKW5nF",
+          "input_b64": "D/oHSluZxRcg5w=="
+        },
+        {
+          "expected_b64": "ttuOtGxbg3aYSEP+",
+          "input_b64": "Co60bFuDdphIQ/622w=="
+        },
+        {
+          "expected_b64": "g7cWSYRmO8Fz7wWo",
+          "input_b64": "CUmEZjvBc+8FqIO3Fg=="
+        },
+        {
+          "expected_b64": "G+Bv8iu6fm4=",
+          "input_b64": "BCu6fm4b4G/y"
+        },
+        {
+          "expected_b64": "tRoY",
+          "input_b64": "CxoYtQ=="
+        },
+        {
+          "expected_b64": "ZTgQ0Q==",
+          "input_b64": "DGU4ENE="
+        },
+        {
+          "expected_b64": "2yZ8",
+          "input_b64": "BHzbJg=="
+        },
+        {
+          "expected_b64": "N8F5C8VO9UA=",
+          "input_b64": "A071QDfBeQvF"
+        },
+        {
+          "expected_b64": "BR6L",
+          "input_b64": "CosFHg=="
+        },
+        {
+          "expected_b64": "6w3YMdFixqe7hHA=",
+          "input_b64": "C+sN2DHRYsanu4Rw"
+        },
+        {
+          "expected_b64": "pQc2ggEvkaqtzQUDmo7b",
+          "input_b64": "DTaCAS+Rqq3NBQOajtulBw=="
+        },
+        {
+          "expected_b64": "wJ+mQR1qJGSpSpC2fQ==",
+          "input_b64": "CGokZKlKkLZ9wJ+mQR0="
+        },
+        {
+          "expected_b64": "vUOCWWBauZrQ7VLzXPR4",
+          "input_b64": "D71DgllgWrma0O1S81z0eA=="
+        },
+        {
+          "expected_b64": "638=",
+          "input_b64": "AX/r"
+        },
+        {
+          "expected_b64": "abo=",
+          "input_b64": "Dmm6"
+        },
+        {
+          "expected_b64": "kO08Gw==",
+          "input_b64": "C+08G5A="
+        },
+        {
+          "expected_b64": "jKVmmfFbo6/lMUijJQ4b",
+          "input_b64": "CaOv5TFIoyUOG4ylZpnxWw=="
+        },
+        {
+          "expected_b64": "ArXlJ9I4XlzgUTwQiqn5",
+          "input_b64": "CFzgUTwQiqn5ArXlJ9I4Xg=="
+        },
+        {
+          "expected_b64": "6ryK6kEnNwcYzejZlsm1",
+          "input_b64": "CTcHGM3o2ZbJteq8iupBJw=="
+        },
+        {
+          "expected_b64": "waSuzvI=",
+          "input_b64": "AMGkrs7y"
+        },
+        {
+          "expected_b64": "H+gv",
+          "input_b64": "BC8f6A=="
+        },
+        {
+          "expected_b64": "ycEBzL3f+fgFEAVx",
+          "input_b64": "DgVxycEBzL3f+fgFEA=="
+        }
+      ],
+      "description": "Input: k (1 byte), then data bytes. Output: data rotated left by k positions (k modulo len(data)).",
+      "task_id": "rotate_left"
+    },
+    {
+      "cases": [
+        {
+          "expected_b64": "",
+          "input_b64": ""
+        },
+        {
+          "expected_b64": "QQ==",
+          "input_b64": "QQ=="
+        },
+        {
+          "expected_b64": "QUJDREE=",
+          "input_b64": "QUFBQkJCQ0NEQUE="
+        },
+        {
+          "expected_b64": "AwADAA==",
+          "input_b64": "AwAAAAMDAA=="
+        },
+        {
+          "expected_b64": "",
+          "input_b64": ""
+        },
+        {
+          "expected_b64": "AgEDAgADAQACAAIEAAMBAAI=",
+          "input_b64": "AgEDAwIAAAMBAAIAAgIEAAMBAAI="
+        },
+        {
+          "expected_b64": "AgM=",
+          "input_b64": "AgM="
+        },
+        {
+          "expected_b64": "AwUBBQIEBQEFAAUCAQUEBQQBAAMFAgQFAAIF",
+          "input_b64": "AwUBAQUCAgQFAQUABQIBBQQFBAEAAwUCBAUAAgU="
+        },
+        {
+          "expected_b64": "AQMCBQ==",
+          "input_b64": "AQMCBQU="
+        },
+        {
+          "expected_b64": "BQMCAQQFAwIFAQMEAwIAAgMB",
+          "input_b64": "BQMCAQEEBQMCBQEDBAMCAgACAwE="
+        },
+        {
+          "expected_b64": "AQMFAgMFAAIFAgADAAQAAgMEAQUA",
+          "input_b64": "AQMDBQIDBQACBQUCAAADAAQAAAAAAgMEAQUA"
+        },
+        {
+          "expected_b64": "AAQFAAIFAQIDAAQBAgEFAgQAAgQAAw==",
+          "input_b64": "AAQFAAIFAQIDAAQBAgEFAgIEAAAAAAAAAgQAAw=="
+        },
+        {
+          "expected_b64": "BQABBAMEAAUBAwIAAgECAAQ=",
+          "input_b64": "BQABBAMEBAAFAQMCAAAAAgEBAQIABA=="
+        },
+        {
+          "expected_b64": "BAMFBAABBQQBAgUDAg==",
+          "input_b64": "BAMFBAABBQQBAQIFAwMC"
+        },
+        {
+          "expected_b64": "AgABAAEEAwIEBQIFAwAFAgQFBAMABA==",
+          "input_b64": "AgABAAEEAwIEBQUCBQUFAwAFBQUFAgQFBAMDAwAE"
+        },
+        {
+          "expected_b64": "BAADAgUCAAIDAQAFAgQAAgMFBAEEAA==",
+          "input_b64": "BAADAgUCAgACAwEABQIEAAIDBQQBBAA="
+        },
+        {
+          "expected_b64": "AQUDBAMCBQIDAgMABAMEAAI=",
+          "input_b64": "AQEFBQMDBAMCBQUCAgMDAgMABAMEAAI="
+        },
+        {
+          "expected_b64": "AQMBBQAFAwQFAwUEAwIBAgEEAgQBAwAFAwU=",
+          "input_b64": "AQEDAwEBBQAFBQMEBQMFBAMCAQIBBAIEBAEDAAUDBQ=="
+        },
+        {
+          "expected_b64": "AgEFAwACBA==",
+          "input_b64": "AgEFAwACAgIE"
+        },
+        {
+          "expected_b64": "AAUCBAMFAAECAwADAQACAA==",
+          "input_b64": "AAAFAgQDBQABAQICAwADAQAAAAIAAA=="
+        },
+        {
+          "expected_b64": "AgUBAgEEAwQAAwQDBQIDBAMFAAMF",
+          "input_b64": "AgICBQECAQQDBAADBAQEAwUCAwQDBQADBQU="
+        },
+        {
+          "expected_b64": "BQMABAUDAQQBBQMBAgMFBA==",
+          "input_b64": "BQMABAUDAQEBAQQBBQMBAgMDBQUE"
+        },
+        {
+          "expected_b64": "AAEAAQIBAgMEAQQ=",
+          "input_b64": "AAEAAQIBAgMEAQQ="
+        },
+        {
+          "expected_b64": "AgADAAIBBAUEAAEEAwQB",
+          "input_b64": "AgADAAIBBAUEBAABBAMEAQ=="
+        },
+        {
+          "expected_b64": "BA==",
+          "input_b64": "BA=="
+        },
+        {
+          "expected_b64": "",
+          "input_b64": ""
+        },
+        {
+          "expected_b64": "BAIDBQECAQIAAwUAAwU=",
+          "input_b64": "BAIDBQEBAgICAQICAAMFBQADBQ=="
+        },
+        {
+          "expected_b64": "BQAFAAMEAQ==",
+          "input_b64": "BQAFAAMEAQ=="
+        },
+        {
+          "expected_b64": "",
+          "input_b64": ""
+        },
+        {
+          "expected_b64": "BAAF",
+          "input_b64": "BAQABQ=="
+        },
+        {
+          "expected_b64": "AQAFAQIABQQFAwACAQM=",
+          "input_b64": "AQAFAQIABQQFAwACAgED"
+        },
+        {
+          "expected_b64": "AgUD",
+          "input_b64": "AgIFAwM="
+        }
+      ],
+      "description": "Output input with consecutive duplicate bytes removed. Example: AAABBBCCDAA -> ABCDA.",
+      "task_id": "dedup_consecutive"
+    }
+  ],
+  "world": "solve-pure"
+}

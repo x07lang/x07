@@ -1,0 +1,132 @@
+{
+  "suite_id": "phaseH1-smoke@0.1.0",
+  "world": "solve-pure",
+  "tasks": [
+    {
+      "task_id": "smoke/echo",
+      "description": "Return the input bytes unchanged.",
+      "cases": [
+        {
+          "name": "misc",
+          "input_b64": "aGkA/w==",
+          "expected_b64": "aGkA/w=="
+        }
+      ]
+    },
+    {
+      "task_id": "smoke/box_select_reverse",
+      "description": "Input format: [mode:u8][payload...]. If mode==0, output payload; else output reversed payload. (Exercise Box ABI + moves).",
+      "cases": [
+        {
+          "name": "mode0_abc",
+          "input_b64": "AGFiYw==",
+          "expected_b64": "YWJj"
+        },
+        {
+          "name": "mode1_abc",
+          "input_b64": "AWFiYw==",
+          "expected_b64": "Y2Jh"
+        }
+      ]
+    },
+    {
+      "task_id": "smoke/vec_dup4",
+      "description": "Output the input repeated 4 times. (Exercise Vec ABI + capacity planning).",
+      "cases": [
+        {
+          "name": "ab",
+          "input_b64": "YWI=",
+          "expected_b64": "YWJhYmFiYWI=",
+          "assertions": {
+            "max_realloc_calls": 0,
+            "max_memcpy_bytes": 256,
+            "max_peak_live_bytes": 4096
+          }
+        }
+      ],
+      "assertions": {
+        "mem_stats_required": true,
+        "leak_free_required": true
+      }
+    },
+    {
+      "task_id": "smoke/view_extract_window",
+      "description": "Input: start:u32le, len:u32le, payload. Output the clipped window. (Exercise view/slice ABI).",
+      "cases": [
+        {
+          "name": "2_3_abcdef",
+          "input_b64": "AgAAAAMAAABhYmNkZWY=",
+          "expected_b64": "Y2Rl",
+          "assertions": {
+            "max_memcpy_bytes": 64,
+            "max_realloc_calls": 0,
+            "max_peak_live_bytes": 4096
+          }
+        }
+      ],
+      "assertions": {
+        "mem_stats_required": true,
+        "leak_free_required": true
+      }
+    },
+    {
+      "task_id": "smoke/result_try_gate",
+      "description": "Input: [flag][payload]. If flag==0 output payload else empty. (Exercise Result ABI + try propagation).",
+      "cases": [
+        {
+          "name": "flag0_ok",
+          "input_b64": "AG9r",
+          "expected_b64": "b2s="
+        },
+        {
+          "name": "flag1_err",
+          "input_b64": "AW5v",
+          "expected_b64": ""
+        }
+      ]
+    },
+    {
+      "task_id": "smoke/interface_dispatch_checksum_u8",
+      "description": "Input: [mode][payload]. mode 0 => sum mod256, else xor. Output 1 byte. (Exercise interface/vtable ABI).",
+      "cases": [
+        {
+          "name": "sum_123",
+          "input_b64": "AAECAw==",
+          "expected_b64": "Bg=="
+        },
+        {
+          "name": "xor_123",
+          "input_b64": "AQECAw==",
+          "expected_b64": "AA=="
+        }
+      ]
+    },
+    {
+      "task_id": "canary/std_json_canonicalize_small",
+      "description": "Canary: std.json.canonicalize_small must compile and run.",
+      "cases": [
+        {
+          "name": "obj_sort1",
+          "input_b64": "eyJiIjoyLCJhIjoxfQ==",
+          "expected_b64": "eyJhIjoxLCJiIjoyfQ=="
+        },
+        {
+          "name": "ws_obj_sort1",
+          "input_b64": "eyAiYiIgOiAyICwgImEiIDogMSB9",
+          "expected_b64": "eyJhIjoxLCJiIjoyfQ=="
+        }
+      ]
+    },
+    {
+      "task_id": "canary/std_prng_x07rand32_v1_stream",
+      "description": "Canary: std.prng.x07rand32_v1_stream must compile and run.",
+      "cases": [
+        {
+          "name": "seed1",
+          "input_b64": "AAAAAAAAAAAEAAAA",
+          "expected_b64": "Oagg4mqeeG4YXcQGqLiL+A=="
+        }
+      ]
+    }
+  ]
+}

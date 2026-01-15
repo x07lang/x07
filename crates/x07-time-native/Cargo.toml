@@ -1,0 +1,15 @@
+[package]
+name = "x07-time-native"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+name = "x07_time"
+crate-type = ["staticlib"]
+test = false
+doctest = false
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+chrono-tz = "0.10"

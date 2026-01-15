@@ -1,0 +1,55 @@
+{
+  "schema_version": "x07.worlds@0.1.0",
+  "worlds": {
+    "solve-pure": {
+      "tier": "eval",
+      "capabilities": []
+    },
+    "solve-fs": {
+      "tier": "eval",
+      "capabilities": [
+        "fs-fixture-ro"
+      ]
+    },
+    "solve-rr": {
+      "tier": "eval",
+      "capabilities": [
+        "rr-fixture"
+      ]
+    },
+    "solve-kv": {
+      "tier": "eval",
+      "capabilities": [
+        "kv-fixture"
+      ]
+    },
+    "solve-full": {
+      "tier": "eval",
+      "capabilities": [
+        "fs-fixture-ro",
+        "rr-fixture",
+        "kv-fixture"
+      ]
+    },
+    "run-os": {
+      "tier": "standalone",
+      "capabilities": [
+        "fs-os",
+        "net-os",
+        "time-os",
+        "env-os",
+        "process-os"
+      ]
+    },
+    "run-os-sandboxed": {
+      "tier": "standalone",
+      "capabilities": [
+        "fs-os-policy",
+        "net-os-policy",
+        "time-os-policy",
+        "env-os-policy",
+        "process-os-policy"
+      ]
+    }
+  }
+}

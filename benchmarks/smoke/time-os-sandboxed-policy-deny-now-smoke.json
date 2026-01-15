@@ -1,0 +1,17 @@
+{
+  "cases": [
+    {
+      "expected_b64": "T0s=",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "notes": [
+    "Smoke: policy denies wall clock; ext.time.os.now_instant_v1 must fail (no trap)."
+  ],
+  "policy_json": "tests/external_os/time_policy_deny_now/run-os-policy.deny-now.json",
+  "program_x07json": "tests/external_os/time_policy_deny_now/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/ext-time@0.1.0/run-os-sandboxed-policy",
+  "world": "run-os-sandboxed"
+}

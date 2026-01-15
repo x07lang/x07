@@ -1,0 +1,542 @@
+{
+  "suite_id": "phase4-tier2-leetcode@0.1.0",
+  "tasks": [
+    {
+      "cases": [
+        {
+          "expected_b64": "AA==",
+          "input_b64": "AA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQ=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "Ag=="
+        },
+        {
+          "expected_b64": "6Q==",
+          "input_b64": "DQ=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQ=="
+        },
+        {
+          "expected_b64": "6Q==",
+          "input_b64": "DQ=="
+        },
+        {
+          "expected_b64": "kA==",
+          "input_b64": "DA=="
+        },
+        {
+          "expected_b64": "6Q==",
+          "input_b64": "DQ=="
+        },
+        {
+          "expected_b64": "BQ==",
+          "input_b64": "BQ=="
+        },
+        {
+          "expected_b64": "kA==",
+          "input_b64": "DA=="
+        },
+        {
+          "expected_b64": "kA==",
+          "input_b64": "DA=="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BA=="
+        },
+        {
+          "expected_b64": "DQ==",
+          "input_b64": "Bw=="
+        },
+        {
+          "expected_b64": "FQ==",
+          "input_b64": "CA=="
+        },
+        {
+          "expected_b64": "DQ==",
+          "input_b64": "Bw=="
+        },
+        {
+          "expected_b64": "Nw==",
+          "input_b64": "Cg=="
+        },
+        {
+          "expected_b64": "Ag==",
+          "input_b64": "Aw=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "Ag=="
+        },
+        {
+          "expected_b64": "Ag==",
+          "input_b64": "Aw=="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BA=="
+        },
+        {
+          "expected_b64": "BQ==",
+          "input_b64": "BQ=="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "Ag=="
+        },
+        {
+          "expected_b64": "Ig==",
+          "input_b64": "CQ=="
+        },
+        {
+          "expected_b64": "DQ==",
+          "input_b64": "Bw=="
+        },
+        {
+          "expected_b64": "6Q==",
+          "input_b64": "DQ=="
+        },
+        {
+          "expected_b64": "DQ==",
+          "input_b64": "Bw=="
+        },
+        {
+          "expected_b64": "WQ==",
+          "input_b64": "Cw=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "Ag=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "AA=="
+        },
+        {
+          "expected_b64": "BQ==",
+          "input_b64": "BQ=="
+        },
+        {
+          "expected_b64": "Ig==",
+          "input_b64": "CQ=="
+        }
+      ],
+      "description": "Input: 1 byte n in [0,13]. Output: 1 byte fib(n). fib(0)=0, fib(1)=1.",
+      "task_id": "fib_u8"
+    },
+    {
+      "cases": [
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQE="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQY="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BgE="
+        },
+        {
+          "expected_b64": "Ag==",
+          "input_b64": "AgI="
+        },
+        {
+          "expected_b64": "/A==",
+          "input_b64": "BgY="
+        },
+        {
+          "expected_b64": "OA==",
+          "input_b64": "BAY="
+        },
+        {
+          "expected_b64": "BQ==",
+          "input_b64": "AgU="
+        },
+        {
+          "expected_b64": "BQ==",
+          "input_b64": "BQI="
+        },
+        {
+          "expected_b64": "fg==",
+          "input_b64": "BgU="
+        },
+        {
+          "expected_b64": "Dw==",
+          "input_b64": "AwU="
+        },
+        {
+          "expected_b64": "Cg==",
+          "input_b64": "AwQ="
+        },
+        {
+          "expected_b64": "/A==",
+          "input_b64": "BgY="
+        },
+        {
+          "expected_b64": "Dw==",
+          "input_b64": "AwU="
+        },
+        {
+          "expected_b64": "Cg==",
+          "input_b64": "AwQ="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BgE="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQE="
+        },
+        {
+          "expected_b64": "fg==",
+          "input_b64": "BgU="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AwE="
+        },
+        {
+          "expected_b64": "Bg==",
+          "input_b64": "AwM="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQY="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "AgM="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "AwI="
+        },
+        {
+          "expected_b64": "BQ==",
+          "input_b64": "BQI="
+        },
+        {
+          "expected_b64": "Cg==",
+          "input_b64": "AwQ="
+        },
+        {
+          "expected_b64": "FQ==",
+          "input_b64": "BgM="
+        },
+        {
+          "expected_b64": "BQ==",
+          "input_b64": "AgU="
+        },
+        {
+          "expected_b64": "OA==",
+          "input_b64": "BAY="
+        },
+        {
+          "expected_b64": "FA==",
+          "input_b64": "BAQ="
+        },
+        {
+          "expected_b64": "FA==",
+          "input_b64": "BAQ="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQE="
+        },
+        {
+          "expected_b64": "FA==",
+          "input_b64": "BAQ="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AwE="
+        }
+      ],
+      "description": "Input: 2 bytes (m,n) with 1<=m,n<=6. Output: 1 byte number of unique paths from (0,0) to (m-1,n-1) moving only Right/Down.",
+      "task_id": "unique_paths_u8"
+    },
+    {
+      "cases": [
+        {
+          "expected_b64": "AA==",
+          "input_b64": "AA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQAB"
+        },
+        {
+          "expected_b64": "Ag==",
+          "input_b64": "AgACAgQ="
+        },
+        {
+          "expected_b64": "Ag==",
+          "input_b64": "AwAKAgMDBA=="
+        },
+        {
+          "expected_b64": "BA==",
+          "input_b64": "Bg0QBQgOEAoLCBADBQ=="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BAIPDRAGBwkL"
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BwwNAwQECwQHCQ8MDQgN"
+        },
+        {
+          "expected_b64": "BA==",
+          "input_b64": "BwQGBwoMDgwPDxAMDwIN"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQgJ"
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BQACCA8BAgwPBwg="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "CAQKBgwPEAECBQsJDAEGAQ4="
+        },
+        {
+          "expected_b64": "BQ==",
+          "input_b64": "Bw8QAwYAAgoLCw4MDwQO"
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BwIHDBAODwsQDhAEDQ8Q"
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BggPDhADCgIGCAsDCg=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AgAKBQs="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "Bg4QChAIDQ8QCgsLDQ=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQQH"
+        },
+        {
+          "expected_b64": "Ag==",
+          "input_b64": "Ag8QBAY="
+        },
+        {
+          "expected_b64": "Ag==",
+          "input_b64": "BAsOCAwCCgoN"
+        },
+        {
+          "expected_b64": "BA==",
+          "input_b64": "Bw0QBwkDBQ8QAwcFBw0Q"
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BwcNDA4CCAkMCBAGDgwP"
+        },
+        {
+          "expected_b64": "BA==",
+          "input_b64": "BwsMAA8FBg8QDQ4ECQYO"
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BQMMCw4PEAUKCA4="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BgADDRACDg4PAwQDCw=="
+        },
+        {
+          "expected_b64": "BA==",
+          "input_b64": "BgoMCg0MDwcNBwgPEA=="
+        },
+        {
+          "expected_b64": "Ag==",
+          "input_b64": "BQUNCQ0ABAILBBA="
+        },
+        {
+          "expected_b64": "Ag==",
+          "input_b64": "Bg0QAA8OEA8QCA8ECw=="
+        },
+        {
+          "expected_b64": "BA==",
+          "input_b64": "BgIHCQ0AAQgLAgwMDQ=="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "BwgJCAwGDA8QAQ0BBw8Q"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AQIG"
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "AggMAQs="
+        },
+        {
+          "expected_b64": "Aw==",
+          "input_b64": "CA8QBA8GDQYOAwcBDwcPBAs="
+        }
+      ],
+      "description": "Input: 1 byte k (0..8), then k intervals (start,end) as 2*k bytes with 0<=start<end<=16. Output: 1 byte maximum number of non-overlapping intervals (treat intervals as [start,end)).",
+      "task_id": "interval_scheduling_u8"
+    },
+    {
+      "cases": [
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQAEAAEAAAAAAAEAAAAAAAEAAAAAAAEAAAAAAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQABAAAAAAABAAEAAAEAAAABAAAAAAEBAQABAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQMBAAEAAQAAAAAAAAAAAAAAAQABAAABAQEAAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQIDAAAAAQAAAAAAAAABAAAAAAAAAAAAAAABAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQMEAAEAAAABAAABAAEAAAABAQEAAAAAAAAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQIBAAAAAAAAAAABAQEBAAEAAQAAAAABAQABAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQQEAAEAAAEAAAAAAAABAAEAAAABAAABAQEBAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQEDAAAAAQEAAAABAAAAAAEBAAABAAABAQEAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQACAAEBAAEBAAABAQAAAAAAAQABAAAAAQAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQIAAAEAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQADAAAAAQABAAABAQABAAEAAAAAAAAAAQAAAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQADAAAAAAAAAAAAAAEAAAEAAAAAAAAAAAABAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQMEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQEBAAEAAAEAAAEAAQAAAAAAAAEAAAAAAAAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQMDAAAAAAAAAAAAAAEBAAAAAAAAAAEAAAAAAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQADAAEAAAAAAAEAAAAAAAABAQAAAAEAAQAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQADAAEAAQAAAAAAAAEAAAABAAAAAAEAAAAAAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQIAAAAAAAAAAAABAAAAAAAAAAAAAAEBAAAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQIBAAEBAAAAAAAAAAAAAAEAAAEAAAEAAAEAAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQIDAAAAAAAAAAAAAQABAAAAAAEAAAEBAQEAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQMDAAAAAAAAAAABAQAAAAAAAAEBAAAAAAABAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQADAAAAAAABAAEAAAEAAAAAAAAAAAEAAAAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQAEAAAAAAEAAAAAAAEAAAABAQEAAAAAAAEBAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQIDAAEAAQEAAAAAAAEBAAAAAAAAAAAAAAABAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQEAAAABAAAAAAABAAAAAAAAAAABAAAAAAAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQIAAAAAAAABAAABAQEBAAEAAAAAAAEAAQAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQIAAAAAAQEAAAAAAAEBAAAAAAAAAAABAAABAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQQCAAEBAAABAAAAAAAAAAAAAAAAAAEAAAAAAA=="
+        },
+        {
+          "expected_b64": "AQ==",
+          "input_b64": "BQAAAAAAAAAAAAAAAQAAAAAAAAEAAAAAAAEAAA=="
+        },
+        {
+          "expected_b64": "AA==",
+          "input_b64": "BQIAAAAAAAABAAEAAAAAAAAAAAAAAAAAAAEAAA=="
+        }
+      ],
+      "description": "Input: n=5 (1 byte), start (1 byte), target (1 byte), then 25 bytes adjacency matrix (row-major, 0/1). Output: 1 byte 1 if a path exists from start to target, else 0.",
+      "task_id": "graph_reachability_u8"
+    }
+  ],
+  "world": "solve-pure"
+}

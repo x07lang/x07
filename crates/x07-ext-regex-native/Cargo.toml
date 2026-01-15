@@ -1,0 +1,15 @@
+[package]
+name = "x07-ext-regex-native"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+name = "x07_ext_regex"
+crate-type = ["staticlib"]
+test = false
+doctest = false
+
+[dependencies]
+regex-automata = "0.4.13"
+regex-syntax = "0.8.8"

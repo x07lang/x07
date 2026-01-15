@@ -1,0 +1,231 @@
+{
+  "suite_id": "emitters-v1-suite@0.1.0",
+  "world": "solve-pure",
+  "tasks": [
+    {
+      "task_id": "pure/emitters_hash_set_emit_u32le_sorted_unique",
+      "description": "Build a u32 hash set from the input and return the canonical emitter output.\n\nInput: [cap_pow2:u32le][elem0:u32le][elem1:u32le]...\nOutput: unique elements, sorted ascending, encoded as u32le sequence.\n\nMust use: std.hash_set.emit_u32le (canonicalizes order; insertion order must not affect output).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-hash_set@0.1.1",
+          "x07:stdlib-hash_set@0.1.1/std.hash_set.new_u32",
+          "x07:stdlib-hash_set@0.1.1/std.hash_set.add_u32",
+          "x07:stdlib-hash_set@0.1.1/std.hash_set.emit_u32le"
+        ]
+      },
+      "cases": [
+        {
+          "name": "perm1",
+          "input_b64": "EAAAAAMAAAABAAAAAgAAAAIAAAAFAAAA",
+          "expected_b64": "AQAAAAIAAAADAAAABQAAAA=="
+        },
+        {
+          "name": "perm2",
+          "input_b64": "EAAAAAUAAAACAAAAAQAAAAMAAAACAAAA",
+          "expected_b64": "AQAAAAIAAAADAAAABQAAAA=="
+        },
+        {
+          "name": "mix",
+          "input_b64": "IAAAAAoAAAAAAAAABwAAAAcAAAAJAAAA",
+          "expected_b64": "AAAAAAcAAAAJAAAACgAAAA=="
+        }
+      ]
+    },
+    {
+      "task_id": "pure/emitters_hash_map_emit_kv_u32le_u32le_sorted_by_key",
+      "description": "Build a u32->u32 hash map from the input and return the canonical emitter output.\n\nInput: [n_pairs:u32le][k0:u32le][v0:u32le]...[k{n-1}:u32le][v{n-1}:u32le]\nOutput: key/value records sorted ascending by key: (key u32le)(value u32le)...\nDuplicate keys: last write wins.\n\nMust use: std.hash_map.emit_kv_u32le_u32le (canonicalizes order; insertion order must not affect output).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-hash_map@0.1.1",
+          "x07:stdlib-hash_map@0.1.1/std.hash_map.with_capacity_u32",
+          "x07:stdlib-hash_map@0.1.1/std.hash_map.set_u32",
+          "x07:stdlib-hash_map@0.1.1/std.hash_map.emit_kv_u32le_u32le"
+        ]
+      },
+      "cases": [
+        {
+          "name": "orderA",
+          "input_b64": "AwAAAAIAAADIAAAAAQAAAGQAAAADAAAALAIAAA==",
+          "expected_b64": "AQAAAGQAAAACAAAAyAAAAAMAAAAsAgAA"
+        },
+        {
+          "name": "orderB",
+          "input_b64": "AwAAAAMAAAAsAgAAAgAAAMgAAAABAAAAZAAAAA==",
+          "expected_b64": "AQAAAGQAAAACAAAAyAAAAAMAAAAsAgAA"
+        },
+        {
+          "name": "last_wins",
+          "input_b64": "BAAAAAIAAADIAAAAAQAAAGQAAAACAAAAyQAAAAMAAAAsAgAA",
+          "expected_b64": "AQAAAGQAAAACAAAAyQAAAAMAAAAsAgAA"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/emitters_btree_set_emit_u32le_sorted_unique",
+      "description": "Build a u32 BTreeSet from the input and return the canonical emitter output.\n\nInput: [elem0:u32le][elem1:u32le]...\nOutput: unique elements, sorted ascending, encoded as u32le sequence.\n\nMust use: std.btree_set.emit_u32le (btree order is already canonical).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-btree_set@0.1.1",
+          "x07:stdlib-btree_set@0.1.1/std.btree_set.empty_u32",
+          "x07:stdlib-btree_set@0.1.1/std.btree_set.insert_u32",
+          "x07:stdlib-btree_set@0.1.1/std.btree_set.emit_u32le"
+        ]
+      },
+      "cases": [
+        {
+          "name": "dup_unsorted",
+          "input_b64": "AwAAAAEAAAACAAAAAgAAAAUAAAA=",
+          "expected_b64": "AQAAAAIAAAADAAAABQAAAA=="
+        },
+        {
+          "name": "mix2",
+          "input_b64": "CgAAAAAAAAAHAAAABwAAAAkAAAA=",
+          "expected_b64": "AAAAAAcAAAAJAAAACgAAAA=="
+        }
+      ]
+    },
+    {
+      "task_id": "pure/emitters_btree_map_emit_kv_u32le_u32le_sorted_by_key",
+      "description": "Build a u32->u32 BTreeMap from the input and return the canonical emitter output.\n\nInput: [n_pairs:u32le][k0:u32le][v0:u32le]...\nOutput: (key u32le)(value u32le)... sorted ascending by key.\nDuplicate keys: last write wins.\n\nMust use: std.btree_map.emit_kv_u32le_u32le (btree order is already canonical).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-btree_map@0.1.1",
+          "x07:stdlib-btree_map@0.1.1/std.btree_map.empty_u32_u32",
+          "x07:stdlib-btree_map@0.1.1/std.btree_map.put_u32_u32",
+          "x07:stdlib-btree_map@0.1.1/std.btree_map.emit_kv_u32le_u32le"
+        ]
+      },
+      "cases": [
+        {
+          "name": "orderA",
+          "input_b64": "AwAAAAIAAADIAAAAAQAAAGQAAAADAAAALAIAAA==",
+          "expected_b64": "AQAAAGQAAAACAAAAyAAAAAMAAAAsAgAA"
+        },
+        {
+          "name": "orderB",
+          "input_b64": "AwAAAAMAAAAsAgAAAgAAAMgAAAABAAAAZAAAAA==",
+          "expected_b64": "AQAAAGQAAAACAAAAyAAAAAMAAAAsAgAA"
+        },
+        {
+          "name": "last_wins",
+          "input_b64": "BAAAAAIAAADIAAAAAQAAAGQAAAACAAAAyQAAAAMAAAAsAgAA",
+          "expected_b64": "AQAAAGQAAAACAAAAyQAAAAMAAAAsAgAA"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/emitters_deque_rotate_left_u32le",
+      "description": "Rotate a u32 deque left by k and emit the resulting sequence.\n\nInput: [k:u32le][x0:u32le][x1:u32le]...\nOutput: the rotated sequence encoded as u32le.\n\nMust use: std.deque_u32.emit_u32le.\nCanonical deque order is front-to-back.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-deque_u32@0.1.1",
+          "x07:stdlib-deque_u32@0.1.1/std.deque_u32.front_or",
+          "x07:stdlib-deque_u32@0.1.1/std.deque_u32.pop_front",
+          "x07:stdlib-deque_u32@0.1.1/std.deque_u32.with_capacity",
+          "x07:stdlib-deque_u32@0.1.1/std.deque_u32.push_back",
+          "x07:stdlib-deque_u32@0.1.1/std.deque_u32.emit_u32le"
+        ]
+      },
+      "cases": [
+        {
+          "name": "k1_4",
+          "input_b64": "AQAAAAoAAAAUAAAAHgAAACgAAAA=",
+          "expected_b64": "FAAAAB4AAAAoAAAACgAAAA=="
+        },
+        {
+          "name": "k3_5",
+          "input_b64": "AwAAAAEAAAACAAAAAwAAAAQAAAAFAAAA",
+          "expected_b64": "BAAAAAUAAAABAAAAAgAAAAMAAAA="
+        },
+        {
+          "name": "k0_2",
+          "input_b64": "AAAAAAcAAAAIAAAA",
+          "expected_b64": "BwAAAAgAAAA="
+        }
+      ]
+    },
+    {
+      "task_id": "pure/emitters_heap_emit_u32le_sorted",
+      "description": "Build a u32 min-heap from the input and return the canonical emitter output.\n\nInput: [x0:u32le][x1:u32le]...\nOutput: all elements in non-decreasing order, encoded as u32le.\n\nMust use: std.heap_u32.emit_u32le.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-heap_u32@0.1.1",
+          "x07:stdlib-heap_u32@0.1.1/std.heap_u32.with_capacity",
+          "x07:stdlib-heap_u32@0.1.1/std.heap_u32.push",
+          "x07:stdlib-heap_u32@0.1.1/std.heap_u32.emit_u32le"
+        ]
+      },
+      "cases": [
+        {
+          "name": "perm4",
+          "input_b64": "BAAAAAEAAAADAAAAAgAAAA==",
+          "expected_b64": "AQAAAAIAAAADAAAABAAAAA=="
+        },
+        {
+          "name": "dups",
+          "input_b64": "BQAAAAEAAAAFAAAAAgAAAA==",
+          "expected_b64": "AQAAAAIAAAAFAAAABQAAAA=="
+        },
+        {
+          "name": "perm_dups",
+          "input_b64": "AgAAAAUAAAABAAAABQAAAA==",
+          "expected_b64": "AQAAAAIAAAAFAAAABQAAAA=="
+        }
+      ]
+    }
+  ]
+}

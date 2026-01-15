@@ -1,0 +1,11 @@
+{
+  "report": "phaseH2_full",
+  "local_scores": "data/scores.csv",
+  "local_events": "data/events.jsonl",
+  "user_keys": [
+    "A",
+    "B",
+    "A"
+  ],
+  "kv_prefix": "cache:"
+}

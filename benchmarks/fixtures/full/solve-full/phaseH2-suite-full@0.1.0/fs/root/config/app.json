@@ -1,0 +1,9 @@
+{
+  "report": "phaseH2_fs",
+  "files": [
+    "data/a.txt",
+    "data/b.txt",
+    "data/c.txt"
+  ],
+  "threshold": 2
+}

@@ -1,0 +1,15 @@
+{
+  "default_ticks": 0,
+  "format": "x07.fs.latency@0.1.0",
+  "paths": {
+    "config/app.json": 5,
+    "config/files.txt": 5,
+    "data/a.txt": 30,
+    "data/b.txt": 10,
+    "data/big.json": 80,
+    "data/c.txt": 20,
+    "data/events.jsonl": 25,
+    "data/scores.csv": 15,
+    "data/users.csv": 25
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "schema_version": "x07.run-os-policy@0.1.0",
+  "policy_id": "ext_net_sockets_loopback_allow",
+  "limits": {
+    "cpu_ms": 5000,
+    "wall_ms": 6000,
+    "mem_bytes": 1073741824,
+    "fds": 1024,
+    "procs": 1024
+  },
+  "fs": {
+    "enabled": false,
+    "read_roots": [],
+    "write_roots": [],
+    "deny_hidden": true
+  },
+  "net": {
+    "enabled": true,
+    "allow_dns": true,
+    "allow_tcp": true,
+    "allow_udp": true,
+    "allow_hosts": [
+      {
+        "host": "127.0.0.1",
+        "ports": [
+          80,
+          30000, 30001, 30002, 30003, 30004, 30005, 30006, 30007, 30008, 30009,
+          30010, 30011, 30012, 30013, 30014, 30015, 30016, 30017, 30018, 30019,
+          30020, 30021, 30022, 30023, 30024, 30025, 30026, 30027, 30028, 30029,
+          30030, 30031
+        ]
+      },
+      {
+        "host": "localhost",
+        "ports": [
+          80,
+          30000, 30001, 30002, 30003, 30004, 30005, 30006, 30007, 30008, 30009,
+          30010, 30011, 30012, 30013, 30014, 30015, 30016, 30017, 30018, 30019,
+          30020, 30021, 30022, 30023, 30024, 30025, 30026, 30027, 30028, 30029,
+          30030, 30031
+        ]
+      },
+      {
+        "host": "[::1]",
+        "ports": [
+          80,
+          30000, 30001, 30002, 30003, 30004, 30005, 30006, 30007, 30008, 30009,
+          30010, 30011, 30012, 30013, 30014, 30015, 30016, 30017, 30018, 30019,
+          30020, 30021, 30022, 30023, 30024, 30025, 30026, 30027, 30028, 30029,
+          30030, 30031
+        ]
+      }
+    ]
+  },
+  "env": {
+    "enabled": false,
+    "allow_keys": [],
+    "deny_keys": []
+  },
+  "time": {
+    "enabled": false,
+    "allow_monotonic": false,
+    "allow_wall_clock": false,
+    "allow_sleep": false,
+    "max_sleep_ms": 0,
+    "allow_local_tzid": false
+  },
+  "language": {
+    "allow_unsafe": true,
+    "allow_ffi": true
+  },
+  "process": {
+    "enabled": false,
+    "allow_spawn": false,
+    "max_live": 0,
+    "max_spawns": 0,
+    "allow_exec": false,
+    "allow_exit": false
+  }
+}

@@ -1,0 +1,217 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  rustfmt:
+    name: ci / rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: cargo fmt --check
+        run: cargo fmt --check
+
+  test:
+    name: ci / test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+      - name: cargo test --workspace
+        run: cargo test --workspace
+
+  clippy:
+    name: ci / clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+      - name: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
+
+  contracts:
+    name: ci / contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+      - name: LLM/tool contracts
+        run: python3 scripts/check_contracts.py
+
+  e2e-smoke:
+    name: ci / e2e-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+      - name: x07 test smoke
+        shell: bash
+        run: ./scripts/ci/check_x07test_smoke.sh
+
+  determinism:
+    name: ci / determinism
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+      - name: Canary gate (includes determinism suites)
+        shell: bash
+        run: ./scripts/ci/check_canaries.sh
+
+  pkg-contracts:
+    name: ci / pkg-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+      - name: Package manager contracts (pack + lock)
+        run: python3 scripts/check_pkg_contracts.py --check
+
+  licenses:
+    name: ci / licenses
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: License files present
+        shell: bash
+        run: ./scripts/ci/check_licenses.sh
+
+  release-manifest:
+    name: ci / release-manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build release manifest (check)
+        run: python3 scripts/build_release_manifest.py --check
+
+  dco:
+    name: ci / dco
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: DCO sign-off
+        shell: bash
+        run: ./scripts/ci/check_dco.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"

@@ -1,0 +1,1 @@
+{"decls":[],"imports":[],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.1.0","solve":["begin",["let","n",["codec.read_u32_le","input",0]],["if",["<u","n",2],["codec.write_u32_le","n"],["begin",["let","a",0],["let","b",1],["for","i",2,["+","n",1],["begin",["let","tmp",["+","a","b"]],["set","a","b"],["set","b","tmp"],0]],["codec.write_u32_le","b"]]]]}

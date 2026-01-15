@@ -1,0 +1,32 @@
+[package]
+name = "x07-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+x07c = { path = "../crates/x07c" }
+x07-worlds = { path = "../crates/x07-worlds" }
+serde_json = "1.0"
+
+[[bin]]
+name = "parse_x07ast_json"
+path = "fuzz_targets/parse_x07ast_json.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parse_sexpr"
+path = "fuzz_targets/parse_sexpr.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "compile_program_to_c"
+path = "fuzz_targets/compile_program_to_c.rs"
+test = false
+doc = false

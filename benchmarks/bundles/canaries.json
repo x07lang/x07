@@ -1,0 +1,11 @@
+{
+  "bundle_id": "canaries@0.1.0",
+  "description": "Fast deterministic canaries (smoke suites + emitters).",
+  "pre_score_canaries": [],
+  "score_suites": [
+    "benchmarks/solve-pure/phaseH1-smoke.json",
+    "benchmarks/solve-full/phaseH2-smoke.json",
+    "benchmarks/solve-pure/emitters-v1-suite.json"
+  ],
+  "debug_suites": []
+}

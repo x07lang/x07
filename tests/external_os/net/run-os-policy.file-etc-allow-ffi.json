@@ -1,0 +1,52 @@
+{
+  "schema_version": "x07.run-os-policy@0.1.0",
+  "policy_id": "ext_net_file_etc_allow_ffi",
+  "limits": {
+    "cpu_ms": 5000,
+    "wall_ms": 6000,
+    "mem_bytes": 1073741824,
+    "fds": 1024,
+    "procs": 1024
+  },
+  "fs": {
+    "enabled": true,
+    "read_roots": [
+      "/",
+      "tmp"
+    ],
+    "write_roots": ["tmp"],
+    "deny_hidden": true
+  },
+  "net": {
+    "enabled": false,
+    "allow_dns": false,
+    "allow_tcp": false,
+    "allow_udp": false,
+    "allow_hosts": []
+  },
+  "env": {
+    "enabled": true,
+    "allow_keys": ["PWD", "GITHUB_WORKSPACE"],
+    "deny_keys": []
+  },
+  "time": {
+    "enabled": false,
+    "allow_monotonic": false,
+    "allow_wall_clock": false,
+    "allow_sleep": false,
+    "max_sleep_ms": 0,
+    "allow_local_tzid": false
+  },
+  "language": {
+    "allow_unsafe": true,
+    "allow_ffi": true
+  },
+  "process": {
+    "enabled": false,
+    "allow_spawn": false,
+    "max_live": 0,
+    "max_spawns": 0,
+    "allow_exec": false,
+    "allow_exit": false
+  }
+}

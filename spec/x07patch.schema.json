@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07patch.schema.json",
+  "title": "X07 x07Patch v0.1.0",
+  "description": "Repair output format for X07 LLM repair loops. This is JSON Patch (RFC 6902) over x07AST using JSON Pointer (RFC 6901).",
+  "type": "array",
+  "items": { "$ref": "x07diag.schema.json#/$defs/patch_op" }
+}

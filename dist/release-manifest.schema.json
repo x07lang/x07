@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/release-manifest.schema.json",
+  "title": "X07 release manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "git_sha", "rust_toolchain", "lockfiles", "schemas"],
+  "properties": {
+    "schema_version": { "const": "x07.release-manifest@0.1.0" },
+    "git_sha": { "type": "string" },
+    "rust_toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel"],
+      "properties": {
+        "channel": { "type": "string" }
+      }
+    },
+    "lockfiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cargo_lock", "stdlib_lock", "stdlib_os_lock"],
+      "properties": {
+        "cargo_lock": { "$ref": "#/$defs/file_hash" },
+        "stdlib_lock": { "$ref": "#/$defs/file_hash" },
+        "stdlib_os_lock": { "$ref": "#/$defs/file_hash" }
+      }
+    },
+    "schemas": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/schema_hash" }
+    }
+  },
+  "$defs": {
+    "file_hash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string" },
+        "sha256": { "type": "string" }
+      }
+    },
+    "schema_hash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string" },
+        "sha256": { "type": "string" },
+        "schema_id": { "type": "string" },
+        "schema_version": { "type": "string" }
+      }
+    }
+  }
+}
+

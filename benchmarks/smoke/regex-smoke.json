@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "expected_b64": "T0s=",
+      "input_b64": "",
+      "name": "default"
+    }
+  ],
+  "notes": [
+    "Smoke: ext.regex native backend (compile/exec/caps/find_all/split/replace)."
+  ],
+  "program_x07json": "tests/external_pure/regex_smoke/src/main.x07.json",
+  "schema_version": "x07.smoke_suite@0.1.0",
+  "suite_id": "smoke/ext-regex@0.2.0/pure",
+  "world": "solve-pure"
+}

@@ -1,0 +1,185 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.regex/basic_literal",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_basic_literal",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/alternation_longest",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_alternation_longest",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/grouping_basic",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_grouping_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/quantifiers_star_plus_qmark",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_quantifiers_star_plus_qmark",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/dot_any",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_dot_any",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/exec_from_v1",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_exec_from_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/find_all_x7sl_v1",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_find_all_x7sl_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/compile_opts_v1",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_compile_opts_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/char_class_ranges",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_char_class_ranges",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/repeat_ok",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_repeat_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/anchors_bol_eol",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_anchors_bol_eol",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/escapes_d_w_s",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_escapes_d_w_s",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/errors_unbalanced_paren",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_errors_unbalanced_paren",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/errors_unclosed_class",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_errors_unclosed_class",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/errors_invalid_escape",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_errors_invalid_escape",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/errors_nothing_to_repeat",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_errors_nothing_to_repeat",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/repeat_range",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_repeat_range",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/exec_caps_basic",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_exec_caps_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/exec_caps_missing_optional",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_exec_caps_missing_optional",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/exec_caps_nested",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_exec_caps_nested",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/exec_caps_noncapturing",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_exec_caps_noncapturing",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/replace_all_v1_basic",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_replace_all_v1_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/replace_all_v1_reorder",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_replace_all_v1_reorder",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/replace_all_v1_limit",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_replace_all_v1_limit",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/replace_all_v1_empty_match",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_replace_all_v1_empty_match",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/split_v1_basic",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_split_v1_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/split_v1_max_parts",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_split_v1_max_parts",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/split_v1_no_match",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_split_v1_no_match",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/split_v1_trailing",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_split_v1_trailing",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.regex/split_v1_empty_match_anchor",
+      "world": "solve-pure",
+      "entry": "ext.regex.tests.test_split_v1_empty_match_anchor",
+      "expect": "pass"
+    }
+  ]
+}

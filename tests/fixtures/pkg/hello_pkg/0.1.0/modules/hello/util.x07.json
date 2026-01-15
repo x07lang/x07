@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["hello.util.answer"]},{"body":["bytes.alloc",0],"kind":"defn","name":"hello.util.answer","params":[],"result":"bytes"}],"imports":[],"kind":"module","module_id":"hello.util","schema_version":"x07.x07ast@0.1.0"}

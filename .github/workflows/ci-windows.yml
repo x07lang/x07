@@ -1,0 +1,124 @@
+name: CI (Windows)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+
+jobs:
+  windows:
+    name: windows-latest
+    runs-on: windows-latest
+    timeout-minutes: 45
+    if: github.event_name != 'schedule'
+    env:
+      X07_PYTHON: python
+      X07_CC: gcc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2 (UCRT64, C toolchain + libs)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-curl
+            mingw-w64-ucrt-x86_64-sqlite3
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-pkgconf
+
+      - name: Add MSYS2 UCRT64 to PATH
+        shell: bash
+        run: echo "${RUNNER_TEMP}\\\\msys64\\\\ucrt64\\\\bin" >> "$GITHUB_PATH"
+
+      - name: Select MSYS2 gcc for builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_temp_posix="${RUNNER_TEMP//\\//}"
+          gcc_path="${runner_temp_posix}/msys64/ucrt64/bin/gcc.exe"
+          if [[ ! -x "$gcc_path" ]]; then
+            echo "ERROR: expected MSYS2 gcc at: $gcc_path" >&2
+            exit 2
+          fi
+          echo "X07_CC=$gcc_path" >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: CI gate
+        shell: bash
+        run: ./scripts/ci/check_all.sh
+
+  wsl2:
+    name: wsl2-ubuntu
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: wsl-bash {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up WSL2 (Ubuntu-22.04)
+        uses: Vampire/setup-wsl@v6
+        with:
+          distribution: Ubuntu-22.04
+          update: "true"
+          additional-packages: >-
+            bash
+            build-essential
+            ca-certificates
+            clang
+            curl
+            git
+            libcurl4-openssl-dev
+            libsqlite3-dev
+            libssl-dev
+            pkg-config
+            python3
+            python3-venv
+            xz-utils
+            zlib1g-dev
+
+      - name: Set up Rust (stable, WSL2)
+        run: |
+          set -euo pipefail
+          if ! command -v cargo >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --profile minimal --default-toolchain stable
+          fi
+
+          . "$HOME/.cargo/env"
+          rustup component add rustfmt clippy
+
+      - name: CI gate (WSL2 Ubuntu-22.04)
+        run: |
+          set -euo pipefail
+
+          workspace="$(pwd)"
+          sha="$(git -C "$workspace" rev-parse HEAD)"
+
+          . "$HOME/.cargo/env"
+
+          rm -rf /root/evolang-wsl
+          git clone --no-checkout "$workspace" /root/evolang-wsl
+          cd /root/evolang-wsl
+          git checkout "$sha"
+
+          bash ./scripts/ci/check_all.sh

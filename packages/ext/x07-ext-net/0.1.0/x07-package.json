@@ -1,0 +1,24 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-net",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": [
+    "std.net.err",
+    "std.net.codec",
+    "std.net.dns",
+    "std.net.tcp",
+    "std.net.tls",
+    "std.net.udp",
+    "std.net.io",
+    "std.net.http",
+    "std.net.http.spec",
+    "std.net.http.client",
+    "std.net.http.server"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
+    "import_mode": "handwritten"
+  }
+}

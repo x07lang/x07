@@ -1,0 +1,13 @@
+[package]
+name = "regex_count"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+regex = "1"
+
+[profile.release]
+opt-level = 3
+lto = true

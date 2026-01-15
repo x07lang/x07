@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "web_crawler/src/main.x07.json",
+  "module_roots": ["web_crawler/src"],
+  "dependencies": [
+    { "name": "ext-fs", "version": "0.1.0", "path": "pkgs/ext-fs/0.1.0" },
+    { "name": "ext-net", "version": "0.1.0", "path": "pkgs/ext-net/0.1.0" },
+    { "name": "ext-curl-c", "version": "0.1.0", "path": "pkgs/ext-curl-c/0.1.0" }
+  ],
+  "lockfile": "web_crawler.lock.json"
+}

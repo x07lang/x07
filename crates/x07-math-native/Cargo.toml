@@ -1,0 +1,21 @@
+[package]
+name = "x07-math-native"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+name = "x07_math"
+crate-type = ["staticlib"]
+test = false
+doctest = false
+
+[dependencies]
+# Deterministic libm-style implementations (pure Rust).
+libm = "0.2"
+
+# Shortest correctly-rounded float -> string.
+ryu = "1"
+
+# Pinned float parser (exact rounding; locale-independent).
+lexical-core = "1"

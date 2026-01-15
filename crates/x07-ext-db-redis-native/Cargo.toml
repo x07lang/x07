@@ -1,0 +1,19 @@
+[package]
+name = "x07-ext-db-redis-native"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+name = "x07_ext_db_redis"
+crate-type = ["staticlib"]
+test = false
+doctest = false
+
+[dependencies]
+x07-ext-db-native-core = { path = "../x07-ext-db-native-core" }
+itoa = "1.0.11"
+once_cell = "1.19.0"
+rustls-tokio-postgres = { version = "0.1.2", default-features = false, features = ["webpki-roots"] }
+tokio = { version = "1.37.0", features = ["rt", "time", "net", "io-util", "sync"] }
+tokio-rustls = "0.26.4"

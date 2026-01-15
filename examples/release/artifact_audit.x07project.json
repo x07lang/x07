@@ -1,0 +1,14 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "artifact_audit/src/main.x07.json",
+  "module_roots": ["artifact_audit/src"],
+  "dependencies": [
+    { "name": "ext-compress-rs", "version": "0.1.0", "path": "pkgs/ext-compress-rs/0.1.0" },
+    { "name": "ext-tar-rs", "version": "0.1.0", "path": "pkgs/ext-tar-rs/0.1.0" },
+    { "name": "ext-crypto-rs", "version": "0.1.0", "path": "pkgs/ext-crypto-rs/0.1.0" },
+    { "name": "ext-hex-rs", "version": "0.1.0", "path": "pkgs/ext-hex-rs/0.1.0" },
+    { "name": "ext-json-rs", "version": "0.1.0", "path": "pkgs/ext-json-rs/0.1.0" }
+  ],
+  "lockfile": "artifact_audit.lock.json"
+}

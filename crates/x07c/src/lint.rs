@@ -1,0 +1,568 @@
+use crate::ast::Expr;
+use crate::diagnostics::{
+    Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Report, Severity, Stage,
+};
+use crate::x07ast::{self, X07AstFile, X07AstKind};
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LintOptions {
+    pub world: x07_worlds::WorldId,
+    pub enable_fs: bool,
+    pub enable_rr: bool,
+    pub enable_kv: bool,
+    pub allow_unsafe: Option<bool>,
+    pub allow_ffi: Option<bool>,
+}
+
+impl LintOptions {
+    pub fn allow_unsafe(&self) -> bool {
+        self.allow_unsafe
+            .unwrap_or_else(|| self.world.caps().allow_unsafe)
+    }
+
+    pub fn allow_ffi(&self) -> bool {
+        self.allow_ffi
+            .unwrap_or_else(|| self.world.caps().allow_ffi)
+    }
+}
+
+pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+
+    match file.kind {
+        X07AstKind::Entry => {
+            if file.solve.is_none() {
+                diagnostics.push(Diagnostic {
+                    code: "X07-AST-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Parse,
+                    message: "entry file must contain /solve".to_string(),
+                    loc: Some(Location::X07Ast {
+                        ptr: "/solve".to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                });
+            }
+        }
+        X07AstKind::Module => {}
+    }
+
+    lint_world_imports(file, options, &mut diagnostics);
+    lint_world_decls(file, options, &mut diagnostics);
+
+    if let Some(solve) = &file.solve {
+        lint_expr(solve, "/solve", options, &mut diagnostics);
+    }
+
+    let export_slots = if file.kind == X07AstKind::Module && !file.exports.is_empty() {
+        1usize
+    } else {
+        0usize
+    };
+    let extern_slots = file.extern_functions.len();
+    let defn_base = export_slots + extern_slots;
+
+    for (idx, f) in file.functions.iter().enumerate() {
+        let ptr = format!("/decls/{}/body", defn_base + idx);
+        lint_expr(&f.body, &ptr, options, &mut diagnostics);
+    }
+    for (idx, f) in file.async_functions.iter().enumerate() {
+        let ptr = format!("/decls/{}/body", defn_base + file.functions.len() + idx);
+        lint_expr(&f.body, &ptr, options, &mut diagnostics);
+    }
+
+    Report::ok().with_diagnostics(diagnostics)
+}
+
+fn lint_world_decls(file: &X07AstFile, options: LintOptions, diagnostics: &mut Vec<Diagnostic>) {
+    let export_slots = if file.kind == X07AstKind::Module && !file.exports.is_empty() {
+        1usize
+    } else {
+        0usize
+    };
+
+    if !options.allow_ffi() {
+        for (idx, f) in file.extern_functions.iter().enumerate() {
+            let ptr = format!("/decls/{}/name", export_slots + idx);
+            diagnostics.push(Diagnostic {
+                code: "X07-WORLD-FFI-0001".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Lint,
+                message: format!(
+                    "ffi capability is not enabled in this world: extern decl {}",
+                    f.name
+                ),
+                loc: Some(Location::X07Ast { ptr }),
+                notes: vec![
+                    "Compile with --world run-os or --world run-os-sandboxed for extern C interop."
+                        .to_string(),
+                ],
+                related: Vec::new(),
+                data: Default::default(),
+                quickfix: None,
+            });
+        }
+    }
+
+    if !options.allow_unsafe() {
+        let mut check_defn_like = |base: usize,
+                                   idx: usize,
+                                   name: &str,
+                                   params: &[crate::program::FunctionParam],
+                                   ret_ty: crate::types::Ty| {
+            for (pidx, p) in params.iter().enumerate() {
+                if p.ty.is_ptr_ty() {
+                    diagnostics.push(Diagnostic {
+                        code: "X07-WORLD-UNSAFE-0002".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Lint,
+                        message: format!("unsafe capability is not enabled in this world: raw pointer type in signature of {name}"),
+                        loc: Some(Location::X07Ast {
+                            ptr: format!("/decls/{}/params/{}/ty", base + idx, pidx),
+                        }),
+                        notes: vec![
+                            "Compile with --world run-os or --world run-os-sandboxed for raw pointers."
+                                .to_string(),
+                        ],
+                        related: Vec::new(),
+                        data: Default::default(),
+                        quickfix: None,
+                    });
+                }
+            }
+            if ret_ty.is_ptr_ty() {
+                diagnostics.push(Diagnostic {
+                    code: "X07-WORLD-UNSAFE-0002".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: format!("unsafe capability is not enabled in this world: raw pointer type in signature of {name}"),
+                    loc: Some(Location::X07Ast {
+                        ptr: format!("/decls/{}/result", base + idx),
+                    }),
+                    notes: vec![
+                        "Compile with --world run-os or --world run-os-sandboxed for raw pointers."
+                            .to_string(),
+                    ],
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                });
+            }
+        };
+
+        for (idx, f) in file.extern_functions.iter().enumerate() {
+            check_defn_like(export_slots, idx, &f.name, &f.params, f.ret_ty);
+        }
+        let defn_base = export_slots + file.extern_functions.len();
+        for (idx, f) in file.functions.iter().enumerate() {
+            check_defn_like(defn_base, idx, &f.name, &f.params, f.ret_ty);
+        }
+        for (idx, f) in file.async_functions.iter().enumerate() {
+            check_defn_like(
+                defn_base + file.functions.len(),
+                idx,
+                &f.name,
+                &f.params,
+                f.ret_ty,
+            );
+        }
+    }
+}
+
+fn lint_world_imports(file: &X07AstFile, options: LintOptions, diagnostics: &mut Vec<Diagnostic>) {
+    if options.world.is_eval_world() {
+        let has_os = file.imports.iter().any(|m| m.starts_with("std.os."));
+        if has_os {
+            let allowed: Vec<String> = file
+                .imports
+                .iter()
+                .filter(|m| !m.starts_with("std.os."))
+                .cloned()
+                .collect();
+            diagnostics.push(Diagnostic {
+                code: "X07-WORLD-OS-0001".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Lint,
+                message: "std.os.* modules are not allowed in solve-* worlds".to_string(),
+                loc: Some(Location::X07Ast {
+                    ptr: "/imports".to_string(),
+                }),
+                notes: vec![
+                    "Use solve-* world adapters (std.fs/std.rr/std.kv) in evaluation.".to_string(),
+                    "std.os.* is standalone-only (run-os / run-os-sandboxed).".to_string(),
+                ],
+                related: Vec::new(),
+                data: Default::default(),
+                quickfix: Some(Quickfix {
+                    kind: QuickfixKind::JsonPatch,
+                    patch: vec![PatchOp::Replace {
+                        path: "/imports".to_string(),
+                        value: serde_json::Value::Array(
+                            allowed.into_iter().map(serde_json::Value::String).collect(),
+                        ),
+                    }],
+                    note: Some("Remove std.os.* imports".to_string()),
+                }),
+            });
+        }
+    }
+
+    let mut forbidden: Vec<&str> = Vec::new();
+    if !options.enable_fs {
+        forbidden.push("std.fs");
+    }
+    if !options.enable_rr {
+        forbidden.push("std.rr");
+    }
+    if !options.enable_kv {
+        forbidden.push("std.kv");
+    }
+    if forbidden.is_empty() {
+        return;
+    }
+
+    let has_forbidden = forbidden.iter().any(|m| file.imports.contains(*m));
+    if !has_forbidden {
+        return;
+    }
+
+    let mut notes = Vec::new();
+    for m in &forbidden {
+        if file.imports.contains(*m) {
+            notes.push(format!("forbidden import in this world: {m}"));
+        }
+    }
+
+    let allowed: Vec<String> = file
+        .imports
+        .iter()
+        .filter(|m| !forbidden.contains(&m.as_str()))
+        .cloned()
+        .collect();
+
+    diagnostics.push(Diagnostic {
+        code: "X07-WORLD-0001".to_string(),
+        severity: Severity::Error,
+        stage: Stage::Lint,
+        message: "program imports modules not allowed in this world".to_string(),
+        loc: Some(Location::X07Ast {
+            ptr: "/imports".to_string(),
+        }),
+        notes,
+        related: Vec::new(),
+        data: Default::default(),
+        quickfix: Some(Quickfix {
+            kind: QuickfixKind::JsonPatch,
+            patch: vec![PatchOp::Replace {
+                path: "/imports".to_string(),
+                value: serde_json::Value::Array(
+                    allowed.into_iter().map(serde_json::Value::String).collect(),
+                ),
+            }],
+            note: Some("Remove forbidden imports".to_string()),
+        }),
+    });
+}
+
+fn lint_expr(expr: &Expr, ptr: &str, options: LintOptions, diagnostics: &mut Vec<Diagnostic>) {
+    match expr {
+        Expr::Int(_) | Expr::Ident(_) => {}
+        Expr::List(items) => {
+            if items.is_empty() {
+                diagnostics.push(Diagnostic {
+                    code: "X07-ARITY-0000".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: "list expression must not be empty".to_string(),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                });
+                return;
+            }
+            let head = items[0].as_ident().unwrap_or("");
+            lint_core_arity(head, items, ptr, diagnostics);
+            lint_world_heads(head, ptr, options, diagnostics);
+
+            for (idx, item) in items.iter().enumerate() {
+                lint_expr(item, &format!("{ptr}/{idx}"), options, diagnostics);
+            }
+        }
+    }
+}
+
+fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<Diagnostic>) {
+    match head {
+        "if" => {
+            if items.len() != 4 {
+                diagnostics.push(Diagnostic {
+                    code: "X07-ARITY-IF-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: format!("if expects 3 args; got {}", items.len().saturating_sub(1)),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                });
+            }
+        }
+        "for" => {
+            if items.len() != 5 {
+                let mut diag = Diagnostic {
+                    code: "X07-ARITY-FOR-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: format!("for expects 4 args; got {}", items.len().saturating_sub(1)),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                };
+                if items.len() > 5 {
+                    let mut new_items: Vec<Expr> = Vec::with_capacity(5);
+                    new_items.extend(items[0..4].iter().cloned());
+                    let mut begin_items: Vec<Expr> =
+                        Vec::with_capacity(items.len().saturating_sub(3));
+                    begin_items.push(Expr::Ident("begin".to_string()));
+                    begin_items.extend(items[4..].iter().cloned());
+                    new_items.push(Expr::List(begin_items));
+                    diag.quickfix = Some(Quickfix {
+                        kind: QuickfixKind::JsonPatch,
+                        patch: vec![PatchOp::Replace {
+                            path: ptr.to_string(),
+                            value: x07ast::expr_to_value(&Expr::List(new_items)),
+                        }],
+                        note: Some("Wrap extra for body expressions in begin".to_string()),
+                    });
+                }
+                diagnostics.push(diag);
+            }
+        }
+        "begin" => {
+            if items.len() < 2 {
+                diagnostics.push(Diagnostic {
+                    code: "X07-ARITY-BEGIN-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: "begin expects at least 1 expression".to_string(),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                });
+            }
+        }
+        "unsafe" => {
+            if items.len() < 2 {
+                diagnostics.push(Diagnostic {
+                    code: "X07-ARITY-UNSAFE-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: "unsafe expects at least 1 expression".to_string(),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                });
+            }
+            let exprs = items.len().saturating_sub(1);
+            if exprs > 16 {
+                diagnostics.push(Diagnostic {
+                    code: "X07-UNSAFE-0001".to_string(),
+                    severity: Severity::Warning,
+                    stage: Stage::Lint,
+                    message: format!("unsafe block is large: {exprs} expressions"),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: vec!["Try to reduce the unsafe surface area.".to_string()],
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                });
+            }
+        }
+        "let" | "set" => {
+            if items.len() != 3 {
+                let mut diag = Diagnostic {
+                    code: "X07-ARITY-LET-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: format!(
+                        "{head} expects 2 args; got {}",
+                        items.len().saturating_sub(1)
+                    ),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                };
+
+                if items.len() > 3 {
+                    let mut begin_items: Vec<Expr> = Vec::with_capacity(items.len());
+                    begin_items.push(Expr::Ident("begin".to_string()));
+                    begin_items.push(Expr::List(items[0..3].to_vec()));
+                    begin_items.extend(items[3..].iter().cloned());
+                    diag.quickfix = Some(Quickfix {
+                        kind: QuickfixKind::JsonPatch,
+                        patch: vec![PatchOp::Replace {
+                            path: ptr.to_string(),
+                            value: x07ast::expr_to_value(&Expr::List(begin_items)),
+                        }],
+                        note: Some(format!("Rewrite {head} with body into begin")),
+                    });
+                }
+
+                diagnostics.push(diag);
+            }
+        }
+        "return" => {
+            if items.len() != 2 {
+                diagnostics.push(Diagnostic {
+                    code: "X07-ARITY-RETURN-0001".to_string(),
+                    severity: Severity::Error,
+                    stage: Stage::Lint,
+                    message: format!(
+                        "return expects 1 arg; got {}",
+                        items.len().saturating_sub(1)
+                    ),
+                    loc: Some(Location::X07Ast {
+                        ptr: ptr.to_string(),
+                    }),
+                    notes: Vec::new(),
+                    related: Vec::new(),
+                    data: Default::default(),
+                    quickfix: None,
+                });
+            }
+        }
+        _ => {}
+    }
+}
+
+fn lint_world_heads(
+    head: &str,
+    ptr: &str,
+    options: LintOptions,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let requires_unsafe = head == "unsafe"
+        || head == "addr_of"
+        || head == "addr_of_mut"
+        || head == "memcpy"
+        || head == "memmove"
+        || head == "memset"
+        || head == "bytes.as_ptr"
+        || head == "bytes.as_mut_ptr"
+        || head == "view.as_ptr"
+        || head == "vec_u8.as_ptr"
+        || head == "vec_u8.as_mut_ptr"
+        || head.starts_with("ptr.");
+
+    if requires_unsafe && !options.allow_unsafe() {
+        diagnostics.push(Diagnostic {
+            code: "X07-WORLD-UNSAFE-0001".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Lint,
+            message: format!("unsafe capability is not enabled in this world: {head}"),
+            loc: Some(Location::X07Ast {
+                ptr: ptr.to_string(),
+            }),
+            notes: vec![
+                "Compile with --world run-os or --world run-os-sandboxed for unsafe operations."
+                    .to_string(),
+            ],
+            related: Vec::new(),
+            data: Default::default(),
+            quickfix: None,
+        });
+    }
+
+    if options.world.is_eval_world() && (head.starts_with("os.") || head.starts_with("std.os.")) {
+        diagnostics.push(Diagnostic {
+            code: "X07-WORLD-OS-0002".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Lint,
+            message: format!("OS capability is not allowed in solve-* worlds: {head}"),
+            loc: Some(Location::X07Ast {
+                ptr: ptr.to_string(),
+            }),
+            notes: vec![
+                "Compile with --world run-os or --world run-os-sandboxed for os.* builtins."
+                    .to_string(),
+            ],
+            related: Vec::new(),
+            data: Default::default(),
+            quickfix: None,
+        });
+    }
+
+    if !options.enable_fs && (head.starts_with("fs.") || head.starts_with("std.fs.")) {
+        diagnostics.push(Diagnostic {
+            code: "X07-WORLD-FS-0001".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Lint,
+            message: format!("filesystem capability is not enabled in this world: {head}"),
+            loc: Some(Location::X07Ast {
+                ptr: ptr.to_string(),
+            }),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: Default::default(),
+            quickfix: None,
+        });
+    }
+    if !options.enable_rr && (head.starts_with("rr.") || head.starts_with("std.rr.")) {
+        diagnostics.push(Diagnostic {
+            code: "X07-WORLD-RR-0001".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Lint,
+            message: format!("request/response capability is not enabled in this world: {head}"),
+            loc: Some(Location::X07Ast {
+                ptr: ptr.to_string(),
+            }),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: Default::default(),
+            quickfix: None,
+        });
+    }
+    if !options.enable_kv && (head.starts_with("kv.") || head.starts_with("std.kv.")) {
+        diagnostics.push(Diagnostic {
+            code: "X07-WORLD-KV-0001".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Lint,
+            message: format!("key/value capability is not enabled in this world: {head}"),
+            loc: Some(Location::X07Ast {
+                ptr: ptr.to_string(),
+            }),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: Default::default(),
+            quickfix: None,
+        });
+    }
+}

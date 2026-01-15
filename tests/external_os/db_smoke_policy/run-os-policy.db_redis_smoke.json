@@ -1,0 +1,88 @@
+{
+  "schema_version": "x07.run-os-policy@0.1.0",
+  "policy_id": "db_redis_smoke",
+  "limits": {
+    "cpu_ms": 5000,
+    "wall_ms": 6000,
+    "mem_bytes": 134217728,
+    "fds": 64,
+    "procs": 16
+  },
+  "fs": {
+    "enabled": false,
+    "read_roots": [],
+    "write_roots": [],
+    "deny_hidden": true,
+    "allow_symlinks": false,
+    "allow_mkdir": false,
+    "allow_remove": false,
+    "allow_rename": false,
+    "allow_walk": false,
+    "allow_glob": false,
+    "max_read_bytes": 0,
+    "max_write_bytes": 0,
+    "max_entries": 0,
+    "max_depth": 0
+  },
+  "net": {
+    "enabled": false,
+    "allow_dns": false,
+    "allow_tcp": false,
+    "allow_udp": false,
+    "allow_hosts": []
+  },
+  "db": {
+    "enabled": true,
+    "drivers": {
+      "sqlite": false,
+      "postgres": false,
+      "mysql": false,
+      "redis": true
+    },
+    "max_live_conns": 8,
+    "max_queries": 1000,
+    "connect_timeout_ms": 5000,
+    "query_timeout_ms": 30000,
+    "max_sql_bytes": 1048576,
+    "max_rows": 10000,
+    "max_resp_bytes": 8388608,
+    "sqlite": {
+      "allow_paths": [],
+      "readonly_only": false,
+      "allow_create": false,
+      "allow_in_memory": false
+    },
+    "net": {
+      "allow_dns": [],
+      "allow_cidrs": ["127.0.0.1/32"],
+      "allow_ports": [6379],
+      "require_tls": false,
+      "require_verify": false
+    }
+  },
+  "env": {
+    "enabled": false,
+    "allow_keys": [],
+    "deny_keys": []
+  },
+  "time": {
+    "enabled": false,
+    "allow_monotonic": false,
+    "allow_wall_clock": false,
+    "allow_sleep": false,
+    "max_sleep_ms": 0,
+    "allow_local_tzid": false
+  },
+  "language": {
+    "allow_unsafe": false,
+    "allow_ffi": false
+  },
+  "process": {
+    "enabled": false,
+    "allow_spawn": false,
+    "max_live": 0,
+    "max_spawns": 0,
+    "allow_exec": false,
+    "allow_exit": false
+  }
+}

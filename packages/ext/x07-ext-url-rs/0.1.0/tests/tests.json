@@ -1,0 +1,53 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.url/parse_full_url",
+      "world": "solve-pure",
+      "entry": "ext.url.tests.test_parse_full_url",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.url/percent_encode_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.url.tests.test_percent_encode_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.httparse/lowercase_ascii",
+      "world": "solve-pure",
+      "entry": "ext.httparse.tests.test_lowercase_ascii",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.httparse/parse_request_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.httparse.tests.test_parse_request_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.httparse/parse_request_no_headers",
+      "world": "solve-pure",
+      "entry": "ext.httparse.tests.test_parse_request_no_headers",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.httparse/parse_response_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.httparse.tests.test_parse_response_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.httparse/parse_partial_is_err",
+      "world": "solve-pure",
+      "entry": "ext.httparse.tests.test_parse_partial_is_err",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.httparse/parse_bad_header_is_err",
+      "world": "solve-pure",
+      "entry": "ext.httparse.tests.test_parse_bad_header_is_err",
+      "expect": "pass"
+    }
+  ]
+}

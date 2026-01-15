@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["std.os.time.now_unix_ms"]},{"body":["std.world.time.now_unix_ms"],"kind":"defn","name":"std.os.time.now_unix_ms","params":[],"result":"i32"}],"imports":["std.world.time"],"kind":"module","module_id":"std.os.time","schema_version":"x07.x07ast@0.1.0"}

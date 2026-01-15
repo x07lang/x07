@@ -1,0 +1,22 @@
+{
+  "suite_id": "solve-pure/cli-v1-specrows-determinism@0.1.0",
+  "world": "solve-pure",
+  "tasks": [
+    {
+      "task_id": "cli/specrows_compile_parse_v1",
+      "description": "Input layout: u32_le spec_json_len || specrows_json_utf8 || argv_blob_v1. The solution must compile the SpecRows, parse argv, and return matches_v1 bytes. Case 2 asserts implied --help works even if the spec did not include a help row.",
+      "cases": [
+        {
+          "name": "basic_verbose_opt_arg",
+          "input_b64": "NgEAAHsiYXBwIjp7ImFib3V0IjoiZGVtbyIsIm5hbWUiOiJkZW1vIiwidmVyc2lvbiI6IjAuMS4wIn0sInJvd3MiOltbInJvb3QiLCJmbGFnIiwiLXYiLCItLXZlcmJvc2UiLCJ2ZXJib3NlIiwiRW5hYmxlIHZlcmJvc2UiLHt9XSxbInJvb3QiLCJvcHQiLCItbyIsIi0tb3V0cHV0Iiwib3V0cHV0IiwiUEFUSCIsIk91dHB1dCBmaWxlIix7InJlcXVpcmVkIjp0cnVlfV0sWyJyb290IiwiYXJnIiwiSU5QVVQiLCJpbnB1dCIsIklucHV0IGZpbGUiLHsicmVxdWlyZWQiOnRydWV9XV0sInNjaGVtYV92ZXJzaW9uIjoieDA3Y2xpLnNwZWNyb3dzQDAuMS4wIn0FAAAABAAAAGRlbW8CAAAALXYIAAAALS1vdXRwdXQFAAAAeC50eHQIAAAAZmlsZS5iaW4=",
+          "expected_b64": "AQQAAAByb290AwAAAAUAAABpbnB1dAMIAAAAZmlsZS5iaW4GAAAAb3V0cHV0AgUAAAB4LnR4dAcAAAB2ZXJib3NlAQEAAAAB"
+        },
+        {
+          "name": "implied_help_flag",
+          "input_b64": "NgEAAHsiYXBwIjp7ImFib3V0IjoiZGVtbyIsIm5hbWUiOiJkZW1vIiwidmVyc2lvbiI6IjAuMS4wIn0sInJvd3MiOltbInJvb3QiLCJmbGFnIiwiLXYiLCItLXZlcmJvc2UiLCJ2ZXJib3NlIiwiRW5hYmxlIHZlcmJvc2UiLHt9XSxbInJvb3QiLCJvcHQiLCItbyIsIi0tb3V0cHV0Iiwib3V0cHV0IiwiUEFUSCIsIk91dHB1dCBmaWxlIix7InJlcXVpcmVkIjp0cnVlfV0sWyJyb290IiwiYXJnIiwiSU5QVVQiLCJpbnB1dCIsIklucHV0IGZpbGUiLHsicmVxdWlyZWQiOnRydWV9XV0sInNjaGVtYV92ZXJzaW9uIjoieDA3Y2xpLnNwZWNyb3dzQDAuMS4wIn0CAAAABAAAAGRlbW8GAAAALS1oZWxw",
+          "expected_b64": "AQQAAAByb290AQAAAAQAAABoZWxwAQEAAAAB"
+        }
+      ]
+    }
+  ]
+}

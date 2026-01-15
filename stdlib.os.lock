@@ -1,0 +1,208 @@
+{
+  "format": "x07.stdlib.lock@0.1.0",
+  "lock_version": 1,
+  "packages": [
+    {
+      "name": "std.os.env",
+      "path": "stdlib/os/0.1.0/modules/std/os/env.x07.json",
+      "relpath": "os/0.1.0/modules/std/os/env.x07.json",
+      "sha256": "108a1faac1fabdeb14e650c0096dd11e01471a80cc7ca42e471b100dca2f3c0e",
+      "size_bytes": 293,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.os.env",
+      "path": "stdlib/os/0.2.0/modules/std/os/env.x07.json",
+      "relpath": "os/0.2.0/modules/std/os/env.x07.json",
+      "sha256": "108a1faac1fabdeb14e650c0096dd11e01471a80cc7ca42e471b100dca2f3c0e",
+      "size_bytes": 293,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.os.fs",
+      "path": "stdlib/os/0.1.0/modules/std/os/fs.x07.json",
+      "relpath": "os/0.1.0/modules/std/os/fs.x07.json",
+      "sha256": "664de1d17e15b9cd67b7ee715c9b517d80c661fba9fb7c0c457c3d0f630bcc16",
+      "size_bytes": 510,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.os.net",
+      "path": "stdlib/os/0.1.0/modules/std/os/net.x07.json",
+      "relpath": "os/0.1.0/modules/std/os/net.x07.json",
+      "sha256": "83319234a9a4f7aa2523d6a0460d8b8fb7288f313212e0cc132ba369dd8e699a",
+      "size_bytes": 320,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.os.net",
+      "path": "stdlib/os/0.2.0/modules/std/os/net.x07.json",
+      "relpath": "os/0.2.0/modules/std/os/net.x07.json",
+      "sha256": "83319234a9a4f7aa2523d6a0460d8b8fb7288f313212e0cc132ba369dd8e699a",
+      "size_bytes": 320,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.os.process",
+      "path": "stdlib/os/0.1.0/modules/std/os/process.x07.json",
+      "relpath": "os/0.1.0/modules/std/os/process.x07.json",
+      "sha256": "ef1d1a33034892abea661a6d48a9663ea91e02c85647dfb2ed67811ae91708ff",
+      "size_bytes": 5349,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.os.process",
+      "path": "stdlib/os/0.2.0/modules/std/os/process.x07.json",
+      "relpath": "os/0.2.0/modules/std/os/process.x07.json",
+      "sha256": "ef1d1a33034892abea661a6d48a9663ea91e02c85647dfb2ed67811ae91708ff",
+      "size_bytes": 5349,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.os.process.caps_v1",
+      "path": "stdlib/os/0.1.0/modules/std/os/process/caps_v1.x07.json",
+      "relpath": "os/0.1.0/modules/std/os/process/caps_v1.x07.json",
+      "sha256": "23d611cc8ba43665437214ad908ea5355743474bd8239b650242237b4425abff",
+      "size_bytes": 752,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.os.process.caps_v1",
+      "path": "stdlib/os/0.2.0/modules/std/os/process/caps_v1.x07.json",
+      "relpath": "os/0.2.0/modules/std/os/process/caps_v1.x07.json",
+      "sha256": "23d611cc8ba43665437214ad908ea5355743474bd8239b650242237b4425abff",
+      "size_bytes": 752,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.os.process.req_v1",
+      "path": "stdlib/os/0.1.0/modules/std/os/process/req_v1.x07.json",
+      "relpath": "os/0.1.0/modules/std/os/process/req_v1.x07.json",
+      "sha256": "13d94ba6695dae0b781c357ceb2803ef705878e69ccab4d22951c52bb88defee",
+      "size_bytes": 11422,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.os.process.req_v1",
+      "path": "stdlib/os/0.2.0/modules/std/os/process/req_v1.x07.json",
+      "relpath": "os/0.2.0/modules/std/os/process/req_v1.x07.json",
+      "sha256": "13d94ba6695dae0b781c357ceb2803ef705878e69ccab4d22951c52bb88defee",
+      "size_bytes": 11422,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.os.process_pool",
+      "path": "stdlib/os/0.1.0/modules/std/os/process_pool.x07.json",
+      "relpath": "os/0.1.0/modules/std/os/process_pool.x07.json",
+      "sha256": "c9d7a09ab37a6bee7edae46e032ad2b5ec3ada93103f68f9ca57a5c340671954",
+      "size_bytes": 9999,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.os.process_pool",
+      "path": "stdlib/os/0.2.0/modules/std/os/process_pool.x07.json",
+      "relpath": "os/0.2.0/modules/std/os/process_pool.x07.json",
+      "sha256": "c9d7a09ab37a6bee7edae46e032ad2b5ec3ada93103f68f9ca57a5c340671954",
+      "size_bytes": 9999,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.os.time",
+      "path": "stdlib/os/0.1.0/modules/std/os/time.x07.json",
+      "relpath": "os/0.1.0/modules/std/os/time.x07.json",
+      "sha256": "a38d62bb1615df6fec161b791cc8e88cd1a0a5d7c009b947ad3d82feaf4153ba",
+      "size_bytes": 287,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.os.time",
+      "path": "stdlib/os/0.2.0/modules/std/os/time.x07.json",
+      "relpath": "os/0.2.0/modules/std/os/time.x07.json",
+      "sha256": "a38d62bb1615df6fec161b791cc8e88cd1a0a5d7c009b947ad3d82feaf4153ba",
+      "size_bytes": 287,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.world.env",
+      "path": "stdlib/os/0.1.0/modules/std/world/env.x07.json",
+      "relpath": "os/0.1.0/modules/std/world/env.x07.json",
+      "sha256": "c8e9854bfe14c3b5071a9d35a31a38934a0a2175bda2ef1ccc0c5a1d7a4316f7",
+      "size_bytes": 280,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.world.env",
+      "path": "stdlib/os/0.2.0/modules/std/world/env.x07.json",
+      "relpath": "os/0.2.0/modules/std/world/env.x07.json",
+      "sha256": "c8e9854bfe14c3b5071a9d35a31a38934a0a2175bda2ef1ccc0c5a1d7a4316f7",
+      "size_bytes": 280,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.world.fs",
+      "path": "stdlib/os/0.1.0/modules/std/world/fs.x07.json",
+      "relpath": "os/0.1.0/modules/std/world/fs.x07.json",
+      "sha256": "8df5da85e79a0b438ad607f5afb5a978f0c1af0c5c3ba82656ee53cbd9fe570a",
+      "size_bytes": 673,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.world.fs",
+      "path": "stdlib/os/0.2.0/modules/std/world/fs.x07.json",
+      "relpath": "os/0.2.0/modules/std/world/fs.x07.json",
+      "sha256": "8df5da85e79a0b438ad607f5afb5a978f0c1af0c5c3ba82656ee53cbd9fe570a",
+      "size_bytes": 673,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.world.net",
+      "path": "stdlib/os/0.1.0/modules/std/world/net.x07.json",
+      "relpath": "os/0.1.0/modules/std/world/net.x07.json",
+      "sha256": "0b63fa58a884b2cd1bfde0fb1065a870dba92431eedd0f73ede0dcfe8b801bb3",
+      "size_bytes": 307,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.world.net",
+      "path": "stdlib/os/0.2.0/modules/std/world/net.x07.json",
+      "relpath": "os/0.2.0/modules/std/world/net.x07.json",
+      "sha256": "0b63fa58a884b2cd1bfde0fb1065a870dba92431eedd0f73ede0dcfe8b801bb3",
+      "size_bytes": 307,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.world.process",
+      "path": "stdlib/os/0.1.0/modules/std/world/process.x07.json",
+      "relpath": "os/0.1.0/modules/std/world/process.x07.json",
+      "sha256": "9a568643dae80b1a226ef7fdc8e85f064a3cc25638dce9da1e5a470ce2b52b77",
+      "size_bytes": 7134,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.world.process",
+      "path": "stdlib/os/0.2.0/modules/std/world/process.x07.json",
+      "relpath": "os/0.2.0/modules/std/world/process.x07.json",
+      "sha256": "9a568643dae80b1a226ef7fdc8e85f064a3cc25638dce9da1e5a470ce2b52b77",
+      "size_bytes": 7134,
+      "version": "0.2.0"
+    },
+    {
+      "name": "std.world.time",
+      "path": "stdlib/os/0.1.0/modules/std/world/time.x07.json",
+      "relpath": "os/0.1.0/modules/std/world/time.x07.json",
+      "sha256": "e724efb7088a0a5d4d20deda82464253b927380d37fb734d44d07d7f214d2d99",
+      "size_bytes": 273,
+      "version": "0.1.0"
+    },
+    {
+      "name": "std.world.time",
+      "path": "stdlib/os/0.2.0/modules/std/world/time.x07.json",
+      "relpath": "os/0.2.0/modules/std/world/time.x07.json",
+      "sha256": "e724efb7088a0a5d4d20deda82464253b927380d37fb734d44d07d7f214d2d99",
+      "size_bytes": 273,
+      "version": "0.2.0"
+    }
+  ],
+  "stdlib_hash": "a5800d9f50205d52193b2ee44c9e0a42109a158c56f5f1efaae6ecc1be04f4e7",
+  "stdlib_root": "stdlib/os"
+}
