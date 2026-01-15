@@ -7,13 +7,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from urllib.parse import quote_from_bytes
 
 
 def _file_url(path: Path) -> str:
-    p = path.resolve()
-    b = str(p).encode("utf-8")
-    return "file://" + quote_from_bytes(b)
+    return path.resolve().as_uri()
 
 
 def _index_rel_path(name: str) -> str:
@@ -242,4 +239,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
-
