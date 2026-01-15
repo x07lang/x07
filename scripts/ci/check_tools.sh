@@ -6,6 +6,7 @@ need() {
 }
 
 need cargo
+need openssl
 
 python_bin="${X07_PYTHON:-}"
 if [[ -z "${python_bin}" ]]; then

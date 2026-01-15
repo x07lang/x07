@@ -43,6 +43,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             clang \
             build-essential \
+            openssl \
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \

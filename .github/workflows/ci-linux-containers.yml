@@ -25,6 +25,7 @@ jobs:
             clang \
             curl \
             git \
+            openssl \
             libcurl4-openssl-dev \
             libsqlite3-dev \
             libssl-dev \
