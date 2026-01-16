@@ -45,5 +45,6 @@
 
 ## Project
 - [About](about.md)
+- [Repositories](project/repositories.md)
 - [Governance](governance.md)
 - [Contributing](contributing.md)

@@ -1,6 +1,14 @@
 # X07
 
-X07 is a deterministic compiler + runner for x07AST JSON programs (`solve(bytes_view)->bytes`). The language surface is defined by the compiler's built-in core semantics plus built-in stdlib modules.
+X07 is a deterministic compiler + runner for x07AST JSON programs (`solve(bytes_view)->bytes`), designed for 100% agentic coding.
+
+What makes X07 different from typical languages:
+
+- **Machine-first source format:** the canonical source of truth is x07AST JSON (`*.x07.json`, schema-pinned), so patches are structural and tooling-driven (not “edit some text and hope the parser agrees”).
+- **Deterministic execution substrate:** the primary world (`solve-*`) is resource-bounded and reproducible, so agents can iterate (build → run → diff) without heisenbugs.
+- **Explicit capability worlds:** side effects are opt-in (`run-os*`), making it clear when code is deterministic vs when it depends on the host OS.
+- **Stable agent tooling surface:** `x07c fmt/lint/fix/apply-patch` operates on a small set of machine I/O contracts (including RFC 6902 JSON Patch), so agents can repair programs mechanically.
+- **Versioned contracts + fixtures:** schemas, lockfiles, and committed suites keep the toolchain/stdlib behavior stable across releases.
 
 This repository currently contains:
 
@@ -20,6 +28,8 @@ This repository currently contains:
 - `x07lang/x07-index` — package sparse index metadata
 - `x07lang/x07-registry` — package registry server
 - `x07lang/x07-perf-compare` — optional perf comparison harnesses (split out to keep `x07` lean)
+
+See `docs/project/repositories.md` for details.
 
 ## Downloads (official builds)
 
