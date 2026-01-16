@@ -1,7 +1,6 @@
 /.git
 /benchmarks
 /fuzz
-/perf-compare
 /target
 /tmp
 **/.DS_Store

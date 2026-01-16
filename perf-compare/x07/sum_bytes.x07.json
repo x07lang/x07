@@ -1,1 +1,0 @@
-{"decls":[],"imports":[],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.1.0","solve":["begin",["let","n",["bytes.len","input"]],["let","acc",0],["for","i",0,"n",["begin",["set","acc",["+","acc",["bytes.get_u8","input","i"]]],0]],["codec.write_u32_le","acc"]]}
