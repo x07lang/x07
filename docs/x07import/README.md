@@ -8,22 +8,22 @@ Memory model note (ABI v2):
 
 ## Repo layout
 
-- Import sources: `import_sources/`
-  - Manifest: `import_sources/manifest.json`
-  - Rust refs: `import_sources/rust/**`
-  - C refs: `import_sources/c/**`
-- Generated modules (checked in): `stdlib/std/0.1.1/modules/**` (only for modules listed in `import_sources/manifest.json`)
+- Import sources (dev-only fixtures): `tests/x07import/fixtures/import_sources/`
+  - Manifest: `tests/x07import/fixtures/import_sources/manifest.json`
+  - Rust refs: `tests/x07import/fixtures/import_sources/rust/**`
+  - C refs: `tests/x07import/fixtures/import_sources/c/**`
+- Generated modules (checked in): `stdlib/std/0.1.1/modules/**` (only for modules listed in the manifest)
   - Current manifest modules: `std.text.ascii`, `std.text.utf8`, `std.regex-lite`, `std.codec`, `std.fmt`
 
-If `import_sources/` is moved out of this repo (for example, into a separate repo or a submodule), CI supports an override:
+If `tests/x07import/fixtures/import_sources/` is moved out of this repo (for example, into a separate repo or a submodule), CI supports an override:
 - `X07IMPORT_MANIFEST=/abs/path/to/manifest.json ./scripts/ci/check_x07import_generated.sh`
 
 ## Commands
 
 - Regenerate all manifest entries:
-  - `cargo run -p x07import-cli -- batch --manifest import_sources/manifest.json`
+  - `cargo run -p x07import-cli -- batch --manifest tests/x07import/fixtures/import_sources/manifest.json`
 - Drift check (no writes):
-  - `cargo run -p x07import-cli -- batch --manifest import_sources/manifest.json --check`
+  - `cargo run -p x07import-cli -- batch --manifest tests/x07import/fixtures/import_sources/manifest.json --check`
   - `./scripts/ci/check_x07import_generated.sh`
 - Diagnostics catalog:
   - `cargo run -p x07import-core --bin gen_diagnostics_md > docs/x07import/diagnostics.md`

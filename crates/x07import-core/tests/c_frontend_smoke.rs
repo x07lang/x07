@@ -188,7 +188,8 @@ fn c_frontend_smoke() {
     let module_root = tmp.path().to_path_buf();
 
     let module_id = "x07import_test.c.smoke";
-    let src_abs = repo_root().join("import_sources/c/x07import_smoke@0.1.0/smoke.c");
+    let src_abs =
+        repo_root().join("tests/x07import/fixtures/import_sources/c/x07import_smoke@0.1.0/smoke.c");
     let m = x07import_core::c::import_c_file(module_id, &src_abs).expect("import C");
     let src = x07import_core::x07_emit::emit_module(&m).expect("emit module");
     write_module(&module_root, module_id, &src);

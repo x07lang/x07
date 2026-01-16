@@ -63,9 +63,9 @@
       "name": "std.codec",
       "path": "stdlib/std/0.1.1/modules/std/codec.x07.json",
       "relpath": "std/0.1.1/modules/std/codec.x07.json",
-      "sha256": "aa8afa970c51e3a4f3c42860822163475fd80277bf170886dea5810b6dd0bc40",
-      "size_bytes": 661,
-      "source_path": "import_sources/rust/std_codec@0.1.1/codec.rs",
+      "sha256": "e0c7947183914dcc8981fd59beb8de32100b68a4ef5af6a24c992f37fee612d6",
+      "size_bytes": 686,
+      "source_path": "tests/x07import/fixtures/import_sources/rust/std_codec@0.1.1/codec.rs",
       "source_sha256": "50afeb382f2d1d514636c4c60d2537ae4e50f23e8509635dbc6013b762f02907",
       "version": "0.1.1"
     },
@@ -106,9 +106,9 @@
       "name": "std.fmt",
       "path": "stdlib/std/0.1.1/modules/std/fmt.x07.json",
       "relpath": "std/0.1.1/modules/std/fmt.x07.json",
-      "sha256": "0fe919e5708986e8e9cc7d9e4e2840facd71e54224e6279f4a661bea9ea98ac1",
-      "size_bytes": 597,
-      "source_path": "import_sources/rust/std_fmt@0.1.1/fmt.rs",
+      "sha256": "9281b6def9096a9e4951960d4def1e9a134ba0909abd63ed164fcfbefa0bd100",
+      "size_bytes": 622,
+      "source_path": "tests/x07import/fixtures/import_sources/rust/std_fmt@0.1.1/fmt.rs",
       "source_sha256": "0b0105da3643fc13127dad87446cf5a50714126ba7a215b84ee327989e732224",
       "version": "0.1.1"
     },
@@ -301,9 +301,9 @@
       "name": "std.regex-lite",
       "path": "stdlib/std/0.1.1/modules/std/regex-lite.x07.json",
       "relpath": "std/0.1.1/modules/std/regex-lite.x07.json",
-      "sha256": "9b36fd32489919e35c58cb7b92e6d808de110772339acc85b668fd62e99ee6bb",
-      "size_bytes": 5691,
-      "source_path": "import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs",
+      "sha256": "6b0d6024b6150830fc722cb7cc1def4d082844d3bd17df37fa6a0dfaf50aff91",
+      "size_bytes": 5716,
+      "source_path": "tests/x07import/fixtures/import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs",
       "source_sha256": "752285b7baf9f3d007a968aee328d097b9ef0fb981b601cdba6c8fe561e56ffb",
       "version": "0.1.1"
     },
@@ -416,9 +416,9 @@
       "name": "std.text.ascii",
       "path": "stdlib/std/0.1.1/modules/std/text/ascii.x07.json",
       "relpath": "std/0.1.1/modules/std/text/ascii.x07.json",
-      "sha256": "e53ae0816cd6fb8cbad27401159ebd4bfb3a3fe0697c5f6d7d3715ed4aae7127",
-      "size_bytes": 8262,
-      "source_path": "import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
+      "sha256": "766c901032343900337eda3f2ded796d71693b44ef47dbd03b36eee0e254d672",
+      "size_bytes": 8287,
+      "source_path": "tests/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
       "source_sha256": "47a0ed64ce97778363a5cc264001898182518315635682ba845c8d191eb615df",
       "version": "0.1.1"
     },
@@ -443,9 +443,9 @@
       "name": "std.text.utf8",
       "path": "stdlib/std/0.1.1/modules/std/text/utf8.x07.json",
       "relpath": "std/0.1.1/modules/std/text/utf8.x07.json",
-      "sha256": "4348f69a98fe61b3a5aa4f61036f3fb1112abfcab2fd279e95f03950fcb8b622",
-      "size_bytes": 3998,
-      "source_path": "import_sources/rust/std_text_utf8@0.1.1/utf8.rs",
+      "sha256": "493409d608e9ce09a6657ced00613575b77d339616b79218a04279f23a1e1f3a",
+      "size_bytes": 4023,
+      "source_path": "tests/x07import/fixtures/import_sources/rust/std_text_utf8@0.1.1/utf8.rs",
       "source_sha256": "2a870193f685d77f9f3068ecf278a677bf06d65a22c22b26c1ab227f2de0c6c2",
       "version": "0.1.1"
     },
@@ -482,6 +482,6 @@
       "version": "0.1.1"
     }
   ],
-  "stdlib_hash": "2d62f332ff33486b28c2285be3a5f0fc15227bf49001cdc98a32bc4c73d6ecd9",
+  "stdlib_hash": "7d7ce2f46ff17e016de22ced076e315911afd4fb28143fca2a1b0bfabd291112",
   "stdlib_root": "stdlib/std"
 }
