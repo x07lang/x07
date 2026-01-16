@@ -13,6 +13,14 @@ This repository currently contains:
 - committed reference solutions (`benchmarks/solutions/`)
 - curriculum suites (optional; see `benchmarks/solve-pure/phase4-*.json`)
 
+## Repository map (x07lang org)
+
+- `x07lang/x07` — toolchain + stdlib + canonical docs (this repo)
+- `x07lang/x07-website` — x07lang.org site (built from released docs bundles)
+- `x07lang/x07-index` — package sparse index metadata
+- `x07lang/x07-registry` — package registry server
+- `x07lang/x07-perf-compare` — optional perf comparison harnesses (split out to keep `x07` lean)
+
 ## Repository layout
 
 - `docs/`: end-user docs (x07lang.org source)

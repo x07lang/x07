@@ -75,4 +75,3 @@ tmp/
 /deps/x07/libx07_ext_db_redis.a
 /deps/x07/x07_ext_db_redis.lib
 /deps/x07/include/x07_ext_db_redis_abi_v1.h
-perf-compare/rust_cargo/regex_replace/target/

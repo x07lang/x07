@@ -15,6 +15,9 @@ Memory model note (ABI v2):
 - Generated modules (checked in): `stdlib/std/0.1.1/modules/**` (only for modules listed in `import_sources/manifest.json`)
   - Current manifest modules: `std.text.ascii`, `std.text.utf8`, `std.regex-lite`, `std.codec`, `std.fmt`
 
+If `import_sources/` is moved out of this repo (for example, into a separate repo or a submodule), CI supports an override:
+- `X07IMPORT_MANIFEST=/abs/path/to/manifest.json ./scripts/ci/check_x07import_generated.sh`
+
 ## Commands
 
 - Regenerate all manifest entries:
