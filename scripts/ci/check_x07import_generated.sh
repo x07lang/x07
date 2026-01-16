@@ -10,7 +10,13 @@ cd "$root"
 
 ./scripts/ci/check_tools.sh >/dev/null
 
-cargo run -p x07import-cli -- batch --manifest import_sources/manifest.json --check
+manifest="${X07IMPORT_MANIFEST:-$root/import_sources/manifest.json}"
+if [[ ! -f "$manifest" ]]; then
+  echo "error: x07import manifest not found: $manifest" >&2
+  echo "hint: set X07IMPORT_MANIFEST=/abs/path/to/manifest.json" >&2
+  exit 2
+fi
 
-echo "ok: x07import outputs match import_sources"
+cargo run -p x07import-cli -- batch --manifest "$manifest" --check
 
+echo "ok: x07import outputs match $manifest"
