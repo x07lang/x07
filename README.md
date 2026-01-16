@@ -21,6 +21,20 @@ This repository currently contains:
 - `x07lang/x07-registry` — package registry server
 - `x07lang/x07-perf-compare` — optional perf comparison harnesses (split out to keep `x07` lean)
 
+## Downloads (official builds)
+
+- Latest release: https://github.com/x07lang/x07/releases/latest
+- All releases: https://github.com/x07lang/x07/releases
+
+Each release includes `x07`, `x07c`, `x07-host-runner`, `x07-os-runner`, and `x07import-cli`.
+
+Artifacts:
+- macOS: `x07-<tag>-macOS.tar.gz`
+- Linux: `x07-<tag>-Linux.tar.gz`
+- Windows: `x07-<tag>-Windows.zip`
+- Skills pack: `x07-skills-<tag>.tar.gz`
+- Release manifest: `release-manifest.json` (see `docs/releases.md` and `docs/official-builds.md`)
+
 ## Repository layout
 
 - `docs/`: end-user docs (x07lang.org source)
