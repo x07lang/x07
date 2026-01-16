@@ -1,0 +1,46 @@
+name: Approval
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  webodik-approval:
+    name: policy / require-webodik-approval
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.base.ref == 'main' }}
+    steps:
+      - name: Require approval by webodik
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.payload.pull_request.number;
+
+            const reviews = await github.paginate(
+              github.rest.pulls.listReviews,
+              { owner, repo, pull_number, per_page: 100 },
+            );
+
+            const relevantStates = new Set(["APPROVED", "CHANGES_REQUESTED", "DISMISSED"]);
+            let latestState = null;
+            for (const review of reviews) {
+              if (review.user?.login !== "webodik") continue;
+              if (!relevantStates.has(review.state)) continue;
+              latestState = review.state;
+            }
+
+            if (latestState !== "APPROVED") {
+              core.setFailed(
+                `missing required approval by webodik (latest relevant state: ${latestState ?? "none"})`,
+              );
+              return;
+            }
+
+            core.notice("ok: approved by webodik");
