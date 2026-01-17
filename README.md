@@ -38,6 +38,12 @@ Errors are **structured identifiers with actionable fixes** designed for LLM con
 
 Side effects are opt-in. `solve-pure` is deterministic bytes → bytes. `run-os*` worlds enable real OS access. The boundary is explicit, not implicit.
 
+### High Performance
+
+X07 compiles to optimized native code with **runtime performance on par with C and Rust**. In direct binary benchmarks, X07 matches or exceeds C/Rust execution times while compiling ~3x faster than C and ~6-7x faster than Rust. Binary sizes are comparable to C (~34 KiB).
+
+See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) for detailed benchmarks.
+
 ---
 
 ## Quick Start
