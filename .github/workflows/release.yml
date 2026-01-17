@@ -120,7 +120,7 @@ jobs:
           fi
 
           "${exe}" --program "${tmp}/program.x07.json" --world solve-pure --input "${tmp}/input.bin" \
-            | python3 -c 'import base64,json,sys; report=json.load(sys.stdin); expected=base64.b64encode(b"hi").decode("ascii"); exit_code=report.get("exit_code"); out=(report.get("solve") or {}).get("solve_output_b64"); if exit_code!=0: raise SystemExit(f"unexpected exit_code={exit_code}: {report}"); if out!=expected: raise SystemExit(f"unexpected solve_output_b64={out!r} expected={expected!r}"); print("ok: relocated host-runner smoke passed")'
+            | python -c 'import base64,json,sys; report=json.load(sys.stdin); expected=base64.b64encode(b"hi").decode("ascii"); exit_code=report.get("exit_code"); out=(report.get("solve") or {}).get("solve_output_b64"); assert exit_code==0, report; assert out==expected, (out, expected); print("ok: relocated host-runner smoke passed")'
 
       - name: Package binaries (Unix)
         if: runner.os != 'Windows'
