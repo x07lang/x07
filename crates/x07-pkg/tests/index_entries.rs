@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -45,7 +45,7 @@ fn setup_index_dir() -> (PathBuf, String) {
     (dir, index_url)
 }
 
-fn write_index_entry(index_dir: &PathBuf, package: &str, ndjson: &str) {
+fn write_index_entry(index_dir: &Path, package: &str, ndjson: &str) {
     let p = match package.len() {
         1 => index_dir.join("1").join(package),
         2 => index_dir.join("2").join(package),
