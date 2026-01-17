@@ -1,7 +1,7 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://x07lang.org/img/logo-full-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="https://x07lang.org/img/logo-full-light.png">
-  <img alt="x07lang" src="https://x07lang.org/img/logo-full-light.png" height="80">
+  <source media="(prefers-color-scheme: dark)" srcset="branding/logo-full-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="branding/logo-full-light.png">
+  <img alt="x07lang" src="branding/logo-full-light.png" height="80">
 </picture>
 
 # The Language Designed for AI Agents
