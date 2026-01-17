@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07c.report.schema.json",
+  "title": "X07 x07c tool report v0.1.0",
+  "description": "Machine-readable report emitted by x07c subcommands when using --report-json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "ok",
+    "in",
+    "diagnostics_count",
+    "exit_code"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07c.report@0.1.0" },
+    "command": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "ok": { "type": "boolean" },
+    "in": { "type": "string" },
+    "diagnostics_count": { "type": "integer", "minimum": 0 },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/diagnostic" },
+      "default": []
+    },
+    "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 }
+  }
+}
+
