@@ -807,12 +807,27 @@ pub fn parse_native_stdout(stdout: &[u8], max_output_bytes: usize) -> Result<Vec
 }
 
 fn cache_dir() -> Result<PathBuf> {
-    let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let root = crate_dir
+    if let Some(override_dir) = std::env::var_os("X07_NATIVE_CACHE_DIR") {
+        let dir = PathBuf::from(override_dir);
+        std::fs::create_dir_all(&dir)
+            .with_context(|| format!("create native cache dir: {}", dir.display()))?;
+        return Ok(dir);
+    }
+
+    let candidate = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(|p| p.parent())
-        .context("locate workspace root for native cache dir")?;
-    Ok(root.join("target/x07-native-cache"))
+        .map(|root| root.join("target/x07-native-cache"));
+    if let Some(dir) = candidate {
+        if std::fs::create_dir_all(&dir).is_ok() {
+            return Ok(dir);
+        }
+    }
+
+    let dir = std::env::temp_dir().join("x07-native-cache");
+    std::fs::create_dir_all(&dir)
+        .with_context(|| format!("create native cache dir: {}", dir.display()))?;
+    Ok(dir)
 }
 
 fn workspace_root() -> Result<PathBuf> {

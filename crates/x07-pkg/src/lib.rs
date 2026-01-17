@@ -21,7 +21,6 @@ pub struct IndexEntry {
     pub name: String,
     pub version: String,
     pub cksum: String,
-    #[serde(default)]
     pub yanked: bool,
 }
 
@@ -398,6 +397,12 @@ fn parse_ndjson(bytes: &[u8]) -> Result<Vec<IndexEntry>> {
         }
         let entry: IndexEntry = serde_json::from_str(line)
             .with_context(|| format!("parse ndjson line {}: {}", idx + 1, line))?;
+        if entry.schema_version.trim() != "x07.index-entry@0.1.0" {
+            anyhow::bail!(
+                "index entry schema_version mismatch: expected x07.index-entry@0.1.0 got {:?}",
+                entry.schema_version
+            );
+        }
         out.push(entry);
     }
     Ok(out)
