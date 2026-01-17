@@ -1,110 +1,133 @@
-# X07
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://x07lang.org/img/logo-full-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://x07lang.org/img/logo-full-light.png">
+  <img alt="x07lang" src="https://x07lang.org/img/logo-full-light.png" height="80">
+</picture>
 
-X07 is a deterministic compiler + runner for x07AST JSON programs (`solve(bytes_view)->bytes`), designed for 100% agentic coding.
+# The Language Designed for AI Agents
 
-What makes X07 different from typical languages:
+X07 is a programming language built from the ground up for **100% agentic coding**. Unlike traditional languages where humans write code and AI assists, X07 flips the model: AI agents generate, modify, test, and repair programs reliably—without needing a human to "massage" code.
 
-- **Machine-first source format:** the canonical source of truth is x07AST JSON (`*.x07.json`, schema-pinned), so patches are structural and tooling-driven (not “edit some text and hope the parser agrees”).
-- **Deterministic execution substrate:** the primary world (`solve-*`) is resource-bounded and reproducible, so agents can iterate (build → run → diff) without heisenbugs.
-- **Explicit capability worlds:** side effects are opt-in (`run-os*`), making it clear when code is deterministic vs when it depends on the host OS.
-- **Stable agent tooling surface:** `x07c fmt/lint/fix/apply-patch` operates on a small set of machine I/O contracts (including RFC 6902 JSON Patch), so agents can repair programs mechanically.
-- **Versioned contracts + fixtures:** schemas, lockfiles, and committed suites keep the toolchain/stdlib behavior stable across releases.
+> **X07 is under active development. APIs and tooling may change.**
 
-This repository currently contains:
+**[Documentation](https://x07lang.org)** · [FAQ](https://x07lang.org/docs/faq) · [Releases](https://github.com/x07lang/x07/releases)
 
-- scaffolding: interfaces, schemas, and project structure
-- deterministic native runner (`crates/x07-host-runner`)
-- standalone OS runner (`crates/x07-os-runner`, for `run-os*` worlds)
-- compiler (`crates/x07c`)
-- deterministic test harness (`crates/x07`, `x07 test`)
-- committed benchmark suites + fixtures (H1/H2)
-- committed reference solutions (`benchmarks/solutions/`)
-- curriculum suites (optional; see `benchmarks/solve-pure/phase4-*.json`)
+---
 
-## Repository map (x07lang org)
+## Why X07?
 
-- `x07lang/x07` — toolchain + stdlib + canonical docs (this repo)
-- `x07lang/x07-website` — x07lang.org site (built from released docs bundles)
-- `x07lang/x07-index` — package sparse index metadata
-- `x07lang/x07-registry` — package registry server
-- `x07lang/x07-perf-compare` — optional perf comparison harnesses (split out to keep `x07` lean)
+Autonomous agents struggle with mainstream languages because of **multiple equivalent patterns**, **ambiguous diagnostics**, **nondeterministic test environments**, and **text-based patching on fragile syntax**. X07 makes these constraints first-class concerns:
 
-See `docs/project/repositories.md` for details.
+### Machine-First Source Format
 
-## Downloads (official builds)
+The canonical source is **x07AST JSON** (`*.x07.json`), not text files. Patches are structural ([RFC 6902 JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902)), so agents apply changes mechanically—no parsing ambiguity, no whitespace surprises.
 
-- Latest release: https://github.com/x07lang/x07/releases/latest
-- All releases: https://github.com/x07lang/x07/releases
+### Deterministic Execution
 
-Each release includes `x07`, `x07c`, `x07-host-runner`, `x07-os-runner`, and `x07import-cli`.
+The primary execution model (`solve-*` worlds) is **resource-bounded and reproducible**. Agents can iterate through build → run → diff cycles without heisenbugs. Same input, same output, every time.
 
-Artifacts:
-- macOS: `x07-<tag>-macOS.tar.gz`
-- Linux: `x07-<tag>-Linux.tar.gz`
-- Windows: `x07-<tag>-Windows.zip`
-- Skills pack: `x07-skills-<tag>.tar.gz`
-- Release manifest: `release-manifest.json` (see `docs/releases.md` and `docs/official-builds.md`)
+### Single Canonical Approach
 
-## Repository layout
+One way to do each thing. No "should I use a for loop or map?" decisions. This eliminates the pattern confusion that plagues LLM-generated code in flexible languages.
 
-- `docs/`: end-user docs (x07lang.org source)
-- `crates/`: Rust workspace (compiler + deterministic runner)
-- `benchmarks/`: benchmark suites + fixtures
-- `scripts/bench/`: benchmark/curriculum tooling
+### Machine-Readable Diagnostics
 
-## LLM-first contracts
+Errors are **structured identifiers with actionable fixes** designed for LLM consumption—not cryptic messages intended for humans to interpret.
 
-- Canonical solver source format: x07AST JSON (`*.x07.json`, `x07.x07ast@0.1.0`) with expressions encoded as json-sexpr (`["head", ...]`).
-- Agent tooling surface (stable machine I/O): `x07c fmt`, `x07c lint`, `x07c fix`, `x07c apply-patch` (RFC 6902 JSON Patch).
-- Built-in deterministic test harness: `x07 test` (manifest-driven; emits `x07test` JSON).
-- Standalone-only systems surface (Phase H4): `unsafe` blocks, raw pointers, and `extern` C declarations/calls (world-gated; not available in `solve-*` worlds).
+### Explicit Capability Worlds
 
-## Quick start (dev)
+Side effects are opt-in. `solve-pure` is deterministic bytes → bytes. `run-os*` worlds enable real OS access. The boundary is explicit, not implicit.
 
-Prereqs:
-- Rust toolchain (`cargo`)
-- C compiler available as `cc` (override via `X07_CC`)
-- `clang` (required for `x07import c` and C-import tests)
-- Python 3 (stdlib only; used by `scripts/bench/` and a few repo maintenance scripts)
+---
 
-Rust workspace checks:
-- `./scripts/ci/check_all.sh` (canonical full gate)
-- `cargo fmt --check`
-- `cargo test`
-- `cargo clippy --all-targets -- -D warnings`
-- `./scripts/ci/check_x07import_generated.sh`
-- `./scripts/ci/check_x07import_diagnostics_sync.sh`
-- `./scripts/ci/check_suites_h1h2.sh`
-- `./scripts/ci/check_asan_c_backend.sh` (C backend sanitizer gate)
-- `cargo run -p x07 -- test --manifest tests/tests.json` (test harness smoke suite)
+## Quick Start
 
-Build + run `solve-pure`:
-- `cargo build -p x07-host-runner`
-- `cargo run -p x07-host-runner -- --program <program.x07.json> --world solve-pure --input <case.bin>`
+### Install
 
-Example `program.x07.json` (echo):
-- `{"schema_version":"x07.x07ast@0.1.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}`
+Download the latest release for your platform:
 
-Build + run `run-os` (standalone-only, not used by benchmark suites):
-- `cargo build -p x07-os-runner`
-- `cargo run -p x07-os-runner -- --program examples/h3/read_file_by_stdin.x07.json --world run-os --input <case.bin>`
+- **macOS:** `x07-<tag>-macOS.tar.gz`
+- **Linux:** `x07-<tag>-Linux.tar.gz`
+- **Windows:** `x07-<tag>-Windows.zip`
 
-Project example (multi-module + lockfile):
-- `cargo run -p x07c -- lock --project examples/phaseE/x07.json`
-- `cargo run -p x07-host-runner -- --project examples/phaseE/x07.json --world solve-pure --input <case.bin>`
+[Latest Release](https://github.com/x07lang/x07/releases/latest) · [All Releases](https://github.com/x07lang/x07/releases)
 
-Benchmark suites (H1/H2):
-- `./scripts/ci/check_suites_h1h2.sh`
-- `python3 scripts/bench/run_bench_suite.py --suite benchmarks/bundles/phaseH1H2.json`
-- H2 collections suite (solve-pure): `benchmarks/solve-pure/phaseH2-collections-suite.json` (included in `benchmarks/bundles/phaseH2.json` and `benchmarks/bundles/phaseH1H2.json`)
-- Stdlib emitters canary (solve-pure): `benchmarks/solve-pure/emitters-v1-suite.json` (included in `benchmarks/bundles/phaseH2.json` and `benchmarks/bundles/phaseH1H2.json`)
+### Run a Program
 
-Curriculum suites (optional):
-- `python3 scripts/bench/generate_phase4_curriculum.py --check`
+```bash
+x07-host-runner --program hello.x07.json --world solve-pure --input input.bin
+```
+
+### Agent Tooling
+
+```bash
+x07c fmt program.x07.json      # Format
+x07c lint program.x07.json     # Lint
+x07c fix program.x07.json      # Auto-fix issues
+x07c apply-patch program.x07.json patch.json  # Apply RFC 6902 patch
+```
+
+---
+
+## Capability Worlds
+
+| World | Description |
+|-------|-------------|
+| `solve-pure` | Pure bytes → bytes, no I/O |
+| `solve-fs` | Read-only fixture filesystem |
+| `solve-rr` | Deterministic request/response (fixture-backed) |
+| `solve-kv` | Deterministic key/value store |
+| `solve-full` | fs + rr + kv combined |
+| `run-os` | Real OS access (non-deterministic) |
+| `run-os-sandboxed` | Policy-restricted OS access |
+
+---
+
+## Repository Layout
+
+```
+x07/
+├── docs/           # End-user documentation (x07lang.org source)
+├── crates/         # Rust workspace
+│   ├── x07c/           # Compiler (X07 → C)
+│   ├── x07-host-runner # Deterministic native runner
+│   └── x07-os-runner   # Standalone OS runner
+├── stdlib/         # Standard library
+├── benchmarks/     # Benchmark suites + fixtures
+└── scripts/        # Tooling and CI scripts
+```
+
+## Related Repositories
+
+- [`x07lang/x07`](https://github.com/x07lang/x07) — Toolchain + stdlib (this repo)
+- [`x07lang/x07-website`](https://github.com/x07lang/x07-website) — x07lang.org
+- [`x07lang/x07-registry`](https://github.com/x07lang/x07-registry) — Package registry
+- [`x07lang/x07-index`](https://github.com/x07lang/x07-index) — Package index
+
+---
+
+## Build from Source
+
+Prerequisites: Rust toolchain, C compiler (`cc`), `clang`, Python 3
+
+```bash
+# Full CI check
+./scripts/ci/check_all.sh
+
+# Individual checks
+cargo fmt --check
+cargo test
+cargo clippy --all-targets -- -D warnings
+
+# Run test harness
+cargo run -p x07 -- test --manifest tests/tests.json
+```
+
+---
 
 ## License
 
 Licensed under either of:
 
-- Apache License, Version 2.0 (`LICENSE-APACHE`)
-- MIT license (`LICENSE-MIT`)
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT License ([LICENSE-MIT](LICENSE-MIT))
