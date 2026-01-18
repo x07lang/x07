@@ -1,0 +1,18 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-json-rs",
+  "description": "JSON canonicalization, JSON Pointer, and ext.data_model parsing.",
+  "version": "0.1.1",
+  "module_root": "modules",
+  "modules": [
+    "ext.json.pointer",
+    "ext.json.canon",
+    "ext.json.data_model",
+    "ext.json.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": ["solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full", "run-os", "run-os-sandboxed"],
+    "import_mode": "x07import"
+  }
+}

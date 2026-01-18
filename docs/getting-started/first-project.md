@@ -14,6 +14,8 @@ x07 ast init --world solve-pure --module main --kind entry --out main.x07.json
 
 This writes a valid `main.x07.json` and prints a small JSON report (including `schema_version` and a sha256 of the file).
 
+If you want a full project skeleton (with `x07.json` / `x07-package.json` / `x07.lock.json`), run `x07 --init` instead (see [Packages](../packages/index.md)).
+
 ## Make it return bytes
 
 Create `patch.json`:

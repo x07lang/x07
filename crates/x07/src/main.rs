@@ -14,6 +14,7 @@ use x07c::compile;
 
 mod ast;
 mod cli;
+mod init;
 mod pkg;
 mod util;
 
@@ -24,6 +25,9 @@ mod util;
 struct Cli {
     #[arg(long, global = true)]
     cli_specrows: bool,
+
+    #[arg(long, global = true)]
+    init: bool,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -217,6 +221,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             },
             Some(Command::Pkg(args)) => match &args.cmd {
                 None => vec!["pkg"],
+                Some(pkg::PkgCommand::Add(_)) => vec!["pkg", "add"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
@@ -228,6 +233,13 @@ fn try_main() -> Result<std::process::ExitCode> {
         let doc = x07c::cli_specrows::command_to_specrows(node);
         println!("{}", serde_json::to_string(&doc)?);
         return Ok(std::process::ExitCode::SUCCESS);
+    }
+
+    if cli.init {
+        if cli.command.is_some() {
+            anyhow::bail!("--init cannot be combined with subcommands");
+        }
+        return init::cmd_init();
     }
 
     let Some(command) = cli.command else {

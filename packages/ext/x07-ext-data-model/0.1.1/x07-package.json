@@ -1,0 +1,30 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-data-model",
+  "description": "Typed data model with JSON/TOML/YAML codecs.",
+  "version": "0.1.1",
+  "module_root": "modules",
+  "modules": [
+    "ext.data_model",
+    "ext.data_model.json",
+    "ext.data_model.json.tests",
+    "ext.data_model.toml",
+    "ext.data_model.toml.tests",
+    "ext.data_model.yaml",
+    "ext.data_model.yaml.tests",
+    "ext.data_model.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

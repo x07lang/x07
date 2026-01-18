@@ -1,0 +1,29 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.memchr/memchr",
+      "world": "solve-pure",
+      "entry": "ext.memchr.tests.test_memchr",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.memchr/memrchr",
+      "world": "solve-pure",
+      "entry": "ext.memchr.tests.test_memrchr",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.memchr/memchr2",
+      "world": "solve-pure",
+      "entry": "ext.memchr.tests.test_memchr2",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.memchr/memchr3",
+      "world": "solve-pure",
+      "entry": "ext.memchr.tests.test_memchr3",
+      "expect": "pass"
+    }
+  ]
+}

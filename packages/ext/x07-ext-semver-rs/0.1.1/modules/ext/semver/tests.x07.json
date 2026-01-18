@@ -1,0 +1,241 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.semver.tests",
+  "imports": ["std.test", "ext.semver"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.semver.tests.test_parse_fields",
+        "ext.semver.tests.test_cmp_prerelease_ordering",
+        "ext.semver.tests.test_parse_invalid_leading_zero",
+        "ext.semver.tests.test_parse_invalid_prerelease"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.semver.tests.test_parse_fields",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src", ["bytes.lit", "1.2.3-alpha.1+build.5"]],
+        ["let", "src_view", ["bytes.view", "src"]],
+        [
+          "let",
+          "doc",
+          ["ext.semver.semver_parse", "src_view"]
+        ],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.semver.semver_is_err", "doc_view"],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.semver.semver_major", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.semver.semver_minor", "doc_view"],
+            2,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.semver.semver_patch", "doc_view"],
+            3,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "pre", ["ext.semver.semver_prerelease", "doc_view"]],
+        ["let", "build", ["ext.semver.semver_build", "doc_view"]],
+        [
+          "try",
+          [
+            "std.test.assert_bytes_eq",
+            "pre",
+            ["bytes.lit", "alpha.1"],
+            ["std.test.code_assert_bytes_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_bytes_eq",
+            "build",
+            ["bytes.lit", "build.5"],
+            ["std.test.code_assert_bytes_eq"]
+          ]
+        ],
+        ["let", "a", ["bytes.lit", "1.0.0+1"]],
+        ["let", "a_view", ["bytes.view", "a"]],
+        ["let", "b", ["bytes.lit", "1.0.0+2"]],
+        ["let", "b_view", ["bytes.view", "b"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            [
+              "ext.semver.semver_cmp_str",
+              "a_view",
+              "b_view"
+            ],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.semver.tests.test_cmp_prerelease_ordering",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "a", ["bytes.lit", "1.0.0-alpha"]],
+        ["let", "a_view", ["bytes.view", "a"]],
+        ["let", "b", ["bytes.lit", "1.0.0-alpha.1"]],
+        ["let", "b_view", ["bytes.view", "b"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            [
+              "ext.semver.semver_cmp_str",
+              "a_view",
+              "b_view"
+            ],
+            -1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "a2", ["bytes.lit", "1.0.0-alpha.1"]],
+        ["let", "a2_view", ["bytes.view", "a2"]],
+        ["let", "b2", ["bytes.lit", "1.0.0-alpha.beta"]],
+        ["let", "b2_view", ["bytes.view", "b2"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            [
+              "ext.semver.semver_cmp_str",
+              "a2_view",
+              "b2_view"
+            ],
+            -1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "a3", ["bytes.lit", "1.0.0-rc.1"]],
+        ["let", "a3_view", ["bytes.view", "a3"]],
+        ["let", "b3", ["bytes.lit", "1.0.0"]],
+        ["let", "b3_view", ["bytes.view", "b3"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            [
+              "ext.semver.semver_cmp_str",
+              "a3_view",
+              "b3_view"
+            ],
+            -1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.semver.tests.test_parse_invalid_leading_zero",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src", ["bytes.lit", "01.0.0"]],
+        ["let", "src_view", ["bytes.view", "src"]],
+        [
+          "let",
+          "doc",
+          ["ext.semver.semver_parse", "src_view"]
+        ],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.semver.semver_is_err", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.semver.semver_err_code", "doc_view"],
+            2,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.semver.tests.test_parse_invalid_prerelease",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src", ["bytes.lit", "1.0.0-alpha..1"]],
+        ["let", "src_view", ["bytes.view", "src"]],
+        [
+          "let",
+          "doc",
+          ["ext.semver.semver_parse", "src_view"]
+        ],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.semver.semver_is_err", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.semver.semver_err_code", "doc_view"],
+            3,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

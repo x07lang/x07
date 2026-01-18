@@ -1,9 +1,11 @@
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use clap::Args;
 use serde::Serialize;
+use serde_json::Value;
 
 use x07_pkg::SparseIndexClient;
 use x07c::project;
@@ -20,10 +22,23 @@ pub struct PkgArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum PkgCommand {
+    Add(AddArgs),
     Pack(PackArgs),
     Lock(LockArgs),
     Login(LoginArgs),
     Publish(PublishArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct AddArgs {
+    #[arg(long, value_name = "PATH", default_value = "x07.json")]
+    pub project: PathBuf,
+
+    #[arg(long, value_name = "PATH")]
+    pub path: Option<String>,
+
+    #[arg(value_name = "NAME@VERSION")]
+    pub spec: String,
 }
 
 #[derive(Debug, Args)]
@@ -55,8 +70,11 @@ pub struct LoginArgs {
     #[arg(long, value_name = "URL")]
     pub index: String,
 
-    #[arg(long, value_name = "TOKEN")]
-    pub token: String,
+    #[arg(long, value_name = "TOKEN", conflicts_with = "token_stdin")]
+    pub token: Option<String>,
+
+    #[arg(long, conflicts_with = "token")]
+    pub token_stdin: bool,
 }
 
 #[derive(Debug, Args)]
@@ -107,6 +125,14 @@ struct LoginResult {
 }
 
 #[derive(Debug, Serialize)]
+struct AddResult {
+    project: String,
+    name: String,
+    version: String,
+    path: String,
+}
+
+#[derive(Debug, Serialize)]
 struct PublishResult {
     index: String,
     package_dir: String,
@@ -130,11 +156,125 @@ pub fn cmd_pkg(args: PkgArgs) -> Result<std::process::ExitCode> {
     };
 
     match cmd {
+        PkgCommand::Add(args) => cmd_pkg_add(args),
         PkgCommand::Pack(args) => cmd_pkg_pack(args),
         PkgCommand::Lock(args) => cmd_pkg_lock(args),
         PkgCommand::Login(args) => cmd_pkg_login(args),
         PkgCommand::Publish(args) => cmd_pkg_publish(args),
     }
+}
+
+fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
+    let project_path = util::resolve_existing_path_upwards(&args.project);
+
+    // Validate using the canonical parser for better error messages and stricter checks.
+    project::load_project_manifest(&project_path).context("load project manifest")?;
+
+    let project_bytes = std::fs::read(&project_path)
+        .with_context(|| format!("read: {}", project_path.display()))?;
+    let mut doc: Value = serde_json::from_slice(&project_bytes)
+        .with_context(|| format!("parse project JSON: {}", project_path.display()))?;
+    let obj = doc
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+
+    let (name, version) = parse_pkg_spec(&args.spec)?;
+    let dep_path = args
+        .path
+        .unwrap_or_else(|| format!(".x07/deps/{name}/{version}"));
+
+    let deps_val = obj
+        .entry("dependencies".to_string())
+        .or_insert_with(|| Value::Array(Vec::new()));
+    let deps = deps_val
+        .as_array_mut()
+        .ok_or_else(|| anyhow::anyhow!("project.dependencies must be an array"))?;
+
+    for dep in deps.iter() {
+        if dep.get("name").and_then(Value::as_str) == Some(name.as_str()) {
+            let report = PkgReport::<AddResult> {
+                ok: false,
+                command: "pkg.add",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_DEP_EXISTS".to_string(),
+                    message: format!("dependency already exists: {name}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    }
+
+    deps.push(Value::Object(
+        [
+            ("name".to_string(), Value::String(name.clone())),
+            ("version".to_string(), Value::String(version.clone())),
+            ("path".to_string(), Value::String(dep_path.clone())),
+        ]
+        .into_iter()
+        .collect(),
+    ));
+
+    deps.sort_by(|a, b| {
+        let an = a.get("name").and_then(Value::as_str).unwrap_or("");
+        let bn = b.get("name").and_then(Value::as_str).unwrap_or("");
+        let c = an.cmp(bn);
+        if c != std::cmp::Ordering::Equal {
+            return c;
+        }
+        let av = a.get("version").and_then(Value::as_str).unwrap_or("");
+        let bv = b.get("version").and_then(Value::as_str).unwrap_or("");
+        av.cmp(bv)
+    });
+
+    let mut out = serde_json::to_vec_pretty(&doc)?;
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    std::fs::write(&project_path, &out)
+        .with_context(|| format!("write: {}", project_path.display()))?;
+
+    let report = PkgReport {
+        ok: true,
+        command: "pkg.add",
+        result: Some(AddResult {
+            project: project_path.display().to_string(),
+            name,
+            version,
+            path: dep_path,
+        }),
+        error: None,
+    };
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn parse_pkg_spec(spec: &str) -> Result<(String, String)> {
+    let spec = spec.trim();
+    let Some((name, version)) = spec.split_once('@') else {
+        anyhow::bail!("expected NAME@VERSION, got {:?}", spec);
+    };
+    let name = name.trim();
+    let version = version.trim();
+    if name.is_empty() {
+        anyhow::bail!("package name must be non-empty");
+    }
+    if version.is_empty() {
+        anyhow::bail!("package version must be non-empty");
+    }
+    if !name
+        .as_bytes()
+        .first()
+        .is_some_and(|b| b.is_ascii_lowercase())
+        || name
+            .as_bytes()
+            .iter()
+            .any(|b| !b.is_ascii_lowercase() && !b.is_ascii_digit() && !matches!(b, b'_' | b'-'))
+    {
+        anyhow::bail!("package name must match ^[a-z][a-z0-9_-]*$: got {:?}", name);
+    }
+    Ok((name.to_string(), version.to_string()))
 }
 
 fn cmd_pkg_pack(args: PackArgs) -> Result<std::process::ExitCode> {
@@ -386,7 +526,45 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
 }
 
 fn cmd_pkg_login(args: LoginArgs) -> Result<std::process::ExitCode> {
-    if let Err(err) = x07_pkg::store_token(&args.index, &args.token) {
+    let token = match (args.token, args.token_stdin) {
+        (Some(token), false) => token,
+        (None, true) => {
+            let mut buf = String::new();
+            if let Err(err) = std::io::stdin().read_to_string(&mut buf) {
+                let report = PkgReport::<LoginResult> {
+                    ok: false,
+                    command: "pkg.login",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_LOGIN_TOKEN".to_string(),
+                        message: format!("read token from stdin: {err}"),
+                    }),
+                };
+                println!("{}", serde_json::to_string(&report)?);
+                return Ok(std::process::ExitCode::from(20));
+            }
+            buf
+        }
+        (None, false) => match rpassword::prompt_password("Token: ") {
+            Ok(token) => token,
+            Err(err) => {
+                let report = PkgReport::<LoginResult> {
+                    ok: false,
+                    command: "pkg.login",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_LOGIN_TOKEN".to_string(),
+                        message: format!("{err}"),
+                    }),
+                };
+                println!("{}", serde_json::to_string(&report)?);
+                return Ok(std::process::ExitCode::from(20));
+            }
+        },
+        (Some(_), true) => unreachable!("clap enforces token/token-stdin mutual exclusion"),
+    };
+
+    if let Err(err) = x07_pkg::store_token(&args.index, &token) {
         let report = PkgReport::<LoginResult> {
             ok: false,
             command: "pkg.login",

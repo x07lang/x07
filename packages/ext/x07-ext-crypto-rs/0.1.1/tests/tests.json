@@ -1,0 +1,35 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.crypto/sha256_vectors",
+      "world": "solve-pure",
+      "entry": "ext.crypto.tests.test_sha256_vectors",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.crypto/hmac_sha256_vectors",
+      "world": "solve-pure",
+      "entry": "ext.crypto.tests.test_hmac_sha256_vectors",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.crypto/eq_ct",
+      "world": "solve-pure",
+      "entry": "ext.crypto.tests.test_eq_ct",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.crypto/sha512_vectors",
+      "world": "solve-pure",
+      "entry": "ext.crypto.tests.test_sha512_vectors",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.crypto/hkdf_sha256_rfc5869_case1",
+      "world": "solve-pure",
+      "entry": "ext.crypto.tests.test_hkdf_sha256_rfc5869_case1",
+      "expect": "pass"
+    }
+  ]
+}

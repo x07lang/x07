@@ -1,0 +1,24 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-unicode-rs",
+  "description": "Unicode character and string utilities.",
+  "version": "0.1.1",
+  "module_root": "modules",
+  "modules": [
+    "ext.unicode",
+    "ext.unicode.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "x07import"
+  }
+}

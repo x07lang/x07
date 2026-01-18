@@ -1,0 +1,117 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.tar.tests",
+  "imports": ["std.test", "ext.tar"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.tar.tests.test_find_file_ok",
+        "ext.tar.tests.test_find_file_not_found"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.tar.tests._tar_one_file_hi",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "name", ["bytes.lit", "hi.txt"]],
+        ["let", "out", ["vec_u8.with_capacity", 1024]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", "name"]],
+        ["let", "nlen", ["bytes.len", "name"]],
+        ["for", "_", "nlen", 100, ["begin",
+          ["set", "out", ["vec_u8.push", "out", 0]],
+          0
+        ]],
+        ["for", "_", 0, 24, ["begin",
+          ["set", "out", ["vec_u8.push", "out", 0]],
+          0
+        ]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.lit", "00000000002"]]],
+        ["set", "out", ["vec_u8.push", "out", 0]],
+        ["for", "_", 0, 20, ["begin",
+          ["set", "out", ["vec_u8.push", "out", 0]],
+          0
+        ]],
+        ["set", "out", ["vec_u8.push", "out", 0]],
+        ["for", "_", 0, 355, ["begin",
+          ["set", "out", ["vec_u8.push", "out", 0]],
+          0
+        ]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.lit", "hi"]]],
+        ["for", "_", 0, 510, ["begin",
+          ["set", "out", ["vec_u8.push", "out", 0]],
+          0
+        ]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.tar.tests.test_find_file_ok",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "tar", ["ext.tar.tests._tar_one_file_hi"]],
+        ["let", "name", ["bytes.lit", "hi.txt"]],
+        ["let", "doc", ["ext.tar.find_file_v1", ["bytes.view", "tar"], ["bytes.view", "name"], 10]],
+        ["let", "docv", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.tar.is_err", "docv"],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_bytes_eq",
+            ["ext.tar.get_bytes", "docv"],
+            ["bytes.lit", "hi"],
+            ["std.test.code_assert_bytes_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.tar.tests.test_find_file_not_found",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "tar", ["ext.tar.tests._tar_one_file_hi"]],
+        ["let", "name", ["bytes.lit", "missing.txt"]],
+        ["let", "doc", ["ext.tar.find_file_v1", ["bytes.view", "tar"], ["bytes.view", "name"], 10]],
+        ["let", "docv", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.tar.is_err", "docv"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.tar.err_code", "docv"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

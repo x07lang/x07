@@ -1,0 +1,188 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.uuid.tests",
+  "imports": ["std.test", "ext.uuid"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.uuid.tests.test_parse_format_roundtrip",
+        "ext.uuid.tests.test_parse_invalid_len",
+        "ext.uuid.tests.test_parse_invalid_hyphen",
+        "ext.uuid.tests.test_parse_invalid_hex"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.uuid.tests.test_parse_format_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "src",
+          ["bytes.lit", "F47AC10B-58CC-4372-A567-0E02B2C3D479"]
+        ],
+        ["let", "doc", ["ext.uuid.uuid_parse", ["bytes.view", "src"]]],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.uuid.uuid_is_err", "doc_view"],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "uuid_bytes", ["ext.uuid.uuid_get_bytes", "doc_view"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["bytes.len", "uuid_bytes"],
+            16,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "let",
+          "fmt_doc",
+          ["ext.uuid.uuid_format", ["bytes.view", "uuid_bytes"]]
+        ],
+        ["let", "fmt_view", ["bytes.view", "fmt_doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.uuid.uuid_is_err", "fmt_view"],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "s", ["ext.uuid.uuid_get_string", "fmt_view"]],
+        [
+          "try",
+          [
+            "std.test.assert_bytes_eq",
+            "s",
+            ["bytes.lit", "f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+            ["std.test.code_assert_bytes_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.uuid.tests.test_parse_invalid_len",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src", ["bytes.lit", "f47ac10b"]],
+        ["let", "src_view", ["bytes.view", "src"]],
+        ["let", "doc", ["ext.uuid.uuid_parse", "src_view"]],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.uuid.uuid_is_err", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.uuid.uuid_err_code", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.uuid.tests.test_parse_invalid_hyphen",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src", ["bytes.lit", "f47ac10bx58cc-4372-a567-0e02b2c3d479"]],
+        ["let", "src_view", ["bytes.view", "src"]],
+        [
+          "let",
+          "doc",
+          [
+            "ext.uuid.uuid_parse",
+            "src_view"
+          ]
+        ],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.uuid.uuid_is_err", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.uuid.uuid_err_code", "doc_view"],
+            2,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.uuid.tests.test_parse_invalid_hex",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src", ["bytes.lit", "f47ac10b-58cc-4372-a567-0e02b2c3d47g"]],
+        ["let", "src_view", ["bytes.view", "src"]],
+        [
+          "let",
+          "doc",
+          [
+            "ext.uuid.uuid_parse",
+            "src_view"
+          ]
+        ],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.uuid.uuid_is_err", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.uuid.uuid_err_code", "doc_view"],
+            3,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.tracing.tests",
+  "imports": [
+    "std.fmt",
+    "std.test",
+    "ext.tracing"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.tracing.tests.test_span_roundtrip_and_format",
+        "ext.tracing.tests.test_event_roundtrip_and_format",
+        "ext.tracing.tests.test_invalid_records"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.tracing.tests.test_span_roundtrip_and_format",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "name", ["bytes.lit", "root"]],
+        ["let", "id", ["ext.tracing.span_id", 0, ["bytes.view", "name"]]],
+        ["let", "rec", ["ext.tracing.span_record", "id", 0, ["bytes.view", "name"]]],
+        ["try", ["std.test.assert_true", ["ext.tracing.span_is_valid_record", ["bytes.view", "rec"]], ["std.test.code_assert_true"]]],
+        ["try", ["std.test.assert_i32_eq", ["ext.tracing.span_record_id", ["bytes.view", "rec"]], "id", ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["ext.tracing.span_record_parent", ["bytes.view", "rec"]], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "formatted", ["ext.tracing.format_span_record", ["bytes.view", "rec"]]],
+        ["let", "id_s", ["std.fmt.u32_to_dec", "id"]],
+        ["let", "parent_s", ["std.fmt.u32_to_dec", 0]],
+        ["let", "exp_v", ["vec_u8.with_capacity", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "span"]]],
+        ["set", "exp_v", ["vec_u8.push", "exp_v", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "id="]]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.view", "id_s"]]],
+        ["set", "exp_v", ["vec_u8.push", "exp_v", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "parent="]]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.view", "parent_s"]]],
+        ["set", "exp_v", ["vec_u8.push", "exp_v", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "name="]]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.view", "name"]]],
+        ["let", "expected", ["vec_u8.into_bytes", "exp_v"]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.tracing.span_record_name", ["bytes.view", "rec"]], "name", ["std.test.code_assert_bytes_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", "formatted", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.tracing.tests.test_event_roundtrip_and_format",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "name", ["bytes.lit", "request"]],
+        ["let", "msg", ["bytes.lit", "ok"]],
+        ["let", "rec", ["ext.tracing.event_record", ["ext.tracing.level_info"], 123, ["bytes.view", "name"], ["bytes.view", "msg"]]],
+        ["try", ["std.test.assert_true", ["ext.tracing.event_is_valid_record", ["bytes.view", "rec"]], ["std.test.code_assert_true"]]],
+        ["try", ["std.test.assert_i32_eq", ["ext.tracing.event_record_level", ["bytes.view", "rec"]], ["ext.tracing.level_info"], ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["ext.tracing.event_record_span_id", ["bytes.view", "rec"]], 123, ["std.test.code_assert_i32_eq"]]],
+        ["let", "formatted", ["ext.tracing.format_event_record", ["bytes.view", "rec"]]],
+        ["let", "span_s", ["std.fmt.u32_to_dec", 123]],
+        ["let", "exp_v", ["vec_u8.with_capacity", 64]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "event"]]],
+        ["set", "exp_v", ["vec_u8.push", "exp_v", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "level="]]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "info"]]],
+        ["set", "exp_v", ["vec_u8.push", "exp_v", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "span="]]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.view", "span_s"]]],
+        ["set", "exp_v", ["vec_u8.push", "exp_v", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "name="]]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.view", "name"]]],
+        ["set", "exp_v", ["vec_u8.push", "exp_v", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "msg="]]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.view", "msg"]]],
+        ["let", "expected", ["vec_u8.into_bytes", "exp_v"]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.tracing.event_record_name", ["bytes.view", "rec"]], "name", ["std.test.code_assert_bytes_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.tracing.event_record_msg", ["bytes.view", "rec"]], "msg", ["std.test.code_assert_bytes_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", "formatted", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.tracing.tests.test_invalid_records",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "empty", ["bytes.alloc", 0]],
+        ["try", ["std.test.assert_i32_eq", ["ext.tracing.span_is_valid_record", ["bytes.view", "empty"]], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["ext.tracing.event_is_valid_record", ["bytes.view", "empty"]], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.tracing.format_span_record", ["bytes.view", "empty"]], ["bytes.lit", "invalid_ext.tracing_span_record"], ["std.test.code_assert_bytes_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.tracing.format_event_record", ["bytes.view", "empty"]], ["bytes.lit", "invalid_ext.tracing_event_record"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

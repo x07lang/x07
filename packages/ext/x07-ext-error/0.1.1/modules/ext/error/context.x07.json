@@ -1,0 +1,148 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.error.context",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.error.context.err_from_code",
+        "ext.error.context.err_from_msg",
+        "ext.error.context.with_context",
+        "ext.error.context.error_code",
+        "ext.error.context.error_msg",
+        "ext.error.context.context_count",
+        "ext.error.context.get_context"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.context._extend_view",
+      "params": [{"name": "v", "ty": "vec_u8"}, {"name": "b", "ty": "bytes_view"}],
+      "result": "vec_u8",
+      "body": ["begin",
+        ["let", "n", ["view.len", "b"]],
+        ["for", "i", 0, "n", ["begin",
+          ["set", "v", ["vec_u8.push", "v", ["view.get_u8", "b", "i"]]],
+          0
+        ]],
+        "v"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.context.err_from_code",
+      "params": [{"name": "code", "ty": "i32"}],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "v", ["vec_u8.with_capacity", 9]],
+        ["set", "v", ["vec_u8.push", "v", 0]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", "code"]]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", 0]]],
+        ["vec_u8.into_bytes", "v"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.context.err_from_msg",
+      "params": [{"name": "msg", "ty": "bytes_view"}],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "msg_len", ["view.len", "msg"]],
+        ["let", "v", ["vec_u8.with_capacity", ["+", 9, "msg_len"]]],
+        ["set", "v", ["vec_u8.push", "v", 0]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", 0]]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", "msg_len"]]],
+        ["set", "v", ["ext.error.context._extend_view", "v", "msg"]],
+        ["vec_u8.into_bytes", "v"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.context.with_context",
+      "params": [{"name": "err", "ty": "bytes_view"}, {"name": "ctx", "ty": "bytes_view"}],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "err_len", ["view.len", "err"]],
+        ["if", ["<", "err_len", 9], ["return", ["view.to_bytes", "err"]], 0],
+        ["let", "ctx_len", ["view.len", "ctx"]],
+        ["let", "v", ["vec_u8.with_capacity", ["+", ["+", "err_len", 4], "ctx_len"]]],
+        ["set", "v", ["ext.error.context._extend_view", "v", "err"]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", "ctx_len"]]],
+        ["set", "v", ["ext.error.context._extend_view", "v", "ctx"]],
+        ["vec_u8.into_bytes", "v"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.context.error_code",
+      "params": [{"name": "err", "ty": "bytes_view"}],
+      "result": "i32",
+      "body": ["if", ["<", ["view.len", "err"], 5], 0, ["codec.read_u32_le", "err", 1]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.context.error_msg",
+      "params": [{"name": "err", "ty": "bytes_view"}],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "err_len", ["view.len", "err"]],
+        ["if", ["<", "err_len", 9], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "msg_len", ["codec.read_u32_le", "err", 5]],
+        ["if", ["<", "err_len", ["+", 9, "msg_len"]], ["return", ["bytes.alloc", 0]], 0],
+        ["view.to_bytes", ["view.slice", "err", 9, "msg_len"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.context.context_count",
+      "params": [{"name": "err", "ty": "bytes_view"}],
+      "result": "i32",
+      "body": ["begin",
+        ["let", "err_len", ["view.len", "err"]],
+        ["if", ["<", "err_len", 9], ["return", 0], 0],
+        ["let", "msg_len", ["codec.read_u32_le", "err", 5]],
+        ["let", "base", ["+", 9, "msg_len"]],
+        ["if", [">=u", "base", "err_len"], ["return", 0], 0],
+        ["let", "count", 0],
+        ["let", "off", "base"],
+        ["for", "_", 0, "err_len", ["begin",
+          ["if", [">=u", ["+", "off", 4], "err_len"], ["return", "count"], 0],
+          ["let", "ctx_len", ["codec.read_u32_le", "err", "off"]],
+          ["set", "off", ["+", ["+", "off", 4], "ctx_len"]],
+          ["set", "count", ["+", "count", 1]],
+          ["if", [">=u", "off", "err_len"], ["return", "count"], 0],
+          0
+        ]],
+        "count"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.context.get_context",
+      "params": [{"name": "err", "ty": "bytes_view"}, {"name": "idx", "ty": "i32"}],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "err_len", ["view.len", "err"]],
+        ["if", ["<", "err_len", 9], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "msg_len", ["codec.read_u32_le", "err", 5]],
+        ["let", "off", ["+", 9, "msg_len"]],
+        ["let", "i", 0],
+        ["for", "_", 0, "err_len", ["begin",
+          ["if", [">=u", ["+", "off", 4], "err_len"], ["return", ["bytes.alloc", 0]], 0],
+          ["let", "ctx_len", ["codec.read_u32_le", "err", "off"]],
+          ["if", ["=", "i", "idx"],
+            ["return", ["view.to_bytes", ["view.slice", "err", ["+", "off", 4], "ctx_len"]]],
+            0
+          ],
+          ["set", "off", ["+", ["+", "off", 4], "ctx_len"]],
+          ["set", "i", ["+", "i", 1]],
+          ["if", [">=u", "off", "err_len"], ["return", ["bytes.alloc", 0]], 0],
+          0
+        ]],
+        ["bytes.alloc", 0]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-curl-c",
+  "description": "HTTP(S) client bindings via libcurl (run-os only).",
+  "version": "0.1.1",
+  "module_root": "modules",
+  "modules": [
+    "ext.curl._ffi",
+    "ext.curl.http"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
+    "import_mode": "ffi",
+    "ffi_libs": ["curl"],
+    "capabilities": ["ffi", "unsafe"]
+  }
+}

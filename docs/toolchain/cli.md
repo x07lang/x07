@@ -4,6 +4,11 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 ## Key commands
 
+### New project skeleton
+
+- `x07 --init`
+  - Creates `x07.json`, `x07-package.json`, `x07.lock.json`, and a minimal `src/` program.
+
 ### Formatting (x07AST JSON)
 
 - `x07c fmt --input <path> --check`
@@ -28,8 +33,10 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 ### Packages (pack/lock/publish)
 
+- `x07 pkg add <name>@<version>`
 - `x07 pkg lock --project x07.json --index <registry_url>`
 - `x07 pkg pack --package <dir> --out <path>`
+- `x07 pkg login --index <registry_url>`
 - `x07 pkg publish --package <dir> --index <registry_url>`
 
 ## JSON outputs (agent-friendly)

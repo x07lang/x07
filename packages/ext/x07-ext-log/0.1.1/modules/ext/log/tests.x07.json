@@ -1,0 +1,78 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.log.tests",
+  "imports": [
+    "std.test",
+    "ext.log"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.log.tests.test_record_roundtrip",
+        "ext.log.tests.test_format_record_empty_target",
+        "ext.log.tests.test_invalid_record_formats"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.tests.test_record_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "target", ["bytes.lit", "app"]],
+        ["let", "msg", ["bytes.lit", "hello"]],
+        ["let", "rec", ["ext.log.record", ["ext.log.level_info"], ["bytes.view", "target"], ["bytes.view", "msg"]]],
+        ["try", ["std.test.assert_true", ["ext.log.is_valid_record", ["bytes.view", "rec"]], ["std.test.code_assert_true"]]],
+        ["try", ["std.test.assert_i32_eq", ["ext.log.record_level", ["bytes.view", "rec"]], ["ext.log.level_info"], ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.log.record_target", ["bytes.view", "rec"]], "target", ["std.test.code_assert_bytes_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.log.record_msg", ["bytes.view", "rec"]], "msg", ["std.test.code_assert_bytes_eq"]]],
+        ["let", "formatted", ["ext.log.format_record", ["bytes.view", "rec"]]],
+        ["let", "expected_v", ["vec_u8.with_capacity", 15]],
+        ["set", "expected_v", ["vec_u8.extend_bytes", "expected_v", ["bytes.lit", "info"]]],
+        ["set", "expected_v", ["vec_u8.push", "expected_v", 32]],
+        ["set", "expected_v", ["vec_u8.extend_bytes", "expected_v", ["bytes.lit", "app"]]],
+        ["set", "expected_v", ["vec_u8.push", "expected_v", 58]],
+        ["set", "expected_v", ["vec_u8.push", "expected_v", 32]],
+        ["set", "expected_v", ["vec_u8.extend_bytes", "expected_v", ["bytes.lit", "hello"]]],
+        ["let", "expected", ["vec_u8.into_bytes", "expected_v"]],
+        ["try", ["std.test.assert_bytes_eq", "formatted", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.tests.test_format_record_empty_target",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "msg", ["bytes.lit", "hello"]],
+        ["let", "rec", ["ext.log.record", ["ext.log.level_warn"], ["view.slice", ["bytes.view", "msg"], 0, 0], ["bytes.view", "msg"]]],
+        ["let", "formatted", ["ext.log.format_record", ["bytes.view", "rec"]]],
+        ["let", "expected_v", ["vec_u8.with_capacity", 11]],
+        ["set", "expected_v", ["vec_u8.extend_bytes", "expected_v", ["bytes.lit", "warn"]]],
+        ["set", "expected_v", ["vec_u8.push", "expected_v", 58]],
+        ["set", "expected_v", ["vec_u8.push", "expected_v", 32]],
+        ["set", "expected_v", ["vec_u8.extend_bytes", "expected_v", ["bytes.lit", "hello"]]],
+        ["let", "expected", ["vec_u8.into_bytes", "expected_v"]],
+        ["try", ["std.test.assert_bytes_eq", "formatted", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.tests.test_invalid_record_formats",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "empty", ["bytes.alloc", 0]],
+        ["try", ["std.test.assert_i32_eq", ["ext.log.is_valid_record", ["bytes.view", "empty"]], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "formatted", ["ext.log.format_record", ["bytes.view", "empty"]]],
+        ["let", "expected", ["bytes.lit", "invalid_ext.log_record"]],
+        ["try", ["std.test.assert_bytes_eq", "formatted", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

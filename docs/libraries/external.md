@@ -6,6 +6,15 @@ External packages provide:
 - performance-critical native backends
 - larger feature sets than stdlib should carry
 
+External packages are distributed via the X07 registry at https://x07.io/packages.
+
+To use an external package from a project:
+
+```bash
+x07 pkg add <name>@<version>
+x07 pkg lock --index sparse+https://registry.x07.io/index/
+```
+
 Examples include:
 
 - networking (HTTP/TLS, servers, client)

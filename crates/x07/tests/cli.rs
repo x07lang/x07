@@ -1,8 +1,11 @@
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde_json::Value;
 use x07_contracts::X07TEST_SCHEMA_VERSION;
+
+static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn repo_root() -> PathBuf {
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -18,6 +21,15 @@ fn run_x07(args: &[&str]) -> std::process::Output {
     Command::new(exe).args(args).output().expect("run x07")
 }
 
+fn run_x07_in_dir(dir: &PathBuf, args: &[&str]) -> std::process::Output {
+    let exe = env!("CARGO_BIN_EXE_x07");
+    Command::new(exe)
+        .current_dir(dir)
+        .args(args)
+        .output()
+        .expect("run x07")
+}
+
 fn parse_json_stdout(out: &std::process::Output) -> Value {
     serde_json::from_slice(&out.stdout).expect("parse stdout JSON")
 }
@@ -27,6 +39,12 @@ fn write_bytes(path: &PathBuf, bytes: &[u8]) {
         std::fs::create_dir_all(parent).expect("create parent dir");
     }
     std::fs::write(path, bytes).expect("write file");
+}
+
+fn fresh_tmp_dir(root: &std::path::Path, name: &str) -> PathBuf {
+    let pid = std::process::id();
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    root.join("target").join(format!("{name}_{pid}_{n}"))
 }
 
 #[test]
@@ -105,6 +123,92 @@ fn x07_test_smoke_suite() {
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+#[test]
+fn x07_init_creates_project_skeleton() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_init_project");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "init");
+
+    for rel in [
+        "x07.json",
+        "x07-package.json",
+        "x07.lock.json",
+        "src/app.x07.json",
+        "src/main.x07.json",
+        ".gitignore",
+    ] {
+        assert!(dir.join(rel).is_file(), "missing {}", rel);
+    }
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--project", "x07.json", "--check"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(out.status.code(), Some(20));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["error"]["code"], "X07INIT_EXISTS");
+}
+
+#[test]
+fn x07_pkg_add_updates_project_manifest() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_add");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.0"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "pkg.add");
+
+    let doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    let deps = doc["dependencies"].as_array().expect("dependencies[]");
+    assert_eq!(deps.len(), 1);
+    assert_eq!(deps[0]["name"], "ext-hex-rs");
+    assert_eq!(deps[0]["version"], "0.1.0");
+    assert_eq!(deps[0]["path"], ".x07/deps/ext-hex-rs/0.1.0");
+
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.0"]);
+    assert_eq!(out.status.code(), Some(20));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["error"]["code"], "X07PKG_DEP_EXISTS");
 }
 
 #[test]

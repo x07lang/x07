@@ -1,0 +1,95 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.error.tests",
+  "imports": ["std.test", "ext.error.context", "ext.error.fmt"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.error.tests.test_err_from_code_roundtrip",
+        "ext.error.tests.test_err_from_msg_roundtrip",
+        "ext.error.tests.test_with_context_adds_context",
+        "ext.error.tests.test_format_error_basic"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.tests.test_err_from_code_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "err", ["ext.error.context.err_from_code", 42]],
+        ["let", "code", ["ext.error.context.error_code", ["bytes.view", "err"]]],
+        ["try", ["std.test.assert_i32_eq", "code", 42, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.tests.test_err_from_msg_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "v", ["vec_u8.with_capacity", 10]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "test"]]],
+        ["set", "v", ["vec_u8.push", "v", 32]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "error"]]],
+        ["let", "msg", ["vec_u8.into_bytes", "v"]],
+        ["let", "err", ["ext.error.context.err_from_msg", ["bytes.view", "msg"]]],
+        ["let", "got_msg", ["ext.error.context.error_msg", ["bytes.view", "err"]]],
+        ["try", ["std.test.assert_bytes_eq", "got_msg", "msg", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.tests.test_with_context_adds_context",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "base_v", ["vec_u8.with_capacity", 10]],
+        ["set", "base_v", ["vec_u8.extend_bytes", "base_v", ["bytes.lit", "base"]]],
+        ["set", "base_v", ["vec_u8.push", "base_v", 32]],
+        ["set", "base_v", ["vec_u8.extend_bytes", "base_v", ["bytes.lit", "error"]]],
+        ["let", "base_msg", ["vec_u8.into_bytes", "base_v"]],
+        ["let", "err", ["ext.error.context.err_from_msg", ["bytes.view", "base_msg"]]],
+        ["let", "ctx_v", ["vec_u8.with_capacity", 9]],
+        ["set", "ctx_v", ["vec_u8.extend_bytes", "ctx_v", ["bytes.lit", "context"]]],
+        ["set", "ctx_v", ["vec_u8.push", "ctx_v", 32]],
+        ["set", "ctx_v", ["vec_u8.extend_bytes", "ctx_v", ["bytes.lit", "1"]]],
+        ["let", "ctx1", ["vec_u8.into_bytes", "ctx_v"]],
+        ["let", "err2", ["ext.error.context.with_context", ["bytes.view", "err"], ["bytes.view", "ctx1"]]],
+        ["let", "count", ["ext.error.context.context_count", ["bytes.view", "err2"]]],
+        ["try", ["std.test.assert_i32_eq", "count", 1, ["std.test.code_assert_i32_eq"]]],
+        ["let", "got_ctx", ["ext.error.context.get_context", ["bytes.view", "err2"], 0]],
+        ["try", ["std.test.assert_bytes_eq", "got_ctx", "ctx1", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.tests.test_format_error_basic",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "msg_v", ["vec_u8.with_capacity", 16]],
+        ["set", "msg_v", ["vec_u8.extend_bytes", "msg_v", ["bytes.lit", "something"]]],
+        ["set", "msg_v", ["vec_u8.push", "msg_v", 32]],
+        ["set", "msg_v", ["vec_u8.extend_bytes", "msg_v", ["bytes.lit", "failed"]]],
+        ["let", "msg", ["vec_u8.into_bytes", "msg_v"]],
+        ["let", "err", ["ext.error.context.err_from_msg", ["bytes.view", "msg"]]],
+        ["let", "formatted", ["ext.error.fmt.format_error", ["bytes.view", "err"]]],
+        ["let", "exp_v", ["vec_u8.with_capacity", 23]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "error:"]]],
+        ["set", "exp_v", ["vec_u8.push", "exp_v", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "something"]]],
+        ["set", "exp_v", ["vec_u8.push", "exp_v", 32]],
+        ["set", "exp_v", ["vec_u8.extend_bytes", "exp_v", ["bytes.lit", "failed"]]],
+        ["let", "expected", ["vec_u8.into_bytes", "exp_v"]],
+        ["try", ["std.test.assert_bytes_eq", "formatted", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

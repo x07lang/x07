@@ -1,0 +1,136 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "std.db.sqlite.spec",
+  "imports": ["std.codec", "std.db.spec"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.db.sqlite.spec.flags_none_v1",
+        "std.db.sqlite.spec.open_flag_readonly_v1",
+        "std.db.sqlite.spec.open_flag_create_v1",
+        "std.db.sqlite.spec.caps_pack_v1",
+        "std.db.sqlite.spec.caps_default_v1",
+        "std.db.sqlite.spec.open_req_path_v1",
+        "std.db.sqlite.spec.query_req_v1",
+        "std.db.sqlite.spec.exec_req_v1",
+        "std.db.sqlite.spec.close_req_v1"
+      ]
+    },
+    { "kind": "defn", "name": "std.db.sqlite.spec.flags_none_v1", "params": [], "result": "i32", "body": 0 },
+    { "kind": "defn", "name": "std.db.sqlite.spec.open_flag_readonly_v1", "params": [], "result": "i32", "body": 1 },
+    { "kind": "defn", "name": "std.db.sqlite.spec.open_flag_create_v1", "params": [], "result": "i32", "body": 2 },
+    {
+      "kind": "defn",
+      "name": "std.db.sqlite.spec.caps_pack_v1",
+      "params": [
+        { "name": "connect_timeout_ms", "ty": "i32" },
+        { "name": "query_timeout_ms", "ty": "i32" },
+        { "name": "max_rows", "ty": "i32" },
+        { "name": "max_resp_bytes", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "std.db.spec.caps_pack_v1",
+        "connect_timeout_ms",
+        "query_timeout_ms",
+        "max_rows",
+        "max_resp_bytes"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.sqlite.spec.caps_default_v1",
+      "params": [],
+      "result": "bytes",
+      "body": ["std.db.spec.caps_default_v1"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.sqlite.spec.open_req_path_v1",
+      "params": [
+        { "name": "path", "ty": "bytes" },
+        { "name": "flags", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "p_len", ["bytes.len", "path"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 16, "p_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.lit", "X7SO"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", 1]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", ["if", ["<", "flags", 0], 0, "flags"]]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "p_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", "path"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.sqlite.spec.query_req_v1",
+      "params": [
+        { "name": "conn_id", "ty": "i32" },
+        { "name": "sql", "ty": "bytes" },
+        { "name": "params_doc", "ty": "bytes" },
+        { "name": "flags", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "sql_len", ["bytes.len", "sql"]],
+        ["let", "p_len", ["bytes.len", "params_doc"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 24, ["+", "sql_len", "p_len"]]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.lit", "X7SQ"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", 1]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "conn_id"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", ["if", ["<", "flags", 0], 0, "flags"]]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "sql_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", "sql"]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "p_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", "params_doc"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.sqlite.spec.exec_req_v1",
+      "params": [
+        { "name": "conn_id", "ty": "i32" },
+        { "name": "sql", "ty": "bytes" },
+        { "name": "params_doc", "ty": "bytes" },
+        { "name": "flags", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "sql_len", ["bytes.len", "sql"]],
+        ["let", "p_len", ["bytes.len", "params_doc"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 24, ["+", "sql_len", "p_len"]]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.lit", "X7SE"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", 1]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "conn_id"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", ["if", ["<", "flags", 0], 0, "flags"]]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "sql_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", "sql"]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "p_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", "params_doc"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.sqlite.spec.close_req_v1",
+      "params": [{ "name": "conn_id", "ty": "i32" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "out", ["vec_u8.with_capacity", 12]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.lit", "X7SC"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", 1]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "conn_id"]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    }
+  ]
+}
