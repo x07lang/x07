@@ -9,7 +9,9 @@ use dbcore::{
 };
 use futures_util::{pin_mut, TryStreamExt as _};
 use once_cell::sync::OnceCell;
-use rustls_tokio_postgres::{config_no_verify, config_webpki_roots, MakeRustlsConnect};
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use rustls::{ClientConfig, Error as RustlsError, SignatureScheme};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -17,6 +19,7 @@ use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio_postgres::types::{ToSql, Type};
 use tokio_postgres::{Client, Config, NoTls};
+use tokio_postgres_rustls::MakeRustlsConnect;
 use x07_ext_db_native_core as dbcore;
 
 const DB_ERR_PG_CONNECT: u32 = 53_520;
@@ -47,6 +50,69 @@ static POLICY: OnceCell<Policy> = OnceCell::new();
 static RT: OnceCell<Runtime> = OnceCell::new();
 static CONNS: OnceCell<Mutex<Vec<Option<Arc<Client>>>>> = OnceCell::new();
 static QUERIES: AtomicU32 = AtomicU32::new(0);
+
+#[derive(Debug)]
+struct AcceptAllVerifier;
+
+impl ServerCertVerifier for AcceptAllVerifier {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, RustlsError> {
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::ECDSA_NISTP384_SHA384,
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::RSA_PSS_SHA512,
+            SignatureScheme::RSA_PSS_SHA384,
+            SignatureScheme::RSA_PSS_SHA256,
+            SignatureScheme::ED25519,
+        ]
+    }
+}
+
+fn tls_config_webpki_roots() -> ClientConfig {
+    let roots = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
+    ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth()
+}
+
+fn tls_config_no_verify() -> ClientConfig {
+    let mut cfg = ClientConfig::builder()
+        .with_root_certificates(rustls::RootCertStore::empty())
+        .with_no_client_auth();
+    cfg.dangerous()
+        .set_certificate_verifier(Arc::new(AcceptAllVerifier));
+    cfg
+}
 
 fn runtime() -> &'static Runtime {
     RT.get_or_init(|| {
@@ -452,9 +518,9 @@ pub extern "C" fn x07_ext_db_pg_open_v1(
         if pol.sandboxed && pol.require_tls {
             cfg.ssl_mode(tokio_postgres::config::SslMode::Require);
             let tls_cfg = if pol.require_verify {
-                config_webpki_roots()
+                tls_config_webpki_roots()
             } else {
-                config_no_verify()
+                tls_config_no_verify()
             };
             let tls = MakeRustlsConnect::new(tls_cfg);
             let (client, connection) = cfg

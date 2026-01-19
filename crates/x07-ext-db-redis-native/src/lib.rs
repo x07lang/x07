@@ -8,7 +8,9 @@ use dbcore::{
     DB_ERR_TOO_LARGE, OP_CLOSE_V1, OP_OPEN_V1, OP_QUERY_V1,
 };
 use once_cell::sync::OnceCell;
-use rustls_tokio_postgres::{config_no_verify, config_webpki_roots};
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use rustls::{ClientConfig, Error as RustlsError, SignatureScheme};
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -61,6 +63,69 @@ static POLICY: OnceCell<Policy> = OnceCell::new();
 static RT: OnceCell<Runtime> = OnceCell::new();
 static CONNS: OnceCell<Mutex<RedisConnTable>> = OnceCell::new();
 static QUERIES: AtomicU32 = AtomicU32::new(0);
+
+#[derive(Debug)]
+struct AcceptAllVerifier;
+
+impl ServerCertVerifier for AcceptAllVerifier {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, RustlsError> {
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::ECDSA_NISTP384_SHA384,
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::RSA_PSS_SHA512,
+            SignatureScheme::RSA_PSS_SHA384,
+            SignatureScheme::RSA_PSS_SHA256,
+            SignatureScheme::ED25519,
+        ]
+    }
+}
+
+fn tls_config_webpki_roots() -> ClientConfig {
+    let roots = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
+    ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth()
+}
+
+fn tls_config_no_verify() -> ClientConfig {
+    let mut cfg = ClientConfig::builder()
+        .with_root_certificates(rustls::RootCertStore::empty())
+        .with_no_client_auth();
+    cfg.dangerous()
+        .set_certificate_verifier(Arc::new(AcceptAllVerifier));
+    cfg
+}
 
 fn runtime() -> &'static Runtime {
     RT.get_or_init(|| {
@@ -585,14 +650,13 @@ pub extern "C" fn x07_ext_db_redis_open_v1(
                         .map_err(|e| (connect_code, e.to_string().into_bytes()))?;
                     if pol.sandboxed && pol.require_tls {
                         let cfg = if pol.require_verify {
-                            config_webpki_roots()
+                            tls_config_webpki_roots()
                         } else {
-                            config_no_verify()
+                            tls_config_no_verify()
                         };
                         let connector = TlsConnector::from(Arc::new(cfg));
-                        let server_name =
-                            tokio_rustls::rustls::pki_types::ServerName::try_from(host_s)
-                                .map_err(|_| (DB_ERR_BAD_REQ, Vec::new()))?;
+                        let server_name = ServerName::try_from(host_s)
+                            .map_err(|_| (DB_ERR_BAD_REQ, Vec::new()))?;
                         let tls = connector
                             .connect(server_name, tcp)
                             .await
