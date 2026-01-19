@@ -1,0 +1,20 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-openssl-c",
+  "description": "OpenSSL bindings: hashes, RNG, and Ed25519 (run-os only).",
+  "version": "0.1.2",
+  "module_root": "modules",
+  "modules": [
+    "ext.openssl._ffi",
+    "ext.openssl.ed25519",
+    "ext.openssl.rand",
+    "ext.openssl.hash"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
+    "import_mode": "ffi",
+    "ffi_libs": ["ssl", "crypto"],
+    "capabilities": ["ffi", "unsafe"]
+  }
+}

@@ -469,6 +469,31 @@
       "version": "0.1.1"
     },
     {
+      "determinism_tier": "os-world-only",
+      "ffi_libs": [
+        "curl"
+      ],
+      "import_mode": "ffi",
+      "modules": [
+        {
+          "module_id": "ext.curl._ffi",
+          "path": "packages/ext/x07-ext-curl-c/0.1.2/modules/ext/curl/_ffi.x07.json",
+          "sha256": "5b4691bb1f553b2cc20d24bd461eaf26c3e5a842537a74c0cf5f23c9aed2fff5",
+          "size_bytes": 3889
+        },
+        {
+          "module_id": "ext.curl.http",
+          "path": "packages/ext/x07-ext-curl-c/0.1.2/modules/ext/curl/http.x07.json",
+          "sha256": "029b531f117042cba8ed364e339ab06cc01d7bd22e2f71af73985ba0d0b1ca67",
+          "size_bytes": 23355
+        }
+      ],
+      "name": "ext-curl-c",
+      "package_manifest_sha256": "0d73c4a326357119ceee1dfc464ea36de85b97e9002d17c4039ed096b126445f",
+      "path": "packages/ext/x07-ext-curl-c/0.1.2",
+      "version": "0.1.2"
+    },
+    {
       "determinism_tier": "pure",
       "import_mode": "handwritten",
       "modules": [
@@ -1583,6 +1608,44 @@
       "version": "0.1.1"
     },
     {
+      "determinism_tier": "os-world-only",
+      "ffi_libs": [
+        "ssl",
+        "crypto"
+      ],
+      "import_mode": "ffi",
+      "modules": [
+        {
+          "module_id": "ext.openssl._ffi",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.2/modules/ext/openssl/_ffi.x07.json",
+          "sha256": "d60d0a3bcbb650f7c9a7c5ab26a17de48338addbde6a7736367dba8299287a3c",
+          "size_bytes": 2742
+        },
+        {
+          "module_id": "ext.openssl.ed25519",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.2/modules/ext/openssl/ed25519.x07.json",
+          "sha256": "bf544d650ddf4d25d5b9c51409866cfd7d590f5d133878a0d454ef66c6323c0e",
+          "size_bytes": 691
+        },
+        {
+          "module_id": "ext.openssl.hash",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.2/modules/ext/openssl/hash.x07.json",
+          "sha256": "a024eea07b9753b7c37b8761cc7bf6b545f8bf4e79738dba85c36850fd6d296c",
+          "size_bytes": 4055
+        },
+        {
+          "module_id": "ext.openssl.rand",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.2/modules/ext/openssl/rand.x07.json",
+          "sha256": "7d4807817f1a95545aeaa8acd9b5b1575f75168bb9c3712e71159ea73c38c9c4",
+          "size_bytes": 2319
+        }
+      ],
+      "name": "ext-openssl-c",
+      "package_manifest_sha256": "95440a43cb66a4c258f1e25b96205f73edd37a59cb56d9b82530af81bea68c3a",
+      "path": "packages/ext/x07-ext-openssl-c/0.1.2",
+      "version": "0.1.2"
+    },
+    {
       "determinism_tier": "pure",
       "import_mode": "x07import",
       "modules": [
@@ -1811,6 +1874,32 @@
       "package_manifest_sha256": "9bb8fa63b33d54f7c9fea8ef7cecc0e68b6b1b489767a09bc6ccbe38e2eb6a3b",
       "path": "packages/ext/x07-ext-sockets-c/0.1.1",
       "version": "0.1.1"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "ffi_libs": [
+        "ssl",
+        "crypto"
+      ],
+      "import_mode": "ffi",
+      "modules": [
+        {
+          "module_id": "ext.sockets._ffi",
+          "path": "packages/ext/x07-ext-sockets-c/0.1.2/modules/ext/sockets/_ffi.x07.json",
+          "sha256": "396adf1cb34e37d233f28cb70266bb7f8f4cedd230f1fb638eeea49da87723d6",
+          "size_bytes": 7045
+        },
+        {
+          "module_id": "ext.sockets.net",
+          "path": "packages/ext/x07-ext-sockets-c/0.1.2/modules/ext/sockets/net.x07.json",
+          "sha256": "92487f6a921e9437c58f1084da340a9b3fcac0fbf26ccb311c15cc12985b7d69",
+          "size_bytes": 10712
+        }
+      ],
+      "name": "ext-sockets-c",
+      "package_manifest_sha256": "51a7566fd88c8fe00fbf84f54b88ef4eb712f8225cf3f72fce6183d6d9972b84",
+      "path": "packages/ext/x07-ext-sockets-c/0.1.2",
+      "version": "0.1.2"
     },
     {
       "determinism_tier": "pure",
@@ -2573,8 +2662,33 @@
       "package_manifest_sha256": "f2aa1e89d79c049506708392d2da1756b0a5a091bc970701ed35380ba76a3cb5",
       "path": "packages/ext/x07-ext-zlib-c/0.1.1",
       "version": "0.1.1"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "ffi_libs": [
+        "z"
+      ],
+      "import_mode": "ffi",
+      "modules": [
+        {
+          "module_id": "ext.zlib._ffi",
+          "path": "packages/ext/x07-ext-zlib-c/0.1.2/modules/ext/zlib/_ffi.x07.json",
+          "sha256": "322900a6c8227e9207265ce6ab9b71c219ed743c6b1a9968745f84b7e27e9ca6",
+          "size_bytes": 2693
+        },
+        {
+          "module_id": "ext.zlib",
+          "path": "packages/ext/x07-ext-zlib-c/0.1.2/modules/ext/zlib.x07.json",
+          "sha256": "4f57aaeff64c45e2f16913c7dffa4616a601e5ccf9064c13246a134563db7e03",
+          "size_bytes": 6346
+        }
+      ],
+      "name": "ext-zlib-c",
+      "package_manifest_sha256": "783c6cb11994c58c5a98ca0a17d0c02cbdc1dc339453bfcbb488566fa8c95d94",
+      "path": "packages/ext/x07-ext-zlib-c/0.1.2",
+      "version": "0.1.2"
     }
   ],
-  "packages_hash": "318b921b59a0c829b8d7bb09524b751540fc6ad4f4865c11b06ab290e88319d4",
+  "packages_hash": "5cf04e6eadce2e3cded205bdb50a867c53538b0ff1303ac84c91fa9ee9b8d922",
   "packages_root": "packages/ext"
 }

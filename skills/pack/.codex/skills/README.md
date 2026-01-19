@@ -10,6 +10,7 @@ Installation (for a user project):
 Available skills:
 
 - `x07-agent-playbook`: agent-first workflow + design rails (toolchain-only)
+- `x07-language-guide`: canonical language + stdlib reference (`x07c guide`)
 - `x07-build-run`: compile+run deterministic solve-world programs (`x07-host-runner`)
 - `x07-lint-repair`: lint/fix/patch x07AST JSON (`x07c` + `x07 ast`)
 - `x07-format`: canonical x07AST JSON formatting (`x07c fmt`)
