@@ -443,7 +443,13 @@ pub fn guide_md() -> String {
     out.push_str(
         "- `[\"bytes.lit\",\"token\"]` -> bytes (UTF-8 of the atom string; no whitespace)\n",
     );
-    out.push_str("  - Example: `[\"bytes.lit\",\"config.bin\"]` produces `b\"config.bin\"`.\n\n");
+    out.push_str("  - Example: `[\"bytes.lit\",\"config.bin\"]` produces `b\"config.bin\"`.\n");
+    out.push_str(
+        "  - The token characters are literal (underscores stay underscores); there are no escape sequences.\n",
+    );
+    out.push_str(
+        "  - For whitespace/newlines/arbitrary bytes, build a `vec_u8` and convert with `std.vec.as_bytes`.\n\n",
+    );
 
     out.push_str("## Views\n\n");
     out.push_str(
@@ -457,6 +463,8 @@ pub fn guide_md() -> String {
     out.push_str("- `[\"view.to_bytes\",\"v\"]` -> bytes (copy)\n");
     out.push_str("- `[\"view.eq\",\"a\",\"b\"]` -> i32 (1 if equal else 0)\n");
     out.push_str("- `[\"view.cmp_range\",\"a\",\"a_off\",\"a_len\",\"b\",\"b_off\",\"b_len\"]` -> i32 (-1/0/1)\n\n");
+
+    out.push_str("Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).\n\n");
 
     out.push_str("## Filesystem (solve-fs only)\n\n");
     out.push_str("- `[\"fs.read\",\"path_bytes\"]` -> bytes\n");

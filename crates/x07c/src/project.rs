@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::collections::{BTreeMap, HashSet};
+use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -381,12 +381,31 @@ pub fn collect_module_roots(
     lock: &Lockfile,
 ) -> Result<Vec<PathBuf>> {
     let base = project_path.parent().unwrap_or_else(|| Path::new("."));
+
+    fn normalize_module_root_path(path: PathBuf) -> PathBuf {
+        let mut out = PathBuf::new();
+        for component in path.components() {
+            if component == Component::CurDir {
+                continue;
+            }
+            out.push(Path::new(component.as_os_str()));
+        }
+        out
+    }
+
+    let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut roots: Vec<PathBuf> = Vec::new();
     for r in &manifest.module_roots {
-        roots.push(base.join(r));
+        let root = normalize_module_root_path(base.join(r));
+        if seen.insert(root.clone()) {
+            roots.push(root);
+        }
     }
     for dep in &lock.dependencies {
-        roots.push(base.join(&dep.path).join(&dep.module_root));
+        let root = normalize_module_root_path(base.join(&dep.path).join(&dep.module_root));
+        if seen.insert(root.clone()) {
+            roots.push(root);
+        }
     }
     Ok(roots)
 }

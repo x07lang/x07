@@ -39,6 +39,22 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 pkg login --index <registry_url>`
 - `x07 pkg publish --package <dir> --index <registry_url>`
 
+### Build to C (project)
+
+- `x07c build --project x07.json --out build/program.c`
+  - Reads `x07.json` + `x07.lock.json`.
+  - Uses `x07.json` `module_roots` plus locked dependency module roots (from the lockfile).
+
+### Running generated executables
+
+The `main` emitted by `x07c build` / `x07c compile` uses a simple byte framing:
+
+- stdin: `u32_le(len)` followed by `len` bytes
+- stdout: `u32_le(len)` followed by `len` bytes
+- stderr: JSON stats (fuel/heap/fs/rr/kv/scheduler)
+
+`x07-host-runner` and `x07-os-runner` handle this framing automatically.
+
 ## JSON outputs (agent-friendly)
 
 Commands that emit structured outputs must guarantee:

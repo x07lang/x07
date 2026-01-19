@@ -289,6 +289,7 @@ fn lint_expr(expr: &Expr, ptr: &str, options: LintOptions, diagnostics: &mut Vec
             }
             let head = items[0].as_ident().unwrap_or("");
             lint_core_arity(head, items, ptr, diagnostics);
+            lint_core_borrow_rules(head, items, ptr, diagnostics);
             lint_world_heads(head, ptr, options, diagnostics);
 
             for (idx, item) in items.iter().enumerate() {
@@ -461,6 +462,53 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
         }
         _ => {}
     }
+}
+
+fn lint_core_borrow_rules(
+    head: &str,
+    items: &[Expr],
+    ptr: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(owner_ptr) = (match head {
+        "bytes.view" | "vec_u8.as_view" => Some(format!("{ptr}/1")),
+        "bytes.subview" => Some(format!("{ptr}/1")),
+        _ => None,
+    }) else {
+        return;
+    };
+
+    let Some(owner) = items.get(1) else {
+        return;
+    };
+    if matches!(owner, Expr::Ident(_)) {
+        return;
+    }
+
+    let mut notes = vec![
+        "This operation borrows from an owned value. It cannot borrow from a temporary expression."
+            .to_string(),
+    ];
+    if head == "bytes.view" || head == "bytes.subview" {
+        notes.push("Bind the bytes to a variable first, then call bytes.view/bytes.subview on that variable.".to_string());
+    } else if head == "vec_u8.as_view" {
+        notes.push(
+            "Bind the vec_u8 to a variable first, then call vec_u8.as_view on that variable."
+                .to_string(),
+        );
+    }
+
+    diagnostics.push(Diagnostic {
+        code: "X07-BORROW-0001".to_string(),
+        severity: Severity::Error,
+        stage: Stage::Lint,
+        message: format!("{head} requires an identifier owner"),
+        loc: Some(Location::X07Ast { ptr: owner_ptr }),
+        notes,
+        related: Vec::new(),
+        data: Default::default(),
+        quickfix: None,
+    });
 }
 
 fn lint_world_heads(

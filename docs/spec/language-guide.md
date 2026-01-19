@@ -426,6 +426,8 @@ Bytes literals:
 
 - `["bytes.lit","token"]` -> bytes (UTF-8 of the atom string; no whitespace)
   - Example: `["bytes.lit","config.bin"]` produces `b"config.bin"`.
+  - The token characters are literal (underscores stay underscores); there are no escape sequences.
+  - For whitespace/newlines/arbitrary bytes, build a `vec_u8` and convert with `std.vec.as_bytes`.
 
 ## Views
 
@@ -439,6 +441,8 @@ Views are explicit, borrowed slices used for scan/trim/split without copying.
 - `["view.to_bytes","v"]` -> bytes (copy)
 - `["view.eq","a","b"]` -> i32 (1 if equal else 0)
 - `["view.cmp_range","a","a_off","a_len","b","b_off","b_len"]` -> i32 (-1/0/1)
+
+Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).
 
 ## Filesystem (solve-fs only)
 

@@ -8181,7 +8181,8 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let Some(b_name) = args[0].as_ident() else {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "bytes.view requires an identifier owner".to_string(),
+                "bytes.view requires an identifier owner (bind the bytes to a variable first)"
+                    .to_string(),
             ));
         };
         let Some(b) = self.lookup(b_name).cloned() else {
@@ -8227,7 +8228,8 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let Some(b_name) = args[0].as_ident() else {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "bytes.subview requires an identifier owner".to_string(),
+                "bytes.subview requires an identifier owner (bind the bytes to a variable first)"
+                    .to_string(),
             ));
         };
         let Some(b) = self.lookup(b_name).cloned() else {
@@ -12154,7 +12156,8 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let Some(h_name) = args[0].as_ident() else {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "vec_u8.as_view requires an identifier owner".to_string(),
+                "vec_u8.as_view requires an identifier owner (bind the vec_u8 to a variable first)"
+                    .to_string(),
             ));
         };
         let Some(h) = self.lookup(h_name).cloned() else {

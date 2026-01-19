@@ -8,6 +8,14 @@ X07 packages are source-only (x07AST JSON), and projects pin dependencies with a
 - `x07-package.json` — package definition
 - `x07.lock.json` — pinned dependency graph + hashes
 
+## Module roots (important)
+
+`x07.json` contains a `module_roots` list. This should list **your source directories** (usually just `src`).
+
+When you run `x07 pkg lock`, dependencies are fetched into `.x07/deps/...` and pinned in `x07.lock.json`. Tooling that accepts `--project` (for example `x07c build --project x07.json`, `x07-host-runner --project x07.json`, `x07-os-runner --project x07.json`) automatically adds the locked dependency module roots from the lockfile.
+
+Do not add `.x07/deps/*/modules` paths to `module_roots` manually.
+
 ## Quickstart
 
 ```bash

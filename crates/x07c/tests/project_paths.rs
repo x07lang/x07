@@ -3,7 +3,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde_json::json;
 use x07_contracts::{PACKAGE_MANIFEST_SCHEMA_VERSION, PROJECT_MANIFEST_SCHEMA_VERSION};
+use x07_worlds::WorldId;
 use x07c::project;
+use x07c::{compile, world_config};
 
 fn create_temp_dir(prefix: &str) -> PathBuf {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -345,6 +347,76 @@ fn package_manifest_trims_fields() {
     assert_eq!(m.version, "0.1.0");
     assert_eq!(m.module_root, "src");
     assert_eq!(m.modules, vec!["dep.main".to_string()]);
+
+    rm_rf(&dir);
+}
+
+#[test]
+fn project_module_roots_dedup_prevents_duplicate_module_hits() {
+    let dir = create_temp_dir("x07_project_roots_dedup");
+
+    let dep_mod_dir = dir.join(".x07/deps/dep/0.1.0/modules/dep");
+    std::fs::create_dir_all(&dep_mod_dir).expect("create dep module dir");
+
+    let dep_module = json!({
+        "schema_version": "x07.x07ast@0.1.0",
+        "kind": "module",
+        "module_id": "dep.main",
+        "imports": [],
+        "decls": [
+            {"kind":"export","names":["dep.main.f"]},
+            {"kind":"defn","name":"dep.main.f","params":[],"result":"bytes","body":["bytes.lit","ok"]}
+        ]
+    });
+    std::fs::write(
+        dep_mod_dir.join("main.x07.json"),
+        serde_json::to_string(&dep_module).expect("encode dep module"),
+    )
+    .expect("write dep module");
+
+    let entry = json!({
+        "schema_version": "x07.x07ast@0.1.0",
+        "kind": "entry",
+        "module_id": "main",
+        "imports": ["dep.main"],
+        "decls": [],
+        "solve": ["dep.main.f"],
+    });
+    let entry_bytes = serde_json::to_vec(&entry).expect("encode entry module");
+
+    let manifest = project::ProjectManifest {
+        schema_version: PROJECT_MANIFEST_SCHEMA_VERSION.to_string(),
+        world: "solve-pure".to_string(),
+        entry: "src/main.x07.json".to_string(),
+        module_roots: vec![
+            "./src".to_string(),
+            "./.x07/deps/dep/0.1.0/modules".to_string(),
+        ],
+        link: project::LinkConfig::default(),
+        dependencies: Vec::new(),
+        lockfile: Some("x07.lock.json".to_string()),
+    };
+
+    let lock = project::Lockfile {
+        schema_version: x07_contracts::PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
+        dependencies: vec![project::LockedDependency {
+            name: "dep".to_string(),
+            version: "0.1.0".to_string(),
+            path: ".x07/deps/dep/0.1.0".to_string(),
+            package_manifest_sha256: "0".repeat(64),
+            module_root: "modules".to_string(),
+            modules_sha256: std::collections::BTreeMap::new(),
+        }],
+    };
+
+    let project_path = dir.join("x07.json");
+    let roots = project::collect_module_roots(&project_path, &manifest, &lock)
+        .expect("collect module roots");
+    assert_eq!(roots.len(), 2, "expected module roots to be deduplicated");
+
+    let options = world_config::compile_options_for_world(WorldId::SolvePure, roots);
+    compile::compile_program_to_c(&entry_bytes, &options)
+        .expect("compile should not fail with duplicate roots");
 
     rm_rf(&dir);
 }
