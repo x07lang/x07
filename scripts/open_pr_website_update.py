@@ -1,107 +1,86 @@
 from __future__ import annotations
 
 import argparse
-import json
-import re
-import sys
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+import subprocess
+import sys
 
 
-WEBSITE_VERSIONS_SCHEMA_VERSION = "x07.website-versions@0.1.0"
-
-
-@dataclass(frozen=True, order=True)
-class SemverKey:
-    major: int
-    minor: int
-    patch: int
-    rest: str
-
-
-SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(.*)$")
-
-
-def semver_key(v: str) -> SemverKey:
-    m = SEMVER_RE.match(v.strip())
-    if not m:
-        return SemverKey(0, 0, 0, v)
-    return SemverKey(int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4))
-
-
-def read_versions(path: Path) -> dict[str, Any]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise SystemExit(f"ERROR: parse {path}: {e}")
-    if not isinstance(data, dict):
-        raise SystemExit(f"ERROR: {path} must be a JSON object")
-    if data.get("schema_version") != WEBSITE_VERSIONS_SCHEMA_VERSION:
-        raise SystemExit(f"ERROR: {path} schema_version mismatch")
-    if not isinstance(data.get("versions"), list):
-        raise SystemExit(f"ERROR: {path} versions must be an array")
-    return data
-
-
-def render_versions(data: dict[str, Any]) -> str:
-    return json.dumps(data, sort_keys=True, indent=2) + "\n"
+def infer_toolchain_repo(website_root: Path) -> Path | None:
+    candidates = [
+        website_root.parent,
+        website_root.parent / "x07",
+    ]
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        if not (candidate / "Cargo.toml").is_file():
+            continue
+        if not (candidate / "docs").is_dir():
+            continue
+        return candidate.resolve()
+    return None
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--versions", type=Path, default=Path("versions.json"))
     ap.add_argument("--tag", required=True, help="Release tag (for example: v0.2.0)")
-    ap.add_argument("--release-base-url", required=True, help="Base URL for release assets (no trailing slash required)")
+    ap.add_argument("--bundle", type=Path, required=True, help="Path to docs bundle tar.gz (from x07)")
+    ap.add_argument("--published-at-utc", default=None)
+    ap.add_argument("--set-latest", action="store_true")
     ap.add_argument("--check", action="store_true", help="Validate without writing files")
     return ap.parse_args(argv)
 
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
-    versions_path: Path = args.versions
+    website_root = Path.cwd()
+
+    sync_script = website_root / "scripts" / "sync_from_bundle.py"
+    if not sync_script.is_file():
+        print(
+            f"ERROR: expected x07-website checkout (missing {sync_script})",
+            file=sys.stderr,
+        )
+        return 2
 
     tag = args.tag.strip()
-    base = args.release_base_url.rstrip("/")
+    toolchain_version = tag.removeprefix("v")
+    if toolchain_version == tag:
+        print(f"ERROR: expected --tag like vX.Y.Z, got: {tag!r}", file=sys.stderr)
+        return 2
 
-    data = read_versions(versions_path)
+    bundle_path = args.bundle.resolve()
+    if not bundle_path.is_file():
+        print(f"ERROR: docs bundle not found: {bundle_path}", file=sys.stderr)
+        return 2
 
-    entry = {
-        "version": tag,
-        "release_base_url": base,
-        "release_manifest_url": f"{base}/release-manifest.json",
-        "skills_pack_url": f"{base}/x07-skills-{tag}.tar.gz",
-    }
+    toolchain_repo = infer_toolchain_repo(website_root)
+    if toolchain_repo is None:
+        print(
+            "ERROR: unable to locate x07 toolchain repo (expected nested checkout or sibling ./x07)",
+            file=sys.stderr,
+        )
+        return 2
 
-    versions = data["versions"]
-    assert isinstance(versions, list)
-
-    out: list[dict[str, Any]] = []
-    replaced = False
-    for item in versions:
-        if not isinstance(item, dict):
-            continue
-        if item.get("version") == tag:
-            out.append(entry)
-            replaced = True
-        else:
-            out.append(item)
-    if not replaced:
-        out.append(entry)
-
-    out.sort(key=lambda v: semver_key(str(v.get("version", ""))))
-    data["versions"] = out
-
-    rendered = render_versions(data)
+    cmd = [
+        sys.executable,
+        str(sync_script),
+        "--toolchain-version",
+        toolchain_version,
+        "--bundle",
+        str(bundle_path),
+        "--toolchain-repo",
+        str(toolchain_repo),
+    ]
+    if args.published_at_utc is not None:
+        cmd.extend(["--published-at-utc", str(args.published_at_utc)])
+    if args.set_latest:
+        cmd.append("--set-latest")
     if args.check:
-        if versions_path.read_text(encoding="utf-8") != rendered:
-            print(f"ERROR: {versions_path} would change", file=sys.stderr)
-            return 1
-        print("ok: versions.json up to date")
-        return 0
+        cmd.append("--check")
 
-    versions_path.write_text(rendered, encoding="utf-8")
-    print(f"ok: updated {versions_path}")
+    subprocess.check_call(cmd)
     return 0
 
 

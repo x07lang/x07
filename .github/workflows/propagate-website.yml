@@ -1,0 +1,76 @@
+name: Propagate Website
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (for example: v0.2.0)"
+        required: true
+      set_latest:
+        description: Update latest_toolchain_version
+        required: false
+        default: "true"
+      published_at_utc:
+        description: Optional published_at_utc (ISO8601, UTC)
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  propagate:
+    name: propagate / website
+    runs-on: ubuntu-latest
+    env:
+      X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
+    steps:
+      - name: Fail (missing X07_BOT_TOKEN)
+        if: ${{ env.X07_BOT_TOKEN == '' }}
+        run: |
+          echo "X07_BOT_TOKEN is not set"
+          exit 2
+
+      - name: Checkout (x07)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build docs bundle
+        run: python3 scripts/build_docs_bundle.py --tag "${{ inputs.tag }}"
+
+      - name: Checkout (x07-website)
+        uses: actions/checkout@v4
+        with:
+          repository: x07lang/x07-website
+          path: x07-website
+          token: ${{ env.X07_BOT_TOKEN }}
+
+      - name: Sync docs+agent into x07-website
+        working-directory: x07-website
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag }}"
+          args=()
+          if [ "${{ inputs.set_latest }}" = "true" ]; then
+            args+=(--set-latest)
+          fi
+          if [ -n "${{ inputs.published_at_utc }}" ]; then
+            args+=(--published-at-utc "${{ inputs.published_at_utc }}")
+          fi
+          python3 ../scripts/open_pr_website_update.py \
+            --tag "$tag" \
+            --bundle "../dist/x07-docs-${tag}.tar.gz" \
+            "${args[@]}"
+
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ env.X07_BOT_TOKEN }}
+          path: x07-website
+          branch: bot/website-sync-${{ inputs.tag }}
+          commit-message: "release: sync website for ${{ inputs.tag }}"
+          title: "release: sync website for ${{ inputs.tag }}"
+          body: Automated website sync from x07 tag ${{ inputs.tag }}.

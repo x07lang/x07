@@ -185,6 +185,9 @@ jobs:
       - name: Build skills pack
         run: python3 scripts/build_skills_pack.py --out "dist/x07-skills-${{ github.ref_name }}.tar.gz"
 
+      - name: Build docs bundle
+        run: python3 scripts/build_docs_bundle.py --tag "${{ github.ref_name }}"
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -222,14 +225,17 @@ jobs:
           path: x07-website
           token: ${{ env.X07_BOT_TOKEN }}
 
-      - name: Update versions.json
+      - name: Sync docs+agent into x07-website
         if: ${{ env.X07_BOT_TOKEN != '' }}
         working-directory: x07-website
         run: |
           set -euo pipefail
           tag="${{ github.ref_name }}"
-          base="https://github.com/${{ github.repository }}/releases/download/${tag}"
-          python3 ../scripts/open_pr_website_update.py --tag "$tag" --release-base-url "$base"
+          python3 ../scripts/build_docs_bundle.py --tag "$tag"
+          python3 ../scripts/open_pr_website_update.py \
+            --tag "$tag" \
+            --bundle "../dist/x07-docs-${tag}.tar.gz" \
+            --set-latest
 
       - name: Open PR
         if: ${{ env.X07_BOT_TOKEN != '' }}
@@ -238,6 +244,6 @@ jobs:
           token: ${{ env.X07_BOT_TOKEN }}
           path: x07-website
           branch: bot/release-${{ github.ref_name }}
-          commit-message: "release: website versions for ${{ github.ref_name }}"
-          title: "release: website versions for ${{ github.ref_name }}"
-          body: Automated update from x07 release ${{ github.ref_name }}.
+          commit-message: "release: sync website for ${{ github.ref_name }}"
+          title: "release: sync website for ${{ github.ref_name }}"
+          body: Automated website sync from x07 release ${{ github.ref_name }}.
