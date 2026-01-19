@@ -1,6 +1,9 @@
 name: Propagate Website
 
 on:
+  push:
+    branches:
+      - fix/propagate-website
   workflow_dispatch:
     inputs:
       tag:
@@ -24,6 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || 'v0.1.0' }}
+      SET_LATEST: ${{ github.event_name == 'workflow_dispatch' && inputs.set_latest || 'true' }}
+      PUBLISHED_AT_UTC: ${{ github.event_name == 'workflow_dispatch' && inputs.published_at_utc || '' }}
     steps:
       - name: Fail (missing X07_BOT_TOKEN)
         if: ${{ env.X07_BOT_TOKEN == '' }}
@@ -40,7 +46,7 @@ jobs:
           python-version: "3.11"
 
       - name: Build docs bundle
-        run: python3 scripts/build_docs_bundle.py --tag "${{ inputs.tag }}"
+        run: python3 scripts/build_docs_bundle.py --tag "${TAG}"
 
       - name: Checkout (x07-website)
         uses: actions/checkout@v4
@@ -53,13 +59,13 @@ jobs:
         working-directory: x07-website
         run: |
           set -euo pipefail
-          tag="${{ inputs.tag }}"
+          tag="${TAG}"
           args=()
-          if [ "${{ inputs.set_latest }}" = "true" ]; then
+          if [ "${SET_LATEST}" = "true" ]; then
             args+=(--set-latest)
           fi
-          if [ -n "${{ inputs.published_at_utc }}" ]; then
-            args+=(--published-at-utc "${{ inputs.published_at_utc }}")
+          if [ -n "${PUBLISHED_AT_UTC}" ]; then
+            args+=(--published-at-utc "${PUBLISHED_AT_UTC}")
           fi
           python3 ../scripts/open_pr_website_update.py \
             --tag "$tag" \
@@ -71,7 +77,7 @@ jobs:
         with:
           token: ${{ env.X07_BOT_TOKEN }}
           path: x07-website
-          branch: bot/website-sync-${{ inputs.tag }}
-          commit-message: "release: sync website for ${{ inputs.tag }}"
-          title: "release: sync website for ${{ inputs.tag }}"
-          body: Automated website sync from x07 tag ${{ inputs.tag }}.
+          branch: bot/website-sync-${{ env.TAG }}
+          commit-message: "release: sync website for ${{ env.TAG }}"
+          title: "release: sync website for ${{ env.TAG }}"
+          body: Automated website sync from x07 tag ${{ env.TAG }}.
