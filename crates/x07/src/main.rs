@@ -35,9 +35,13 @@ struct Cli {
 
 #[derive(clap::Subcommand, Debug)]
 enum Command {
+    /// Run deterministic test suites.
     Test(TestArgs),
+    /// Initialize, validate, and patch x07AST JSON files.
     Ast(ast::AstArgs),
+    /// Work with CLI specrows schemas and tooling.
     Cli(cli::CliArgs),
+    /// Manage packages and lockfiles.
     Pkg(pkg::PkgArgs),
 }
 

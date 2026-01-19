@@ -3,7 +3,7 @@
 X07 supports agent-built web services through:
 
 - `std.web` core (pure routing + request/response model)
-- `ext.net` / OS HTTPS adapters for real networking
+- `ext-net` / OS HTTPS adapters for real networking
 
 ## Canonical approach
 

@@ -130,24 +130,29 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           out="dist/x07-${tag}-${{ runner.os }}.tar.gz"
           mkdir -p dist
-          tar -czf "$out" -C target/release x07 x07c x07-host-runner x07-os-runner x07import-cli
+          scripts/build_toolchain_tarball.sh --tag "$tag" --platform "${{ runner.os }}" --out "$out"
           echo "artifact_path=$out" >> "$GITHUB_ENV"
 
-      - name: Package binaries (Windows)
+      - name: Package toolchain (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $tag = $env:GITHUB_REF_NAME
           New-Item -ItemType Directory -Force dist | Out-Null
+          $stage = "dist/.tmp_toolchain_${tag}_Windows"
+          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force "$stage/bin" | Out-Null
+          New-Item -ItemType Directory -Force "$stage/stdlib/os/0.2.0" | Out-Null
+
+          $bins = @("x07","x07c","x07-host-runner","x07-os-runner","x07import-cli")
+          foreach ($b in $bins) {
+            Copy-Item -Force "target/release/$b.exe" "$stage/bin/$b.exe"
+          }
+
+          Copy-Item -Recurse -Force "stdlib/os/0.2.0/modules" "$stage/stdlib/os/0.2.0"
+
           $out = "dist/x07-$tag-Windows.zip"
-          $paths = @(
-            "target/release/x07.exe",
-            "target/release/x07c.exe",
-            "target/release/x07-host-runner.exe",
-            "target/release/x07-os-runner.exe",
-            "target/release/x07import-cli.exe"
-          )
-          Compress-Archive -Path $paths -DestinationPath $out -Force
+          Compress-Archive -Path "$stage/*" -DestinationPath $out -Force
           "artifact_path=$out" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload artifact

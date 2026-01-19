@@ -41,6 +41,7 @@ pub struct CliArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum CliCommand {
+    /// Work with the CLI specrows schema format.
     Spec(SpecArgs),
 }
 
@@ -52,8 +53,11 @@ pub struct SpecArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum SpecCommand {
+    /// Canonically format a specrows JSON file.
     Fmt(SpecFmtArgs),
+    /// Validate a specrows JSON file and emit diagnostics.
     Check(SpecCheckArgs),
+    /// Compile a specrows JSON file into specbin.
     Compile(SpecCompileArgs),
 }
 

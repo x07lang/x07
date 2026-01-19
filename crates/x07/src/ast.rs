@@ -25,9 +25,13 @@ pub struct AstArgs {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum AstCommand {
+    /// Emit a minimal x07AST entry/module template.
     Init(AstInitArgs),
+    /// Apply a JSON patch file to an x07AST JSON input.
     ApplyPatch(AstApplyPatchArgs),
+    /// Validate an x07AST file (schema + optional diagnostics catalog).
     Validate(AstValidateArgs),
+    /// Canonicalize an x07AST JSON file (JCS ordering).
     Canon(AstCanonArgs),
 }
 

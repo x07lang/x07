@@ -303,7 +303,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 .with_context(|| format!("read entry: {}", entry_path.display()))?;
 
             let mut module_roots = project::collect_module_roots(project_path, &manifest, &lock)?;
-            let os_roots = default_os_module_roots().context("locate stdlib/os module root")?;
+            let os_roots = default_os_module_roots()?;
             for r in os_roots {
                 if !module_roots.contains(&r) {
                     module_roots.push(r);
@@ -453,7 +453,7 @@ fn compile_runner_config(cli: &Cli, max_output_bytes: usize) -> RunnerConfig {
 }
 
 fn collect_module_roots_for_os(cli: &Cli) -> Result<Vec<PathBuf>> {
-    let mut roots = default_os_module_roots().context("locate stdlib/os module root")?;
+    let mut roots = default_os_module_roots()?;
     roots.extend(cli.module_root.clone());
     Ok(roots)
 }
@@ -652,10 +652,13 @@ fn brew_prefix_openssl() -> Option<PathBuf> {
     None
 }
 
-fn default_os_module_roots() -> Option<Vec<PathBuf>> {
+fn default_os_module_roots() -> Result<Vec<PathBuf>> {
+    let mut checked: Vec<PathBuf> = Vec::new();
+
     let rel = PathBuf::from("stdlib/os/0.2.0/modules");
+    checked.push(rel.clone());
     if rel.is_dir() {
-        return Some(vec![rel]);
+        return Ok(vec![rel]);
     }
 
     if let Ok(exe) = std::env::current_exe() {
@@ -663,21 +666,32 @@ fn default_os_module_roots() -> Option<Vec<PathBuf>> {
             for base in [Some(exe_dir), exe_dir.parent()] {
                 let Some(base) = base else { continue };
                 let cand = base.join("stdlib/os/0.2.0/modules");
+                checked.push(cand.clone());
                 if cand.is_dir() {
-                    return Some(vec![cand]);
+                    return Ok(vec![cand]);
                 }
             }
         }
     }
 
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let workspace_root = crate_dir.parent()?.parent()?;
-    let abs = workspace_root.join("stdlib/os/0.2.0/modules");
-    if abs.is_dir() {
-        return Some(vec![abs]);
+    if let Some(workspace_root) = crate_dir.parent().and_then(|p| p.parent()) {
+        let abs = workspace_root.join("stdlib/os/0.2.0/modules");
+        checked.push(abs.clone());
+        if abs.is_dir() {
+            return Ok(vec![abs]);
+        }
     }
 
-    None
+    let checked = checked
+        .into_iter()
+        .map(|p| format!("  - {}", p.display()))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    anyhow::bail!(
+        "could not locate stdlib/os module root (expected stdlib/os/0.2.0/modules)\n\nlooked for:\n{checked}\n\nfix:\n  - install an official toolchain archive (it must include stdlib/os/0.2.0/modules), or\n  - run x07-os-runner from the x07 repo root"
+    );
 }
 
 fn load_policy(world: WorldId, policy_path: Option<&PathBuf>) -> Result<Option<policy::Policy>> {

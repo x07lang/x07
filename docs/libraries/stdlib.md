@@ -8,6 +8,10 @@ X07 includes a small stdlib for:
 - deterministic PRNG
 - I/O traits (so fixture and OS adapters share a surface)
 
+The canonical index of built-in stdlib modules and exports is published here:
+
+- https://x07lang.org/agent/latest/stdlib/index.json
+
 The stdlib should remain:
 
 - stable,

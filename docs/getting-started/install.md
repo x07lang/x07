@@ -23,6 +23,8 @@ See [platform support and smoke tests](../worlds/os-worlds.md#platform-support).
 2. Unpack it.
 3. Add the `bin/` directory to your `PATH`.
 
+If the archive does not contain a `bin/` directory, the binaries are at the archive root; add that directory to your `PATH` instead.
+
 Verify:
 
 - `x07 --help`
@@ -59,3 +61,10 @@ Install:
 ### “I can run `x07` but `x07 run` fails”
 
 Use `x07-host-runner --help` and ensure a working `cc` is available (override via `X07_CC`).
+
+### “could not locate stdlib/os module root”
+
+`x07-os-runner` expects the toolchain install tree to include `stdlib/os/0.2.0/modules`.
+
+- If you downloaded a release archive, ensure `stdlib/` exists next to `bin/`.
+- If you built from source, run `x07-os-runner` from the `x07/` repo root (so it can find `stdlib/os/...`).

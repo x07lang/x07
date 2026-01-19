@@ -22,66 +22,85 @@ pub struct PkgArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum PkgCommand {
+    /// Add a dependency entry to `x07.json`.
     Add(AddArgs),
+    /// Pack a local package directory into a publishable archive.
     Pack(PackArgs),
+    /// Resolve project dependencies and write `x07.lock.json`.
     Lock(LockArgs),
+    /// Store a registry token for `pkg publish`.
     Login(LoginArgs),
+    /// Publish a package archive to an index.
     Publish(PublishArgs),
 }
 
 #[derive(Debug, Args)]
 pub struct AddArgs {
+    /// Project manifest path (`x07.json`).
     #[arg(long, value_name = "PATH", default_value = "x07.json")]
     pub project: PathBuf,
 
+    /// Override the dependency path stored in `x07.json`.
     #[arg(long, value_name = "PATH")]
     pub path: Option<String>,
 
+    /// Package spec in `NAME@VERSION` form.
     #[arg(value_name = "NAME@VERSION")]
     pub spec: String,
 }
 
 #[derive(Debug, Args)]
 pub struct PackArgs {
+    /// Package directory containing `x07-package.json`.
     #[arg(long, value_name = "DIR")]
     pub package: PathBuf,
 
+    /// Output archive path.
     #[arg(long, value_name = "PATH")]
     pub out: PathBuf,
 }
 
 #[derive(Debug, Args)]
 pub struct LockArgs {
+    /// Project manifest path (`x07.json`).
     #[arg(long, value_name = "PATH", default_value = "x07.json")]
     pub project: PathBuf,
 
+    /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
     #[arg(long, value_name = "URL")]
     pub index: Option<String>,
 
+    /// Fail if `x07.lock.json` is out of date.
     #[arg(long)]
     pub check: bool,
 
+    /// Disallow network access and reuse existing `.x07/deps` contents.
     #[arg(long)]
     pub offline: bool,
 }
 
 #[derive(Debug, Args)]
 pub struct LoginArgs {
+    /// Index base URL.
     #[arg(long, value_name = "URL")]
     pub index: String,
 
+    /// Token value.
     #[arg(long, value_name = "TOKEN", conflicts_with = "token_stdin")]
     pub token: Option<String>,
 
+    /// Read token from stdin.
     #[arg(long, conflicts_with = "token")]
     pub token_stdin: bool,
 }
 
 #[derive(Debug, Args)]
 pub struct PublishArgs {
+    /// Package directory containing `x07-package.json`.
     #[arg(long, value_name = "DIR")]
     pub package: PathBuf,
 
+    /// Index base URL.
     #[arg(long, value_name = "URL")]
     pub index: String,
 }
