@@ -16,7 +16,6 @@ on:
       published_at_utc:
         description: Optional published_at_utc (ISO8601, UTC)
         required: false
-        default: ""
 
 permissions:
   contents: read
