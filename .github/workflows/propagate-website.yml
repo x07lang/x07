@@ -27,9 +27,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
-      TAG: ${{ github.event.inputs.tag || 'v0.1.0' }}
-      SET_LATEST: ${{ github.event.inputs.set_latest || 'true' }}
-      PUBLISHED_AT_UTC: ${{ github.event.inputs.published_at_utc || '' }}
     steps:
       - name: Fail (missing X07_BOT_TOKEN)
         if: ${{ env.X07_BOT_TOKEN == '' }}
@@ -44,6 +41,39 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Resolve tag + options
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            python3 - <<'PY' >"${RUNNER_TEMP}/propagate_env.txt"
+          import json
+          import os
+
+          with open(os.environ["GITHUB_EVENT_PATH"], "r", encoding="utf-8") as f:
+              payload = json.load(f)
+
+          inputs = payload.get("inputs") or {}
+          tag = str(inputs.get("tag") or "").strip()
+          set_latest = str(inputs.get("set_latest") or "true").strip()
+          published_at_utc = str(inputs.get("published_at_utc") or "").strip()
+
+          if not tag:
+              raise SystemExit("ERROR: workflow_dispatch missing inputs.tag")
+
+          print(f"TAG={tag}")
+          print(f"SET_LATEST={set_latest}")
+          print(f"PUBLISHED_AT_UTC={published_at_utc}")
+          PY
+            cat "${RUNNER_TEMP}/propagate_env.txt" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          echo "TAG=v0.1.0" >> "$GITHUB_ENV"
+          echo "SET_LATEST=true" >> "$GITHUB_ENV"
+          echo "PUBLISHED_AT_UTC=" >> "$GITHUB_ENV"
 
       - name: Build docs bundle
         run: python3 scripts/build_docs_bundle.py --tag "${TAG}"
@@ -77,7 +107,7 @@ jobs:
         with:
           token: ${{ env.X07_BOT_TOKEN }}
           path: x07-website
-          branch: bot/website-sync-${{ env.TAG }}
-          commit-message: "release: sync website for ${{ env.TAG }}"
-          title: "release: sync website for ${{ env.TAG }}"
-          body: Automated website sync from x07 tag ${{ env.TAG }}.
+          branch: bot/website-sync-${{ github.run_id }}
+          commit-message: "release: sync website"
+          title: "release: sync website"
+          body: Automated website sync.
