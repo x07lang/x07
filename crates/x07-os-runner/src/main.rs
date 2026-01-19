@@ -285,7 +285,10 @@ fn try_main() -> Result<std::process::ExitCode> {
 
         (None, None, Some(project_path)) => {
             let manifest = project::load_project_manifest(project_path)?;
-            let base = project_path.parent().unwrap_or_else(|| Path::new("."));
+            let base = project_path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."));
             let mut extra_cc_args = manifest.link.cc_args(base);
             let lock_path = project::default_lockfile_path(project_path, &manifest);
             let lock_bytes = std::fs::read(&lock_path)
@@ -653,6 +656,18 @@ fn default_os_module_roots() -> Option<Vec<PathBuf>> {
     let rel = PathBuf::from("stdlib/os/0.2.0/modules");
     if rel.is_dir() {
         return Some(vec![rel]);
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            for base in [Some(exe_dir), exe_dir.parent()] {
+                let Some(base) = base else { continue };
+                let cand = base.join("stdlib/os/0.2.0/modules");
+                if cand.is_dir() {
+                    return Some(vec![cand]);
+                }
+            }
+        }
     }
 
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

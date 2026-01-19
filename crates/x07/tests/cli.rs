@@ -212,6 +212,48 @@ fn x07_pkg_add_updates_project_manifest() {
 }
 
 #[test]
+fn x07_pkg_pack_includes_ffi_dir() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_pack_ffi");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let package_dir = root.join("packages/ext/x07-ext-curl-c/0.1.1");
+    assert!(
+        package_dir.join("ffi/curl_shim.c").is_file(),
+        "missing fixture file"
+    );
+
+    let out_path = dir.join("ext-curl-c-0.1.1.x07pkg");
+    let out = run_x07(&[
+        "pkg",
+        "pack",
+        "--package",
+        package_dir.to_str().unwrap(),
+        "--out",
+        out_path.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+
+    let bytes = std::fs::read(&out_path).expect("read archive bytes");
+    let unpack_dir = dir.join("unpacked");
+    x07_pkg::unpack_tar_bytes(&bytes, &unpack_dir).expect("unpack archive");
+    assert!(
+        unpack_dir.join("ffi/curl_shim.c").is_file(),
+        "missing ffi/curl_shim.c in packed archive"
+    );
+}
+
+#[test]
 fn x07_cli_spec_check_ok_and_fmt_inserts_help_version() {
     let root = repo_root();
     let spec_path = root.join("target/tmp_cli_specrows_valid.json");

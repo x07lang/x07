@@ -308,7 +308,10 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
         project::load_project_manifest(&project_path).context("load project manifest")?;
     let lock_path = project::default_lockfile_path(&project_path, &manifest);
 
-    let base = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let base = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
 
     let mut fetched = Vec::new();
     let mut missing = Vec::new();
@@ -726,6 +729,36 @@ fn pack_package_to_tar(package_dir: &Path) -> Result<(project::PackageManifest, 
         let bytes = std::fs::read(&disk_path)
             .with_context(|| format!("read module {module_id:?}: {}", disk_path.display()))?;
         entries.push((PathBuf::from(&pkg.module_root).join(rel), bytes));
+    }
+
+    let ffi_dir = package_dir.join("ffi");
+    if ffi_dir.is_dir() {
+        let mut pending: Vec<PathBuf> = vec![ffi_dir];
+        while let Some(dir) = pending.pop() {
+            for entry in std::fs::read_dir(&dir)
+                .with_context(|| format!("read ffi dir: {}", dir.display()))?
+            {
+                let entry =
+                    entry.with_context(|| format!("read ffi dir entry in {}", dir.display()))?;
+                let disk_path = entry.path();
+                let file_type = entry
+                    .file_type()
+                    .with_context(|| format!("file_type for {}", disk_path.display()))?;
+                if file_type.is_dir() {
+                    pending.push(disk_path);
+                    continue;
+                }
+                if !file_type.is_file() {
+                    anyhow::bail!("unsupported ffi entry type: {}", disk_path.display());
+                }
+                let rel = disk_path
+                    .strip_prefix(package_dir)
+                    .with_context(|| format!("strip prefix: {}", disk_path.display()))?;
+                let bytes = std::fs::read(&disk_path)
+                    .with_context(|| format!("read ffi file: {}", disk_path.display()))?;
+                entries.push((rel.to_path_buf(), bytes));
+            }
+        }
     }
 
     let tar = x07_pkg::build_tar_bytes(&entries)?;
