@@ -27,9 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
-      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || 'v0.1.0' }}
-      SET_LATEST: ${{ github.event_name == 'workflow_dispatch' && inputs.set_latest || 'true' }}
-      PUBLISHED_AT_UTC: ${{ github.event_name == 'workflow_dispatch' && inputs.published_at_utc || '' }}
+      TAG: ${{ github.event.inputs.tag || 'v0.1.0' }}
+      SET_LATEST: ${{ github.event.inputs.set_latest || 'true' }}
+      PUBLISHED_AT_UTC: ${{ github.event.inputs.published_at_utc || '' }}
     steps:
       - name: Fail (missing X07_BOT_TOKEN)
         if: ${{ env.X07_BOT_TOKEN == '' }}
