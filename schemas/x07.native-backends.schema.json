@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "x07.native-backends@0.1.0",
+  "title": "x07 native backends manifest (toolchain-shipped)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "backends"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "x07.native-backends@0.1.0"
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]{1,64}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([+-][0-9A-Za-z.-]+)?$"
+        }
+      }
+    },
+    "backends": {
+      "type": "array",
+      "minItems": 0,
+      "items": { "$ref": "#/$defs/Backend" }
+    }
+  },
+  "$defs": {
+    "BackendId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+    },
+    "RelPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!\\./)(?!.*\\\\)(?!.*(^|/)\\.\\.($|/))[A-Za-z0-9][A-Za-z0-9_./@+\\-]*$"
+    },
+    "Arg": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\u0000\\r\\n\\t]+$"
+    },
+    "SymbolPrefix": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "LinkSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "files", "args"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["static", "dynamic"]
+        },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RelPath" }
+        },
+        "args": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Arg" }
+        },
+        "search_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RelPath" }
+        },
+        "force_load": {
+          "type": "boolean"
+        },
+        "whole_archive": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend_id", "abi_major", "link"],
+      "properties": {
+        "backend_id": { "$ref": "#/$defs/BackendId" },
+        "abi_major": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "abi_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "provides_prefixes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SymbolPrefix" }
+        },
+        "link": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["linux", "macos", "windows-msvc"],
+          "properties": {
+            "linux": { "$ref": "#/$defs/LinkSpec" },
+            "macos": { "$ref": "#/$defs/LinkSpec" },
+            "windows-msvc": { "$ref": "#/$defs/LinkSpec" },
+            "windows-gnu": { "$ref": "#/$defs/LinkSpec" }
+          }
+        }
+      }
+    }
+  }
+}

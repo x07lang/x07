@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "x07.native-requires@0.1.0",
+  "title": "x07 native backend requirements (compiler-emitted)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "requires"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "x07.native-requires@0.1.0"
+    },
+    "world": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "requires": {
+      "type": "array",
+      "minItems": 0,
+      "items": { "$ref": "#/$defs/BackendReq" }
+    }
+  },
+  "$defs": {
+    "BackendId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+    },
+    "Feature": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+    },
+    "BackendReq": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend_id", "abi_major"],
+      "properties": {
+        "backend_id": { "$ref": "#/$defs/BackendId" },
+        "abi_major": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "min_abi_minor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "features": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Feature" }
+        }
+      }
+    }
+  }
+}

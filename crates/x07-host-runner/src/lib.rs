@@ -14,9 +14,13 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use x07_contracts::NATIVE_REQUIRES_SCHEMA_VERSION;
 use x07_worlds::WorldId;
 use x07c::compile;
 use x07c::language;
+
+mod native_backends;
+pub use native_backends::plan_native_link_argv;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab_case")]
@@ -115,6 +119,7 @@ pub struct CompilerResult {
     pub exit_status: i32,
     pub lang_id: String,
     pub guide_md: String,
+    pub native_requires: x07c::native::NativeRequires,
     pub c_source_size: usize,
     pub compiled_exe: Option<PathBuf>,
     pub compiled_exe_size: Option<u64>,
@@ -329,212 +334,48 @@ pub fn compile_program_with_options(
     let lang_id = language::LANG_ID.to_string();
     let guide_md = compile::guide_md();
 
-    let (c_source, compile_stats) =
-        match compile::compile_program_to_c_with_stats(program, compile_options) {
-            Ok((src, stats)) => (src, stats),
-            Err(err) => {
-                let msg = format!("{:?}: {}", err.kind, err.message);
-                return Ok(CompilerResult {
-                    ok: false,
-                    exit_status: 1,
-                    lang_id,
-                    guide_md,
-                    c_source_size: 0,
-                    compiled_exe: None,
-                    compiled_exe_size: None,
-                    compile_error: Some(msg),
-                    stdout: Vec::new(),
-                    stderr: Vec::new(),
-                    fuel_used: None,
-                    trap: None,
-                });
-            }
-        };
+    let compile_out = match compile::compile_program_to_c_with_meta(program, compile_options) {
+        Ok(out) => out,
+        Err(err) => {
+            let msg = format!("{:?}: {}", err.kind, err.message);
+            return Ok(CompilerResult {
+                ok: false,
+                exit_status: 1,
+                lang_id,
+                guide_md,
+                native_requires: empty_native_requires(compile_options),
+                c_source_size: 0,
+                compiled_exe: None,
+                compiled_exe_size: None,
+                compile_error: Some(msg),
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+                fuel_used: None,
+                trap: None,
+            });
+        }
+    };
+
+    let c_source = compile_out.c_src;
+    let compile_stats = compile_out.stats;
+    let native_requires = compile_out.native_requires;
 
     let mut cc_args = extra_cc_args.to_vec();
-    if c_source.contains("= ev_math_f64_") {
-        if let Some(lib) = staged_math_native_lib()? {
-            cc_args.push(lib.display().to_string());
-        } else {
+    if !native_requires.requires.is_empty() {
+        let root = workspace_root()?;
+        if let Err(err) = native_backends::plan_native_link_argv(&root, &native_requires)
+            .map(|argv| cc_args.extend(argv))
+        {
             return Ok(CompilerResult {
                 ok: false,
                 exit_status: 1,
                 lang_id,
                 guide_md,
+                native_requires,
                 c_source_size: c_source.len(),
                 compiled_exe: None,
                 compiled_exe_size: None,
-                compile_error: Some(
-                    "native math backend missing (build + stage with ./scripts/build_ext_math.sh)"
-                        .to_string(),
-                ),
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-                fuel_used: Some(compile_stats.fuel_used),
-                trap: None,
-            });
-        }
-    }
-    if c_source.contains("= ev_time_tzdb_") {
-        if let Some(lib) = staged_time_native_lib()? {
-            cc_args.push(lib.display().to_string());
-        } else {
-            return Ok(CompilerResult {
-                ok: false,
-                exit_status: 1,
-                lang_id,
-                guide_md,
-                c_source_size: c_source.len(),
-                compiled_exe: None,
-                compiled_exe_size: None,
-                compile_error: Some(
-                    "native time backend missing (build + stage with ./scripts/build_ext_time.sh)"
-                        .to_string(),
-                ),
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-                fuel_used: Some(compile_stats.fuel_used),
-                trap: None,
-            });
-        }
-    }
-    if c_source.contains("= x07_ext_fs_") {
-        if let Some(lib) = staged_ext_fs_native_lib()? {
-            cc_args.push(lib.display().to_string());
-        } else {
-            return Ok(CompilerResult {
-                ok: false,
-                exit_status: 1,
-                lang_id,
-                guide_md,
-                c_source_size: c_source.len(),
-                compiled_exe: None,
-                compiled_exe_size: None,
-                compile_error: Some(
-                    "native ext-fs backend missing (build + stage with ./scripts/build_ext_fs.sh)"
-                        .to_string(),
-                ),
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-                fuel_used: Some(compile_stats.fuel_used),
-                trap: None,
-            });
-        }
-    }
-    if c_source.contains("= x07_ext_db_sqlite_") {
-        if let Some(lib) = staged_ext_db_sqlite_native_lib()? {
-            cc_args.push(lib.display().to_string());
-        } else {
-            return Ok(CompilerResult {
-                ok: false,
-                exit_status: 1,
-                lang_id,
-                guide_md,
-                c_source_size: c_source.len(),
-                compiled_exe: None,
-                compiled_exe_size: None,
-                compile_error: Some(
-                    "native ext-db-sqlite backend missing (build + stage with ./scripts/build_ext_db_sqlite.sh)"
-                        .to_string(),
-                ),
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-                fuel_used: Some(compile_stats.fuel_used),
-                trap: None,
-            });
-        }
-    }
-    if c_source.contains("= x07_ext_db_pg_") {
-        if let Some(lib) = staged_ext_db_pg_native_lib()? {
-            cc_args.push(lib.display().to_string());
-            if cfg!(target_os = "macos") {
-                cc_args.push("-framework".to_string());
-                cc_args.push("CoreFoundation".to_string());
-                cc_args.push("-framework".to_string());
-                cc_args.push("SystemConfiguration".to_string());
-            }
-        } else {
-            return Ok(CompilerResult {
-                ok: false,
-                exit_status: 1,
-                lang_id,
-                guide_md,
-                c_source_size: c_source.len(),
-                compiled_exe: None,
-                compiled_exe_size: None,
-                compile_error: Some(
-                    "native ext-db-pg backend missing (build + stage with ./scripts/build_ext_db_pg.sh)"
-                        .to_string(),
-                ),
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-                fuel_used: Some(compile_stats.fuel_used),
-                trap: None,
-            });
-        }
-    }
-    if c_source.contains("= x07_ext_db_mysql_") {
-        if let Some(lib) = staged_ext_db_mysql_native_lib()? {
-            cc_args.push(lib.display().to_string());
-        } else {
-            return Ok(CompilerResult {
-                ok: false,
-                exit_status: 1,
-                lang_id,
-                guide_md,
-                c_source_size: c_source.len(),
-                compiled_exe: None,
-                compiled_exe_size: None,
-                compile_error: Some(
-                    "native ext-db-mysql backend missing (build + stage with ./scripts/build_ext_db_mysql.sh)"
-                        .to_string(),
-                ),
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-                fuel_used: Some(compile_stats.fuel_used),
-                trap: None,
-            });
-        }
-    }
-    if c_source.contains("= x07_ext_db_redis_") {
-        if let Some(lib) = staged_ext_db_redis_native_lib()? {
-            cc_args.push(lib.display().to_string());
-        } else {
-            return Ok(CompilerResult {
-                ok: false,
-                exit_status: 1,
-                lang_id,
-                guide_md,
-                c_source_size: c_source.len(),
-                compiled_exe: None,
-                compiled_exe_size: None,
-                compile_error: Some(
-                    "native ext-db-redis backend missing (build + stage with ./scripts/build_ext_db_redis.sh)"
-                        .to_string(),
-                ),
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-                fuel_used: Some(compile_stats.fuel_used),
-                trap: None,
-            });
-        }
-    }
-    if c_source.contains("= x07_ext_regex_") {
-        if let Some(lib) = staged_ext_regex_native_lib()? {
-            cc_args.push(lib.display().to_string());
-        } else {
-            return Ok(CompilerResult {
-                ok: false,
-                exit_status: 1,
-                lang_id,
-                guide_md,
-                c_source_size: c_source.len(),
-                compiled_exe: None,
-                compiled_exe_size: None,
-                compile_error: Some(
-                    "native ext-regex backend missing (build + stage with ./scripts/build_ext_regex.sh)"
-                        .to_string(),
-                ),
+                compile_error: Some(format_native_backend_error(&err)),
                 stdout: Vec::new(),
                 stderr: Vec::new(),
                 fuel_used: Some(compile_stats.fuel_used),
@@ -550,6 +391,7 @@ pub fn compile_program_with_options(
             exit_status: tool.exit_status,
             lang_id,
             guide_md,
+            native_requires,
             c_source_size: c_source.len(),
             compiled_exe: None,
             compiled_exe_size: None,
@@ -597,6 +439,7 @@ pub fn compile_program_with_options(
         exit_status: 0,
         lang_id,
         guide_md,
+        native_requires,
         c_source_size: c_source.len(),
         compiled_exe: Some(final_exe),
         compiled_exe_size: exe_size,
@@ -840,76 +683,56 @@ fn workspace_root() -> Result<PathBuf> {
         .context("canonicalize workspace root")
 }
 
-fn staged_math_native_lib() -> Result<Option<PathBuf>> {
-    let root = workspace_root()?;
-    let candidates = [
-        root.join("deps/x07/libx07_math.a"),
-        root.join("deps/x07/x07_math.lib"),
-    ];
-    Ok(candidates.into_iter().find(|p| p.is_file()))
+fn empty_native_requires(options: &compile::CompileOptions) -> x07c::native::NativeRequires {
+    x07c::native::NativeRequires {
+        schema_version: NATIVE_REQUIRES_SCHEMA_VERSION.to_string(),
+        world: Some(options.world.as_str().to_string()),
+        requires: Vec::new(),
+    }
 }
 
-fn staged_time_native_lib() -> Result<Option<PathBuf>> {
-    let root = workspace_root()?;
-    let candidates = [
-        root.join("deps/x07/libx07_time.a"),
-        root.join("deps/x07/x07_time.lib"),
-    ];
-    Ok(candidates.into_iter().find(|p| p.is_file()))
+fn format_native_backend_error(err: &anyhow::Error) -> String {
+    let msg = format!("{err:#}");
+    if !msg.contains("native backend file missing:") {
+        return msg;
+    }
+
+    let backend_id = parse_backend_id_from_native_error(&msg);
+    if let Some(backend_id) = backend_id {
+        if let Some(hint) = native_backend_missing_hint(&backend_id) {
+            return hint.to_string();
+        }
+    }
+
+    msg
 }
 
-fn staged_ext_fs_native_lib() -> Result<Option<PathBuf>> {
-    let root = workspace_root()?;
-    let candidates = [
-        root.join("deps/x07/libx07_ext_fs.a"),
-        root.join("deps/x07/x07_ext_fs.lib"),
-    ];
-    Ok(candidates.into_iter().find(|p| p.is_file()))
+fn parse_backend_id_from_native_error(msg: &str) -> Option<String> {
+    let marker = "backend_id=";
+    let idx = msg.find(marker)?;
+    let rest = &msg[idx + marker.len()..];
+    let end = rest
+        .find(|c: char| c.is_whitespace() || c == '\n' || c == '\r')
+        .unwrap_or(rest.len());
+    let backend_id = rest[..end].trim();
+    if backend_id.is_empty() {
+        return None;
+    }
+    Some(backend_id.to_string())
 }
 
-fn staged_ext_db_sqlite_native_lib() -> Result<Option<PathBuf>> {
-    let root = workspace_root()?;
-    let candidates = [
-        root.join("deps/x07/libx07_ext_db_sqlite.a"),
-        root.join("deps/x07/x07_ext_db_sqlite.lib"),
-    ];
-    Ok(candidates.into_iter().find(|p| p.is_file()))
-}
-
-fn staged_ext_db_pg_native_lib() -> Result<Option<PathBuf>> {
-    let root = workspace_root()?;
-    let candidates = [
-        root.join("deps/x07/libx07_ext_db_pg.a"),
-        root.join("deps/x07/x07_ext_db_pg.lib"),
-    ];
-    Ok(candidates.into_iter().find(|p| p.is_file()))
-}
-
-fn staged_ext_db_mysql_native_lib() -> Result<Option<PathBuf>> {
-    let root = workspace_root()?;
-    let candidates = [
-        root.join("deps/x07/libx07_ext_db_mysql.a"),
-        root.join("deps/x07/x07_ext_db_mysql.lib"),
-    ];
-    Ok(candidates.into_iter().find(|p| p.is_file()))
-}
-
-fn staged_ext_db_redis_native_lib() -> Result<Option<PathBuf>> {
-    let root = workspace_root()?;
-    let candidates = [
-        root.join("deps/x07/libx07_ext_db_redis.a"),
-        root.join("deps/x07/x07_ext_db_redis.lib"),
-    ];
-    Ok(candidates.into_iter().find(|p| p.is_file()))
-}
-
-fn staged_ext_regex_native_lib() -> Result<Option<PathBuf>> {
-    let root = workspace_root()?;
-    let candidates = [
-        root.join("deps/x07/libx07_ext_regex.a"),
-        root.join("deps/x07/x07_ext_regex.lib"),
-    ];
-    Ok(candidates.into_iter().find(|p| p.is_file()))
+fn native_backend_missing_hint(backend_id: &str) -> Option<&'static str> {
+    match backend_id {
+        "x07.math" => Some("native math backend missing (build + stage with ./scripts/build_ext_math.sh)"),
+        "x07.time" => Some("native time backend missing (build + stage with ./scripts/build_ext_time.sh)"),
+        "x07.ext.fs" => Some("native ext-fs backend missing (build + stage with ./scripts/build_ext_fs.sh)"),
+        "x07.ext.db.sqlite" => Some("native ext-db-sqlite backend missing (build + stage with ./scripts/build_ext_db_sqlite.sh)"),
+        "x07.ext.db.pg" => Some("native ext-db-pg backend missing (build + stage with ./scripts/build_ext_db_pg.sh)"),
+        "x07.ext.db.mysql" => Some("native ext-db-mysql backend missing (build + stage with ./scripts/build_ext_db_mysql.sh)"),
+        "x07.ext.db.redis" => Some("native ext-db-redis backend missing (build + stage with ./scripts/build_ext_db_redis.sh)"),
+        "x07.ext.regex" => Some("native ext-regex backend missing (build + stage with ./scripts/build_ext_regex.sh)"),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -965,6 +788,11 @@ pub fn compile_c_to_exe_with_config(
     hasher.update(config.fuel_init.to_le_bytes());
     hasher.update(config.mem_cap_bytes.to_le_bytes());
     hasher.update([config.debug_borrow_checks as u8]);
+    hasher.update([
+        config.enable_fs as u8,
+        config.enable_rr as u8,
+        config.enable_kv as u8,
+    ]);
     hasher.update(b"\0");
     hasher.update(cc_args.trim().as_bytes());
     hasher.update(b"\0");

@@ -4,11 +4,13 @@ use crate::builtin_modules;
 use crate::c_emit;
 use crate::guide;
 use crate::language;
+use crate::native::NativeRequires;
 use crate::optimize;
 use crate::program::{AsyncFunctionDef, FunctionDef, Program};
 use crate::types::Ty;
 use crate::validate;
 use crate::x07ast;
+use x07_contracts::NATIVE_REQUIRES_SCHEMA_VERSION;
 
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
@@ -101,13 +103,28 @@ pub fn compile_program_to_c(
     program: &[u8],
     options: &CompileOptions,
 ) -> Result<String, CompilerError> {
-    compile_program_to_c_with_stats(program, options).map(|(c, _stats)| c)
+    compile_program_to_c_with_meta(program, options).map(|out| out.c_src)
 }
 
 pub fn compile_program_to_c_with_stats(
     program: &[u8],
     options: &CompileOptions,
 ) -> Result<(String, CompileStats), CompilerError> {
+    let out = compile_program_to_c_with_meta(program, options)?;
+    Ok((out.c_src, out.stats))
+}
+
+#[derive(Debug, Clone)]
+pub struct CompileToCOutput {
+    pub c_src: String,
+    pub stats: CompileStats,
+    pub native_requires: NativeRequires,
+}
+
+pub fn compile_program_to_c_with_meta(
+    program: &[u8],
+    options: &CompileOptions,
+) -> Result<CompileToCOutput, CompilerError> {
     if options.freestanding {
         if options.emit_main {
             return Err(CompilerError::new(
@@ -249,7 +266,8 @@ pub fn compile_program_to_c_with_stats(
         ));
     }
 
-    let c_src = c_emit::emit_c_program(&parsed_program, options)?;
+    let (c_src, native_requires) =
+        c_emit::emit_c_program_with_native_requires(&parsed_program, options)?;
 
     if c_src.len() > language::limits::MAX_C_BYTES {
         return Err(CompilerError::new(
@@ -262,7 +280,15 @@ pub fn compile_program_to_c_with_stats(
         ));
     }
 
-    Ok((c_src, CompileStats { fuel_used }))
+    Ok(CompileToCOutput {
+        c_src,
+        stats: CompileStats { fuel_used },
+        native_requires: NativeRequires {
+            schema_version: NATIVE_REQUIRES_SCHEMA_VERSION.to_string(),
+            world: Some(options.world.as_str().to_string()),
+            requires: native_requires,
+        },
+    })
 }
 
 #[derive(Debug, Clone)]

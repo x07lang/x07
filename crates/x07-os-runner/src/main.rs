@@ -397,6 +397,7 @@ fn compiler_json(
         "exit_status": compile.exit_status,
         "lang_id": compile.lang_id,
         "guide_md": compile.guide_md,
+        "native_requires": compile.native_requires,
         "c_source_size": compile.c_source_size,
         "compiled_exe": compile.compiled_exe.as_ref().map(|p| p.display().to_string()),
         "compiled_exe_size": compile.compiled_exe_size,

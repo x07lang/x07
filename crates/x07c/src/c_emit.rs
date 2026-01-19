@@ -3,6 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::ast::Expr;
 use crate::compile::{CompileErrorKind, CompileOptions, CompilerError};
 use crate::language;
+use crate::native;
+use crate::native::NativeBackendReq;
 use crate::program::{AsyncFunctionDef, ExternFunctionDecl, FunctionDef, FunctionParam, Program};
 use crate::types::Ty;
 
@@ -209,6 +211,13 @@ pub fn emit_c_program(
     program: &Program,
     options: &CompileOptions,
 ) -> Result<String, CompilerError> {
+    emit_c_program_with_native_requires(program, options).map(|(src, _)| src)
+}
+
+pub fn emit_c_program_with_native_requires(
+    program: &Program,
+    options: &CompileOptions,
+) -> Result<(String, Vec<NativeBackendReq>), CompilerError> {
     let mut emitter = Emitter::new(program, options.clone());
     emitter.emit_program().map_err(|mut e| {
         if let Some(name) = &emitter.current_fn_name {
@@ -218,7 +227,8 @@ pub fn emit_c_program(
         }
         e
     })?;
-    Ok(emitter.out)
+    let native_requires = emitter.native_requires();
+    Ok((emitter.out, native_requires))
 }
 
 pub fn check_c_program(program: &Program, options: &CompileOptions) -> Result<(), CompilerError> {
@@ -261,6 +271,13 @@ struct Emitter<'a> {
     allow_async_ops: bool,
     unsafe_depth: usize,
     current_fn_name: Option<String>,
+    native_requires: BTreeMap<String, NativeReqAcc>,
+}
+
+#[derive(Debug, Clone)]
+struct NativeReqAcc {
+    abi_major: u32,
+    features: BTreeSet<String>,
 }
 
 impl<'a> Emitter<'a> {
@@ -295,7 +312,52 @@ impl<'a> Emitter<'a> {
             allow_async_ops: false,
             unsafe_depth: 0,
             current_fn_name: None,
+            native_requires: BTreeMap::new(),
         }
+    }
+
+    fn require_native_backend(
+        &mut self,
+        backend_id: &str,
+        abi_major: u32,
+        feature: &str,
+    ) -> Result<(), CompilerError> {
+        let mismatch = {
+            let entry = self
+                .native_requires
+                .entry(backend_id.to_string())
+                .or_insert_with(|| NativeReqAcc {
+                    abi_major,
+                    features: BTreeSet::new(),
+                });
+
+            if entry.abi_major != abi_major {
+                Some(entry.abi_major)
+            } else {
+                entry.features.insert(feature.to_string());
+                None
+            }
+        };
+
+        if let Some(expected) = mismatch {
+            return Err(self.err(
+                CompileErrorKind::Internal,
+                format!("native backend ABI mismatch for {backend_id}: got {abi_major} expected {expected}"),
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn native_requires(&self) -> Vec<NativeBackendReq> {
+        self.native_requires
+            .iter()
+            .map(|(backend_id, acc)| NativeBackendReq {
+                backend_id: backend_id.clone(),
+                abi_major: acc.abi_major,
+                features: acc.features.iter().cloned().collect(),
+            })
+            .collect()
     }
 
     fn push_str(&mut self, s: &str) {
@@ -7990,6 +8052,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(native::BACKEND_ID_MATH, native::ABI_MAJOR_V1, head)?;
         if args.len() != 2 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -8032,6 +8095,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(native::BACKEND_ID_MATH, native::ABI_MAJOR_V1, head)?;
         if args.len() != 1 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -8066,6 +8130,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_MATH,
+            native::ABI_MAJOR_V1,
+            "math.f64.parse_v1",
+        )?;
         if args.len() != 1 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -8100,6 +8169,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_MATH,
+            native::ABI_MAJOR_V1,
+            "math.f64.from_i32_v1",
+        )?;
         if args.len() != 1 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -8132,6 +8206,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_MATH,
+            native::ABI_MAJOR_V1,
+            "math.f64.to_i32_trunc_v1",
+        )?;
         if args.len() != 1 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9159,6 +9238,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only("os.fs.read_all_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.read_all_v1",
+        )?;
         if args.len() != 2 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9193,6 +9277,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only("os.fs.write_all_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.write_all_v1",
+        )?;
         if args.len() != 3 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9228,6 +9317,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only("os.fs.mkdirs_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.mkdirs_v1",
+        )?;
         if args.len() != 2 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9262,6 +9356,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only("os.fs.remove_file_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.remove_file_v1",
+        )?;
         if args.len() != 2 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9296,6 +9395,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only("os.fs.remove_dir_all_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.remove_dir_all_v1",
+        )?;
         if args.len() != 2 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9330,6 +9434,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only("os.fs.rename_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.rename_v1",
+        )?;
         if args.len() != 3 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9365,6 +9474,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only("os.fs.list_dir_sorted_text_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.list_dir_sorted_text_v1",
+        )?;
         if args.len() != 2 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9399,6 +9513,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only("os.fs.walk_glob_sorted_text_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.walk_glob_sorted_text_v1",
+        )?;
         if args.len() != 3 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9435,6 +9554,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only("os.fs.stat_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.stat_v1",
+        )?;
         if args.len() != 2 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9471,6 +9595,20 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest: &str,
     ) -> Result<(), CompilerError> {
         self.require_standalone_only(builtin)?;
+        let backend_id = if builtin.starts_with("os.db.sqlite.") {
+            Some(native::BACKEND_ID_EXT_DB_SQLITE)
+        } else if builtin.starts_with("os.db.pg.") {
+            Some(native::BACKEND_ID_EXT_DB_PG)
+        } else if builtin.starts_with("os.db.mysql.") {
+            Some(native::BACKEND_ID_EXT_DB_MYSQL)
+        } else if builtin.starts_with("os.db.redis.") {
+            Some(native::BACKEND_ID_EXT_DB_REDIS)
+        } else {
+            None
+        };
+        if let Some(backend_id) = backend_id {
+            self.require_native_backend(backend_id, native::ABI_MAJOR_V1, builtin)?;
+        }
         if args.len() != 2 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9861,6 +9999,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_TIME,
+            native::ABI_MAJOR_V1,
+            "os.time.tzdb_is_valid_tzid_v1",
+        )?;
         if args.len() != 1 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9893,6 +10036,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_REGEX,
+            native::ABI_MAJOR_V1,
+            "regex.compile_opts_v1",
+        )?;
         if args.len() != 2 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9926,6 +10074,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_REGEX,
+            native::ABI_MAJOR_V1,
+            "regex.exec_from_v1",
+        )?;
         if args.len() != 3 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9961,6 +10114,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_REGEX,
+            native::ABI_MAJOR_V1,
+            "regex.exec_caps_from_v1",
+        )?;
         if args.len() != 3 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -9996,6 +10154,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_REGEX,
+            native::ABI_MAJOR_V1,
+            "regex.find_all_x7sl_v1",
+        )?;
         if args.len() != 3 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -10030,6 +10193,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_REGEX,
+            native::ABI_MAJOR_V1,
+            "regex.split_v1",
+        )?;
         if args.len() != 3 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -10065,6 +10233,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_REGEX,
+            native::ABI_MAJOR_V1,
+            "regex.replace_all_v1",
+        )?;
         if args.len() != 4 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -10104,6 +10277,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_TIME,
+            native::ABI_MAJOR_V1,
+            "os.time.tzdb_offset_duration_v1",
+        )?;
         if args.len() != 3 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -10144,6 +10322,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         dest_ty: Ty,
         dest: &str,
     ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_TIME,
+            native::ABI_MAJOR_V1,
+            "os.time.tzdb_snapshot_id_v1",
+        )?;
         if !args.is_empty() {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,

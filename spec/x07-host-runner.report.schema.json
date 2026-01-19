@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-host-runner.report.schema.json",
-  "title": "X07 x07-host-runner report v0.1.0",
+  "title": "X07 x07-host-runner report v0.1.1",
   "description": "Machine-readable report emitted by x07-host-runner.",
   "oneOf": [
     { "$ref": "#/$defs/solve_report" },
@@ -15,6 +15,26 @@
     "maybe_u64": { "type": ["integer", "null"], "minimum": 0 },
     "maybe_i32": { "type": ["integer", "null"] },
     "maybe_string": { "type": ["string", "null"] },
+    "native_backend_req": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend_id", "abi_major"],
+      "properties": {
+        "backend_id": { "type": "string" },
+        "abi_major": { "type": "integer", "minimum": 1 },
+        "features": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "native_requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "requires"],
+      "properties": {
+        "schema_version": { "const": "x07.native-requires@0.1.0" },
+        "world": { "type": "string" },
+        "requires": { "type": "array", "items": { "$ref": "#/$defs/native_backend_req" } }
+      }
+    },
     "mem_stats": {
       "type": "object",
       "additionalProperties": false,
@@ -89,6 +109,7 @@
         "exit_status",
         "lang_id",
         "guide_md",
+        "native_requires",
         "c_source_size",
         "compiled_exe",
         "compiled_exe_size",
@@ -103,6 +124,7 @@
         "exit_status": { "type": "integer" },
         "lang_id": { "type": "string" },
         "guide_md": { "type": "string" },
+        "native_requires": { "$ref": "#/$defs/native_requires" },
         "c_source_size": { "type": "integer", "minimum": 0 },
         "compiled_exe": { "$ref": "#/$defs/maybe_string" },
         "compiled_exe_size": { "$ref": "#/$defs/maybe_u64" },
@@ -184,7 +206,7 @@
         "trap"
       ],
       "properties": {
-        "schema_version": { "const": "x07-host-runner.report@0.1.0" },
+        "schema_version": { "const": "x07-host-runner.report@0.1.1" },
         "mode": { "const": "solve" },
         "ok": { "type": "boolean" },
         "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
@@ -212,7 +234,7 @@
       "additionalProperties": false,
       "required": ["schema_version", "mode", "exit_code", "compile", "solve"],
       "properties": {
-        "schema_version": { "const": "x07-host-runner.report@0.1.0" },
+        "schema_version": { "const": "x07-host-runner.report@0.1.1" },
         "mode": { "const": "compile" },
         "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
         "compile": { "$ref": "#/$defs/compiler_result" },
@@ -224,7 +246,7 @@
       "additionalProperties": false,
       "required": ["schema_version", "mode", "exit_code", "compile", "solve"],
       "properties": {
-        "schema_version": { "const": "x07-host-runner.report@0.1.0" },
+        "schema_version": { "const": "x07-host-runner.report@0.1.1" },
         "mode": { "const": "compile-run" },
         "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
         "compile": { "$ref": "#/$defs/compiler_result" },
@@ -236,7 +258,7 @@
       "additionalProperties": false,
       "required": ["schema_version", "mode", "exit_code", "compile", "solve"],
       "properties": {
-        "schema_version": { "const": "x07-host-runner.report@0.1.0" },
+        "schema_version": { "const": "x07-host-runner.report@0.1.1" },
         "mode": { "const": "project-compile" },
         "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
         "compile": { "$ref": "#/$defs/compiler_result" },
@@ -248,7 +270,7 @@
       "additionalProperties": false,
       "required": ["schema_version", "mode", "exit_code", "compile", "solve"],
       "properties": {
-        "schema_version": { "const": "x07-host-runner.report@0.1.0" },
+        "schema_version": { "const": "x07-host-runner.report@0.1.1" },
         "mode": { "const": "project-compile-run" },
         "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
         "compile": { "$ref": "#/$defs/compiler_result" },
@@ -257,4 +279,3 @@
     }
   }
 }
-

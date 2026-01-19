@@ -8,6 +8,7 @@ pub mod guide;
 pub mod json_patch;
 pub mod language;
 pub mod lint;
+pub mod native;
 pub mod optimize;
 pub mod program;
 pub mod project;
