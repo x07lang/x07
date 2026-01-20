@@ -48,6 +48,9 @@ step "release manifest (check)"
 step "cargo fmt --check"
 cargo fmt --check
 
+step "build runner binaries (for x07 run tests)"
+cargo build -p x07-host-runner -p x07-os-runner
+
 step "cargo test"
 cargo test
 

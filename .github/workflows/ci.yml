@@ -39,6 +39,8 @@ jobs:
             libcurl4-openssl-dev \
             zlib1g-dev \
             libsqlite3-dev
+      - name: Build runner binaries (needed by x07 run tests)
+        run: cargo build -p x07-host-runner -p x07-os-runner
       - name: cargo test --workspace
         run: cargo test --workspace
 

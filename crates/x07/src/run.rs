@@ -1635,17 +1635,41 @@ fn discover_project_manifest(start: &Path) -> Result<Option<PathBuf>> {
 }
 
 fn resolve_sibling_or_path(name: &str) -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let mut cand = dir.join(name);
+    let Ok(exe) = std::env::current_exe() else {
+        return PathBuf::from(name);
+    };
+    let Some(dir) = exe.parent() else {
+        return PathBuf::from(name);
+    };
+
+    let mut candidates = Vec::new();
+
+    let mut cand = dir.join(name);
+    if cfg!(windows) {
+        cand.set_extension("exe");
+    }
+    candidates.push(cand);
+
+    if dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n == "deps")
+    {
+        if let Some(parent) = dir.parent() {
+            let mut cand = parent.join(name);
             if cfg!(windows) {
                 cand.set_extension("exe");
             }
-            if cand.is_file() {
-                return cand;
-            }
+            candidates.push(cand);
         }
     }
+
+    for cand in candidates {
+        if cand.is_file() {
+            return cand;
+        }
+    }
+
     PathBuf::from(name)
 }
 
