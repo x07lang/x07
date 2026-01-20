@@ -1,6 +1,9 @@
 name: Propagate Website
 
 on:
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       tag:
@@ -24,6 +27,41 @@ jobs:
     env:
       X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
     steps:
+      - name: Resolve tag and options
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${GITHUB_EVENT_NAME}" in
+            workflow_dispatch)
+              tag="$(jq -r '.inputs.tag' "$GITHUB_EVENT_PATH")"
+              set_latest="$(jq -r '.inputs.set_latest // "true"' "$GITHUB_EVENT_PATH")"
+              published_at_utc="$(jq -r '.inputs.published_at_utc // ""' "$GITHUB_EVENT_PATH")"
+              ;;
+            release)
+              tag="$(jq -r '.release.tag_name' "$GITHUB_EVENT_PATH")"
+              set_latest="true"
+              published_at_utc="$(jq -r '.release.published_at // ""' "$GITHUB_EVENT_PATH")"
+              ;;
+            *)
+              echo "ERROR: unsupported event: ${GITHUB_EVENT_NAME}" >&2
+              exit 2
+              ;;
+          esac
+          if [[ -z "$tag" || "$tag" == "null" ]]; then
+            echo "ERROR: missing tag" >&2
+            exit 2
+          fi
+          if [[ -z "$set_latest" || "$set_latest" == "null" ]]; then
+            set_latest="true"
+          fi
+          if [[ "$published_at_utc" == "null" ]]; then
+            published_at_utc=""
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "set_latest=$set_latest" >> "$GITHUB_OUTPUT"
+          echo "published_at_utc=$published_at_utc" >> "$GITHUB_OUTPUT"
+
       - name: Fail (missing X07_BOT_TOKEN)
         if: ${{ env.X07_BOT_TOKEN == '' }}
         run: |
@@ -32,6 +70,8 @@ jobs:
 
       - name: Checkout (x07)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.vars.outputs.tag }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -39,7 +79,7 @@ jobs:
           python-version: "3.11"
 
       - name: Build docs bundle
-        run: python3 scripts/build_docs_bundle.py --tag "${{ inputs.tag }}"
+        run: python3 scripts/build_docs_bundle.py --tag "${{ steps.vars.outputs.tag }}"
 
       - name: Checkout (x07-website)
         uses: actions/checkout@v4
@@ -52,13 +92,13 @@ jobs:
         working-directory: x07-website
         run: |
           set -euo pipefail
-          tag="${{ inputs.tag }}"
+          tag="${{ steps.vars.outputs.tag }}"
           args=()
-          if [ "${{ inputs.set_latest }}" = "true" ]; then
+          if [ "${{ steps.vars.outputs.set_latest }}" = "true" ]; then
             args+=(--set-latest)
           fi
-          if [ -n "${{ inputs.published_at_utc }}" ]; then
-            args+=(--published-at-utc "${{ inputs.published_at_utc }}")
+          if [ -n "${{ steps.vars.outputs.published_at_utc }}" ]; then
+            args+=(--published-at-utc "${{ steps.vars.outputs.published_at_utc }}")
           fi
           python3 ../scripts/open_pr_website_update.py \
             --tag "$tag" \
@@ -70,7 +110,7 @@ jobs:
         with:
           token: ${{ env.X07_BOT_TOKEN }}
           path: x07-website
-          branch: bot/website-sync-${{ inputs.tag }}
-          commit-message: "release: sync website for ${{ inputs.tag }}"
-          title: "release: sync website for ${{ inputs.tag }}"
-          body: Automated website sync from x07 tag ${{ inputs.tag }}.
+          branch: bot/website-sync-${{ steps.vars.outputs.tag }}
+          commit-message: "release: sync website for ${{ steps.vars.outputs.tag }}"
+          title: "release: sync website for ${{ steps.vars.outputs.tag }}"
+          body: Automated website sync from x07 tag ${{ steps.vars.outputs.tag }}.
