@@ -25,18 +25,22 @@ Same as `run-os`, but enforced by policy:
 
 ### Create a base policy (recommended)
 
-Use `x07 policy init` to generate a schema-valid starting point:
+Use `x07 policy init` to generate a schema-valid starting point (then extend it for your app):
 
 - `x07 policy init --template cli`
-- `x07 policy init --template crawler`
+- `x07 policy init --template http-client`
 - `x07 policy init --template web-service`
+- `x07 policy init --template fs-tool`
+- `x07 policy init --template sqlite-app`
+- `x07 policy init --template postgres-client`
+- `x07 policy init --template worker`
 
 ### Allow/deny networking destinations (CLI convenience)
 
 When running in `run-os-sandboxed`, `x07 run` can materialize a derived policy under `.x07/policies/_generated/`:
 
-- `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:443`
-- `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --deny-host example.com:*`
+- `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
+- `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --deny-host example.com:*`
 
 Denies apply after allows, so deny wins.
 

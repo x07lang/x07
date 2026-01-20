@@ -28,9 +28,13 @@ pub enum PolicyCommand {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab_case")]
 pub enum PolicyTemplate {
-    Crawler,
     Cli,
+    HttpClient,
     WebService,
+    FsTool,
+    SqliteApp,
+    PostgresClient,
+    Worker,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -150,9 +154,13 @@ fn cmd_policy_init(args: PolicyInitArgs) -> Result<std::process::ExitCode> {
             let report = PolicyInitReport {
                 schema_version: X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
                 template: match args.template {
-                    PolicyTemplate::Crawler => "crawler",
                     PolicyTemplate::Cli => "cli",
+                    PolicyTemplate::HttpClient => "http-client",
                     PolicyTemplate::WebService => "web-service",
+                    PolicyTemplate::FsTool => "fs-tool",
+                    PolicyTemplate::SqliteApp => "sqlite-app",
+                    PolicyTemplate::PostgresClient => "postgres-client",
+                    PolicyTemplate::Worker => "worker",
                 },
                 project_root: project_root.display().to_string(),
                 out: out_rel,
@@ -211,14 +219,26 @@ fn resolve_project_root(cwd: &Path, project: Option<&Path>) -> Result<(PathBuf, 
 fn resolve_out_path(project_root: &Path, args: &PolicyInitArgs) -> PathBuf {
     let rel = match (args.out.as_deref(), args.template) {
         (Some(out), _) => out.to_path_buf(),
-        (None, PolicyTemplate::Crawler) => {
-            PathBuf::from(".x07/policies/base/crawler.sandbox.base.policy.json")
-        }
         (None, PolicyTemplate::Cli) => {
             PathBuf::from(".x07/policies/base/cli.sandbox.base.policy.json")
         }
+        (None, PolicyTemplate::HttpClient) => {
+            PathBuf::from(".x07/policies/base/http-client.sandbox.base.policy.json")
+        }
         (None, PolicyTemplate::WebService) => {
             PathBuf::from(".x07/policies/base/web-service.sandbox.base.policy.json")
+        }
+        (None, PolicyTemplate::FsTool) => {
+            PathBuf::from(".x07/policies/base/fs-tool.sandbox.base.policy.json")
+        }
+        (None, PolicyTemplate::SqliteApp) => {
+            PathBuf::from(".x07/policies/base/sqlite-app.sandbox.base.policy.json")
+        }
+        (None, PolicyTemplate::PostgresClient) => {
+            PathBuf::from(".x07/policies/base/postgres-client.sandbox.base.policy.json")
+        }
+        (None, PolicyTemplate::Worker) => {
+            PathBuf::from(".x07/policies/base/worker.sandbox.base.policy.json")
         }
     };
 
@@ -275,66 +295,42 @@ fn validate_policy_id(id: &str) -> Result<()> {
     Ok(())
 }
 
+fn base_process_policy() -> Value {
+    serde_json::json!({
+        "enabled": true,
+        "allow_spawn": false,
+        "max_live": 0,
+        "max_spawns": 0,
+        "allow_exec": false,
+        "allow_exit": true,
+        "allow_execs": [],
+        "allow_exec_prefixes": [],
+        "allow_args_regex_lite": [],
+        "allow_env_keys": [],
+        "max_exe_bytes": 4096,
+        "max_args": 64,
+        "max_arg_bytes": 4096,
+        "max_env": 64,
+        "max_env_key_bytes": 256,
+        "max_env_val_bytes": 4096,
+        "max_runtime_ms": 0,
+        "max_stdout_bytes": 10485760,
+        "max_stderr_bytes": 10485760,
+        "max_total_bytes": 16777216,
+        "max_stdin_bytes": 1048576,
+        "kill_on_drop": true,
+        "kill_tree": true,
+        "allow_cwd": false,
+        "allow_cwd_roots": []
+    })
+}
+
 fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&str>) -> Value {
     let mut policy = match template {
-        PolicyTemplate::Crawler => serde_json::json!({
-            "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
-            "policy_id": "sandbox.crawler.base",
-            "notes": "Base run-os-sandboxed policy for crawlers. net.allow_hosts is intentionally empty. Use `x07 run --profile sandbox --allow-host host:port` to derive a policy with explicit destinations.",
-            "limits": { "cpu_ms": 180000, "wall_ms": 300000, "mem_bytes": 1073741824, "fds": 256, "procs": 32, "core_dumps": false },
-            "fs": {
-              "enabled": true,
-              "read_roots": ["."],
-              "write_roots": ["out"],
-              "deny_hidden": true,
-              "allow_symlinks": false,
-              "allow_mkdir": true,
-              "allow_remove": false,
-              "allow_rename": true,
-              "allow_walk": true,
-              "allow_glob": false,
-              "max_read_bytes": 67108864,
-              "max_write_bytes": 268435456,
-              "max_entries": 20000,
-              "max_depth": 32
-            },
-            "net": { "enabled": true, "allow_dns": false, "allow_tcp": true, "allow_udp": false, "allow_hosts": [] },
-            "db": { "enabled": false, "drivers": { "sqlite": false, "postgres": false, "mysql": false, "redis": false } },
-            "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
-            "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": true, "max_sleep_ms": 5000, "allow_local_tzid": false },
-            "language": { "allow_unsafe": false, "allow_ffi": true },
-            "process": {
-              "enabled": true,
-              "allow_spawn": false,
-              "max_live": 0,
-              "max_spawns": 0,
-              "allow_exec": false,
-              "allow_exit": true,
-              "allow_execs": [],
-              "allow_exec_prefixes": [],
-              "allow_args_regex_lite": [],
-              "allow_env_keys": [],
-              "max_exe_bytes": 4096,
-              "max_args": 64,
-              "max_arg_bytes": 4096,
-              "max_env": 64,
-              "max_env_key_bytes": 256,
-              "max_env_val_bytes": 4096,
-              "max_runtime_ms": 0,
-              "max_stdout_bytes": 10485760,
-              "max_stderr_bytes": 10485760,
-              "max_total_bytes": 16777216,
-              "max_stdin_bytes": 1048576,
-              "kill_on_drop": true,
-              "kill_tree": true,
-              "allow_cwd": false,
-              "allow_cwd_roots": []
-            }
-        }),
         PolicyTemplate::Cli => serde_json::json!({
             "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
             "policy_id": "sandbox.cli.base",
-            "notes": "Base run-os-sandboxed policy for CLI tools. No networking. Reads project tree; writes under out/.",
+            "notes": "Base policy for local CLI tools. No networking. Reads project tree; writes under out/.",
             "limits": { "cpu_ms": 60000, "wall_ms": 120000, "mem_bytes": 536870912, "fds": 128, "procs": 16, "core_dumps": false },
             "fs": {
               "enabled": true,
@@ -353,42 +349,42 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
               "max_depth": 64
             },
             "net": { "enabled": false, "allow_dns": false, "allow_tcp": false, "allow_udp": false, "allow_hosts": [] },
-            "db": { "enabled": false, "drivers": { "sqlite": false, "postgres": false, "mysql": false, "redis": false } },
             "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
             "language": { "allow_unsafe": false, "allow_ffi": false },
-            "process": {
+            "process": base_process_policy()
+        }),
+        PolicyTemplate::HttpClient => serde_json::json!({
+            "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+            "policy_id": "sandbox.http-client.base",
+            "notes": "Base policy for outbound HTTP/TLS. net.allow_hosts is intentionally empty. Use x07 run --allow-host to derive a policy with explicit destinations.",
+            "limits": { "cpu_ms": 180000, "wall_ms": 300000, "mem_bytes": 1073741824, "fds": 256, "procs": 32, "core_dumps": false },
+            "fs": {
               "enabled": true,
-              "allow_spawn": false,
-              "max_live": 0,
-              "max_spawns": 0,
-              "allow_exec": false,
-              "allow_exit": true,
-              "allow_execs": [],
-              "allow_exec_prefixes": [],
-              "allow_args_regex_lite": [],
-              "allow_env_keys": [],
-              "max_exe_bytes": 4096,
-              "max_args": 64,
-              "max_arg_bytes": 4096,
-              "max_env": 64,
-              "max_env_key_bytes": 256,
-              "max_env_val_bytes": 4096,
-              "max_runtime_ms": 0,
-              "max_stdout_bytes": 10485760,
-              "max_stderr_bytes": 10485760,
-              "max_total_bytes": 16777216,
-              "max_stdin_bytes": 1048576,
-              "kill_on_drop": true,
-              "kill_tree": true,
-              "allow_cwd": false,
-              "allow_cwd_roots": []
-            }
+              "read_roots": ["."],
+              "write_roots": ["out"],
+              "deny_hidden": true,
+              "allow_symlinks": false,
+              "allow_mkdir": true,
+              "allow_remove": false,
+              "allow_rename": true,
+              "allow_walk": true,
+              "allow_glob": false,
+              "max_read_bytes": 67108864,
+              "max_write_bytes": 268435456,
+              "max_entries": 20000,
+              "max_depth": 32
+            },
+            "net": { "enabled": true, "allow_dns": false, "allow_tcp": true, "allow_udp": false, "allow_hosts": [] },
+            "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
+            "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": true, "max_sleep_ms": 5000, "allow_local_tzid": false },
+            "language": { "allow_unsafe": false, "allow_ffi": true },
+            "process": base_process_policy()
         }),
         PolicyTemplate::WebService => serde_json::json!({
             "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
             "policy_id": "sandbox.web-service.base",
-            "notes": "Base run-os-sandboxed policy for web services. net.allow_hosts is intentionally empty. Use `x07 run --profile sandbox --allow-host ...` to allow bind/connect targets explicitly.",
+            "notes": "Base policy for web services. net.allow_hosts is intentionally empty. Allow bind/connect targets via x07 run --allow-host. Env restricted to PORT/HOST/LOG_LEVEL.",
             "limits": { "cpu_ms": 180000, "wall_ms": 600000, "mem_bytes": 1073741824, "fds": 512, "procs": 64, "core_dumps": false },
             "fs": {
               "enabled": true,
@@ -407,37 +403,153 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
               "max_depth": 64
             },
             "net": { "enabled": true, "allow_dns": false, "allow_tcp": true, "allow_udp": false, "allow_hosts": [] },
-            "db": { "enabled": false, "drivers": { "sqlite": false, "postgres": false, "mysql": false, "redis": false } },
             "env": { "enabled": true, "allow_keys": ["PORT", "HOST", "LOG_LEVEL"], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": true, "max_sleep_ms": 1000, "allow_local_tzid": false },
             "language": { "allow_unsafe": false, "allow_ffi": true },
-            "process": {
+            "process": base_process_policy()
+        }),
+        PolicyTemplate::FsTool => serde_json::json!({
+            "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+            "policy_id": "sandbox.fs-tool.base",
+            "notes": "Base policy for filesystem tools (formatters/generators). No networking. Reads project; writes limited to src/ and out/.",
+            "limits": { "cpu_ms": 90000, "wall_ms": 180000, "mem_bytes": 536870912, "fds": 256, "procs": 16, "core_dumps": false },
+            "fs": {
               "enabled": true,
-              "allow_spawn": false,
-              "max_live": 0,
-              "max_spawns": 0,
-              "allow_exec": false,
-              "allow_exit": true,
-              "allow_execs": [],
-              "allow_exec_prefixes": [],
-              "allow_args_regex_lite": [],
-              "allow_env_keys": [],
-              "max_exe_bytes": 4096,
-              "max_args": 64,
-              "max_arg_bytes": 4096,
-              "max_env": 64,
-              "max_env_key_bytes": 256,
-              "max_env_val_bytes": 4096,
-              "max_runtime_ms": 0,
-              "max_stdout_bytes": 10485760,
-              "max_stderr_bytes": 10485760,
-              "max_total_bytes": 16777216,
-              "max_stdin_bytes": 1048576,
-              "kill_on_drop": true,
-              "kill_tree": true,
-              "allow_cwd": false,
-              "allow_cwd_roots": []
-            }
+              "read_roots": ["."],
+              "write_roots": ["src", "out"],
+              "deny_hidden": true,
+              "allow_symlinks": false,
+              "allow_mkdir": true,
+              "allow_remove": false,
+              "allow_rename": true,
+              "allow_walk": true,
+              "allow_glob": true,
+              "max_read_bytes": 268435456,
+              "max_write_bytes": 268435456,
+              "max_entries": 200000,
+              "max_depth": 128
+            },
+            "net": { "enabled": false, "allow_dns": false, "allow_tcp": false, "allow_udp": false, "allow_hosts": [] },
+            "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
+            "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
+            "language": { "allow_unsafe": false, "allow_ffi": false },
+            "process": base_process_policy()
+        }),
+        PolicyTemplate::SqliteApp => serde_json::json!({
+            "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+            "policy_id": "sandbox.sqlite-app.base",
+            "notes": "Base policy for local SQLite apps. No networking. SQLite allowed only at out/app.sqlite (and optionally in-memory).",
+            "limits": { "cpu_ms": 120000, "wall_ms": 300000, "mem_bytes": 1073741824, "fds": 256, "procs": 32, "core_dumps": false },
+            "fs": {
+              "enabled": true,
+              "read_roots": ["."],
+              "write_roots": ["out"],
+              "deny_hidden": true,
+              "allow_symlinks": false,
+              "allow_mkdir": true,
+              "allow_remove": false,
+              "allow_rename": true,
+              "allow_walk": true,
+              "allow_glob": true,
+              "max_read_bytes": 134217728,
+              "max_write_bytes": 268435456,
+              "max_entries": 100000,
+              "max_depth": 64
+            },
+            "net": { "enabled": false, "allow_dns": false, "allow_tcp": false, "allow_udp": false, "allow_hosts": [] },
+            "db": {
+              "enabled": true,
+              "drivers": { "sqlite": true, "postgres": false, "mysql": false, "redis": false },
+              "max_live_conns": 8,
+              "max_queries": 10000,
+              "connect_timeout_ms": 2000,
+              "query_timeout_ms": 30000,
+              "max_sql_bytes": 1048576,
+              "max_rows": 100000,
+              "max_resp_bytes": 16777216,
+              "sqlite": {
+                "allow_paths": ["out/app.sqlite"],
+                "readonly_only": false,
+                "allow_create": true,
+                "allow_in_memory": true
+              }
+            },
+            "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
+            "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
+            "language": { "allow_unsafe": false, "allow_ffi": true },
+            "process": base_process_policy()
+        }),
+        PolicyTemplate::PostgresClient => serde_json::json!({
+            "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+            "policy_id": "sandbox.postgres-client.base",
+            "notes": "Base policy for Postgres clients. General net is disabled; DB access is enabled but DB allowlists start empty (deny-by-default).",
+            "limits": { "cpu_ms": 120000, "wall_ms": 300000, "mem_bytes": 1073741824, "fds": 256, "procs": 32, "core_dumps": false },
+            "fs": {
+              "enabled": true,
+              "read_roots": ["."],
+              "write_roots": ["out"],
+              "deny_hidden": true,
+              "allow_symlinks": false,
+              "allow_mkdir": true,
+              "allow_remove": false,
+              "allow_rename": true,
+              "allow_walk": true,
+              "allow_glob": true,
+              "max_read_bytes": 67108864,
+              "max_write_bytes": 67108864,
+              "max_entries": 50000,
+              "max_depth": 64
+            },
+            "net": { "enabled": false, "allow_dns": false, "allow_tcp": false, "allow_udp": false, "allow_hosts": [] },
+            "db": {
+              "enabled": true,
+              "drivers": { "sqlite": false, "postgres": true, "mysql": false, "redis": false },
+              "max_live_conns": 8,
+              "max_queries": 10000,
+              "connect_timeout_ms": 5000,
+              "query_timeout_ms": 30000,
+              "max_sql_bytes": 1048576,
+              "max_rows": 100000,
+              "max_resp_bytes": 16777216,
+              "net": {
+                "allow_dns": [],
+                "allow_cidrs": [],
+                "allow_ports": [],
+                "require_tls": true,
+                "require_verify": true
+              }
+            },
+            "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
+            "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
+            "language": { "allow_unsafe": false, "allow_ffi": true },
+            "process": base_process_policy()
+        }),
+        PolicyTemplate::Worker => serde_json::json!({
+            "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+            "policy_id": "sandbox.worker.base",
+            "notes": "Base policy for compute workers. No fs/net/env by default. Allows bounded sleep for backoff.",
+            "limits": { "cpu_ms": 300000, "wall_ms": 300000, "mem_bytes": 1073741824, "fds": 64, "procs": 16, "core_dumps": false },
+            "fs": {
+              "enabled": false,
+              "read_roots": [],
+              "write_roots": [],
+              "deny_hidden": true,
+              "allow_symlinks": false,
+              "allow_mkdir": false,
+              "allow_remove": false,
+              "allow_rename": false,
+              "allow_walk": false,
+              "allow_glob": false,
+              "max_read_bytes": 0,
+              "max_write_bytes": 0,
+              "max_entries": 0,
+              "max_depth": 0
+            },
+            "net": { "enabled": false, "allow_dns": false, "allow_tcp": false, "allow_udp": false, "allow_hosts": [] },
+            "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
+            "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": false, "allow_sleep": true, "max_sleep_ms": 5000, "allow_local_tzid": false },
+            "language": { "allow_unsafe": false, "allow_ffi": false },
+            "process": base_process_policy()
         }),
     };
 

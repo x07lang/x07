@@ -8,7 +8,17 @@
   "required": ["schema_version", "template", "project_root", "out", "status", "policy_id"],
   "properties": {
     "schema_version": { "const": "x07.policy.init.report@0.1.0" },
-    "template": { "enum": ["crawler", "cli", "web-service"] },
+    "template": {
+      "enum": [
+        "cli",
+        "http-client",
+        "web-service",
+        "fs-tool",
+        "sqlite-app",
+        "postgres-client",
+        "worker"
+      ]
+    },
     "project_root": { "type": "string" },
     "out": { "type": "string" },
     "status": { "enum": ["created", "unchanged", "overwritten", "exists_different"] },

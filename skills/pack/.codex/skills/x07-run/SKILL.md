@@ -33,15 +33,22 @@ Use this skill for normal program execution. `x07 run` dispatches to:
 
 - Generate a base sandbox policy:
   - `x07 policy init --template cli`
-  - `x07 policy init --template crawler`
+  - `x07 policy init --template http-client`
   - `x07 policy init --template web-service`
+  - `x07 policy init --template fs-tool`
+  - `x07 policy init --template sqlite-app`
+  - `x07 policy init --template postgres-client`
+  - `x07 policy init --template worker`
+
+  Policies are starting points: review and extend them for your app (roots, env keys, subprocess allowlists, limits).
+  For net-enabled templates, keep `net.allow_hosts: []` in the base policy and use `--allow-host` / `--deny-host` to materialize derived policies for specific destinations.
 
 - Run policy-enforced OS world (requires a policy file):
   - `x07 run --world run-os-sandboxed --policy .x07/policies/base/cli.sandbox.base.policy.json`
 
 - Materialize a derived policy with explicit network destinations (deny-by-default):
-  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:443`
-  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:80,443 --deny-host example.com:80`
+  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
+  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:80,443 --deny-host example.com:80`
 
 ## Inputs
 

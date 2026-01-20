@@ -328,6 +328,80 @@ fn x07_policy_init_cli_template_creates_base_policy() {
     assert_eq!(pol["policy_id"], "sandbox.cli.base");
 }
 
+#[test]
+fn x07_policy_init_all_templates_create_policies() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_policy_init_all_templates");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let cases = [
+        (
+            "cli",
+            ".x07/policies/base/cli.sandbox.base.policy.json",
+            "sandbox.cli.base",
+        ),
+        (
+            "http-client",
+            ".x07/policies/base/http-client.sandbox.base.policy.json",
+            "sandbox.http-client.base",
+        ),
+        (
+            "web-service",
+            ".x07/policies/base/web-service.sandbox.base.policy.json",
+            "sandbox.web-service.base",
+        ),
+        (
+            "fs-tool",
+            ".x07/policies/base/fs-tool.sandbox.base.policy.json",
+            "sandbox.fs-tool.base",
+        ),
+        (
+            "sqlite-app",
+            ".x07/policies/base/sqlite-app.sandbox.base.policy.json",
+            "sandbox.sqlite-app.base",
+        ),
+        (
+            "postgres-client",
+            ".x07/policies/base/postgres-client.sandbox.base.policy.json",
+            "sandbox.postgres-client.base",
+        ),
+        (
+            "worker",
+            ".x07/policies/base/worker.sandbox.base.policy.json",
+            "sandbox.worker.base",
+        ),
+    ];
+
+    for (template, out_rel, policy_id) in cases {
+        let out = run_x07_in_dir(&dir, &["policy", "init", "--template", template]);
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "template={template} stderr:\n{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let v = parse_json_stdout(&out);
+        assert_eq!(v["schema_version"], X07_POLICY_INIT_REPORT_SCHEMA_VERSION);
+        assert_eq!(v["template"], template);
+        assert_eq!(v["status"], "created");
+        assert_eq!(v["out"], out_rel);
+        assert_eq!(v["policy_id"], policy_id);
+
+        let pol_path = dir.join(out_rel);
+        assert!(pol_path.is_file(), "missing {}", pol_path.display());
+        let pol: Value =
+            serde_json::from_slice(&std::fs::read(&pol_path).unwrap()).expect("parse policy json");
+        assert_eq!(pol["schema_version"], "x07.run-os-policy@0.1.0");
+        assert_eq!(pol["policy_id"], policy_id);
+    }
+}
+
 fn derived_policy_path_from_stderr(stderr: &[u8]) -> Option<String> {
     let s = String::from_utf8_lossy(stderr);
     for line in s.lines() {
@@ -351,7 +425,7 @@ fn x07_run_allow_host_materializes_policy() {
     let out = run_x07_in_dir(&dir, &["--init"]);
     assert_eq!(out.status.code(), Some(0));
 
-    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "crawler"]);
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "http-client"]);
     assert_eq!(out.status.code(), Some(0));
 
     let out = run_x07_in_dir(
@@ -361,7 +435,7 @@ fn x07_run_allow_host_materializes_policy() {
             "--world",
             "run-os-sandboxed",
             "--policy",
-            ".x07/policies/base/crawler.sandbox.base.policy.json",
+            ".x07/policies/base/http-client.sandbox.base.policy.json",
             "--allow-host",
             "example.com:443",
             "--project",
@@ -415,7 +489,7 @@ fn x07_run_deny_host_removes_allow() {
     let out = run_x07_in_dir(&dir, &["--init"]);
     assert_eq!(out.status.code(), Some(0));
 
-    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "crawler"]);
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "http-client"]);
     assert_eq!(out.status.code(), Some(0));
 
     let out = run_x07_in_dir(
@@ -425,7 +499,7 @@ fn x07_run_deny_host_removes_allow() {
             "--world",
             "run-os-sandboxed",
             "--policy",
-            ".x07/policies/base/crawler.sandbox.base.policy.json",
+            ".x07/policies/base/http-client.sandbox.base.policy.json",
             "--allow-host",
             "example.com:443",
             "--deny-host",

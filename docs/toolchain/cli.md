@@ -81,16 +81,20 @@ World IDs (`--world solve-pure`, `--world run-os`, ...) remain available as an a
 
 #### Policies (run-os-sandboxed)
 
-To create a schema-valid base policy:
+`run-os-sandboxed` requires an explicit policy file. Use `x07 policy init` to generate a schema-valid starting point, then extend it for your app (filesystem roots, env keys, subprocess allowlists, resource limits):
 
 - `x07 policy init --template cli`
-- `x07 policy init --template crawler`
+- `x07 policy init --template http-client`
 - `x07 policy init --template web-service`
+- `x07 policy init --template fs-tool`
+- `x07 policy init --template sqlite-app`
+- `x07 policy init --template postgres-client`
+- `x07 policy init --template worker`
 
-To materialize a derived policy with explicit network destinations:
+For net-enabled templates, the base policy starts with `net.allow_hosts: []` (deny-by-default destinations). Use `--allow-host` / `--deny-host` to materialize a derived policy under `.x07/policies/_generated/`:
 
-- `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:443`
-- `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:80,443 --deny-host example.com:80`
+- `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
+- `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:80,443 --deny-host example.com:80`
 
 Derived policies are written under `.x07/policies/_generated/` and passed to `x07-os-runner`.
 

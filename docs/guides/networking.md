@@ -58,14 +58,16 @@ System prerequisites depend on platform (for example, `libcurl` + `openssl` dev 
 1. Generate a base policy (deny-by-default destinations):
 
    ```bash
-   x07 policy init --template crawler
+   x07 policy init --template http-client
    ```
 
-2. Run with explicit destinations:
+   Treat this as a starting point: review and edit the base policy for your project (filesystem roots, limits, env, etc.).
+
+2. Run with explicit destinations (materializes a derived policy under `.x07/policies/_generated/`):
 
    ```bash
    x07 run --world run-os-sandboxed \
-     --policy .x07/policies/base/crawler.sandbox.base.policy.json \
+     --policy .x07/policies/base/http-client.sandbox.base.policy.json \
      --allow-host example.com:443
    ```
 
