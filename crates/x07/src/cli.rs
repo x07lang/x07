@@ -574,7 +574,7 @@ fn semantic_script_path() -> Result<PathBuf> {
 fn default_cli_module_roots() -> Result<Vec<PathBuf>> {
     let candidates = [
         PathBuf::from("stdlib/std/0.1.1/modules"),
-        PathBuf::from("packages/ext/x07-ext-cli/0.1.0/modules"),
+        PathBuf::from("packages/ext/x07-ext-cli/0.1.2/modules"),
         PathBuf::from("packages/ext/x07-ext-data-model/0.1.0/modules"),
         PathBuf::from("packages/ext/x07-ext-json-rs/0.1.0/modules"),
     ];
