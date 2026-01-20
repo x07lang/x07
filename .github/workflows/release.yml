@@ -122,6 +122,20 @@ jobs:
           "${exe}" --program "${tmp}/program.x07.json" --world solve-pure --input "${tmp}/input.bin" \
             | python -c 'import base64,json,sys; report=json.load(sys.stdin); expected=base64.b64encode(b"hi").decode("ascii"); exit_code=report.get("exit_code"); out=(report.get("solve") or {}).get("solve_output_b64"); assert exit_code==0, report; assert out==expected, (out, expected); print("ok: relocated host-runner smoke passed")'
 
+      - name: Build and stage native backends (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/build_ext_regex.sh
+          ./scripts/build_ext_fs.sh
+          ./scripts/build_ext_math.sh
+          ./scripts/build_ext_time.sh
+          ./scripts/build_ext_db_sqlite.sh
+          ./scripts/build_ext_db_pg.sh
+          ./scripts/build_ext_db_mysql.sh
+          ./scripts/build_ext_db_redis.sh
+
       - name: Package binaries (Unix)
         if: runner.os != 'Windows'
         shell: bash
@@ -189,9 +203,26 @@ jobs:
         run: python3 scripts/build_docs_bundle.py --tag "${{ github.ref_name }}"
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/**/x07-*.tar.gz
-            dist/**/x07-*.zip
-            dist/release-manifest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --title "$tag" --generate-notes --verify-tag
+          fi
+
+          files=()
+          while IFS= read -r -d '' f; do
+            files+=("$f")
+          done < <(find dist -type f \( -name 'x07-*.tar.gz' -o -name 'x07-*.zip' -o -name 'release-manifest.json' \) -print0)
+
+          if (( ${#files[@]} == 0 )); then
+            echo "ERROR: no release assets found under dist/" >&2
+            exit 2
+          fi
+
+          gh release upload "$tag" "${files[@]}" --clobber
