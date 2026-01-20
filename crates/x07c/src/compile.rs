@@ -269,12 +269,13 @@ pub fn compile_program_to_c_with_meta(
     let (c_src, native_requires) =
         c_emit::emit_c_program_with_native_requires(&parsed_program, options)?;
 
-    if c_src.len() > language::limits::MAX_C_BYTES {
+    let max_c_bytes = language::limits::max_c_bytes();
+    if c_src.len() > max_c_bytes {
         return Err(CompilerError::new(
             CompileErrorKind::Budget,
             format!(
-                "C source too large: max_c_bytes={} got {}",
-                language::limits::MAX_C_BYTES,
+                "C source too large: max_c_bytes={} got {} (set X07_MAX_C_BYTES=<bytes> or pass --max-c-bytes <bytes>)",
+                max_c_bytes,
                 c_src.len()
             ),
         ));

@@ -1,0 +1,28 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-cli",
+  "description": "Command-line argument parsing, help, and shell completion.",
+  "docs": "Specrows-based CLI parsing.\n\n- Compile a specrows JSON command spec with ext.cli.specrows.compile.\n- Parse argv bytes with ext.cli.parse_specrows(spec_json_bytes, argv_v1_bytes).\n- On error, use ext.cli.err_msg / ext.cli.err_usage.\n- On success, use ext.cli.matches_cmd and ext.cli.matches_get.\n",
+  "version": "0.1.3",
+  "module_root": "modules",
+  "modules": [
+    "ext.cli",
+    "ext.cli.specrows",
+    "ext.cli.help",
+    "ext.cli.complete",
+    "ext.cli.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

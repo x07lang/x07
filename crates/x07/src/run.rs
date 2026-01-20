@@ -82,6 +82,10 @@ pub struct RunArgs {
     #[arg(long, value_enum)]
     pub cc_profile: Option<CcProfile>,
 
+    /// Override the generated C source budget (in bytes).
+    #[arg(long, value_name = "BYTES")]
+    pub max_c_bytes: Option<usize>,
+
     #[arg(long, value_name = "PATH")]
     pub compiled_out: Option<PathBuf>,
 
@@ -338,6 +342,11 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
         "--world".to_string(),
         world.as_str().to_string(),
     ];
+
+    if let Some(max_c_bytes) = args.max_c_bytes {
+        argv.push("--max-c-bytes".to_string());
+        argv.push(max_c_bytes.to_string());
+    }
 
     if let Some(path) = &args.compiled_out {
         argv.push("--compiled-out".to_string());

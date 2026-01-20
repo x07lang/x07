@@ -73,6 +73,8 @@ enum Cmd {
         emit_c_header: Option<PathBuf>,
         #[arg(long)]
         freestanding: bool,
+        #[arg(long, value_name = "BYTES")]
+        max_c_bytes: Option<usize>,
     },
     Compile {
         #[arg(long)]
@@ -87,6 +89,8 @@ enum Cmd {
         emit_c_header: Option<PathBuf>,
         #[arg(long)]
         freestanding: bool,
+        #[arg(long, value_name = "BYTES")]
+        max_c_bytes: Option<usize>,
     },
 }
 
@@ -560,7 +564,12 @@ fn try_main() -> Result<std::process::ExitCode> {
             out,
             emit_c_header,
             freestanding,
+            max_c_bytes,
         } => {
+            if let Some(max_c_bytes) = max_c_bytes {
+                std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
+            }
+
             let manifest = project::load_project_manifest(&project_path)?;
             let lock_path = project::default_lockfile_path(&project_path, &manifest);
             let lock_bytes = std::fs::read(&lock_path)
@@ -625,7 +634,12 @@ fn try_main() -> Result<std::process::ExitCode> {
             out,
             emit_c_header,
             freestanding,
+            max_c_bytes,
         } => {
+            if let Some(max_c_bytes) = max_c_bytes {
+                std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
+            }
+
             let program_bytes = std::fs::read(&program)
                 .with_context(|| format!("read program: {}", program.display()))?;
             let mut options = x07c::world_config::compile_options_for_world(world, module_root);

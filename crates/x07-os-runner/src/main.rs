@@ -44,6 +44,9 @@ struct Cli {
     #[arg(long, value_enum, default_value_t = WorldId::RunOs)]
     world: WorldId,
 
+    #[arg(long, value_name = "BYTES")]
+    max_c_bytes: Option<usize>,
+
     #[arg(long)]
     policy: Option<PathBuf>,
 
@@ -97,6 +100,10 @@ fn try_main() -> Result<std::process::ExitCode> {
     }
 
     apply_cc_profile(cli.cc_profile);
+
+    if let Some(max_c_bytes) = cli.max_c_bytes {
+        std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
+    }
 
     let world = cli.world;
     if world.is_eval_world() {

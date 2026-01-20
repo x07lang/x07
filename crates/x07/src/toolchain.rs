@@ -58,6 +58,9 @@ pub struct BuildArgs {
 
     #[arg(long)]
     pub freestanding: bool,
+
+    #[arg(long, value_name = "BYTES")]
+    pub max_c_bytes: Option<usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -429,6 +432,10 @@ pub fn cmd_fix(args: FixArgs) -> Result<std::process::ExitCode> {
 }
 
 pub fn cmd_build(args: BuildArgs) -> Result<std::process::ExitCode> {
+    if let Some(max_c_bytes) = args.max_c_bytes {
+        std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
+    }
+
     let manifest = project::load_project_manifest(&args.project)?;
     let lock_path = project::default_lockfile_path(&args.project, &manifest);
     let lock_bytes = std::fs::read(&lock_path)

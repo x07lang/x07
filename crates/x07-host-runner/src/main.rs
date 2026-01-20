@@ -32,6 +32,9 @@ struct Cli {
     #[arg(long, value_enum, default_value_t = WorldId::SolvePure)]
     world: WorldId,
 
+    #[arg(long, value_name = "BYTES")]
+    max_c_bytes: Option<usize>,
+
     #[arg(long)]
     module_root: Vec<PathBuf>,
 
@@ -133,6 +136,10 @@ fn try_main() -> Result<std::process::ExitCode> {
     }
 
     apply_cc_profile(cli.cc_profile);
+
+    if let Some(max_c_bytes) = cli.max_c_bytes {
+        std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
+    }
 
     let input = match &cli.input {
         Some(path) => {
