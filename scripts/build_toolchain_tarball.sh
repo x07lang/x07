@@ -14,6 +14,7 @@ Usage:
 
 Builds a toolchain tarball containing:
   - bin/{x07,x07c,x07-host-runner,x07-os-runner,x07import-cli}
+  - deps/x07/native_backends.json + native backend archives (for native backends like ext-regex)
   - stdlib/os/0.2.0/modules (for x07-os-runner)
 
 Expected inputs:
@@ -88,6 +89,7 @@ fi
 stage_root="$root/dist/.tmp_toolchain_${tag}_${platform}"
 rm -rf "$stage_root"
 mkdir -p "$stage_root/bin"
+mkdir -p "$stage_root/deps/x07"
 mkdir -p "$stage_root/stdlib/os/0.2.0"
 
 install_bin() {
@@ -121,9 +123,65 @@ if [[ ! -d "$stdlib_src" ]]; then
 fi
 cp -R "$stdlib_src" "$stdlib_dst"
 
+python_bin="${X07_PYTHON:-}"
+if [[ -z "${python_bin}" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    python_bin="python3"
+  else
+    python_bin="python"
+  fi
+fi
+
+native_backends_src="$root/deps/x07/native_backends.json"
+if [[ ! -f "$native_backends_src" ]]; then
+  echo "ERROR: missing native backends manifest: $native_backends_src" >&2
+  exit 1
+fi
+cp -f "$native_backends_src" "$stage_root/deps/x07/native_backends.json"
+
+platform_key=""
+case "$platform" in
+  macOS) platform_key="macos" ;;
+  Linux) platform_key="linux" ;;
+  *) echo "ERROR: unsupported platform: $platform" >&2; exit 2 ;;
+esac
+
+native_backend_files="$("$python_bin" - "$native_backends_src" "$platform_key" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+platform_key = sys.argv[2]
+doc = json.load(open(path, "r", encoding="utf-8"))
+files = []
+for backend in doc.get("backends") or []:
+    link = backend.get("link") or {}
+    spec = link.get(platform_key) or {}
+    files.extend(spec.get("files") or [])
+for rel in sorted(set(files)):
+    print(rel)
+PY
+)"
+
+while IFS= read -r rel; do
+  [[ -z "$rel" ]] && continue
+  if [[ "$rel" = /* || "$rel" == *\\* || "$rel" == *..* ]]; then
+    echo "ERROR: invalid native backend relpath in deps/x07/native_backends.json: $rel" >&2
+    exit 2
+  fi
+  src="$root/$rel"
+  if [[ ! -f "$src" ]]; then
+    echo "ERROR: missing native backend file: $src" >&2
+    echo "hint: build and stage native backends (for example: ./scripts/build_ext_regex.sh)" >&2
+    exit 1
+  fi
+  dst="$stage_root/$rel"
+  mkdir -p "$(dirname "$dst")"
+  cp -f "$src" "$dst"
+done <<<"$native_backend_files"
+
 find "$stage_root" -exec touch -t 200001010000.00 {} + 2>/dev/null || true
 
 mkdir -p "$(dirname "$out")"
 tar -czf "$out" -C "$stage_root" .
 echo "ok: wrote $out"
-

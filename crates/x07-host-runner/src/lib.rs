@@ -623,13 +623,47 @@ fn cache_dir() -> Result<PathBuf> {
 }
 
 fn workspace_root() -> Result<PathBuf> {
+    if let Some(override_dir) = std::env::var_os("X07_WORKSPACE_ROOT") {
+        let dir = PathBuf::from(override_dir);
+        return dir
+            .canonicalize()
+            .with_context(|| format!("canonicalize X07_WORKSPACE_ROOT: {}", dir.display()));
+    }
+
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .context("locate workspace root")?
-        .canonicalize()
-        .context("canonicalize workspace root")
+    if crate_dir.is_dir() {
+        if let Some(root) = crate_dir.parent().and_then(|p| p.parent()) {
+            if let Ok(root) = root.canonicalize() {
+                return Ok(root);
+            }
+        }
+    }
+
+    let exe = std::env::current_exe().context("locate current executable")?;
+    let root = find_workspace_root_from(&exe).with_context(|| {
+        format!(
+            "locate workspace root from current executable (expected deps/x07/native_backends.json; exe={})",
+            exe.display()
+        )
+    })?;
+    root.canonicalize()
+        .with_context(|| format!("canonicalize workspace root: {}", root.display()))
+}
+
+fn find_workspace_root_from(start: &Path) -> Option<PathBuf> {
+    let mut cur = if start.is_dir() {
+        Some(start)
+    } else {
+        start.parent()
+    };
+    for _ in 0..8 {
+        let dir = cur?;
+        if dir.join("deps/x07/native_backends.json").is_file() {
+            return Some(dir.to_path_buf());
+        }
+        cur = dir.parent();
+    }
+    None
 }
 
 fn empty_native_requires(options: &compile::CompileOptions) -> x07c::native::NativeRequires {
@@ -1052,6 +1086,41 @@ pub fn compile_c_to_exe_with_config(
         stderr,
         exe_path: ok.then_some(final_exe_path),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_temp_dir(prefix: &str) -> PathBuf {
+        let base = std::env::temp_dir();
+        let pid = std::process::id();
+        for n in 0..10_000u32 {
+            let p = base.join(format!("x07-host-runner-{prefix}-{pid}-{n}"));
+            if std::fs::create_dir(&p).is_ok() {
+                return p;
+            }
+        }
+        panic!("failed to create temp dir under {}", base.display());
+    }
+
+    #[test]
+    fn find_workspace_root_from_walks_up_to_marker() {
+        let root = make_temp_dir("workspace_root");
+        let marker = root.join("deps/x07/native_backends.json");
+        std::fs::create_dir_all(marker.parent().unwrap()).unwrap();
+        std::fs::write(&marker, b"{}").unwrap();
+
+        let bin_dir = root.join("bin");
+        std::fs::create_dir_all(&bin_dir).unwrap();
+        let exe = bin_dir.join("x07");
+        std::fs::write(&exe, b"").unwrap();
+
+        let found = find_workspace_root_from(&exe).unwrap();
+        assert_eq!(found, root);
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 }
 
 fn compile_c_to_exe(
