@@ -61,16 +61,16 @@ Download the latest release for your platform:
 ### Run a Program
 
 ```bash
-x07-host-runner --program hello.x07.json --world solve-pure --input input.bin
+x07 run --program program.x07.json --world solve-pure --input input.bin
 ```
 
 ### Agent Tooling
 
 ```bash
-x07c fmt program.x07.json      # Format
-x07c lint program.x07.json     # Lint
-x07c fix program.x07.json      # Auto-fix issues
-x07c apply-patch program.x07.json patch.json  # Apply RFC 6902 patch
+x07 fmt --input program.x07.json --write
+x07 lint --input program.x07.json --world solve-pure
+x07 fix --input program.x07.json --world solve-pure --write
+x07 ast apply-patch --in program.x07.json --patch patch.json --out program.x07.json --validate
 ```
 
 ---

@@ -38,13 +38,13 @@ To discover available packages and versions, use the index catalog:
 2. Lock and fetch deps:
 
    ```bash
-   x07 pkg lock --index sparse+https://registry.x07.io/index/
+   x07 pkg lock
    ```
 
-3. Run in an OS world (required), typically with automatic FFI wiring:
+3. Run in an OS world (required). By default, `x07 run` enables automatic FFI wiring for OS worlds:
 
    ```bash
-   x07-os-runner --project x07.json --world run-os --input input.bin --auto-ffi
+   x07 run --project x07.json --world run-os --input input.bin
    ```
 
 System prerequisites depend on platform (for example, `libcurl` + `openssl` dev packages on Linux; Homebrew `openssl@3` on macOS).

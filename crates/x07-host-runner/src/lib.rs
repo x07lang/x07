@@ -200,67 +200,16 @@ pub fn compile_options_for_world(
     world: WorldId,
     module_roots: Vec<PathBuf>,
 ) -> Result<compile::CompileOptions> {
-    match world {
-        WorldId::SolvePure => Ok(compile::CompileOptions {
-            world: WorldId::SolvePure,
-            enable_fs: false,
-            enable_rr: false,
-            enable_kv: false,
-            module_roots,
-            emit_main: true,
-            freestanding: false,
-            allow_unsafe: None,
-            allow_ffi: None,
-        }),
-        WorldId::SolveFs => Ok(compile::CompileOptions {
-            world: WorldId::SolveFs,
-            enable_fs: true,
-            enable_rr: false,
-            enable_kv: false,
-            module_roots,
-            emit_main: true,
-            freestanding: false,
-            allow_unsafe: None,
-            allow_ffi: None,
-        }),
-        WorldId::SolveRr => Ok(compile::CompileOptions {
-            world: WorldId::SolveRr,
-            enable_fs: false,
-            enable_rr: true,
-            enable_kv: false,
-            module_roots,
-            emit_main: true,
-            freestanding: false,
-            allow_unsafe: None,
-            allow_ffi: None,
-        }),
-        WorldId::SolveKv => Ok(compile::CompileOptions {
-            world: WorldId::SolveKv,
-            enable_fs: false,
-            enable_rr: false,
-            enable_kv: true,
-            module_roots,
-            emit_main: true,
-            freestanding: false,
-            allow_unsafe: None,
-            allow_ffi: None,
-        }),
-        WorldId::SolveFull => Ok(compile::CompileOptions {
-            world: WorldId::SolveFull,
-            enable_fs: true,
-            enable_rr: true,
-            enable_kv: true,
-            module_roots,
-            emit_main: true,
-            freestanding: false,
-            allow_unsafe: None,
-            allow_ffi: None,
-        }),
-        other => anyhow::bail!(
+    if !world.is_eval_world() {
+        anyhow::bail!(
             "x07-host-runner supports only deterministic solve worlds, got {}",
-            other.as_str()
-        ),
+            world.as_str()
+        );
     }
+    Ok(x07c::world_config::compile_options_for_world(
+        world,
+        module_roots,
+    ))
 }
 
 pub fn compile_and_run(

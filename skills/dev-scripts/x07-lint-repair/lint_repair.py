@@ -5,7 +5,7 @@ Deterministic lint + JSON Patch apply wrapper for X07 x07AST JSON files.
 Design goals:
 - No network.
 - Stable JSON output (single object printed to stdout).
-- Patch application uses the canonical toolchain semantics (`x07c apply-patch`).
+- Patch application uses the canonical toolchain semantics (`x07 ast apply-patch`).
 """
 from __future__ import annotations
 
@@ -24,24 +24,24 @@ X07DIAG_SCHEMA_VERSION = "x07.x07diag@0.1.0"
 def find_repo_root(start: Path) -> Path:
     cur = start.resolve()
     for _ in range(20):
-        if (cur / "Cargo.toml").is_file() and (cur / "scripts" / "ci" / "find_x07c.sh").is_file():
+        if (cur / "Cargo.toml").is_file() and (cur / "scripts" / "ci" / "find_x07.sh").is_file():
             return cur
         if cur.parent == cur:
             break
         cur = cur.parent
-    raise SystemExit("could not find repo root (expected Cargo.toml and scripts/ci/find_x07c.sh)")
+    raise SystemExit("could not find repo root (expected Cargo.toml and scripts/ci/find_x07.sh)")
 
 
-def find_x07c(root: Path) -> str:
+def find_x07(root: Path) -> str:
     proc = subprocess.run(
-        ["bash", "-lc", "./scripts/ci/find_x07c.sh"],
+        ["bash", "-lc", "./scripts/ci/find_x07.sh"],
         cwd=root,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
     if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or "find_x07c.sh failed")
+        raise RuntimeError(proc.stderr.strip() or "find_x07.sh failed")
     return proc.stdout.strip()
 
 
@@ -57,12 +57,12 @@ def x07diag_error(code: str, stage: str, message: str, ptr: Optional[str] = None
     return {"schema_version": X07DIAG_SCHEMA_VERSION, "ok": False, "diagnostics": [diag], "meta": {}}
 
 
-def run_x07c_lint(x07c: str, world: str, path: Path) -> Tuple[int, str, str]:
-    cmd = [x07c, "lint", "--input", str(path), "--world", world, "--report-json"]
+def run_x07_lint(x07: str, world: str, path: Path) -> Tuple[int, str, str]:
+    cmd = [x07, "lint", "--input", str(path), "--world", world, "--report-json"]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError:
-        return 127, "", f"x07c not found: {x07c}"
+        return 127, "", f"x07 not found: {x07}"
     return p.returncode, p.stdout, p.stderr
 
 
@@ -70,9 +70,9 @@ def tool_report_to_x07diag(tool_report: Dict[str, Any]) -> Dict[str, Any]:
     diagnostics = tool_report.get("diagnostics")
     ok = tool_report.get("ok")
     if not isinstance(diagnostics, list) or not isinstance(ok, bool):
-        return x07diag_error("X07LINT_BAD_JSON", "lint", "x07c lint --report-json returned unexpected JSON")
+        return x07diag_error("X07LINT_BAD_JSON", "lint", "x07 lint --report-json returned unexpected JSON")
     meta = {
-        "tool": "x07c",
+        "tool": "x07",
         "tool_schema_version": tool_report.get("schema_version"),
         "tool_command": tool_report.get("command"),
         "tool_in": tool_report.get("in"),
@@ -81,12 +81,12 @@ def tool_report_to_x07diag(tool_report: Dict[str, Any]) -> Dict[str, Any]:
     return {"schema_version": X07DIAG_SCHEMA_VERSION, "ok": ok, "diagnostics": diagnostics, "meta": meta}
 
 
-def apply_patch(x07c: str, program: Path, patch: Path, out_path: Path) -> Tuple[int, str, str]:
-    cmd = [x07c, "apply-patch", "--program", str(program), "--patch", str(patch), "--out", str(out_path)]
+def apply_patch(x07: str, program: Path, patch: Path, out_path: Path) -> Tuple[int, str, str]:
+    cmd = [x07, "ast", "apply-patch", "--in", str(program), "--patch", str(patch), "--out", str(out_path), "--validate"]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError:
-        return 127, "", f"x07c not found: {x07c}"
+        return 127, "", f"x07 not found: {x07}"
     return p.returncode, p.stdout, p.stderr
 
 
@@ -96,11 +96,11 @@ def main() -> int:
     ap.add_argument("--world", default=os.environ.get("X07_WORLD", "solve-pure"))
     ap.add_argument("--apply-patch", help="Path to JSON Patch file (RFC 6902) to apply to the x07AST.")
     ap.add_argument("--in-place", action="store_true", help="Write patched x07AST back to --file.")
-    ap.add_argument("--x07c", help="Path to x07c (default: scripts/ci/find_x07c.sh).")
+    ap.add_argument("--x07", help="Path to x07 (default: scripts/ci/find_x07.sh).")
     args = ap.parse_args()
 
     root = find_repo_root(Path(__file__).resolve())
-    x07c = args.x07c or os.environ.get("X07C") or find_x07c(root)
+    x07 = args.x07 or os.environ.get("X07") or find_x07(root)
 
     file_path = Path(args.file)
     if not file_path.is_absolute():
@@ -144,12 +144,12 @@ def main() -> int:
             out_path = tmp_dir / file_path.name
             lint_target = out_path
 
-        code, _stdout, stderr = apply_patch(x07c, file_path, patch_path, out_path)
+        code, _stdout, stderr = apply_patch(x07, file_path, patch_path, out_path)
         if code != 0:
             out["diagnostics"] = x07diag_error(
                 "X07PATCH_APPLY_FAILED",
                 "rewrite",
-                (stderr.strip() or f"x07c apply-patch failed with exit_code={code}")[:4096],
+                (stderr.strip() or f"x07 ast apply-patch failed with exit_code={code}")[:4096],
             )
             print(json.dumps(out, ensure_ascii=False, sort_keys=True))
             return 1
@@ -158,7 +158,7 @@ def main() -> int:
         if args.in_place:
             out["files_modified"].append(str(file_path))
 
-    exit_code, stdout, stderr = run_x07c_lint(x07c, args.world, lint_target)
+    exit_code, stdout, stderr = run_x07_lint(x07, args.world, lint_target)
     out["lint_exit_code"] = exit_code
 
     if stdout.strip():
@@ -168,15 +168,15 @@ def main() -> int:
             out["diagnostics"] = x07diag_error(
                 "X07LINT_NON_JSON",
                 "lint",
-                "x07c lint did not emit JSON. See stderr for details.",
+                "x07 lint did not emit JSON. See stderr for details.",
             )
         else:
             if isinstance(tool_report, dict):
                 out["diagnostics"] = tool_report_to_x07diag(tool_report)
             else:
-                out["diagnostics"] = x07diag_error("X07LINT_BAD_JSON", "lint", "x07c lint --report-json returned non-object JSON")
+                out["diagnostics"] = x07diag_error("X07LINT_BAD_JSON", "lint", "x07 lint --report-json returned non-object JSON")
     else:
-        msg = stderr.strip() or f"x07c lint emitted empty stdout; exit_code={exit_code}"
+        msg = stderr.strip() or f"x07 lint emitted empty stdout; exit_code={exit_code}"
         out["diagnostics"] = x07diag_error("X07LINT_EMPTY_STDOUT", "lint", msg)
 
     out["ok"] = bool(out.get("diagnostics", {}).get("ok") is True) and exit_code == 0

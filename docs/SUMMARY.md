@@ -3,6 +3,7 @@
 - [Home](index.md)
 
 ## Getting started
+- [Agent quickstart](getting-started/agent-quickstart.md)
 - [Install](getting-started/install.md)
 - [First project](getting-started/first-project.md)
 - [Agent workflow](getting-started/agent-workflow.md)

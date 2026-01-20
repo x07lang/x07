@@ -16,6 +16,9 @@ step() {
 step "check tools"
 ./scripts/ci/check_tools.sh
 
+step "agent surface sanity"
+./scripts/ci/check_agent_surface_sanity.sh
+
 python_bin="${X07_PYTHON:-}"
 if [[ -z "${python_bin}" ]]; then
   if [[ -x ".venv/bin/python" ]]; then

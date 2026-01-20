@@ -1,0 +1,10 @@
+{
+  "format": "x07.rr.fixture_index@0.1.0",
+  "default_latency_ticks": 0,
+  "requests": {
+    "C": {
+      "latency_ticks": 0,
+      "body_file": "bodies/PING.bin"
+    }
+  }
+}

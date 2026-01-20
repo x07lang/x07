@@ -16,7 +16,7 @@ X07 welcomes contributions, especially in:
 ## How to contribute
 
 1. Fork the repo
-2. Run `x07 fmt --check`, `x07 lint`, and `x07 test`
+2. Run `./scripts/ci/check_all.sh`
 3. Submit a PR with:
    - clear intent
    - deterministic tests

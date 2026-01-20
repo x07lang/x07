@@ -15,6 +15,7 @@ use x07_host_runner::{
 };
 use x07_worlds::WorldId;
 
+#[cfg(test)]
 use x07c::compile;
 use x07c::project;
 
@@ -40,8 +41,8 @@ struct Cli {
     #[arg(long)]
     project: Option<PathBuf>,
 
-    #[arg(long, default_value = "run-os")]
-    world: String,
+    #[arg(long, value_enum, default_value_t = WorldId::RunOs)]
+    world: WorldId,
 
     #[arg(long)]
     policy: Option<PathBuf>,
@@ -97,8 +98,7 @@ fn try_main() -> Result<std::process::ExitCode> {
 
     apply_cc_profile(cli.cc_profile);
 
-    let world =
-        WorldId::parse(&cli.world).with_context(|| format!("invalid --world {:?}", cli.world))?;
+    let world = cli.world;
     if world.is_eval_world() {
         anyhow::bail!(
             "refusing to run eval world {:?} in x07-os-runner",
@@ -211,17 +211,10 @@ fn try_main() -> Result<std::process::ExitCode> {
             } else {
                 Vec::new()
             };
-            let compile_options = compile::CompileOptions {
-                world,
-                enable_fs: true,
-                enable_rr: false,
-                enable_kv: false,
-                module_roots,
-                emit_main: true,
-                freestanding: false,
-                allow_unsafe,
-                allow_ffi,
-            };
+            let mut compile_options =
+                x07c::world_config::compile_options_for_world(world, module_roots);
+            compile_options.allow_unsafe = allow_unsafe;
+            compile_options.allow_ffi = allow_ffi;
 
             let cfg = compile_runner_config(&cli, max_output_bytes);
             let compile = compile_program_with_options(
@@ -315,17 +308,10 @@ fn try_main() -> Result<std::process::ExitCode> {
                 dedup_cc_args(&mut extra_cc_args);
             }
 
-            let compile_options = compile::CompileOptions {
-                world,
-                enable_fs: true,
-                enable_rr: false,
-                enable_kv: false,
-                module_roots,
-                emit_main: true,
-                freestanding: false,
-                allow_unsafe,
-                allow_ffi,
-            };
+            let mut compile_options =
+                x07c::world_config::compile_options_for_world(world, module_roots);
+            compile_options.allow_unsafe = allow_unsafe;
+            compile_options.allow_ffi = allow_ffi;
 
             let cfg = compile_runner_config(&cli, max_output_bytes);
             let compile = compile_program_with_options(
@@ -454,8 +440,13 @@ fn compile_runner_config(cli: &Cli, max_output_bytes: usize) -> RunnerConfig {
 }
 
 fn collect_module_roots_for_os(cli: &Cli) -> Result<Vec<PathBuf>> {
-    let mut roots = default_os_module_roots()?;
-    roots.extend(cli.module_root.clone());
+    let mut roots = cli.module_root.clone();
+    let os_roots = default_os_module_roots()?;
+    for r in os_roots {
+        if !roots.contains(&r) {
+            roots.push(r);
+        }
+    }
     Ok(roots)
 }
 
@@ -697,7 +688,12 @@ fn default_os_module_roots() -> Result<Vec<PathBuf>> {
 
 fn load_policy(world: WorldId, policy_path: Option<&PathBuf>) -> Result<Option<policy::Policy>> {
     match world {
-        WorldId::RunOs => Ok(None),
+        WorldId::RunOs => {
+            if policy_path.is_some() {
+                anyhow::bail!("--policy is only valid for --world run-os-sandboxed");
+            }
+            Ok(None)
+        }
         WorldId::RunOsSandboxed => {
             let policy_path = policy_path.context("run-os-sandboxed requires --policy")?;
             let txt = std::fs::read_to_string(policy_path)

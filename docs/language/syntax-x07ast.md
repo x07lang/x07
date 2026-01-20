@@ -35,13 +35,15 @@ The entrypoint expression returns **bytes**.
 
 - `x07 ast init` / `x07 ast validate`:
   - generates and validates `*.x07.json` skeletons
-- `x07c fmt`:
+- `x07 fmt`:
   - canonicalizes JSON (JCS) and ensures stable emission
-- `x07c lint`:
+- `x07 lint`:
   - checks schema + semantic constraints
   - prints `x07diag` (machine-readable diagnostics)
-- `x07c fix`:
+- `x07 fix`:
   - applies quickfixes (JSON Patch) and rewrites `*.x07.json` deterministically
+- `x07 ast apply-patch`:
+  - applies RFC 6902 JSON Patch deterministically (agent-safe edits)
 
 ## Common mistakes (and the canonical fixes)
 

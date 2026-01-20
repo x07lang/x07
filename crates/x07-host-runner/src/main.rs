@@ -29,8 +29,8 @@ struct Cli {
     #[arg(long)]
     project: Option<PathBuf>,
 
-    #[arg(long, default_value = "solve-pure")]
-    world: String,
+    #[arg(long, value_enum, default_value_t = WorldId::SolvePure)]
+    world: WorldId,
 
     #[arg(long)]
     module_root: Vec<PathBuf>,
@@ -158,8 +158,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             if cli.compile_only {
                 anyhow::bail!("--compile-only is only valid with --program or --project");
             }
-            let world = WorldId::parse(&cli.world)
-                .with_context(|| format!("invalid --world '{}'", cli.world))?;
+            let world = cli.world;
             if !world.is_eval_world() {
                 anyhow::bail!(
                     "x07-host-runner supports only deterministic solve worlds, got {}",
@@ -250,8 +249,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         }
 
         (None, Some(program_path), None) => {
-            let world = WorldId::parse(&cli.world)
-                .with_context(|| format!("invalid --world '{}'", cli.world))?;
+            let world = cli.world;
             if !world.is_eval_world() {
                 anyhow::bail!(
                     "x07-host-runner supports only deterministic solve worlds, got {}",
@@ -428,10 +426,10 @@ fn try_main() -> Result<std::process::ExitCode> {
                 anyhow::bail!("--module-root is only valid with --program");
             }
             let manifest = project::load_project_manifest(project_path)?;
-            if cli.world != manifest.world {
+            if cli.world.as_str() != manifest.world {
                 anyhow::bail!(
-                    "--world {:?} does not match project world {:?}",
-                    cli.world,
+                    "--world {} does not match project world {:?}",
+                    cli.world.as_str(),
                     manifest.world
                 );
             }

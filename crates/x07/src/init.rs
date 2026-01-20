@@ -8,6 +8,11 @@ use x07_contracts::{
     PROJECT_MANIFEST_SCHEMA_VERSION, X07AST_SCHEMA_VERSION,
 };
 
+#[derive(Debug, Clone, Copy)]
+pub struct InitOptions {
+    pub package: bool,
+}
+
 #[derive(Debug, Serialize)]
 struct InitError {
     code: String,
@@ -24,7 +29,7 @@ struct InitReport {
     error: Option<InitError>,
 }
 
-pub fn cmd_init() -> Result<std::process::ExitCode> {
+pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
     let root = match std::env::current_dir() {
         Ok(p) => p,
         Err(err) => {
@@ -43,13 +48,6 @@ pub fn cmd_init() -> Result<std::process::ExitCode> {
         }
     };
 
-    let pkg_name = sanitize_pkg_name(
-        root.file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .as_ref(),
-    );
-
     let paths = InitPaths {
         project: root.join("x07.json"),
         package: root.join("x07-package.json"),
@@ -61,13 +59,12 @@ pub fn cmd_init() -> Result<std::process::ExitCode> {
     };
 
     let mut conflicts = Vec::new();
-    for p in [
-        &paths.project,
-        &paths.package,
-        &paths.lock,
-        &paths.app,
-        &paths.main,
-    ] {
+    let mut required_paths: Vec<&PathBuf> =
+        vec![&paths.project, &paths.lock, &paths.app, &paths.main];
+    if options.package {
+        required_paths.push(&paths.package);
+    }
+    for p in required_paths {
         if p.exists() {
             conflicts.push(rel(&root, p));
         }
@@ -130,10 +127,18 @@ pub fn cmd_init() -> Result<std::process::ExitCode> {
     }
     created.push(rel(&root, &paths.project));
 
-    if let Err(err) = write_new_file(&paths.package, &package_json_bytes(&pkg_name)?) {
-        return print_io_error(&root, &created, "x07-package.json", err);
+    if options.package {
+        let pkg_name = sanitize_pkg_name(
+            root.file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .as_ref(),
+        );
+        if let Err(err) = write_new_file(&paths.package, &package_json_bytes(&pkg_name)?) {
+            return print_io_error(&root, &created, "x07-package.json", err);
+        }
+        created.push(rel(&root, &paths.package));
     }
-    created.push(rel(&root, &paths.package));
 
     if let Err(err) = write_new_file(&paths.lock, &lock_json_bytes()?) {
         return print_io_error(&root, &created, "x07.lock.json", err);

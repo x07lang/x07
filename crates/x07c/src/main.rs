@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use serde::Serialize;
 
 use x07_contracts::X07C_REPORT_SCHEMA_VERSION;
+use x07_worlds::WorldId;
 use x07c::compile;
 use x07c::diagnostics;
 use x07c::json_patch;
@@ -42,28 +43,20 @@ enum Cmd {
     Lint {
         #[arg(long)]
         input: PathBuf,
-        #[arg(long, default_value = "solve-pure")]
-        world: String,
+        #[arg(long, value_enum, default_value_t = WorldId::SolvePure)]
+        world: WorldId,
         #[arg(long)]
         report_json: bool,
     },
     Fix {
         #[arg(long)]
         input: PathBuf,
-        #[arg(long, default_value = "solve-pure")]
-        world: String,
+        #[arg(long, value_enum, default_value_t = WorldId::SolvePure)]
+        world: WorldId,
         #[arg(long)]
         write: bool,
         #[arg(long)]
         report_json: bool,
-    },
-    ApplyPatch {
-        #[arg(long)]
-        program: PathBuf,
-        #[arg(long)]
-        patch: PathBuf,
-        #[arg(long)]
-        out: Option<PathBuf>,
     },
     Lock {
         #[arg(long)]
@@ -84,8 +77,8 @@ enum Cmd {
     Compile {
         #[arg(long)]
         program: PathBuf,
-        #[arg(long, default_value = "solve-pure")]
-        world: String,
+        #[arg(long, value_enum, default_value_t = WorldId::SolvePure)]
+        world: WorldId,
         #[arg(long)]
         module_root: Vec<PathBuf>,
         #[arg(long)]
@@ -132,7 +125,6 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Cmd::Fmt { .. }) => vec!["fmt"],
             Some(Cmd::Lint { .. }) => vec!["lint"],
             Some(Cmd::Fix { .. }) => vec!["fix"],
-            Some(Cmd::ApplyPatch { .. }) => vec!["apply-patch"],
             Some(Cmd::Lock { .. }) => vec!["lock"],
             Some(Cmd::Build { .. }) => vec!["build"],
             Some(Cmd::Compile { .. }) => vec!["compile"],
@@ -350,29 +342,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             };
 
             x07ast::canonicalize_x07ast_file(&mut file);
-            let lint_options = match lint_options_for_world(&world) {
-                Ok(options) => options,
-                Err(err) => {
-                    if report_json {
-                        let report = X07cToolReport {
-                            schema_version: X07C_REPORT_SCHEMA_VERSION,
-                            command: "lint",
-                            ok: false,
-                            r#in: input.display().to_string(),
-                            diagnostics_count: 1,
-                            diagnostics: vec![diagnostic_error(
-                                "X07-WORLD-0001",
-                                diagnostics::Stage::Parse,
-                                &err.to_string(),
-                            )],
-                            exit_code: 2,
-                        };
-                        print_json(&report)?;
-                        return Ok(std::process::ExitCode::from(2));
-                    }
-                    return Err(err);
-                }
-            };
+            let lint_options = x07c::world_config::lint_options_for_world(world);
             let report = lint::lint_file(&file, lint_options);
 
             if report_json {
@@ -469,29 +439,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 }
             };
 
-            let lint_options = match lint_options_for_world(&world) {
-                Ok(options) => options,
-                Err(err) => {
-                    if report_json {
-                        let report = X07cToolReport {
-                            schema_version: X07C_REPORT_SCHEMA_VERSION,
-                            command: "fix",
-                            ok: false,
-                            r#in: input.display().to_string(),
-                            diagnostics_count: 1,
-                            diagnostics: vec![diagnostic_error(
-                                "X07-WORLD-0001",
-                                diagnostics::Stage::Parse,
-                                &err.to_string(),
-                            )],
-                            exit_code: 2,
-                        };
-                        print_json(&report)?;
-                        return Ok(std::process::ExitCode::from(2));
-                    }
-                    return Err(err);
-                }
-            };
+            let lint_options = x07c::world_config::lint_options_for_world(world);
 
             let (final_report, formatted) = match (|| -> Result<(diagnostics::Report, String)> {
                 for _pass in 0..5 {
@@ -591,41 +539,6 @@ fn try_main() -> Result<std::process::ExitCode> {
 
             Ok(std::process::ExitCode::SUCCESS)
         }
-        Cmd::ApplyPatch {
-            program,
-            patch,
-            out,
-        } => {
-            let mut doc: serde_json::Value = serde_json::from_slice(&std::fs::read(&program)?)
-                .with_context(|| format!("parse program JSON: {}", program.display()))?;
-            let patch_bytes = std::fs::read(&patch)
-                .with_context(|| format!("read patch: {}", patch.display()))?;
-            let ops: Vec<diagnostics::PatchOp> = serde_json::from_slice(&patch_bytes)
-                .with_context(|| format!("parse patch JSON: {}", patch.display()))?;
-            json_patch::apply_patch(&mut doc, &ops)
-                .map_err(|e| anyhow::anyhow!("apply patch failed: {e}"))?;
-
-            let doc_bytes = serde_json::to_vec(&doc)?;
-            let mut file =
-                x07ast::parse_x07ast_json(&doc_bytes).map_err(|e| anyhow::anyhow!("{e}"))?;
-            x07ast::canonicalize_x07ast_file(&mut file);
-            let mut v = x07ast::x07ast_file_to_value(&file);
-            x07ast::canon_value_jcs(&mut v);
-            let formatted = serde_json::to_string(&v)? + "\n";
-
-            match out {
-                Some(path) => {
-                    if let Some(parent) = path.parent() {
-                        std::fs::create_dir_all(parent)
-                            .with_context(|| format!("create output dir: {}", parent.display()))?;
-                    }
-                    std::fs::write(&path, formatted.as_bytes())
-                        .with_context(|| format!("write: {}", path.display()))?;
-                }
-                None => print!("{formatted}"),
-            }
-            Ok(std::process::ExitCode::SUCCESS)
-        }
         Cmd::Lock {
             project: project_path,
             out,
@@ -715,8 +628,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         } => {
             let program_bytes = std::fs::read(&program)
                 .with_context(|| format!("read program: {}", program.display()))?;
-            let world_id = x07c::world_config::parse_world_id(&world)?;
-            let mut options = x07c::world_config::compile_options_for_world(world_id, module_root);
+            let mut options = x07c::world_config::compile_options_for_world(world, module_root);
             if freestanding {
                 options.emit_main = false;
                 options.freestanding = true;
@@ -753,11 +665,6 @@ fn try_main() -> Result<std::process::ExitCode> {
             Ok(std::process::ExitCode::SUCCESS)
         }
     }
-}
-
-fn lint_options_for_world(world: &str) -> Result<lint::LintOptions> {
-    let world_id = x07c::world_config::parse_world_id(world)?;
-    Ok(x07c::world_config::lint_options_for_world(world_id))
 }
 
 fn print_json<T: Serialize>(value: &T) -> Result<()> {

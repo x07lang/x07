@@ -25,6 +25,8 @@ X07C_BIN="$(./scripts/ci/find_x07c.sh)"
 "$python_bin" scripts/check_x07_parens.py >/dev/null
 ./scripts/ci/check_language_guide_sync.sh >/dev/null
 ./scripts/ci/check_llm_contracts.sh >/dev/null
+./scripts/ci/check_repair_loop.sh >/dev/null
+./scripts/ci/check_readme_commands.sh >/dev/null
 ./scripts/ci/check_x07test_smoke.sh >/dev/null
 "$python_bin" scripts/generate_stdlib_lock.py --check >/dev/null
 "$python_bin" scripts/generate_stdlib_lock.py --stdlib-root stdlib/os --out stdlib.os.lock --check >/dev/null

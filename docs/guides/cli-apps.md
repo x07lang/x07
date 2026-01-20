@@ -18,6 +18,7 @@ Add packages (X07 does not resolve transitive deps yet):
 x07 pkg add ext-cli@<version>
 x07 pkg add ext-json-rs@<version>
 x07 pkg add ext-data-model@<version>
+x07 pkg lock
 ```
 
 `argv_v1` encoding:
@@ -27,7 +28,7 @@ x07 pkg add ext-data-model@<version>
   - `u32_le(len)`
   - `len` raw bytes
 
-When running under `x07-host-runner` / `x07-os-runner`, you still pass `argv_v1` bytes via `--input`.
+When running under `x07 run` (or the underlying runners), you still pass `argv_v1` bytes via `--input`.
 
 ## Recommended layout
 

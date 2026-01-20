@@ -14,7 +14,8 @@ x07 ast init --world solve-pure --module main --kind entry --out main.x07.json
 
 This writes a valid `main.x07.json` and prints a small JSON report (including `schema_version` and a sha256 of the file).
 
-If you want a full project skeleton (with `x07.json` / `x07-package.json` / `x07.lock.json`), run `x07 --init` instead (see [Packages](../packages/index.md)).
+If you want a full project skeleton (with `x07.json` / `x07.lock.json`), run `x07 --init` instead (see [Packages](../packages/index.md)).
+Use `x07 --init --package` only when you are creating a publishable package (needs `x07-package.json`).
 
 ## Make it return bytes
 
@@ -35,15 +36,15 @@ x07 ast apply-patch --in main.x07.json --patch patch.json --out main.x07.json --
 ## Lint
 
 ```bash
-x07c lint --input main.x07.json --world solve-pure
+x07 lint --input main.x07.json --world solve-pure
 ```
 
-`x07c lint` prints an `x07diag` JSON report to stdout.
+`x07 lint` prints an `x07diag` JSON report to stdout.
 
 ## Run (deterministic)
 
 ```bash
-x07-host-runner --program main.x07.json --world solve-pure
+x07 run --program main.x07.json --world solve-pure
 ```
 
 The runner prints a JSON report; the program’s bytes output is in `solve_output_b64`.

@@ -8,6 +8,7 @@ use jsonschema::Draft;
 use serde::Serialize;
 use serde_json::Value;
 use x07_contracts::X07AST_SCHEMA_VERSION;
+use x07_worlds::WorldId;
 use x07c::diagnostics;
 use x07c::json_patch;
 
@@ -38,7 +39,7 @@ pub enum AstCommand {
 #[derive(Debug, Clone, Args)]
 pub struct AstInitArgs {
     #[arg(long, value_enum)]
-    pub world: AstWorld,
+    pub world: WorldId,
 
     #[arg(long)]
     pub module: String,
@@ -48,32 +49,6 @@ pub struct AstInitArgs {
 
     #[arg(long, value_name = "PATH")]
     pub out: PathBuf,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-#[clap(rename_all = "kebab_case")]
-pub enum AstWorld {
-    SolvePure,
-    SolveFs,
-    SolveRr,
-    SolveKv,
-    SolveFull,
-    RunOs,
-    RunOsSandboxed,
-}
-
-impl AstWorld {
-    fn as_str(self) -> &'static str {
-        match self {
-            AstWorld::SolvePure => "solve-pure",
-            AstWorld::SolveFs => "solve-fs",
-            AstWorld::SolveRr => "solve-rr",
-            AstWorld::SolveKv => "solve-kv",
-            AstWorld::SolveFull => "solve-full",
-            AstWorld::RunOs => "run-os",
-            AstWorld::RunOsSandboxed => "run-os-sandboxed",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

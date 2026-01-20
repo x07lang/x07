@@ -1,6 +1,10 @@
 [package]
 name = "x07-worlds"
-version = "0.0.10"
+version = "0.0.11"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4", features = ["derive"], optional = true }
+
+[features]
+clap = ["dep:clap"]

@@ -19,6 +19,27 @@
       "entry": "smoke_fs.fs_read_hello",
       "fixture_root": "fixtures/fs_smoke/root",
       "expect": "pass"
+    },
+    {
+      "id": "smoke/rr_fetch_pong",
+      "world": "solve-rr",
+      "entry": "smoke_rr.rr_fetch_pong",
+      "fixture_root": "fixtures/rr_smoke",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/kv_get_pong",
+      "world": "solve-kv",
+      "entry": "smoke_kv.kv_get_pong",
+      "fixture_root": "fixtures/kv_smoke",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/full_fs_rr_kv",
+      "world": "solve-full",
+      "entry": "smoke_full.full_fs_rr_kv_smoke",
+      "fixture_root": "fixtures/full_smoke",
+      "expect": "pass"
     }
   ]
 }

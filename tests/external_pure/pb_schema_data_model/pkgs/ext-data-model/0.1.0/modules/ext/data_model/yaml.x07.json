@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["ext.data_model.yaml.emit_canon"]},{"body":["ext.data_model.json.emit_canon","doc"],"kind":"defn","name":"ext.data_model.yaml.emit_canon","params":[{"name":"doc","ty":"bytes_view"}],"result":"bytes"}],"imports":["ext.data_model.json"],"kind":"module","module_id":"ext.data_model.yaml","schema_version":"x07.x07ast@0.1.0"}

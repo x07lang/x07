@@ -1,6 +1,6 @@
 [package]
 name = "x07-host-runner"
-version = "0.0.10"
+version = "0.0.11"
 edition = "2021"
 
 [dependencies]
@@ -14,4 +14,4 @@ sha2 = "0.10"
 
 x07-contracts = { path = "../x07-contracts" }
 x07c = { path = "../x07c" }
-x07-worlds = { path = "../x07-worlds" }
+x07-worlds = { path = "../x07-worlds", features = ["clap"] }

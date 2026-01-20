@@ -2,10 +2,10 @@
 
 X07 ships as a small toolchain with stable, JSON-first contracts:
 
-- `x07` — test harness + helpers (`test`, `ast`, `pkg`)
-- `x07c` — compiler + agent tooling (`fmt`, `lint`, `fix`, `apply-patch`, `lock`, `build`, `compile`)
-- `x07-host-runner` — deterministic native runner (solve-* worlds)
-- `x07-os-runner` — standalone runner (run-os* worlds)
+- `x07` — canonical CLI (init, ast, fmt/lint/fix, run, test, pkg, build)
+- `x07c` — compiler backend (advanced)
+- `x07-host-runner` — deterministic runner backend (solve-* worlds; advanced)
+- `x07-os-runner` — OS runner backend (run-os* worlds; advanced)
 
 ## Supported platforms
 
@@ -28,14 +28,15 @@ If the archive does not contain a `bin/` directory, the binaries are at the arch
 Verify:
 
 - `x07 --help`
-- `x07c --help`
-- `x07-host-runner --help`
+- `x07 run --help`
+- `x07 ast apply-patch --help`
+- optional (advanced): `x07c --help`, `x07-host-runner --help`, `x07-os-runner --help`
 
 ## Option B: build from source (Rust toolchain)
 
 If you have `cargo` installed:
 
-- `cargo build -p x07 -p x07c -p x07-host-runner --release`
+- `cargo build -p x07 -p x07c -p x07-host-runner -p x07-os-runner --release`
 - the resulting binaries will be in `target/release/`
 
 Then verify with the same commands above.
@@ -60,7 +61,10 @@ Install:
 
 ### “I can run `x07` but `x07 run` fails”
 
-Use `x07-host-runner --help` and ensure a working `cc` is available (override via `X07_CC`).
+`x07 run` dispatches to `x07-host-runner` / `x07-os-runner`.
+
+- ensure the runner binaries are on your `PATH` (or installed next to `x07`)
+- ensure a working C compiler is available (override via `X07_CC`)
 
 ### “could not locate stdlib/os module root”
 

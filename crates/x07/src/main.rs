@@ -6,16 +6,18 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use base64::Engine;
-use clap::{Args, Parser, ValueEnum};
+use clap::{Args, Parser};
 use sha2::{Digest, Sha256};
 use x07_contracts::{X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION};
 use x07_host_runner::{run_artifact_file, RunnerConfig, RunnerResult};
-use x07c::compile;
+use x07_worlds::WorldId;
 
 mod ast;
 mod cli;
 mod init;
 mod pkg;
+mod run;
+mod toolchain;
 mod util;
 
 #[derive(Parser, Debug)]
@@ -29,6 +31,10 @@ struct Cli {
     #[arg(long, global = true)]
     init: bool,
 
+    /// When used with `--init`, also create `x07-package.json` for publishable packages.
+    #[arg(long = "package", requires = "init")]
+    init_package: bool,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -37,62 +43,22 @@ struct Cli {
 enum Command {
     /// Run deterministic test suites.
     Test(TestArgs),
+    /// Run X07 programs via the appropriate runner.
+    Run(Box<run::RunArgs>),
     /// Initialize, validate, and patch x07AST JSON files.
     Ast(ast::AstArgs),
+    /// Format x07AST JSON files.
+    Fmt(toolchain::FmtArgs),
+    /// Lint x07AST JSON files.
+    Lint(toolchain::LintArgs),
+    /// Apply deterministic quickfixes to an x07AST JSON file.
+    Fix(toolchain::FixArgs),
+    /// Build a project to C.
+    Build(toolchain::BuildArgs),
     /// Work with CLI specrows schemas and tooling.
     Cli(cli::CliArgs),
     /// Manage packages and lockfiles.
     Pkg(pkg::PkgArgs),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-#[clap(rename_all = "kebab_case")]
-enum World {
-    SolvePure,
-    SolveFs,
-}
-
-impl World {
-    fn as_str(self) -> &'static str {
-        match self {
-            World::SolvePure => "solve-pure",
-            World::SolveFs => "solve-fs",
-        }
-    }
-
-    fn to_world_id(self) -> x07_worlds::WorldId {
-        match self {
-            World::SolvePure => x07_worlds::WorldId::SolvePure,
-            World::SolveFs => x07_worlds::WorldId::SolveFs,
-        }
-    }
-
-    fn to_compile_options(self, module_roots: Vec<PathBuf>) -> compile::CompileOptions {
-        match self {
-            World::SolvePure => compile::CompileOptions {
-                world: x07_worlds::WorldId::SolvePure,
-                enable_fs: false,
-                enable_rr: false,
-                enable_kv: false,
-                module_roots,
-                emit_main: true,
-                freestanding: false,
-                allow_unsafe: None,
-                allow_ffi: None,
-            },
-            World::SolveFs => compile::CompileOptions {
-                world: x07_worlds::WorldId::SolveFs,
-                enable_fs: true,
-                enable_rr: false,
-                enable_kv: false,
-                module_roots,
-                emit_main: true,
-                freestanding: false,
-                allow_unsafe: None,
-                allow_ffi: None,
-            },
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -121,7 +87,7 @@ enum TestReturns {
 #[derive(Debug, Clone)]
 struct TestDecl {
     id: String,
-    world: World,
+    world: WorldId,
     entry: String,
     expect: Expect,
     returns: TestReturns,
@@ -143,7 +109,7 @@ struct TestArgs {
     stdlib_lock: PathBuf,
 
     #[arg(long, value_enum)]
-    world: Option<World>,
+    world: Option<WorldId>,
 
     #[arg(long, value_name = "SUBSTR")]
     filter: Option<String>,
@@ -207,6 +173,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         let path: Vec<&str> = match &cli.command {
             None => Vec::new(),
             Some(Command::Test(_)) => vec!["test"],
+            Some(Command::Run(_)) => vec!["run"],
             Some(Command::Ast(args)) => match &args.cmd {
                 None => vec!["ast"],
                 Some(ast::AstCommand::Init(_)) => vec!["ast", "init"],
@@ -214,6 +181,10 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(ast::AstCommand::Validate(_)) => vec!["ast", "validate"],
                 Some(ast::AstCommand::Canon(_)) => vec!["ast", "canon"],
             },
+            Some(Command::Fmt(_)) => vec!["fmt"],
+            Some(Command::Lint(_)) => vec!["lint"],
+            Some(Command::Fix(_)) => vec!["fix"],
+            Some(Command::Build(_)) => vec!["build"],
             Some(Command::Cli(args)) => match &args.cmd {
                 None => vec!["cli"],
                 Some(cli::CliCommand::Spec(args)) => match &args.cmd {
@@ -243,7 +214,13 @@ fn try_main() -> Result<std::process::ExitCode> {
         if cli.command.is_some() {
             anyhow::bail!("--init cannot be combined with subcommands");
         }
-        return init::cmd_init();
+        return init::cmd_init(init::InitOptions {
+            package: cli.init_package,
+        });
+    }
+
+    if cli.init_package {
+        anyhow::bail!("--package requires --init");
     }
 
     let Some(command) = cli.command else {
@@ -252,7 +229,12 @@ fn try_main() -> Result<std::process::ExitCode> {
 
     match command {
         Command::Test(args) => cmd_test(args),
+        Command::Run(args) => run::cmd_run(*args),
         Command::Ast(args) => ast::cmd_ast(args),
+        Command::Fmt(args) => toolchain::cmd_fmt(args),
+        Command::Lint(args) => toolchain::cmd_lint(args),
+        Command::Fix(args) => toolchain::cmd_fix(args),
+        Command::Build(args) => toolchain::cmd_build(args),
         Command::Cli(args) => cli::cmd_cli(args),
         Command::Pkg(args) => pkg::cmd_pkg(args),
     }
@@ -277,6 +259,12 @@ fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
 
     let mut tests = validated.tests;
     if let Some(world) = args.world {
+        if !world.is_eval_world() {
+            anyhow::bail!(
+                "x07 test supports only deterministic solve worlds, got {}",
+                world.as_str()
+            );
+        }
         tests.retain(|t| t.world == world);
     }
     if let Some(filter) = &args.filter {
@@ -464,9 +452,8 @@ fn run_one_test(args: &TestArgs, module_root: &Path, test: &TestDecl) -> Result<
         (None, None, None)
     };
 
-    let compile_options = test
-        .world
-        .to_compile_options(vec![module_root.to_path_buf()]);
+    let compile_options =
+        x07c::world_config::compile_options_for_world(test.world, vec![module_root.to_path_buf()]);
 
     let runner_config = runner_config_for_test(test)?;
 
@@ -586,9 +573,9 @@ fn runner_config_for_test(test: &TestDecl) -> Result<RunnerConfig> {
         None => 5,
     };
 
-    Ok(RunnerConfig {
-        world: test.world.to_world_id(),
-        fixture_fs_dir: test.fixture_root.clone(),
+    let mut cfg = RunnerConfig {
+        world: test.world,
+        fixture_fs_dir: None,
         fixture_fs_root: None,
         fixture_fs_latency_index: None,
         fixture_rr_dir: None,
@@ -600,7 +587,76 @@ fn runner_config_for_test(test: &TestDecl) -> Result<RunnerConfig> {
         max_output_bytes: 1024 * 1024,
         cpu_time_limit_seconds,
         debug_borrow_checks: false,
-    })
+    };
+
+    match test.world {
+        WorldId::SolvePure => {}
+        WorldId::SolveFs => {
+            let fixture = test
+                .fixture_root
+                .as_deref()
+                .context("solve-fs requires fixture_root")?;
+            cfg.fixture_fs_dir = Some(fixture.to_path_buf());
+            if fixture.join("root").is_dir() {
+                cfg.fixture_fs_root = Some(PathBuf::from("root"));
+            }
+            if fixture.join("latency.json").is_file() {
+                cfg.fixture_fs_latency_index = Some(PathBuf::from("latency.json"));
+            }
+        }
+        WorldId::SolveRr => {
+            let fixture = test
+                .fixture_root
+                .as_deref()
+                .context("solve-rr requires fixture_root")?;
+            cfg.fixture_rr_dir = Some(fixture.to_path_buf());
+            if fixture.join("index.json").is_file() {
+                cfg.fixture_rr_index = Some(PathBuf::from("index.json"));
+            }
+        }
+        WorldId::SolveKv => {
+            let fixture = test
+                .fixture_root
+                .as_deref()
+                .context("solve-kv requires fixture_root")?;
+            cfg.fixture_kv_dir = Some(fixture.to_path_buf());
+            if fixture.join("seed.json").is_file() {
+                cfg.fixture_kv_seed = Some(PathBuf::from("seed.json"));
+            }
+        }
+        WorldId::SolveFull => {
+            let fixture = test
+                .fixture_root
+                .as_deref()
+                .context("solve-full requires fixture_root")?;
+            let fs_fixture = fixture.join("fs");
+            let rr_fixture = fixture.join("rr");
+            let kv_fixture = fixture.join("kv");
+
+            cfg.fixture_fs_dir = Some(fs_fixture.clone());
+            if fs_fixture.join("root").is_dir() {
+                cfg.fixture_fs_root = Some(PathBuf::from("root"));
+            }
+            if fs_fixture.join("latency.json").is_file() {
+                cfg.fixture_fs_latency_index = Some(PathBuf::from("latency.json"));
+            }
+
+            cfg.fixture_rr_dir = Some(rr_fixture.clone());
+            if rr_fixture.join("index.json").is_file() {
+                cfg.fixture_rr_index = Some(PathBuf::from("index.json"));
+            }
+
+            cfg.fixture_kv_dir = Some(kv_fixture.clone());
+            if kv_fixture.join("seed.json").is_file() {
+                cfg.fixture_kv_seed = Some(PathBuf::from("seed.json"));
+            }
+        }
+        WorldId::RunOs | WorldId::RunOsSandboxed => {
+            anyhow::bail!("internal error: x07 test does not support OS worlds");
+        }
+    }
+
+    Ok(cfg)
 }
 
 fn ms_to_ceiling_seconds(ms: u64) -> Result<u64> {
@@ -794,7 +850,10 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
             None => {
                 diags.push(ManifestDiag {
                     code: "ETEST_WORLD_INVALID",
-                    message: format!("invalid world: {} (allowed: solve-pure, solve-fs)", t.world),
+                    message: format!(
+                        "invalid world: {} (allowed: solve-pure, solve-fs, solve-rr, solve-kv, solve-full)",
+                        t.world
+                    ),
                     path: format!("{base}/world"),
                 });
                 continue;
@@ -854,46 +913,7 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
         }
 
         let fixture_root = match world {
-            World::SolveFs => match t.fixture_root.as_deref() {
-                None => {
-                    diags.push(ManifestDiag {
-                        code: "ETEST_FIXTURE_REQUIRED",
-                        message: "fixture_root is required for solve-fs".to_string(),
-                        path: format!("{base}/fixture_root"),
-                    });
-                    continue;
-                }
-                Some(fr) => {
-                    if fr.contains('\\') {
-                        diags.push(ManifestDiag {
-                            code: "ETEST_FIXTURE_UNSAFE_PATH",
-                            message: format!("fixture_root must not contain '\\\\': {fr}"),
-                            path: format!("{base}/fixture_root"),
-                        });
-                        continue;
-                    }
-                    let rel = Path::new(fr);
-                    if let Err(err) = x07_host_runner::ensure_safe_rel_path(rel) {
-                        diags.push(ManifestDiag {
-                            code: "ETEST_FIXTURE_UNSAFE_PATH",
-                            message: format!("unsafe fixture_root path: {err}"),
-                            path: format!("{base}/fixture_root"),
-                        });
-                        continue;
-                    }
-                    let abs = manifest_dir.join(rel);
-                    if !abs.is_dir() {
-                        diags.push(ManifestDiag {
-                            code: "ETEST_FIXTURE_MISSING",
-                            message: format!("fixture_root must be an existing directory: {fr}"),
-                            path: format!("{base}/fixture_root"),
-                        });
-                        continue;
-                    }
-                    Some(abs)
-                }
-            },
-            World::SolvePure => {
+            WorldId::SolvePure => {
                 if t.fixture_root.is_some() {
                     diags.push(ManifestDiag {
                         code: "ETEST_FIXTURE_FORBIDDEN",
@@ -903,6 +923,94 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
                     continue;
                 }
                 None
+            }
+            WorldId::SolveFs | WorldId::SolveRr | WorldId::SolveKv => {
+                let Some(fr) = t.fixture_root.as_deref() else {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_REQUIRED",
+                        message: format!("fixture_root is required for {}", world.as_str()),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                };
+                if fr.contains('\\') {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_UNSAFE_PATH",
+                        message: format!("fixture_root must not contain '\\\\': {fr}"),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                }
+                let rel = Path::new(fr);
+                if let Err(err) = x07_host_runner::ensure_safe_rel_path(rel) {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_UNSAFE_PATH",
+                        message: format!("unsafe fixture_root path: {err}"),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                }
+                let abs = manifest_dir.join(rel);
+                if !abs.is_dir() {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_MISSING",
+                        message: format!("fixture_root must be an existing directory: {fr}"),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                }
+                Some(abs)
+            }
+            WorldId::SolveFull => {
+                let Some(fr) = t.fixture_root.as_deref() else {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_REQUIRED",
+                        message: "fixture_root is required for solve-full".to_string(),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                };
+                if fr.contains('\\') {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_UNSAFE_PATH",
+                        message: format!("fixture_root must not contain '\\\\': {fr}"),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                }
+                let rel = Path::new(fr);
+                if let Err(err) = x07_host_runner::ensure_safe_rel_path(rel) {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_UNSAFE_PATH",
+                        message: format!("unsafe fixture_root path: {err}"),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                }
+                let abs = manifest_dir.join(rel);
+                if !abs.is_dir() {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_MISSING",
+                        message: format!("fixture_root must be an existing directory: {fr}"),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                }
+                let missing_sub = ["fs", "rr", "kv"]
+                    .into_iter()
+                    .find(|sub| !abs.join(sub).is_dir());
+                if let Some(sub) = missing_sub {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_MISSING",
+                        message: format!("solve-full fixture_root must contain {sub}/ directory"),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                }
+                Some(abs)
+            }
+            WorldId::RunOs | WorldId::RunOsSandboxed => {
+                unreachable!("test manifest forbids OS worlds")
             }
         };
 
@@ -940,10 +1048,13 @@ fn is_ascii_printable(s: &str) -> bool {
     s.bytes().all(|b| matches!(b, 0x20..=0x7e))
 }
 
-fn parse_world(s: &str) -> Option<World> {
-    match s {
-        "solve-pure" => Some(World::SolvePure),
-        "solve-fs" => Some(World::SolveFs),
+fn parse_world(s: &str) -> Option<WorldId> {
+    match s.trim() {
+        "solve-pure" => Some(WorldId::SolvePure),
+        "solve-fs" => Some(WorldId::SolveFs),
+        "solve-rr" => Some(WorldId::SolveRr),
+        "solve-kv" => Some(WorldId::SolveKv),
+        "solve-full" => Some(WorldId::SolveFull),
         _ => None,
     }
 }

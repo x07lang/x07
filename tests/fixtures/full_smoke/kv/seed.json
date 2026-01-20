@@ -1,0 +1,11 @@
+{
+  "format": "x07.kv.seed@0.1.0",
+  "default_latency_ticks": 0,
+  "entries": [
+    {
+      "key_b64": "UElORw==",
+      "value_b64": "UE9ORw==",
+      "latency_ticks": 0
+    }
+  ]
+}

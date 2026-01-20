@@ -63,13 +63,13 @@ fn x07_test_smoke_suite() {
     );
     let v = parse_json_stdout(&out);
     assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
-    assert_eq!(v["summary"]["passed"], 2);
+    assert_eq!(v["summary"]["passed"], 5);
     assert_eq!(v["summary"]["failed"], 0);
     assert_eq!(v["summary"]["errors"], 0);
     assert_eq!(v["summary"]["xfail_failed"], 1);
 
     let tests = v["tests"].as_array().expect("tests[]");
-    assert_eq!(tests.len(), 3);
+    assert_eq!(tests.len(), 6);
     let ids: Vec<&str> = tests
         .iter()
         .map(|t| t["id"].as_str().expect("test.id"))
@@ -78,8 +78,11 @@ fn x07_test_smoke_suite() {
         ids,
         vec![
             "smoke/fs_read_hello",
+            "smoke/full_fs_rr_kv",
+            "smoke/kv_get_pong",
             "smoke/pure_i32_eq",
-            "smoke/pure_xfail_demo"
+            "smoke/pure_xfail_demo",
+            "smoke/rr_fetch_pong"
         ]
     );
 
@@ -147,7 +150,6 @@ fn x07_init_creates_project_skeleton() {
 
     for rel in [
         "x07.json",
-        "x07-package.json",
         "x07.lock.json",
         "src/app.x07.json",
         "src/main.x07.json",
@@ -155,6 +157,7 @@ fn x07_init_creates_project_skeleton() {
     ] {
         assert!(dir.join(rel).is_file(), "missing {}", rel);
     }
+    assert!(!dir.join("x07-package.json").exists());
 
     let out = run_x07_in_dir(&dir, &["pkg", "lock", "--project", "x07.json", "--check"]);
     assert_eq!(
@@ -171,6 +174,21 @@ fn x07_init_creates_project_skeleton() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
     assert_eq!(v["error"]["code"], "X07INIT_EXISTS");
+
+    let dir2 = fresh_tmp_dir(&root, "tmp_x07_init_package");
+    if dir2.exists() {
+        std::fs::remove_dir_all(&dir2).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir2).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir2, &["--init", "--package"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(dir2.join("x07-package.json").is_file());
 }
 
 #[test]

@@ -6,6 +6,8 @@
 //!
 //! can share an authoritative list of worlds and whether they are allowed in evaluation.
 
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "clap", clap(rename_all = "kebab_case"))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum WorldId {
     #[default]

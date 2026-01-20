@@ -33,12 +33,12 @@ An autonomous agent should follow a loop like:
 1. Read task/spec + `AGENTS.md`
 2. Modify code **only through structured patches** (JSON Patch)
 3. Run deterministic checks:
-   - `x07c lint`
+   - `x07 lint`
    - `x07 test`
    - optional: benchmark suites (for performance budgets)
 4. If it fails:
    - parse `x07diag` output
-   - apply a suggested quickfix (JSON Patch), or produce a new patch
+   - apply a suggested quickfix (`x07 fix`), or produce a new patch and apply it with `x07 ast apply-patch`
 5. Repeat until green
 
 If you want a good mental model for “AI-native engineering”, see OpenAI’s Codex guide on building AI-native engineering teams.

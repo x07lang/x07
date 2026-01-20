@@ -19,9 +19,9 @@ if [[ -z "${python_bin}" ]]; then
   fi
 fi
 
-x07c_bin="${X07C_BIN:-}"
-if [[ -z "${x07c_bin}" ]]; then
-  x07c_bin="$(./scripts/ci/find_x07c.sh)"
+x07_bin="${X07_BIN:-}"
+if [[ -z "${x07_bin}" ]]; then
+  x07_bin="$(./scripts/ci/find_x07.sh)"
 fi
 
 "$python_bin" - <<'PY'
@@ -35,6 +35,7 @@ schemas = [
     root / "spec" / "x07diag.schema.json",
     root / "spec" / "x07patch.schema.json",
     root / "spec" / "x07test.schema.json",
+    root / "spec" / "x07-run.report.schema.json",
 ]
 
 for p in schemas:
@@ -69,11 +70,11 @@ cat >"$patch" <<'JSON'
 ]
 JSON
 
-"$x07c_bin" fmt --input "$program" --write >/dev/null
-"$x07c_bin" fmt --input "$program" --check >/dev/null
-"$x07c_bin" lint --input "$program" --world solve-pure >/dev/null
-"$x07c_bin" apply-patch --program "$program" --patch "$patch" --out "$program" >/dev/null
-"$x07c_bin" fmt --input "$program" --check >/dev/null
-"$x07c_bin" lint --input "$program" --world solve-pure >/dev/null
+"$x07_bin" fmt --input "$program" --write >/dev/null
+"$x07_bin" fmt --input "$program" --check >/dev/null
+"$x07_bin" lint --input "$program" --world solve-pure >/dev/null
+"$x07_bin" ast apply-patch --in "$program" --patch "$patch" --out "$program" --validate >/dev/null
+"$x07_bin" fmt --input "$program" --check >/dev/null
+"$x07_bin" lint --input "$program" --world solve-pure >/dev/null
 
 echo "ok: llm contracts"

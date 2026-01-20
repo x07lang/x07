@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-run.report.schema.json",
+  "title": "X07 x07 run report v0.1.0",
+  "description": "Optional wrapper report emitted by `x07 run --report wrapped`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "runner", "world", "target", "report"],
+  "properties": {
+    "schema_version": { "const": "x07.run.report@0.1.0" },
+    "runner": { "enum": ["host", "os"] },
+    "world": {
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "project_root", "lockfile", "resolved_module_roots"],
+      "properties": {
+        "kind": { "enum": ["project", "program", "artifact"] },
+        "path": { "type": "string" },
+        "project_root": { "type": ["string", "null"] },
+        "lockfile": { "type": ["string", "null"] },
+        "resolved_module_roots": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "report": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "runner": { "const": "host" } } },
+      "then": {
+        "properties": {
+          "report": { "$ref": "https://x07.io/spec/x07-host-runner.report.schema.json" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "runner": { "const": "os" } } },
+      "then": {
+        "properties": {
+          "report": { "$ref": "https://x07.io/spec/x07-os-runner.report.schema.json" }
+        }
+      }
+    }
+  ]
+}

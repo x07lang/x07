@@ -14,6 +14,8 @@ use crate::util;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+const DEFAULT_INDEX_URL: &str = "sparse+https://registry.x07.io/index/";
+
 #[derive(Debug, Args)]
 pub struct PkgArgs {
     #[command(subcommand)]
@@ -39,6 +41,14 @@ pub struct AddArgs {
     /// Project manifest path (`x07.json`).
     #[arg(long, value_name = "PATH", default_value = "x07.json")]
     pub project: PathBuf,
+
+    /// After adding the dependency, resolve and update `x07.lock.json`.
+    #[arg(long)]
+    pub sync: bool,
+
+    /// Sparse index URL used when fetching dependencies (default: official registry).
+    #[arg(long, value_name = "URL")]
+    pub index: Option<String>,
 
     /// Override the dependency path stored in `x07.json`.
     #[arg(long, value_name = "PATH")]
@@ -149,6 +159,8 @@ struct AddResult {
     name: String,
     version: String,
     path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lock: Option<LockResult>,
 }
 
 #[derive(Debug, Serialize)]
@@ -254,15 +266,39 @@ fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
     std::fs::write(&project_path, &out)
         .with_context(|| format!("write: {}", project_path.display()))?;
 
+    let mut add_result = AddResult {
+        project: project_path.display().to_string(),
+        name,
+        version,
+        path: dep_path,
+        lock: None,
+    };
+
+    if args.sync {
+        let lock_args = LockArgs {
+            project: project_path.clone(),
+            index: args.index.clone(),
+            check: false,
+            offline: false,
+        };
+        let (lock_code, lock_report) = pkg_lock_report(&lock_args)?;
+        add_result.lock = lock_report.result;
+        if !lock_report.ok {
+            let report = PkgReport::<AddResult> {
+                ok: false,
+                command: "pkg.add",
+                result: Some(add_result),
+                error: lock_report.error,
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(lock_code);
+        }
+    }
+
     let report = PkgReport {
         ok: true,
         command: "pkg.add",
-        result: Some(AddResult {
-            project: project_path.display().to_string(),
-            name,
-            version,
-            path: dep_path,
-        }),
+        result: Some(add_result),
         error: None,
     };
     println!("{}", serde_json::to_string(&report)?);
@@ -322,6 +358,12 @@ fn cmd_pkg_pack(args: PackArgs) -> Result<std::process::ExitCode> {
 }
 
 fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
+    let (code, report) = pkg_lock_report(&args)?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(code)
+}
+
+fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport<LockResult>)> {
     let project_path = util::resolve_existing_path_upwards(&args.project);
     let manifest =
         project::load_project_manifest(&project_path).context("load project manifest")?;
@@ -341,9 +383,11 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
         }
     }
 
+    let mut index_used: Option<String> = None;
+
     if !missing.is_empty() {
         if args.offline {
-            let report = PkgReport::<LockResult> {
+            let report = PkgReport {
                 ok: false,
                 command: "pkg.lock",
                 result: None,
@@ -352,29 +396,17 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
                     message: format!("{} missing dependencies (offline mode)", missing.len()),
                 }),
             };
-            println!("{}", serde_json::to_string(&report)?);
-            return Ok(std::process::ExitCode::from(20));
+            return Ok((std::process::ExitCode::from(20), report));
         }
 
         let index = match args.index.as_deref() {
-            Some(index) => index,
-            None => {
-                let report = PkgReport::<LockResult> {
-                    ok: false,
-                    command: "pkg.lock",
-                    result: None,
-                    error: Some(PkgError {
-                        code: "X07PKG_INDEX_REQUIRED".to_string(),
-                        message: "--index is required when dependencies need fetching".to_string(),
-                    }),
-                };
-                println!("{}", serde_json::to_string(&report)?);
-                return Ok(std::process::ExitCode::from(20));
-            }
+            Some(index) => index.to_string(),
+            None => DEFAULT_INDEX_URL.to_string(),
         };
+        index_used = Some(index.clone());
 
-        let token = x07_pkg::load_token(index).unwrap_or(None);
-        let client = SparseIndexClient::from_index_url(index, token)?;
+        let token = x07_pkg::load_token(&index).unwrap_or(None);
+        let client = SparseIndexClient::from_index_url(&index, token)?;
 
         for dep in missing {
             let dep_dir = base.join(&dep.path);
@@ -397,8 +429,7 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
                         ),
                     }),
                 };
-                println!("{}", serde_json::to_string(&report)?);
-                return Ok(std::process::ExitCode::from(20));
+                return Ok((std::process::ExitCode::from(20), report));
             };
 
             let cache_dir = base.join(".x07").join("cache").join("sha256");
@@ -469,7 +500,7 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
         let existing_bytes = match std::fs::read(&lock_path) {
             Ok(bytes) => bytes,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                let report = PkgReport::<LockResult> {
+                let report = PkgReport {
                     ok: false,
                     command: "pkg.lock",
                     result: None,
@@ -478,8 +509,7 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
                         message: format!("missing lockfile: {}", lock_path.display()),
                     }),
                 };
-                println!("{}", serde_json::to_string(&report)?);
-                return Ok(std::process::ExitCode::from(20));
+                return Ok((std::process::ExitCode::from(20), report));
             }
             Err(err) => {
                 return Err(err).with_context(|| format!("read lockfile: {}", lock_path.display()))
@@ -488,12 +518,12 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
         let existing: project::Lockfile = serde_json::from_slice(&existing_bytes)
             .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?;
         if existing != lock {
-            let report = PkgReport::<LockResult> {
+            let report = PkgReport {
                 ok: false,
                 command: "pkg.lock",
                 result: Some(LockResult {
                     project: project_path.display().to_string(),
-                    index: args.index.clone(),
+                    index: index_used.clone().or(args.index.clone()),
                     lockfile: lock_path.display().to_string(),
                     fetched,
                 }),
@@ -502,8 +532,7 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
                     message: format!("{} would change", lock_path.display()),
                 }),
             };
-            println!("{}", serde_json::to_string(&report)?);
-            return Ok(std::process::ExitCode::from(20));
+            return Ok((std::process::ExitCode::from(20), report));
         }
 
         let report = PkgReport {
@@ -511,14 +540,13 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
             command: "pkg.lock",
             result: Some(LockResult {
                 project: project_path.display().to_string(),
-                index: args.index.clone(),
+                index: index_used.clone().or(args.index.clone()),
                 lockfile: lock_path.display().to_string(),
                 fetched,
             }),
             error: None,
         };
-        println!("{}", serde_json::to_string(&report)?);
-        return Ok(std::process::ExitCode::SUCCESS);
+        return Ok((std::process::ExitCode::SUCCESS, report));
     }
 
     if let Some(parent) = lock_path.parent() {
@@ -537,14 +565,13 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
         command: "pkg.lock",
         result: Some(LockResult {
             project: project_path.display().to_string(),
-            index: args.index.clone(),
+            index: index_used.or(args.index.clone()),
             lockfile: lock_path.display().to_string(),
             fetched,
         }),
         error: None,
     };
-    println!("{}", serde_json::to_string(&report)?);
-    Ok(std::process::ExitCode::SUCCESS)
+    Ok((std::process::ExitCode::SUCCESS, report))
 }
 
 fn cmd_pkg_login(args: LoginArgs) -> Result<std::process::ExitCode> {

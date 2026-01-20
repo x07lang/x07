@@ -90,10 +90,10 @@ What it must not do.
 - entrypoints (thin glue)
 
 ## Tooling commands
-- format: `x07 fmt --check ...`
-- lint: `x07 lint ...`
-- test: `x07 test ...`
-- bench (optional): `x07 bench ...`
+- format: `x07 fmt --input <file.x07.json> --check`
+- lint: `x07 lint --input <file.x07.json> --world solve-pure`
+- test: `x07 test --manifest tests/tests.json`
+- bench (optional): `<project-specific bench command>`
 
 ## Budgets / gates
 - max allocs
