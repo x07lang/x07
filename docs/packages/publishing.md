@@ -48,8 +48,7 @@ printf '%s' "$X07_TOKEN" | x07 pkg login --index sparse+https://registry.x07.io/
 
 ### Publishing
 
-Ensure `x07-package.json` contains a `description` (that’s what shows up on https://x07.io/packages), bump the `version`,
-then publish the directory:
+Ensure `x07-package.json` contains a non-empty `description` and `docs`, bump the `version`, then publish the directory:
 
 ```bash
 x07 pkg publish --index sparse+https://registry.x07.io/index/ --package .
