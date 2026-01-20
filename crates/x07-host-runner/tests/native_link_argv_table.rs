@@ -167,13 +167,19 @@ fn native_link_argv_windows_msvc_exact() {
 
     let expected = vec![
         "Ws2_32.lib".to_string(),
-        dir.join("deps/x07/x07_ext_net.lib")
+        dir.join("deps")
+            .join("x07")
+            .join("x07_ext_net.lib")
             .to_string_lossy()
             .to_string(),
-        dir.join("deps/x07/x07_ext_regex.lib")
+        dir.join("deps")
+            .join("x07")
+            .join("x07_ext_regex.lib")
             .to_string_lossy()
             .to_string(),
-        dir.join("deps/x07/x07_ext_sqlite3.lib")
+        dir.join("deps")
+            .join("x07")
+            .join("x07_ext_sqlite3.lib")
             .to_string_lossy()
             .to_string(),
     ];
