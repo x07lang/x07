@@ -23,6 +23,23 @@ Same as `run-os`, but enforced by policy:
 - max live processes / connections
 - byte caps / timeouts
 
+### Create a base policy (recommended)
+
+Use `x07 policy init` to generate a schema-valid starting point:
+
+- `x07 policy init --template cli`
+- `x07 policy init --template crawler`
+- `x07 policy init --template web-service`
+
+### Allow/deny networking destinations (CLI convenience)
+
+When running in `run-os-sandboxed`, `x07 run` can materialize a derived policy under `.x07/policies/_generated/`:
+
+- `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:443`
+- `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --deny-host example.com:*`
+
+Denies apply after allows, so deny wins.
+
 ## Platform support
 
 X07 should treat these as Tier-1 OS platforms:

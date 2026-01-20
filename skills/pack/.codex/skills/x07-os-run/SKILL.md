@@ -25,6 +25,15 @@ Use this skill when you need real OS I/O (fs/net/process/time) via `run-os` or p
 - Run sandboxed (requires an explicit policy):
   - `x07 run --project x07.json --world run-os-sandboxed --policy run-os-policy.json`
 
+- Generate a schema-valid base policy:
+  - `x07 policy init --template cli`
+  - `x07 policy init --template crawler`
+  - `x07 policy init --template web-service`
+
+- Materialize a derived policy with explicit destinations (only in run-os-sandboxed):
+  - `x07 run --project x07.json --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:443`
+  - `x07 run --project x07.json --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --deny-host example.com:*`
+
 - Run a single program (when not using a project manifest):
   - `x07 run --program src/main.x07.json --world run-os --module-root src`
 
@@ -42,7 +51,7 @@ Use this skill when you need real OS I/O (fs/net/process/time) via `run-os` or p
 ## Policy
 
 Use a minimal allowlist policy and expand it deliberately.
-Start from `references/run-os-policy.sample.json`.
+Prefer `x07 policy init --template ...` for a schema-valid starting point.
 
 ## Output contract
 

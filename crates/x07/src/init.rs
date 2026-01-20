@@ -288,6 +288,59 @@ fn project_json_bytes() -> Result<Vec<u8>> {
                 "lockfile".to_string(),
                 Value::String("x07.lock.json".to_string()),
             ),
+            (
+                "default_profile".to_string(),
+                Value::String("test".to_string()),
+            ),
+            (
+                "profiles".to_string(),
+                Value::Object(
+                    [
+                        (
+                            "test".to_string(),
+                            Value::Object(
+                                [("world".to_string(), Value::String("solve-pure".to_string()))]
+                                    .into_iter()
+                                    .collect(),
+                            ),
+                        ),
+                        (
+                            "os".to_string(),
+                            Value::Object(
+                                [
+                                    ("world".to_string(), Value::String("run-os".to_string())),
+                                    ("auto_ffi".to_string(), Value::Bool(true)),
+                                ]
+                                .into_iter()
+                                .collect(),
+                            ),
+                        ),
+                        (
+                            "sandbox".to_string(),
+                            Value::Object(
+                                [
+                                    (
+                                        "world".to_string(),
+                                        Value::String("run-os-sandboxed".to_string()),
+                                    ),
+                                    (
+                                        "policy".to_string(),
+                                        Value::String(
+                                            ".x07/policies/base/cli.sandbox.base.policy.json"
+                                                .to_string(),
+                                        ),
+                                    ),
+                                    ("auto_ffi".to_string(), Value::Bool(true)),
+                                ]
+                                .into_iter()
+                                .collect(),
+                            ),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
         ]
         .into_iter()
         .collect(),

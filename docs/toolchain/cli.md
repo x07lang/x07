@@ -58,6 +58,42 @@ Notes:
 
 Use `x07 run` as the canonical entry point for execution.
 
+#### Profiles (recommended)
+
+`x07 run` supports intent-driven **profiles** defined in your project manifest (`x07.json`):
+
+- `default_profile`: which profile `x07 run` uses by default
+- `profiles.<name>`: a profile definition (world + optional defaults)
+
+Common profile names are:
+
+- `test` → deterministic `solve-*` world
+- `os` → `run-os`
+- `sandbox` → `run-os-sandboxed` + policy
+
+Examples:
+
+- `x07 run` (uses `x07.json.default_profile`)
+- `x07 run --profile os`
+- `x07 run --profile sandbox`
+
+World IDs (`--world solve-pure`, `--world run-os`, ...) remain available as an advanced escape hatch.
+
+#### Policies (run-os-sandboxed)
+
+To create a schema-valid base policy:
+
+- `x07 policy init --template cli`
+- `x07 policy init --template crawler`
+- `x07 policy init --template web-service`
+
+To materialize a derived policy with explicit network destinations:
+
+- `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:443`
+- `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:80,443 --deny-host example.com:80`
+
+Derived policies are written under `.x07/policies/_generated/` and passed to `x07-os-runner`.
+
 The generated `main` uses a simple byte framing:
 
 - stdin: `u32_le(len)` followed by `len` bytes

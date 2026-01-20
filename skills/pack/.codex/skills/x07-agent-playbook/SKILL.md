@@ -32,7 +32,7 @@ Execution should go through `x07 run` (single front door). The standalone runner
 6. Run in the correct capability world (canonical: `x07 run`):
    - deterministic solve worlds (recommended default): `x07 run`
    - OS worlds (unsandboxed): `x07 run --os` (equivalently: `x07 run --world run-os`)
-   - OS worlds (policy-enforced): `x07 run --world run-os-sandboxed --policy run-os-policy.json`
+   - OS worlds (policy-enforced): `x07 policy init --template <cli|crawler|web-service>`, then `x07 run --world run-os-sandboxed --policy .x07/policies/base/<...>.policy.json` (optionally add `--allow-host ...` / `--deny-host ...`)
 
    Expert backends (use only when you need runner-only flags or are debugging runner behavior):
    - solve worlds: `x07-host-runner --project x07.json`

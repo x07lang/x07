@@ -19,6 +19,11 @@ Use this skill for normal program execution. `x07 run` dispatches to:
 - Run the current project (auto-discovers `x07.json`):
   - `x07 run`
 
+- Run a specific project profile:
+  - `x07 run --profile test`
+  - `x07 run --profile os`
+  - `x07 run --profile sandbox`
+
 - Run a deterministic fixture world:
   - `x07 run --world solve-fs --fixtures fixtures`
 
@@ -26,8 +31,17 @@ Use this skill for normal program execution. `x07 run` dispatches to:
   - `x07 run --os`
   - (equivalently) `x07 run --world run-os`
 
-- Run policy-enforced OS world (requires explicit policy):
-  - `x07 run --world run-os-sandboxed --policy run-os-policy.json`
+- Generate a base sandbox policy:
+  - `x07 policy init --template cli`
+  - `x07 policy init --template crawler`
+  - `x07 policy init --template web-service`
+
+- Run policy-enforced OS world (requires a policy file):
+  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/cli.sandbox.base.policy.json`
+
+- Materialize a derived policy with explicit network destinations (deny-by-default):
+  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:443`
+  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/crawler.sandbox.base.policy.json --allow-host example.com:80,443 --deny-host example.com:80`
 
 ## Inputs
 
@@ -48,4 +62,3 @@ Optional wrapper (debuggable resolution envelope):
 
 - `x07 run --report wrapped`
 - Wrapper schema: `x07.run.report@0.1.0` (field `report` contains the raw runner report object).
-

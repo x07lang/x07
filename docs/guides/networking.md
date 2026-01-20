@@ -44,10 +44,30 @@ To discover available packages and versions, use the index catalog:
 3. Run in an OS world (required). By default, `x07 run` enables automatic FFI wiring for OS worlds:
 
    ```bash
+   # If your project defines profiles (recommended):
+   x07 run --profile os --input input.bin
+
+   # Otherwise (legacy / explicit):
    x07 run --project x07.json --world run-os --input input.bin
    ```
 
 System prerequisites depend on platform (for example, `libcurl` + `openssl` dev packages on Linux; Homebrew `openssl@3` on macOS).
+
+## Sandboxed networking (explicit allowlists)
+
+1. Generate a base policy (deny-by-default destinations):
+
+   ```bash
+   x07 policy init --template crawler
+   ```
+
+2. Run with explicit destinations:
+
+   ```bash
+   x07 run --world run-os-sandboxed \
+     --policy .x07/policies/base/crawler.sandbox.base.policy.json \
+     --allow-host example.com:443
+   ```
 
 ## Deterministic tests
 

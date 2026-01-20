@@ -3,6 +3,16 @@
   "world": "solve-pure",
   "entry": "web_crawler/src/main.x07.json",
   "module_roots": ["web_crawler/src"],
+  "default_profile": "os",
+  "profiles": {
+    "test": { "world": "solve-pure" },
+    "os": { "world": "run-os", "auto_ffi": true },
+    "sandbox": {
+      "world": "run-os-sandboxed",
+      "policy": ".x07/policies/base/crawler.sandbox.base.policy.json",
+      "auto_ffi": true
+    }
+  },
   "dependencies": [
     { "name": "ext-fs", "version": "0.1.0", "path": "pkgs/ext-fs/0.1.0" },
     { "name": "ext-net", "version": "0.1.0", "path": "pkgs/ext-net/0.1.0" },

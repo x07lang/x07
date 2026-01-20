@@ -3,7 +3,10 @@ use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde_json::Value;
-use x07_contracts::X07TEST_SCHEMA_VERSION;
+use x07_contracts::{
+    X07TEST_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
+    X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
+};
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -269,6 +272,182 @@ fn x07_pkg_pack_includes_ffi_dir() {
         unpack_dir.join("ffi/curl_shim.c").is_file(),
         "missing ffi/curl_shim.c in packed archive"
     );
+}
+
+#[test]
+fn x07_policy_init_cli_template_creates_base_policy() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_policy_init_cli");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "cli"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07_POLICY_INIT_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["template"], "cli");
+    assert_eq!(v["status"], "created");
+    assert_eq!(v["out"], ".x07/policies/base/cli.sandbox.base.policy.json");
+    assert_eq!(v["policy_id"], "sandbox.cli.base");
+
+    let pol_path = dir.join(".x07/policies/base/cli.sandbox.base.policy.json");
+    assert!(pol_path.is_file(), "missing {}", pol_path.display());
+    let pol: Value =
+        serde_json::from_slice(&std::fs::read(&pol_path).unwrap()).expect("parse policy json");
+    assert_eq!(pol["schema_version"], "x07.run-os-policy@0.1.0");
+    assert_eq!(pol["policy_id"], "sandbox.cli.base");
+
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "cli"]);
+    assert_eq!(out.status.code(), Some(0));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["status"], "unchanged");
+
+    // exists_different without --force.
+    write_bytes(&pol_path, b"{\"not\":\"a policy\"}\n");
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "cli"]);
+    assert_eq!(out.status.code(), Some(2));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["status"], "exists_different");
+
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "cli", "--force"]);
+    assert_eq!(out.status.code(), Some(0));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["status"], "overwritten");
+    let pol: Value =
+        serde_json::from_slice(&std::fs::read(&pol_path).unwrap()).expect("parse policy json");
+    assert_eq!(pol["policy_id"], "sandbox.cli.base");
+}
+
+fn derived_policy_path_from_stderr(stderr: &[u8]) -> Option<String> {
+    let s = String::from_utf8_lossy(stderr);
+    for line in s.lines() {
+        let prefix = "x07 run: using derived policy ";
+        if let Some(rest) = line.strip_prefix(prefix) {
+            return Some(rest.trim().to_string());
+        }
+    }
+    None
+}
+
+#[test]
+fn x07_run_allow_host_materializes_policy() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_allow_host");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "crawler"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "run",
+            "--world",
+            "run-os-sandboxed",
+            "--policy",
+            ".x07/policies/base/crawler.sandbox.base.policy.json",
+            "--allow-host",
+            "example.com:443",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let runner_report = parse_json_stdout(&out);
+    assert_eq!(
+        runner_report["schema_version"],
+        X07_OS_RUNNER_REPORT_SCHEMA_VERSION
+    );
+    assert_eq!(runner_report["exit_code"], 0);
+
+    let derived_path =
+        derived_policy_path_from_stderr(&out.stderr).expect("derived policy stderr line");
+    let derived_path = PathBuf::from(derived_path);
+    assert!(derived_path.is_file(), "missing {}", derived_path.display());
+
+    let pol: Value = serde_json::from_slice(&std::fs::read(&derived_path).unwrap())
+        .expect("parse derived policy json");
+    assert_eq!(pol["schema_version"], "x07.run-os-policy@0.1.0");
+    assert!(pol["policy_id"].as_str().unwrap_or("").contains(".g"));
+    assert!(pol["policy_id"].as_str().unwrap_or("").len() <= 64);
+    assert_eq!(pol["net"]["allow_dns"], true);
+
+    let hosts = pol["net"]["allow_hosts"].as_array().expect("allow_hosts[]");
+    assert!(hosts.iter().any(|h| h["host"] == "example.com"));
+    let entry = hosts
+        .iter()
+        .find(|h| h["host"] == "example.com")
+        .expect("example.com entry");
+    assert_eq!(entry["ports"], serde_json::json!([443]));
+}
+
+#[test]
+fn x07_run_deny_host_removes_allow() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_deny_host");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "crawler"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "run",
+            "--world",
+            "run-os-sandboxed",
+            "--policy",
+            ".x07/policies/base/crawler.sandbox.base.policy.json",
+            "--allow-host",
+            "example.com:443",
+            "--deny-host",
+            "example.com:*",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let derived_path =
+        derived_policy_path_from_stderr(&out.stderr).expect("derived policy stderr line");
+    let derived_path = PathBuf::from(derived_path);
+    let pol: Value = serde_json::from_slice(&std::fs::read(&derived_path).unwrap())
+        .expect("parse derived policy json");
+    assert_eq!(pol["net"]["allow_hosts"], serde_json::json!([]));
+    assert_eq!(pol["net"]["allow_dns"], false);
 }
 
 #[test]

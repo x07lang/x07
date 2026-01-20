@@ -41,6 +41,14 @@ OS worlds are always opt-in, and sandboxed variants are governed by explicit pol
 - `run-os`: real OS adapters (disk/net/time/env/process)
 - `run-os-sandboxed`: policy-limited OS adapters
 
+## Profiles (recommended front door)
+
+Most projects should not hardcode an OS world in `x07.json.world` (that field stays deterministic).
+Instead, define `x07.json.profiles` and a `default_profile`, and use:
+
+- `x07 run` (uses `default_profile`)
+- `x07 run --profile <name>` (pick explicitly)
+
 See:
 - [Fixture worlds](fixture-worlds.md)
 - [OS worlds](os-worlds.md)

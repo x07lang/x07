@@ -70,4 +70,4 @@ If you want native Windows (not WSL2), you need:
 - A C toolchain and libcurl development files available to the linker (e.g. MSYS2 + `pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-curl`, or vcpkg + MSVC)
 - Stage ext-fs native backend into `deps/x07/` (the helper script currently expects `scripts/build_ext_fs.sh`, which is bash-centric)
 
-Note: `web_crawler.x07project.json` is marked `world: solve-pure` because the current `x07.project@0.2.0` schema is restricted to deterministic `solve-*` worlds, but this example must be run with `--world run-os`.
+Note: `web_crawler.x07project.json` is marked `world: solve-pure` because the `x07.project@0.2.0` schema keeps `world` deterministic (`solve-*`). OS execution is configured via `default_profile: os` / `profiles.os.world: run-os` for `x07 run`. If you invoke `x07-os-runner` directly, pass `--world run-os`.

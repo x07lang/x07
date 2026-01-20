@@ -47,7 +47,7 @@ x07 lint --input src/main.x07.json --world solve-pure
 Run:
 
 ```bash
-x07 run --project x07.json --world solve-pure
+x07 run
 ```
 
 Run the deterministic harness (repo-defined suites):
@@ -105,6 +105,11 @@ See also: [Packages & projects](../packages/index.md).
 
 - Deterministic worlds: `solve-pure`, `solve-fs`, `solve-rr`, `solve-kv`, `solve-full`
 - OS worlds: `run-os`, `run-os-sandboxed` (policy-gated, not a hardened sandbox)
+
+Prefer profiles (`x07.json.default_profile` + `x07.json.profiles`) so agents usually run:
+
+- `x07 run` (project default)
+- `x07 run --profile os` / `x07 run --profile sandbox` (explicit intent)
 
 See: [Fixture worlds](../worlds/fixture-worlds.md) and [OS worlds](../worlds/os-worlds.md).
 

@@ -16,6 +16,7 @@ mod ast;
 mod cli;
 mod init;
 mod pkg;
+mod policy;
 mod run;
 mod toolchain;
 mod util;
@@ -45,6 +46,8 @@ enum Command {
     Test(TestArgs),
     /// Run X07 programs via the appropriate runner.
     Run(Box<run::RunArgs>),
+    /// Generate and manage run-os-sandboxed policy files.
+    Policy(policy::PolicyArgs),
     /// Initialize, validate, and patch x07AST JSON files.
     Ast(ast::AstArgs),
     /// Format x07AST JSON files.
@@ -174,6 +177,10 @@ fn try_main() -> Result<std::process::ExitCode> {
             None => Vec::new(),
             Some(Command::Test(_)) => vec!["test"],
             Some(Command::Run(_)) => vec!["run"],
+            Some(Command::Policy(args)) => match &args.cmd {
+                None => vec!["policy"],
+                Some(policy::PolicyCommand::Init(_)) => vec!["policy", "init"],
+            },
             Some(Command::Ast(args)) => match &args.cmd {
                 None => vec!["ast"],
                 Some(ast::AstCommand::Init(_)) => vec!["ast", "init"],
@@ -230,6 +237,7 @@ fn try_main() -> Result<std::process::ExitCode> {
     match command {
         Command::Test(args) => cmd_test(args),
         Command::Run(args) => run::cmd_run(*args),
+        Command::Policy(args) => policy::cmd_policy(args),
         Command::Ast(args) => ast::cmd_ast(args),
         Command::Fmt(args) => toolchain::cmd_fmt(args),
         Command::Lint(args) => toolchain::cmd_lint(args),

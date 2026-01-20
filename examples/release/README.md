@@ -38,7 +38,7 @@ bash scripts/examples/docker/run_matrix.sh
 
 ## Web crawler (run-os)
 
-This example uses `x07-os-runner` (real OS filesystem + real network). Note: the `x07.project@0.2.0` manifest schema currently only allows `solve-*` values in its `world` field, so `web_crawler.x07project.json` is marked `solve-pure` but must be run with `--world run-os`.
+This example uses `x07-os-runner` (real OS filesystem + real network). The `x07.project@0.2.0` manifest keeps `world` deterministic (`solve-*`), so `web_crawler.x07project.json` is marked `solve-pure` and uses `default_profile: os` / `profiles.os.world: run-os` to make OS execution the default when using `x07 run`. If you invoke `x07-os-runner` directly, pass `--world run-os`.
 
 Stage the ext-fs native backend once:
 
