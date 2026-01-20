@@ -1,0 +1,21 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-db-sqlite",
+  "description": "SQLite driver for std.db (run-os only).",
+  "docs": "SQLite driver for std.db (run-os only).\n\nModules:\n- std.db.sqlite\n- std.db.sqlite.spec\n- std.db.sqlite.pool\n\nUsage:\n- Add dependency: x07 pkg add ext-db-sqlite@0.1.2\n- Import the modules listed above.\n",
+  "version": "0.1.2",
+  "module_root": "modules",
+  "modules": [
+    "std.db.sqlite",
+    "std.db.sqlite.spec",
+    "std.db.sqlite.pool"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

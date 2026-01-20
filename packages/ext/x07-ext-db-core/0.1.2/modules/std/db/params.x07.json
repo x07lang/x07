@@ -1,0 +1,223 @@
+{
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.db.params.empty_v1",
+        "std.db.params.one_value_v1",
+        "std.db.params.one_string_v1",
+        "std.db.params.one_number_dec_v1",
+        "std.db.params.one_null_v1",
+        "std.db.params.one_bool_v1"
+      ]
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "elems",
+          [
+            "codec.write_u32_le",
+            0
+          ]
+        ],
+        [
+          "let",
+          "val",
+          [
+            "ext.data_model.value_seq_from_elems",
+            [
+              "bytes.view",
+              "elems"
+            ]
+          ]
+        ],
+        [
+          "ext.data_model.doc_ok",
+          [
+            "bytes.view",
+            "val"
+          ]
+        ]
+      ],
+      "kind": "defn",
+      "name": "std.db.params.empty_v1",
+      "params": [],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "v_len",
+          [
+            "bytes.len",
+            "value"
+          ]
+        ],
+        [
+          "let",
+          "elems",
+          [
+            "vec_u8.with_capacity",
+            [
+              "+",
+              12,
+              "v_len"
+            ]
+          ]
+        ],
+        [
+          "set",
+          "elems",
+          [
+            "vec_u8.extend_bytes",
+            "elems",
+            [
+              "codec.write_u32_le",
+              1
+            ]
+          ]
+        ],
+        [
+          "set",
+          "elems",
+          [
+            "vec_u8.extend_bytes",
+            "elems",
+            [
+              "codec.write_u32_le",
+              "v_len"
+            ]
+          ]
+        ],
+        [
+          "set",
+          "elems",
+          [
+            "vec_u8.extend_bytes",
+            "elems",
+            "value"
+          ]
+        ],
+        [
+          "let",
+          "elems_b",
+          [
+            "vec_u8.into_bytes",
+            "elems"
+          ]
+        ],
+        [
+          "let",
+          "seq_val",
+          [
+            "ext.data_model.value_seq_from_elems",
+            [
+              "bytes.view",
+              "elems_b"
+            ]
+          ]
+        ],
+        [
+          "ext.data_model.doc_ok",
+          [
+            "bytes.view",
+            "seq_val"
+          ]
+        ]
+      ],
+      "kind": "defn",
+      "name": "std.db.params.one_value_v1",
+      "params": [
+        {
+          "name": "value",
+          "ty": "bytes"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "std.db.params.one_value_v1",
+        [
+          "ext.data_model.value_string",
+          [
+            "bytes.view",
+            "s"
+          ]
+        ]
+      ],
+      "kind": "defn",
+      "name": "std.db.params.one_string_v1",
+      "params": [
+        {
+          "name": "s",
+          "ty": "bytes"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "std.db.params.one_value_v1",
+        [
+          "ext.data_model.value_number",
+          [
+            "bytes.view",
+            "dec_ascii"
+          ]
+        ]
+      ],
+      "kind": "defn",
+      "name": "std.db.params.one_number_dec_v1",
+      "params": [
+        {
+          "name": "dec_ascii",
+          "ty": "bytes"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "std.db.params.one_value_v1",
+        [
+          "ext.data_model.value_null"
+        ]
+      ],
+      "kind": "defn",
+      "name": "std.db.params.one_null_v1",
+      "params": [],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "std.db.params.one_value_v1",
+        [
+          "ext.data_model.value_bool",
+          "b"
+        ]
+      ],
+      "kind": "defn",
+      "name": "std.db.params.one_bool_v1",
+      "params": [
+        {
+          "name": "b",
+          "ty": "i32"
+        }
+      ],
+      "result": "bytes"
+    }
+  ],
+  "imports": [
+    "ext.data_model",
+    "std.codec",
+    "std.vec"
+  ],
+  "kind": "module",
+  "module_id": "std.db.params",
+  "schema_version": "x07.x07ast@0.1.0"
+}

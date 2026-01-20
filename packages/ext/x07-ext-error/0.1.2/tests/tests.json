@@ -1,0 +1,29 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.error/err_from_code_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.error.tests.test_err_from_code_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.error/err_from_msg_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.error.tests.test_err_from_msg_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.error/with_context_adds_context",
+      "world": "solve-pure",
+      "entry": "ext.error.tests.test_with_context_adds_context",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.error/format_error_basic",
+      "world": "solve-pure",
+      "entry": "ext.error.tests.test_format_error_basic",
+      "expect": "pass"
+    }
+  ]
+}

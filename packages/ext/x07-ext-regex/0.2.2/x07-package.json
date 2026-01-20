@@ -1,0 +1,25 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-regex",
+  "description": "Regular expression matching and searching.",
+  "docs": "Regular expression matching and searching.\n\nModules:\n- ext.regex\n- ext.regex.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-regex@0.2.2\n- Import the modules listed above.\n",
+  "version": "0.2.2",
+  "module_root": "modules",
+  "modules": [
+    "ext.regex",
+    "ext.regex.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

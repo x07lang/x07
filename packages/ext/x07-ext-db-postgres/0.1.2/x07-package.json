@@ -1,0 +1,21 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-db-postgres",
+  "description": "PostgreSQL driver for std.db (run-os only).",
+  "docs": "PostgreSQL driver for std.db (run-os only).\n\nModules:\n- std.db.pg\n- std.db.pg.spec\n- std.db.pg.pool\n\nUsage:\n- Add dependency: x07 pkg add ext-db-postgres@0.1.2\n- Import the modules listed above.\n",
+  "version": "0.1.2",
+  "module_root": "modules",
+  "modules": [
+    "std.db.pg",
+    "std.db.pg.spec",
+    "std.db.pg.pool"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

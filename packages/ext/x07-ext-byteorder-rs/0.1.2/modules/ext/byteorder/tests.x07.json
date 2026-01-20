@@ -1,0 +1,180 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.byteorder.tests",
+  "imports": ["std.test", "ext.byteorder"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.byteorder.tests.test_u16_le_be_roundtrip",
+        "ext.byteorder.tests.test_u32_le_be_roundtrip",
+        "ext.byteorder.tests.test_read_default_oob"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.byteorder.tests.test_u16_le_be_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "x", 4660],
+        ["let", "le", ["ext.byteorder.byteorder_write_u16_le", "x"]],
+        ["let", "be", ["ext.byteorder.byteorder_write_u16_be", "x"]],
+        ["let", "v_le", ["vec_u8.with_capacity", 2]],
+        ["set", "v_le", ["vec_u8.push", "v_le", 52]],
+        ["set", "v_le", ["vec_u8.push", "v_le", 18]],
+        ["let", "exp_le", ["vec_u8.into_bytes", "v_le"]],
+        ["let", "le_view", ["bytes.view", "le"]],
+        ["let", "exp_le_view", ["bytes.view", "exp_le"]],
+        [
+          "try",
+          [
+            "std.test.assert_view_eq",
+            "le_view",
+            "exp_le_view",
+            ["std.test.code_assert_view_eq"]
+          ]
+        ],
+        ["let", "v_be", ["vec_u8.with_capacity", 2]],
+        ["set", "v_be", ["vec_u8.push", "v_be", 18]],
+        ["set", "v_be", ["vec_u8.push", "v_be", 52]],
+        ["let", "exp_be", ["vec_u8.into_bytes", "v_be"]],
+        ["let", "be_view", ["bytes.view", "be"]],
+        ["let", "exp_be_view", ["bytes.view", "exp_be"]],
+        [
+          "try",
+          [
+            "std.test.assert_view_eq",
+            "be_view",
+            "exp_be_view",
+            ["std.test.code_assert_view_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.byteorder.byteorder_read_u16_le_or", "le_view", 0, -1],
+            "x",
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.byteorder.byteorder_read_u16_be_or", "be_view", 0, -1],
+            "x",
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.byteorder.tests.test_u32_le_be_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "x", 305419896],
+        ["let", "le", ["ext.byteorder.byteorder_write_u32_le", "x"]],
+        ["let", "be", ["ext.byteorder.byteorder_write_u32_be", "x"]],
+        ["let", "v_le", ["vec_u8.with_capacity", 4]],
+        ["set", "v_le", ["vec_u8.push", "v_le", 120]],
+        ["set", "v_le", ["vec_u8.push", "v_le", 86]],
+        ["set", "v_le", ["vec_u8.push", "v_le", 52]],
+        ["set", "v_le", ["vec_u8.push", "v_le", 18]],
+        ["let", "exp_le", ["vec_u8.into_bytes", "v_le"]],
+        ["let", "le_view", ["bytes.view", "le"]],
+        ["let", "exp_le_view", ["bytes.view", "exp_le"]],
+        [
+          "try",
+          [
+            "std.test.assert_view_eq",
+            "le_view",
+            "exp_le_view",
+            ["std.test.code_assert_view_eq"]
+          ]
+        ],
+        ["let", "v_be", ["vec_u8.with_capacity", 4]],
+        ["set", "v_be", ["vec_u8.push", "v_be", 18]],
+        ["set", "v_be", ["vec_u8.push", "v_be", 52]],
+        ["set", "v_be", ["vec_u8.push", "v_be", 86]],
+        ["set", "v_be", ["vec_u8.push", "v_be", 120]],
+        ["let", "exp_be", ["vec_u8.into_bytes", "v_be"]],
+        ["let", "be_view", ["bytes.view", "be"]],
+        ["let", "exp_be_view", ["bytes.view", "exp_be"]],
+        [
+          "try",
+          [
+            "std.test.assert_view_eq",
+            "be_view",
+            "exp_be_view",
+            ["std.test.code_assert_view_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.byteorder.byteorder_read_u32_le_or", "le_view", 0, -1],
+            "x",
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.byteorder.byteorder_read_u32_be_or", "be_view", 0, -1],
+            "x",
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.byteorder.tests.test_read_default_oob",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "b", ["bytes.lit", "a"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.byteorder.byteorder_read_u32_le_or", ["bytes.view", "b"], 0, 123],
+            123,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.byteorder.byteorder_read_u16_le_or", ["bytes.view", "b"], 0, 7],
+            7,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.byteorder.byteorder_read_u32_le_or", ["bytes.view", "b"], -1, 9],
+            9,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

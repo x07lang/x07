@@ -1,0 +1,25 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-log",
+  "description": "Log record encoding and formatting helpers.",
+  "docs": "Log record encoding and formatting helpers.\n\nModules:\n- ext.log\n- ext.log.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-log@0.1.2\n- Import the modules listed above.\n",
+  "version": "0.1.2",
+  "module_root": "modules",
+  "modules": [
+    "ext.log",
+    "ext.log.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

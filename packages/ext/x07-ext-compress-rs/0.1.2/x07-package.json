@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-compress-rs",
+  "description": "Compression primitives and ZIP archives.",
+  "docs": "Compression primitives and ZIP archives.\n\nModules:\n- ext.compress\n- ext.zip\n- ext.compress.tests\n- ext.zip.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-compress-rs@0.1.2\n- Import the modules listed above.\n",
+  "version": "0.1.2",
+  "module_root": "modules",
+  "modules": [
+    "ext.compress",
+    "ext.zip",
+    "ext.compress.tests",
+    "ext.zip.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "x07import"
+  }
+}

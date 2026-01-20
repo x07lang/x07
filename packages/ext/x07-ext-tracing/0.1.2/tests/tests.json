@@ -1,0 +1,24 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.tracing/span_roundtrip_and_format",
+      "world": "solve-pure",
+      "entry": "ext.tracing.tests.test_span_roundtrip_and_format",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.tracing/event_roundtrip_and_format",
+      "world": "solve-pure",
+      "entry": "ext.tracing.tests.test_event_roundtrip_and_format",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.tracing/invalid_records",
+      "world": "solve-pure",
+      "entry": "ext.tracing.tests.test_invalid_records",
+      "expect": "pass"
+    }
+  ]
+}
+
