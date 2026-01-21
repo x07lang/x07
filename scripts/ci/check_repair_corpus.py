@@ -54,11 +54,12 @@ def _resolve_x07_bin(root: Path, x07_override: Optional[str]) -> Path:
             return p
         raise SystemExit(f"ERROR: X07_BIN is set but not executable: {env}")
 
-    find = root / "scripts" / "ci" / "find_x07.sh"
+    find_rel = Path("scripts") / "ci" / "find_x07.sh"
+    find = root / find_rel
     if not find.is_file():
         raise SystemExit(f"ERROR: missing helper: {find}")
 
-    out = subprocess.check_output(["bash", str(find)], cwd=root).decode("utf-8").strip()
+    out = subprocess.check_output(["bash", find_rel.as_posix()], cwd=root).decode("utf-8").strip()
     p = (root / out).resolve() if not Path(out).is_absolute() else Path(out)
     if not p.is_file():
         raise SystemExit(f"ERROR: find_x07.sh returned non-file path: {out}")
@@ -367,4 +368,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
