@@ -43,7 +43,6 @@ done
 
 if ! cargo build -p x07 >/dev/null 2>&1; then
   cargo build -p x07
-  exit 1
 fi
 
 for p in "${candidates[@]}"; do
