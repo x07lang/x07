@@ -4,6 +4,11 @@ on:
   release:
     types:
       - published
+  workflow_run:
+    workflows:
+      - Release
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       tag:
@@ -24,6 +29,7 @@ jobs:
   propagate:
     name: propagate / website
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     env:
       X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
     steps:
@@ -37,6 +43,11 @@ jobs:
               tag="$(jq -r '.inputs.tag' "$GITHUB_EVENT_PATH")"
               set_latest="$(jq -r '.inputs.set_latest // "true"' "$GITHUB_EVENT_PATH")"
               published_at_utc="$(jq -r '.inputs.published_at_utc // ""' "$GITHUB_EVENT_PATH")"
+              ;;
+            workflow_run)
+              tag="$(jq -r '.workflow_run.head_branch' "$GITHUB_EVENT_PATH")"
+              set_latest="true"
+              published_at_utc=""
               ;;
             release)
               tag="$(jq -r '.release.tag_name' "$GITHUB_EVENT_PATH")"
