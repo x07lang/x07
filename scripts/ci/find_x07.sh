@@ -8,9 +8,18 @@ repo_root() {
 root="$(repo_root)"
 cd "$root"
 
+is_executable() {
+  local path="$1"
+  if [[ "$path" == *.exe ]]; then
+    [[ -f "$path" ]]
+  else
+    [[ -x "$path" ]]
+  fi
+}
+
 x07_bin="${X07_BIN:-}"
 if [[ -n "${x07_bin}" ]]; then
-  if [[ -x "${x07_bin}" ]]; then
+  if is_executable "${x07_bin}"; then
     echo "${x07_bin}"
     exit 0
   fi
@@ -26,16 +35,19 @@ candidates=(
 )
 
 for p in "${candidates[@]}"; do
-  if [[ -x "$p" ]]; then
+  if is_executable "$p"; then
     echo "$p"
     exit 0
   fi
 done
 
-cargo build -p x07 >/dev/null
+if ! cargo build -p x07 >/dev/null 2>&1; then
+  cargo build -p x07
+  exit 1
+fi
 
 for p in "${candidates[@]}"; do
-  if [[ -x "$p" ]]; then
+  if is_executable "$p"; then
     echo "$p"
     exit 0
   fi
@@ -43,4 +55,3 @@ done
 
 echo "ERROR: missing x07 binary (build with \`cargo build -p x07\`)" >&2
 exit 1
-
