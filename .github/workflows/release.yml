@@ -63,6 +63,7 @@ jobs:
           update: true
           install: >-
             mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-lld
             mingw-w64-ucrt-x86_64-openssl
             mingw-w64-ucrt-x86_64-curl
             mingw-w64-ucrt-x86_64-sqlite3
@@ -86,6 +87,7 @@ jobs:
             exit 2
           fi
           echo "X07_CC=$gcc_path" >> "$GITHUB_ENV"
+          echo "X07_CC_ARGS=-fuse-ld=lld" >> "$GITHUB_ENV"
 
       - name: CI gate
         shell: bash
