@@ -908,7 +908,15 @@ pub fn compile_c_to_exe_with_config(
         }
     }
     for a in &config.extra_cc_args {
-        cmd.arg(a);
+        #[cfg(windows)]
+        {
+            let arg = strip_windows_verbatim_path_prefix(a);
+            cmd.arg(arg.as_ref());
+        }
+        #[cfg(not(windows))]
+        {
+            cmd.arg(a);
+        }
     }
 
     let cmd_program = cmd.get_program().to_os_string();
@@ -1086,6 +1094,24 @@ pub fn compile_c_to_exe_with_config(
         stderr,
         exe_path: ok.then_some(final_exe_path),
     })
+}
+
+#[cfg(windows)]
+fn strip_windows_verbatim_path_prefix(arg: &str) -> std::borrow::Cow<'_, str> {
+    if !(arg.contains(r"\\?\") || arg.contains(r"//?/")) {
+        return std::borrow::Cow::Borrowed(arg);
+    }
+
+    // Rust's canonicalize() can produce verbatim paths like:
+    // - \\?\C:\path\to\file
+    // - \\?\UNC\server\share\path
+    //
+    // Some C toolchains (notably mingw gcc) fail to resolve these paths.
+    let mut s = arg.replace(r"\\?\UNC\", r"\\");
+    s = s.replace(r"\\?\", "");
+    s = s.replace(r"//?/UNC/", r"//");
+    s = s.replace(r"//?/", "");
+    std::borrow::Cow::Owned(s)
 }
 
 #[cfg(test)]
