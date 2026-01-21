@@ -10,6 +10,8 @@ cd "$root"
 
 ./scripts/ci/check_tools.sh >/dev/null
 
+source ./scripts/ci/lib_ext_packages.sh
+
 mkdir -p tmp tmp/tmp
 
 cargo build -p x07-os-runner >/dev/null
@@ -269,108 +271,108 @@ run_one_multi_bg_with_http_client() {
 
 run_one "ext-zlib-c" \
   "tests/external_os/zlib/src/main.x07.json" \
-  "packages/ext/x07-ext-zlib-c/0.1.0/modules" \
-  "packages/ext/x07-ext-zlib-c/0.1.0/ffi/zlib_shim.c"
+  "$(x07_ext_pkg_modules x07-ext-zlib-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-zlib-c zlib_shim.c)"
 
 run_one "ext-openssl-c" \
   "tests/external_os/openssl/src/main.x07.json" \
-  "packages/ext/x07-ext-openssl-c/0.1.0/modules" \
-  "packages/ext/x07-ext-openssl-c/0.1.0/ffi/openssl_shim.c"
+  "$(x07_ext_pkg_modules x07-ext-openssl-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-openssl-c openssl_shim.c)"
 
 run_one "ext-curl-c" \
   "tests/external_os/curl/src/main.x07.json" \
-  "packages/ext/x07-ext-curl-c/0.1.0/modules" \
-  "packages/ext/x07-ext-curl-c/0.1.0/ffi/curl_shim.c"
+  "$(x07_ext_pkg_modules x07-ext-curl-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-curl-c curl_shim.c)"
 
 run_one_multi "ext-net" \
   "tests/external_os/net/src/main.x07.json" \
-  "packages/ext/x07-ext-curl-c/0.1.0/x07-package.json" \
-  "packages/ext/x07-ext-curl-c/0.1.0/ffi/curl_shim.c" \
-  "packages/ext/x07-ext-net/0.1.0/modules" \
-  "packages/ext/x07-ext-curl-c/0.1.0/modules"
+  "$(x07_ext_pkg_manifest x07-ext-curl-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-curl-c curl_shim.c)" \
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-curl-c)"
 
 run_one_multi_sandboxed "ext-net (file:// only)" \
   "tests/external_os/net/src/main.x07.json" \
   "tests/external_os/net/run-os-policy.file-etc-allow-ffi.json" \
-  "packages/ext/x07-ext-curl-c/0.1.0/x07-package.json" \
-  "packages/ext/x07-ext-curl-c/0.1.0/ffi/curl_shim.c" \
-  "packages/ext/x07-ext-net/0.1.0/modules" \
-  "packages/ext/x07-ext-curl-c/0.1.0/modules"
+  "$(x07_ext_pkg_manifest x07-ext-curl-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-curl-c curl_shim.c)" \
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-curl-c)"
 
 run_one_multi "ext-net sockets" \
   "tests/external_os/net_sockets/src/main.x07.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/x07-package.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/ffi/sockets_shim.c" \
-  "packages/ext/x07-ext-net/0.1.0/modules" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/modules"
+  "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-sockets-c)"
 
 run_one_multi_sandboxed "ext-net sockets (loopback allow)" \
   "tests/external_os/net_sockets/src/main.x07.json" \
   "tests/external_os/net_sockets/run-os-policy.loopback-allow.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/x07-package.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/ffi/sockets_shim.c" \
-  "packages/ext/x07-ext-net/0.1.0/modules" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/modules"
+  "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-sockets-c)"
 
 run_one_multi "ext-net iface streaming" \
   "tests/external_os/net_iface_stream/src/main.x07.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/x07-package.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/ffi/sockets_shim.c" \
-  "packages/ext/x07-ext-net/0.1.0/modules" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/modules"
+  "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-sockets-c)"
 
 run_one_multi_sandboxed "ext-net iface streaming (loopback allow)" \
   "tests/external_os/net_iface_stream/src/main.x07.json" \
   "tests/external_os/net_sockets/run-os-policy.loopback-allow.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/x07-package.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/ffi/sockets_shim.c" \
-  "packages/ext/x07-ext-net/0.1.0/modules" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/modules"
+  "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-sockets-c)"
 
 run_one_multi_bg_with_http_client "ext-net http server" \
   "run-os" \
   "tests/external_os/net_http_server/src/main.x07.json" \
   "" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/x07-package.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/ffi/sockets_shim.c" \
+  "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
   "127.0.0.1" "30031" \
-  "packages/ext/x07-ext-net/0.1.0/modules" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/modules" \
-  "packages/ext/x07-ext-url-rs/0.1.0/modules"
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_modules x07-ext-url-rs)"
 
 run_one_multi_bg_with_http_client "ext-net http server (loopback allow)" \
   "run-os-sandboxed" \
   "tests/external_os/net_http_server/src/main.x07.json" \
   "tests/external_os/net_sockets/run-os-policy.loopback-allow.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/x07-package.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/ffi/sockets_shim.c" \
+  "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
   "127.0.0.1" "30031" \
-  "packages/ext/x07-ext-net/0.1.0/modules" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/modules" \
-  "packages/ext/x07-ext-url-rs/0.1.0/modules"
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_modules x07-ext-url-rs)"
 
 with_tls_echo_server "127.0.0.1" "30030" \
   run_one_multi "ext-net tls" \
     "tests/external_os/net_tls/src/main.x07.json" \
-    "packages/ext/x07-ext-sockets-c/0.1.0/x07-package.json" \
-    "packages/ext/x07-ext-sockets-c/0.1.0/ffi/sockets_shim.c" \
-    "packages/ext/x07-ext-net/0.1.0/modules" \
-    "packages/ext/x07-ext-sockets-c/0.1.0/modules"
+    "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+    "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
+    "$(x07_ext_pkg_modules x07-ext-net)" \
+    "$(x07_ext_pkg_modules x07-ext-sockets-c)"
 
 with_tls_echo_server "127.0.0.1" "30030" \
   run_one_multi_sandboxed "ext-net tls (loopback allow)" \
     "tests/external_os/net_tls/src/main.x07.json" \
     "tests/external_os/net_sockets/run-os-policy.loopback-allow.json" \
-    "packages/ext/x07-ext-sockets-c/0.1.0/x07-package.json" \
-    "packages/ext/x07-ext-sockets-c/0.1.0/ffi/sockets_shim.c" \
-    "packages/ext/x07-ext-net/0.1.0/modules" \
-    "packages/ext/x07-ext-sockets-c/0.1.0/modules"
+    "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+    "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
+    "$(x07_ext_pkg_modules x07-ext-net)" \
+    "$(x07_ext_pkg_modules x07-ext-sockets-c)"
 run_one_multi_sandboxed "ext-net sockets (policy denied)" \
   "tests/external_os/net_sockets_policy_denied/src/main.x07.json" \
   "tests/external_os/net/run-os-policy.file-etc-allow-ffi.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/x07-package.json" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/ffi/sockets_shim.c" \
-  "packages/ext/x07-ext-net/0.1.0/modules" \
-  "packages/ext/x07-ext-sockets-c/0.1.0/modules"
+  "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-sockets-c)"
 
 echo "ok: external OS-world packages smoke"

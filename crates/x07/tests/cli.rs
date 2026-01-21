@@ -241,13 +241,13 @@ fn x07_pkg_pack_includes_ffi_dir() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let package_dir = root.join("packages/ext/x07-ext-curl-c/0.1.1");
+    let package_dir = root.join("packages/ext/x07-ext-curl-c/0.1.3");
     assert!(
         package_dir.join("ffi/curl_shim.c").is_file(),
         "missing fixture file"
     );
 
-    let out_path = dir.join("ext-curl-c-0.1.1.x07pkg");
+    let out_path = dir.join("ext-curl-c-0.1.3.x07pkg");
     let out = run_x07(&[
         "pkg",
         "pack",

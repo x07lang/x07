@@ -12,6 +12,8 @@ cd "$root"
 
 ./scripts/ci/check_tools.sh >/dev/null
 
+source ./scripts/ci/lib_ext_packages.sh
+
 python_bin="${X07_PYTHON:-}"
 if [[ -z "${python_bin}" ]]; then
   if [[ -x ".venv/bin/python" ]]; then
@@ -62,7 +64,7 @@ pick_runner() {
 X07_HOST_RUNNER="$(pick_runner "${X07_HOST_RUNNER:-}" "x07-host-runner")"
 X07_OS_RUNNER="$(pick_runner "${X07_OS_RUNNER:-}" "x07-os-runner")"
 
-MODULE_ROOT="${X07_EXT_TIME_MODULE_ROOT:-packages/ext/x07-ext-time-rs/0.1.0/modules}"
+MODULE_ROOT="${X07_EXT_TIME_MODULE_ROOT:-$(x07_ext_pkg_modules x07-ext-time-rs)}"
 if [[ ! -d "$MODULE_ROOT" ]]; then
   echo "ERROR: ext-time module root not found at $MODULE_ROOT" >&2
   exit 2
@@ -84,4 +86,3 @@ run_suite "benchmarks/smoke/time-os-smoke.json"
 run_suite "benchmarks/smoke/time-os-sandboxed-policy-deny-now-smoke.json"
 
 echo "[time-smoke] OK"
-

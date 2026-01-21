@@ -10,6 +10,8 @@ cd "$root"
 
 ./scripts/ci/check_tools.sh >/dev/null
 
+source ./scripts/ci/lib_ext_packages.sh
+
 python_bin="${X07_PYTHON:-}"
 if [[ -z "${python_bin}" ]]; then
   if [[ -x ".venv/bin/python" ]]; then
@@ -44,7 +46,7 @@ fi
 "$python_bin" scripts/bench/run_bench_suite.py --suite benchmarks/solve-pure/phaseH1-smoke.json --solutions "$solutions_dir"
 "$python_bin" scripts/bench/run_bench_suite.py --suite benchmarks/solve-full/phaseH2-smoke.json --solutions "$solutions_dir"
 "$python_bin" scripts/bench/run_bench_suite.py --suite benchmarks/solve-pure/emitters-v1-suite.json --solutions "$solutions_dir"
-X07_BENCH_MODULE_ROOT="stdlib/std/0.1.1/modules:packages/ext/x07-ext-cli/0.1.2/modules:packages/ext/x07-ext-data-model/0.1.0/modules:packages/ext/x07-ext-json-rs/0.1.0/modules" \
+X07_BENCH_MODULE_ROOT="stdlib/std/0.1.1/modules:$(x07_ext_pkg_modules x07-ext-cli):$(x07_ext_pkg_modules x07-ext-data-model):$(x07_ext_pkg_modules x07-ext-json-rs)" \
   "$python_bin" scripts/bench/run_bench_suite.py --suite benchmarks/solve-pure/cli-v1-specrows-determinism.json --solutions "$solutions_dir"
 
 echo "ok: canary gate passed"

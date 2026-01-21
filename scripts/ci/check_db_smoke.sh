@@ -12,6 +12,8 @@ cd "$root"
 
 ./scripts/ci/check_tools.sh >/dev/null
 
+source ./scripts/ci/lib_ext_packages.sh
+
 python_bin="${X07_PYTHON:-}"
 if [[ -z "${python_bin}" ]]; then
   if [[ -x ".venv/bin/python" ]]; then
@@ -65,13 +67,13 @@ pick_runner() {
 X07_HOST_RUNNER="$(pick_runner "${X07_HOST_RUNNER:-}" "x07-host-runner")"
 X07_OS_RUNNER="$(pick_runner "${X07_OS_RUNNER:-}" "x07-os-runner")"
 
-DB_CORE_ROOT="${X07_EXT_DB_CORE_MODULE_ROOT:-packages/ext/x07-ext-db-core/0.1.0/modules}"
-DB_SQLITE_ROOT="${X07_EXT_DB_SQLITE_MODULE_ROOT:-packages/ext/x07-ext-db-sqlite/0.1.0/modules}"
-DB_PG_ROOT="${X07_EXT_DB_PG_MODULE_ROOT:-packages/ext/x07-ext-db-postgres/0.1.0/modules}"
-DB_MYSQL_ROOT="${X07_EXT_DB_MYSQL_MODULE_ROOT:-packages/ext/x07-ext-db-mysql/0.1.0/modules}"
-DB_REDIS_ROOT="${X07_EXT_DB_REDIS_MODULE_ROOT:-packages/ext/x07-ext-db-redis/0.1.0/modules}"
-DATA_MODEL_ROOT="${X07_EXT_DATA_MODEL_MODULE_ROOT:-packages/ext/x07-ext-data-model/0.1.0/modules}"
-HEX_ROOT="${X07_EXT_HEX_MODULE_ROOT:-packages/ext/x07-ext-hex-rs/0.1.0/modules}"
+DB_CORE_ROOT="${X07_EXT_DB_CORE_MODULE_ROOT:-$(x07_ext_pkg_modules x07-ext-db-core)}"
+DB_SQLITE_ROOT="${X07_EXT_DB_SQLITE_MODULE_ROOT:-$(x07_ext_pkg_modules x07-ext-db-sqlite)}"
+DB_PG_ROOT="${X07_EXT_DB_PG_MODULE_ROOT:-$(x07_ext_pkg_modules x07-ext-db-postgres)}"
+DB_MYSQL_ROOT="${X07_EXT_DB_MYSQL_MODULE_ROOT:-$(x07_ext_pkg_modules x07-ext-db-mysql)}"
+DB_REDIS_ROOT="${X07_EXT_DB_REDIS_MODULE_ROOT:-$(x07_ext_pkg_modules x07-ext-db-redis)}"
+DATA_MODEL_ROOT="${X07_EXT_DATA_MODEL_MODULE_ROOT:-$(x07_ext_pkg_modules x07-ext-data-model)}"
+HEX_ROOT="${X07_EXT_HEX_MODULE_ROOT:-$(x07_ext_pkg_modules x07-ext-hex-rs)}"
 
 for r in "$DB_CORE_ROOT" "$DB_SQLITE_ROOT" "$DB_PG_ROOT" "$DB_MYSQL_ROOT" "$DB_REDIS_ROOT" "$DATA_MODEL_ROOT" "$HEX_ROOT"; do
   if [[ ! -d "$r" ]]; then

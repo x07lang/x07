@@ -12,6 +12,8 @@ cd "$root"
 
 ./scripts/ci/check_tools.sh >/dev/null
 
+source ./scripts/ci/lib_ext_packages.sh
+
 python_bin="${X07_PYTHON:-}"
 if [[ -z "${python_bin}" ]]; then
   if [[ -x ".venv/bin/python" ]]; then
@@ -62,7 +64,7 @@ pick_runner() {
 X07_HOST_RUNNER="$(pick_runner "${X07_HOST_RUNNER:-}" "x07-host-runner")"
 X07_OS_RUNNER="$(pick_runner "${X07_OS_RUNNER:-}" "x07-os-runner")"
 
-MODULE_ROOT="${X07_EXT_FS_MODULE_ROOT:-packages/ext/x07-ext-fs/0.1.0/modules}"
+MODULE_ROOT="${X07_EXT_FS_MODULE_ROOT:-$(x07_ext_pkg_modules x07-ext-fs)}"
 if [[ ! -d "$MODULE_ROOT" ]]; then
   echo "ERROR: ext-fs module root not found at $MODULE_ROOT" >&2
   exit 2
@@ -82,4 +84,3 @@ run_suite "benchmarks/smoke/fs-os-smoke.json"
 run_suite "benchmarks/smoke/fs-os-sandboxed-policy-deny-smoke.json"
 
 echo "[fs-smoke] OK"
-

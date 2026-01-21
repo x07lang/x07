@@ -4,9 +4,9 @@
   "pre_score_canaries": [],
   "score_suites": [],
   "test_manifests": [
-    "packages/ext/x07-ext-zlib-c/0.1.0/tests/tests.json",
-    "packages/ext/x07-ext-openssl-c/0.1.0/tests/tests.json",
-    "packages/ext/x07-ext-curl-c/0.1.0/tests/tests.json"
+    "packages/ext/x07-ext-zlib-c/0.1.3/tests/tests.json",
+    "packages/ext/x07-ext-openssl-c/0.1.3/tests/tests.json",
+    "packages/ext/x07-ext-curl-c/0.1.3/tests/tests.json"
   ],
   "notes": {
     "determinism_tier": "os-world-only",
