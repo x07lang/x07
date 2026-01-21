@@ -93,6 +93,7 @@ pub fn plan_native_link_argv(
     reqs.dedup_by(|a, b| a.backend_id == b.backend_id);
 
     let mut out: Vec<String> = Vec::new();
+    let mut post_out: Vec<String> = Vec::new();
     let mut seen_args: BTreeSet<String> = BTreeSet::new();
     let mut libs: Vec<String> = Vec::new();
     let mut seen_libs: BTreeSet<String> = BTreeSet::new();
@@ -149,7 +150,11 @@ pub fn plan_native_link_argv(
 
         for arg in &spec.args {
             if seen_args.insert(arg.clone()) {
-                out.push(arg.clone());
+                if matches!(platform, HostPlatform::WindowsGnu) {
+                    post_out.push(arg.clone());
+                } else {
+                    out.push(arg.clone());
+                }
             }
         }
 
@@ -193,6 +198,10 @@ pub fn plan_native_link_argv(
         HostPlatform::MacOS | HostPlatform::WindowsMsvc | HostPlatform::WindowsGnu => {
             out.extend(libs);
         }
+    }
+
+    if matches!(platform, HostPlatform::WindowsGnu) {
+        out.extend(post_out);
     }
 
     Ok(out)

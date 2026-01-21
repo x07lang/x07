@@ -218,7 +218,6 @@ fn native_link_argv_windows_gnu_exact() {
     let argv = plan_native_link_argv(&dir, &requires_doc()).expect("plan argv");
 
     let expected = vec![
-        "-lws2_32".to_string(),
         dir.join("deps")
             .join("x07")
             .join("libx07_ext_net.a")
@@ -234,6 +233,7 @@ fn native_link_argv_windows_gnu_exact() {
             .join("libx07_ext_sqlite3.a")
             .to_string_lossy()
             .to_string(),
+        "-lws2_32".to_string(),
     ];
 
     assert_eq!(argv, expected);
