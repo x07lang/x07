@@ -139,9 +139,8 @@ pub fn plan_native_link_argv(
             let full = join_rel(toolchain_root, rel)?;
             let flag = match platform {
                 HostPlatform::Linux | HostPlatform::MacOS => format!("-L{}", full.display()),
-                HostPlatform::WindowsMsvc | HostPlatform::WindowsGnu => {
-                    format!("/LIBPATH:{}", full.display())
-                }
+                HostPlatform::WindowsMsvc => format!("/LIBPATH:{}", full.display()),
+                HostPlatform::WindowsGnu => format!("-L{}", full.display()),
             };
             if seen_args.insert(flag.clone()) {
                 out.push(flag);
@@ -207,12 +206,34 @@ fn host_platform() -> Result<HostPlatform> {
         return Ok(HostPlatform::MacOS);
     }
     if cfg!(windows) {
+        if let Some(p) = windows_link_platform_from_env() {
+            return Ok(p);
+        }
         if cfg!(target_env = "msvc") {
             return Ok(HostPlatform::WindowsMsvc);
         }
         return Ok(HostPlatform::WindowsGnu);
     }
     anyhow::bail!("unsupported host platform");
+}
+
+fn windows_link_platform_from_env() -> Option<HostPlatform> {
+    if !cfg!(windows) {
+        return None;
+    }
+
+    let cc = std::env::var("X07_CC").ok()?;
+    let cc = cc.trim();
+    if cc.is_empty() {
+        return None;
+    }
+
+    let cc_lc = cc.to_ascii_lowercase();
+    if cc_lc.contains("clang-cl") || cc_lc.ends_with("cl.exe") || cc_lc == "cl" {
+        Some(HostPlatform::WindowsMsvc)
+    } else {
+        Some(HostPlatform::WindowsGnu)
+    }
 }
 
 fn join_rel(root: &Path, rel: &str) -> Result<PathBuf> {

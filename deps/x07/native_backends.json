@@ -148,6 +148,14 @@
           "search_paths": [],
           "force_load": false,
           "whole_archive": false
+        },
+        "windows-gnu": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_ext_fs.a"],
+          "args": ["-lws2_32"],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
         }
       }
     },

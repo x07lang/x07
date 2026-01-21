@@ -31,7 +31,8 @@ const MANIFEST_JSON: &str = r#"
       "link": {
         "linux": { "kind": "static", "files": ["deps/x07/libx07_ext_net.a"], "args": ["-pthread"], "search_paths": [], "force_load": false, "whole_archive": false },
         "macos": { "kind": "static", "files": ["deps/x07/libx07_ext_net.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "windows-msvc": { "kind": "static", "files": ["deps/x07/x07_ext_net.lib"], "args": ["Ws2_32.lib"], "search_paths": [], "force_load": false, "whole_archive": false }
+        "windows-msvc": { "kind": "static", "files": ["deps/x07/x07_ext_net.lib"], "args": ["Ws2_32.lib"], "search_paths": [], "force_load": false, "whole_archive": false },
+        "windows-gnu": { "kind": "static", "files": ["deps/x07/libx07_ext_net.a"], "args": ["-lws2_32"], "search_paths": [], "force_load": false, "whole_archive": false }
       }
     },
     {
@@ -40,7 +41,8 @@ const MANIFEST_JSON: &str = r#"
       "link": {
         "linux": { "kind": "static", "files": ["deps/x07/libx07_ext_regex.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
         "macos": { "kind": "static", "files": ["deps/x07/libx07_ext_regex.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "windows-msvc": { "kind": "static", "files": ["deps/x07/x07_ext_regex.lib"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false }
+        "windows-msvc": { "kind": "static", "files": ["deps/x07/x07_ext_regex.lib"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
+        "windows-gnu": { "kind": "static", "files": ["deps/x07/libx07_ext_regex.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false }
       }
     },
     {
@@ -49,7 +51,8 @@ const MANIFEST_JSON: &str = r#"
       "link": {
         "linux": { "kind": "static", "files": ["deps/x07/libx07_ext_sqlite3.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
         "macos": { "kind": "static", "files": ["deps/x07/libx07_ext_sqlite3.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "windows-msvc": { "kind": "static", "files": ["deps/x07/x07_ext_sqlite3.lib"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false }
+        "windows-msvc": { "kind": "static", "files": ["deps/x07/x07_ext_sqlite3.lib"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
+        "windows-gnu": { "kind": "static", "files": ["deps/x07/libx07_ext_sqlite3.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false }
       }
     }
   ]
@@ -160,6 +163,9 @@ fn native_link_argv_macos_exact() {
 #[test]
 #[cfg(windows)]
 fn native_link_argv_windows_msvc_exact() {
+    let prev_cc = std::env::var_os("X07_CC");
+    std::env::set_var("X07_CC", "cl.exe");
+
     let dir = temp_dir("x07_native_link_windows");
     write_fixture_toolchain_root(&dir);
 
@@ -187,4 +193,43 @@ fn native_link_argv_windows_msvc_exact() {
     assert_eq!(argv, expected);
 
     let _ = std::fs::remove_dir_all(&dir);
+
+    match prev_cc {
+        Some(v) => std::env::set_var("X07_CC", v),
+        None => std::env::remove_var("X07_CC"),
+    }
+}
+
+#[test]
+#[cfg(windows)]
+fn native_link_argv_windows_gnu_exact() {
+    let prev_cc = std::env::var_os("X07_CC");
+    std::env::set_var("X07_CC", "gcc");
+
+    let dir = temp_dir("x07_native_link_windows_gnu");
+    write_fixture_toolchain_root(&dir);
+
+    let argv = plan_native_link_argv(&dir, &requires_doc()).expect("plan argv");
+
+    let expected = vec![
+        "-lws2_32".to_string(),
+        dir.join("deps/x07/libx07_ext_net.a")
+            .to_string_lossy()
+            .to_string(),
+        dir.join("deps/x07/libx07_ext_regex.a")
+            .to_string_lossy()
+            .to_string(),
+        dir.join("deps/x07/libx07_ext_sqlite3.a")
+            .to_string_lossy()
+            .to_string(),
+    ];
+
+    assert_eq!(argv, expected);
+
+    let _ = std::fs::remove_dir_all(&dir);
+
+    match prev_cc {
+        Some(v) => std::env::set_var("X07_CC", v),
+        None => std::env::remove_var("X07_CC"),
+    }
 }
