@@ -16,6 +16,8 @@ Builds a toolchain tarball containing:
   - bin/{x07,x07c,x07-host-runner,x07-os-runner,x07import-cli}
   - deps/x07/native_backends.json + native backend archives (for native backends like ext-regex)
   - stdlib/os/0.2.0/modules (for x07-os-runner)
+  - docs/ (human docs snapshot; also shipped as x07-docs-*.tar.gz)
+  - .codex/skills/ (Codex skills pack; also shipped as x07-skills-*.tar.gz)
 
 Expected inputs:
   - Release binaries already built under <target-dir>/release (default: ./target/release)
@@ -91,6 +93,8 @@ rm -rf "$stage_root"
 mkdir -p "$stage_root/bin"
 mkdir -p "$stage_root/deps/x07"
 mkdir -p "$stage_root/stdlib/os/0.2.0"
+mkdir -p "$stage_root/docs"
+mkdir -p "$stage_root/.codex/skills"
 
 install_bin() {
   local name="$1"
@@ -122,6 +126,20 @@ if [[ ! -d "$stdlib_src" ]]; then
   exit 1
 fi
 cp -R "$stdlib_src" "$stdlib_dst"
+
+docs_src="$root/docs"
+if [[ ! -d "$docs_src" ]]; then
+  echo "ERROR: missing docs dir: $docs_src" >&2
+  exit 1
+fi
+cp -R "$docs_src/." "$stage_root/docs"
+
+skills_src="$root/skills/pack/.codex/skills"
+if [[ ! -d "$skills_src" ]]; then
+  echo "ERROR: missing skills pack dir: $skills_src" >&2
+  exit 1
+fi
+cp -R "$skills_src/." "$stage_root/.codex/skills"
 
 python_bin="${X07_PYTHON:-}"
 if [[ -z "${python_bin}" ]]; then
