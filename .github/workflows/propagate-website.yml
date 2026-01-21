@@ -117,6 +117,7 @@ jobs:
             "${args[@]}"
 
       - name: Open PR
+        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ env.X07_BOT_TOKEN }}
@@ -125,3 +126,12 @@ jobs:
           commit-message: "release: sync website for ${{ steps.vars.outputs.tag }}"
           title: "release: sync website for ${{ steps.vars.outputs.tag }}"
           body: Automated website sync from x07 tag ${{ steps.vars.outputs.tag }}.
+
+      - name: Enable auto-merge (squash)
+        if: ${{ steps.cpr.outputs.pull-request-number != '' }}
+        env:
+          GH_TOKEN: ${{ env.X07_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          pr="${{ steps.cpr.outputs.pull-request-number }}"
+          gh pr merge "$pr" --repo x07lang/x07-website --squash --auto --delete-branch
