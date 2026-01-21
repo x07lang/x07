@@ -1,11 +1,15 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(windows)]
+use std::sync::Mutex;
 
 use x07_contracts::{NATIVE_BACKENDS_SCHEMA_VERSION, NATIVE_REQUIRES_SCHEMA_VERSION};
 use x07_host_runner::plan_native_link_argv;
 use x07c::native::{NativeBackendReq, NativeRequires};
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+#[cfg(windows)]
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 fn temp_dir(prefix: &str) -> PathBuf {
     let base = std::env::temp_dir();
@@ -163,6 +167,7 @@ fn native_link_argv_macos_exact() {
 #[test]
 #[cfg(windows)]
 fn native_link_argv_windows_msvc_exact() {
+    let _lock = ENV_LOCK.lock().expect("lock env");
     let prev_cc = std::env::var_os("X07_CC");
     std::env::set_var("X07_CC", "cl.exe");
 
@@ -203,6 +208,7 @@ fn native_link_argv_windows_msvc_exact() {
 #[test]
 #[cfg(windows)]
 fn native_link_argv_windows_gnu_exact() {
+    let _lock = ENV_LOCK.lock().expect("lock env");
     let prev_cc = std::env::var_os("X07_CC");
     std::env::set_var("X07_CC", "gcc");
 
@@ -213,13 +219,19 @@ fn native_link_argv_windows_gnu_exact() {
 
     let expected = vec![
         "-lws2_32".to_string(),
-        dir.join("deps/x07/libx07_ext_net.a")
+        dir.join("deps")
+            .join("x07")
+            .join("libx07_ext_net.a")
             .to_string_lossy()
             .to_string(),
-        dir.join("deps/x07/libx07_ext_regex.a")
+        dir.join("deps")
+            .join("x07")
+            .join("libx07_ext_regex.a")
             .to_string_lossy()
             .to_string(),
-        dir.join("deps/x07/libx07_ext_sqlite3.a")
+        dir.join("deps")
+            .join("x07")
+            .join("libx07_ext_sqlite3.a")
             .to_string_lossy()
             .to_string(),
     ];
