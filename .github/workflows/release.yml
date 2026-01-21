@@ -55,24 +55,24 @@ jobs:
         run: |
           brew install openssl@3 pkg-config
 
-      - name: Set up MSYS2 (UCRT64, C toolchain + libs)
+      - name: Set up MSYS2 (MINGW64, C toolchain + libs)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
+          msystem: MINGW64
           update: true
           install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-openssl
-            mingw-w64-ucrt-x86_64-curl
-            mingw-w64-ucrt-x86_64-sqlite3
-            mingw-w64-ucrt-x86_64-zlib
-            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-curl
+            mingw-w64-x86_64-sqlite3
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-pkgconf
 
-      - name: Add MSYS2 UCRT64 to PATH
+      - name: Add MSYS2 MINGW64 to PATH
         if: runner.os == 'Windows'
         shell: bash
-        run: echo "${RUNNER_TEMP}\\\\msys64\\\\ucrt64\\\\bin" >> "$GITHUB_PATH"
+        run: echo "${RUNNER_TEMP}\\\\msys64\\\\mingw64\\\\bin" >> "$GITHUB_PATH"
 
       - name: Select MSYS2 gcc for builds
         if: runner.os == 'Windows'
@@ -80,7 +80,7 @@ jobs:
         run: |
           set -euo pipefail
           runner_temp_posix="${RUNNER_TEMP//\\//}"
-          gcc_path="${runner_temp_posix}/msys64/ucrt64/bin/gcc.exe"
+          gcc_path="${runner_temp_posix}/msys64/mingw64/bin/gcc.exe"
           if [[ ! -x "$gcc_path" ]]; then
             echo "ERROR: expected MSYS2 gcc at: $gcc_path" >&2
             exit 2
