@@ -1,0 +1,6 @@
+fixture_site:
+  host: 127.0.0.1
+  port: 18080
+  base_url: "http://127.0.0.1:18080/"
+output:
+  path: "out/results.txt"

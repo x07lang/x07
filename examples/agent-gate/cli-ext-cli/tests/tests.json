@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "smoke/cli_ext_cli",
+      "world": "solve-pure",
+      "entry": "smoke.cli_ext_cli",
+      "expect": "pass"
+    }
+  ]
+}

@@ -28,7 +28,21 @@ x07 pkg lock
   - `u32_le(len)`
   - `len` raw bytes
 
-When running under `x07 run` (or the underlying runners), you still pass `argv_v1` bytes via `--input`.
+When running under `x07 run`, you can either:
+
+- pass process args after `--` (recommended; `x07 run` encodes `argv_v1` into input bytes), or
+- provide `argv_v1` bytes directly via `--input` (advanced; useful for fixtures).
+
+### Canonical execution for CLI args: `x07 run -- <args...>`
+
+If your program expects `argv_v1`, pass process args after `--` and `x07 run` will encode them into input bytes automatically:
+
+```bash
+x07 run --profile test -- tool --help
+x07 run --profile os -- tool --url https://example.com --depth 2 --out out/results.txt
+```
+
+This eliminates the need to manually construct `--input` bytes for normal runs. `--input` remains available for fixture-based tests and advanced usage.
 
 ## Recommended layout
 

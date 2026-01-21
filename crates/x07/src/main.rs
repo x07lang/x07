@@ -8,12 +8,16 @@ use anyhow::{Context, Result};
 use base64::Engine;
 use clap::{Args, Parser};
 use sha2::{Digest, Sha256};
-use x07_contracts::{X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION};
+use x07_contracts::{
+    PROJECT_LOCKFILE_SCHEMA_VERSION, X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
+};
 use x07_host_runner::{run_artifact_file, RunnerConfig, RunnerResult};
 use x07_worlds::WorldId;
+use x07c::project;
 
 mod ast;
 mod cli;
+mod doctor;
 mod init;
 mod pkg;
 mod policy;
@@ -46,6 +50,8 @@ enum Command {
     Test(TestArgs),
     /// Run X07 programs via the appropriate runner.
     Run(Box<run::RunArgs>),
+    /// Check platform prerequisites for OS worlds.
+    Doctor(doctor::DoctorArgs),
     /// Generate and manage run-os-sandboxed policy files.
     Policy(policy::PolicyArgs),
     /// Initialize, validate, and patch x07AST JSON files.
@@ -177,6 +183,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             None => Vec::new(),
             Some(Command::Test(_)) => vec!["test"],
             Some(Command::Run(_)) => vec!["run"],
+            Some(Command::Doctor(_)) => vec!["doctor"],
             Some(Command::Policy(args)) => match &args.cmd {
                 None => vec!["policy"],
                 Some(policy::PolicyCommand::Init(_)) => vec!["policy", "init"],
@@ -237,6 +244,7 @@ fn try_main() -> Result<std::process::ExitCode> {
     match command {
         Command::Test(args) => cmd_test(args),
         Command::Run(args) => run::cmd_run(*args),
+        Command::Doctor(args) => doctor::cmd_doctor(args),
         Command::Policy(args) => policy::cmd_policy(args),
         Command::Ast(args) => ast::cmd_ast(args),
         Command::Fmt(args) => toolchain::cmd_fmt(args),
@@ -264,6 +272,12 @@ fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
             return write_report_and_exit(args, report, 12);
         }
     };
+
+    let module_root_used = args
+        .module_root
+        .clone()
+        .unwrap_or_else(|| validated.manifest_dir.clone());
+    let module_roots = compute_test_module_roots(&args, &validated)?;
 
     let mut tests = validated.tests;
     if let Some(world) = args.world {
@@ -297,11 +311,6 @@ fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::SUCCESS);
     }
 
-    let module_root = args
-        .module_root
-        .clone()
-        .unwrap_or_else(|| validated.manifest_dir.clone());
-
     let stdlib_lock_path =
         util::resolve_existing_path_upwards_from(&validated.manifest_dir, &args.stdlib_lock);
     args.stdlib_lock = stdlib_lock_path;
@@ -315,17 +324,86 @@ fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
         );
     }
 
-    let results = run_tests(&args, &module_root, &tests)?;
+    let results = run_tests(&args, &module_roots, &tests)?;
 
-    let report = finalize_report(&args, &module_root, started.elapsed(), results);
+    let report = finalize_report(&args, &module_root_used, started.elapsed(), results);
 
     let exit_code = compute_exit_code(&args, &report);
     write_report_and_exit(args, report, exit_code)
 }
 
+fn compute_test_module_roots(
+    args: &TestArgs,
+    validated: &ValidatedManifest,
+) -> Result<Vec<PathBuf>> {
+    if let Some(module_root) = args.module_root.as_ref() {
+        return Ok(vec![module_root.clone()]);
+    }
+
+    let manifest_dir = &validated.manifest_dir;
+    let project_path =
+        util::resolve_existing_path_upwards_from(manifest_dir, Path::new("x07.json"));
+    if !project_path.is_file() {
+        return Ok(vec![manifest_dir.clone()]);
+    }
+
+    let project_manifest =
+        project::load_project_manifest(&project_path).context("load project manifest")?;
+    let lock_path = project::default_lockfile_path(&project_path, &project_manifest);
+
+    let lock: project::Lockfile = if lock_path.is_file() {
+        let bytes = std::fs::read(&lock_path)
+            .with_context(|| format!("read lockfile: {}", lock_path.display()))?;
+        serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?
+    } else if project_manifest.dependencies.is_empty() {
+        project::Lockfile {
+            schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
+            dependencies: Vec::new(),
+        }
+    } else {
+        anyhow::bail!(
+            "missing lockfile for project with dependencies: {}",
+            lock_path.display()
+        );
+    };
+
+    if lock.schema_version.trim() != PROJECT_LOCKFILE_SCHEMA_VERSION {
+        anyhow::bail!(
+            "lockfile schema_version mismatch: expected {} got {:?}",
+            PROJECT_LOCKFILE_SCHEMA_VERSION,
+            lock.schema_version
+        );
+    }
+
+    let mut roots = project::collect_module_roots(&project_path, &project_manifest, &lock)
+        .context("collect module roots")?;
+
+    let manifest_norm = normalize_module_root_path(manifest_dir);
+    let already_in_roots = roots
+        .iter()
+        .any(|p| normalize_module_root_path(p) == manifest_norm);
+    if !already_in_roots {
+        roots.push(manifest_dir.clone());
+    }
+
+    Ok(roots)
+}
+
+fn normalize_module_root_path(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        if component == std::path::Component::CurDir {
+            continue;
+        }
+        out.push(Path::new(component.as_os_str()));
+    }
+    out
+}
+
 fn run_tests(
     args: &TestArgs,
-    module_root: &Path,
+    module_roots: &[PathBuf],
     tests: &[TestDecl],
 ) -> Result<Vec<TestCaseResult>> {
     if args.jobs != 1 && !args.no_fail_fast {
@@ -346,7 +424,7 @@ fn run_tests(
                 eprintln!("test: {}", test.id);
             }
 
-            let result = run_one_test(args, module_root, test)?;
+            let result = run_one_test(args, module_roots, test)?;
             if !args.no_fail_fast {
                 let fail_fast = if args.no_run {
                     result.compile.as_ref().is_some_and(|c| !c.ok)
@@ -385,7 +463,7 @@ fn run_tests(
                 if args.verbose {
                     eprintln!("test: {}", test.id);
                 }
-                match run_one_test(args, module_root, test) {
+                match run_one_test(args, module_roots, test) {
                     Ok(r) => {
                         if let Ok(mut guard) = results.lock() {
                             guard.push(r);
@@ -424,7 +502,11 @@ fn matches_expectation_strs(expect: &str, status: &str) -> bool {
     )
 }
 
-fn run_one_test(args: &TestArgs, module_root: &Path, test: &TestDecl) -> Result<TestCaseResult> {
+fn run_one_test(
+    args: &TestArgs,
+    module_roots: &[PathBuf],
+    test: &TestDecl,
+) -> Result<TestCaseResult> {
     let start = Instant::now();
 
     if matches!(test.expect, Expect::Skip) {
@@ -461,7 +543,7 @@ fn run_one_test(args: &TestArgs, module_root: &Path, test: &TestDecl) -> Result<
     };
 
     let compile_options =
-        x07c::world_config::compile_options_for_world(test.world, vec![module_root.to_path_buf()]);
+        x07c::world_config::compile_options_for_world(test.world, module_roots.to_vec());
 
     let runner_config = runner_config_for_test(test)?;
 

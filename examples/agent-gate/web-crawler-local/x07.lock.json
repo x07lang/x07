@@ -1,0 +1,47 @@
+{
+  "schema_version": "x07.lock@0.2.0",
+  "dependencies": [
+    {
+      "name": "ext-curl-c",
+      "version": "0.1.3",
+      "path": ".x07/deps/ext-curl-c/0.1.3",
+      "package_manifest_sha256": "6718fec494ebd0f88483f66144db8aea9ff1455b31808ca4331229b6880c5307",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.curl._ffi": "5b4691bb1f553b2cc20d24bd461eaf26c3e5a842537a74c0cf5f23c9aed2fff5",
+        "ext.curl.http": "029b531f117042cba8ed364e339ab06cc01d7bd22e2f71af73985ba0d0b1ca67"
+      }
+    },
+    {
+      "name": "ext-fs",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-fs/0.1.2",
+      "package_manifest_sha256": "b7a4af3dbaa6ff255f5a9ff0064cf62ebe62abbba797e5a4cc29a98f7ba746fb",
+      "module_root": "modules",
+      "modules_sha256": {
+        "std.os.fs": "7a977bc432d4ad28b8e8ea247de5b9e1da40a0ff1af92d2c50bf7c001b314897",
+        "std.os.fs.spec": "e82b8646681471e39502f86fd0bfc240ebf25c9e0dd28aaff8670ce1359bba44"
+      }
+    },
+    {
+      "name": "ext-net",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-net/0.1.2",
+      "package_manifest_sha256": "38505c4401791e692cda31995e8212bf81868caa1ad1948f3734fc2a11ea6cc7",
+      "module_root": "modules",
+      "modules_sha256": {
+        "std.net.codec": "307d39e67735b4f91929f3da03ee26592dc6669bb0ab9f3b9cddeccf8d9108ee",
+        "std.net.dns": "02e2ba8aaaf924ac2e12ead1aae311229129bebfcd7a16021c3c1e0f4a534493",
+        "std.net.err": "0b1127abecceabbc445b155373c54261965a207bd29effb4cafb4f5dea0ebe8c",
+        "std.net.http": "b301e004fdfc6852ec2ee05a79abbc1b38e8bd9e4646dde947576c11fa492f79",
+        "std.net.http.client": "50d52da6e451aa9beb4dfe159f1d048b2e74640a8aaf9f6e46eaeea216b46dff",
+        "std.net.http.server": "103f0a246e144ca890cc733721f47e8de4560f21d19b1cd889b6c0cc0438ad3d",
+        "std.net.http.spec": "a2388069be8768123729933dfea00015e79c09f61fc817c4eacf2ab48c4d1eb9",
+        "std.net.io": "92412ef5c6cf1fada2b46cf72e88c8511c2bf068c4491733e5d864a13ab1cc05",
+        "std.net.tcp": "0d50662c2459e64f40f3993b36196121aa56bf755fe3c7133793d7d4e5ef231a",
+        "std.net.tls": "d594913b3133dec09a4a9d292e708cd81afcbf60e0c92bff52dc75cb8a510c55",
+        "std.net.udp": "379ebfe41750978ae2589914cd850d173aeb463fbde66018beb1a0d24e6caaed"
+      }
+    }
+  ]
+}

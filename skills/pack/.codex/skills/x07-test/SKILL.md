@@ -19,3 +19,5 @@ This skill provides the single canonical way to run tests for an X07 project usi
 
 - By default, `x07 test` prints JSON to stdout; use `--report-out <path>` to write a report file.
 - If your project pins stdlib via `stdlib.lock`, keep it in the project root or pass `--stdlib-lock <path>`.
+- New projects created with `x07 --init` include `tests/tests.json` plus a minimal `tests/smoke.x07.json`.
+- Tests under `tests/` can import your project modules under `src/` (via project module-root discovery).

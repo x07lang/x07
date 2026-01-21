@@ -1,0 +1,46 @@
+{
+  "format": "x07.agent_gate.repair_corpus@0.1.0",
+  "default_world": "solve-pure",
+  "cases": [
+    {
+      "id": "001_world_os_import",
+      "dir": "cases/001_world_os_import",
+      "broken": "broken.x07.json",
+      "fixed": "fixed.x07.json",
+      "expect_codes": ["X07-WORLD-OS-0001"],
+      "expect_quickfix": true
+    },
+    {
+      "id": "002_world_fs_import",
+      "dir": "cases/002_world_fs_import",
+      "broken": "broken.x07.json",
+      "fixed": "fixed.x07.json",
+      "expect_codes": ["X07-WORLD-0001"],
+      "expect_quickfix": true
+    },
+    {
+      "id": "003_arity_for_varargs",
+      "dir": "cases/003_arity_for_varargs",
+      "broken": "broken.x07.json",
+      "fixed": "fixed.x07.json",
+      "expect_codes": ["X07-ARITY-FOR-0001"],
+      "expect_quickfix": true
+    },
+    {
+      "id": "004_arity_let_varargs",
+      "dir": "cases/004_arity_let_varargs",
+      "broken": "broken.x07.json",
+      "fixed": "fixed.x07.json",
+      "expect_codes": ["X07-ARITY-LET-0001"],
+      "expect_quickfix": true
+    },
+    {
+      "id": "005_multi_quickfix",
+      "dir": "cases/005_multi_quickfix",
+      "broken": "broken.x07.json",
+      "fixed": "fixed.x07.json",
+      "expect_codes": ["X07-WORLD-0001", "X07-ARITY-LET-0001"],
+      "expect_quickfix": true
+    }
+  ]
+}

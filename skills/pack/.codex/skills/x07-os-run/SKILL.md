@@ -9,21 +9,24 @@ metadata:
 
 # x07-os-run
 
-Prefer `x07 run --os` (or `x07 run --world run-os*`) for normal execution. Use `x07-os-runner` directly only when you need runner-specific flags (policy debugging, auto-FFI toggles, explicit compiled artifact paths) or when you are debugging runner behavior.
+Prefer `x07 run --profile os` / `x07 run --profile sandbox` (or `x07 run --world run-os*`) for normal execution. Use `x07-os-runner` directly only when you need runner-specific flags (policy debugging, auto-FFI toggles, explicit compiled artifact paths) or when you are debugging runner behavior.
 
 Use this skill when you need real OS I/O (fs/net/process/time) via `run-os` or policy-enforced execution via `run-os-sandboxed`.
 
 ## Canonical commands (recommended: `x07 run`)
 
 - Run the current project (unsandboxed):
-  - `x07 run --os`
-  - (equivalently) `x07 run --world run-os`
+  - `x07 run --profile os`
+  - (equivalently) `x07 run --os` or `x07 run --world run-os`
 
 - Run a project explicitly (unsandboxed):
   - `x07 run --project x07.json --world run-os`
 
 - Run sandboxed (requires an explicit policy):
   - `x07 run --project x07.json --world run-os-sandboxed --policy run-os-policy.json`
+
+- If your program expects CLI args via `argv_v1`, pass them after `--` and `x07 run` will encode them into input bytes:
+  - `x07 run --profile os -- tool --help`
 
 - Generate a schema-valid base policy:
   - `x07 policy init --template cli`

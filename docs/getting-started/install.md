@@ -30,6 +30,7 @@ Verify:
 - `x07 --help`
 - `x07 run --help`
 - `x07 ast apply-patch --help`
+- `x07 doctor` (checks for a working C compiler and common native deps)
 - optional (advanced): `x07c --help`, `x07-host-runner --help`, `x07-os-runner --help`
 
 ## Option B: build from source (Rust toolchain)
@@ -52,6 +53,8 @@ If Gatekeeper blocks the binary:
 ### “C compiler not found”
 
 X07 compiles to C and invokes a system C compiler.
+
+Run `x07 doctor` for a machine-readable environment report and install suggestions.
 
 Install:
 

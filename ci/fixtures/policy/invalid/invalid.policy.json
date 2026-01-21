@@ -1,0 +1,4 @@
+{
+  "schema_version": "x07.run-os-policy@0.1.0",
+  "policy_id": "invalid.missing.required.fields"
+}

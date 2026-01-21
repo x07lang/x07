@@ -56,11 +56,20 @@ pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
         src_dir: root.join("src"),
         app: root.join("src").join("app.x07.json"),
         main: root.join("src").join("main.x07.json"),
+        tests_dir: root.join("tests"),
+        tests_manifest: root.join("tests").join("tests.json"),
+        tests_smoke: root.join("tests").join("smoke.x07.json"),
     };
 
     let mut conflicts = Vec::new();
-    let mut required_paths: Vec<&PathBuf> =
-        vec![&paths.project, &paths.lock, &paths.app, &paths.main];
+    let mut required_paths: Vec<&PathBuf> = vec![
+        &paths.project,
+        &paths.lock,
+        &paths.app,
+        &paths.main,
+        &paths.tests_manifest,
+        &paths.tests_smoke,
+    ];
     if options.package {
         required_paths.push(&paths.package);
     }
@@ -105,6 +114,24 @@ pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::from(20));
     }
 
+    if paths.tests_dir.exists() && !paths.tests_dir.is_dir() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_TESTS".to_string(),
+                message: format!(
+                    "tests exists but is not a directory: {}",
+                    rel(&root, &paths.tests_dir)
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
     let mut created: Vec<String> = Vec::new();
 
     if let Err(err) = std::fs::create_dir_all(&paths.src_dir) {
@@ -116,6 +143,21 @@ pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
             error: Some(InitError {
                 code: "X07INIT_IO".to_string(),
                 message: format!("create src dir: {err}"),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    if let Err(err) = std::fs::create_dir_all(&paths.tests_dir) {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_IO".to_string(),
+                message: format!("create tests dir: {err}"),
             }),
         };
         println!("{}", serde_json::to_string(&report)?);
@@ -155,6 +197,16 @@ pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
     }
     created.push(rel(&root, &paths.main));
 
+    if let Err(err) = write_new_file(&paths.tests_manifest, &tests_manifest_bytes()?) {
+        return print_io_error(&root, &created, "tests/tests.json", err);
+    }
+    created.push(rel(&root, &paths.tests_manifest));
+
+    if let Err(err) = write_new_file(&paths.tests_smoke, &tests_smoke_module_bytes()?) {
+        return print_io_error(&root, &created, "tests/smoke.x07.json", err);
+    }
+    created.push(rel(&root, &paths.tests_smoke));
+
     match ensure_gitignore(&paths.gitignore) {
         Ok(true) => created.push(rel(&root, &paths.gitignore)),
         Ok(false) => {}
@@ -193,6 +245,9 @@ struct InitPaths {
     src_dir: PathBuf,
     app: PathBuf,
     main: PathBuf,
+    tests_dir: PathBuf,
+    tests_manifest: PathBuf,
+    tests_smoke: PathBuf,
 }
 
 fn rel(root: &Path, path: &Path) -> String {
@@ -486,6 +541,96 @@ fn main_entry_bytes() -> Result<Vec<u8>> {
                 Value::Array(vec![
                     Value::String("app.solve".to_string()),
                     Value::String("input".to_string()),
+                ]),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    );
+    x07c::x07ast::canon_value_jcs(&mut v);
+    let mut out = serde_json::to_string(&v)?.into_bytes();
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    Ok(out)
+}
+
+fn tests_manifest_bytes() -> Result<Vec<u8>> {
+    let v = Value::Object(
+        [
+            (
+                "schema_version".to_string(),
+                Value::String("x07.tests_manifest@0.1.0".to_string()),
+            ),
+            (
+                "tests".to_string(),
+                Value::Array(vec![Value::Object(
+                    [
+                        ("id".to_string(), Value::String("smoke/pass".to_string())),
+                        ("world".to_string(), Value::String("solve-pure".to_string())),
+                        ("entry".to_string(), Value::String("smoke.pass".to_string())),
+                        ("expect".to_string(), Value::String("pass".to_string())),
+                    ]
+                    .into_iter()
+                    .collect(),
+                )]),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    );
+
+    let mut out = serde_json::to_vec_pretty(&v)?;
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    Ok(out)
+}
+
+fn tests_smoke_module_bytes() -> Result<Vec<u8>> {
+    let mut v = Value::Object(
+        [
+            (
+                "schema_version".to_string(),
+                Value::String(X07AST_SCHEMA_VERSION.to_string()),
+            ),
+            ("kind".to_string(), Value::String("module".to_string())),
+            ("module_id".to_string(), Value::String("smoke".to_string())),
+            (
+                "imports".to_string(),
+                Value::Array(vec![Value::String("std.test".to_string())]),
+            ),
+            (
+                "decls".to_string(),
+                Value::Array(vec![
+                    Value::Object(
+                        [
+                            ("kind".to_string(), Value::String("export".to_string())),
+                            (
+                                "names".to_string(),
+                                Value::Array(vec![Value::String("smoke.pass".to_string())]),
+                            ),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    Value::Object(
+                        [
+                            ("kind".to_string(), Value::String("defn".to_string())),
+                            ("name".to_string(), Value::String("smoke.pass".to_string())),
+                            ("params".to_string(), Value::Array(Vec::new())),
+                            (
+                                "result".to_string(),
+                                Value::String("result_i32".to_string()),
+                            ),
+                            (
+                                "body".to_string(),
+                                Value::Array(vec![Value::String("std.test.pass".to_string())]),
+                            ),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
                 ]),
             ),
         ]

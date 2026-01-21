@@ -1,0 +1,49 @@
+{
+  "schema_version": "x07.lock@0.2.0",
+  "dependencies": [
+    {
+      "name": "ext-cli",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-cli/0.1.2",
+      "package_manifest_sha256": "526dd1ce4d7f43bbe331668f9bd41e6e4cc2d102e7a2bb154a963c524b5376cf",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.cli": "4f1078c93c98faf0d55c2cba9676e8844f2d150301be18e5c9624a6c5081870e",
+        "ext.cli.complete": "dd0ef3e53f44d074b6a06a3ee023f5389e9d91b30ffcda6ca312e5bbc957f49d",
+        "ext.cli.help": "18e095036361d6dc2fb1fa5123371d4d53963ba0ddfbee1f4c34e3b876e4286b",
+        "ext.cli.specrows": "3238bdb0f673973cf7659ff27fa22f929cdad45b7267dd477b3ff75503aac77e",
+        "ext.cli.tests": "ef8b59a4532f93f829b9f10755180bc986751dbe774710eee2e2a39793d66468"
+      }
+    },
+    {
+      "name": "ext-data-model",
+      "version": "0.1.0",
+      "path": ".x07/deps/ext-data-model/0.1.0",
+      "package_manifest_sha256": "d6975a9971824d8405958c2a3518a94b2a56f090461bc9734c6f40cbbe3d36f9",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.data_model": "62ab24c6aa3ff6277ffaebb4574537f7ccc96c164426b8cf85ec9abecf029c05",
+        "ext.data_model.json": "f695f4758365743e01d4e98543bc640e0e83dfbac8f67980f0834ee4d8c89f41",
+        "ext.data_model.json.tests": "ab56828796f458070e66b10511b1c1f786d4cf7c7f4cf5e475781144e0a694f5",
+        "ext.data_model.tests": "fa3fe4df0791826aa5f5afdb7aef47e6f07846643f0ec9d225b6ee56fb5d4ae7",
+        "ext.data_model.toml": "13af7f2d210e4b15b9823cb1ba5a2a4fe28ae04c7002d736c61aa8a1de3ed485",
+        "ext.data_model.toml.tests": "eb9fd4b78485ed91b824e2f6fb68a83069f7cd8524225cc9e3caa91224fe4b81",
+        "ext.data_model.yaml": "668b8004ace4f02dafeeb95410808cdc68d7c98d61f7a99cd0886094d99cf0e7",
+        "ext.data_model.yaml.tests": "913dc8e5c6d87f50d55bb652ed90cc4d0f451521b3e1b4c03a9b42a993b4727e"
+      }
+    },
+    {
+      "name": "ext-json-rs",
+      "version": "0.1.0",
+      "path": ".x07/deps/ext-json-rs/0.1.0",
+      "package_manifest_sha256": "9794e4ded28899bf6abf865decf68d86b573ef5a65cbf36a697f9d3ea7e63caa",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.json.canon": "447918b74e61c643321c982d8485a8a89a29ac1c8fdb45f415b9c53fc21bb8c1",
+        "ext.json.data_model": "bbc405e76e096df6d1e3619db09223066a46e33fd5afbf2508bbaae800323d89",
+        "ext.json.pointer": "9e680033236452b5097ce92096aac6bcd8264b23b5d318e5097a552cabd39cee",
+        "ext.json.tests": "c56869e1958182d0b58ea8d71313a503271945b9221c590cf0ae2e3c96027aa2"
+      }
+    }
+  ]
+}

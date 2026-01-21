@@ -15,6 +15,12 @@ To discover available packages and versions, use the index catalog:
 
 - https://registry.x07.io/index/catalog.json
 
+Before using OS networking, verify native prerequisites (C compiler + curl/openssl linkability):
+
+```bash
+x07 doctor
+```
+
 ## Canonical approach
 
 - Always construct requests through pack/unpack helpers:
@@ -45,10 +51,13 @@ To discover available packages and versions, use the index catalog:
 
    ```bash
    # If your project defines profiles (recommended):
+   x07 run --profile os -- <your-cli-args...>
+
+   # Advanced: provide input bytes directly (for fixtures)
    x07 run --profile os --input input.bin
 
-   # Otherwise (legacy / explicit):
-   x07 run --project x07.json --world run-os --input input.bin
+   # Otherwise (explicit world selection):
+   x07 run --project x07.json --world run-os -- <your-cli-args...>
    ```
 
 System prerequisites depend on platform (for example, `libcurl` + `openssl` dev packages on Linux; Homebrew `openssl@3` on macOS).
@@ -68,8 +77,11 @@ System prerequisites depend on platform (for example, `libcurl` + `openssl` dev 
    ```bash
    x07 run --world run-os-sandboxed \
      --policy .x07/policies/base/http-client.sandbox.base.policy.json \
-     --allow-host example.com:443
+     --allow-host example.com:443 \
+     -- <your-cli-args...>
    ```
+
+If you edit a net-enabled base policy manually, keep `net.allow_dns: true` (required by the curl shim) and use `--allow-host` / `--deny-host` for destinations.
 
 ## Deterministic tests
 
@@ -77,3 +89,5 @@ Networking logic should be tested through:
 
 - fixture cassettes (request/response replay), or
 - pure request/response transforms.
+
+See `examples/agent-gate/web-crawler-local` in the `x07` repo for an end-to-end sandboxed crawler that runs against a local fixture site (no public internet).

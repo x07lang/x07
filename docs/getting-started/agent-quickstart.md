@@ -21,6 +21,12 @@ x07 run --help
 x07 --cli-specrows
 ```
 
+If you plan to use OS worlds (`run-os*`) with native deps (for example `ext-curl-c` / `ext-openssl-c`), run:
+
+```bash
+x07 doctor
+```
+
 See also: [Install](install.md).
 
 ## 2) Create a project (canonical starting point)
@@ -31,7 +37,12 @@ cd myapp
 x07 --init
 ```
 
-This creates `x07.json`, `x07.lock.json`, and a minimal `src/` program.
+This creates:
+
+- `x07.json` (with `test`, `os`, and `sandbox` profiles)
+- `x07.lock.json`
+- `src/` (a minimal program)
+- `tests/tests.json` + `tests/smoke.x07.json` (a deterministic harness smoke test)
 
 If you are creating a publishable package, use `x07 --init --package` to also create `x07-package.json`.
 
@@ -48,6 +59,12 @@ Run:
 
 ```bash
 x07 run
+```
+
+If your program expects CLI arguments via `argv_v1`, pass them after `--` and `x07 run` will encode them into input bytes:
+
+```bash
+x07 run --profile os -- tool --help
 ```
 
 Run the deterministic harness (repo-defined suites):
@@ -117,3 +134,11 @@ See: [Fixture worlds](../worlds/fixture-worlds.md) and [OS worlds](../worlds/os-
 
 - CLI surface: `x07 --cli-specrows`
 - Schemas: `spec/*.schema.json` (and the synced copies on x07lang.org under `/agent/.../schemas/`)
+
+## 9) Known-good reference projects (copy/paste)
+
+The `x07` repo ships three CI-gated example projects under `examples/agent-gate/`:
+
+- `cli-newline` (pure CLI payload parsing)
+- `cli-ext-cli` (CLI args via `ext-cli` + `argv_v1`)
+- `web-crawler-local` (sandboxed OS networking + `--allow-host`, against a local fixture site)

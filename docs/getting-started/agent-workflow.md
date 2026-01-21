@@ -43,6 +43,8 @@ An autonomous agent should follow a loop like:
 
 If you want a good mental model for “AI-native engineering”, see OpenAI’s Codex guide on building AI-native engineering teams.
 
+When OS access is required, prefer explicit profiles (for example `x07 run --profile os` / `x07 run --profile sandbox`) and run `x07 doctor` early to catch platform prerequisites.
+
 ## Golden rule: keep boundaries explicit
 
 Agent-written code is far more reliable if your system architecture makes boundaries explicit:

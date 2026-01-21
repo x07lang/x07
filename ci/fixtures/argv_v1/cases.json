@@ -1,0 +1,23 @@
+{
+  "format": "x07.argv_v1.fixtures@0.1.0",
+  "cases": [
+    {
+      "name": "basic_help",
+      "tokens": ["tool", "--help"],
+      "argv_v1_b64": "AgAAAAQAAAB0b29sBgAAAC0taGVscA=="
+    },
+    {
+      "name": "crawler_args",
+      "tokens": [
+        "crawler",
+        "--url",
+        "http://127.0.0.1:18080/",
+        "--depth",
+        "2",
+        "--out",
+        "out/results.txt"
+      ],
+      "argv_v1_b64": "BwAAAAYAAABjcmF3bGVyBQAAAC0tdXJsFwAAAGh0dHA6Ly8xMjcuMC4wLjE6MTgwODAvBwAAAC0tZGVwdGgBAAAAMgUAAAAtLW91dA8AAABvdXQvcmVzdWx0cy50eHQ="
+    }
+  ]
+}

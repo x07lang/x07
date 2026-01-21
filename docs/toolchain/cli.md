@@ -7,9 +7,14 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 ### New project skeleton
 
 - `x07 --init`
-  - Creates `x07.json`, `x07.lock.json`, and a minimal `src/` program.
+  - Creates `x07.json` (with `test`/`os`/`sandbox` profiles), `x07.lock.json`, a minimal `src/` program, and a `tests/` harness (`tests/tests.json`).
 - `x07 --init --package`
   - Also creates `x07-package.json` (required only for publishable packages).
+
+### Doctor (platform prerequisites)
+
+- `x07 doctor`
+  - Checks for a working C compiler and (when available) validates native deps for common OS stacks (curl + OpenSSL).
 
 ### Formatting (x07AST JSON)
 
@@ -57,6 +62,12 @@ Notes:
 ### Running generated executables
 
 Use `x07 run` as the canonical entry point for execution.
+
+#### CLI args (`argv_v1`) passthrough
+
+If your program expects `argv_v1` input, pass process args after `--` and `x07 run` will encode them into input bytes:
+
+- `x07 run --profile os -- tool --help`
 
 #### Profiles (recommended)
 

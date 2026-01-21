@@ -79,6 +79,14 @@ pub struct RunArgs {
     #[arg(long, conflicts_with_all = ["input", "stdin"], value_name = "BASE64")]
     pub input_b64: Option<String>,
 
+    /// Trailing arguments after `--` are encoded as `argv_v1` and provided as runner input.
+    #[arg(
+        trailing_var_arg = true,
+        value_name = "ARG",
+        conflicts_with_all = ["input", "stdin", "input_b64"]
+    )]
+    pub argv: Vec<String>,
+
     #[arg(long, value_enum)]
     pub cc_profile: Option<CcProfile>,
 
@@ -1710,6 +1718,14 @@ fn prepare_input_flag(
             Some(TempPathGuard { path }),
         ));
     }
+    if !args.argv.is_empty() {
+        let bytes = pack_argv_v1(&args.argv)?;
+        let path = write_temp_file(cwd, "x07_run_argv_v1", &bytes)?;
+        return Ok((
+            Some(vec!["--input".to_string(), path.display().to_string()]),
+            Some(TempPathGuard { path }),
+        ));
+    }
     if let Some(path) = default_input {
         return Ok((
             Some(vec!["--input".to_string(), path.display().to_string()]),
@@ -1717,6 +1733,25 @@ fn prepare_input_flag(
         ));
     }
     Ok((None, None))
+}
+
+fn pack_argv_v1(tokens: &[String]) -> Result<Vec<u8>> {
+    let argc: u32 = tokens.len().try_into().context("argv_v1 argc overflow")?;
+
+    let mut out = Vec::new();
+    out.extend_from_slice(&argc.to_le_bytes());
+
+    for tok in tokens {
+        let b = tok.as_bytes();
+        let len: u32 = b
+            .len()
+            .try_into()
+            .context("argv_v1 token length overflow")?;
+        out.extend_from_slice(&len.to_le_bytes());
+        out.extend_from_slice(b);
+    }
+
+    Ok(out)
 }
 
 fn read_all_stdin() -> Result<Vec<u8>> {

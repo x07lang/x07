@@ -24,6 +24,9 @@ Use this skill for normal program execution. `x07 run` dispatches to:
   - `x07 run --profile os`
   - `x07 run --profile sandbox`
 
+- Check platform prerequisites for OS worlds (C compiler + common native deps):
+  - `x07 doctor`
+
 - Run a deterministic fixture world:
   - `x07 run --world solve-fs --fixtures fixtures`
 
@@ -57,6 +60,11 @@ Default is empty input bytes. Provide input via:
 - file: `x07 run --input input.bin`
 - stdin: `cat input.bin | x07 run --stdin`
 - base64: `x07 run --input-b64 <BASE64>`
+
+For CLI-style programs that expect `argv_v1`, pass process args after `--` and `x07 run` will encode them into input bytes:
+
+- `x07 run --profile test -- tool --help`
+- `x07 run --profile os -- tool --url https://example.com --depth 2 --out out/results.txt`
 
 ## Output contract
 

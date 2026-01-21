@@ -521,7 +521,7 @@ fn x07_run_deny_host_removes_allow() {
     let pol: Value = serde_json::from_slice(&std::fs::read(&derived_path).unwrap())
         .expect("parse derived policy json");
     assert_eq!(pol["net"]["allow_hosts"], serde_json::json!([]));
-    assert_eq!(pol["net"]["allow_dns"], false);
+    assert_eq!(pol["net"]["allow_dns"], true);
 }
 
 #[test]

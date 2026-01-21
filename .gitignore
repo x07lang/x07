@@ -30,6 +30,10 @@ venv/
 artifacts/*
 tmp/
 
+# Release artifacts (generated locally)
+dist/*.tar.gz
+dist/.tmp_toolchain_*
+
 # OS helper binaries (built by scripts/build_os_helpers.sh)
 /deps/x07/x07-proc-echo
 /deps/x07/x07-proc-echo.exe
