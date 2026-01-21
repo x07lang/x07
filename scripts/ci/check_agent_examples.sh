@@ -32,6 +32,12 @@ if [[ ! -x "target/debug/x07-host-runner" && ! -x "target/release/x07-host-runne
   cargo build -p x07-host-runner -p x07-os-runner >/dev/null
 fi
 
+# Ensure the native ext-fs backend exists (required by OS-world examples that write files).
+if [[ ! -f "deps/x07/include/x07_ext_fs_abi_v1.h" ]] || \
+   [[ ! -f "deps/x07/libx07_ext_fs.a" && ! -f "deps/x07/x07_ext_fs.lib" ]]; then
+  ./scripts/build_ext_fs.sh >/dev/null
+fi
+
 tmp_dir="$(mktemp -t x07_agent_examples_XXXXXX -d)"
 cleanup() {
   # Best-effort cleanup of background processes (server).
