@@ -38,7 +38,17 @@ if [[ ! -f "deps/x07/include/x07_ext_fs_abi_v1.h" ]] || \
   ./scripts/build_ext_fs.sh >/dev/null
 fi
 
-tmp_dir="$(mktemp -t x07_agent_examples_XXXXXX -d)"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    # Keep temp paths under the repo on Windows so both bash tools and native
+    # Windows executables (python, x07.exe) agree on path semantics.
+    mkdir -p "$root/tmp"
+    tmp_dir="$(mktemp -d -p "$root/tmp" x07_agent_examples_XXXXXX)"
+    ;;
+  *)
+    tmp_dir="$(mktemp -t x07_agent_examples_XXXXXX -d)"
+    ;;
+esac
 cleanup() {
   # Best-effort cleanup of background processes (server).
   if [[ -n "${SERVER_PID:-}" ]]; then
@@ -251,6 +261,7 @@ require_path "$fixture_site"
 require_path "$root/scripts/ci/local_http_server.py"
 
 server_ready="$tmp_dir/http_server.ready.json"
+server_log="$tmp_dir/http_server.log"
 set +e
 "$python_bin" "$root/scripts/ci/local_http_server.py" \
   --root "$fixture_site" \
@@ -258,7 +269,7 @@ set +e
   --port 0 \
   --ready-json "$server_ready" \
   --quiet \
-  >/dev/null 2>&1 &
+  >"$server_log" 2>&1 &
 SERVER_PID="$!"
 set -e
 
@@ -268,11 +279,17 @@ for _i in $(seq 1 200); do
     break
   fi
   if ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+    echo "--- local_http_server.py log ---" >&2
+    cat "$server_log" >&2 || true
     die "local_http_server.py exited before becoming ready"
   fi
   sleep 0.05
 done
-[[ -s "$server_ready" ]] || die "local_http_server.py did not become ready (timeout)"
+if [[ ! -s "$server_ready" ]]; then
+  echo "--- local_http_server.py log ---" >&2
+  cat "$server_log" >&2 || true
+  die "local_http_server.py did not become ready (timeout)"
+fi
 
 host="$("$python_bin" - "$server_ready" <<'PY'
 import json, sys
