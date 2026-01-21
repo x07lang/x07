@@ -1122,6 +1122,7 @@ fn strip_windows_verbatim_path_prefix(arg: &str) -> std::borrow::Cow<'_, str> {
     s = s.replace(r"\\?\", "");
     s = s.replace(r"//?/UNC/", r"//");
     s = s.replace(r"//?/", "");
+    s = s.replace('\\', "/");
     std::borrow::Cow::Owned(s)
 }
 
