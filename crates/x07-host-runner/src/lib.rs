@@ -1043,6 +1043,17 @@ pub fn compile_c_to_exe_with_config(
             if !diag.ends_with(b"\n") {
                 diag.extend_from_slice(b"\n");
             }
+            #[cfg(windows)]
+            {
+                let filtered = filter_windows_link_errors(&diag_cc_out);
+                if !filtered.is_empty() {
+                    diag.extend_from_slice(b"\n--- cc -Wl,-t output (errors) ---\n");
+                    diag.extend_from_slice(&filtered);
+                    if !diag.ends_with(b"\n") {
+                        diag.extend_from_slice(b"\n");
+                    }
+                }
+            }
         }
 
         let mut combined = diag;
@@ -1112,6 +1123,37 @@ fn strip_windows_verbatim_path_prefix(arg: &str) -> std::borrow::Cow<'_, str> {
     s = s.replace(r"//?/UNC/", r"//");
     s = s.replace(r"//?/", "");
     std::borrow::Cow::Owned(s)
+}
+
+#[cfg(windows)]
+fn filter_windows_link_errors(out: &[u8]) -> Vec<u8> {
+    let text = String::from_utf8_lossy(out);
+    let needles = [
+        "error:",
+        "undefined reference",
+        "cannot find",
+        "file format",
+        "not recognized",
+        "ld:",
+        "collect2.exe:",
+    ];
+
+    let mut matched: Vec<&str> = Vec::new();
+    for line in text.lines() {
+        let lc = line.to_ascii_lowercase();
+        if needles.iter().any(|n| lc.contains(n)) {
+            matched.push(line);
+        }
+    }
+
+    let keep = 80usize;
+    let start = matched.len().saturating_sub(keep);
+    let mut out = Vec::new();
+    for line in &matched[start..] {
+        out.extend_from_slice(line.as_bytes());
+        out.extend_from_slice(b"\n");
+    }
+    out
 }
 
 #[cfg(test)]
