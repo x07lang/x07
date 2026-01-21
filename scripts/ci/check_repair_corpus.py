@@ -50,37 +50,35 @@ def _resolve_x07_bin(root: Path, x07_override: Optional[str]) -> Path:
     env = x07_override or os.environ.get("X07_BIN", "")
     if env:
         p = Path(env)
-        if p.is_file() and os.access(p, os.X_OK):
+        if p.is_file() and (os.name == "nt" or os.access(p, os.X_OK)):
             return p
         raise SystemExit(f"ERROR: X07_BIN is set but not executable: {env}")
 
-    find_rel = Path("scripts") / "ci" / "find_x07.sh"
-    find = root / find_rel
-    if not find.is_file():
-        raise SystemExit(f"ERROR: missing helper: {find}")
+    def is_exec(p: Path) -> bool:
+        if not p.is_file():
+            return False
+        if os.name == "nt":
+            return True
+        return os.access(p, os.X_OK)
 
-    try:
-        out = (
-            subprocess.check_output(
-                ["bash", find_rel.as_posix()],
-                cwd=root,
-                stderr=subprocess.STDOUT,
-            )
-            .decode("utf-8", errors="replace")
-            .strip()
-        )
-    except subprocess.CalledProcessError as e:
-        sys.stderr.write("ERROR: find_x07.sh failed\n")
-        if e.output:
-            sys.stderr.write(e.output.decode("utf-8", errors="replace"))
-            sys.stderr.write("\n")
-        raise SystemExit(1)
-    p = (root / out).resolve() if not Path(out).is_absolute() else Path(out)
-    if not p.is_file():
-        raise SystemExit(f"ERROR: find_x07.sh returned non-file path: {out}")
-    if not os.access(p, os.X_OK):
-        raise SystemExit(f"ERROR: x07 binary is not executable: {p}")
-    return p
+    candidates = [
+        root / "target" / "debug" / "x07",
+        root / "target" / "debug" / "x07.exe",
+        root / "target" / "release" / "x07",
+        root / "target" / "release" / "x07.exe",
+    ]
+
+    for c in candidates:
+        if is_exec(c):
+            return c
+
+    _run(["cargo", "build", "-p", "x07"], cwd=root, expect_codes=[0])
+
+    for c in candidates:
+        if is_exec(c):
+            return c
+
+    raise SystemExit("ERROR: missing x07 binary (expected cargo build -p x07 to produce it)")
 
 
 def _run(
