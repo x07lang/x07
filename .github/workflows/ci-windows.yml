@@ -66,6 +66,12 @@ jobs:
         shell: bash
         run: ./scripts/ci/check_all.sh
 
+      - name: Installer smoke (local channels)
+        shell: pwsh
+        env:
+          X07_INSTALL_SMOKE_MODE: local
+        run: ./scripts/ci/check_installer_smoke_windows.ps1
+
   wsl2:
     name: wsl2-ubuntu
     runs-on: windows-latest

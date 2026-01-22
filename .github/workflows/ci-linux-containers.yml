@@ -49,3 +49,7 @@ jobs:
       - name: CI gate
         shell: bash
         run: ./scripts/ci/check_all.sh
+
+      - name: Installer smoke (local channels)
+        shell: bash
+        run: ./scripts/ci/check_installer_smoke.sh

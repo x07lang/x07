@@ -203,6 +203,35 @@ jobs:
       - name: Build release manifest (check)
         run: python3 scripts/build_release_manifest.py --check
 
+  installer-smoke:
+    name: ci / installer-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+      - name: Installer smoke (local channels)
+        shell: bash
+        run: ./scripts/ci/check_installer_smoke.sh
+
   dco:
     name: ci / dco
     runs-on: ubuntu-latest

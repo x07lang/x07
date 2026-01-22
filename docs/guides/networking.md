@@ -19,7 +19,7 @@ To discover available packages and versions, use the index catalog:
 Before using OS networking, verify native prerequisites (C compiler + curl/openssl linkability):
 
 ```bash
-x07 doctor
+x07up doctor --json
 ```
 
 ## Canonical approach

@@ -10,7 +10,7 @@ repo_root() {
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/build_toolchain_tarball.sh --tag vX.Y.Z [--platform <macOS|Linux>] [--target-dir <dir>] [--out <path>]
+  scripts/build_toolchain_tarball.sh --tag vX.Y.Z [--platform <macOS|Linux>] [--target-dir <dir>] [--out <path>] [--skip-native-backends]
 
 Builds a toolchain tarball containing:
   - bin/{x07,x07c,x07-host-runner,x07-os-runner,x07import-cli}
@@ -34,6 +34,7 @@ tag=""
 platform=""
 target_dir="${CARGO_TARGET_DIR:-$root/target}"
 out=""
+skip_native_backends="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -52,6 +53,10 @@ while [[ $# -gt 0 ]]; do
     --out)
       out="${2:-}"
       shift 2
+      ;;
+    --skip-native-backends)
+      skip_native_backends="true"
+      shift 1
       ;;
     -h|--help)
       usage
@@ -157,6 +162,10 @@ if [[ ! -f "$native_backends_src" ]]; then
 fi
 cp -f "$native_backends_src" "$stage_root/deps/x07/native_backends.json"
 
+if [[ "$skip_native_backends" == "true" ]]; then
+  echo "warn: skipping native backend archives (--skip-native-backends)"
+  native_backend_files=""
+else
 platform_key=""
 case "$platform" in
   macOS) platform_key="macos" ;;
@@ -180,6 +189,7 @@ for rel in sorted(set(files)):
     print(rel)
 PY
 )"
+fi
 
 while IFS= read -r rel; do
   [[ -z "$rel" ]] && continue

@@ -18,6 +18,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
+          - macos-13
           - macos-14
           - windows-latest
     env:
@@ -97,7 +98,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli
+          cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli -p x07up
+
+      - name: Detect Rust host target triple
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$(rustc -vV | awk -F': ' '/^host:/{print $2}')"
+          if [[ -z "$target" ]]; then
+            echo "ERROR: failed to detect rustc host triple" >&2
+            exit 2
+          fi
+          echo "X07_TARGET=$target" >> "$GITHUB_ENV"
 
       - name: Smoke x07-host-runner cache fallback
         shell: bash
@@ -144,10 +156,25 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
-          out="dist/x07-${tag}-${{ runner.os }}.tar.gz"
+          target="${X07_TARGET}"
+          out="dist/x07-${tag}-${target}.tar.gz"
           mkdir -p dist
           scripts/build_toolchain_tarball.sh --tag "$tag" --platform "${{ runner.os }}" --out "$out"
-          echo "artifact_path=$out" >> "$GITHUB_ENV"
+
+      - name: Package x07up (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          target="${X07_TARGET}"
+          out="dist/x07up-${tag}-${target}.tar.gz"
+          stage="dist/.tmp_x07up_${tag}_${target}"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp -f "target/release/x07up" "$stage/x07up"
+          chmod 0755 "$stage/x07up"
+          tar -czf "$out" -C "$stage" x07up
 
       - name: Package toolchain (Windows)
         if: runner.os == 'Windows'
@@ -155,9 +182,11 @@ jobs:
         run: |
           $tag = $env:GITHUB_REF_NAME
           New-Item -ItemType Directory -Force dist | Out-Null
+          $target = $env:X07_TARGET
           $stage = "dist/.tmp_toolchain_${tag}_Windows"
           Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force "$stage/bin" | Out-Null
+          New-Item -ItemType Directory -Force "$stage/deps/x07" | Out-Null
           New-Item -ItemType Directory -Force "$stage/stdlib/os/0.2.0" | Out-Null
           New-Item -ItemType Directory -Force "$stage/docs" | Out-Null
           New-Item -ItemType Directory -Force "$stage/.codex/skills" | Out-Null
@@ -167,19 +196,37 @@ jobs:
             Copy-Item -Force "target/release/$b.exe" "$stage/bin/$b.exe"
           }
 
+          Copy-Item -Force "deps/x07/native_backends.json" "$stage/deps/x07/native_backends.json"
           Copy-Item -Recurse -Force "stdlib/os/0.2.0/modules" "$stage/stdlib/os/0.2.0"
           Copy-Item -Recurse -Force "docs/*" "$stage/docs"
           Copy-Item -Recurse -Force "skills/pack/.codex/skills/*" "$stage/.codex/skills"
 
-          $out = "dist/x07-$tag-Windows.zip"
+          $out = "dist/x07-$tag-$target.zip"
           Compress-Archive -Path "$stage/*" -DestinationPath $out -Force
-          "artifact_path=$out" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Package x07up (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $target = $env:X07_TARGET
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $stage = "dist/.tmp_x07up_${tag}_Windows"
+          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item -Force "target/release/x07up.exe" "$stage/x07up.exe"
+          $out = "dist/x07up-$tag-$target.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $out -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: x07-${{ github.ref_name }}-${{ runner.os }}
-          path: ${{ env.artifact_path }}
+          name: x07-${{ github.ref_name }}-${{ matrix.os }}
+          path: |
+            dist/x07-${{ github.ref_name }}-*.tar.gz
+            dist/x07-${{ github.ref_name }}-*.zip
+            dist/x07up-${{ github.ref_name }}-*.tar.gz
+            dist/x07up-${{ github.ref_name }}-*.zip
 
   publish:
     name: release / publish
@@ -199,6 +246,20 @@ jobs:
         with:
           path: dist
 
+      - name: Flatten toolchain artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=()
+          while IFS= read -r -d '' f; do
+            files+=("$f")
+          done < <(find dist -type f \( -name 'x07-*.tar.gz' -o -name 'x07-*.zip' -o -name 'x07up-*.tar.gz' -o -name 'x07up-*.zip' \) -print0)
+
+          for f in "${files[@]}"; do
+            base="$(basename "$f")"
+            cp -f "$f" "dist/$base"
+          done
+
       - name: Build release manifest
         run: python3 scripts/build_release_manifest.py --out dist/release-manifest.json
 
@@ -207,6 +268,9 @@ jobs:
 
       - name: Build docs bundle
         run: python3 scripts/build_docs_bundle.py --tag "${{ github.ref_name }}"
+
+      - name: Build channels manifest (install)
+        run: python3 scripts/build_channels_json.py --tag "${{ github.ref_name }}" --out dist/channels.json
 
       - name: Publish GitHub Release
         env:
@@ -224,7 +288,7 @@ jobs:
           files=()
           while IFS= read -r -d '' f; do
             files+=("$f")
-          done < <(find dist -type f \( -name 'x07-*.tar.gz' -o -name 'x07-*.zip' -o -name 'release-manifest.json' \) -print0)
+          done < <(find dist -type f \( -name 'x07-*.tar.gz' -o -name 'x07-*.zip' -o -name 'x07up-*.tar.gz' -o -name 'x07up-*.zip' -o -name 'release-manifest.json' -o -name 'channels.json' \) -print0)
 
           if (( ${#files[@]} == 0 )); then
             echo "ERROR: no release assets found under dist/" >&2

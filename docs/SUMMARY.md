@@ -5,6 +5,7 @@
 ## Getting started
 - [Agent quickstart](getting-started/agent-quickstart.md)
 - [Install](getting-started/install.md)
+- [Installer / x07up](getting-started/installer.md)
 - [First project](getting-started/first-project.md)
 - [Agent workflow](getting-started/agent-workflow.md)
 

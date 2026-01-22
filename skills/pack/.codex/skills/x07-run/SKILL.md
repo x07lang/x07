@@ -25,7 +25,7 @@ Use this skill for normal program execution. `x07 run` dispatches to:
   - `x07 run --profile sandbox`
 
 - Check platform prerequisites for OS worlds (C compiler + common native deps):
-  - `x07 doctor`
+  - `x07up doctor --json`
 
 - Run a deterministic fixture world:
   - `x07 run --world solve-fs --fixtures fixtures`

@@ -10,21 +10,34 @@ This page is a single entry point for LLM agents. X07 is a new language and most
 
 ## 1) Install and verify the toolchain
 
-- Download the latest release archive from https://github.com/x07lang/x07/releases/latest
-- Add its `bin/` directory to `PATH`.
+- Install with `x07up` (recommended).
+
+macOS / Linux (CI-safe, no profile edits, JSON report):
+
+```bash
+curl -fsSL https://x07lang.org/install.sh | sh -s -- \
+  --yes \
+  --channel stable \
+  --no-modify-path \
+  --json
+export PATH="$HOME/.x07/bin:$PATH"
+```
+
+If you are not in CI, you can omit `--no-modify-path` and the installer will attempt to persist the PATH change.
 
 Verify:
 
 ```bash
 x07 --help
 x07 run --help
+x07up show --json
 x07 --cli-specrows
 ```
 
 If you plan to use OS worlds (`run-os*`) with native deps (for example `ext-net` / `ext-curl-c` / `ext-sockets-c`), run:
 
 ```bash
-x07 doctor
+x07up doctor --json
 ```
 
 See also: [Install](install.md).
@@ -35,6 +48,12 @@ See also: [Install](install.md).
 mkdir myapp
 cd myapp
 x07 --init
+```
+
+For agent rails (toolchain pin + skills + a self-recovery guide), run:
+
+```bash
+x07up agent init --project . --pin stable --with-skills project
 ```
 
 This creates:
@@ -136,6 +155,7 @@ See: [Fixture worlds](../worlds/fixture-worlds.md) and [OS worlds](../worlds/os-
 - CLI surface: `x07 --cli-specrows`
 - Schemas: `spec/*.schema.json` (and the synced copies on x07lang.org under `/agent/.../schemas/`)
 - External packages index: `GET /agent/latest/packages/index.json` on x07lang.org
+- Offline docs: `x07up docs path --json`
 - Local module inspection: `x07 doc <module-or-symbol>`
 - Built-in reference guide: `x07 guide`
 

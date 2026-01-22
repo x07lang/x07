@@ -1,0 +1,51 @@
+{
+  "schema_version": "x07.install.channels@0.1.0",
+  "updated_at": "2026-01-21T00:00:00Z",
+  "channels": {
+    "stable": { "toolchain": "v0.0.0-example", "x07up": "v0.0.0-example" }
+  },
+  "toolchains": {
+    "v0.0.0-example": {
+      "published_at": "2026-01-21T00:00:00Z",
+      "notes": "Example instance for schema validation.",
+      "assets": {
+        "x86_64-unknown-linux-gnu": {
+          "url": "https://x07lang.org/install/artifacts/x07-v0.0.0-example-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "size_bytes": 0,
+          "format": "tar.gz"
+        }
+      },
+      "components": {
+        "docs": {
+          "url": "https://x07lang.org/install/artifacts/x07-docs-v0.0.0-example.tar.gz",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "size_bytes": 0,
+          "format": "tar.gz"
+        },
+        "skills": {
+          "url": "https://x07lang.org/install/artifacts/x07-skills-v0.0.0-example.tar.gz",
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "size_bytes": 0,
+          "format": "tar.gz"
+        }
+      },
+      "min_required": { "x07up": "v0.0.0-example" }
+    }
+  },
+  "x07up": {
+    "v0.0.0-example": {
+      "published_at": "2026-01-21T00:00:00Z",
+      "notes": "Example instance for schema validation.",
+      "assets": {
+        "x86_64-unknown-linux-gnu": {
+          "url": "https://x07lang.org/install/artifacts/x07up-v0.0.0-example-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "size_bytes": 0,
+          "format": "tar.gz"
+        }
+      }
+    }
+  }
+}
+

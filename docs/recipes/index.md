@@ -277,7 +277,7 @@ This fetches `https://example.com/` using `std.net.http.get_v1`, writes the body
 
 ```bash
 # Ensure native prerequisites for libcurl/OpenSSL are installed.
-x07 doctor
+x07up doctor --json
 
 # Add networking stack (transitive helper packages are auto-added at lock time).
 x07 pkg add ext-net@0.1.2 --sync
@@ -312,5 +312,5 @@ Expected:
 
 Common failures:
 
-- If you see C compile/link errors, run `x07 doctor` and install the suggested native deps.
+- If you see C compile/link errors, run `x07up doctor --json` and install the suggested native deps.
 - If you see a policy denial, ensure you passed `--allow-host example.com:443` (and that the policy is the `http-client` template).

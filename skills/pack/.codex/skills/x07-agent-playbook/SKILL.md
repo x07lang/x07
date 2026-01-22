@@ -18,7 +18,7 @@ See `references/tooling.md`.
 
 Execution should go through `x07 run` (single front door). The standalone runner binaries (`x07-host-runner`, `x07-os-runner`) remain available for expert usage, but are not part of the default agent loop.
 
-If the task needs OS worlds or native deps (curl/openssl, etc), run `x07 doctor` early and follow its suggestions.
+If the task needs OS worlds or native deps (curl/openssl, etc), run `x07up doctor --json` early and follow its suggestions.
 
 ## Single canonical agent loop (edit → format → lint → run)
 

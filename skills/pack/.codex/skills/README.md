@@ -4,8 +4,12 @@ Canonical source location (in the toolchain repo): `skills/pack/.codex/skills/`.
 
 Installation (for a user project):
 
-- copy these skill folders into `<project>/.codex/skills/` (project-scoped), or
-- copy them into `~/.codex/skills/` (user-scoped).
+- preferred: use `x07up`:
+  - user-scoped: `x07up skills install --user`
+  - project-scoped: `x07up skills install --project .`
+- advanced/manual:
+  - copy these skill folders into `<project>/.codex/skills/` (project-scoped), or
+  - copy them into `~/.codex/skills/` (user-scoped).
 
 Available skills:
 

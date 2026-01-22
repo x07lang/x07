@@ -25,7 +25,7 @@ You will start from `x07 --init` and evolve the program through stages:
 
 For the HTTP stage:
 
-- Run `x07 doctor` and install the suggested native prerequisites (libcurl/OpenSSL, C compiler, etc).
+- Run `x07up doctor --json` and install the suggested native prerequisites (libcurl/OpenSSL, C compiler, etc).
 
 Companion example (in the `x07` repo):
 

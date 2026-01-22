@@ -13,8 +13,8 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 ### Doctor (platform prerequisites)
 
-- `x07 doctor`
-  - Checks for a working C compiler and (when available) validates native deps for common OS stacks (curl + OpenSSL).
+- `x07up doctor --json`
+  - Checks toolchain integrity and host prerequisites (C compiler + common native deps).
 
 ### Guide (built-in language + stdlib reference)
 

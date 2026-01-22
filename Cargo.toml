@@ -5,6 +5,7 @@ members = [
   "crates/x07-contracts",
   "crates/x07",
   "crates/x07c",
+  "crates/x07up",
   "crates/x07-host-runner",
   "crates/x07-pkg",
   "crates/x07-ext-db-native-core",

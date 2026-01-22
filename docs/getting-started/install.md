@@ -7,6 +7,12 @@ X07 ships as a small toolchain with stable, JSON-first contracts:
 - `x07-host-runner` — deterministic runner backend (solve-* worlds; advanced)
 - `x07-os-runner` — OS runner backend (run-os* worlds; advanced)
 
+The recommended installer is `x07up` (toolchain manager). It installs:
+
+- the toolchain under `~/.x07/toolchains/<tag>/`
+- shims under `~/.x07/bin/` (put this on `PATH`)
+- offline docs + the Codex skills pack (default profile)
+
 ## Supported platforms
 
 X07 aims to be usable on:
@@ -17,23 +23,63 @@ X07 aims to be usable on:
 
 See [platform support and smoke tests](../worlds/os-worlds.md#platform-support).
 
-## Option A: install a prebuilt release
+## Option A (recommended): install via `x07up`
 
-1. Download the latest X07 release artifact for your platform (from the project’s releases).
-2. Unpack it.
-3. Add the `bin/` directory to your `PATH`.
+### macOS / Linux
 
-If the archive does not contain a `bin/` directory, the binaries are at the archive root; add that directory to your `PATH` instead.
+Install `x07up` + the stable toolchain:
+
+```bash
+curl -fsSL https://x07lang.org/install.sh | sh -s -- --yes --channel stable
+```
+
+CI / agent-friendly (no profile edits, JSON report):
+
+```bash
+curl -fsSL https://x07lang.org/install.sh | sh -s -- \
+  --yes \
+  --channel stable \
+  --no-modify-path \
+  --json
+```
+
+### Windows
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://x07lang.org/install.ps1 -OutFile install.ps1; .\\install.ps1 -Yes -Channel stable"
+```
+
+CI / agent-friendly:
+
+```powershell
+.\install.ps1 -Yes -Channel stable -NoModifyPath -Json
+```
+
+### Verify
 
 Verify:
 
 - `x07 --help`
 - `x07 run --help`
 - `x07 ast apply-patch --help`
-- `x07 doctor` (checks for a working C compiler and common native deps)
+- `x07up doctor --json` (toolchain + host prerequisites)
 - optional (advanced): `x07c --help`, `x07-host-runner --help`, `x07-os-runner --help`
 
-## Option B: build from source (Rust toolchain)
+### Pin a toolchain per project
+
+Write `x07-toolchain.toml` in your repo root:
+
+```bash
+x07up override set v0.0.19
+```
+
+This makes toolchain selection deterministic for agents and CI.
+
+## Option B (advanced): manual install
+
+If you cannot use `x07up`, download and unpack a toolchain archive and put its `bin/` directory on `PATH`.
+
+## Option C (advanced): build from source (Rust toolchain)
 
 If you have `cargo` installed:
 
@@ -54,7 +100,7 @@ If Gatekeeper blocks the binary:
 
 X07 compiles to C and invokes a system C compiler.
 
-Run `x07 doctor` for a machine-readable environment report and install suggestions.
+Run `x07up doctor --json` for a machine-readable environment report and install suggestions.
 
 Install:
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -26,6 +27,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", required=True, help="Release tag (for example: v0.2.0)")
     ap.add_argument("--bundle", type=Path, required=True, help="Path to docs bundle tar.gz (from x07)")
+    ap.add_argument(
+        "--channels-json",
+        type=Path,
+        default=None,
+        help="Path to channels.json to publish (default: <toolchain-repo>/dist/channels.json)",
+    )
     ap.add_argument("--published-at-utc", default=None)
     ap.add_argument("--set-latest", action="store_true")
     ap.add_argument("--check", action="store_true", help="Validate without writing files")
@@ -35,6 +42,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     website_root = Path.cwd()
+
+    def sync_file(*, src: Path, dst: Path) -> None:
+        if not src.is_file():
+            raise ValueError(f"missing source file: {src}")
+        if args.check:
+            if not dst.is_file():
+                raise ValueError(f"[CHECK] missing: {dst.relative_to(website_root)}")
+            if dst.read_bytes() != src.read_bytes():
+                raise ValueError(f"[CHECK] out of date: {dst.relative_to(website_root)}")
+            return
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
     sync_script = website_root / "scripts" / "sync_from_bundle.py"
     if not sync_script.is_file():
@@ -81,6 +100,30 @@ def main(argv: list[str]) -> int:
         cmd.append("--check")
 
     subprocess.check_call(cmd)
+
+    try:
+        sync_file(
+            src=toolchain_repo / "dist" / "install" / "install.sh",
+            dst=website_root / "site" / "static" / "install.sh",
+        )
+        sync_file(
+            src=toolchain_repo / "dist" / "install" / "install.ps1",
+            dst=website_root / "site" / "static" / "install.ps1",
+        )
+
+        channels_path = args.channels_json
+        if channels_path is None:
+            channels_path = toolchain_repo / "dist" / "channels.json"
+        sync_file(
+            src=channels_path.resolve(),
+            dst=website_root / "site" / "static" / "install" / "channels.json",
+        )
+    except ValueError as e:
+        msg = str(e)
+        print(f"ERROR: {msg}", file=sys.stderr)
+        if args.check and msg.startswith("[CHECK]"):
+            return 1
+        return 2
     return 0
 
 

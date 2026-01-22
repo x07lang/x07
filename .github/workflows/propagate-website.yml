@@ -92,6 +92,15 @@ jobs:
       - name: Build docs bundle
         run: python3 scripts/build_docs_bundle.py --tag "${{ steps.vars.outputs.tag }}"
 
+      - name: Download channels manifest (install)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.vars.outputs.tag }}"
+          mkdir -p dist
+          gh release download "$tag" --pattern "channels.json" --dir dist
+
       - name: Checkout (x07-website)
         uses: actions/checkout@v4
         with:
