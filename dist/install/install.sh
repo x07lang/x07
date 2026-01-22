@@ -84,12 +84,86 @@ def detect_target() -> str:
     raise InstallError(2, "ASSET_NOT_FOUND", f"unsupported host for installer: os={os_name} arch={machine}")
 
 
-def http_get_json(url: str) -> dict[str, Any]:
+def _curl_get_bytes(url: str, timeout_sec: int) -> bytes:
+    proc = subprocess.run(
+        [
+            "curl",
+            "--fail",
+            "--location",
+            "--silent",
+            "--show-error",
+            "--max-time",
+            str(timeout_sec),
+            url,
+        ],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if proc.returncode != 0:
+        err = proc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(err or f"curl failed with exit code {proc.returncode}")
+    return proc.stdout
+
+
+def _curl_download_file(url: str, out: Path, timeout_sec: int) -> None:
+    proc = subprocess.run(
+        [
+            "curl",
+            "--fail",
+            "--location",
+            "--silent",
+            "--show-error",
+            "--max-time",
+            str(timeout_sec),
+            "--output",
+            str(out),
+            url,
+        ],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if proc.returncode != 0:
+        out.unlink(missing_ok=True)
+        err = proc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(err or f"curl failed with exit code {proc.returncode}")
+
+
+def _http_get_bytes(url: str, timeout_sec: int) -> bytes:
+    errors: list[str] = []
+    if shutil.which("curl"):
+        try:
+            return _curl_get_bytes(url, timeout_sec=timeout_sec)
+        except Exception as e:
+            errors.append(f"curl: {e}")
     try:
-        with urllib.request.urlopen(url, timeout=60) as resp:
-            body = resp.read()
+        with urllib.request.urlopen(url, timeout=timeout_sec) as resp:
+            return resp.read()
     except urllib.error.URLError as e:
-        raise InstallError(10, "NETWORK_ERROR", f"failed to download: {url}", hint=str(e))
+        errors.append(f"python: {e}")
+        raise InstallError(10, "NETWORK_ERROR", f"failed to download: {url}", hint="; ".join(errors))
+
+
+def _download_to_file(url: str, out: Path, timeout_sec: int) -> None:
+    errors: list[str] = []
+    if shutil.which("curl"):
+        try:
+            _curl_download_file(url, out, timeout_sec=timeout_sec)
+            return
+        except Exception as e:
+            errors.append(f"curl: {e}")
+    try:
+        with urllib.request.urlopen(url, timeout=timeout_sec) as resp, out.open("wb") as f:
+            shutil.copyfileobj(resp, f, length=1024 * 1024)
+    except urllib.error.URLError as e:
+        out.unlink(missing_ok=True)
+        errors.append(f"python: {e}")
+        raise InstallError(10, "NETWORK_ERROR", f"failed to download: {url}", hint="; ".join(errors))
+
+
+def http_get_json(url: str) -> dict[str, Any]:
+    body = _http_get_bytes(url, timeout_sec=60)
     try:
         doc = json.loads(body.decode("utf-8"))
     except Exception as e:
@@ -110,11 +184,7 @@ def sha256_file(path: Path) -> str:
 def download_file(url: str, out: Path, expected_sha256: str, args: argparse.Namespace) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(out.suffix + ".tmp")
-    try:
-        with urllib.request.urlopen(url, timeout=600) as resp, tmp.open("wb") as f:
-            shutil.copyfileobj(resp, f, length=1024 * 1024)
-    except urllib.error.URLError as e:
-        raise InstallError(10, "NETWORK_ERROR", f"failed to download: {url}", hint=str(e))
+    _download_to_file(url, tmp, timeout_sec=600)
     actual = sha256_file(tmp)
     if actual.lower() != expected_sha256.strip().lower():
         tmp.unlink(missing_ok=True)
