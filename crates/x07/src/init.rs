@@ -646,7 +646,8 @@ fn tests_smoke_module_bytes() -> Result<Vec<u8>> {
 }
 
 fn ensure_gitignore(path: &Path) -> Result<bool> {
-    const REQUIRED: [&str; 2] = [".x07/", "target/"];
+    // Keep policy files committable by default, but ignore generated artifacts.
+    const REQUIRED: [&str; 3] = [".x07/deps/", ".x07/policies/_generated/", "target/"];
 
     let existing = match std::fs::read_to_string(path) {
         Ok(s) => s.replace("\r\n", "\n"),

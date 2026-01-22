@@ -329,8 +329,25 @@ fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::SUCCESS);
     }
 
-    let stdlib_lock_path =
-        util::resolve_existing_path_upwards_from(&validated.manifest_dir, &args.stdlib_lock);
+    let stdlib_lock_raw = args.stdlib_lock.clone();
+    let mut stdlib_lock_path =
+        util::resolve_existing_path_upwards_from(&validated.manifest_dir, &stdlib_lock_raw);
+    if !stdlib_lock_path.exists() && !stdlib_lock_raw.is_absolute() {
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(exe_dir) = exe.parent() {
+                let cand = util::resolve_existing_path_upwards_from(exe_dir, &stdlib_lock_raw);
+                if cand.exists() {
+                    stdlib_lock_path = cand;
+                }
+            }
+        }
+    }
+    if !stdlib_lock_path.exists() {
+        anyhow::bail!(
+            "could not find stdlib lock file: {} (pass --stdlib-lock <path>)",
+            stdlib_lock_raw.display()
+        );
+    }
     args.stdlib_lock = stdlib_lock_path;
 
     if args.verbose {

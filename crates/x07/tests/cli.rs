@@ -50,6 +50,12 @@ fn fresh_tmp_dir(root: &std::path::Path, name: &str) -> PathBuf {
     root.join("target").join(format!("{name}_{pid}_{n}"))
 }
 
+fn fresh_os_tmp_dir(name: &str) -> PathBuf {
+    let pid = std::process::id();
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{name}_{pid}_{n}"))
+}
+
 #[test]
 fn x07_test_smoke_suite() {
     let root = repo_root();
@@ -129,6 +135,46 @@ fn x07_test_smoke_suite() {
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+#[test]
+fn x07_test_finds_stdlib_lock_from_exe_when_missing() {
+    let root = repo_root();
+    let dir = fresh_os_tmp_dir("tmp_x07_test_stdlib_lock");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07_in_dir(&dir, &["test"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
+    assert_eq!(v["summary"]["passed"], 1);
+
+    let stdlib_lock = v["invocation"]["stdlib_lock"]
+        .as_str()
+        .expect("invocation.stdlib_lock");
+    assert_eq!(
+        PathBuf::from(stdlib_lock),
+        root.join("stdlib.lock"),
+        "expected fallback to the toolchain stdlib.lock"
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
 }
 
 #[test]

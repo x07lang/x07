@@ -9,7 +9,7 @@
       "result": "bytes",
       "body": [
         "bytes.lit",
-        "hello from task\n"
+        "hello_from_task"
       ]
     }
   },

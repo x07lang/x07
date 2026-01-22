@@ -30,10 +30,6 @@ Use this skill for normal program execution. `x07 run` dispatches to:
 - Run a deterministic fixture world:
   - `x07 run --world solve-fs --fixtures fixtures`
 
-- Run with real OS access (non-deterministic):
-  - `x07 run --os`
-  - (equivalently) `x07 run --world run-os`
-
 - Generate a base sandbox policy:
   - `x07 policy init --template cli`
   - `x07 policy init --template http-client`
@@ -47,11 +43,11 @@ Use this skill for normal program execution. `x07 run` dispatches to:
   For net-enabled templates, keep `net.allow_hosts: []` in the base policy and use `--allow-host` / `--deny-host` to materialize derived policies for specific destinations.
 
 - Run policy-enforced OS world (requires a policy file):
-  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/cli.sandbox.base.policy.json`
+  - `x07 run --profile sandbox`
 
 - Materialize a derived policy with explicit network destinations (deny-by-default):
-  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
-  - `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:80,443 --deny-host example.com:80`
+  - `x07 run --profile sandbox --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
+  - `x07 run --profile sandbox --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:80,443 --deny-host example.com:80`
 
 ## Inputs
 

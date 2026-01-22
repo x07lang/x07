@@ -2,6 +2,8 @@
 
 `x07import` is a deterministic importer that translates a restricted subset of Rust/C into X07 module files (`.x07.json`, x07AST JSON).
 
+For an end-to-end tutorial that produces a publishable package, see: [Porting by example](porting-by-example.md).
+
 Memory model note (ABI v2):
 - Prefer `bytes_view` for read-only byte inputs in imported signatures (borrowed, zero-copy), and return owned `bytes` (drop-clean).
 - Finalize `vec_u8` builders with `std.vec.as_bytes` (wraps `vec_u8.into_bytes`).

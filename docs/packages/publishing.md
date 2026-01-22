@@ -6,6 +6,8 @@ X07 supports a Cargo-like workflow:
 - lock
 - publish
 
+For a copy/paste end-to-end tutorial, see: [Publishing by example](publishing-by-example.md).
+
 ## Source-only packages
 
 Packages publish only x07AST JSON sources.

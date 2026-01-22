@@ -44,6 +44,8 @@ When running in `run-os-sandboxed`, `x07 run` can materialize a derived policy u
 
 Denies apply after allows, so deny wins.
 
+See also: [Sandbox policy walkthrough](sandbox-policy-walkthrough.md).
+
 ## Platform support
 
 X07 should treat these as Tier-1 OS platforms:

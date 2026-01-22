@@ -11,10 +11,8 @@
   },
   {
     "op": "replace",
-    "path": "/decls/1/body",
-    "value": [
-      "bytes.concat",
-      [
+      "path": "/decls/1/body",
+      "value": [
         "std.fmt.s32_to_dec",
         [
           "std.regex-lite.find_literal",
@@ -27,11 +25,6 @@
             ]
           ]
         ]
-      ],
-      [
-        "bytes.lit",
-        "\n"
       ]
-    ]
-  }
-]
+    }
+  ]

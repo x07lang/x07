@@ -1,0 +1,23 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-smoke-c-demo",
+  "version": "0.1.0",
+  "description": "Demo package: C imported via x07import (clang-backed).",
+  "docs": "Imported module: ext.smoke\nTests module: ext.smoke.tests\n",
+  "module_root": "modules",
+  "modules": ["ext.smoke", "ext.smoke.tests"],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "x07import"
+  }
+}
+

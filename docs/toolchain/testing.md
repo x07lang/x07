@@ -2,6 +2,8 @@
 
 X07 includes a deterministic test harness designed for agents.
 
+For a step-by-step walkthrough with fixtures, see: [Testing by example](testing-by-example.md).
+
 ## What “deterministic tests” mean
 
 - deterministic inputs

@@ -32,7 +32,7 @@ This rewrites `app.solve` to ignore input and return a fixed bytes literal.
 
 ```bash
 cat > /tmp/x07-hello-output.patch.json <<'JSON'
-[{"op":"replace","path":"/decls/1/body","value":["bytes.lit","Hello from X07\\n"]}]
+[{"op":"replace","path":"/decls/1/body","value":["bytes.lit","Hello_from_X07"]}]
 JSON
 
 x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-hello-output.patch.json --out src/app.x07.json --validate
@@ -41,7 +41,7 @@ x07 lint --input src/app.x07.json --world solve-pure
 x07 run
 ```
 
-Expected: `solve_output_b64` decodes to `Hello from X07\n`.
+Expected: `solve_output_b64` decodes to `Hello_from_X07`.
 
 Common failures:
 
@@ -101,7 +101,7 @@ x07 pkg add ext-cli@0.1.3 --sync
 cat > /tmp/x07-ext-cli-name.patch.json <<'JSON'
 [
   {"op":"add","path":"/imports/0","value":"ext.cli"},
-  {"op":"replace","path":"/decls/1/body","value":["begin",["let","spec",["bytes.lit","{\\\"schema_version\\\":\\\"x07cli.specrows@0.1.0\\\",\\\"app\\\":{\\\"name\\\":\\\"tool\\\",\\\"version\\\":\\\"0.1.0\\\"},\\\"rows\\\":[[\\\"root\\\",\\\"opt\\\",\\\"\\\",\\\"--name\\\",\\\"name\\\",\\\"NAME\\\",\\\"\\\",{\\\"required\\\":true}]]}"]],["let","argv_v1",["view.to_bytes","b"]],["let","doc",["ext.cli.parse_specrows","spec","argv_v1"]],["if",["=",["ext.cli.is_ok",["bytes.view","doc"]],0],["return",["ext.cli.err_usage",["bytes.view","doc"]]],0],["let","name",["option_bytes.unwrap_or",["ext.cli.matches_get",["bytes.view","doc"],["bytes.view",["bytes.lit","name"]],2],["bytes.alloc",0]]],["bytes.concat",["bytes.concat",["bytes.lit","name="],"name"],["bytes.lit","\\n"]]]}
+  {"op":"replace","path":"/decls/1/body","value":["begin",["let","spec",["bytes.lit","{\\\"schema_version\\\":\\\"x07cli.specrows@0.1.0\\\",\\\"app\\\":{\\\"name\\\":\\\"tool\\\",\\\"version\\\":\\\"0.1.0\\\"},\\\"rows\\\":[[\\\"root\\\",\\\"opt\\\",\\\"\\\",\\\"--name\\\",\\\"name\\\",\\\"NAME\\\",\\\"\\\",{\\\"required\\\":true}]]}"]],["let","argv_v1",["view.to_bytes","b"]],["let","doc",["ext.cli.parse_specrows","spec","argv_v1"]],["if",["=",["ext.cli.is_ok",["bytes.view","doc"]],0],["return",["ext.cli.err_usage",["bytes.view","doc"]]],0],["let","name",["option_bytes.unwrap_or",["ext.cli.matches_get",["bytes.view","doc"],["bytes.view",["bytes.lit","name"]],2],["bytes.alloc",0]]],["bytes.concat",["bytes.lit","name="],"name"]]}
 ]
 JSON
 
@@ -112,7 +112,7 @@ x07 lint --input src/app.x07.json --world solve-pure
 x07 run -- tool --name Alice
 ```
 
-Expected: `solve_output_b64` decodes to `name=Alice\n`.
+Expected: `solve_output_b64` decodes to `name=Alice`.
 
 Common failures:
 
@@ -127,7 +127,7 @@ cat > /tmp/x07-find-literal.patch.json <<'JSON'
 [
   {"op":"add","path":"/imports/0","value":"std.regex-lite"},
   {"op":"add","path":"/imports/1","value":"std.fmt"},
-  {"op":"replace","path":"/decls/1/body","value":["bytes.concat",["std.fmt.s32_to_dec",["std.regex-lite.find_literal","b",["bytes.view",["bytes.lit","needle"]]]],["bytes.lit","\\n"]]}
+  {"op":"replace","path":"/decls/1/body","value":["std.fmt.s32_to_dec",["std.regex-lite.find_literal","b",["bytes.view",["bytes.lit","needle"]]]]}
 ]
 JSON
 
@@ -139,7 +139,7 @@ printf 'hayneedlehay' > /tmp/input.bin
 x07 run --input /tmp/input.bin
 ```
 
-Expected: `solve_output_b64` decodes to `3\n`.
+Expected: `solve_output_b64` decodes to `3`.
 
 ### 6) Canonicalize JSON (pure, solve-pure)
 
@@ -170,7 +170,7 @@ This adds a `defasync` and uses `task.spawn` + `await`.
 ```bash
 cat > /tmp/x07-async-hello.patch.json <<'JSON'
 [
-  {"op":"add","path":"/decls/-","value":{"kind":"defasync","name":"app.hello_task","params":[],"result":"bytes","body":["bytes.lit","hello from task\\n"]}},
+  {"op":"add","path":"/decls/-","value":{"kind":"defasync","name":"app.hello_task","params":[],"result":"bytes","body":["bytes.lit","hello_from_task"]}},
   {"op":"replace","path":"/decls/1/body","value":["begin",["let","h",["app.hello_task"]],["task.spawn","h"],["await","h"]]}
 ]
 JSON
@@ -181,7 +181,7 @@ x07 lint --input src/app.x07.json --world solve-pure
 x07 run
 ```
 
-Expected: `solve_output_b64` decodes to `hello from task\n`.
+Expected: `solve_output_b64` decodes to `hello_from_task`.
 
 ### 8) Read a fixture file (solve-fs)
 
@@ -247,7 +247,10 @@ x07 policy init --template cli
 mkdir -p out
 
 cat > /tmp/x07-sandbox-write-file.patch.json <<'JSON'
-[{"op":"replace","path":"/decls/1/body","value":["begin",["os.fs.write_file",["bytes.lit","out/hello.txt"],["bytes.lit","Hello from sandbox\\n"]],["bytes.lit","ok\\n"]]}]
+[
+  {"op":"add","path":"/imports/-","value":"std.os.fs"},
+  {"op":"replace","path":"/decls/1/body","value":["begin",["std.os.fs.write_file",["bytes.lit","out/hello.txt"],["bytes.lit","Hello_from_sandbox"]],["bytes.lit","ok"]]}
+]
 JSON
 
 x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-sandbox-write-file.patch.json --out src/app.x07.json --validate
@@ -260,8 +263,8 @@ cat out/hello.txt
 
 Expected:
 
-- `out/hello.txt` contains `Hello from sandbox\n`
-- `solve_output_b64` decodes to `ok\n`
+- `out/hello.txt` contains `Hello_from_sandbox`
+- `solve_output_b64` decodes to `ok`
 
 Common failures:
 
@@ -270,7 +273,7 @@ Common failures:
 
 ### 11) HTTP GET in a sandbox (run-os-sandboxed + `ext-net`)
 
-This fetches `https://example.com/` using `std.net.http.client.get_v1`, writes the body to `out/example.html`, and returns `status=<code>\n`.
+This fetches `https://example.com/` using `std.net.http.get_v1`, writes the body to `out/example.html`, and returns `status=<code>`.
 
 ```bash
 # Ensure native prerequisites for libcurl/OpenSSL are installed.
@@ -285,10 +288,11 @@ mkdir -p out
 
 cat > /tmp/x07-sandbox-http-get.patch.json <<'JSON'
 [
-  {"op":"add","path":"/imports/0","value":"std.net.http.client"},
-  {"op":"add","path":"/imports/1","value":"std.net.http.spec"},
-  {"op":"add","path":"/imports/2","value":"std.fmt"},
-  {"op":"replace","path":"/decls/1/body","value":["begin",["let","url",["bytes.lit","https://example.com/"]],["let","caps",["std.net.http.spec.caps_default_v1"]],["let","resp",["std.net.http.client.get_v1","url","caps"]],["let","dv",["bytes.view","resp"]],["let","status",["std.net.http.client.resp_status_v1","dv"]],["let","body",["std.net.http.client.resp_body_v1","dv"]],["os.fs.write_file",["bytes.lit","out/example.html"],"body"],["bytes.concat",["bytes.concat",["bytes.lit","status="],["std.fmt.u32_to_dec","status"]],["bytes.lit","\\n"]]]}
+  {"op":"add","path":"/imports/-","value":"std.net.http"},
+  {"op":"add","path":"/imports/-","value":"std.net.http.spec"},
+  {"op":"add","path":"/imports/-","value":"std.fmt"},
+  {"op":"add","path":"/imports/-","value":"std.os.fs"},
+  {"op":"replace","path":"/decls/1/body","value":["begin",["let","url",["bytes.lit","https://example.com/"]],["let","caps",["std.net.http.spec.caps_default_v1"]],["let","resp",["std.net.http.get_v1","url","caps"]],["let","dv",["bytes.view","resp"]],["if",["std.net.http.resp_is_err_v1","dv"],["begin",["let","code",["std.net.http.resp_err_code_v1","dv"]],["let","code_b",["std.fmt.s32_to_dec","code"]],["bytes.concat",["bytes.lit","http_error_code="],"code_b"]],["begin",["let","status",["std.net.http.resp_status_v1","dv"]],["let","body",["std.net.http.resp_body_v1","dv"]],["std.os.fs.write_file",["bytes.lit","out/example.html"],"body"],["bytes.concat",["bytes.lit","status="],["std.fmt.u32_to_dec","status"]]]]}
 ]
 JSON
 
@@ -304,7 +308,7 @@ x07 run --profile sandbox \
 Expected:
 
 - `out/example.html` contains the fetched response body bytes
-- `solve_output_b64` decodes to `status=200\n` (or another HTTP status)
+- `solve_output_b64` decodes to `status=200` (or another HTTP status)
 
 Common failures:
 

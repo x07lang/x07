@@ -21,16 +21,23 @@
 - [Worlds overview](worlds/index.md)
 - [Fixture worlds](worlds/fixture-worlds.md)
 - [OS worlds](worlds/os-worlds.md)
+- [Sandbox policy walkthrough](worlds/sandbox-policy-walkthrough.md)
 
 ## Toolchain
 - [CLI](toolchain/cli.md)
 - [Diagnostics & repair](toolchain/diagnostics-repair.md)
 - [Testing](toolchain/testing.md)
+- [Testing by example](toolchain/testing-by-example.md)
 - [Performance comparisons](dev/perf-compare.md)
 
 ## Packages
 - [Packages & workspaces](packages/index.md)
 - [Publishing](packages/publishing.md)
+- [Publishing by example](packages/publishing-by-example.md)
+
+## x07import
+- [Overview](x07import/README.md)
+- [Porting by example](x07import/porting-by-example.md)
 
 ## Libraries
 - [Stdlib](libraries/stdlib.md)

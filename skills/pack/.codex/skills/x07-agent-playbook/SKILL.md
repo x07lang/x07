@@ -33,8 +33,8 @@ If the task needs OS worlds or native deps (curl/openssl, etc), run `x07 doctor`
    - `x07 ast apply-patch --in src/main.x07.json --patch /tmp/repair.patch.json --validate`
 6. Run in the correct capability world (canonical: `x07 run`):
    - deterministic solve worlds (recommended default): `x07 run`
-   - OS worlds (unsandboxed): `x07 run --profile os` (equivalently: `x07 run --os` or `x07 run --world run-os`)
-   - OS worlds (policy-enforced): `x07 policy init --template <cli|http-client|web-service|fs-tool|sqlite-app|postgres-client|worker>` (starting point; review and extend), then `x07 run --world run-os-sandboxed --policy .x07/policies/base/<template>.sandbox.base.policy.json` (optionally add `--allow-host ...` / `--deny-host ...` to materialize derived policies)
+   - OS worlds (unsandboxed): `x07 run --profile os`
+   - OS worlds (policy-enforced): `x07 policy init --template <cli|http-client|web-service|fs-tool|sqlite-app|postgres-client|worker>` (starting point; review and extend), then `x07 run --profile sandbox` (optionally add `--allow-host ...` / `--deny-host ...` to materialize derived policies)
 
    For CLI-style programs that expect `argv_v1`, pass process args after `--` and `x07 run` will encode them into input bytes:
    - `x07 run --profile os -- tool --help`
@@ -63,3 +63,10 @@ Keep each iteration small and deterministic; if a repair loop does not converge 
 See `references/design-rails.md`.
 
 For a built-in language/stdlib reference (toolchain-only), use `x07 guide`.
+
+## By-example docs (recommended)
+
+- Sandbox policy workflow: https://x07lang.org/docs/worlds/sandbox-policy-walkthrough/
+- Publishing packages: https://x07lang.org/docs/packages/publishing-by-example/
+- Porting via x07import: https://x07lang.org/docs/x07import/porting-by-example/
+- Testing harness: https://x07lang.org/docs/toolchain/testing-by-example/

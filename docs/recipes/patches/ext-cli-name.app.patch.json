@@ -88,17 +88,10 @@
       [
         "bytes.concat",
         [
-          "bytes.concat",
-          [
-            "bytes.lit",
-            "name="
-          ],
-          "name"
-        ],
-        [
           "bytes.lit",
-          "\n"
-        ]
+          "name="
+        ],
+        "name"
       ]
     ]
   }

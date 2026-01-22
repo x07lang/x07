@@ -40,7 +40,10 @@ Use this skill when:
 
 ## Notes
 
+- Official registry index URL: `sparse+https://registry.x07.io/index/`
 - The lockfile path is controlled by `x07.json` (`lockfile`) and defaults to `x07.lock.json`.
 - When fetching is required, `x07 pkg lock` defaults to the official registry index; override with `--index <url>`.
 - Official packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` will add and fetch these transitive deps automatically (and update `x07.json`).
 - If dependencies are already present on disk, `x07 pkg lock` can run without `--index` using `--offline`.
+
+See also: https://x07lang.org/docs/packages/publishing-by-example/

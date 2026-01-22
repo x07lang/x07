@@ -1,0 +1,8 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "modules/demo/tests_pure.x07.json",
+  "module_roots": ["modules"],
+  "lockfile": "x07.lock.json",
+  "dependencies": []
+}

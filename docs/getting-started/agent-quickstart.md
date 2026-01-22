@@ -148,3 +148,10 @@ The `x07` repo ships three CI-gated example projects under `examples/agent-gate/
 - `web-crawler-local` (sandboxed OS networking + `--allow-host`, against a local fixture site)
 
 See also: [Patch-based recipes](../recipes/index.md).
+
+## 10) By-example tutorials (long-form)
+
+- [Sandbox policy walkthrough](../worlds/sandbox-policy-walkthrough.md) (progressive policy + `--allow-host`)
+- [Publishing by example](../packages/publishing-by-example.md) (author → test → pack → publish → consume)
+- [Porting by example](../x07import/porting-by-example.md) (`x07import-cli` Rust/C → x07 package)
+- [Testing by example](../toolchain/testing-by-example.md) (`x07 test` + fixtures)

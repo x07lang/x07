@@ -1,23 +1,28 @@
 [
   {
+    "op": "add",
+    "path": "/imports/-",
+    "value": "std.os.fs"
+  },
+  {
     "op": "replace",
     "path": "/decls/1/body",
     "value": [
       "begin",
       [
-        "os.fs.write_file",
+        "std.os.fs.write_file",
         [
           "bytes.lit",
           "out/hello.txt"
         ],
         [
           "bytes.lit",
-          "Hello from sandbox\n"
+          "Hello_from_sandbox"
         ]
       ],
       [
         "bytes.lit",
-        "ok\n"
+        "ok"
       ]
     ]
   }

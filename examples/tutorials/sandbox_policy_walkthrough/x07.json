@@ -1,0 +1,17 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "src/main.x07.json",
+  "module_roots": ["src"],
+  "dependencies": [],
+  "lockfile": "x07.lock.json",
+  "default_profile": "sandbox",
+  "profiles": {
+    "sandbox": {
+      "world": "run-os-sandboxed",
+      "policy": ".x07/policies/base/cli.sandbox.base.policy.json",
+      "auto_ffi": true
+    }
+  }
+}
+
