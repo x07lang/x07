@@ -383,7 +383,7 @@
         }
       ],
       "name": "ext-cli",
-      "package_manifest_sha256": "3d6ef954ece5aa8c76140eea140e268fbb3bb44b2c3b7bf0da33a87f5b1ab4ad",
+      "package_manifest_sha256": "384aa13f438aebd97e740b054250f013cdda3cbd33d2421db9b9abf6d721697c",
       "path": "packages/ext/x07-ext-cli/0.1.3",
       "version": "0.1.3"
     },
@@ -2319,7 +2319,7 @@
         }
       ],
       "name": "ext-net",
-      "package_manifest_sha256": "38505c4401791e692cda31995e8212bf81868caa1ad1948f3734fc2a11ea6cc7",
+      "package_manifest_sha256": "be69494aea199fa0165e69d4cb27e9be21b8c4f31efa5237b0802384b2082275",
       "path": "packages/ext/x07-ext-net/0.1.2",
       "version": "0.1.2"
     },
@@ -4004,6 +4004,6 @@
       "version": "0.1.3"
     }
   ],
-  "packages_hash": "df6c48da348b068189d923f79e53438bb11d18f305135807e0c6088ac103ad8c",
+  "packages_hash": "aa2af506d43a1a28ae1eb2e81c6d695c69311ebeb122f7f27090da3aace7c2d4",
   "packages_root": "packages/ext"
 }

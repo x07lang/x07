@@ -17,4 +17,4 @@ X07 concurrency is deterministic and virtual (no OS threads); blocking points ar
 - Avoid implicit sources of nondeterminism (OS clocks, random, network) in solve worlds.
 - Keep scheduling decisions explicit and data-driven (inputs → outputs), so runs are replayable.
 
-For the built-in reference guide, use `x07c guide` and search for `defasync` / `task.` / `chan.bytes.`.
+For the built-in reference guide, use `x07 guide` and search for `defasync` / `task.` / `chan.bytes.`.

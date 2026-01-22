@@ -24,11 +24,13 @@ cd mypkg
 x07 --init
 
 # Browse packages at https://x07.io/packages
-x07 pkg add ext-base64-rs@0.1.1 --sync
+x07 pkg add ext-base64-rs@0.1.2 --sync
 ```
 
 `x07 pkg lock` downloads dependencies into `.x07/deps/…` and writes `x07.lock.json`.
 Commit `x07.lock.json` to make builds reproducible.
+
+If any dependency declares required helper packages via `meta.requires_packages`, `x07 pkg lock` will also add those transitive deps to `x07.json` (and then lock them).
 
 When fetching is required, `x07 pkg lock` defaults to the official registry index.
 Override with `--index sparse+https://registry.x07.io/index/`, or use `--offline` to forbid network access.

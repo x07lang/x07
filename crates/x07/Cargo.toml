@@ -12,6 +12,7 @@ rpassword = "7"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 sha2 = "0.10"
+ureq = "3"
 
 x07-contracts = { path = "../x07-contracts" }
 x07-host-runner = { path = "../x07-host-runner" }

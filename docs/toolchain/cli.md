@@ -16,6 +16,11 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 doctor`
   - Checks for a working C compiler and (when available) validates native deps for common OS stacks (curl + OpenSSL).
 
+### Guide (built-in language + stdlib reference)
+
+- `x07 guide`
+  - Prints the built-in language + stdlib reference guide (Markdown).
+
 ### Formatting (x07AST JSON)
 
 - `x07 fmt --input <path> --check`
@@ -38,6 +43,17 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Uses deterministic worlds by default.
   - Prints an `x07test` JSON report (or writes it with `--report-out`).
 
+### Doc (module exports)
+
+- `x07 doc <module-id>`
+- `x07 doc <module-id>.<exported_symbol>`
+  - Prints exported symbol signatures from a module file (useful for agents exploring unfamiliar modules).
+
+### RR (record solve-rr fixtures)
+
+- `x07 rr record --out fixtures/rr <key> <url>`
+  - Records a real HTTP response body into a `solve-rr` fixture directory (see `docs/worlds/fixture-worlds.md`).
+
 ### Packages (pack/lock/publish)
 
 - `x07 pkg add <name>@<version>`
@@ -52,6 +68,7 @@ Notes:
 - `x07 pkg add` edits `x07.json` only (no network) unless you pass `--sync`.
 - `x07 pkg lock` uses the official registry index by default when fetching is required; override with `--index` or use `--offline`.
 - Use `x07 pkg lock --check` in CI to fail if `x07.lock.json` is out of date.
+- If any dependency declares required helper packages via `meta.requires_packages`, `x07 pkg lock` will add them to `x07.json` (and then lock them).
 
 ### Build to C (project)
 

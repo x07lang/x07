@@ -23,6 +23,10 @@
       "run-os",
       "run-os-sandboxed"
     ],
+    "requires_packages": [
+      "ext-data-model@0.1.2",
+      "ext-json-rs@0.1.2"
+    ],
     "import_mode": "handwritten"
   }
 }

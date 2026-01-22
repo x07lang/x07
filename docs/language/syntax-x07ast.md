@@ -33,6 +33,8 @@ The entrypoint expression returns **bytes**.
 
 ## Tooling
 
+For a full project skeleton (`x07.json`, lockfile, `src/`, `tests/`), use `x07 --init`. The `x07 ast` subcommands are for working with individual `*.x07.json` files.
+
 - `x07 ast init` / `x07 ast validate`:
   - generates and validates `*.x07.json` skeletons
 - `x07 fmt`:

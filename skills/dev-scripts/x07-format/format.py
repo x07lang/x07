@@ -13,24 +13,24 @@ from typing import Any
 def find_repo_root(start: Path) -> Path:
     cur = start.resolve()
     for _ in range(20):
-        if (cur / "Cargo.toml").is_file() and (cur / "scripts" / "ci" / "find_x07c.sh").is_file():
+        if (cur / "Cargo.toml").is_file() and (cur / "scripts" / "ci" / "find_x07.sh").is_file():
             return cur
         if cur.parent == cur:
             break
         cur = cur.parent
-    raise SystemExit("could not find repo root (expected Cargo.toml and scripts/ci/find_x07c.sh)")
+    raise SystemExit("could not find repo root (expected Cargo.toml and scripts/ci/find_x07.sh)")
 
 
-def find_x07c(root: Path) -> str:
+def find_x07(root: Path) -> str:
     proc = subprocess.run(
-        ["bash", "-lc", "./scripts/ci/find_x07c.sh"],
+        ["bash", "-lc", "./scripts/ci/find_x07.sh"],
         cwd=root,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
     if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or "find_x07c.sh failed")
+        raise RuntimeError(proc.stderr.strip() or "find_x07.sh failed")
     return proc.stdout.strip()
 
 
@@ -52,8 +52,8 @@ def iter_x07_files(paths: list[Path]) -> list[Path]:
     return [uniq[k] for k in sorted(uniq.keys())]
 
 
-def run_fmt(x07c: str, file_path: Path, mode: str) -> tuple[int, dict[str, Any]]:
-    cmd = [x07c, "fmt", "--input", str(file_path), f"--{mode}", "--report-json"]
+def run_fmt(x07: str, file_path: Path, mode: str) -> tuple[int, dict[str, Any]]:
+    cmd = [x07, "fmt", "--input", str(file_path), f"--{mode}", "--report-json"]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if proc.returncode == 0:
         return 0, {}
@@ -67,7 +67,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--path", action="append", default=[], help="File or directory to scan (repeatable).")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--write", action="store_true")
-    ap.add_argument("--x07c", help="Path to x07c (default: scripts/ci/find_x07c.sh).")
+    ap.add_argument("--x07", help="Path to x07 (default: scripts/ci/find_x07.sh).")
     args = ap.parse_args(argv)
 
     if args.check == args.write:
@@ -80,11 +80,11 @@ def main(argv: list[str]) -> int:
     scan_paths = [Path(p) for p in (args.path or ["src", "tests", "benchmarks", "packages", "stdlib"])]
     files = iter_x07_files([root / p if not Path(p).is_absolute() else Path(p) for p in scan_paths])
 
-    x07c = args.x07c or os.environ.get("X07C") or find_x07c(root)
+    x07 = args.x07 or os.environ.get("X07") or find_x07(root)
 
     failed: list[dict[str, Any]] = []
     for f in files:
-        code, info = run_fmt(x07c, f, mode)
+        code, info = run_fmt(x07, f, mode)
         if code != 0:
             failed.append({"file": str(f), "exit_code": code, **info})
 
@@ -100,4 +100,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
-

@@ -5,10 +5,13 @@ It must not rely on the toolchain source repo.
 
 ## Required binaries
 
-- `x07` (canonical front door: `run`, `fmt`, `lint`, `fix`, plus `pkg`, `test`, `ast`, CLI specs)
-- `x07c` (compiler driver + language guide output)
+- `x07` (canonical front door: `run`, `fmt`, `lint`, `fix`, plus `pkg`, `test`, `ast`, CLI specs, `guide`)
 - `x07-host-runner` (expert backend: deterministic solve-world runner)
 - `x07-os-runner` (expert backend: run-os / run-os-sandboxed runner)
+
+## Optional (advanced) binaries
+
+- `x07c` (compiler driver; exposed for expert usage)
 
 ## External tools
 
@@ -24,7 +27,7 @@ It must not rely on the toolchain source repo.
 
 - `x07 --help`
 - `x07 run --help`
-- `x07c --help`
+- `x07 guide | head`
 - `cc --version`
 
 Expert-only:

@@ -1,0 +1,61 @@
+name: Agent readiness gate
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+
+jobs:
+  gate:
+    name: "agent gate - ${{ matrix.env }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: ubuntu-24.04
+          - env: debian:bookworm
+            container: debian:bookworm
+
+    container: ${{ matrix.container }}
+
+    env:
+      X07_PYTHON: python3
+
+    steps:
+      - name: Install base deps (Debian)
+        if: startsWith(matrix.env, 'debian:')
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            bash \
+            build-essential \
+            ca-certificates \
+            clang \
+            curl \
+            git \
+            openssl \
+            pkg-config \
+            python3 \
+            python3-venv \
+            xz-utils \
+            zlib1g-dev
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Agent readiness gate
+        shell: bash
+        run: |
+          ./scripts/ci/check_canaries.sh
+          "$X07_PYTHON" scripts/check_pkg_contracts.py --check
+

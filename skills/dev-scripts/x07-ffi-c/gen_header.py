@@ -13,12 +13,29 @@ from typing import Any
 def find_repo_root(start: Path) -> Path:
     cur = start.resolve()
     for _ in range(20):
-        if (cur / "Cargo.toml").is_file() and (cur / "scripts" / "ci" / "find_x07c.sh").is_file():
+        if (
+            (cur / "Cargo.toml").is_file()
+            and (cur / "scripts" / "ci" / "find_x07.sh").is_file()
+            and (cur / "scripts" / "ci" / "find_x07c.sh").is_file()
+        ):
             return cur
         if cur.parent == cur:
             break
         cur = cur.parent
-    raise SystemExit("could not find repo root (expected Cargo.toml and scripts/ci/find_x07c.sh)")
+    raise SystemExit("could not find repo root (expected Cargo.toml and scripts/ci/find_x07.sh)")
+
+
+def find_x07(root: Path) -> str:
+    proc = subprocess.run(
+        ["bash", "-lc", "./scripts/ci/find_x07.sh"],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip() or "find_x07.sh failed")
+    return proc.stdout.strip()
 
 
 def find_x07c(root: Path) -> str:
@@ -42,6 +59,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--module-root", action="append", default=[])
     ap.add_argument("--out-c", required=True)
     ap.add_argument("--out-h", required=True)
+    ap.add_argument("--x07", help="Path to x07 (default: scripts/ci/find_x07.sh).")
     ap.add_argument("--x07c", help="Path to x07c (default: scripts/ci/find_x07c.sh).")
     args = ap.parse_args(argv)
 
@@ -50,7 +68,7 @@ def main(argv: list[str]) -> int:
         return 2
 
     root = find_repo_root(Path(__file__).resolve())
-    x07c = args.x07c or os.environ.get("X07C") or find_x07c(root)
+    x07 = args.x07 or os.environ.get("X07") or find_x07(root)
 
     out_c = Path(args.out_c)
     out_h = Path(args.out_h)
@@ -59,7 +77,7 @@ def main(argv: list[str]) -> int:
 
     if args.project is not None:
         cmd = [
-            x07c,
+            x07,
             "build",
             "--project",
             str(Path(args.project)),
@@ -69,6 +87,7 @@ def main(argv: list[str]) -> int:
             str(out_h),
         ]
     else:
+        x07c = args.x07c or os.environ.get("X07C") or find_x07c(root)
         cmd = [
             x07c,
             "compile",
@@ -102,4 +121,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
-

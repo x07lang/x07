@@ -21,7 +21,7 @@ x07 run --help
 x07 --cli-specrows
 ```
 
-If you plan to use OS worlds (`run-os*`) with native deps (for example `ext-curl-c` / `ext-openssl-c`), run:
+If you plan to use OS worlds (`run-os*`) with native deps (for example `ext-net` / `ext-curl-c` / `ext-sockets-c`), run:
 
 ```bash
 x07 doctor
@@ -108,13 +108,14 @@ Discover packages and versions:
 Add a dependency:
 
 ```bash
-x07 pkg add ext-base64-rs@0.1.1 --sync
+x07 pkg add ext-base64-rs@0.1.2 --sync
 ```
 
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
+- Official packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` will add and fetch these transitive deps automatically (and update `x07.json`).
 
 See also: [Packages & projects](../packages/index.md).
 
@@ -134,6 +135,9 @@ See: [Fixture worlds](../worlds/fixture-worlds.md) and [OS worlds](../worlds/os-
 
 - CLI surface: `x07 --cli-specrows`
 - Schemas: `spec/*.schema.json` (and the synced copies on x07lang.org under `/agent/.../schemas/`)
+- External packages index: `GET /agent/latest/packages/index.json` on x07lang.org
+- Local module inspection: `x07 doc <module-or-symbol>`
+- Built-in reference guide: `x07 guide`
 
 ## 9) Known-good reference projects (copy/paste)
 
@@ -142,3 +146,5 @@ The `x07` repo ships three CI-gated example projects under `examples/agent-gate/
 - `cli-newline` (pure CLI payload parsing)
 - `cli-ext-cli` (CLI args via `ext-cli` + `argv_v1`)
 - `web-crawler-local` (sandboxed OS networking + `--allow-host`, against a local fixture site)
+
+See also: [Patch-based recipes](../recipes/index.md).

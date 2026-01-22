@@ -2988,6 +2988,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "ureq",
  "x07-contracts",
  "x07-host-runner",
  "x07-pkg",

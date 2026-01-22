@@ -4,18 +4,22 @@ This page shows the minimal “hello world” shape **for agents** and **for hum
 
 X07 programs are stored as **x07AST JSON** (`*.x07.json`). Agents should modify programs via JSON Patch applied to a known-good base.
 
-## Create an entry program
+## Create a project (canonical)
 
 ```bash
 mkdir myapp
 cd myapp
-x07 ast init --world solve-pure --module main --kind entry --out main.x07.json
+x07 --init
 ```
 
-This writes a valid `main.x07.json` and prints a small JSON report (including `schema_version` and a sha256 of the file).
+This creates:
 
-If you want a full project skeleton (with `x07.json` / `x07.lock.json`), run `x07 --init` instead (see [Packages](../packages/index.md)).
-Use `x07 --init --package` only when you are creating a publishable package (needs `x07-package.json`).
+- `x07.json` (with `test`, `os`, and `sandbox` profiles)
+- `x07.lock.json`
+- `src/main.x07.json` (a minimal program)
+- `tests/tests.json` + `tests/smoke.x07.json` (a deterministic harness smoke test)
+
+If you are creating a publishable package, use `x07 --init --package` to also create `x07-package.json`.
 
 ## Make it return bytes
 
@@ -30,13 +34,14 @@ Create `patch.json`:
 Apply and validate:
 
 ```bash
-x07 ast apply-patch --in main.x07.json --patch patch.json --out main.x07.json --validate
+x07 ast apply-patch --in src/main.x07.json --patch patch.json --out src/main.x07.json --validate
+x07 fmt --input src/main.x07.json --write
 ```
 
 ## Lint
 
 ```bash
-x07 lint --input main.x07.json --world solve-pure
+x07 lint --input src/main.x07.json --world solve-pure
 ```
 
 `x07 lint` prints an `x07diag` JSON report to stdout.
@@ -44,7 +49,7 @@ x07 lint --input main.x07.json --world solve-pure
 ## Run (deterministic)
 
 ```bash
-x07 run --program main.x07.json --world solve-pure
+x07 run
 ```
 
 The runner prints a JSON report; the program’s bytes output is in `solve_output_b64`.

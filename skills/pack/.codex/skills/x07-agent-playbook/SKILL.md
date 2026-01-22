@@ -45,6 +45,8 @@ If the task needs OS worlds or native deps (curl/openssl, etc), run `x07 doctor`
 7. If the project uses dependencies, update the lockfile:
    - `x07 pkg lock --project x07.json`
 
+   If any dependency declares required helper packages via `meta.requires_packages`, `x07 pkg lock` may also update `x07.json` to add those transitive deps.
+
 Keep each iteration small and deterministic; if a repair loop does not converge quickly, stop and re-evaluate the approach.
 
 ## Recommended project layout (single canonical shape)
@@ -60,4 +62,4 @@ Keep each iteration small and deterministic; if a repair loop does not converge 
 
 See `references/design-rails.md`.
 
-For a built-in language/stdlib reference (toolchain-only), use `x07c guide`.
+For a built-in language/stdlib reference (toolchain-only), use `x07 guide`.

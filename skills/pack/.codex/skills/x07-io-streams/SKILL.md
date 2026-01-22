@@ -22,4 +22,4 @@ Prefer streaming parsing and zero-copy views over full-buffer copies.
   - `std.rr.send`
   - `std.kv.get_stream`
 
-For the built-in reference guide, use `x07c guide` and search for `std.io` / `std.io.bufread`.
+For the built-in reference guide, use `x07 guide` and search for `std.io` / `std.io.bufread`.

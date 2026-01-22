@@ -1621,7 +1621,7 @@ fn apply_policy_id_and_notes(
     }
 }
 
-fn discover_project_manifest(start: &Path) -> Result<Option<PathBuf>> {
+pub(crate) fn discover_project_manifest(start: &Path) -> Result<Option<PathBuf>> {
     let mut dir: Option<&Path> = Some(start);
     while let Some(d) = dir {
         let x07_json = d.join("x07.json");

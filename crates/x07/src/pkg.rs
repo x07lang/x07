@@ -1,3 +1,4 @@
+use std::collections::{BTreeSet, HashSet};
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -247,23 +248,8 @@ fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
         .collect(),
     ));
 
-    deps.sort_by(|a, b| {
-        let an = a.get("name").and_then(Value::as_str).unwrap_or("");
-        let bn = b.get("name").and_then(Value::as_str).unwrap_or("");
-        let c = an.cmp(bn);
-        if c != std::cmp::Ordering::Equal {
-            return c;
-        }
-        let av = a.get("version").and_then(Value::as_str).unwrap_or("");
-        let bv = b.get("version").and_then(Value::as_str).unwrap_or("");
-        av.cmp(bv)
-    });
-
-    let mut out = serde_json::to_vec_pretty(&doc)?;
-    if out.last() != Some(&b'\n') {
-        out.push(b'\n');
-    }
-    std::fs::write(&project_path, &out)
+    sort_project_deps(deps);
+    write_canonical_json_file(&project_path, &doc)
         .with_context(|| format!("write: {}", project_path.display()))?;
 
     let mut add_result = AddResult {
@@ -365,9 +351,14 @@ fn cmd_pkg_lock(args: LockArgs) -> Result<std::process::ExitCode> {
 
 fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport<LockResult>)> {
     let project_path = util::resolve_existing_path_upwards(&args.project);
-    let manifest =
+    let project_bytes = std::fs::read(&project_path)
+        .with_context(|| format!("read: {}", project_path.display()))?;
+    let mut doc: Value = serde_json::from_slice(&project_bytes)
+        .with_context(|| format!("parse project JSON: {}", project_path.display()))?;
+
+    // Validate using the canonical parser for better error messages and stricter checks.
+    let mut manifest =
         project::load_project_manifest(&project_path).context("load project manifest")?;
-    let lock_path = project::default_lockfile_path(&project_path, &manifest);
 
     let base = project_path
         .parent()
@@ -375,124 +366,50 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         .unwrap_or_else(|| Path::new("."));
 
     let mut fetched = Vec::new();
-    let mut missing = Vec::new();
-    for dep in &manifest.dependencies {
-        let dep_dir = base.join(&dep.path);
-        if !dep_dir.join("x07-package.json").is_file() {
-            missing.push(dep);
-        }
-    }
-
     let mut index_used: Option<String> = None;
 
-    if !missing.is_empty() {
-        if args.offline {
+    let transitive = match resolve_transitive_deps(
+        &mut doc,
+        &project_path,
+        &manifest,
+        base,
+        args,
+        &mut fetched,
+        &mut index_used,
+    )? {
+        TransitiveResolutionOutcome::Ok(res) => res,
+        TransitiveResolutionOutcome::Error(err) => {
+            let report = PkgReport {
+                ok: false,
+                command: "pkg.lock",
+                result: None,
+                error: Some(err),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+    if transitive.changed {
+        if args.check {
             let report = PkgReport {
                 ok: false,
                 command: "pkg.lock",
                 result: None,
                 error: Some(PkgError {
-                    code: "X07PKG_OFFLINE_MISSING_DEP".to_string(),
-                    message: format!("{} missing dependencies (offline mode)", missing.len()),
+                    code: "X07PKG_TRANSITIVE_MISSING".to_string(),
+                    message: format!(
+                        "project is missing transitive dependencies (run `x07 pkg lock` to update x07.json): {}",
+                        transitive.added_specs.join(", ")
+                    ),
                 }),
             };
             return Ok((std::process::ExitCode::from(20), report));
         }
-
-        let index = match args.index.as_deref() {
-            Some(index) => index.to_string(),
-            None => DEFAULT_INDEX_URL.to_string(),
-        };
-        index_used = Some(index.clone());
-
-        let token = x07_pkg::load_token(&index).unwrap_or(None);
-        let client = SparseIndexClient::from_index_url(&index, token)?;
-
-        for dep in missing {
-            let dep_dir = base.join(&dep.path);
-            let entries = client
-                .fetch_entries(&dep.name)
-                .with_context(|| format!("fetch index entries for {:?}", dep.name))?;
-            let Some(entry) = entries
-                .into_iter()
-                .find(|e| e.name == dep.name && e.version == dep.version && !e.yanked)
-            else {
-                let report = PkgReport::<LockResult> {
-                    ok: false,
-                    command: "pkg.lock",
-                    result: None,
-                    error: Some(PkgError {
-                        code: "X07PKG_INDEX_NO_MATCH".to_string(),
-                        message: format!(
-                            "no non-yanked index entry for {:?}@{:?}",
-                            dep.name, dep.version
-                        ),
-                    }),
-                };
-                return Ok((std::process::ExitCode::from(20), report));
-            };
-
-            let cache_dir = base.join(".x07").join("cache").join("sha256");
-            let archive_path = cache_dir.join(format!("{}.x07pkg", entry.cksum));
-            if archive_path.is_file() {
-                let bytes = std::fs::read(&archive_path)
-                    .with_context(|| format!("read cached archive: {}", archive_path.display()))?;
-                let actual = x07_pkg::sha256_hex(&bytes);
-                if actual != entry.cksum {
-                    anyhow::bail!(
-                        "cached archive sha256 mismatch: expected {} got {} ({})",
-                        entry.cksum,
-                        actual,
-                        archive_path.display()
-                    );
-                }
-            } else {
-                client.download_to_file(&dep.name, &dep.version, &entry.cksum, &archive_path)?;
-            }
-
-            let archive_bytes = std::fs::read(&archive_path)
-                .with_context(|| format!("read archive for {:?}@{:?}", dep.name, dep.version))?;
-            let tmp_dir = temp_unpack_dir(base)?;
-            x07_pkg::unpack_tar_bytes(&archive_bytes, &tmp_dir)?;
-
-            let (pkg, _pkg_manifest_path, _pkg_manifest_bytes) =
-                project::load_package_manifest(&tmp_dir).with_context(|| {
-                    format!("validate unpacked package at {}", tmp_dir.display())
-                })?;
-            if pkg.name != dep.name || pkg.version != dep.version {
-                anyhow::bail!(
-                    "unpacked package identity mismatch: expected {:?}@{:?} got {:?}@{:?}",
-                    dep.name,
-                    dep.version,
-                    pkg.name,
-                    pkg.version
-                );
-            }
-
-            if dep_dir.exists() {
-                std::fs::remove_dir_all(&dep_dir)
-                    .with_context(|| format!("remove existing dep dir: {}", dep_dir.display()))?;
-            }
-            if let Some(parent) = dep_dir.parent() {
-                std::fs::create_dir_all(parent)
-                    .with_context(|| format!("create dep parent: {}", parent.display()))?;
-            }
-            std::fs::rename(&tmp_dir, &dep_dir).with_context(|| {
-                format!(
-                    "move unpacked package into place: {} -> {}",
-                    tmp_dir.display(),
-                    dep_dir.display()
-                )
-            })?;
-
-            fetched.push(FetchedDep {
-                name: dep.name.clone(),
-                version: dep.version.clone(),
-                path: dep.path.clone(),
-                sha256: entry.cksum,
-            });
-        }
+        write_canonical_json_file(&project_path, &doc)
+            .with_context(|| format!("write: {}", project_path.display()))?;
+        manifest = project::load_project_manifest(&project_path).context("reload project")?;
     }
+
+    let lock_path = project::default_lockfile_path(&project_path, &manifest);
 
     let lock = project::compute_lockfile(&project_path, &manifest)?;
 
@@ -572,6 +489,359 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         error: None,
     };
     Ok((std::process::ExitCode::SUCCESS, report))
+}
+
+#[derive(Debug, Clone)]
+struct TransitiveResolution {
+    changed: bool,
+    added_specs: Vec<String>,
+}
+
+enum TransitiveResolutionOutcome {
+    Ok(TransitiveResolution),
+    Error(PkgError),
+}
+
+fn resolve_transitive_deps(
+    doc: &mut Value,
+    project_path: &Path,
+    _manifest: &project::ProjectManifest,
+    base: &Path,
+    args: &LockArgs,
+    fetched: &mut Vec<FetchedDep>,
+    index_used: &mut Option<String>,
+) -> Result<TransitiveResolutionOutcome> {
+    let mut scanned: HashSet<(String, String)> = HashSet::new();
+    let mut added: BTreeSet<String> = BTreeSet::new();
+    let mut changed = false;
+
+    let index = match args.index.as_deref() {
+        Some(index) => index.to_string(),
+        None => DEFAULT_INDEX_URL.to_string(),
+    };
+
+    let mut client: Option<SparseIndexClient> = None;
+
+    loop {
+        let deps = deps_from_project_doc(doc, project_path)?;
+        if let Some(err) =
+            ensure_deps_present(&deps, base, args, &index, &mut client, fetched, index_used)?
+        {
+            return Ok(TransitiveResolutionOutcome::Error(err));
+        }
+
+        let mut round_added = false;
+        for dep in deps {
+            let key = (dep.name.clone(), dep.version.clone());
+            if !scanned.insert(key) {
+                continue;
+            }
+            let dep_dir = base.join(&dep.path);
+            let reqs = requires_packages_from_manifest(&dep_dir)?;
+            for spec in reqs {
+                let (name, version) = parse_pkg_spec(&spec)?;
+                let path = format!(".x07/deps/{name}/{version}");
+                match ensure_dep_entry(doc, &name, &version, &path)? {
+                    EnsureDepOutcome::Added => {
+                        changed = true;
+                        round_added = true;
+                        added.insert(format!("{name}@{version}"));
+                    }
+                    EnsureDepOutcome::AlreadyPresentSameVersion => {}
+                    EnsureDepOutcome::AlreadyPresentDifferentVersion { existing_version } => {
+                        anyhow::bail!(
+                            "dependency version conflict: project has {name}@{existing_version}, but {spec:?} is required by a dependency"
+                        );
+                    }
+                }
+            }
+        }
+
+        if !round_added {
+            break;
+        }
+    }
+
+    Ok(TransitiveResolutionOutcome::Ok(TransitiveResolution {
+        changed,
+        added_specs: added.into_iter().collect(),
+    }))
+}
+
+#[derive(Debug, Clone)]
+enum EnsureDepOutcome {
+    Added,
+    AlreadyPresentSameVersion,
+    AlreadyPresentDifferentVersion { existing_version: String },
+}
+
+fn ensure_dep_entry(
+    doc: &mut Value,
+    name: &str,
+    version: &str,
+    path: &str,
+) -> Result<EnsureDepOutcome> {
+    let obj = doc
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+    let deps_val = obj
+        .entry("dependencies".to_string())
+        .or_insert_with(|| Value::Array(Vec::new()));
+    let deps = deps_val
+        .as_array_mut()
+        .ok_or_else(|| anyhow::anyhow!("project.dependencies must be an array"))?;
+
+    for dep in deps.iter() {
+        let dep_name = dep.get("name").and_then(Value::as_str).unwrap_or("");
+        if dep_name != name {
+            continue;
+        }
+        let dep_ver = dep.get("version").and_then(Value::as_str).unwrap_or("");
+        if dep_ver == version {
+            return Ok(EnsureDepOutcome::AlreadyPresentSameVersion);
+        }
+        return Ok(EnsureDepOutcome::AlreadyPresentDifferentVersion {
+            existing_version: dep_ver.to_string(),
+        });
+    }
+
+    deps.push(Value::Object(
+        [
+            ("name".to_string(), Value::String(name.to_string())),
+            ("version".to_string(), Value::String(version.to_string())),
+            ("path".to_string(), Value::String(path.to_string())),
+        ]
+        .into_iter()
+        .collect(),
+    ));
+    sort_project_deps(deps);
+    Ok(EnsureDepOutcome::Added)
+}
+
+fn sort_project_deps(deps: &mut [Value]) {
+    deps.sort_by(|a, b| {
+        let an = a.get("name").and_then(Value::as_str).unwrap_or("");
+        let bn = b.get("name").and_then(Value::as_str).unwrap_or("");
+        let c = an.cmp(bn);
+        if c != std::cmp::Ordering::Equal {
+            return c;
+        }
+        let av = a.get("version").and_then(Value::as_str).unwrap_or("");
+        let bv = b.get("version").and_then(Value::as_str).unwrap_or("");
+        av.cmp(bv)
+    });
+}
+
+fn write_canonical_json_file(path: &Path, doc: &Value) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create dir: {}", parent.display()))?;
+    }
+    let mut out = serde_json::to_vec_pretty(doc)?;
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    std::fs::write(path, &out).with_context(|| format!("write: {}", path.display()))?;
+    Ok(())
+}
+
+fn deps_from_project_doc(doc: &Value, project_path: &Path) -> Result<Vec<project::DependencySpec>> {
+    let obj = doc
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+    let Some(deps_val) = obj.get("dependencies") else {
+        return Ok(Vec::new());
+    };
+    let deps = deps_val
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("project.dependencies must be an array"))?;
+    let mut out = Vec::with_capacity(deps.len());
+    for (idx, dep) in deps.iter().enumerate() {
+        let name = dep
+            .get("name")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow::anyhow!("project.dependencies[{idx}].name must be a string"))?
+            .trim()
+            .to_string();
+        let version = dep
+            .get("version")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow::anyhow!("project.dependencies[{idx}].version must be a string"))?
+            .trim()
+            .to_string();
+        let path = dep
+            .get("path")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow::anyhow!("project.dependencies[{idx}].path must be a string"))?
+            .trim()
+            .to_string();
+        if name.is_empty() || version.is_empty() || path.is_empty() {
+            anyhow::bail!(
+                "invalid dependency entry in {} at index {idx}",
+                project_path.display()
+            );
+        }
+        out.push(project::DependencySpec {
+            name,
+            version,
+            path,
+        });
+    }
+    Ok(out)
+}
+
+fn requires_packages_from_manifest(dep_dir: &Path) -> Result<Vec<String>> {
+    let path = dep_dir.join("x07-package.json");
+    let bytes =
+        std::fs::read(&path).with_context(|| format!("read package: {}", path.display()))?;
+    let doc: Value = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse package JSON: {}", path.display()))?;
+    let Some(meta) = doc.get("meta").and_then(Value::as_object) else {
+        return Ok(Vec::new());
+    };
+    let Some(reqs) = meta.get("requires_packages") else {
+        return Ok(Vec::new());
+    };
+    let Some(reqs) = reqs.as_array() else {
+        anyhow::bail!(
+            "package meta.requires_packages must be an array: {}",
+            path.display()
+        );
+    };
+    let mut out = Vec::new();
+    for (idx, raw) in reqs.iter().enumerate() {
+        let Some(spec) = raw.as_str() else {
+            anyhow::bail!(
+                "package meta.requires_packages[{idx}] must be a string: {}",
+                path.display()
+            );
+        };
+        let spec = spec.trim();
+        if spec.is_empty() {
+            continue;
+        }
+        out.push(spec.to_string());
+    }
+    out.sort();
+    out.dedup();
+    Ok(out)
+}
+
+fn ensure_deps_present(
+    deps: &[project::DependencySpec],
+    base: &Path,
+    args: &LockArgs,
+    index: &str,
+    client: &mut Option<SparseIndexClient>,
+    fetched: &mut Vec<FetchedDep>,
+    index_used: &mut Option<String>,
+) -> Result<Option<PkgError>> {
+    let mut missing: Vec<&project::DependencySpec> = Vec::new();
+    for dep in deps {
+        let dep_dir = base.join(&dep.path);
+        if !dep_dir.join("x07-package.json").is_file() {
+            missing.push(dep);
+        }
+    }
+
+    if missing.is_empty() {
+        return Ok(None);
+    }
+
+    if args.offline {
+        return Ok(Some(PkgError {
+            code: "X07PKG_OFFLINE_MISSING_DEP".to_string(),
+            message: format!("{} missing dependencies (offline mode)", missing.len()),
+        }));
+    }
+
+    if client.is_none() {
+        let token = x07_pkg::load_token(index).unwrap_or(None);
+        *client = Some(SparseIndexClient::from_index_url(index, token)?);
+    }
+    let client = client.as_ref().expect("client initialized");
+    if index_used.is_none() {
+        *index_used = Some(index.to_string());
+    }
+
+    for dep in missing {
+        let dep_dir = base.join(&dep.path);
+        let entries = client
+            .fetch_entries(&dep.name)
+            .with_context(|| format!("fetch index entries for {:?}", dep.name))?;
+        let Some(entry) = entries
+            .into_iter()
+            .find(|e| e.name == dep.name && e.version == dep.version && !e.yanked)
+        else {
+            return Ok(Some(PkgError {
+                code: "X07PKG_INDEX_NO_MATCH".to_string(),
+                message: format!(
+                    "no non-yanked index entry for {:?}@{:?}",
+                    dep.name, dep.version
+                ),
+            }));
+        };
+
+        let cache_dir = base.join(".x07").join("cache").join("sha256");
+        let archive_path = cache_dir.join(format!("{}.x07pkg", entry.cksum));
+        if archive_path.is_file() {
+            let bytes = std::fs::read(&archive_path)
+                .with_context(|| format!("read cached archive: {}", archive_path.display()))?;
+            let actual = x07_pkg::sha256_hex(&bytes);
+            if actual != entry.cksum {
+                anyhow::bail!(
+                    "cached archive sha256 mismatch: expected {} got {} ({})",
+                    entry.cksum,
+                    actual,
+                    archive_path.display()
+                );
+            }
+        } else {
+            client.download_to_file(&dep.name, &dep.version, &entry.cksum, &archive_path)?;
+        }
+
+        let archive_bytes = std::fs::read(&archive_path)
+            .with_context(|| format!("read archive for {:?}@{:?}", dep.name, dep.version))?;
+        let tmp_dir = temp_unpack_dir(base)?;
+        x07_pkg::unpack_tar_bytes(&archive_bytes, &tmp_dir)?;
+
+        let (pkg, _pkg_manifest_path, _pkg_manifest_bytes) =
+            project::load_package_manifest(&tmp_dir)
+                .with_context(|| format!("validate unpacked package at {}", tmp_dir.display()))?;
+        if pkg.name != dep.name || pkg.version != dep.version {
+            anyhow::bail!(
+                "unpacked package identity mismatch: expected {:?}@{:?} got {:?}@{:?}",
+                dep.name,
+                dep.version,
+                pkg.name,
+                pkg.version
+            );
+        }
+
+        if dep_dir.exists() {
+            std::fs::remove_dir_all(&dep_dir)
+                .with_context(|| format!("remove existing dep dir: {}", dep_dir.display()))?;
+        }
+        if let Some(parent) = dep_dir.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("create dep parent: {}", parent.display()))?;
+        }
+        std::fs::rename(&tmp_dir, &dep_dir).with_context(|| {
+            format!(
+                "move unpacked package into place: {} -> {}",
+                tmp_dir.display(),
+                dep_dir.display()
+            )
+        })?;
+
+        fetched.push(FetchedDep {
+            name: dep.name.clone(),
+            version: dep.version.clone(),
+            path: dep.path.clone(),
+            sha256: entry.cksum,
+        });
+    }
+    Ok(None)
 }
 
 fn cmd_pkg_login(args: LoginArgs) -> Result<std::process::ExitCode> {

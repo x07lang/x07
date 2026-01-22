@@ -17,10 +17,13 @@ use x07c::project;
 
 mod ast;
 mod cli;
+mod doc;
 mod doctor;
+mod guide;
 mod init;
 mod pkg;
 mod policy;
+mod rr;
 mod run;
 mod toolchain;
 mod util;
@@ -50,6 +53,8 @@ enum Command {
     Test(TestArgs),
     /// Run X07 programs via the appropriate runner.
     Run(Box<run::RunArgs>),
+    /// Print the built-in language + stdlib guide.
+    Guide(guide::GuideArgs),
     /// Check platform prerequisites for OS worlds.
     Doctor(doctor::DoctorArgs),
     /// Generate and manage run-os-sandboxed policy files.
@@ -68,6 +73,10 @@ enum Command {
     Cli(cli::CliArgs),
     /// Manage packages and lockfiles.
     Pkg(pkg::PkgArgs),
+    /// Inspect module exports and signatures.
+    Doc(doc::DocArgs),
+    /// Record solve-rr fixtures.
+    Rr(rr::RrArgs),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -183,6 +192,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             None => Vec::new(),
             Some(Command::Test(_)) => vec!["test"],
             Some(Command::Run(_)) => vec!["run"],
+            Some(Command::Guide(_)) => vec!["guide"],
             Some(Command::Doctor(_)) => vec!["doctor"],
             Some(Command::Policy(args)) => match &args.cmd {
                 None => vec!["policy"],
@@ -216,6 +226,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
                 Some(pkg::PkgCommand::Publish(_)) => vec!["pkg", "publish"],
             },
+            Some(Command::Doc(_)) => vec!["doc"],
+            Some(Command::Rr(args)) => match &args.cmd {
+                None => vec!["rr"],
+                Some(rr::RrCommand::Record(_)) => vec!["rr", "record"],
+            },
         };
 
         let node = x07c::cli_specrows::find_command(&root, &path).unwrap_or(&root);
@@ -244,6 +259,7 @@ fn try_main() -> Result<std::process::ExitCode> {
     match command {
         Command::Test(args) => cmd_test(args),
         Command::Run(args) => run::cmd_run(*args),
+        Command::Guide(args) => guide::cmd_guide(args),
         Command::Doctor(args) => doctor::cmd_doctor(args),
         Command::Policy(args) => policy::cmd_policy(args),
         Command::Ast(args) => ast::cmd_ast(args),
@@ -253,6 +269,8 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Build(args) => toolchain::cmd_build(args),
         Command::Cli(args) => cli::cmd_cli(args),
         Command::Pkg(args) => pkg::cmd_pkg(args),
+        Command::Doc(args) => doc::cmd_doc(args),
+        Command::Rr(args) => rr::cmd_rr(args),
     }
 }
 

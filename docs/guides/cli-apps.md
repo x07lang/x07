@@ -12,14 +12,13 @@ X07 is intended to make it easy for agents to build robust command-line tools.
 
 `ext-cli` parses a declarative CLI spec plus an `argv_v1` byte encoding.
 
-Add packages (X07 does not resolve transitive deps yet):
+Add the package and sync the lockfile:
 
 ```bash
-x07 pkg add ext-cli@<version>
-x07 pkg add ext-json-rs@<version>
-x07 pkg add ext-data-model@<version>
-x07 pkg lock
+x07 pkg add ext-cli@0.1.3 --sync
 ```
+
+`ext-cli` declares its required helper packages via `meta.requires_packages`, so `x07 pkg lock` will add and fetch them automatically.
 
 `argv_v1` encoding:
 
@@ -43,6 +42,8 @@ x07 run --profile os -- tool --url https://example.com --depth 2 --out out/resul
 ```
 
 This eliminates the need to manually construct `--input` bytes for normal runs. `--input` remains available for fixture-based tests and advanced usage.
+
+See also: `examples/agent-gate/cli-ext-cli` in the `x07` repo (CI-gated reference project).
 
 ## Recommended layout
 

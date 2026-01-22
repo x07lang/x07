@@ -1,0 +1,10 @@
+[
+  {
+    "op": "replace",
+    "path": "/decls/1/body",
+    "value": [
+      "bytes.lit",
+      "Hello from X07"
+    ]
+  }
+]

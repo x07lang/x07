@@ -8,6 +8,9 @@
 - [First project](getting-started/first-project.md)
 - [Agent workflow](getting-started/agent-workflow.md)
 
+## Recipes
+- [Patch-based recipes](recipes/index.md)
+
 ## Language
 - [Overview](language/overview.md)
 - [Syntax & x07AST](language/syntax-x07ast.md)

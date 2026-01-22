@@ -14,11 +14,14 @@ External packages are distributed via the X07 registry:
 To use an external package from a project:
 
 ```bash
-x07 pkg add <name>@<version>
-x07 pkg lock --index sparse+https://registry.x07.io/index/
+x07 pkg add <name>@<version> --sync
 ```
 
-X07 does not resolve transitive package dependencies yet, so you may need to add multiple packages for a feature (for example: `ext-net` + `ext-curl-c` + `ext-sockets-c` + `ext-openssl-c` for networking).
+Notes:
+
+- With `--sync`, `x07 pkg add` also runs `x07 pkg lock` to fetch deps and update `x07.lock.json`.
+- `x07 pkg lock` defaults to the official registry index when fetching is required.
+- Official packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` will add and fetch these transitive deps automatically (and update `x07.json`).
 
 Examples include:
 

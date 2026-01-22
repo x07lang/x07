@@ -20,8 +20,11 @@ Use this skill when:
 
 ## Canonical commands
 
+- Add a dependency entry to `x07.json` and sync the lockfile:
+  - `x07 pkg add <name>@<version> --sync`
+
 - Generate or update a project lockfile:
-  - `x07 pkg lock --project x07.json --index <url>`
+  - `x07 pkg lock --project x07.json`
 
 - Verify a lockfile is up to date (CI mode):
   - `x07 pkg lock --project x07.json --check`
@@ -38,4 +41,6 @@ Use this skill when:
 ## Notes
 
 - The lockfile path is controlled by `x07.json` (`lockfile`) and defaults to `x07.lock.json`.
+- When fetching is required, `x07 pkg lock` defaults to the official registry index; override with `--index <url>`.
+- Official packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` will add and fetch these transitive deps automatically (and update `x07.json`).
 - If dependencies are already present on disk, `x07 pkg lock` can run without `--index` using `--offline`.
