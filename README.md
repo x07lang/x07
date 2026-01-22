@@ -50,13 +50,23 @@ See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) fo
 
 ### Install
 
-Download the latest release for your platform:
+The recommended installer is `x07up` (toolchain manager). It installs the toolchain under `~/.x07/`, configures `~/.x07/bin/` shims, and can install the agent kit (offline docs + skills).
 
-- **macOS:** `x07-<tag>-macOS.tar.gz`
-- **Linux:** `x07-<tag>-Linux.tar.gz`
-- **Windows:** `x07-<tag>-Windows.zip`
+macOS / Linux:
 
-[Latest Release](https://github.com/x07lang/x07/releases/latest) · [All Releases](https://github.com/x07lang/x07/releases)
+```bash
+curl -fsSL https://x07lang.org/install.sh | sh -s -- --yes --channel stable
+```
+
+Windows:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://x07lang.org/install.ps1 -OutFile install.ps1; .\\install.ps1 -Yes -Channel stable"
+```
+
+Docs: https://x07lang.org/docs/getting-started/installer/
+
+Advanced: toolchain archives are also available under https://github.com/x07lang/x07/releases
 
 ### Run a Program
 
