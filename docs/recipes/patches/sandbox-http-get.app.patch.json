@@ -1,0 +1,98 @@
+[
+  {
+    "op": "add",
+    "path": "/imports/0",
+    "value": "std.net.http.client"
+  },
+  {
+    "op": "add",
+    "path": "/imports/1",
+    "value": "std.net.http.spec"
+  },
+  {
+    "op": "add",
+    "path": "/imports/2",
+    "value": "std.fmt"
+  },
+  {
+    "op": "replace",
+    "path": "/decls/1/body",
+    "value": [
+      "begin",
+      [
+        "let",
+        "url",
+        [
+          "bytes.lit",
+          "https://example.com/"
+        ]
+      ],
+      [
+        "let",
+        "caps",
+        [
+          "std.net.http.spec.caps_default_v1"
+        ]
+      ],
+      [
+        "let",
+        "resp",
+        [
+          "std.net.http.client.get_v1",
+          "url",
+          "caps"
+        ]
+      ],
+      [
+        "let",
+        "dv",
+        [
+          "bytes.view",
+          "resp"
+        ]
+      ],
+      [
+        "let",
+        "status",
+        [
+          "std.net.http.client.resp_status_v1",
+          "dv"
+        ]
+      ],
+      [
+        "let",
+        "body",
+        [
+          "std.net.http.client.resp_body_v1",
+          "dv"
+        ]
+      ],
+      [
+        "os.fs.write_file",
+        [
+          "bytes.lit",
+          "out/example.html"
+        ],
+        "body"
+      ],
+      [
+        "bytes.concat",
+        [
+          "bytes.concat",
+          [
+            "bytes.lit",
+            "status="
+          ],
+          [
+            "std.fmt.u32_to_dec",
+            "status"
+          ]
+        ],
+        [
+          "bytes.lit",
+          "\n"
+        ]
+      ]
+    ]
+  }
+]

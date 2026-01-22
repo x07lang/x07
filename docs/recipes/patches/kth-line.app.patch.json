@@ -1,0 +1,19 @@
+[
+  {
+    "op": "add",
+    "path": "/imports/0",
+    "value": "std.text.ascii"
+  },
+  {
+    "op": "replace",
+    "path": "/decls/1/body",
+    "value": [
+      "view.to_bytes",
+      [
+        "std.text.ascii.kth_line_view",
+        "b",
+        1
+      ]
+    ]
+  }
+]

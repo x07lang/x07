@@ -1,0 +1,15 @@
+[
+  {
+    "op": "add",
+    "path": "/imports/0",
+    "value": "std.json"
+  },
+  {
+    "op": "replace",
+    "path": "/decls/1/body",
+    "value": [
+      "std.json.canonicalize_small",
+      "b"
+    ]
+  }
+]

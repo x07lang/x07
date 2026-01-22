@@ -1,6 +1,6 @@
 ---
 name: x07-os-run
-description: Expert backend for run-os / run-os-sandboxed execution via x07-os-runner. Prefer `x07 run --os` as the canonical agent entry point.
+description: Expert backend for run-os / run-os-sandboxed execution via x07-os-runner. Prefer `x07 run --profile os` / `x07 run --profile sandbox`.
 metadata:
   short-description: Run OS-world programs
   version: 0.1.0

@@ -1,0 +1,24 @@
+[
+  {
+    "op": "replace",
+    "path": "/decls/1/body",
+    "value": [
+      "begin",
+      [
+        "os.fs.write_file",
+        [
+          "bytes.lit",
+          "out/hello.txt"
+        ],
+        [
+          "bytes.lit",
+          "Hello from sandbox\n"
+        ]
+      ],
+      [
+        "bytes.lit",
+        "ok\n"
+      ]
+    ]
+  }
+]

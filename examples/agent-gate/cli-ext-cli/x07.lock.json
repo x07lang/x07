@@ -3,9 +3,9 @@
   "dependencies": [
     {
       "name": "ext-cli",
-      "version": "0.1.2",
-      "path": ".x07/deps/ext-cli/0.1.2",
-      "package_manifest_sha256": "526dd1ce4d7f43bbe331668f9bd41e6e4cc2d102e7a2bb154a963c524b5376cf",
+      "version": "0.1.3",
+      "path": ".x07/deps/ext-cli/0.1.3",
+      "package_manifest_sha256": "3d6ef954ece5aa8c76140eea140e268fbb3bb44b2c3b7bf0da33a87f5b1ab4ad",
       "module_root": "modules",
       "modules_sha256": {
         "ext.cli": "4f1078c93c98faf0d55c2cba9676e8844f2d150301be18e5c9624a6c5081870e",
@@ -17,9 +17,9 @@
     },
     {
       "name": "ext-data-model",
-      "version": "0.1.0",
-      "path": ".x07/deps/ext-data-model/0.1.0",
-      "package_manifest_sha256": "d6975a9971824d8405958c2a3518a94b2a56f090461bc9734c6f40cbbe3d36f9",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-data-model/0.1.2",
+      "package_manifest_sha256": "e44b9b6ddcc7e758536a65d721e8ddbfc6c424c92ed35eea09757707bc7d4a78",
       "module_root": "modules",
       "modules_sha256": {
         "ext.data_model": "62ab24c6aa3ff6277ffaebb4574537f7ccc96c164426b8cf85ec9abecf029c05",
@@ -34,9 +34,9 @@
     },
     {
       "name": "ext-json-rs",
-      "version": "0.1.0",
-      "path": ".x07/deps/ext-json-rs/0.1.0",
-      "package_manifest_sha256": "9794e4ded28899bf6abf865decf68d86b573ef5a65cbf36a697f9d3ea7e63caa",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-json-rs/0.1.2",
+      "package_manifest_sha256": "cff09659e85fb9c98495a66f1661f7733dd8cfd319d58092203e5a2fac8219a8",
       "module_root": "modules",
       "modules_sha256": {
         "ext.json.canon": "447918b74e61c643321c982d8485a8a89a29ac1c8fdb45f415b9c53fc21bb8c1",

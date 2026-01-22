@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Track B model:
 
 - Programs are **x07AST JSON** (`*.x07.json`, `x07.x07ast@0.1.0`) with expressions encoded as json-sexpr (`["head", ...]`).
-- The toolchain enforces an agent-friendly loop: `x07c fmt` → `x07c lint`/`fix` → compile/run; repairs are JSON Patch (RFC 6902) applied with `x07c apply-patch`.
+- The toolchain enforces an agent-friendly loop: `x07 fmt` → `x07 lint`/`x07 fix` → `x07 ast apply-patch` → `x07 run` / `x07 test` (JSON Patch is RFC 6902).
 - The built-in test harness (`x07 test`) runs manifest-declared tests deterministically and emits a strict `x07test` JSON report.
 - The compiler (`crates/x07c`) compiles a program to self-contained C.
 - The runner (`crates/x07-host-runner`) compiles the C to a native executable and runs it deterministically.

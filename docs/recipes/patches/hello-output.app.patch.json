@@ -4,7 +4,7 @@
     "path": "/decls/1/body",
     "value": [
       "bytes.lit",
-      "Hello from X07"
+      "Hello from X07\n"
     ]
   }
 ]

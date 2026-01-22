@@ -1,0 +1,37 @@
+[
+  {
+    "op": "add",
+    "path": "/imports/0",
+    "value": "std.regex-lite"
+  },
+  {
+    "op": "add",
+    "path": "/imports/1",
+    "value": "std.fmt"
+  },
+  {
+    "op": "replace",
+    "path": "/decls/1/body",
+    "value": [
+      "bytes.concat",
+      [
+        "std.fmt.s32_to_dec",
+        [
+          "std.regex-lite.find_literal",
+          "b",
+          [
+            "bytes.view",
+            [
+              "bytes.lit",
+              "needle"
+            ]
+          ]
+        ]
+      ],
+      [
+        "bytes.lit",
+        "\n"
+      ]
+    ]
+  }
+]

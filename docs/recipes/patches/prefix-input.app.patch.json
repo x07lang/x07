@@ -1,0 +1,17 @@
+[
+  {
+    "op": "replace",
+    "path": "/decls/1/body",
+    "value": [
+      "bytes.concat",
+      [
+        "bytes.lit",
+        "prefix:"
+      ],
+      [
+        "view.to_bytes",
+        "b"
+      ]
+    ]
+  }
+]

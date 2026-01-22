@@ -1,0 +1,21 @@
+[
+  {
+    "op": "add",
+    "path": "/imports/0",
+    "value": "std.fs"
+  },
+  {
+    "op": "replace",
+    "path": "/decls/1/body",
+    "value": [
+      "std.fs.read",
+      [
+        "bytes.view",
+        [
+          "bytes.lit",
+          "hello.txt"
+        ]
+      ]
+    ]
+  }
+]

@@ -2,6 +2,13 @@
 
 These recipes are designed for coding agents: start from `x07 --init`, apply a small RFC 6902 JSON Patch, then run deterministically.
 
+Each recipe assumes the default `x07 --init` skeleton:
+
+- `src/app.x07.json` exports `app.solve` at JSON Pointer `/decls/1/body`
+- `x07.json.default_profile` is `test` (deterministic `solve-pure`)
+
+For reference, these patches are also checked into the toolchain repo under `docs/recipes/patches/`.
+
 ## How to use a recipe
 
 ```bash
@@ -11,25 +18,199 @@ cat > /tmp/patch.json <<'JSON'
 JSON
 x07 ast apply-patch --in src/app.x07.json --patch /tmp/patch.json --out src/app.x07.json --validate
 x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-pure
+x07 run
 ```
+
+`x07 run` prints a JSON report to stdout; the program’s output bytes are in `solve_output_b64` (base64).
 
 ## Recipes
 
-### 1) Hello output (pure)
+### 1) Hello output (pure, solve-pure)
 
 This rewrites `app.solve` to ignore input and return a fixed bytes literal.
 
 ```bash
 cat > /tmp/x07-hello-output.patch.json <<'JSON'
-[{"op":"replace","path":"/decls/1/body","value":["bytes.lit","Hello from X07"]}]
+[{"op":"replace","path":"/decls/1/body","value":["bytes.lit","Hello from X07\\n"]}]
 JSON
 
 x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-hello-output.patch.json --out src/app.x07.json --validate
 x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-pure
 x07 run
 ```
 
-### 2) Record → replay HTTP body (solve-rr)
+Expected: `solve_output_b64` decodes to `Hello from X07\n`.
+
+Common failures:
+
+- If you see `X07INIT_EXISTS`, run in an empty directory (or delete the existing `x07.json`/`src/` skeleton first).
+
+### 2) Prefix input bytes (pure, solve-pure)
+
+This uses `bytes.concat` to return `prefix + input`.
+
+```bash
+cat > /tmp/x07-prefix-input.patch.json <<'JSON'
+[{"op":"replace","path":"/decls/1/body","value":["bytes.concat",["bytes.lit","prefix:"],["view.to_bytes","b"]]}]
+JSON
+
+x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-prefix-input.patch.json --out src/app.x07.json --validate
+x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-pure
+
+printf 'hello' > /tmp/input.bin
+x07 run --input /tmp/input.bin
+```
+
+Expected: `solve_output_b64` decodes to `prefix:hello`.
+
+### 3) Parse newline-separated fields (pure, solve-pure)
+
+This returns the *second* line of input (`k=1`) using `std.text.ascii.kth_line_view`.
+
+```bash
+cat > /tmp/x07-kth-line.patch.json <<'JSON'
+[
+  {"op":"add","path":"/imports/0","value":"std.text.ascii"},
+  {"op":"replace","path":"/decls/1/body","value":["view.to_bytes",["std.text.ascii.kth_line_view","b",1]]}
+]
+JSON
+
+x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-kth-line.patch.json --out src/app.x07.json --validate
+x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-pure
+
+cat > /tmp/input.txt <<'TXT'
+first
+second
+TXT
+x07 run --input /tmp/input.txt
+```
+
+Expected: `solve_output_b64` decodes to `second`.
+
+### 4) Parse CLI args via `ext-cli` (pure, solve-pure)
+
+This uses `ext.cli.parse_specrows` to parse `argv_v1`. Run it with `x07 run -- ...` so the toolchain encodes `argv_v1` for you.
+
+```bash
+x07 pkg add ext-cli@0.1.3 --sync
+
+cat > /tmp/x07-ext-cli-name.patch.json <<'JSON'
+[
+  {"op":"add","path":"/imports/0","value":"ext.cli"},
+  {"op":"replace","path":"/decls/1/body","value":["begin",["let","spec",["bytes.lit","{\\\"schema_version\\\":\\\"x07cli.specrows@0.1.0\\\",\\\"app\\\":{\\\"name\\\":\\\"tool\\\",\\\"version\\\":\\\"0.1.0\\\"},\\\"rows\\\":[[\\\"root\\\",\\\"opt\\\",\\\"\\\",\\\"--name\\\",\\\"name\\\",\\\"NAME\\\",\\\"\\\",{\\\"required\\\":true}]]}"]],["let","argv_v1",["view.to_bytes","b"]],["let","doc",["ext.cli.parse_specrows","spec","argv_v1"]],["if",["=",["ext.cli.is_ok",["bytes.view","doc"]],0],["return",["ext.cli.err_usage",["bytes.view","doc"]]],0],["let","name",["option_bytes.unwrap_or",["ext.cli.matches_get",["bytes.view","doc"],["bytes.view",["bytes.lit","name"]],2],["bytes.alloc",0]]],["bytes.concat",["bytes.concat",["bytes.lit","name="],"name"],["bytes.lit","\\n"]]]}
+]
+JSON
+
+x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-ext-cli-name.patch.json --out src/app.x07.json --validate
+x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-pure
+
+x07 run -- tool --name Alice
+```
+
+Expected: `solve_output_b64` decodes to `name=Alice\n`.
+
+Common failures:
+
+- If you see a package error while locking, re-run `x07 pkg lock --project x07.json` (or use `--sync` as shown).
+
+### 5) Find a substring (pure, solve-pure)
+
+This finds the first index of `needle` in the input and returns the index as decimal (or `-1`).
+
+```bash
+cat > /tmp/x07-find-literal.patch.json <<'JSON'
+[
+  {"op":"add","path":"/imports/0","value":"std.regex-lite"},
+  {"op":"add","path":"/imports/1","value":"std.fmt"},
+  {"op":"replace","path":"/decls/1/body","value":["bytes.concat",["std.fmt.s32_to_dec",["std.regex-lite.find_literal","b",["bytes.view",["bytes.lit","needle"]]]],["bytes.lit","\\n"]]}
+]
+JSON
+
+x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-find-literal.patch.json --out src/app.x07.json --validate
+x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-pure
+
+printf 'hayneedlehay' > /tmp/input.bin
+x07 run --input /tmp/input.bin
+```
+
+Expected: `solve_output_b64` decodes to `3\n`.
+
+### 6) Canonicalize JSON (pure, solve-pure)
+
+This returns a canonical JSON encoding for a small JSON document.
+
+```bash
+cat > /tmp/x07-json-canon.patch.json <<'JSON'
+[
+  {"op":"add","path":"/imports/0","value":"std.json"},
+  {"op":"replace","path":"/decls/1/body","value":["std.json.canonicalize_small","b"]}
+]
+JSON
+
+x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-json-canon.patch.json --out src/app.x07.json --validate
+x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-pure
+
+printf '{\"b\":2,\"a\":1}' > /tmp/input.json
+x07 run --input /tmp/input.json
+```
+
+Expected: `solve_output_b64` decodes to `{\"a\":1,\"b\":2}`.
+
+### 7) Async task + await (pure, solve-pure)
+
+This adds a `defasync` and uses `task.spawn` + `await`.
+
+```bash
+cat > /tmp/x07-async-hello.patch.json <<'JSON'
+[
+  {"op":"add","path":"/decls/-","value":{"kind":"defasync","name":"app.hello_task","params":[],"result":"bytes","body":["bytes.lit","hello from task\\n"]}},
+  {"op":"replace","path":"/decls/1/body","value":["begin",["let","h",["app.hello_task"]],["task.spawn","h"],["await","h"]]}
+]
+JSON
+
+x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-async-hello.patch.json --out src/app.x07.json --validate
+x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-pure
+x07 run
+```
+
+Expected: `solve_output_b64` decodes to `hello from task\n`.
+
+### 8) Read a fixture file (solve-fs)
+
+This reads `hello.txt` from the mounted fixture directory.
+
+```bash
+cat > /tmp/x07-solve-fs-read.patch.json <<'JSON'
+[
+  {"op":"add","path":"/imports/0","value":"std.fs"},
+  {"op":"replace","path":"/decls/1/body","value":["std.fs.read",["bytes.view",["bytes.lit","hello.txt"]]]}
+]
+JSON
+
+x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-solve-fs-read.patch.json --out src/app.x07.json --validate
+x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-fs
+
+mkdir -p fixtures/fs
+printf 'Hello from solve-fs\\n' > fixtures/fs/hello.txt
+x07 run --world solve-fs --fixture-fs-dir fixtures/fs
+```
+
+Expected: `solve_output_b64` decodes to `Hello from solve-fs\n`.
+
+Common failures:
+
+- If you see a missing fixture error, make sure `--fixture-fs-dir` points to the directory that contains `hello.txt`.
+
+### 9) Record → replay HTTP body (solve-rr)
 
 Steps:
 
@@ -44,7 +225,88 @@ JSON
 
 x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-solve-rr-fetch.patch.json --out src/app.x07.json --validate
 x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world solve-rr
 
 # Run deterministically in solve-rr.
 x07 run --world solve-rr --fixture-rr-dir fixtures/rr --input-b64 ZXhhbXBsZS5jb20=
 ```
+
+Expected: `solve_output_b64` decodes to the recorded response body bytes for `example.com`.
+
+Common failures:
+
+- If you see `X07RR_HTTP`, the recording step could not fetch the URL (check network access).
+- If you see a missing fixture error, confirm `fixtures/rr/index.json` exists and `--fixture-rr-dir` points to it.
+
+### 10) Write a file (run-os-sandboxed)
+
+This writes `out/hello.txt` under the default sandbox profile’s base policy.
+
+```bash
+x07 policy init --template cli
+mkdir -p out
+
+cat > /tmp/x07-sandbox-write-file.patch.json <<'JSON'
+[{"op":"replace","path":"/decls/1/body","value":["begin",["os.fs.write_file",["bytes.lit","out/hello.txt"],["bytes.lit","Hello from sandbox\\n"]],["bytes.lit","ok\\n"]]}]
+JSON
+
+x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-sandbox-write-file.patch.json --out src/app.x07.json --validate
+x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world run-os-sandboxed
+
+x07 run --profile sandbox
+cat out/hello.txt
+```
+
+Expected:
+
+- `out/hello.txt` contains `Hello from sandbox\n`
+- `solve_output_b64` decodes to `ok\n`
+
+Common failures:
+
+- If you see `missing policy file`, run `x07 policy init --template cli` (it creates `.x07/policies/base/cli.sandbox.base.policy.json`).
+- If you see policy denial for filesystem writes, ensure you’re writing under `out/` (or pass `--allow-write-root <path>`).
+
+### 11) HTTP GET in a sandbox (run-os-sandboxed + `ext-net`)
+
+This fetches `https://example.com/` using `std.net.http.client.get_v1`, writes the body to `out/example.html`, and returns `status=<code>\n`.
+
+```bash
+# Ensure native prerequisites for libcurl/OpenSSL are installed.
+x07 doctor
+
+# Add networking stack (transitive helper packages are auto-added at lock time).
+x07 pkg add ext-net@0.1.2 --sync
+
+# Generate a base deny-by-default HTTP client policy.
+x07 policy init --template http-client
+mkdir -p out
+
+cat > /tmp/x07-sandbox-http-get.patch.json <<'JSON'
+[
+  {"op":"add","path":"/imports/0","value":"std.net.http.client"},
+  {"op":"add","path":"/imports/1","value":"std.net.http.spec"},
+  {"op":"add","path":"/imports/2","value":"std.fmt"},
+  {"op":"replace","path":"/decls/1/body","value":["begin",["let","url",["bytes.lit","https://example.com/"]],["let","caps",["std.net.http.spec.caps_default_v1"]],["let","resp",["std.net.http.client.get_v1","url","caps"]],["let","dv",["bytes.view","resp"]],["let","status",["std.net.http.client.resp_status_v1","dv"]],["let","body",["std.net.http.client.resp_body_v1","dv"]],["os.fs.write_file",["bytes.lit","out/example.html"],"body"],["bytes.concat",["bytes.concat",["bytes.lit","status="],["std.fmt.u32_to_dec","status"]],["bytes.lit","\\n"]]]}
+]
+JSON
+
+x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-sandbox-http-get.patch.json --out src/app.x07.json --validate
+x07 fmt --input src/app.x07.json --write
+x07 lint --input src/app.x07.json --world run-os-sandboxed
+
+x07 run --profile sandbox \
+  --policy .x07/policies/base/http-client.sandbox.base.policy.json \
+  --allow-host example.com:443
+```
+
+Expected:
+
+- `out/example.html` contains the fetched response body bytes
+- `solve_output_b64` decodes to `status=200\n` (or another HTTP status)
+
+Common failures:
+
+- If you see C compile/link errors, run `x07 doctor` and install the suggested native deps.
+- If you see a policy denial, ensure you passed `--allow-host example.com:443` (and that the policy is the `http-client` template).
