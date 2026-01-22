@@ -205,6 +205,60 @@ fn is_executable(path: &Path) -> bool {
     }
 }
 
+fn curl_openssl_link_args(openssl_prefix: Option<&Path>) -> Vec<String> {
+    let mut args: Vec<String> = Vec::new();
+    if let Some(prefix) = openssl_prefix {
+        let inc_dir = prefix.join("include");
+        let lib_dir = prefix.join("lib");
+        args.push(format!("-I{}", inc_dir.display()));
+        args.push(format!("-L{}", lib_dir.display()));
+        args.push(format!("-Wl,-rpath,{}", lib_dir.display()));
+    }
+    args.extend(
+        ["-lcurl", "-lssl", "-lcrypto"]
+            .into_iter()
+            .map(str::to_string),
+    );
+    args
+}
+
+fn brew_prefix(formula: &str) -> Option<PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    find_in_path("brew")?;
+
+    let out = std::process::Command::new("brew")
+        .args(["--prefix", formula])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let prefix = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if prefix.is_empty() {
+        return None;
+    }
+    let prefix = PathBuf::from(prefix);
+    if prefix.join("include").is_dir() && prefix.join("lib").is_dir() {
+        Some(prefix)
+    } else {
+        None
+    }
+}
+
+fn brew_prefix_openssl() -> Option<PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    for formula in ["openssl@3", "openssl@1.1", "openssl"] {
+        if let Some(prefix) = brew_prefix(formula) {
+            return Some(prefix);
+        }
+    }
+    None
+}
+
 fn check_curl_openssl_link(compiler: &PathBuf) -> Result<()> {
     let tmp = std::env::temp_dir();
     let pid = std::process::id();
@@ -216,13 +270,13 @@ fn check_curl_openssl_link(compiler: &PathBuf) -> Result<()> {
     let c_src = b"#include <curl/curl.h>\n#include <openssl/ssl.h>\nint main(void) { return 0; }\n";
     std::fs::write(&c_path, c_src).with_context(|| format!("write {}", c_path.display()))?;
 
-    let cmd = std::process::Command::new(compiler)
-        .arg(&c_path)
-        .arg("-o")
-        .arg(&out_path)
-        .arg("-lcurl")
-        .arg("-lssl")
-        .arg("-lcrypto")
+    let mut cc_cmd = std::process::Command::new(compiler);
+    cc_cmd.arg(&c_path).arg("-o").arg(&out_path);
+    for arg in curl_openssl_link_args(brew_prefix_openssl().as_deref()) {
+        cc_cmd.arg(arg);
+    }
+
+    let cmd = cc_cmd
         .output()
         .with_context(|| format!("exec {}", compiler.display()))?;
 
@@ -238,5 +292,46 @@ fn check_curl_openssl_link(compiler: &PathBuf) -> Result<()> {
             String::from_utf8_lossy(&cmd.stdout),
             String::from_utf8_lossy(&cmd.stderr)
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn curl_openssl_link_args_without_prefix() {
+        let args = curl_openssl_link_args(None);
+        assert_eq!(
+            args,
+            vec![
+                "-lcurl".to_string(),
+                "-lssl".to_string(),
+                "-lcrypto".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn curl_openssl_link_args_with_prefix() {
+        let prefix = PathBuf::from("openssl-prefix");
+        let args = curl_openssl_link_args(Some(&prefix));
+
+        let inc = format!("-I{}", prefix.join("include").display());
+        let lib = format!("-L{}", prefix.join("lib").display());
+        let rpath = format!("-Wl,-rpath,{}", prefix.join("lib").display());
+
+        assert_eq!(
+            args,
+            vec![
+                inc,
+                lib,
+                rpath,
+                "-lcurl".to_string(),
+                "-lssl".to_string(),
+                "-lcrypto".to_string()
+            ]
+        );
     }
 }
