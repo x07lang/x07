@@ -125,22 +125,23 @@ jobs:
             --bundle "../dist/x07-docs-${tag}.tar.gz" \
             "${args[@]}"
 
-      - name: Open PR
-        id: cpr
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ env.X07_BOT_TOKEN }}
-          path: x07-website
-          branch: bot/website-sync-${{ steps.vars.outputs.tag }}
-          commit-message: "release: sync website for ${{ steps.vars.outputs.tag }}"
-          title: "release: sync website for ${{ steps.vars.outputs.tag }}"
-          body: Automated website sync from x07 tag ${{ steps.vars.outputs.tag }}.
-
-      - name: Enable auto-merge (squash)
-        if: ${{ steps.cpr.outputs.pull-request-number != '' }}
-        env:
-          GH_TOKEN: ${{ env.X07_BOT_TOKEN }}
+      - name: Commit + push (x07-website main)
+        working-directory: x07-website
         run: |
           set -euo pipefail
-          pr="${{ steps.cpr.outputs.pull-request-number }}"
-          gh pr merge "$pr" --repo x07lang/x07-website --squash --auto --delete-branch
+          tag="${{ steps.vars.outputs.tag }}"
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "ok: no website changes to push"
+            exit 0
+          fi
+
+          git status --porcelain
+          git config user.name "x07-bot"
+          git config user.email "x07-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "release: sync website for ${tag}"
+
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
