@@ -177,11 +177,12 @@ with_tls_echo_server() {
   local port="$2"
   shift 2
 
+  local log_path="tmp/tmp/tls_echo_server_${port}.log"
   "$python_bin" "tests/external_os/net_tls/tls_echo_server.py" \
     --host "$host" \
     --port "$port" \
     --timeout-s 20 \
-    >/dev/null 2>&1 &
+    >"$log_path" 2>&1 &
   local pid="$!"
 
   cleanup() {
@@ -190,7 +191,37 @@ with_tls_echo_server() {
   }
   trap cleanup RETURN
 
-  sleep 0.1
+  # Avoid flaky sleeps: wait until the server is listening before running the client.
+  ready="false"
+  for _i in $(seq 1 200); do
+    if "$python_bin" - "$host" "$port" <<'PY'
+import socket, sys
+host = sys.argv[1]
+port = int(sys.argv[2])
+try:
+    with socket.create_connection((host, port), timeout=0.2):
+        pass
+except OSError:
+    raise SystemExit(1)
+raise SystemExit(0)
+PY
+    then
+      ready="true"
+      break
+    fi
+    if ! kill -0 "$pid" >/dev/null 2>&1; then
+      echo "ERROR: tls_echo_server exited early; log follows:" >&2
+      cat "$log_path" >&2 || true
+      exit 1
+    fi
+    sleep 0.05
+  done
+  if [[ "$ready" != "true" ]]; then
+    echo "ERROR: tls_echo_server did not become ready (timeout); log follows:" >&2
+    cat "$log_path" >&2 || true
+    exit 1
+  fi
+
   "$@"
 }
 
