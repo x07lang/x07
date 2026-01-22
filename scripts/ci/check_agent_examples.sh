@@ -273,8 +273,8 @@ set +e
 SERVER_PID="$!"
 set -e
 
-# Wait for ready file.
-for _i in $(seq 1 200); do
+# Wait for ready file. Some runners (notably macOS) can be slow to spin up Python.
+for _i in $(seq 1 1000); do
   if [[ -s "$server_ready" ]]; then
     break
   fi
@@ -288,6 +288,10 @@ done
 if [[ ! -s "$server_ready" ]]; then
   echo "--- local_http_server.py log ---" >&2
   cat "$server_log" >&2 || true
+  echo "--- local_http_server.py process ---" >&2
+  ps -p "$SERVER_PID" -o pid=,ppid=,command= >&2 || true
+  echo "--- server_ready path ---" >&2
+  ls -l "$server_ready" >&2 || true
   die "local_http_server.py did not become ready (timeout)"
 fi
 
