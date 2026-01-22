@@ -61,7 +61,7 @@ def replace_dependency_version_literals(src: str, *, old_version: str, new_versi
         return src, 0
 
     pattern = re.compile(rf'(\bversion\s*=\s*"){re.escape(old_version)}(")')
-    out, count = pattern.subn(rf'\1{new_version}\2', src)
+    out, count = pattern.subn(lambda m: f"{m.group(1)}{new_version}{m.group(2)}", src)
     return out, count
 
 
