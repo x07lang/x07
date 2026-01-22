@@ -118,6 +118,7 @@ x07/
 - [`x07lang/x07`](https://github.com/x07lang/x07) — Toolchain + stdlib (this repo)
 - [`x07lang/x07-website`](https://github.com/x07lang/x07-website) — x07lang.org
 - [`x07lang/x07-registry`](https://github.com/x07lang/x07-registry) — Package registry
+- [`x07lang/x07-registry-web`](https://github.com/x07lang/x07-registry-web) — Registry UI (x07.io)
 - [`x07lang/x07-index`](https://github.com/x07lang/x07-index) — Package index
 
 ---

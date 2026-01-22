@@ -4,6 +4,8 @@ X07’s canonical installer is `x07up` (toolchain manager).
 
 The bootstrap scripts (`install.sh` / `install.ps1`) install `x07up`, then `x07up` installs the selected toolchain and sets up `~/.x07/bin/` shims.
 
+Quickstart: see [Install](install.md).
+
 ## One-command install
 
 macOS / Linux:
@@ -44,8 +46,21 @@ curl -fsSL https://x07lang.org/install.sh | sh -s -- \
 Write `x07-toolchain.toml`:
 
 ```bash
-x07up override set v0.0.19
+x07up override set v0.0.20
 ```
+
+This writes a file like:
+
+```toml
+[toolchain]
+channel = "v0.0.20"
+components = ["docs", "skills"]
+```
+
+Notes:
+
+- `channel` can be `stable` or a specific tag like `v0.0.20`.
+- `components` controls whether `x07up` installs the offline docs and skills pack.
 
 Remove it:
 
@@ -61,6 +76,8 @@ x07up override unset
   - project-scoped: `x07up skills install --project .`
 - Project rails: `x07up agent init --project . --pin stable --with-skills project`
 
+See also: [Available skills](available-skills.md).
+
 ## If you’re stuck
 
 Run:
@@ -70,4 +87,3 @@ x07up doctor --json
 ```
 
 It reports missing prerequisites and broken toolchain layout in a machine-readable way.
-

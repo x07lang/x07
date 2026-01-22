@@ -4,6 +4,7 @@
 
 ## Getting started
 - [Agent quickstart](getting-started/agent-quickstart.md)
+- [Available skills](getting-started/available-skills.md)
 - [Install](getting-started/install.md)
 - [Installer / x07up](getting-started/installer.md)
 - [First project](getting-started/first-project.md)

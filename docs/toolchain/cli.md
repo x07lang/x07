@@ -148,3 +148,45 @@ For machine-first discovery and debugging:
 - Many commands support `--report-json` for tool-style wrapper reports.
 
 See [Diagnostics & repair](diagnostics-repair.md).
+
+## Programmatic CLI discovery (`--cli-specrows`)
+
+Agents should not scrape `--help` text. Use `--cli-specrows`:
+
+- `x07 --cli-specrows`
+- `x07c --cli-specrows`
+- `x07-host-runner --cli-specrows`
+- `x07-os-runner --cli-specrows`
+
+Output is a single JSON object:
+
+- `schema_version: "x07cli.specrows@0.1.0"`
+- `rows: [...]` (a flat, ordered table describing the CLI surface)
+
+Schema: `spec/x07cli.specrows.schema.json`.
+
+## Tool wrapper reports (`--report-json`)
+
+Some commands can emit a tool-style wrapper report for agents:
+
+- `x07 fmt --report-json ...`
+- `x07 lint --report-json ...`
+- `x07 fix --report-json ...` (requires `--write`)
+
+Wrapper schema: `schema_version: "x07c.report@0.1.0"` (see `spec/x07c.report.schema.json`).
+
+Notes:
+
+- `x07 lint` without `--report-json` prints the raw diagnostics report (`x07diag`, see `spec/x07diag.schema.json`).
+- `x07 fix` without `--report-json` prints the fixed x07AST JSON to stdout unless `--write` is set.
+
+## Agent bootstrap recipe
+
+Canonical minimal sequence:
+
+1. Discover CLIs: `x07 --cli-specrows`
+2. Format + lint: `x07 fmt` / `x07 lint` (use `--report-json` when you need wrapper reports)
+3. Repair: `x07 fix` and/or `x07 ast apply-patch`
+4. Execute + validate: `x07 run`, `x07 test`
+
+See: [Agent quickstart](../getting-started/agent-quickstart.md).

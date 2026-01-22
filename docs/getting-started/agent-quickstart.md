@@ -56,6 +56,13 @@ For agent rails (toolchain pin + skills + a self-recovery guide), run:
 x07up agent init --project . --pin stable --with-skills project
 ```
 
+`x07 --init` vs `x07up agent init`:
+
+| Command | When to use | What it creates |
+|---|---|---|
+| `x07 --init` | minimal project skeleton | `x07.json`, `x07.lock.json`, `src/`, `tests/` |
+| `x07up agent init --project . ...` | autonomous agent rails | `AGENTS.md`, `x07-toolchain.toml`, optional skills install, and (if missing) the same project skeleton as `x07 --init` |
+
 This creates:
 
 - `x07.json` (with `test`, `os`, and `sandbox` profiles)
@@ -64,6 +71,8 @@ This creates:
 - `tests/tests.json` + `tests/smoke.x07.json` (a deterministic harness smoke test)
 
 If you are creating a publishable package, use `x07 --init --package` to also create `x07-package.json`.
+
+See also: [Available skills](available-skills.md).
 
 ## 3) The core loop: fmt → lint → run → test
 

@@ -1,11 +1,11 @@
 {
   "schema_version": "x07.package@0.1.0",
-  "name": "ext-memchr-rs-demo",
+  "name": "ext-hex-rs-demo",
   "version": "0.1.0",
-  "description": "Demo package: memchr imported via x07import (restricted Rust subset).",
-  "docs": "Imported module: ext.memchr\nTests module: ext.memchr.tests\n",
+  "description": "Demo package: hex imported via x07import (restricted Rust subset).",
+  "docs": "Imported module: ext.hex\nTests module: ext.hex.tests\n",
   "module_root": "modules",
-  "modules": ["ext.memchr", "ext.memchr.tests"],
+  "modules": ["ext.hex", "ext.hex.tests"],
   "meta": {
     "determinism_tier": "pure",
     "worlds_allowed": [
@@ -20,4 +20,3 @@
     "import_mode": "x07import"
   }
 }
-

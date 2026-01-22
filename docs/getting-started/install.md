@@ -13,6 +13,10 @@ The recommended installer is `x07up` (toolchain manager). It installs:
 - shims under `~/.x07/bin/` (put this on `PATH`)
 - offline docs + the Codex skills pack (default profile)
 
+Quickstart and full installer reference:
+
+- quickstart: [Installer / x07up](installer.md)
+
 ## Supported platforms
 
 X07 aims to be usable on:
@@ -70,7 +74,7 @@ Verify:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.0.19
+x07up override set v0.0.20
 ```
 
 This makes toolchain selection deterministic for agents and CI.

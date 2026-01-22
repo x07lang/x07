@@ -1,6 +1,6 @@
 [package]
 name = "x07up"
-version = "0.0.19"
+version = "0.0.20"
 edition = "2021"
 
 [dependencies]
@@ -13,4 +13,3 @@ sha2 = "0.10"
 tar = "0.4"
 ureq = "3"
 zip = "2"
-
