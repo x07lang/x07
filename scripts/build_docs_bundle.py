@@ -8,6 +8,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import sys
+import json
 
 
 FIXED_MTIME = 946684800  # 2000-01-01T00:00:00Z
@@ -37,7 +38,18 @@ def iter_docs_files(docs_root: Path) -> list[tuple[str, Path]]:
     return files
 
 
-def write_docs_bundle(out_path: Path, docs_root: Path) -> None:
+def docs_bundle_meta_bytes(tag: str) -> bytes:
+    toolchain_tag = tag.strip()
+    toolchain_version = toolchain_tag[1:] if toolchain_tag.startswith("v") else toolchain_tag
+    meta = {
+        "schema_version": "x07.docs.bundle-meta@0.1.0",
+        "toolchain_tag": toolchain_tag,
+        "toolchain_version": toolchain_version,
+    }
+    return (json.dumps(meta, sort_keys=True, indent=2) + "\n").encode("utf-8")
+
+
+def write_docs_bundle(out_path: Path, docs_root: Path, tag: str) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     files = iter_docs_files(docs_root)
 
@@ -64,6 +76,17 @@ def write_docs_bundle(out_path: Path, docs_root: Path) -> None:
                     info.mtime = FIXED_MTIME
                     info.size = len(data)
                     tf.addfile(info, io.BytesIO(data))
+                meta_data = docs_bundle_meta_bytes(tag)
+                meta_info = tarfile.TarInfo(name="docs/_bundle_meta.json")
+                meta_info.type = tarfile.REGTYPE
+                meta_info.mode = 0o644
+                meta_info.uid = 0
+                meta_info.gid = 0
+                meta_info.uname = ""
+                meta_info.gname = ""
+                meta_info.mtime = FIXED_MTIME
+                meta_info.size = len(meta_data)
+                tf.addfile(meta_info, io.BytesIO(meta_data))
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -107,7 +130,7 @@ def main(argv: list[str]) -> int:
         before = sha256_file(out_path)
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp) / "bundle.tar.gz"
-            write_docs_bundle(tmp_path, docs_root)
+            write_docs_bundle(tmp_path, docs_root, tag)
             after = sha256_file(tmp_path)
         if before != after:
             print(f"ERROR: {out_path} would change", file=sys.stderr)
@@ -115,7 +138,7 @@ def main(argv: list[str]) -> int:
         print(f"ok: docs bundle up to date ({before})")
         return 0
 
-    write_docs_bundle(out_path, docs_root)
+    write_docs_bundle(out_path, docs_root, tag)
     try:
         display_path = str(out_path.relative_to(root))
     except ValueError:

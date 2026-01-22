@@ -264,7 +264,7 @@ jobs:
         run: python3 scripts/build_release_manifest.py --out dist/release-manifest.json
 
       - name: Build skills pack
-        run: python3 scripts/build_skills_pack.py --out "dist/x07-skills-${{ github.ref_name }}.tar.gz"
+        run: python3 scripts/build_skills_pack.py --tag "${{ github.ref_name }}" --out "dist/x07-skills-${{ github.ref_name }}.tar.gz"
 
       - name: Build docs bundle
         run: python3 scripts/build_docs_bundle.py --tag "${{ github.ref_name }}"

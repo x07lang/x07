@@ -8,6 +8,7 @@ import tarfile
 from pathlib import Path
 import sys
 import gzip
+import json
 
 
 def sha256_hex(data: bytes) -> str:
@@ -53,7 +54,31 @@ def add_file(tar: tarfile.TarFile, path: Path, arcname: str) -> None:
     tar.addfile(ti, io.BytesIO(data))
 
 
-def build_skills_pack_bytes(root: Path) -> bytes:
+def add_bytes(tar: tarfile.TarFile, data: bytes, arcname: str) -> None:
+    ti = tarfile.TarInfo(name=arcname)
+    ti.type = tarfile.REGTYPE
+    ti.mode = 0o644
+    ti.uid = 0
+    ti.gid = 0
+    ti.uname = ""
+    ti.gname = ""
+    ti.mtime = 0
+    ti.size = len(data)
+    tar.addfile(ti, io.BytesIO(data))
+
+
+def skills_pack_meta_bytes(tag: str) -> bytes:
+    toolchain_tag = tag.strip()
+    toolchain_version = toolchain_tag[1:] if toolchain_tag.startswith("v") else toolchain_tag
+    meta = {
+        "schema_version": "x07.skills.pack-meta@0.1.0",
+        "toolchain_tag": toolchain_tag,
+        "toolchain_version": toolchain_version,
+    }
+    return (json.dumps(meta, sort_keys=True, indent=2) + "\n").encode("utf-8")
+
+
+def build_skills_pack_bytes(root: Path, *, tag: str | None) -> bytes:
     skills_root = root / "skills" / "pack" / ".codex" / "skills"
     if not skills_root.is_dir():
         raise SystemExit("ERROR: missing skills/pack/.codex/skills/")
@@ -71,12 +96,15 @@ def build_skills_pack_bytes(root: Path) -> bytes:
             for f in files:
                 rel = f.relative_to(skills_root).as_posix()
                 add_file(tar, f, f".codex/skills/{rel}")
+            if tag is not None:
+                add_bytes(tar, skills_pack_meta_bytes(tag), ".codex/skills/_pack_meta.json")
     return out.getvalue()
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="dist/x07-skills.tar.gz", help="Output path")
+    ap.add_argument("--tag", default=None, help="Release tag (for example: v0.0.21)")
     ap.add_argument("--check", action="store_true", help="Validate determinism and (if present) output content")
     return ap.parse_args(argv)
 
@@ -85,8 +113,10 @@ def main(argv: list[str]) -> int:
     args = parse_args(argv)
     root = Path(__file__).resolve().parents[1]
 
-    a = build_skills_pack_bytes(root)
-    b = build_skills_pack_bytes(root)
+    tag = args.tag.strip() if isinstance(args.tag, str) and args.tag.strip() else None
+
+    a = build_skills_pack_bytes(root, tag=tag)
+    b = build_skills_pack_bytes(root, tag=tag)
     if a != b:
         print("ERROR: skills pack generation is not deterministic", file=sys.stderr)
         return 3
