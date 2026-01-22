@@ -288,7 +288,7 @@ jobs:
           files=()
           while IFS= read -r -d '' f; do
             files+=("$f")
-          done < <(find dist -type f \( -name 'x07-*.tar.gz' -o -name 'x07-*.zip' -o -name 'x07up-*.tar.gz' -o -name 'x07up-*.zip' -o -name 'release-manifest.json' -o -name 'channels.json' \) -print0)
+          done < <(find dist -maxdepth 1 -type f \( -name 'x07-*.tar.gz' -o -name 'x07-*.zip' -o -name 'x07up-*.tar.gz' -o -name 'x07up-*.zip' -o -name 'release-manifest.json' -o -name 'channels.json' \) -print0)
 
           if (( ${#files[@]} == 0 )); then
             echo "ERROR: no release assets found under dist/" >&2
