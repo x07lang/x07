@@ -63,6 +63,8 @@ CI / agent-friendly:
 
 Verify:
 
+- `x07 --version`
+- `x07up --version`
 - `x07 --help`
 - `x07 run --help`
 - `x07 ast apply-patch --help`

@@ -31,6 +31,7 @@ mod util;
 #[derive(Parser, Debug)]
 #[command(name = "x07")]
 #[command(about = "X07 toolchain utilities.", long_about = None)]
+#[command(version)]
 #[command(subcommand_required = false)]
 struct Cli {
     #[arg(long, global = true)]

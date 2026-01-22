@@ -20,6 +20,7 @@ const DOCTOR_SCHEMA_VERSION: &str = "x07up.doctor.report@0.1.0";
 #[derive(Debug, Parser)]
 #[command(name = "x07up")]
 #[command(about = "X07 toolchain manager.", long_about = None)]
+#[command(version)]
 struct Cli {
     #[arg(long, global = true)]
     root: Option<PathBuf>,
