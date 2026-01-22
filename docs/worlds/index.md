@@ -52,3 +52,4 @@ Instead, define `x07.json.profiles` and a `default_profile`, and use:
 See:
 - [Fixture worlds](fixture-worlds.md)
 - [OS worlds](os-worlds.md)
+- [Running programs](../toolchain/running-programs.md)

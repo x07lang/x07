@@ -22,16 +22,7 @@ Agents should never scrape text; they should parse the structured payload.
 
 ## Repair loop
 
-A good agent loop:
-
-1. Run `x07 lint --input <program.x07.json> --world solve-pure` (or add `--report-json` for a tool wrapper report)
-2. Parse diagnostics
-3. Apply quickfixes (if present) with `x07 fix --input <program.x07.json> --world solve-pure --write`,
-   or apply an explicit patch with `x07 ast apply-patch --in <program.x07.json> --patch <patch.json> --out <program.x07.json> --validate`
-4. Re-run `x07 lint`
-5. Then run `x07 test`
-
-This is how you turn LLM output into reliable engineering.
+See [Repair loop](repair-loop.md) for the canonical command sequence (format → lint → quickfix/patch → re-lint → test).
 
 ## Output contracts (agent-friendly)
 

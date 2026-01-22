@@ -89,6 +89,8 @@ Run:
 x07 run
 ```
 
+See: [Running programs](../toolchain/running-programs.md).
+
 If your program expects CLI arguments via `argv_v1`, pass them after `--` and `x07 run` will encode them into input bytes:
 
 ```bash
@@ -115,6 +117,8 @@ x07 lint --input src/main.x07.json --world solve-pure
 x07 fix --input src/main.x07.json --world solve-pure --write
 x07 lint --input src/main.x07.json --world solve-pure
 ```
+
+See: [Repair loop](../toolchain/repair-loop.md).
 
 ## 5) Learn the language
 

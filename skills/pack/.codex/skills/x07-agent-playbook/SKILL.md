@@ -20,6 +20,11 @@ Execution should go through `x07 run` (single front door). The standalone runner
 
 If the task needs OS worlds or native deps (curl/openssl, etc), run `x07up doctor --json` early and follow its suggestions.
 
+Canonical docs:
+
+- https://x07lang.org/docs/toolchain/repair-loop/
+- https://x07lang.org/docs/toolchain/running-programs/
+
 ## Single canonical agent loop (edit → format → lint → run)
 
 1. Create or edit x07AST JSON (`*.x07.json`).
@@ -30,7 +35,7 @@ If the task needs OS worlds or native deps (curl/openssl, etc), run `x07up docto
 4. Apply tool-provided quickfixes (when available):
    - `x07 fix --input src/main.x07.json --world solve-pure --write --report-json`
 5. If a targeted structural change is needed, apply an explicit JSON Patch:
-   - `x07 ast apply-patch --in src/main.x07.json --patch /tmp/repair.patch.json --validate`
+   - `x07 ast apply-patch --in src/main.x07.json --patch /tmp/repair.patch.json --out src/main.x07.json --validate`
 6. Run in the correct capability world (canonical: `x07 run`):
    - deterministic solve worlds (recommended default): `x07 run`
    - OS worlds (unsandboxed): `x07 run --profile os`

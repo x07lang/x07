@@ -57,4 +57,4 @@ The runner prints a JSON report; the program’s bytes output is in `solve_outpu
 ## Next
 
 - For packages and lockfiles, see [Packages](../packages/index.md).
-- For the repair loop, see [Diagnostics & repair](../toolchain/diagnostics-repair.md).
+- For the repair loop, see [Repair loop](../toolchain/repair-loop.md).

@@ -76,63 +76,15 @@ Notes:
   - Reads `x07.json` + `x07.lock.json`.
   - Uses `x07.json` `module_roots` plus locked dependency module roots (from the lockfile).
 
-### Running generated executables
+### Running programs (canonical)
 
-Use `x07 run` as the canonical entry point for execution.
+Use `x07 run` as the canonical entry point for execution. Prefer intent-driven profiles (`x07.json.default_profile` + `x07.json.profiles`) so most invocations look like:
 
-#### CLI args (`argv_v1`) passthrough
-
-If your program expects `argv_v1` input, pass process args after `--` and `x07 run` will encode them into input bytes:
-
-- `x07 run --profile os -- tool --help`
-
-#### Profiles (recommended)
-
-`x07 run` supports intent-driven **profiles** defined in your project manifest (`x07.json`):
-
-- `default_profile`: which profile `x07 run` uses by default
-- `profiles.<name>`: a profile definition (world + optional defaults)
-
-Common profile names are:
-
-- `test` → deterministic `solve-*` world
-- `os` → `run-os`
-- `sandbox` → `run-os-sandboxed` + policy
-
-Examples:
-
-- `x07 run` (uses `x07.json.default_profile`)
+- `x07 run`
 - `x07 run --profile os`
 - `x07 run --profile sandbox`
 
-World IDs (`--world solve-pure`, `--world run-os`, ...) remain available as an advanced escape hatch.
-
-#### Policies (run-os-sandboxed)
-
-`run-os-sandboxed` requires an explicit policy file. Use `x07 policy init` to generate a schema-valid starting point, then extend it for your app (filesystem roots, env keys, subprocess allowlists, resource limits):
-
-- `x07 policy init --template cli`
-- `x07 policy init --template http-client`
-- `x07 policy init --template web-service`
-- `x07 policy init --template fs-tool`
-- `x07 policy init --template sqlite-app`
-- `x07 policy init --template postgres-client`
-- `x07 policy init --template worker`
-
-For net-enabled templates, the base policy starts with `net.allow_hosts: []` (deny-by-default destinations). Use `--allow-host` / `--deny-host` to materialize a derived policy under `.x07/policies/_generated/`:
-
-- `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
-- `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:80,443 --deny-host example.com:80`
-
-Derived policies are written under `.x07/policies/_generated/` and passed to `x07-os-runner`.
-
-The generated `main` uses a simple byte framing:
-
-- stdin: `u32_le(len)` followed by `len` bytes
-- stdout: `u32_le(len)` followed by `len` bytes
-- stderr: JSON stats (fuel/heap/fs/rr/kv/scheduler)
-
-`x07 run`, `x07-host-runner`, and `x07-os-runner` handle this framing automatically.
+For the complete guide (targets, worlds, input, fixtures, policies, reports), see [Running programs](running-programs.md).
 
 ## JSON outputs (agent-friendly)
 

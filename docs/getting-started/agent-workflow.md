@@ -41,6 +41,8 @@ An autonomous agent should follow a loop like:
    - apply a suggested quickfix (`x07 fix`), or produce a new patch and apply it with `x07 ast apply-patch`
 5. Repeat until green
 
+See also: [Repair loop](../toolchain/repair-loop.md) and [Running programs](../toolchain/running-programs.md).
+
 If you want a good mental model for “AI-native engineering”, see OpenAI’s Codex guide on building AI-native engineering teams.
 
 When OS access is required, prefer explicit profiles (for example `x07 run --profile os` / `x07 run --profile sandbox`) and run `x07up doctor --json` early to catch platform prerequisites.
