@@ -220,6 +220,25 @@ if not any(r.replace("\\","/").endswith("/src") or r == "src" for r in roots):
 print("ok: host wrapped report ok")
 PY
 
+step "smoke: test harness baseline (stdlib.lock fallback)"
+x07 test --manifest tests/tests.json >"$tmp/x07test.report.json"
+"$python_bin" - "$tmp/x07test.report.json" <<'PY'
+import json, sys
+from pathlib import Path
+doc = json.load(open(sys.argv[1], "r", encoding="utf-8"))
+if doc.get("schema_version") != "x07.x07test@0.2.0":
+    raise SystemExit("ERROR: x07test schema_version mismatch")
+summary = doc.get("summary") or {}
+if summary.get("passed") != 1:
+    raise SystemExit(f"ERROR: expected 1 passed test, got: {summary.get('passed')}")
+stdlib_lock = (doc.get("invocation") or {}).get("stdlib_lock")
+if not isinstance(stdlib_lock, str) or not stdlib_lock.endswith("stdlib.lock"):
+    raise SystemExit("ERROR: missing invocation.stdlib_lock")
+if not Path(stdlib_lock).is_file():
+    raise SystemExit(f"ERROR: invocation.stdlib_lock does not exist: {stdlib_lock}")
+print("ok: x07 test ok")
+PY
+
 step "smoke: run (os profile) if compiler is present"
 if command -v cc >/dev/null 2>&1 || command -v clang >/dev/null 2>&1 || command -v gcc >/dev/null 2>&1; then
   x07 run --profile os --input input.bin --report wrapped --report-out .x07/run.os.json >/dev/null

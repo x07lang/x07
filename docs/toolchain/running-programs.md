@@ -121,3 +121,15 @@ Report modes:
 
 - `--report runner` (default): pass through the runner JSON (`spec/x07-host-runner.report.schema.json` or `spec/x07-os-runner.report.schema.json`)
 - `--report wrapped`: wrap the runner JSON in `spec/x07-run.report.schema.json` (`schema_version: "x07.run.report@0.1.0"`)
+
+### Common failure: unknown module (missing deps)
+
+If compilation fails because a module can’t be resolved, the report will have:
+
+- `compile.ok: false`
+- `compile.compile_error` containing something like `Parse: unknown module: "ext.cli" (searched: ext/cli.x07.json)`
+
+Fix:
+
+- for packages: add the dependency (`x07 pkg add <name>@<ver> --sync`) so `x07.lock.json` provides module roots, or
+- for standalone `--program` runs: ensure the module exists under a `--module-root` directory.

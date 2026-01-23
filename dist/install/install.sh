@@ -244,12 +244,25 @@ def ensure_executable(path: Path) -> None:
     path.chmod(st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
+def detect_profile_path() -> Path:
+    home = Path.home()
+    shell = os.environ.get("SHELL") or ""
+    shell_name = Path(shell).name if shell else ""
+
+    if shell_name == "zsh":
+        return home / ".zprofile"
+    if shell_name == "bash":
+        bash_profile = home / ".bash_profile"
+        if bash_profile.exists():
+            return bash_profile
+    return home / ".profile"
+
+
 def maybe_modify_path(root: Path, args: argparse.Namespace) -> tuple[bool, str | None]:
-    hint = f'export PATH="{root / "bin"}:$PATH"'
     if args.no_modify_path:
         return False, None
 
-    profile = Path.home() / ".profile"
+    profile = detect_profile_path()
     line = f'export PATH="{root / "bin"}:$PATH"'
     try:
         existing = profile.read_text(encoding="utf-8") if profile.exists() else ""

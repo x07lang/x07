@@ -71,6 +71,8 @@ try {
 
     Copy-Item -Force "deps/x07/native_backends.json" (Join-Path $toolchainStage "deps\\x07\\native_backends.json")
     Copy-Item -Recurse -Force "stdlib/os/0.2.0/modules" (Join-Path $toolchainStage "stdlib\\os\\0.2.0")
+    Copy-Item -Force "stdlib.lock" (Join-Path $toolchainStage "stdlib.lock")
+    Copy-Item -Force "stdlib.os.lock" (Join-Path $toolchainStage "stdlib.os.lock")
     Copy-Item -Recurse -Force "docs/*" (Join-Path $toolchainStage "docs")
     Copy-Item -Recurse -Force "skills/pack/.codex/skills/*" (Join-Path $toolchainStage ".codex\\skills")
 

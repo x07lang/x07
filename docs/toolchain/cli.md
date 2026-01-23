@@ -115,6 +115,11 @@ Output is a single JSON object:
 - `schema_version: "x07cli.specrows@0.1.0"`
 - `rows: [...]` (a flat, ordered table describing the CLI surface)
 
+Each row is a small tuple. Examples:
+
+- `["root","help","-h","--help","Print help"]`
+- `["root","version","","--version","Print version"]`
+
 Schema: `spec/x07cli.specrows.schema.json`.
 
 ## Tool wrapper reports (`--report-json`)

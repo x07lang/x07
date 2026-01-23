@@ -37,6 +37,14 @@ Install `x07up` + the stable toolchain:
 curl -fsSL https://x07lang.org/install.sh | sh -s -- --yes --channel stable
 ```
 
+Then (in the same shell session), ensure `x07` is on `PATH`:
+
+```bash
+export PATH="$HOME/.x07/bin:$PATH"
+```
+
+If you omit `--no-modify-path`, the installer also attempts to persist this for future shells (for zsh on macOS: `~/.zprofile`).
+
 CI / agent-friendly (no profile edits, JSON report):
 
 ```bash
@@ -76,7 +84,7 @@ Verify:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.0.23
+x07up override set v0.0.24
 ```
 
 This makes toolchain selection deterministic for agents and CI.

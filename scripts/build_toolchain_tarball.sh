@@ -14,6 +14,7 @@ Usage:
 
 Builds a toolchain tarball containing:
   - bin/{x07,x07c,x07-host-runner,x07-os-runner,x07import-cli}
+  - stdlib.lock + stdlib.os.lock (stdlib package lockfiles used by `x07 test`)
   - deps/x07/native_backends.json + native backend archives (for native backends like ext-regex)
   - stdlib/os/0.2.0/modules (for x07-os-runner)
   - docs/ (human docs snapshot; also shipped as x07-docs-*.tar.gz)
@@ -131,6 +132,15 @@ if [[ ! -d "$stdlib_src" ]]; then
   exit 1
 fi
 cp -R "$stdlib_src" "$stdlib_dst"
+
+for lock in stdlib.lock stdlib.os.lock; do
+  lock_src="$root/$lock"
+  if [[ ! -f "$lock_src" ]]; then
+    echo "ERROR: missing stdlib lock file: $lock_src" >&2
+    exit 1
+  fi
+  cp -f "$lock_src" "$stage_root/$lock"
+done
 
 docs_src="$root/docs"
 if [[ ! -d "$docs_src" ]]; then
