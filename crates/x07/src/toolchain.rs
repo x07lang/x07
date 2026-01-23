@@ -50,15 +50,19 @@ pub struct BuildArgs {
     #[arg(long, value_name = "PATH")]
     pub project: PathBuf,
 
-    #[arg(long)]
+    /// Write generated C source to a file (default: stdout).
+    #[arg(long, value_name = "PATH")]
     pub out: Option<PathBuf>,
 
-    #[arg(long)]
+    /// Emit the runtime C header (requires `emit_main=false`; use `--freestanding` for embedding).
+    #[arg(long, value_name = "PATH")]
     pub emit_c_header: Option<PathBuf>,
 
+    /// Build in freestanding mode for library embedding (exports `x07_solve_v2`; no `main()`).
     #[arg(long)]
     pub freestanding: bool,
 
+    /// Override the generated C source size budget (in bytes).
     #[arg(long, value_name = "BYTES")]
     pub max_c_bytes: Option<usize>,
 }

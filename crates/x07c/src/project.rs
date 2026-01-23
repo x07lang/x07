@@ -186,9 +186,10 @@ pub struct LockedDependency {
 }
 
 pub fn load_project_manifest(path: &Path) -> Result<ProjectManifest> {
-    let bytes = std::fs::read(path).with_context(|| format!("read project: {}", path.display()))?;
+    let bytes = std::fs::read(path)
+        .with_context(|| format!("[X07PROJECT_READ] read project: {}", path.display()))?;
     let mut m: ProjectManifest = serde_json::from_slice(&bytes)
-        .with_context(|| format!("parse project JSON: {}", path.display()))?;
+        .with_context(|| format!("[X07PROJECT_PARSE] parse project JSON: {}", path.display()))?;
 
     normalize_string_in_place(&mut m.schema_version);
     normalize_string_in_place(&mut m.world);
@@ -345,7 +346,7 @@ pub fn verify_lockfile(
 ) -> Result<()> {
     if lock.schema_version.trim() != PROJECT_LOCKFILE_SCHEMA_VERSION {
         anyhow::bail!(
-            "lockfile schema_version mismatch: expected {} got {:?}",
+            "[X07LOCK_SCHEMA] lockfile schema_version mismatch: expected {} got {:?} (hint: run `x07 pkg lock`)",
             PROJECT_LOCKFILE_SCHEMA_VERSION,
             lock.schema_version
         );

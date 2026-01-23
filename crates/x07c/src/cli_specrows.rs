@@ -58,10 +58,21 @@ fn rows_for_command(cmd: &Command) -> Vec<Value> {
     let mut subs: Vec<&Command> = cmd.get_subcommands().collect();
     subs.sort_by(|a, b| a.get_name().cmp(b.get_name()));
     for sc in subs {
-        push_scope_rows(&mut rows, sc.get_name(), sc);
+        push_scope_rows_recursive(&mut rows, sc.get_name(), sc);
     }
 
     rows
+}
+
+fn push_scope_rows_recursive(rows: &mut Vec<Value>, scope: &str, cmd: &Command) {
+    push_scope_rows(rows, scope, cmd);
+
+    let mut subs: Vec<&Command> = cmd.get_subcommands().collect();
+    subs.sort_by(|a, b| a.get_name().cmp(b.get_name()));
+    for sc in subs {
+        let nested = format!("{scope}.{}", sc.get_name());
+        push_scope_rows_recursive(rows, &nested, sc);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

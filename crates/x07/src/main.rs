@@ -1530,11 +1530,22 @@ fn write_report_and_exit(
         );
     }
 
-    if args.json && args.report_out.is_none() {
+    if args.json {
         print!("{json}");
-    } else if args.json && args.report_out.is_some() {
-        // still emit machine output if explicitly requested
-        print!("{json}");
+    } else {
+        for t in &report.tests {
+            println!("{}\t{}", t.status, t.id);
+        }
+        println!(
+            "summary: passed={} failed={} skipped={} errors={} xfail_passed={} xfail_failed={} (exit={})",
+            report.summary.passed,
+            report.summary.failed,
+            report.summary.skipped,
+            report.summary.errors,
+            report.summary.xfail_passed,
+            report.summary.xfail_failed,
+            exit_code
+        );
     }
 
     Ok(std::process::ExitCode::from(exit_code))

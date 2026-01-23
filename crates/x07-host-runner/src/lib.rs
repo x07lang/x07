@@ -1285,10 +1285,20 @@ fn setup_run_dir(tmp: &TempDir, config: &RunnerConfig) -> Result<()> {
             copy_dir_contents(fixture, &rr_dir)
                 .with_context(|| format!("copy rr fixture dir: {}", fixture.display()))?;
 
+            let dst = rr_dir.join("index.evrr");
             if let Some(rr_index) = config.fixture_rr_index.as_deref() {
                 ensure_safe_rel_path(rr_index)?;
                 let src = fixture.join(rr_index);
-                let dst = rr_dir.join("index.evrr");
+                write_rr_index_evrr(&src, &dst)
+                    .with_context(|| format!("generate rr index from {}", src.display()))?;
+            } else if !dst.is_file() {
+                let src = fixture.join("index.json");
+                if !src.is_file() {
+                    anyhow::bail!(
+                        "missing rr fixture index (expected {} or prebuilt index.evrr)",
+                        src.display()
+                    );
+                }
                 write_rr_index_evrr(&src, &dst)
                     .with_context(|| format!("generate rr index from {}", src.display()))?;
             }
@@ -1354,10 +1364,20 @@ fn setup_run_dir(tmp: &TempDir, config: &RunnerConfig) -> Result<()> {
                 .with_context(|| format!("create rr fixture dir: {}", rr_dir.display()))?;
             copy_dir_contents(rr_fixture, &rr_dir)
                 .with_context(|| format!("copy rr fixture dir: {}", rr_fixture.display()))?;
+            let dst = rr_dir.join("index.evrr");
             if let Some(rr_index) = config.fixture_rr_index.as_deref() {
                 ensure_safe_rel_path(rr_index)?;
                 let src = rr_fixture.join(rr_index);
-                let dst = rr_dir.join("index.evrr");
+                write_rr_index_evrr(&src, &dst)
+                    .with_context(|| format!("generate rr index from {}", src.display()))?;
+            } else if !dst.is_file() {
+                let src = rr_fixture.join("index.json");
+                if !src.is_file() {
+                    anyhow::bail!(
+                        "missing rr fixture index (expected {} or prebuilt index.evrr)",
+                        src.display()
+                    );
+                }
                 write_rr_index_evrr(&src, &dst)
                     .with_context(|| format!("generate rr index from {}", src.display()))?;
             }

@@ -138,6 +138,56 @@ fn x07_test_smoke_suite() {
 }
 
 #[test]
+fn x07_test_json_false_prints_human_output() {
+    let root = repo_root();
+    let manifest = root.join("tests/tests.json");
+    assert!(manifest.is_file(), "missing {}", manifest.display());
+
+    let out = run_x07(&[
+        "test",
+        "--manifest",
+        manifest.to_str().unwrap(),
+        "--json",
+        "false",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !out.stdout.is_empty(),
+        "expected human-readable stdout when --json=false"
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("summary:"),
+        "expected summary line in stdout:\n{stdout}"
+    );
+}
+
+#[test]
+fn x07_cli_specrows_includes_nested_subcommands() {
+    let out = run_x07(&["--cli-specrows"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    let rows = v["rows"].as_array().expect("rows[]");
+    let has_pkg_add = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("pkg.add")
+    });
+    assert!(has_pkg_add, "missing pkg.add in --cli-specrows output");
+}
+
+#[test]
 fn x07_test_finds_stdlib_lock_from_exe_when_missing() {
     let root = repo_root();
     let dir = fresh_os_tmp_dir("tmp_x07_test_stdlib_lock");
@@ -276,6 +326,84 @@ fn x07_pkg_add_updates_project_manifest() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
     assert_eq!(v["error"]["code"], "X07PKG_DEP_EXISTS");
+}
+
+#[test]
+fn x07_pkg_add_sync_is_atomic_on_failure() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_add_sync_atomic");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let before = std::fs::read(dir.join("x07.json")).expect("read x07.json");
+
+    // Use an invalid index URL to trigger a deterministic `--sync` failure (no network).
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "pkg",
+            "add",
+            "ext-cli@0.1.3",
+            "--sync",
+            "--index",
+            "sparse+https://localhost:99999/index/",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["command"], "pkg.add");
+    assert_eq!(v["error"]["code"], "X07PKG_INDEX_CONFIG");
+
+    let after = std::fs::read(dir.join("x07.json")).expect("read x07.json");
+    assert_eq!(after, before, "x07.json changed despite failed --sync");
+}
+
+#[test]
+fn x07_pkg_add_rejects_non_semver_versions() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_add_bad_version");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let before = std::fs::read(dir.join("x07.json")).expect("read x07.json");
+
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-cli@invalid-version"]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["command"], "pkg.add");
+    assert_eq!(v["error"]["code"], "X07PKG_SPEC_INVALID");
+
+    let after = std::fs::read(dir.join("x07.json")).expect("read x07.json");
+    assert_eq!(after, before, "x07.json changed despite invalid version");
 }
 
 #[test]
@@ -521,6 +649,133 @@ fn x07_run_allow_host_materializes_policy() {
         .find(|h| h["host"] == "example.com")
         .expect("example.com entry");
     assert_eq!(entry["ports"], serde_json::json!([443]));
+}
+
+#[test]
+fn x07_run_os_sandboxed_allows_write_under_write_root() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_os_sandboxed_write");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "cli"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    std::fs::create_dir_all(dir.join("out")).expect("create out dir");
+
+    write_bytes(
+        &dir.join("main.x07.json"),
+        br#"{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "entry",
+  "module_id": "main",
+  "imports": [],
+  "decls": [],
+  "solve": [
+    "begin",
+    [
+      "let",
+      "r",
+      [
+        "os.fs.write_file",
+        ["bytes.lit", "out/test.txt"],
+        ["bytes.lit", "hello_world"]
+      ]
+    ],
+    [
+      "if",
+      ["=", "r", 0],
+      ["bytes.lit", "ok"],
+      ["bytes.lit", "err"]
+    ]
+  ]
+}
+"#,
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "run",
+            "--world",
+            "run-os-sandboxed",
+            "--policy",
+            ".x07/policies/base/cli.sandbox.base.policy.json",
+            "--program",
+            "main.x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let path = dir.join("out/test.txt");
+    assert!(path.is_file(), "missing {}", path.display());
+    let bytes = std::fs::read(&path).expect("read output file");
+    assert_eq!(bytes, b"hello_world");
+}
+
+#[test]
+fn x07_run_errors_include_diagnostic_codes_and_hints() {
+    let root = repo_root();
+
+    // Invalid project JSON should carry a stable diagnostic code.
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_bad_project_json");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(out.status.code(), Some(0));
+    write_bytes(&dir.join("x07.json"), b"{ this is not json }\n");
+
+    let out = run_x07_in_dir(&dir, &["run"]);
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("[X07PROJECT_PARSE]"),
+        "stderr missing diagnostic code:\n{stderr}"
+    );
+
+    // Corrupt lockfile should carry a stable diagnostic code and recovery hint.
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_bad_lockfile_json");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    let out = run_x07_in_dir(&dir, &["--init"]);
+    assert_eq!(out.status.code(), Some(0));
+    write_bytes(&dir.join("x07.lock.json"), b"{ this is not json }\n");
+
+    let out = run_x07_in_dir(&dir, &["run"]);
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("[X07LOCK_PARSE]"),
+        "stderr missing diagnostic code:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("x07 pkg lock"),
+        "stderr missing recovery hint:\n{stderr}"
+    );
 }
 
 #[test]

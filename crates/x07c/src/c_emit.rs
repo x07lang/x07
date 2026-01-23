@@ -22110,6 +22110,22 @@ static char* rt_os_join_root_and_rel(ctx_t* ctx, const char* root, size_t root_l
   return out;
 }
 
+static bytes_t rt_os_strip_root_prefix(bytes_t path, const char* root, size_t root_len) {
+  // If the caller already included the root prefix in `path` (common for project-relative paths like
+  // `out/file.txt`), avoid producing `root/root/...` when we join roots.
+  size_t trimmed = root_len;
+  while (trimmed > 0 && (root[trimmed - 1] == '/' || root[trimmed - 1] == '\\')) trimmed--;
+  if (trimmed == 0) return path;
+  if ((uint32_t)trimmed >= path.len) return path;
+  if (memcmp(path.ptr, root, trimmed) != 0) return path;
+  if (path.ptr[trimmed] != (uint8_t)'/') return path;
+
+  bytes_t out = path;
+  out.ptr = path.ptr + trimmed + 1;
+  out.len = path.len - (uint32_t)(trimmed + 1);
+  return out;
+}
+
 static bytes_t rt_os_fs_read_file(ctx_t* ctx, bytes_t path) {
   rt_os_policy_init(ctx);
 
@@ -22129,7 +22145,8 @@ static bytes_t rt_os_fs_read_file(ctx_t* ctx, bytes_t path) {
     const char* root = NULL;
     size_t root_len = 0;
     while (rt_os_split_next(&cur, &root, &root_len)) {
-      p = rt_os_join_root_and_rel(ctx, root, root_len, path);
+      bytes_t rel = rt_os_strip_root_prefix(path, root, root_len);
+      p = rt_os_join_root_and_rel(ctx, root, root_len, rel);
       f = fopen(p, "rb");
       if (f) break;
     }
@@ -22175,7 +22192,8 @@ static uint32_t rt_os_fs_write_file(ctx_t* ctx, bytes_t path, bytes_t data) {
     const char* root = NULL;
     size_t root_len = 0;
     while (rt_os_split_next(&cur, &root, &root_len)) {
-      p = rt_os_join_root_and_rel(ctx, root, root_len, path);
+      bytes_t rel = rt_os_strip_root_prefix(path, root, root_len);
+      p = rt_os_join_root_and_rel(ctx, root, root_len, rel);
       f = fopen(p, "wb");
       if (f) break;
       last_errno = errno;

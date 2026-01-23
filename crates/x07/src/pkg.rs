@@ -204,13 +204,33 @@ fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
 
     let project_bytes = std::fs::read(&project_path)
         .with_context(|| format!("read: {}", project_path.display()))?;
-    let mut doc: Value = serde_json::from_slice(&project_bytes)
-        .with_context(|| format!("parse project JSON: {}", project_path.display()))?;
+    let original_project_bytes = project_bytes.clone();
+    let mut doc: Value = serde_json::from_slice(&project_bytes).with_context(|| {
+        format!(
+            "[X07PROJECT_PARSE] parse project JSON: {}",
+            project_path.display()
+        )
+    })?;
     let obj = doc
         .as_object_mut()
         .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
 
-    let (name, version) = parse_pkg_spec(&args.spec)?;
+    let (name, version) = match parse_pkg_spec(&args.spec) {
+        Ok(out) => out,
+        Err(err) => {
+            let report = PkgReport::<AddResult> {
+                ok: false,
+                command: "pkg.add",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SPEC_INVALID".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
     let dep_path = args
         .path
         .unwrap_or_else(|| format!(".x07/deps/{name}/{version}"));
@@ -267,9 +287,22 @@ fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
             check: false,
             offline: false,
         };
-        let (lock_code, lock_report) = pkg_lock_report(&lock_args)?;
+        let (lock_code, lock_report) = match pkg_lock_report(&lock_args) {
+            Ok(out) => out,
+            Err(err) => {
+                if let Err(rollback_err) = std::fs::write(&project_path, &original_project_bytes) {
+                    return Err(anyhow::anyhow!(
+                        "{err}\nrollback failed ({}): {rollback_err}",
+                        project_path.display()
+                    ));
+                }
+                return Err(err);
+            }
+        };
         add_result.lock = lock_report.result;
         if !lock_report.ok {
+            std::fs::write(&project_path, &original_project_bytes)
+                .with_context(|| format!("rollback write: {}", project_path.display()))?;
             let report = PkgReport::<AddResult> {
                 ok: false,
                 command: "pkg.add",
@@ -304,6 +337,12 @@ fn parse_pkg_spec(spec: &str) -> Result<(String, String)> {
     if version.is_empty() {
         anyhow::bail!("package version must be non-empty");
     }
+    if !is_valid_semver_version(version) {
+        anyhow::bail!(
+            "package version must be semver (MAJOR.MINOR.PATCH), got {:?}",
+            version
+        );
+    }
     if !name
         .as_bytes()
         .first()
@@ -316,6 +355,95 @@ fn parse_pkg_spec(spec: &str) -> Result<(String, String)> {
         anyhow::bail!("package name must match ^[a-z][a-z0-9_-]*$: got {:?}", name);
     }
     Ok((name.to_string(), version.to_string()))
+}
+
+fn is_valid_semver_version(version: &str) -> bool {
+    let (core_and_pre, build) = match version.split_once('+') {
+        Some((a, b)) => (a, Some(b)),
+        None => (version, None),
+    };
+
+    if let Some(build) = build {
+        if build.is_empty() {
+            return false;
+        }
+        if !build.split('.').all(is_valid_semver_build_identifier) {
+            return false;
+        }
+    }
+
+    let (core, pre) = match core_and_pre.split_once('-') {
+        Some((a, b)) => (a, Some(b)),
+        None => (core_and_pre, None),
+    };
+
+    let mut parts = core.split('.');
+    let Some(major) = parts.next() else {
+        return false;
+    };
+    let Some(minor) = parts.next() else {
+        return false;
+    };
+    let Some(patch) = parts.next() else {
+        return false;
+    };
+    if parts.next().is_some() {
+        return false;
+    }
+    if !is_valid_semver_numeric_identifier(major) {
+        return false;
+    }
+    if !is_valid_semver_numeric_identifier(minor) {
+        return false;
+    }
+    if !is_valid_semver_numeric_identifier(patch) {
+        return false;
+    }
+
+    if let Some(pre) = pre {
+        if pre.is_empty() {
+            return false;
+        }
+        if !pre.split('.').all(is_valid_semver_prerelease_identifier) {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn is_valid_semver_numeric_identifier(id: &str) -> bool {
+    if id.is_empty() {
+        return false;
+    }
+    if !id.as_bytes().iter().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    id == "0" || !id.starts_with('0')
+}
+
+fn is_valid_semver_prerelease_identifier(id: &str) -> bool {
+    if id.is_empty() {
+        return false;
+    }
+
+    if id.as_bytes().iter().all(|b| b.is_ascii_digit()) {
+        return id == "0" || !id.starts_with('0');
+    }
+
+    id.as_bytes()
+        .iter()
+        .all(|b| b.is_ascii_alphanumeric() || *b == b'-')
+}
+
+fn is_valid_semver_build_identifier(id: &str) -> bool {
+    if id.is_empty() {
+        return false;
+    }
+
+    id.as_bytes()
+        .iter()
+        .all(|b| b.is_ascii_alphanumeric() || *b == b'-')
 }
 
 fn cmd_pkg_pack(args: PackArgs) -> Result<std::process::ExitCode> {
@@ -353,8 +481,12 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
     let project_path = util::resolve_existing_path_upwards(&args.project);
     let project_bytes = std::fs::read(&project_path)
         .with_context(|| format!("read: {}", project_path.display()))?;
-    let mut doc: Value = serde_json::from_slice(&project_bytes)
-        .with_context(|| format!("parse project JSON: {}", project_path.display()))?;
+    let mut doc: Value = serde_json::from_slice(&project_bytes).with_context(|| {
+        format!(
+            "[X07PROJECT_PARSE] parse project JSON: {}",
+            project_path.display()
+        )
+    })?;
 
     // Validate using the canonical parser for better error messages and stricter checks.
     let mut manifest =
@@ -757,7 +889,15 @@ fn ensure_deps_present(
 
     if client.is_none() {
         let token = x07_pkg::load_token(index).unwrap_or(None);
-        *client = Some(SparseIndexClient::from_index_url(index, token)?);
+        *client = match SparseIndexClient::from_index_url(index, token) {
+            Ok(c) => Some(c),
+            Err(err) => {
+                return Ok(Some(PkgError {
+                    code: "X07PKG_INDEX_CONFIG".to_string(),
+                    message: format!("{err:#}"),
+                }))
+            }
+        };
     }
     let client = client.as_ref().expect("client initialized");
     if index_used.is_none() {
@@ -766,9 +906,18 @@ fn ensure_deps_present(
 
     for dep in missing {
         let dep_dir = base.join(&dep.path);
-        let entries = client
-            .fetch_entries(&dep.name)
-            .with_context(|| format!("fetch index entries for {:?}", dep.name))?;
+        let entries = match client.fetch_entries(&dep.name) {
+            Ok(entries) => entries,
+            Err(err) => {
+                return Ok(Some(PkgError {
+                    code: "X07PKG_INDEX_FETCH".to_string(),
+                    message: format!(
+                        "fetch index entries for {:?}: {err:#} (hint: check the package name and index URL)",
+                        dep.name
+                    ),
+                }))
+            }
+        };
         let Some(entry) = entries
             .into_iter()
             .find(|e| e.name == dep.name && e.version == dep.version && !e.yanked)
@@ -796,8 +945,16 @@ fn ensure_deps_present(
                     archive_path.display()
                 );
             }
-        } else {
-            client.download_to_file(&dep.name, &dep.version, &entry.cksum, &archive_path)?;
+        } else if let Err(err) =
+            client.download_to_file(&dep.name, &dep.version, &entry.cksum, &archive_path)
+        {
+            return Ok(Some(PkgError {
+                code: "X07PKG_DOWNLOAD_FAILED".to_string(),
+                message: format!(
+                    "download {:?}@{:?}: {err:#} (hint: check network access and index URL)",
+                    dep.name, dep.version
+                ),
+            }));
         }
 
         let archive_bytes = std::fs::read(&archive_path)

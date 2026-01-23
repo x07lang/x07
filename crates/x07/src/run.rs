@@ -127,7 +127,7 @@ pub struct RunArgs {
     pub policy: Option<PathBuf>,
 
     /// Append network destinations to the sandbox policy allowlist (repeatable).
-    #[arg(long, value_name = "HOST:PORTS")]
+    #[arg(long, value_name = "HOST:PORT[,PORT...]")]
     pub allow_host: Vec<String>,
 
     /// Read allow-host entries from a file (repeatable).
@@ -135,7 +135,7 @@ pub struct RunArgs {
     pub allow_host_file: Vec<PathBuf>,
 
     /// Remove network destinations from the sandbox policy allowlist (repeatable; deny wins).
-    #[arg(long, value_name = "HOST:PORTS")]
+    #[arg(long, value_name = "HOST:*|HOST:PORT[,PORT...]")]
     pub deny_host: Vec<String>,
 
     /// Read deny-host entries from a file (repeatable).
@@ -610,10 +610,18 @@ fn resolve_target(cwd: &Path, args: &RunArgs) -> Result<(TargetKind, PathBuf, Op
 }
 
 fn load_project_profiles(project_manifest: &Path) -> Result<ProjectRunProfilesFile> {
-    let bytes = std::fs::read(project_manifest)
-        .with_context(|| format!("read project: {}", project_manifest.display()))?;
-    let mut file: ProjectRunProfilesFile = serde_json::from_slice(&bytes)
-        .with_context(|| format!("parse project JSON: {}", project_manifest.display()))?;
+    let bytes = std::fs::read(project_manifest).with_context(|| {
+        format!(
+            "[X07PROJECT_READ] read project: {}",
+            project_manifest.display()
+        )
+    })?;
+    let mut file: ProjectRunProfilesFile = serde_json::from_slice(&bytes).with_context(|| {
+        format!(
+            "[X07PROJECT_PARSE] parse project JSON: {}",
+            project_manifest.display()
+        )
+    })?;
     if let Some(dp) = file.default_profile.as_mut() {
         if dp.trim() != dp.as_str() {
             *dp = dp.trim().to_string();
@@ -1261,9 +1269,12 @@ fn read_host_specs_from_file(root: &Path, path: &Path) -> Result<Vec<String>> {
 }
 
 fn parse_allow_host_spec(raw: &str) -> Result<(String, BTreeSet<u16>)> {
-    let (host_raw, ports_raw) = split_host_ports(raw)?;
+    let (host_raw, ports_raw) =
+        split_host_ports(raw).context("Expected HOST:PORTS (ports are 1..65535).")?;
     if ports_raw.trim() == "*" {
-        anyhow::bail!("Expected HOST:PORTS (ports are 1..65535 or *).");
+        anyhow::bail!(
+            "Expected HOST:PORTS (ports are 1..65535; '*' is only valid for --deny-host)."
+        );
     }
     let host = normalize_host_token(host_raw)?;
     let ports = parse_ports_list(ports_raw)?;
@@ -1271,7 +1282,8 @@ fn parse_allow_host_spec(raw: &str) -> Result<(String, BTreeSet<u16>)> {
 }
 
 fn parse_deny_host_spec(raw: &str) -> Result<(String, DenySpec)> {
-    let (host_raw, ports_raw) = split_host_ports(raw)?;
+    let (host_raw, ports_raw) =
+        split_host_ports(raw).context("Expected HOST:PORTS (ports are 1..65535 or *).")?;
     let host = normalize_host_token(host_raw)?;
     let ports_raw = ports_raw.trim();
     if ports_raw == "*" {
@@ -1296,30 +1308,24 @@ fn parse_deny_host_spec(raw: &str) -> Result<(String, DenySpec)> {
 fn split_host_ports(raw: &str) -> Result<(&str, &str)> {
     let raw = raw.trim();
     if raw.is_empty() {
-        anyhow::bail!("Expected HOST:PORTS (ports are 1..65535 or *).");
+        anyhow::bail!("Expected HOST:PORTS.");
     }
     if raw.starts_with('[') {
-        let close = raw
-            .find(']')
-            .context("Expected HOST:PORTS (ports are 1..65535 or *).")?;
+        let close = raw.find(']').context("Expected HOST:PORTS.")?;
         let after = &raw[close + 1..];
-        let ports = after
-            .strip_prefix(':')
-            .context("Expected HOST:PORTS (ports are 1..65535 or *).")?;
+        let ports = after.strip_prefix(':').context("Expected HOST:PORTS.")?;
         let host = &raw[1..close];
         if host.is_empty() || ports.trim().is_empty() {
-            anyhow::bail!("Expected HOST:PORTS (ports are 1..65535 or *).");
+            anyhow::bail!("Expected HOST:PORTS.");
         }
         return Ok((host, ports));
     }
 
-    let idx = raw
-        .rfind(':')
-        .context("Expected HOST:PORTS (ports are 1..65535 or *).")?;
+    let idx = raw.rfind(':').context("Expected HOST:PORTS.")?;
     let (host, ports) = raw.split_at(idx);
     let ports = &ports[1..];
     if host.trim().is_empty() || ports.trim().is_empty() {
-        anyhow::bail!("Expected HOST:PORTS (ports are 1..65535 or *).");
+        anyhow::bail!("Expected HOST:PORTS.");
     }
     Ok((host, ports))
 }
@@ -1349,11 +1355,11 @@ fn parse_ports_list(raw: &str) -> Result<BTreeSet<u16>> {
     for part in raw.split(',') {
         let part = part.trim();
         if part.is_empty() {
-            anyhow::bail!("Expected HOST:PORTS (ports are 1..65535 or *).");
+            anyhow::bail!("Expected HOST:PORTS (ports are 1..65535).");
         }
         let port: u16 = part
             .parse()
-            .map_err(|_| anyhow::anyhow!("Expected HOST:PORTS (ports are 1..65535 or *)."))?;
+            .map_err(|_| anyhow::anyhow!("Expected HOST:PORTS (ports are 1..65535)."))?;
         if port == 0 {
             anyhow::bail!("ports are 1..65535");
         }
