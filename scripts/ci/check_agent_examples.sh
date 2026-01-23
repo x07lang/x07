@@ -325,6 +325,59 @@ gen_dir="$crawler_work/.x07/policies/_generated"
 [[ -d "$gen_dir" ]] || die "expected derived policy dir to exist: $gen_dir"
 ls "$gen_dir"/*.json >/dev/null 2>&1 || die "expected a derived policy JSON under: $gen_dir"
 
+# Assert allow-host was merged into derived policy.
+policy_allow="$(ls -1 "$gen_dir"/*.json | sort | tail -n 1)"
+"$python_bin" - "$policy_allow" "$host" "$port" <<'PY'
+import json, sys
+p=json.load(open(sys.argv[1], "r", encoding="utf-8"))
+host=sys.argv[2].strip().lower()
+port=int(sys.argv[3])
+allow_hosts=(p.get("net") or {}).get("allow_hosts") or []
+ok=False
+for e in allow_hosts:
+    if not isinstance(e, dict):
+        continue
+    if (e.get("host") or "").strip().lower() != host:
+        continue
+    ports=e.get("ports") or []
+    if isinstance(ports, list) and port in ports:
+        ok=True
+        break
+assert ok, (host, port, allow_hosts)
+PY
+
+# Now run with allow + deny for the same host, and ensure deny wins in the derived policy.
+gen_before="$(ls -1 "$gen_dir"/*.json | sort || true)"
+wrapped_3b="$(run_x07_run "web-crawler-local" "$crawler_work" \
+  --profile sandbox \
+  --allow-host "${host}:${port}" \
+  --deny-host "${host}:${port}" \
+  --cpu-time-limit-seconds 60 \
+  -- crawler --url "$base_url" --depth "1" --out "$out_3" \
+)"
+unwrap_and_check_wrapped_report "web-crawler-local" "$wrapped_3b" "$crawler_work/tmp/runner_deny.json" "os" "run-os-sandboxed" "true"
+
+gen_after="$(ls -1 "$gen_dir"/*.json | sort || true)"
+policy_deny="$(comm -13 <(printf '%s\n' "$gen_before") <(printf '%s\n' "$gen_after") | tail -n 1 || true)"
+if [[ -z "${policy_deny:-}" ]]; then
+  policy_deny="$(printf '%s\n' "$gen_after" | tail -n 1)"
+fi
+"$python_bin" - "$policy_deny" "$host" "$port" <<'PY'
+import json, sys
+p=json.load(open(sys.argv[1], "r", encoding="utf-8"))
+host=sys.argv[2].strip().lower()
+port=int(sys.argv[3])
+allow_hosts=(p.get("net") or {}).get("allow_hosts") or []
+for e in allow_hosts:
+    if not isinstance(e, dict):
+        continue
+    if (e.get("host") or "").strip().lower() != host:
+        continue
+    ports=e.get("ports") or []
+    if isinstance(ports, list) and port in ports:
+        raise SystemExit((host, port, allow_hosts))
+PY
+
 # Compare produced outputs against golden fixtures.
 require_path "$crawler_work/$out_3"
 require_path "$crawler_work/$out_3.text"

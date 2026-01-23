@@ -20,5 +20,18 @@ if [[ -n "${symlinks}" ]]; then
   exit 1
 fi
 
-echo "ok: agent surface sanity"
+for f in \
+  spec/x07-project.schema.json \
+  spec/x07-lock.schema.json \
+  spec/x07-package.schema.json \
+  spec/x07-capabilities.schema.json \
+  spec/x07-website.package-index.schema.json \
+  catalog/capabilities.json \
+; do
+  if [[ ! -f "$f" ]]; then
+    echo "ERROR: missing required agent contract file: $f" >&2
+    exit 1
+  fi
+done
 
+echo "ok: agent surface sanity"

@@ -36,6 +36,11 @@ schemas = [
     root / "spec" / "x07patch.schema.json",
     root / "spec" / "x07test.schema.json",
     root / "spec" / "x07-run.report.schema.json",
+    root / "spec" / "x07-project.schema.json",
+    root / "spec" / "x07-lock.schema.json",
+    root / "spec" / "x07-package.schema.json",
+    root / "spec" / "x07-capabilities.schema.json",
+    root / "spec" / "x07-website.package-index.schema.json",
 ]
 
 for p in schemas:

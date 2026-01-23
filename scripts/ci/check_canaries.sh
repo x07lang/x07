@@ -27,6 +27,10 @@ X07C_BIN="$(./scripts/ci/find_x07c.sh)"
 "$python_bin" scripts/check_x07_parens.py >/dev/null
 ./scripts/ci/check_language_guide_sync.sh >/dev/null
 ./scripts/ci/check_llm_contracts.sh >/dev/null
+"$python_bin" scripts/ci/check_project_manifests.py >/dev/null
+"$python_bin" scripts/ci/check_package_manifests.py >/dev/null
+"$python_bin" scripts/ci/check_capabilities_catalog.py >/dev/null
+"$python_bin" scripts/ci/check_doc_command_surface.py >/dev/null
 "$python_bin" scripts/ci/check_repair_corpus.py >/dev/null
 ./scripts/ci/check_agent_examples.sh >/dev/null
 ./scripts/ci/check_readme_commands.sh >/dev/null
