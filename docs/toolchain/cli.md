@@ -75,6 +75,10 @@ Notes:
 - `x07 build --project x07.json --out build/program.c`
   - Reads `x07.json` + `x07.lock.json`.
   - Uses `x07.json` `module_roots` plus locked dependency module roots (from the lockfile).
+- `x07 build --project x07.json --out build/program.c --emit-c-header build/x07.h --freestanding`
+  - Emits an embeddable `x07_solve_v2` entry point.
+
+See: [Embedding in C](embedding-in-c.md).
 
 ### Running programs (canonical)
 

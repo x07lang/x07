@@ -42,6 +42,11 @@ When running in `run-os-sandboxed`, `x07 run` can materialize a derived policy u
 - `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
 - `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --deny-host example.com:*`
 
+Syntax:
+
+- `--allow-host HOST:PORT[,PORT...]` (explicit ports only)
+- `--deny-host HOST:*` or `--deny-host HOST:PORT[,PORT...]`
+
 Denies apply after allows, so deny wins.
 
 See also: [Sandbox policy walkthrough](sandbox-policy-walkthrough.md).

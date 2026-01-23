@@ -88,6 +88,8 @@ Required fixture dirs:
 - `solve-kv` requires a `kv` fixture dir
 - `solve-full` requires all three
 
+See: [Fixture formats](../worlds/fixture-formats.md).
+
 ## Policies (run-os-sandboxed)
 
 `run-os-sandboxed` requires a base policy file:
@@ -99,8 +101,10 @@ To generate a schema-valid starting policy, use `x07 policy init --template <...
 
 Convenience overrides for net/filesystem allowlists are available only in `run-os-sandboxed` and materialize a derived policy under `.x07/policies/_generated/`:
 
-- `--allow-host host:ports` / `--deny-host host:ports` (deny wins)
+- `--allow-host host:port[,port...]` / `--deny-host host:*|host:port[,port...]` (deny wins)
 - `--allow-read-root /abs/or/rel/path` / `--allow-write-root /abs/or/rel/path`
+
+Note: `--allow-host` requires explicit ports; `*` is accepted only by `--deny-host`.
 
 ## Compilation and resource knobs
 

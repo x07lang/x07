@@ -22,15 +22,19 @@
 ## Worlds
 - [Worlds overview](worlds/index.md)
 - [Fixture worlds](worlds/fixture-worlds.md)
+- [Fixture formats](worlds/fixture-formats.md)
 - [OS worlds](worlds/os-worlds.md)
 - [Sandbox policy walkthrough](worlds/sandbox-policy-walkthrough.md)
 
 ## Toolchain
 - [CLI](toolchain/cli.md)
 - [Running programs](toolchain/running-programs.md)
+- [Embedding in C](toolchain/embedding-in-c.md)
 - [Repair loop](toolchain/repair-loop.md)
 - [Diagnostics & repair](toolchain/diagnostics-repair.md)
+- [Diagnostic codes](toolchain/diagnostic-codes.md)
 - [Testing](toolchain/testing.md)
+- [Test manifest](toolchain/tests-manifest.md)
 - [Testing by example](toolchain/testing-by-example.md)
 - [Performance comparisons](dev/perf-compare.md)
 

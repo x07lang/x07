@@ -6,6 +6,8 @@ Fixture worlds exist so agents can:
 - reproduce bugs exactly,
 - measure changes reliably.
 
+See also: [Fixture formats](fixture-formats.md).
+
 ## Key rules
 
 - no ambient time
