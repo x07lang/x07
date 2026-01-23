@@ -32,6 +32,7 @@ tmp/
 
 # Release artifacts (generated locally)
 dist/*.tar.gz
+dist/channels.json
 dist/.tmp_toolchain_*
 
 # OS helper binaries (built by scripts/build_os_helpers.sh)
