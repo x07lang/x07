@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-website.package-index.schema.json",
+  "title": "x07.website.package-index@0.2.0",
+  "description": "Per-package, per-version index published in the x07lang.org agent portal. Generated from a package's x07-package.json plus export decls extracted from the module x07AST JSON files.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "name",
+    "version",
+    "description",
+    "docs",
+    "module_root",
+    "meta",
+    "modules"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.website.package-index@0.2.0" },
+    "name": { "$ref": "#/$defs/pkg_name" },
+    "version": { "$ref": "#/$defs/semver" },
+    "description": {
+      "type": "string",
+      "maxLength": 4096,
+      "description": "Short human summary. May be empty for legacy package versions that predate description fields."
+    },
+    "docs": {
+      "type": "string",
+      "maxLength": 131072,
+      "description": "Long-form usage notes. May be empty for legacy package versions that predate docs fields."
+    },
+    "module_root": { "$ref": "#/$defs/rel_dir" },
+    "meta": { "$ref": "#/$defs/meta" },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/module_entry" }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([+-][0-9A-Za-z.-]+)?$",
+      "description": "Semantic-ish version string."
+    },
+    "pkg_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_-]{0,127}$",
+      "description": "Registry package name."
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "determinism_tier": {
+      "type": "string",
+      "enum": ["pure", "os-world-only"],
+      "description": "Determinism tier declared by the package."
+    },
+    "import_mode": {
+      "type": "string",
+      "enum": ["handwritten", "x07import", "ffi"],
+      "description": "How modules were produced / imported."
+    },
+    "pkg_ref": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9_-]{0,127}@[0-9]+\\.[0-9]+\\.[0-9]+([+-][0-9A-Za-z.-]+)?$",
+      "description": "Pinned dependency reference of the form name@version."
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+    },
+    "ffi_lib": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.+-]+$",
+      "description": "Native library token (linker name)."
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$",
+      "description": "Relative path (no absolute paths, no '..' segments)."
+    },
+    "rel_dir": {
+      "allOf": [
+        { "$ref": "#/$defs/rel_path" },
+        { "type": "string", "pattern": "^(?!.*\\.x07\\.json$).+$" }
+      ],
+      "description": "Relative directory path."
+    },
+    "module_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+      "description": "Module identifier."
+    },
+    "export_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$",
+      "description": "Fully-qualified export name."
+    },
+    "module_path": {
+      "allOf": [
+        { "$ref": "#/$defs/rel_path" },
+        { "type": "string", "pattern": "\\.x07\\.json$" }
+      ],
+      "description": "Relative path to a module file under module_root."
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["determinism_tier", "worlds_allowed", "import_mode"],
+      "properties": {
+        "determinism_tier": { "$ref": "#/$defs/determinism_tier" },
+        "worlds_allowed": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/world_id" }
+        },
+        "requires_packages": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/pkg_ref" }
+        },
+        "import_mode": { "$ref": "#/$defs/import_mode" },
+        "ffi_libs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/ffi_lib" }
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/capability" }
+        }
+      }
+    },
+    "module_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_id", "path", "exports"],
+      "properties": {
+        "module_id": { "$ref": "#/$defs/module_id" },
+        "path": { "$ref": "#/$defs/module_path" },
+        "exports": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/export_name" }
+        }
+      }
+    }
+  }
+}

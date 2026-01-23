@@ -1,0 +1,106 @@
+{
+  "schema_version": "x07.capabilities@0.1.0",
+  "capabilities": [
+    {
+      "id": "cli.args",
+      "summary": "Parse CLI argv (argv_v1) and define CLI interfaces.",
+      "canonical": { "name": "ext-cli", "version": "0.1.3" },
+      "status": "stable"
+    },
+    {
+      "id": "fs.io",
+      "summary": "OS filesystem API (run-os*).",
+      "canonical": { "name": "ext-fs", "version": "0.1.2" },
+      "worlds": ["run-os", "run-os-sandboxed"],
+      "status": "stable"
+    },
+    {
+      "id": "net.http",
+      "summary": "HTTP client for OS worlds (GET/POST, headers, body).",
+      "canonical": { "name": "ext-net", "version": "0.1.2" },
+      "alternatives": [{ "name": "ext-curl-c", "version": "0.1.3" }],
+      "worlds": ["run-os", "run-os-sandboxed"],
+      "status": "stable",
+      "notes": "Prefer ext-net unless you need raw curl bindings."
+    },
+    {
+      "id": "net.sockets",
+      "summary": "Low-level sockets for OS worlds.",
+      "canonical": { "name": "ext-sockets-c", "version": "0.1.3" },
+      "worlds": ["run-os", "run-os-sandboxed"],
+      "status": "stable"
+    },
+    {
+      "id": "url.parse",
+      "summary": "Parse and normalize URLs; stable URL primitives.",
+      "canonical": { "name": "ext-url-rs", "version": "0.1.2" },
+      "status": "stable"
+    },
+    {
+      "id": "data.json",
+      "summary": "JSON parse/encode.",
+      "canonical": { "name": "ext-json-rs", "version": "0.1.2" },
+      "status": "stable"
+    },
+    {
+      "id": "data.yaml",
+      "summary": "YAML parse/encode.",
+      "canonical": { "name": "ext-yaml-rs", "version": "0.1.2" },
+      "status": "stable"
+    },
+    {
+      "id": "data.csv",
+      "summary": "CSV parse/encode.",
+      "canonical": { "name": "ext-csv-rs", "version": "0.1.2" },
+      "status": "stable"
+    },
+    {
+      "id": "data.xml",
+      "summary": "XML parse helpers.",
+      "canonical": { "name": "ext-xml-rs", "version": "0.1.2" },
+      "status": "stable"
+    },
+    {
+      "id": "text.regex",
+      "summary": "Regex match/search.",
+      "canonical": { "name": "ext-regex", "version": "0.2.2" },
+      "alternatives": [
+        { "name": "ext-aho-corasick-rs", "version": "0.1.1" },
+        { "name": "ext-memchr-rs", "version": "0.1.2" }
+      ],
+      "status": "stable",
+      "notes": "Prefer ext-regex unless you need very fast literal multi-pattern scanning."
+    },
+    {
+      "id": "log.basic",
+      "summary": "Simple log record encoding/formatting (no span model).",
+      "canonical": { "name": "ext-log", "version": "0.1.2" },
+      "alternatives": [{ "name": "ext-tracing", "version": "0.1.2" }],
+      "status": "stable",
+      "notes": "Prefer ext-log for most apps; ext-tracing if you need spans/events."
+    },
+    {
+      "id": "time",
+      "summary": "Time utilities (encoding/format).",
+      "canonical": { "name": "ext-time-rs", "version": "0.1.2" },
+      "status": "stable"
+    },
+    {
+      "id": "db.sqlite",
+      "summary": "SQLite client for OS worlds.",
+      "canonical": { "name": "ext-db-sqlite", "version": "0.1.2" },
+      "worlds": ["run-os", "run-os-sandboxed"],
+      "status": "experimental"
+    }
+  ],
+  "aliases": {
+    "http-client": "net.http",
+    "crawler": "net.http",
+    "cli": "cli.args",
+    "filesystem": "fs.io",
+    "json": "data.json",
+    "yaml": "data.yaml",
+    "regex": "text.regex",
+    "sqlite": "db.sqlite"
+  }
+}
