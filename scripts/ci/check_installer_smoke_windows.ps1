@@ -160,13 +160,28 @@ try {
   if ($rep.solve.ok -ne $true) { throw "host solve not ok" }
 
   $roots = @()
-  if ($runHost.target -and $runHost.target.resolved_module_roots) { $roots = $runHost.target.resolved_module_roots }
-  $hasSrc = $false
-  foreach ($r in @($roots)) {
-    $norm = ([string]$r).Replace("\\","/").Trim().TrimEnd("/")
-    if ($norm.EndsWith("/src") -or $norm -eq "src") { $hasSrc = $true }
+  if ($runHost.target) { $roots = @($runHost.target.resolved_module_roots) }
+
+  $projManifest = Get-Content "x07.json" -Raw | ConvertFrom-Json
+  $expectedRoots = @()
+  if ($projManifest.module_roots) { $expectedRoots = @($projManifest.module_roots) }
+  if ($expectedRoots.Count -eq 0) { throw "x07.json missing module_roots" }
+
+  $missing = @()
+  foreach ($exp in $expectedRoots) {
+    $expNorm = ([string]$exp).Replace("\\","/").Trim().TrimEnd("/")
+    $found = $false
+    foreach ($r in @($roots)) {
+      $norm = ([string]$r).Replace("\\","/").Trim().TrimEnd("/")
+      if ($norm -eq $expNorm -or $norm.EndsWith("/$expNorm")) { $found = $true }
+    }
+    if (-not $found) { $missing += $expNorm }
   }
-  if (-not $hasSrc) { throw "expected src in resolved_module_roots" }
+  if ($missing.Count -ne 0) {
+    Write-Host "resolved_module_roots: $($roots | ConvertTo-Json -Compress)"
+    Write-Host "expected module_roots: $($expectedRoots | ConvertTo-Json -Compress)"
+    throw "resolved_module_roots missing expected roots: $($missing -join ', ')"
+  }
 
   Step "smoke: agent init produces AGENT.md"
   x07up agent init --project $proj --with-skills project | Out-Null
