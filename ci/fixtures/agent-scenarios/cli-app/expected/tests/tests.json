@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "smoke/cli_newline",
+      "world": "solve-pure",
+      "entry": "smoke.cli_newline",
+      "expect": "pass"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": "x07.run.report@0.1.0",
+  "runner": "host",
+  "world": "solve-pure",
+  "target": {
+    "kind": "project",
+    "path": "x07.json",
+    "project_root": "<PROJECT_ROOT>",
+    "lockfile": "x07.lock.json",
+    "resolved_module_roots": ["src"]
+  },
+  "report": {
+    "mode": "project-compile-run",
+    "exit_code": 0,
+    "solve": {
+      "ok": true,
+      "exit_status": 0,
+      "solve_output_b64": "dXJsPWh0dHBzOi8vZXhhbXBsZS5pbnZhbGlkLwpkZXB0aD0yCm91dD1vdXQvcmVzdWx0cy50eHQK"
+    }
+  }
+}
+

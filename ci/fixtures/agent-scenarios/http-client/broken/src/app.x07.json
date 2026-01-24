@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["app.solve"]},{"body":["std.rr.fetch","b"],"kind":"defn","name":"app.solve","params":[{"name":"b","ty":"bytes_view"}],"result":"bytes"}],"imports":["std.rr","std.os.proc"],"kind":"module","module_id":"app","schema_version":"x07.x07ast@0.1.0"}

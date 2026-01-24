@@ -142,11 +142,8 @@ lint_check_one() {
 pkg_lock_check() {
   local work="$1"
 
-  local args=(pkg lock --check)
-  if [[ "${X07_AGENT_GATE_OFFLINE:-}" == "1" ]]; then
-    args+=(--offline)
-  fi
-  (cd "$work" && "$x07_bin" "${args[@]}" >/dev/null)
+  # Keep agent examples deterministic: no network access during pkg lock checks.
+  (cd "$work" && "$x07_bin" pkg lock --check --offline >/dev/null)
 }
 
 run_x07_run() {
@@ -252,6 +249,51 @@ echo "==> agent example: web-crawler-local (run-os-sandboxed + allow-host sugar)
 crawler_work="$tmp_dir/web-crawler-local"
 copy_project "examples/agent-gate/web-crawler-local" "$crawler_work"
 
+seed_official_deps() {
+  local work="$1"
+  "$python_bin" - "$root" "$work" <<'PY'
+import json
+import shutil
+import sys
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+work = Path(sys.argv[2]).resolve()
+
+doc = json.loads((work / "x07.json").read_text(encoding="utf-8"))
+deps = doc.get("dependencies") or []
+if not isinstance(deps, list):
+    raise SystemExit("x07.json: dependencies must be an array")
+
+for dep in deps:
+    if not isinstance(dep, dict):
+        raise SystemExit(f"x07.json: dependency must be an object: {dep!r}")
+    name = dep.get("name")
+    version = dep.get("version")
+    rel_path = dep.get("path")
+    if not isinstance(name, str) or not name:
+        raise SystemExit(f"x07.json: dependency.name must be string: {dep!r}")
+    if not isinstance(version, str) or not version:
+        raise SystemExit(f"x07.json: dependency.version must be string: {dep!r}")
+    if not isinstance(rel_path, str) or not rel_path:
+        raise SystemExit(f"x07.json: dependency.path must be string: {dep!r}")
+
+    dst = work / rel_path
+    if dst.exists():
+        if dst.is_dir():
+            continue
+        raise SystemExit(f"dependency path exists but is not a directory: {dst}")
+
+    src = repo_root / "packages" / "ext" / f"x07-{name}" / version
+    if not src.is_dir():
+        raise SystemExit(f"missing official package dir for {name}@{version}: {src}")
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dst)
+PY
+}
+
+seed_official_deps "$crawler_work"
 pkg_lock_check "$crawler_work"
 fmt_check_all "$crawler_work"
 lint_check_one "$crawler_work" "run-os-sandboxed" "src/main.x07.json"

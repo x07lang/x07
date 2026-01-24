@@ -144,7 +144,7 @@ try {
   New-Item -ItemType Directory -Force -Path $proj | Out-Null
   Set-Location $proj
 
-  x07 --init | Out-Null
+  x07 init | Out-Null
   "hello" | Set-Content -NoNewline -Encoding ascii "input.bin"
 
   New-Item -ItemType Directory -Force -Path (Join-Path $proj ".x07") | Out-Null

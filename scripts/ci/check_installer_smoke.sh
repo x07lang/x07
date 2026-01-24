@@ -193,7 +193,7 @@ step "smoke: init+run (host profile)"
 proj="$tmp/proj"
 mkdir -p "$proj"
 cd "$proj"
-x07 --init >/dev/null
+x07 init >/dev/null
 
 printf "hello" > input.bin
 x07 run --profile test --input input.bin --report wrapped --report-out .x07/run.host.json >/dev/null

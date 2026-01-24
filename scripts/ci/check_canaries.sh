@@ -30,10 +30,16 @@ X07C_BIN="$(./scripts/ci/find_x07c.sh)"
 "$python_bin" scripts/ci/check_project_manifests.py >/dev/null
 "$python_bin" scripts/ci/check_package_manifests.py >/dev/null
 "$python_bin" scripts/ci/check_capabilities_catalog.py >/dev/null
+"$python_bin" scripts/ci/check_package_policy.py >/dev/null
 "$python_bin" scripts/ci/check_doc_command_surface.py >/dev/null
+"$python_bin" scripts/ci/check_guides_structure.py >/dev/null
+"$python_bin" scripts/ci/check_doc_version_pins.py >/dev/null
+./scripts/ci/check_policy_templates.sh >/dev/null
 "$python_bin" scripts/ci/check_repair_corpus.py >/dev/null
+./scripts/ci/check_agent_scenarios.sh >/dev/null
 ./scripts/ci/check_agent_examples.sh >/dev/null
 ./scripts/ci/check_readme_commands.sh >/dev/null
+./scripts/ci/check_doc_flows.sh >/dev/null
 ./scripts/ci/check_x07test_smoke.sh >/dev/null
 "$python_bin" scripts/generate_stdlib_lock.py --check >/dev/null
 "$python_bin" scripts/generate_stdlib_lock.py --stdlib-root stdlib/os --out stdlib.os.lock --check >/dev/null
