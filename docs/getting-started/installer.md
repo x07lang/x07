@@ -6,6 +6,12 @@ The bootstrap scripts (`install.sh` / `install.ps1`) install `x07up`, then `x07u
 
 Quickstart: see [Install](install.md).
 
+## Prerequisites
+
+- macOS / Linux: `python3` (3.10+) for `install.sh` (optional: `curl`)
+- For compiling/running X07 programs: a C toolchain (`x07up doctor --json` reports missing deps)
+- Linux: libcurl development headers for packages that link libcurl (for example `ext-curl-c`)
+
 ## One-command install
 
 macOS / Linux:

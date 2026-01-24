@@ -17,13 +17,23 @@ Quickstart and full installer reference:
 
 - quickstart: [Installer / x07up](installer.md)
 
+## Prerequisites
+
+- macOS / Linux bootstrap installer (`install.sh`): `python3` (3.10+)
+- A C compiler toolchain (`clang`/`gcc` on macOS/Linux; MSVC or clang-cl on Windows)
+- Linux: libcurl development headers for packages that link libcurl (for example `ext-curl-c`)
+
+Run `x07up doctor --json` for a machine-readable environment report and install suggestions.
+
 ## Supported platforms
 
-X07 aims to be usable on:
+Prebuilt toolchains (via `x07up`) are currently published for:
 
 - macOS (Apple Silicon + Intel)
-- Linux (glibc + musl variants)
-- Windows
+- Linux (x86_64 glibc)
+- Windows (x86_64)
+
+Other targets (for example Linux ARM64) currently require building from source.
 
 See [platform support and smoke tests](../worlds/os-worlds.md#platform-support).
 

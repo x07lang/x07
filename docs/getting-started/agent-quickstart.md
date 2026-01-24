@@ -12,6 +12,12 @@ This page is a single entry point for LLM agents. Use the published agent portal
 
 - Install with `x07up` (recommended).
 
+Prerequisites (macOS / Linux):
+
+- `python3` (3.10+)
+- optional: `curl` (used for downloads when available)
+- for OS worlds / native deps (for example `ext-curl-c`): a C toolchain and libcurl headers (`x07up doctor --json` reports missing deps)
+
 macOS / Linux (CI-safe, no profile edits, JSON report):
 
 ```bash
