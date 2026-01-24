@@ -4,9 +4,8 @@
     {
       "id": "hello_v1",
       "world": "solve-pure",
-      "entry": "ext.hello.tests.test_hello_v1",
+      "entry": "ext.acme_hello_demo.tests.test_hello_v1",
       "expect": "pass"
     }
   ]
 }
-

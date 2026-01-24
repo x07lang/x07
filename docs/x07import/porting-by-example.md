@@ -54,8 +54,12 @@ This example imports a small, deterministic hex encoder/decoder.
 mkdir ext-hex-rs-demo
 cd ext-hex-rs-demo
 x07 init --package
-rm -rf src
-mkdir -p import_sources/rust modules/ext/hex tests
+mkdir -p import_sources/rust
+
+# This tutorial uses `ext.hex` / `ext.hex.tests` as the module IDs.
+# Replace the default generated module files from `x07 init --package`.
+rm -rf modules
+mkdir -p modules/ext/hex
 ```
 
 ### A2. Add a restricted Rust source file

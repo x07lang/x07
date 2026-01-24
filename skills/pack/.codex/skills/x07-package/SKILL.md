@@ -20,6 +20,9 @@ Use this skill when:
 
 ## Canonical commands
 
+- Create a publishable package repo (for `x07 pkg publish`):
+  - `x07 init --package`
+
 - Add a dependency entry to `x07.json` and sync the lockfile:
   - `x07 pkg add <name>@<version> --sync`
 
@@ -30,10 +33,11 @@ Use this skill when:
   - `x07 pkg lock --project x07.json --check`
 
 - Pack a package directory deterministically:
-  - `x07 pkg pack --package <dir> --out <out.tar.gz>`
+  - `x07 pkg pack --package <dir> --out <out.x07pkg>`
 
 - Login (store credentials for an index):
-  - `x07 pkg login --index <url> --token <token>`
+  - Interactive: `x07 pkg login --index <url>`
+  - Non-interactive: `printf '%s' "$X07_TOKEN" | x07 pkg login --index <url> --token-stdin`
 
 - Publish:
   - `x07 pkg publish --package <dir> --index <url>`
@@ -41,6 +45,7 @@ Use this skill when:
 ## Notes
 
 - Official registry index URL: `sparse+https://registry.x07.io/index/`
+- Publishing to the official registry requires non-empty `description` and `docs` in `x07-package.json`.
 - The lockfile path is controlled by `x07.json` (`lockfile`) and defaults to `x07.lock.json`.
 - When fetching is required, `x07 pkg lock` defaults to the official registry index; override with `--index <url>`.
 - Official packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` will add and fetch these transitive deps automatically (and update `x07.json`).

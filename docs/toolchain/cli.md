@@ -9,7 +9,8 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 init`
   - Creates `x07.json` (with `test`/`os`/`sandbox` profiles), `x07.lock.json`, a minimal `src/` program, and a `tests/` harness (`tests/tests.json`).
 - `x07 init --package`
-  - Also creates `x07-package.json` (required only for publishable packages).
+  - Creates a publishable package repo: `x07-package.json`, a minimal `x07.json` + `x07.lock.json`, publishable `modules/` layout, and a CI-friendly `tests/tests.json`.
+  - Not compatible with `--template` (templates are for app scaffolds).
 
 ### Doctor (platform prerequisites)
 

@@ -19,7 +19,7 @@ This creates:
 - `src/main.x07.json` (a minimal program)
 - `tests/tests.json` + `tests/smoke.x07.json` (a deterministic harness smoke test)
 
-If you are creating a publishable package, use `x07 init --package` to also create `x07-package.json`.
+If you are creating a publishable package repo (for `x07 pkg publish`), use `x07 init --package` instead of `x07 init`.
 
 ## Make it return bytes
 

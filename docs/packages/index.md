@@ -10,7 +10,7 @@ X07 packages are source-only (x07AST JSON), and projects pin dependencies with a
 
 ## Module roots (important)
 
-`x07.json` contains a `module_roots` list. This should list **your source directories** (usually just `src`).
+`x07.json` contains a `module_roots` list. This should list **your source directories** (usually `src` for projects, and `modules` for publishable package repos).
 
 When you run `x07 pkg lock`, dependencies are fetched into `.x07/deps/...` and pinned in `x07.lock.json`. Tooling that accepts `--project` (for example `x07 build --project x07.json` and `x07 run --project x07.json`) automatically adds the locked dependency module roots from the lockfile.
 
@@ -27,6 +27,8 @@ x07 init
 # Pick NAME@VERSION from the registry catalog (or the capability map for canonical picks).
 x07 pkg add NAME@VERSION --sync
 ```
+
+If you are creating a publishable package repo, start with `x07 init --package` instead of `x07 init`.
 
 `x07 pkg lock` downloads dependencies into `.x07/deps/…` and writes `x07.lock.json`.
 Commit `x07.lock.json` to make builds reproducible.
