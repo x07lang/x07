@@ -169,10 +169,10 @@ try {
 
   $missing = @()
   foreach ($exp in $expectedRoots) {
-    $expNorm = ([string]$exp).Replace("\\","/").Trim().TrimEnd("/")
+    $expNorm = ([string]$exp).Replace([char]92,[char]47).Trim().TrimEnd("/")
     $found = $false
     foreach ($r in @($roots)) {
-      $norm = ([string]$r).Replace("\\","/").Trim().TrimEnd("/")
+      $norm = ([string]$r).Replace([char]92,[char]47).Trim().TrimEnd("/")
       if ($norm -eq $expNorm -or $norm.EndsWith("/$expNorm")) { $found = $true }
     }
     if (-not $found) { $missing += $expNorm }
