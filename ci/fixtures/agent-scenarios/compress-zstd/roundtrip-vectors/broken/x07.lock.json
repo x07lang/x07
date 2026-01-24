@@ -1,0 +1,33 @@
+{
+  "schema_version": "x07.lock@0.2.0",
+  "dependencies": [
+    {
+      "name": "ext-compress-rs",
+      "version": "0.1.3",
+      "path": ".x07/deps/ext-compress-rs/0.1.3",
+      "package_manifest_sha256": "a6ee3c4c6438b8a9c122e5bddb0adbbb0f10ca15551dd73854517f2360859a10",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.compress": "5441ee0797727abf20c04f9c83ca5272e5cc3ccd539be52b6ba79f886033414b",
+        "ext.compress.tests": "0e6b778f745659ab6ccdf3ed42f6558619a717268c0788b067d8ce5702ee29da",
+        "ext.zip": "11d76ba87761076dc754932066467f2f151f6bc5c8dc587870c3f1071943549d",
+        "ext.zip.tests": "009246742484ba4e38c4f093fb471c21f0a2926e7d461ef0f65fd096150e9e93",
+        "ext.zstd": "c096034f6c04e5bfa53fcaf6c4792ffc3dac0748ba92157e1997c5072b375564",
+        "ext.zstd.tests": "78ee63061c1d933704c9d373d0ae8d85e5cdb63317bd3f2a00afd1fc6fff506b"
+      }
+    },
+    {
+      "name": "ext-error",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-error/0.1.2",
+      "package_manifest_sha256": "34d6ed661c267e550bea1af6688799341e0a5f557189633fd12665e21993fdae",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.error.chain": "35193a5265840747ef52bc8c386dc7b1d44abc780504ad0f2c3a857183a8aa67",
+        "ext.error.context": "95161e94aa65f48b4bc41eb26490108543b76f77148510191fa6f3c85627a7ac",
+        "ext.error.fmt": "a9487a51312f93764103f52e8297e5398f315ed572f8b105dd6329d0ee8465dc",
+        "ext.error.tests": "ba8fdb32cb7e6a87c867817f80c4be7a28226ca0bec66047c7177ebf687282d8"
+      }
+    }
+  ]
+}

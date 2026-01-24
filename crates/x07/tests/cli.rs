@@ -348,12 +348,14 @@ fn x07_pkg_add_sync_is_atomic_on_failure() {
     let before = std::fs::read(dir.join("x07.json")).expect("read x07.json");
 
     // Use an invalid index URL to trigger a deterministic `--sync` failure (no network).
+    // Use a missing local version so `--sync` must consult the index (and fail deterministically
+    // on invalid URL parsing).
     let out = run_x07_in_dir(
         &dir,
         &[
             "pkg",
             "add",
-            "ext-cli@0.1.3",
+            "ext-cli@9.9.9",
             "--sync",
             "--index",
             "sparse+https://localhost:99999/index/",
@@ -404,6 +406,64 @@ fn x07_pkg_add_rejects_non_semver_versions() {
 
     let after = std::fs::read(dir.join("x07.json")).expect("read x07.json");
     assert_eq!(after, before, "x07.json changed despite invalid version");
+}
+
+#[test]
+fn x07_pkg_lock_offline_uses_official_packages_when_available() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_offline_official");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    // Add without syncing so the dependency is declared but not present on disk yet.
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.0"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let dep_manifest = dir.join(".x07/deps/ext-hex-rs/0.1.0/x07-package.json");
+    assert!(
+        !dep_manifest.is_file(),
+        "expected dep not to be present before pkg lock: {}",
+        dep_manifest.display()
+    );
+
+    // Offline lock should seed official deps from the workspace when possible (no network).
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+
+    assert!(
+        dep_manifest.is_file(),
+        "expected official dep to be copied into project: {}",
+        dep_manifest.display()
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--check", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
 }
 
 #[test]

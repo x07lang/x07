@@ -171,14 +171,14 @@
         {
           "module_id": "std.math.bigint.parse",
           "path": "packages/ext/x07-ext-bigint-rs/0.1.0/modules/std/math/bigint/parse.x07.json",
-          "sha256": "b0324d51cfd58d023e61d7302ccb9f2d32133bd2139e6f1b8cee95630d0666f9",
-          "size_bytes": 5853
+          "sha256": "19abfae81e4e1c73ca90946b4f10efee987db896e7c96677a9557884004de2d1",
+          "size_bytes": 5215
         },
         {
           "module_id": "std.math.bigint.tests",
           "path": "packages/ext/x07-ext-bigint-rs/0.1.0/modules/std/math/bigint/tests.x07.json",
-          "sha256": "7f31b7ca9da67078d87ecf1925543e4e827cc114ae0819bb029945f0903d461a",
-          "size_bytes": 6842
+          "sha256": "61b589cc730489023bede49dd0746280c82eeb7f309a0d1314dd47b1f2f002d1",
+          "size_bytes": 7658
         },
         {
           "module_id": "std.math.bigint",
@@ -4506,6 +4506,6 @@
       "version": "0.1.3"
     }
   ],
-  "packages_hash": "3fc07ff39f6c0314d24791800739a47c5a7220cd0bfcb3aea92af044c32e85b9",
+  "packages_hash": "98035cfac8df45fd6be565f8a7df381668ce54cedeb25e86cb2370ead39f15f3",
   "packages_root": "packages/ext"
 }

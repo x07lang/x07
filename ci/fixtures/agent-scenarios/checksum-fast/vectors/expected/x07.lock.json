@@ -1,0 +1,29 @@
+{
+  "schema_version": "x07.lock@0.2.0",
+  "dependencies": [
+    {
+      "name": "ext-checksum-rs",
+      "version": "0.1.0",
+      "path": ".x07/deps/ext-checksum-rs/0.1.0",
+      "package_manifest_sha256": "7a1090728c214cf9a96743908a0f39a19aa8e01b5298dee52331d9746b4071e5",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.checksum.crc32c": "223fc9d9d184de4f308798bd3ea6988fd3b2eaf065398997d63291a42b535c97",
+        "ext.checksum.tests": "2a2af8dcab825e6fb55283b104824dc2d8d111f82a2e55a0147b5f6d742593d5",
+        "ext.checksum.xxhash64": "7e8b746b45c2aa6e5d3bf613153a8035cd2a37a5938db75a7d67d197e3ec2d12"
+      }
+    },
+    {
+      "name": "ext-u64-rs",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-u64-rs/0.1.2",
+      "package_manifest_sha256": "81b3647ff8410a7488bebfabdbb277fe6b836dbdd8cccb19bb496f7c6f804f1d",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.u64": "782c75d52f6f1b2f25402ee12184e6be049764a918484c39cba00171ce0c34a0",
+        "ext.u64.tests": "5a992a379bf32286c2fb8064886ac410090ea087a2de971eb87b750454b61422"
+      }
+    }
+  ]
+}
+

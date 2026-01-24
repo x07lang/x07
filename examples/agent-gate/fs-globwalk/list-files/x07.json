@@ -1,0 +1,18 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "src/main.x07.json",
+  "module_roots": ["src"],
+  "dependencies": [
+    { "name": "ext-error", "version": "0.1.2", "path": ".x07/deps/ext-error/0.1.2" },
+    { "name": "ext-fs", "version": "0.1.2", "path": ".x07/deps/ext-fs/0.1.2" },
+    { "name": "ext-glob-rs", "version": "0.1.1", "path": ".x07/deps/ext-glob-rs/0.1.1" },
+    { "name": "ext-path-glob-rs", "version": "0.1.0", "path": ".x07/deps/ext-path-glob-rs/0.1.0" }
+  ],
+  "lockfile": "x07.lock.json",
+  "default_profile": "os",
+  "profiles": {
+    "os": { "world": "run-os" }
+  }
+}
+

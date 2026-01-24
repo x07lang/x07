@@ -1,0 +1,19 @@
+{
+  "schema_version": "x07.lock@0.2.0",
+  "dependencies": [
+    {
+      "name": "ext-unicode-rs",
+      "version": "0.1.3",
+      "path": ".x07/deps/ext-unicode-rs/0.1.3",
+      "package_manifest_sha256": "511721ac6657be61cd1668f68fad5fba659713f946c85a3c2bb128e2cbe33919",
+      "module_root": "modules",
+      "modules_sha256": {
+        "ext.unicode": "c5546525088baff2ce77b44384258ab00360a1022363de3613f8f87b4b0891be",
+        "ext.unicode.casefold": "c76b94d2104ce04a89e669f9b6cc33d957480c39c8c232d48c2ab51b8768d659",
+        "ext.unicode.normalize": "b147e10b96571dd958d1f48dad934380fff6fd1fe44127a456ebfa9d423c9079",
+        "ext.unicode.segment": "fb4333255c4cbeb04f45104ca5a9e84a00022360a8e4b9965e9c65f5d29912ef",
+        "ext.unicode.tests": "5fb7d3a1c5ba981849460becc4253041ab13e659ca41e101b0ca607d44f91c37"
+      }
+    }
+  ]
+}

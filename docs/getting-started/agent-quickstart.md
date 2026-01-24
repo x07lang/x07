@@ -175,11 +175,13 @@ See: [Fixture worlds](../worlds/fixture-worlds.md) and [OS worlds](../worlds/os-
 
 ## 9) Known-good reference projects (copy/paste)
 
-The `x07` repo ships three CI-gated example projects under `examples/agent-gate/`:
+The `x07` repo ships CI-gated example projects under `examples/agent-gate/`:
 
 - `cli-newline` (pure CLI payload parsing)
 - `cli-ext-cli` (CLI args via `ext-cli` + `argv_v1`)
 - `web-crawler-local` (sandboxed OS networking + `--allow-host`, against a local fixture site)
+
+For the canonical package-focused set (examples + scenarios), see: [Agent workflow](agent-workflow.md).
 
 See also: [Patch-based recipes](../recipes/index.md).
 

@@ -47,6 +47,68 @@ If you want a good mental model for “AI-native engineering”, see OpenAI’s 
 
 When OS access is required, prefer explicit profiles (for example `x07 run --profile os` / `x07 run --profile sandbox`) and run `x07up doctor --json` early to catch platform prerequisites.
 
+## Canonical by-example workflow (CI-gated, offline)
+
+The `x07` repo includes two canonical, CI-gated “agentic” by-example surfaces:
+
+- Agent-gate example projects under `examples/agent-gate/` (runnable via `x07 run`, validated by `./scripts/ci/check_agent_examples.sh`)
+- Agent-scenario fixtures under `ci/fixtures/agent-scenarios/` (validated by `./scripts/ci/check_agent_scenarios.sh`)
+
+### Package → example → scenario map
+
+Each capability below has one canonical package, one runnable example, and one or more scenario fixtures.
+
+- `text.core` (canonical: `ext-text`)
+  - Example: `examples/agent-gate/text-core/text-utils/` (`x07 run --profile test`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/text-core/missing-dep/`
+    - `ci/fixtures/agent-scenarios/text-core/semantics/`
+- `math.bigint` (canonical: `ext-bigint-rs`)
+  - Example: `examples/agent-gate/math-bigint/factorial-100/` (`x07 run --profile test`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/math-bigint/missing-dep/`
+    - `ci/fixtures/agent-scenarios/math-bigint/codec-v1/`
+- `math.decimal` (canonical: `ext-decimal-rs`)
+  - Example: `examples/agent-gate/math-decimal/money-format/` (`x07 run --profile test`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/math-decimal/missing-dep/`
+    - `ci/fixtures/agent-scenarios/math-decimal/scale-rounding/`
+- `text.unicode` (canonical: `ext-unicode-rs`)
+  - Example: `examples/agent-gate/text-unicode/normalize-casefold/` (`x07 run --profile test`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/text-unicode/missing-dep/`
+    - `ci/fixtures/agent-scenarios/text-unicode/normalize-casefold-segmentation/`
+- `data.cbor` (canonical: `ext-cbor-rs`)
+  - Example: `examples/agent-gate/data-cbor/roundtrip/` (`x07 run --profile test`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/data-cbor/missing-dep/`
+    - `ci/fixtures/agent-scenarios/data-cbor/canonical-encoding/`
+- `data.msgpack` (canonical: `ext-msgpack-rs`)
+  - Example: `examples/agent-gate/data-msgpack/roundtrip/` (`x07 run --profile test`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/data-msgpack/missing-dep/`
+    - `ci/fixtures/agent-scenarios/data-msgpack/encoding-vectors/`
+- `checksum.fast` (canonical: `ext-checksum-rs`)
+  - Example: `examples/agent-gate/checksum-fast/smoke/` (`x07 run --profile test`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/checksum-fast/missing-dep/`
+    - `ci/fixtures/agent-scenarios/checksum-fast/vectors/`
+- `diff.patch` (canonical: `ext-diff-rs`)
+  - Example: `examples/agent-gate/diff-patch/apply/` (`x07 run --profile test`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/diff-patch/missing-dep/`
+    - `ci/fixtures/agent-scenarios/diff-patch/patch-v1/`
+- `compress.zstd` (canonical: `ext-compress-rs`)
+  - Example: `examples/agent-gate/compress-zstd/roundtrip/` (`x07 run --profile test`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/compress-zstd/missing-dep/`
+    - `ci/fixtures/agent-scenarios/compress-zstd/roundtrip-vectors/`
+- `fs.globwalk` (canonical: `ext-path-glob-rs`)
+  - Example: `examples/agent-gate/fs-globwalk/list-files/` (`x07 run --profile os`)
+  - Scenarios:
+    - `ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/`
+    - `ci/fixtures/agent-scenarios/fs-globwalk/deterministic-ordering/`
+
 ## Golden rule: keep boundaries explicit
 
 Agent-written code is far more reliable if your system architecture makes boundaries explicit:

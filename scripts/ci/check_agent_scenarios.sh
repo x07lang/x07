@@ -36,6 +36,9 @@ if [[ ! -x "target/debug/x07-host-runner" && ! -x "target/release/x07-host-runne
   cargo build -p x07-host-runner -p x07-os-runner >/dev/null
 fi
 
+# OS-world agent scenarios rely on the ext-fs native backend.
+./scripts/ci/ensure_ext_fs_backend.sh >/dev/null
+
 scenarios_dir="$root/ci/fixtures/agent-scenarios"
 [[ -d "$scenarios_dir" ]] || { echo "ERROR: missing $scenarios_dir" >&2; exit 1; }
 
@@ -54,21 +57,35 @@ trap cleanup EXIT
 export X07_AGENT_SCENARIOS_TMP="$tmp_dir"
 
 fail=0
-for s in "$scenarios_dir"/*; do
-  [[ -d "$s" ]] || continue
-  name="$(basename "$s")"
-  [[ "$name" == _* ]] && continue
+for group in "$scenarios_dir"/*; do
+  [[ -d "$group" ]] || continue
+  group_name="$(basename "$group")"
+  [[ "$group_name" == _* ]] && continue
 
-  echo "==> agent scenario: $name"
+  for scenario in "$group"/*; do
+    [[ -d "$scenario" ]] || continue
+    scenario_name="$(basename "$scenario")"
+    [[ "$scenario_name" == _* ]] && continue
 
-  [[ -f "$s/prompt.md" ]] || { echo "ERROR: $name: missing prompt.md" >&2; fail=1; continue; }
-  [[ -d "$s/broken" ]] || { echo "ERROR: $name: missing broken/" >&2; fail=1; continue; }
-  [[ -d "$s/expected" ]] || { echo "ERROR: $name: missing expected/" >&2; fail=1; continue; }
-  [[ -f "$s/assert.sh" ]] || { echo "ERROR: $name: missing assert.sh" >&2; fail=1; continue; }
-  [[ -f "$s/golden.report.json" ]] || { echo "ERROR: $name: missing golden.report.json" >&2; fail=1; continue; }
+    id="$group_name/$scenario_name"
+    echo "==> agent scenario: $id"
 
-  bash "$s/assert.sh"
-  echo "ok: agent scenario $name"
+    [[ -f "$scenario/prompt.md" ]] || { echo "ERROR: $id: missing prompt.md" >&2; fail=1; continue; }
+    [[ -d "$scenario/broken" ]] || { echo "ERROR: $id: missing broken/" >&2; fail=1; continue; }
+    [[ -d "$scenario/expected" ]] || { echo "ERROR: $id: missing expected/" >&2; fail=1; continue; }
+    [[ -f "$scenario/assert.sh" ]] || { echo "ERROR: $id: missing assert.sh" >&2; fail=1; continue; }
+
+    set +e
+    bash "$scenario/assert.sh"
+    code="$?"
+    set -e
+    if [[ "$code" -ne 0 ]]; then
+      echo "ERROR: agent scenario failed: $id (exit $code)" >&2
+      fail=1
+      continue
+    fi
+    echo "ok: agent scenario $id"
+  done
 done
 
 if [[ "$fail" -ne 0 ]]; then
@@ -76,4 +93,3 @@ if [[ "$fail" -ne 0 ]]; then
 fi
 
 printf 'OK %s\n' "$(basename "$0")"
-

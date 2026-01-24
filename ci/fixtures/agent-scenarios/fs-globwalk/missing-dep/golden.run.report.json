@@ -1,0 +1,9 @@
+{
+  "compile_error": null,
+  "exit_code": 0,
+  "mode": "project-compile-run",
+  "runner": "os",
+  "schema_version": "x07.run.golden@0.1.0",
+  "solve_output_b64": "b2s=",
+  "world": "run-os"
+}

@@ -30,6 +30,7 @@ X07C_BIN="$(./scripts/ci/find_x07c.sh)"
 "$python_bin" scripts/ci/check_project_manifests.py >/dev/null
 "$python_bin" scripts/ci/check_package_manifests.py >/dev/null
 "$python_bin" scripts/ci/check_capabilities_catalog.py >/dev/null
+"$python_bin" scripts/ci/check_registry_backlog.py --check >/dev/null
 "$python_bin" scripts/ci/check_package_policy.py >/dev/null
 "$python_bin" scripts/ci/check_doc_command_surface.py >/dev/null
 "$python_bin" scripts/ci/check_guides_structure.py >/dev/null

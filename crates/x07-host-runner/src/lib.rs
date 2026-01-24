@@ -22,6 +22,8 @@ use x07c::language;
 mod native_backends;
 pub use native_backends::plan_native_link_argv;
 
+const EXTERNAL_PACKAGES_LOCK_JSON: &str = include_str!("../../../locks/external-packages.lock");
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab_case")]
 pub enum CcProfile {
@@ -286,7 +288,16 @@ pub fn compile_program_with_options(
     let compile_out = match compile::compile_program_to_c_with_meta(program, compile_options) {
         Ok(out) => out,
         Err(err) => {
-            let msg = format!("{:?}: {}", err.kind, err.message);
+            let mut msg = format!("{:?}: {}", err.kind, err.message);
+            if let Some(module_id) = missing_module_id_from_compile_error(&err.message) {
+                if let Some(spec) = best_package_spec_for_module(&module_id) {
+                    msg.push_str("\n\nhint: ");
+                    msg.push_str(&format!(
+                        "x07 pkg add {}@{} --sync",
+                        spec.name, spec.version
+                    ));
+                }
+            }
             return Ok(CompilerResult {
                 ok: false,
                 exit_status: 1,
@@ -397,6 +408,131 @@ pub fn compile_program_with_options(
         stderr: tool.stderr,
         fuel_used: Some(compile_stats.fuel_used),
         trap: None,
+    })
+}
+
+#[derive(Debug, Clone)]
+struct PackageSpec {
+    name: String,
+    version: String,
+}
+
+fn missing_module_id_from_compile_error(message: &str) -> Option<String> {
+    let idx = message.find("unknown module: ")?;
+    let rest = &message[idx + "unknown module: ".len()..];
+    let rest = rest.trim_start();
+    if !rest.starts_with('"') {
+        return None;
+    }
+    let quoted = take_rust_debug_quoted_string(rest)?;
+    serde_json::from_str::<String>(quoted).ok()
+}
+
+fn take_rust_debug_quoted_string(s: &str) -> Option<&str> {
+    let mut escaped = false;
+    let mut end = None;
+    for (i, ch) in s.char_indices().skip(1) {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '"' {
+            end = Some(i);
+            break;
+        }
+    }
+    let end = end?;
+    Some(&s[..=end])
+}
+
+fn best_package_spec_for_module(module_id: &str) -> Option<PackageSpec> {
+    static MAP: std::sync::OnceLock<std::collections::HashMap<String, PackageSpec>> =
+        std::sync::OnceLock::new();
+    let map = MAP.get_or_init(|| build_module_to_package_map(EXTERNAL_PACKAGES_LOCK_JSON));
+    map.get(module_id).cloned()
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct ExternalPackagesLock {
+    packages: Vec<ExternalPackageEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct ExternalPackageEntry {
+    name: String,
+    version: String,
+    modules: Vec<ExternalPackageModuleEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct ExternalPackageModuleEntry {
+    module_id: String,
+}
+
+fn build_module_to_package_map(json_src: &str) -> std::collections::HashMap<String, PackageSpec> {
+    let mut out: std::collections::HashMap<String, PackageSpec> = std::collections::HashMap::new();
+    let lock: ExternalPackagesLock = match serde_json::from_str(json_src) {
+        Ok(lock) => lock,
+        Err(_) => return out,
+    };
+    for pkg in lock.packages {
+        for module in pkg.modules {
+            let entry = PackageSpec {
+                name: pkg.name.clone(),
+                version: pkg.version.clone(),
+            };
+            match out.get(&module.module_id) {
+                None => {
+                    out.insert(module.module_id, entry);
+                }
+                Some(existing) => {
+                    if semver_is_greater(&entry.version, &existing.version) {
+                        out.insert(module.module_id, entry);
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+fn semver_is_greater(a: &str, b: &str) -> bool {
+    match (parse_semver(a), parse_semver(b)) {
+        (Some(a), Some(b)) => a > b,
+        (Some(_), None) => true,
+        (None, Some(_)) => false,
+        (None, None) => a > b,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct SemverKey {
+    major: u64,
+    minor: u64,
+    patch: u64,
+    // Stable releases sort after prereleases.
+    is_stable: bool,
+}
+
+fn parse_semver(v: &str) -> Option<SemverKey> {
+    let (core_and_pre, _build) = v.split_once('+').unwrap_or((v, ""));
+    let (core, pre) = core_and_pre.split_once('-').unwrap_or((core_and_pre, ""));
+    let mut it = core.split('.');
+    let major: u64 = it.next()?.parse().ok()?;
+    let minor: u64 = it.next()?.parse().ok()?;
+    let patch: u64 = it.next()?.parse().ok()?;
+    if it.next().is_some() {
+        return None;
+    }
+    Some(SemverKey {
+        major,
+        minor,
+        patch,
+        is_stable: pre.is_empty(),
     })
 }
 

@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.fixture.vectors@0.1.0",
+  "package": "ext-bigint-rs@0.1.0",
+  "vectors": [
+    {
+      "id": "canon/remove-leading-zeros",
+      "in_bytes_u8": [1, 0, 0, 5],
+      "want_bytes_u8": [1, 5]
+    }
+  ]
+}
+

@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.fixture.vectors@0.1.0",
+  "package": "ext-compress-rs@0.1.3",
+  "tests": [
+    "ext.zstd.tests.test_roundtrip_empty_v1",
+    "ext.zstd.tests.test_roundtrip_small_v1",
+    "ext.zstd.tests.test_err_invalid_magic_v1",
+    "ext.zstd.tests.test_err_output_limit_v1"
+  ]
+}
+

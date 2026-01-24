@@ -1,0 +1,79 @@
+diff --git a/ci/fixtures/agent-scenarios/math-bigint/missing-dep/broken/x07.json b/ci/fixtures/agent-scenarios/math-bigint/missing-dep/expected/x07.json
+index f4ea51e..e685cfb 100644
+--- a/ci/fixtures/agent-scenarios/math-bigint/missing-dep/broken/x07.json
++++ b/ci/fixtures/agent-scenarios/math-bigint/missing-dep/expected/x07.json
+@@ -1,13 +1,27 @@
+ {
+-  "schema_version": "x07.project@0.2.0",
+-  "world": "solve-pure",
++  "default_profile": "test",
++  "dependencies": [
++    {
++      "name": "ext-bigint-rs",
++      "path": ".x07/deps/ext-bigint-rs/0.1.0",
++      "version": "0.1.0"
++    },
++    {
++      "name": "ext-error",
++      "path": ".x07/deps/ext-error/0.1.2",
++      "version": "0.1.2"
++    }
++  ],
+   "entry": "src/main.x07.json",
+-  "module_roots": ["src"],
+-  "dependencies": [],
+   "lockfile": "x07.lock.json",
+-  "default_profile": "test",
++  "module_roots": [
++    "src"
++  ],
+   "profiles": {
+-    "test": { "world": "solve-pure" }
+-  }
++    "test": {
++      "world": "solve-pure"
++    }
++  },
++  "schema_version": "x07.project@0.2.0",
++  "world": "solve-pure"
+ }
+-
+diff --git a/ci/fixtures/agent-scenarios/math-bigint/missing-dep/broken/x07.lock.json b/ci/fixtures/agent-scenarios/math-bigint/missing-dep/expected/x07.lock.json
+index 52ca7bf..b961879 100644
+--- a/ci/fixtures/agent-scenarios/math-bigint/missing-dep/broken/x07.lock.json
++++ b/ci/fixtures/agent-scenarios/math-bigint/missing-dep/expected/x07.lock.json
+@@ -1,5 +1,32 @@
+ {
+   "schema_version": "x07.lock@0.2.0",
+-  "dependencies": []
++  "dependencies": [
++    {
++      "name": "ext-bigint-rs",
++      "version": "0.1.0",
++      "path": ".x07/deps/ext-bigint-rs/0.1.0",
++      "package_manifest_sha256": "c535707f5fd4296005f848cdde77369a1fd0ee66eaf1a5611b4c65049e59531c",
++      "module_root": "modules",
++      "modules_sha256": {
++        "std.math.bigint": "bc486e33e7a1c412c40196b920a6b42d1786401d3118a28035c562e170498655",
++        "std.math.bigint.codec_v1": "0ac88130b51e73fdc52f486cf55c9416d5688cacb6602a2c3d2845a3cd51d2e5",
++        "std.math.bigint.fmt": "a1c4d5a6b89a2d30eda1d52b0082d4e29399282c614c35eceed4b35d2ab2fbce",
++        "std.math.bigint.parse": "19abfae81e4e1c73ca90946b4f10efee987db896e7c96677a9557884004de2d1",
++        "std.math.bigint.tests": "61b589cc730489023bede49dd0746280c82eeb7f309a0d1314dd47b1f2f002d1"
++      }
++    },
++    {
++      "name": "ext-error",
++      "version": "0.1.2",
++      "path": ".x07/deps/ext-error/0.1.2",
++      "package_manifest_sha256": "34d6ed661c267e550bea1af6688799341e0a5f557189633fd12665e21993fdae",
++      "module_root": "modules",
++      "modules_sha256": {
++        "ext.error.chain": "35193a5265840747ef52bc8c386dc7b1d44abc780504ad0f2c3a857183a8aa67",
++        "ext.error.context": "95161e94aa65f48b4bc41eb26490108543b76f77148510191fa6f3c85627a7ac",
++        "ext.error.fmt": "a9487a51312f93764103f52e8297e5398f315ed572f8b105dd6329d0ee8465dc",
++        "ext.error.tests": "ba8fdb32cb7e6a87c867817f80c4be7a28226ca0bec66047c7177ebf687282d8"
++      }
++    }
++  ]
+ }
+-

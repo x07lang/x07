@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.test.golden@0.1.0",
+  "summary": {
+    "compile_failures": 0,
+    "errors": 0,
+    "failed": 0,
+    "passed": 2,
+    "run_failures": 0,
+    "skipped": 0,
+    "xfail_failed": 0,
+    "xfail_passed": 0
+  },
+  "tests": [
+    {
+      "expect": "pass",
+      "id": "msgpack/data_model_roundtrip",
+      "status": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "expect": "pass",
+      "id": "msgpack/data_model_vectors",
+      "status": "pass",
+      "world": "solve-pure"
+    }
+  ]
+}

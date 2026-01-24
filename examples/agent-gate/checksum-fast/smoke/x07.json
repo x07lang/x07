@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "src/main.x07.json",
+  "module_roots": ["src"],
+  "dependencies": [
+    { "name": "ext-checksum-rs", "version": "0.1.0", "path": ".x07/deps/ext-checksum-rs/0.1.0" },
+    { "name": "ext-u64-rs", "version": "0.1.2", "path": ".x07/deps/ext-u64-rs/0.1.2" }
+  ],
+  "lockfile": "x07.lock.json",
+  "default_profile": "test",
+  "profiles": {
+    "test": { "world": "solve-pure" }
+  }
+}
+

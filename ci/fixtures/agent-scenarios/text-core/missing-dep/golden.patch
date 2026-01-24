@@ -1,0 +1,63 @@
+diff --git a/ci/fixtures/agent-scenarios/text-core/missing-dep/broken/x07.json b/ci/fixtures/agent-scenarios/text-core/missing-dep/expected/x07.json
+index f4ea51e..91ad4d0 100644
+--- a/ci/fixtures/agent-scenarios/text-core/missing-dep/broken/x07.json
++++ b/ci/fixtures/agent-scenarios/text-core/missing-dep/expected/x07.json
+@@ -1,13 +1,22 @@
+ {
+-  "schema_version": "x07.project@0.2.0",
+-  "world": "solve-pure",
++  "default_profile": "test",
++  "dependencies": [
++    {
++      "name": "ext-text",
++      "path": ".x07/deps/ext-text/0.1.0",
++      "version": "0.1.0"
++    }
++  ],
+   "entry": "src/main.x07.json",
+-  "module_roots": ["src"],
+-  "dependencies": [],
+   "lockfile": "x07.lock.json",
+-  "default_profile": "test",
++  "module_roots": [
++    "src"
++  ],
+   "profiles": {
+-    "test": { "world": "solve-pure" }
+-  }
++    "test": {
++      "world": "solve-pure"
++    }
++  },
++  "schema_version": "x07.project@0.2.0",
++  "world": "solve-pure"
+ }
+-
+diff --git a/ci/fixtures/agent-scenarios/text-core/missing-dep/broken/x07.lock.json b/ci/fixtures/agent-scenarios/text-core/missing-dep/expected/x07.lock.json
+index 52ca7bf..920fcb4 100644
+--- a/ci/fixtures/agent-scenarios/text-core/missing-dep/broken/x07.lock.json
++++ b/ci/fixtures/agent-scenarios/text-core/missing-dep/expected/x07.lock.json
+@@ -1,5 +1,21 @@
+ {
+   "schema_version": "x07.lock@0.2.0",
+-  "dependencies": []
++  "dependencies": [
++    {
++      "name": "ext-text",
++      "version": "0.1.0",
++      "path": ".x07/deps/ext-text/0.1.0",
++      "package_manifest_sha256": "a9585757c82dc68e54503b7ea20f04a9b94b72f9cf7c5d367c204414d37bc45d",
++      "module_root": "modules",
++      "modules_sha256": {
++        "std.text": "e01b2eabe5101c6936b92ec5b3946e6501a46ad8393125c23e95a9d52842c8bd",
++        "std.text.find": "a9ea39948540672d2ce318fa9b37ecbeb39155775b6c66b73744af3a4e40f460",
++        "std.text.join": "194169135ff465f44afa8fde3952f338c87df88b067b535bf0730cfc2009b8a1",
++        "std.text.lines": "53a260f960afda9d9b1beae93131c2818d8725ea02479a3d85fedf77492db457",
++        "std.text.split": "1a369b48f4fca753b87996bdbe1bccae5602f37056d35e32d994153607b94eb3",
++        "std.text.tests": "cd406b50577db89c14027b2d612e00d05ae5aa501f1d51951f103d78d415b2d8",
++        "std.text.ws": "fe585b8a2df5794a3ca14c0f936ef3a809ceec66e608b7e12f7f32d296730520"
++      }
++    }
++  ]
+ }
+-

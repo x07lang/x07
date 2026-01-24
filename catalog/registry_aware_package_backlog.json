@@ -1,0 +1,507 @@
+{
+  "schema_version": "x07.planning.registry_aware_package_backlog@0.1.0",
+  "generated_at": "2026-01-24T00:00:00Z",
+  "notes": [
+    "Offline-only: this repo is the source of truth for packages, examples, and CI fixtures.",
+    "Agent gates reference paths under examples/agent-gate/ and ci/fixtures/agent-scenarios/."
+  ],
+  "global_definition_of_done": {
+    "examples": {
+      "base_dir": "examples/agent-gate/",
+      "must_be_runnable_via": "x07 run",
+      "canonical_runner": "x07 run",
+      "must_capture_machine_report": "artifacts/run.report.json"
+    },
+    "fixtures": {
+      "base_dir": "ci/fixtures/agent-scenarios/",
+      "required_fixture_kind": "missing-dependency-self-repair",
+      "missing_dependency_fixture_contract": {
+        "broken_project_must_fail": true,
+        "error_output_must_suggest": "x07 pkg add <pkg>@<ver> --sync",
+        "after_fix_project_must_pass": true,
+        "golden_artifacts": ["golden.patch", "golden.run.report.json"]
+      }
+    },
+    "ci_gates": [
+      "scripts/ci/check_agent_examples.sh",
+      "scripts/ci/check_repair_corpus.py",
+      "scripts/ci/check_registry_backlog.py"
+    ]
+  },
+  "items": [
+    {
+      "id": "PKG-001",
+      "priority": "P0",
+      "capability_id": "text.core",
+      "proposal_type": "new_package",
+      "package": {
+        "name": "ext-text",
+        "version": "0.1.0",
+        "determinism": "pure",
+        "worlds_supported": ["solve-pure", "solve-io"],
+        "modules": [
+          "std.text",
+          "std.text.ws",
+          "std.text.lines",
+          "std.text.split",
+          "std.text.join",
+          "std.text.find",
+          "std.text.tests"
+        ]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-text/0.1.0/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-text@0.1.0 --sync",
+            "Bytes-first",
+            "Determinism: pure"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/text-core/text-utils/",
+          "profile": "test",
+          "must_pass_command": "x07 run --profile test",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/text-core/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-text@0.1.0 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "semantics-regression",
+            "path": "ci/fixtures/agent-scenarios/text-core/semantics/",
+            "goldens": ["golden.test.report.json", "vectors.json"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PKG-002",
+      "priority": "P0",
+      "capability_id": "math.bigint",
+      "proposal_type": "new_package",
+      "package": {
+        "name": "ext-bigint-rs",
+        "version": "0.1.0",
+        "determinism": "pure",
+        "worlds_supported": ["solve-pure", "solve-io"],
+        "modules": [
+          "std.math.bigint",
+          "std.math.bigint.codec_v1",
+          "std.math.bigint.parse",
+          "std.math.bigint.fmt",
+          "std.math.bigint.tests"
+        ]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-bigint-rs/0.1.0/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-bigint-rs@0.1.0 --sync",
+            "Determinism: pure",
+            "codec_v1"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/math-bigint/factorial-100/",
+          "profile": "test",
+          "must_pass_command": "x07 run --profile test",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/math-bigint/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-bigint-rs@0.1.0 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "codec-v1-roundtrip",
+            "path": "ci/fixtures/agent-scenarios/math-bigint/codec-v1/",
+            "goldens": ["vectors.json", "golden.test.report.json"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PKG-003",
+      "priority": "P0",
+      "capability_id": "math.decimal",
+      "proposal_type": "new_package",
+      "package": {
+        "name": "ext-decimal-rs",
+        "version": "0.1.0",
+        "determinism": "pure",
+        "worlds_supported": ["solve-pure", "solve-io"],
+        "modules": [
+          "std.math.decimal",
+          "std.math.decimal.codec_v1",
+          "std.math.decimal.parse",
+          "std.math.decimal.fmt",
+          "std.math.decimal.tests"
+        ]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-decimal-rs/0.1.0/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-decimal-rs@0.1.0 --sync",
+            "Determinism: pure",
+            "Representation: (sign, scale, magnitude)",
+            "codec_v1"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/math-decimal/money-format/",
+          "profile": "test",
+          "must_pass_command": "x07 run --profile test",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/math-decimal/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-decimal-rs@0.1.0 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "scale-rounding-regression",
+            "path": "ci/fixtures/agent-scenarios/math-decimal/scale-rounding/",
+            "goldens": ["golden.test.report.json"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PKG-004",
+      "priority": "P0",
+      "capability_id": "text.unicode",
+      "proposal_type": "extend_existing_package",
+      "package": {
+        "name": "ext-unicode-rs",
+        "from_version": "0.1.2",
+        "version": "0.1.3",
+        "determinism": "pure",
+        "worlds_supported": ["solve-pure", "solve-io"],
+        "modules": [
+          "ext.unicode",
+          "ext.unicode.normalize",
+          "ext.unicode.casefold",
+          "ext.unicode.segment",
+          "ext.unicode.tests"
+        ]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-unicode-rs/0.1.3/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-unicode-rs@0.1.3 --sync",
+            "Determinism: pure",
+            "normalize",
+            "casefold",
+            "segment"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/text-unicode/normalize-casefold/",
+          "profile": "test",
+          "must_pass_command": "x07 run --profile test",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/text-unicode/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-unicode-rs@0.1.3 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "normalize-casefold-segmentation",
+            "path": "ci/fixtures/agent-scenarios/text-unicode/normalize-casefold-segmentation/",
+            "goldens": ["vectors.json", "golden.test.report.json"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PKG-005",
+      "priority": "P1",
+      "capability_id": "data.cbor",
+      "proposal_type": "new_package",
+      "package": {
+        "name": "ext-cbor-rs",
+        "version": "0.1.0",
+        "determinism": "pure",
+        "worlds_supported": ["solve-pure", "solve-io"],
+        "modules": ["ext.cbor", "ext.cbor.data_model", "ext.cbor.tests"]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-cbor-rs/0.1.0/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-cbor-rs@0.1.0 --sync",
+            "Determinism: pure",
+            "data_model"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/data-cbor/roundtrip/",
+          "profile": "test",
+          "must_pass_command": "x07 run --profile test",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/data-cbor/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-cbor-rs@0.1.0 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "canonical-encoding-vectors",
+            "path": "ci/fixtures/agent-scenarios/data-cbor/canonical-encoding/",
+            "goldens": ["vectors.json", "golden.test.report.json"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PKG-006",
+      "priority": "P1",
+      "capability_id": "data.msgpack",
+      "proposal_type": "new_package",
+      "package": {
+        "name": "ext-msgpack-rs",
+        "version": "0.1.0",
+        "determinism": "pure",
+        "worlds_supported": ["solve-pure", "solve-io"],
+        "modules": ["ext.msgpack", "ext.msgpack.data_model", "ext.msgpack.tests"]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-msgpack-rs/0.1.0/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-msgpack-rs@0.1.0 --sync",
+            "Determinism: pure",
+            "data_model"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/data-msgpack/roundtrip/",
+          "profile": "test",
+          "must_pass_command": "x07 run --profile test",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/data-msgpack/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-msgpack-rs@0.1.0 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "encoding-vectors",
+            "path": "ci/fixtures/agent-scenarios/data-msgpack/encoding-vectors/",
+            "goldens": ["vectors.json", "golden.test.report.json"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PKG-007",
+      "priority": "P1",
+      "capability_id": "checksum.fast",
+      "proposal_type": "new_package",
+      "package": {
+        "name": "ext-checksum-rs",
+        "version": "0.1.0",
+        "determinism": "pure",
+        "worlds_supported": ["solve-pure", "solve-io"],
+        "modules": ["ext.checksum.crc32c", "ext.checksum.xxhash64", "ext.checksum.tests"]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-checksum-rs/0.1.0/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-checksum-rs@0.1.0 --sync",
+            "Determinism: pure",
+            "Non-cryptographic"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/checksum-fast/smoke/",
+          "profile": "test",
+          "must_pass_command": "x07 run --profile test",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/checksum-fast/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-checksum-rs@0.1.0 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "golden-vectors",
+            "path": "ci/fixtures/agent-scenarios/checksum-fast/vectors/",
+            "goldens": ["vectors.json", "golden.test.report.json"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PKG-008",
+      "priority": "P1",
+      "capability_id": "diff.patch",
+      "proposal_type": "new_package",
+      "package": {
+        "name": "ext-diff-rs",
+        "version": "0.1.0",
+        "determinism": "pure",
+        "worlds_supported": ["solve-pure", "solve-io"],
+        "modules": ["ext.diff.bytes", "ext.diff.lines", "ext.diff.patch_v1", "ext.diff.tests"]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-diff-rs/0.1.0/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-diff-rs@0.1.0 --sync",
+            "Determinism: pure",
+            "patch_v1"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/diff-patch/apply/",
+          "profile": "test",
+          "must_pass_command": "x07 run --profile test",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/diff-patch/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-diff-rs@0.1.0 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "patch-v1-golden",
+            "path": "ci/fixtures/agent-scenarios/diff-patch/patch-v1/",
+            "goldens": ["before.bin", "after.bin", "patch_v1.bin", "golden.test.report.json"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PKG-009",
+      "priority": "P2",
+      "capability_id": "fs.globwalk",
+      "proposal_type": "new_package",
+      "package": {
+        "name": "ext-path-glob-rs",
+        "version": "0.1.0",
+        "determinism": "os-world-only",
+        "worlds_supported": ["run-os", "run-os-sandboxed"],
+        "modules": [
+          "std.os.fs.glob",
+          "std.os.fs.walk",
+          "std.os.fs.ignore",
+          "std.os.fs.globwalk.tests"
+        ]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-path-glob-rs/0.1.0/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-path-glob-rs@0.1.0 --sync",
+            "Worlds: run-os only",
+            "Deterministic output: sort paths lexicographically"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/fs-globwalk/list-files/",
+          "profile": "os",
+          "must_pass_command": "x07 run --profile os",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/fs-globwalk/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-path-glob-rs@0.1.0 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "deterministic-ordering",
+            "path": "ci/fixtures/agent-scenarios/fs-globwalk/deterministic-ordering/",
+            "goldens": ["golden.paths.txt", "golden.run.report.json"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PKG-010",
+      "priority": "P2",
+      "capability_id": "compress.zstd",
+      "proposal_type": "extend_existing_package",
+      "package": {
+        "name": "ext-compress-rs",
+        "from_version": "0.1.2",
+        "version": "0.1.3",
+        "determinism": "pure",
+        "worlds_supported": ["solve-pure", "solve-io"],
+        "modules": [
+          "ext.compress",
+          "ext.zip",
+          "ext.zstd",
+          "ext.compress.tests",
+          "ext.zip.tests",
+          "ext.zstd.tests"
+        ]
+      },
+      "definition_of_done": {
+        "docs": {
+          "manifest_path": "packages/ext/x07-ext-compress-rs/0.1.3/x07-package.json",
+          "docs_must_contain": [
+            "Usage:",
+            "x07 pkg add ext-compress-rs@0.1.3 --sync",
+            "Adds module: ext.zstd",
+            "Determinism: pure"
+          ]
+        },
+        "example": {
+          "path": "examples/agent-gate/compress-zstd/roundtrip/",
+          "profile": "test",
+          "must_pass_command": "x07 run --profile test",
+          "expected_artifacts": ["artifacts/run.report.json"]
+        },
+        "fixtures": [
+          {
+            "id": "missing-dependency-self-repair",
+            "path": "ci/fixtures/agent-scenarios/compress-zstd/missing-dep/",
+            "must_suggest_fix_command": "x07 pkg add ext-compress-rs@0.1.3 --sync",
+            "goldens": ["golden.patch", "golden.run.report.json"]
+          },
+          {
+            "id": "zstd-roundtrip-vectors",
+            "path": "ci/fixtures/agent-scenarios/compress-zstd/roundtrip-vectors/",
+            "goldens": ["vectors.json", "golden.test.report.json"]
+          }
+        ]
+      }
+    }
+  ]
+}
+

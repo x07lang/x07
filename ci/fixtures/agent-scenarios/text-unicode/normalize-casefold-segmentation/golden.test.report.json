@@ -1,0 +1,33 @@
+{
+  "schema_version": "x07.test.golden@0.1.0",
+  "summary": {
+    "compile_failures": 0,
+    "errors": 0,
+    "failed": 0,
+    "passed": 3,
+    "run_failures": 0,
+    "skipped": 0,
+    "xfail_failed": 0,
+    "xfail_passed": 0
+  },
+  "tests": [
+    {
+      "expect": "pass",
+      "id": "unicode/casefold_basic_v1",
+      "status": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "expect": "pass",
+      "id": "unicode/normalize_nfkc_basic_v1",
+      "status": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "expect": "pass",
+      "id": "unicode/segment_grapheme_slices_v1",
+      "status": "pass",
+      "world": "solve-pure"
+    }
+  ]
+}

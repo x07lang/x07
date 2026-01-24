@@ -874,6 +874,105 @@ fn requires_packages_from_manifest(dep_dir: &Path) -> Result<Vec<String>> {
     Ok(out)
 }
 
+fn official_ext_packages_dir() -> Option<PathBuf> {
+    if let Ok(v) = std::env::var("X07_REPO_ROOT") {
+        let root = PathBuf::from(v);
+        let cand = root.join("packages").join("ext");
+        if cand.is_dir() {
+            return Some(cand);
+        }
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        for anc in exe.ancestors() {
+            let cand = anc.join("packages").join("ext");
+            if cand.is_dir() {
+                return Some(cand);
+            }
+        }
+    }
+
+    None
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst).with_context(|| format!("create dir: {}", dst.display()))?;
+
+    for entry in std::fs::read_dir(src).with_context(|| format!("read dir: {}", src.display()))? {
+        let entry = entry.with_context(|| format!("read dir entry: {}", src.display()))?;
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("read file type: {}", entry.path().display()))?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if file_type.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+            continue;
+        }
+
+        if file_type.is_file() {
+            std::fs::copy(&src_path, &dst_path).with_context(|| {
+                format!(
+                    "copy file: {} -> {}",
+                    src_path.display(),
+                    dst_path.display()
+                )
+            })?;
+            continue;
+        }
+
+        anyhow::bail!(
+            "unsupported file type in {}: {}",
+            src.display(),
+            src_path.display()
+        );
+    }
+
+    Ok(())
+}
+
+fn try_copy_official_dep(
+    official_ext: &Path,
+    dep: &project::DependencySpec,
+    base: &Path,
+) -> Result<bool> {
+    let src = official_ext
+        .join(format!("x07-{}", dep.name))
+        .join(&dep.version);
+    if !src.join("x07-package.json").is_file() {
+        return Ok(false);
+    }
+
+    let dst = base.join(&dep.path);
+    if dst.exists() {
+        if dst.is_dir() {
+            std::fs::remove_dir_all(&dst)
+                .with_context(|| format!("remove existing dep dir: {}", dst.display()))?;
+        } else {
+            anyhow::bail!(
+                "dependency path exists but is not a directory: {}",
+                dst.display()
+            );
+        }
+    }
+
+    if let Some(parent) = dst.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create dep parent dir: {}", parent.display()))?;
+    }
+    copy_dir_recursive(&src, &dst).with_context(|| {
+        format!(
+            "copy official package {}@{} from {}",
+            dep.name,
+            dep.version,
+            src.display()
+        )
+    })?;
+
+    Ok(true)
+}
+
 fn ensure_deps_present(
     deps: &[project::DependencySpec],
     base: &Path,
@@ -893,6 +992,21 @@ fn ensure_deps_present(
 
     if missing.is_empty() {
         return Ok(None);
+    }
+
+    if let Some(official_ext) = official_ext_packages_dir() {
+        let mut still_missing: Vec<&project::DependencySpec> = Vec::new();
+        for dep in missing {
+            if try_copy_official_dep(&official_ext, dep, base)? {
+                continue;
+            }
+            still_missing.push(dep);
+        }
+
+        if still_missing.is_empty() {
+            return Ok(None);
+        }
+        missing = still_missing;
     }
 
     if args.offline {

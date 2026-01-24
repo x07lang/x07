@@ -66,7 +66,7 @@
         "begin",
         ["let", "n", ["view.len", "s"]],
         ["if", ["=", "n", 0], ["return", ["ext.error.context.err_from_code", 1]], 0],
-        ["let", "i", 0],
+        ["let", "start", 0],
         ["let", "sign", 1],
         [
           "if",
@@ -77,67 +77,54 @@
             [
               "if",
               ["=", "c0", 45],
-              ["begin", ["set", "sign", 2], ["set", "i", 1]],
-              ["if", ["=", "c0", 43], ["set", "i", 1], 0]
+              ["begin", ["set", "sign", 2], ["set", "start", 1]],
+              ["if", ["=", "c0", 43], ["set", "start", 1], 0]
             ]
           ],
           0
         ],
-        ["if", [">=u", "i", "n"], ["return", ["ext.error.context.err_from_code", 1]], 0],
+        ["if", [">=u", "start", "n"], ["return", ["ext.error.context.err_from_code", 1]], 0],
         ["let", "mag", ["vec_u8.push", ["vec_u8.with_capacity", 1], 0]],
-        ["let", "done", 0],
         [
           "for",
-          "_",
-          0,
+          "pos",
+          "start",
           "n",
           [
-            "if",
-            ["=", "done", 0],
+            "begin",
+            ["let", "c", ["view.get_u8", "s", "pos"]],
+            ["if", ["<u", "c", 48], ["return", ["ext.error.context.err_from_code", 2]], 0],
+            ["if", [">=u", "c", 58], ["return", ["ext.error.context.err_from_code", 2]], 0],
+            ["let", "digit", ["-", "c", 48]],
+            ["let", "mlen", ["vec_u8.len", "mag"]],
+            ["let", "carry", "digit"],
             [
-              "if",
-              ["<u", "i", "n"],
+              "for",
+              "k",
+              0,
+              "mlen",
               [
                 "begin",
-                ["let", "c", ["view.get_u8", "s", "i"]],
-                ["if", ["<u", "c", 48], ["return", ["ext.error.context.err_from_code", 2]], 0],
-                ["if", [">=u", "c", 58], ["return", ["ext.error.context.err_from_code", 2]], 0],
-                ["let", "digit", ["-", "c", 48]],
-                ["let", "mlen", ["vec_u8.len", "mag"]],
-                ["let", "carry", "digit"],
-                ["let", "j", 0],
-                [
-                  "for",
-                  "_",
-                  0,
-                  "mlen",
-                  [
-                    "begin",
-                    ["let", "idx", ["-", ["-", "mlen", 1], "j"]],
-                    ["let", "b", ["vec_u8.get", "mag", "idx"]],
-                    ["let", "prod", ["+", ["*", "b", 10], "carry"]],
-                    ["set", "mag", ["vec_u8.set", "mag", "idx", ["&", "prod", 255]]],
-                    ["set", "carry", [">>u", "prod", 8]],
-                    ["set", "j", ["+", "j", 1]]
-                  ]
-                ],
-                [
-                  "if",
-                  [">", "carry", 0],
-                  [
-                    "begin",
-                    ["let", "old", "mag"],
-                    ["let", "oldv", ["vec_u8.as_view", "old"]],
-                    ["let", "new", ["vec_u8.with_capacity", ["+", "mlen", 4]]],
-                    ["if", ["<u", "carry", 256], ["set", "new", ["vec_u8.push", "new", "carry"]], ["begin", ["set", "new", ["vec_u8.push", "new", ["&", [">>u", "carry", 8], 255]]], ["set", "new", ["vec_u8.push", "new", ["&", "carry", 255]]]]],
-                    ["set", "new", ["vec_u8.extend_bytes_range", "new", "oldv", 0, "mlen"]],
-                    ["set", "mag", "new"]
-                  ],
-                  0
-                ],
-                ["set", "i", ["+", "i", 1]]
+                ["let", "idx", ["-", ["-", "mlen", 1], "k"]],
+                ["let", "b", ["vec_u8.get", "mag", "idx"]],
+                ["let", "prod", ["+", ["*", "b", 10], "carry"]],
+                ["set", "mag", ["vec_u8.set", "mag", "idx", ["&", "prod", 255]]],
+                ["set", "carry", [">>u", "prod", 8]]
+              ]
+            ],
+            [
+              "if",
+              [">", "carry", 0],
+              [
+                "begin",
+                ["let", "old", "mag"],
+                ["let", "oldv", ["vec_u8.as_view", "old"]],
+                ["let", "new", ["vec_u8.with_capacity", ["+", "mlen", 4]]],
+                ["set", "new", ["vec_u8.push", "new", "carry"]],
+                ["set", "new", ["vec_u8.extend_bytes_range", "new", "oldv", 0, "mlen"]],
+                ["set", "mag", "new"]
               ],
-              ["set", "done", 1]
+              0
             ],
             0
           ]

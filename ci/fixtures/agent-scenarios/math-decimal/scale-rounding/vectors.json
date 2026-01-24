@@ -1,0 +1,9 @@
+{
+  "schema_version": "x07.fixture.vectors@0.1.0",
+  "package": "ext-decimal-rs@0.1.0",
+  "examples": [
+    { "in": "001.2300", "want": "1.23" },
+    { "in": "-0.00", "want": "0" }
+  ]
+}
+

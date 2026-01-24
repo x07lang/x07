@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "diff/patch_v1_roundtrip",
+      "world": "solve-pure",
+      "entry": "patch.test_roundtrip",
+      "expect": "pass"
+    }
+  ]
+}
+

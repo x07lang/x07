@@ -1,0 +1,22 @@
+{
+  "default_profile": "test",
+  "dependencies": [
+    {
+      "name": "ext-text",
+      "path": ".x07/deps/ext-text/0.1.0",
+      "version": "0.1.0"
+    }
+  ],
+  "entry": "src/main.x07.json",
+  "lockfile": "x07.lock.json",
+  "module_roots": [
+    "src"
+  ],
+  "profiles": {
+    "test": {
+      "world": "solve-pure"
+    }
+  },
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure"
+}

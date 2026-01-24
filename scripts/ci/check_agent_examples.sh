@@ -32,11 +32,8 @@ if [[ ! -x "target/debug/x07-host-runner" && ! -x "target/release/x07-host-runne
   cargo build -p x07-host-runner -p x07-os-runner >/dev/null
 fi
 
-# Ensure the native ext-fs backend exists (required by OS-world examples that write files).
-if [[ ! -f "deps/x07/include/x07_ext_fs_abi_v1.h" ]] || \
-   [[ ! -f "deps/x07/libx07_ext_fs.a" && ! -f "deps/x07/x07_ext_fs.lib" ]]; then
-  ./scripts/build_ext_fs.sh >/dev/null
-fi
+# Ensure the native ext-fs backend exists (required by OS-world examples).
+./scripts/ci/ensure_ext_fs_backend.sh >/dev/null
 
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
@@ -122,8 +119,9 @@ for dep in deps:
     dst = work / rel_path
     if dst.exists():
         if dst.is_dir():
-            continue
-        raise SystemExit(f"dependency path exists but is not a directory: {dst}")
+            shutil.rmtree(dst)
+        else:
+            raise SystemExit(f"dependency path exists but is not a directory: {dst}")
 
     src = repo_root / "packages" / "ext" / f"x07-{name}" / version
     if not src.is_dir():
@@ -210,8 +208,9 @@ run_x07_run() {
   shift 2
 
   mkdir -p "$work/tmp"
+  mkdir -p "$work/artifacts"
 
-  local wrapped="$work/tmp/run.wrapped.json"
+  local wrapped="$work/artifacts/run.report.json"
   local stdout_log="$work/tmp/run.stdout"
   local stderr_log="$work/tmp/run.stderr"
 
@@ -301,7 +300,220 @@ expected_2="url=${url_2}"$'\n'"depth=${depth_2}"$'\n'"out=${out_2}"$'\n'
 echo "ok: cli-ext-cli"
 
 # ----------------------------
-# Example 3: Web crawler against a local fixture site (sandboxed OS world)
+# Example 3: Text utils (solve-pure + ext-text)
+# ----------------------------
+
+echo "==> agent example: text-utils (solve-pure + ext-text)"
+
+text_work="$tmp_dir/text-utils"
+copy_project "examples/agent-gate/text-core/text-utils" "$text_work"
+
+seed_official_deps "$text_work"
+pkg_lock_check "$text_work"
+fmt_check_all "$text_work"
+lint_check_one "$text_work" "solve-pure" "src/main.x07.json"
+
+wrapped_3="$(run_x07_run "text-utils" "$text_work" --profile test)"
+unwrap_and_check_wrapped_report "text-utils" "$wrapped_3" "$text_work/tmp/runner.json" "host" "solve-pure" "true"
+
+expected_3="hello|world"$'\n'
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "text-utils" --path "$text_work/tmp/runner.json" --expect "$expected_3" >/dev/null
+
+echo "ok: text-utils"
+
+# ----------------------------
+# Example 4: BigInt factorial (solve-pure + ext-bigint-rs)
+# ----------------------------
+
+echo "==> agent example: factorial-100 (solve-pure + ext-bigint-rs)"
+
+bigint_work="$tmp_dir/factorial-100"
+copy_project "examples/agent-gate/math-bigint/factorial-100" "$bigint_work"
+
+seed_official_deps "$bigint_work"
+pkg_lock_check "$bigint_work"
+fmt_check_all "$bigint_work"
+lint_check_one "$bigint_work" "solve-pure" "src/main.x07.json"
+
+wrapped_4="$(run_x07_run "factorial-100" "$bigint_work" --profile test)"
+unwrap_and_check_wrapped_report "factorial-100" "$wrapped_4" "$bigint_work/tmp/runner.json" "host" "solve-pure" "true"
+
+expected_4="ok"$'\n'
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "factorial-100" --path "$bigint_work/tmp/runner.json" --expect "$expected_4" >/dev/null
+
+echo "ok: factorial-100"
+
+# ----------------------------
+# Example 5: Decimal money formatting (solve-pure + ext-decimal-rs)
+# ----------------------------
+
+echo "==> agent example: money-format (solve-pure + ext-decimal-rs)"
+
+decimal_work="$tmp_dir/money-format"
+copy_project "examples/agent-gate/math-decimal/money-format" "$decimal_work"
+
+seed_official_deps "$decimal_work"
+pkg_lock_check "$decimal_work"
+fmt_check_all "$decimal_work"
+lint_check_one "$decimal_work" "solve-pure" "src/main.x07.json"
+
+wrapped_5="$(run_x07_run "money-format" "$decimal_work" --profile test)"
+unwrap_and_check_wrapped_report "money-format" "$wrapped_5" "$decimal_work/tmp/runner.json" "host" "solve-pure" "true"
+
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "money-format" --path "$decimal_work/tmp/runner.json" --expect "$expected_4" >/dev/null
+
+echo "ok: money-format"
+
+# ----------------------------
+# Example 6: Unicode normalize + casefold (solve-pure + ext-unicode-rs)
+# ----------------------------
+
+echo "==> agent example: normalize-casefold (solve-pure + ext-unicode-rs)"
+
+unicode_work="$tmp_dir/normalize-casefold"
+copy_project "examples/agent-gate/text-unicode/normalize-casefold" "$unicode_work"
+
+seed_official_deps "$unicode_work"
+pkg_lock_check "$unicode_work"
+fmt_check_all "$unicode_work"
+lint_check_one "$unicode_work" "solve-pure" "src/main.x07.json"
+
+wrapped_6="$(run_x07_run "normalize-casefold" "$unicode_work" --profile test)"
+unwrap_and_check_wrapped_report "normalize-casefold" "$wrapped_6" "$unicode_work/tmp/runner.json" "host" "solve-pure" "true"
+
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "normalize-casefold" --path "$unicode_work/tmp/runner.json" --expect "$expected_4" >/dev/null
+
+echo "ok: normalize-casefold"
+
+# ----------------------------
+# Example 7: CBOR roundtrip (solve-pure + ext-cbor-rs)
+# ----------------------------
+
+echo "==> agent example: cbor-roundtrip (solve-pure + ext-cbor-rs)"
+
+cbor_work="$tmp_dir/data-cbor"
+copy_project "examples/agent-gate/data-cbor/roundtrip" "$cbor_work"
+
+seed_official_deps "$cbor_work"
+pkg_lock_check "$cbor_work"
+fmt_check_all "$cbor_work"
+lint_check_one "$cbor_work" "solve-pure" "src/main.x07.json"
+
+wrapped_7="$(run_x07_run "data-cbor" "$cbor_work" --profile test)"
+unwrap_and_check_wrapped_report "data-cbor" "$wrapped_7" "$cbor_work/tmp/runner.json" "host" "solve-pure" "true"
+
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "data-cbor" --path "$cbor_work/tmp/runner.json" --expect "$expected_4" >/dev/null
+
+echo "ok: data-cbor"
+
+# ----------------------------
+# Example 8: MessagePack roundtrip (solve-pure + ext-msgpack-rs)
+# ----------------------------
+
+echo "==> agent example: msgpack-roundtrip (solve-pure + ext-msgpack-rs)"
+
+msgpack_work="$tmp_dir/data-msgpack"
+copy_project "examples/agent-gate/data-msgpack/roundtrip" "$msgpack_work"
+
+seed_official_deps "$msgpack_work"
+pkg_lock_check "$msgpack_work"
+fmt_check_all "$msgpack_work"
+lint_check_one "$msgpack_work" "solve-pure" "src/main.x07.json"
+
+wrapped_8="$(run_x07_run "data-msgpack" "$msgpack_work" --profile test)"
+unwrap_and_check_wrapped_report "data-msgpack" "$wrapped_8" "$msgpack_work/tmp/runner.json" "host" "solve-pure" "true"
+
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "data-msgpack" --path "$msgpack_work/tmp/runner.json" --expect "$expected_4" >/dev/null
+
+echo "ok: data-msgpack"
+
+# ----------------------------
+# Example 9: Checksums (solve-pure + ext-checksum-rs)
+# ----------------------------
+
+echo "==> agent example: checksum-smoke (solve-pure + ext-checksum-rs)"
+
+checksum_work="$tmp_dir/checksum-fast"
+copy_project "examples/agent-gate/checksum-fast/smoke" "$checksum_work"
+
+seed_official_deps "$checksum_work"
+pkg_lock_check "$checksum_work"
+fmt_check_all "$checksum_work"
+lint_check_one "$checksum_work" "solve-pure" "src/main.x07.json"
+
+wrapped_9="$(run_x07_run "checksum-fast" "$checksum_work" --profile test)"
+unwrap_and_check_wrapped_report "checksum-fast" "$wrapped_9" "$checksum_work/tmp/runner.json" "host" "solve-pure" "true"
+
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "checksum-fast" --path "$checksum_work/tmp/runner.json" --expect "$expected_4" >/dev/null
+
+echo "ok: checksum-fast"
+
+# ----------------------------
+# Example 10: Diff/patch apply (solve-pure + ext-diff-rs)
+# ----------------------------
+
+echo "==> agent example: diff-patch-apply (solve-pure + ext-diff-rs)"
+
+diff_work="$tmp_dir/diff-patch"
+copy_project "examples/agent-gate/diff-patch/apply" "$diff_work"
+
+seed_official_deps "$diff_work"
+pkg_lock_check "$diff_work"
+fmt_check_all "$diff_work"
+lint_check_one "$diff_work" "solve-pure" "src/main.x07.json"
+
+wrapped_10="$(run_x07_run "diff-patch" "$diff_work" --profile test)"
+unwrap_and_check_wrapped_report "diff-patch" "$wrapped_10" "$diff_work/tmp/runner.json" "host" "solve-pure" "true"
+
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "diff-patch" --path "$diff_work/tmp/runner.json" --expect "$expected_4" >/dev/null
+
+echo "ok: diff-patch"
+
+# ----------------------------
+# Example 11: zstd roundtrip (solve-pure + ext-compress-rs)
+# ----------------------------
+
+echo "==> agent example: compress-zstd (solve-pure + ext-compress-rs)"
+
+zstd_work="$tmp_dir/compress-zstd"
+copy_project "examples/agent-gate/compress-zstd/roundtrip" "$zstd_work"
+
+seed_official_deps "$zstd_work"
+pkg_lock_check "$zstd_work"
+fmt_check_all "$zstd_work"
+lint_check_one "$zstd_work" "solve-pure" "src/main.x07.json"
+
+wrapped_11="$(run_x07_run "compress-zstd" "$zstd_work" --profile test)"
+unwrap_and_check_wrapped_report "compress-zstd" "$wrapped_11" "$zstd_work/tmp/runner.json" "host" "solve-pure" "true"
+
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "compress-zstd" --path "$zstd_work/tmp/runner.json" --expect "$expected_4" >/dev/null
+
+echo "ok: compress-zstd"
+
+# ----------------------------
+# Example 12: OS-world glob + walk (run-os + ext-path-glob-rs)
+# ----------------------------
+
+echo "==> agent example: fs-globwalk (run-os + ext-path-glob-rs)"
+
+globwalk_work="$tmp_dir/fs-globwalk"
+copy_project "examples/agent-gate/fs-globwalk/list-files" "$globwalk_work"
+
+seed_official_deps "$globwalk_work"
+pkg_lock_check "$globwalk_work"
+fmt_check_all "$globwalk_work"
+lint_check_one "$globwalk_work" "run-os" "src/main.x07.json"
+
+wrapped_12="$(run_x07_run "fs-globwalk" "$globwalk_work" --profile os)"
+unwrap_and_check_wrapped_report "fs-globwalk" "$wrapped_12" "$globwalk_work/tmp/runner.json" "os" "run-os" "true"
+
+expected_12="a.txt"$'\n'"sub/c.txt"$'\n'
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "fs-globwalk" --path "$globwalk_work/tmp/runner.json" --expect "$expected_12" >/dev/null
+
+echo "ok: fs-globwalk"
+
+# ----------------------------
+# Example 13: Web crawler against a local fixture site (sandboxed OS world)
 # ----------------------------
 
 echo "==> agent example: web-crawler-local (run-os-sandboxed + allow-host sugar)"
@@ -365,16 +577,16 @@ PY
 )"
 
 base_url="http://${host}:${port}/"
-out_3="out/results.txt"
+out_13="out/results.txt"
 mkdir -p "$crawler_work/out"
 
-wrapped_3="$(run_x07_run "web-crawler-local" "$crawler_work" \
+wrapped_13="$(run_x07_run "web-crawler-local" "$crawler_work" \
   --profile sandbox \
   --allow-host "${host}:${port}" \
   --cpu-time-limit-seconds 60 \
-  -- crawler --url "$base_url" --depth "2" --out "$out_3" \
+  -- crawler --url "$base_url" --depth "2" --out "$out_13" \
 )"
-unwrap_and_check_wrapped_report "web-crawler-local" "$wrapped_3" "$crawler_work/tmp/runner.json" "os" "run-os-sandboxed" "true"
+unwrap_and_check_wrapped_report "web-crawler-local" "$wrapped_13" "$crawler_work/tmp/runner.json" "os" "run-os-sandboxed" "true"
 
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "web-crawler-local" --path "$crawler_work/tmp/runner.json" --expect "ok" >/dev/null
 
@@ -406,14 +618,14 @@ assert ok, (host, port, allow_hosts)
 PY
 
 # Now run with allow + deny for the same host, and ensure deny wins in the derived policy.
-wrapped_3b="$(run_x07_run "web-crawler-local" "$crawler_work" \
+wrapped_13b="$(run_x07_run "web-crawler-local" "$crawler_work" \
   --profile sandbox \
   --allow-host "${host}:${port}" \
   --deny-host "${host}:${port}" \
   --cpu-time-limit-seconds 60 \
-  -- crawler --url "$base_url" --depth "1" --out "$out_3" \
+  -- crawler --url "$base_url" --depth "1" --out "$out_13" \
 )"
-unwrap_and_check_wrapped_report "web-crawler-local" "$wrapped_3b" "$crawler_work/tmp/runner_deny.json" "os" "run-os-sandboxed" "true"
+unwrap_and_check_wrapped_report "web-crawler-local" "$wrapped_13b" "$crawler_work/tmp/runner_deny.json" "os" "run-os-sandboxed" "true"
 
 policy_deny="$(extract_derived_policy_path "$crawler_work/tmp/run.stdout" "$crawler_work/tmp/run.stderr")"
 [[ -f "$policy_deny" ]] || die "derived policy path missing: $policy_deny"
@@ -434,8 +646,8 @@ for e in allow_hosts:
 PY
 
 # Compare produced outputs against golden fixtures.
-require_path "$crawler_work/$out_3"
-require_path "$crawler_work/$out_3.text"
+require_path "$crawler_work/$out_13"
+require_path "$crawler_work/$out_13.text"
 
 expected_urls="$fixture_site/expected_urls.txt"
 expected_text="$fixture_site/expected_text.txt"
@@ -445,8 +657,8 @@ require_path "$expected_text"
 expected_urls_tmp="$crawler_work/tmp/expected_urls.actual_port.txt"
 sed -e "s/{{PORT}}/${port}/g" -e "s/18080/${port}/g" "$expected_urls" >"$expected_urls_tmp"
 
-diff -u "$expected_urls_tmp" "$crawler_work/$out_3" >/dev/null
-diff -u "$expected_text" "$crawler_work/$out_3.text" >/dev/null
+diff -u "$expected_urls_tmp" "$crawler_work/$out_13" >/dev/null
+diff -u "$expected_text" "$crawler_work/$out_13.text" >/dev/null
 
 echo "ok: web-crawler-local"
 
