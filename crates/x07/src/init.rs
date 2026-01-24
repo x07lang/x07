@@ -16,7 +16,7 @@ pub struct InitArgs {
     #[arg(long, value_enum)]
     pub template: Option<InitTemplate>,
 
-    /// Also create `x07-package.json` for publishable packages.
+    /// Initialize a publishable package repo (modules/ + x07-package.json + tests/).
     #[arg(long)]
     pub package: bool,
 }
@@ -209,9 +209,27 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
         }
     };
 
+    if args.package {
+        if args.template.is_some() {
+            let report = InitReport {
+                ok: false,
+                command: "init",
+                root: root.display().to_string(),
+                created: Vec::new(),
+                error: Some(InitError {
+                    code: "X07INIT_ARGS".to_string(),
+                    message: "x07 init --package does not support --template (use x07 init --template ... for app scaffolds, or x07 init --package for a publishable package scaffold)".to_string(),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+
+        return cmd_init_package(&root);
+    }
+
     let paths = InitPaths {
         project: root.join("x07.json"),
-        package: root.join("x07-package.json"),
         lock: root.join("x07.lock.json"),
         gitignore: root.join(".gitignore"),
         src_dir: root.join("src"),
@@ -228,7 +246,7 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
     });
 
     let mut conflicts = Vec::new();
-    let mut required_paths: Vec<&PathBuf> = vec![
+    let required_paths: [&PathBuf; 6] = [
         &paths.project,
         &paths.lock,
         &paths.app,
@@ -236,9 +254,6 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
         &paths.tests_manifest,
         &paths.tests_smoke,
     ];
-    if args.package {
-        required_paths.push(&paths.package);
-    }
     for p in required_paths {
         if p.exists() {
             conflicts.push(rel(&root, p));
@@ -371,19 +386,6 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
     }
     created.push(rel(&root, &paths.project));
 
-    if args.package {
-        let pkg_name = sanitize_pkg_name(
-            root.file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .as_ref(),
-        );
-        if let Err(err) = write_new_file(&paths.package, &package_json_bytes(&pkg_name)?) {
-            return print_io_error(&root, &created, "x07-package.json", err);
-        }
-        created.push(rel(&root, &paths.package));
-    }
-
     if let Err(err) = write_new_file(&paths.lock, &lock_json_bytes()?) {
         return print_io_error(&root, &created, "x07.lock.json", err);
     }
@@ -479,9 +481,174 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
+fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
+    let pkg_name = sanitize_pkg_name(
+        root.file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .as_ref(),
+    );
+    let ids = package_ids(&pkg_name);
+
+    let entry_rel = format!("modules/ext/{}/tests.x07.json", ids.tail);
+    let module_main_rel = format!("modules/ext/{}.x07.json", ids.tail);
+    let module_tests_rel = entry_rel.clone();
+
+    let paths = PackageInitPaths {
+        project: root.join("x07.json"),
+        package: root.join("x07-package.json"),
+        lock: root.join("x07.lock.json"),
+        gitignore: root.join(".gitignore"),
+        modules_dir: root.join("modules"),
+        module_main: root.join(&module_main_rel),
+        module_tests: root.join(&module_tests_rel),
+        tests_dir: root.join("tests"),
+        tests_manifest: root.join("tests").join("tests.json"),
+    };
+
+    let mut conflicts = Vec::new();
+    for p in [
+        &paths.project,
+        &paths.package,
+        &paths.lock,
+        &paths.module_main,
+        &paths.module_tests,
+        &paths.tests_manifest,
+    ] {
+        if p.exists() {
+            conflicts.push(rel(root, p));
+        }
+    }
+    if !conflicts.is_empty() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_EXISTS".to_string(),
+                message: format!(
+                    "refusing to overwrite existing paths: {}",
+                    conflicts.join(", ")
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    if paths.modules_dir.exists() && !paths.modules_dir.is_dir() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_MODULES".to_string(),
+                message: format!(
+                    "modules exists but is not a directory: {}",
+                    rel(root, &paths.modules_dir)
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    if paths.tests_dir.exists() && !paths.tests_dir.is_dir() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_TESTS".to_string(),
+                message: format!(
+                    "tests exists but is not a directory: {}",
+                    rel(root, &paths.tests_dir)
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let mut created: Vec<String> = Vec::new();
+
+    // x07.json
+    if let Err(err) = write_new_file(&paths.project, &package_project_json_bytes(&entry_rel)?) {
+        return print_io_error(root, &created, "x07.json", err);
+    }
+    created.push(rel(root, &paths.project));
+
+    // x07-package.json
+    if let Err(err) = write_new_file(&paths.package, &package_json_bytes(&pkg_name, &ids)?) {
+        return print_io_error(root, &created, "x07-package.json", err);
+    }
+    created.push(rel(root, &paths.package));
+
+    // x07.lock.json
+    if let Err(err) = write_new_file(&paths.lock, &lock_json_bytes()?) {
+        return print_io_error(root, &created, "x07.lock.json", err);
+    }
+    created.push(rel(root, &paths.lock));
+
+    // modules/ext/<tail>.x07.json
+    if let Err(err) = write_new_file(&paths.module_main, &package_module_bytes(&ids)?) {
+        return print_io_error(root, &created, &module_main_rel, err);
+    }
+    created.push(rel(root, &paths.module_main));
+
+    // modules/ext/<tail>/tests.x07.json
+    if let Err(err) = write_new_file(&paths.module_tests, &package_tests_module_bytes(&ids)?) {
+        return print_io_error(root, &created, &module_tests_rel, err);
+    }
+    created.push(rel(root, &paths.module_tests));
+
+    // tests/tests.json
+    if let Err(err) = write_new_file(
+        &paths.tests_manifest,
+        &package_tests_manifest_bytes(&ids.test_fn)?,
+    ) {
+        return print_io_error(root, &created, "tests/tests.json", err);
+    }
+    created.push(rel(root, &paths.tests_manifest));
+
+    match ensure_gitignore(&paths.gitignore) {
+        Ok(wrote) => {
+            if wrote {
+                created.push(rel(root, &paths.gitignore));
+            }
+        }
+        Err(err) => {
+            let report = InitReport {
+                ok: false,
+                command: "init",
+                root: root.display().to_string(),
+                created,
+                error: Some(InitError {
+                    code: "X07INIT_GITIGNORE".to_string(),
+                    message: format!("ensure .gitignore: {err}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    }
+
+    let report = InitReport {
+        ok: true,
+        command: "init",
+        root: root.display().to_string(),
+        created,
+        error: None,
+    };
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
 struct InitPaths {
     project: PathBuf,
-    package: PathBuf,
     lock: PathBuf,
     gitignore: PathBuf,
     src_dir: PathBuf,
@@ -490,6 +657,27 @@ struct InitPaths {
     tests_dir: PathBuf,
     tests_manifest: PathBuf,
     tests_smoke: PathBuf,
+}
+
+struct PackageInitPaths {
+    project: PathBuf,
+    package: PathBuf,
+    lock: PathBuf,
+    gitignore: PathBuf,
+    modules_dir: PathBuf,
+    module_main: PathBuf,
+    module_tests: PathBuf,
+    tests_dir: PathBuf,
+    tests_manifest: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+struct PackageIds {
+    tail: String,
+    module_id: String,
+    tests_module_id: String,
+    hello_fn: String,
+    test_fn: String,
 }
 
 fn rel(root: &Path, path: &Path) -> String {
@@ -549,6 +737,41 @@ fn sanitize_pkg_name(raw: &str) -> String {
         out = format!("x07-{out}");
     }
     out
+}
+
+fn package_ids(pkg_name: &str) -> PackageIds {
+    // Canonical mapping:
+    //   pkg name: ext-foo-bar  -> module_id: ext.foo_bar
+    //   tests:                 -> ext.foo_bar.tests
+    // This mirrors the publishing-by-example tutorial layout under examples/tutorials/.
+    let tail_raw = pkg_name.strip_prefix("ext-").unwrap_or(pkg_name);
+    let mut tail = tail_raw.replace('-', "_");
+    while tail.contains("__") {
+        tail = tail.replace("__", "_");
+    }
+    tail = tail.trim_matches('_').to_string();
+    if tail.is_empty() {
+        tail = "pkg".to_string();
+    }
+    if !tail
+        .as_bytes()
+        .first()
+        .is_some_and(|b| b.is_ascii_lowercase())
+    {
+        tail = format!("pkg_{tail}");
+    }
+
+    let module_id = format!("ext.{tail}");
+    let tests_module_id = format!("{module_id}.tests");
+    let hello_fn = format!("{module_id}.hello_v1");
+    let test_fn = format!("{tests_module_id}.test_hello_v1");
+    PackageIds {
+        tail,
+        module_id,
+        tests_module_id,
+        hello_fn,
+        test_fn,
+    }
 }
 
 fn write_new_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
@@ -679,7 +902,52 @@ fn project_json_bytes(template: Option<InitTemplate>, deps: &[PkgRef]) -> Result
     Ok(out)
 }
 
-fn package_json_bytes(name: &str) -> Result<Vec<u8>> {
+fn package_project_json_bytes(entry_rel: &str) -> Result<Vec<u8>> {
+    // Package repos are designed primarily for `x07 test` + `x07 pkg publish`.
+    // We mirror the minimal shape used in examples/tutorials/package_publish_ext_hello.
+    let v = Value::Object(
+        [
+            (
+                "schema_version".to_string(),
+                Value::String(PROJECT_MANIFEST_SCHEMA_VERSION.to_string()),
+            ),
+            ("world".to_string(), Value::String("solve-pure".to_string())),
+            ("entry".to_string(), Value::String(entry_rel.to_string())),
+            (
+                "module_roots".to_string(),
+                Value::Array(vec![Value::String("modules".to_string())]),
+            ),
+            (
+                "lockfile".to_string(),
+                Value::String("x07.lock.json".to_string()),
+            ),
+            ("dependencies".to_string(), Value::Array(Vec::new())),
+        ]
+        .into_iter()
+        .collect(),
+    );
+
+    let mut out = serde_json::to_vec_pretty(&v)?;
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    Ok(out)
+}
+
+fn package_json_bytes(name: &str, ids: &PackageIds) -> Result<Vec<u8>> {
+    let version = "0.1.0";
+    let docs = format!(
+        "Starter package generated by `x07 init --package`.\n\nModules:\n- {}\n- {}\n\nUsage:\n- Add: x07 pkg add {}@{} --sync\n- Import: {}\n- Call: {}\n\nDev:\n- Test: x07 test --manifest tests/tests.json\n- Pack: x07 pkg pack --package . --out dist/{}-{}.x07pkg\n",
+        ids.module_id,
+        ids.tests_module_id,
+        name,
+        version,
+        ids.module_id,
+        ids.hello_fn,
+        name,
+        version,
+    );
+
     let v = Value::Object(
         [
             (
@@ -689,13 +957,61 @@ fn package_json_bytes(name: &str) -> Result<Vec<u8>> {
             ("name".to_string(), Value::String(name.to_string())),
             (
                 "description".to_string(),
-                Value::String("A new X07 package.".to_string()),
+                Value::String(format!(
+                    "Starter package generated by `x07 init --package`: {}(name) -> bytes.",
+                    ids.hello_fn
+                )),
             ),
-            ("version".to_string(), Value::String("0.1.0".to_string())),
-            ("module_root".to_string(), Value::String("src".to_string())),
+            ("docs".to_string(), Value::String(docs)),
+            ("version".to_string(), Value::String(version.to_string())),
+            (
+                "module_root".to_string(),
+                Value::String("modules".to_string()),
+            ),
             (
                 "modules".to_string(),
-                Value::Array(vec![Value::String("app".to_string())]),
+                Value::Array(vec![
+                    Value::String(ids.module_id.clone()),
+                    Value::String(ids.tests_module_id.clone()),
+                ]),
+            ),
+            (
+                "meta".to_string(),
+                Value::Object(
+                    [
+                        (
+                            "determinism_tier".to_string(),
+                            Value::String("pure".to_string()),
+                        ),
+                        (
+                            "worlds_allowed".to_string(),
+                            Value::Array(
+                                [
+                                    "solve-pure",
+                                    "solve-fs",
+                                    "solve-rr",
+                                    "solve-kv",
+                                    "solve-full",
+                                    "run-os",
+                                    "run-os-sandboxed",
+                                ]
+                                .into_iter()
+                                .map(|s| Value::String(s.to_string()))
+                                .collect(),
+                            ),
+                        ),
+                        (
+                            "import_mode".to_string(),
+                            Value::String("handwritten".to_string()),
+                        ),
+                        (
+                            "visibility".to_string(),
+                            Value::String("experimental".to_string()),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
             ),
         ]
         .into_iter()
@@ -722,6 +1038,70 @@ fn lock_json_bytes() -> Result<Vec<u8>> {
         .collect(),
     );
     let mut out = serde_json::to_vec_pretty(&v)?;
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    Ok(out)
+}
+
+fn package_module_bytes(ids: &PackageIds) -> Result<Vec<u8>> {
+    let mut v = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": ids.module_id.clone(),
+        "imports": [],
+        "decls": [
+            {"kind": "export", "names": [ids.hello_fn.clone()]},
+            {
+                "kind": "defn",
+                "name": ids.hello_fn.clone(),
+                "params": [{"name": "name", "ty": "bytes_view"}],
+                "result": "bytes",
+                "body": [
+                    "begin",
+                    ["let", "prefix", ["bytes.concat", ["bytes.lit", "hello,"], ["bytes1", 32]]],
+                    ["let", "tmp", ["bytes.concat", "prefix", ["view.to_bytes", "name"]]],
+                    ["bytes.concat", "tmp", ["bytes1", 10]]
+                ]
+            }
+        ]
+    });
+    x07c::x07ast::canon_value_jcs(&mut v);
+    let mut out = serde_json::to_string(&v)?.into_bytes();
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    Ok(out)
+}
+
+fn package_tests_module_bytes(ids: &PackageIds) -> Result<Vec<u8>> {
+    let mut v = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": ids.tests_module_id.clone(),
+        "imports": [ids.module_id.clone(), "std.test"],
+        "decls": [
+            {"kind": "export", "names": [ids.test_fn.clone()]},
+            {
+                "kind": "defn",
+                "name": ids.test_fn.clone(),
+                "params": [],
+                "result": "result_i32",
+                "body": [
+                    "begin",
+                    ["let", "name", ["bytes.lit", "x07"]],
+                    ["let", "got", [ids.hello_fn.clone(), ["bytes.view", "name"]]],
+                    ["let", "expected_prefix", ["bytes.concat", ["bytes.lit", "hello,"], ["bytes1", 32]]],
+                    ["let", "expected_tmp", ["bytes.concat", "expected_prefix", "name"]],
+                    ["let", "expected", ["bytes.concat", "expected_tmp", ["bytes1", 10]]],
+                    ["try", ["std.test.assert_bytes_eq", "got", "expected", ["std.test.code_assert_bytes_eq"]]],
+                    ["std.test.pass"]
+                ]
+            }
+        ]
+    });
+    x07c::x07ast::canon_value_jcs(&mut v);
+    let mut out = serde_json::to_string(&v)?.into_bytes();
     if out.last() != Some(&b'\n') {
         out.push(b'\n');
     }
@@ -1096,6 +1476,38 @@ fn main_entry_bytes() -> Result<Vec<u8>> {
     Ok(out)
 }
 
+fn package_tests_manifest_bytes(test_entry: &str) -> Result<Vec<u8>> {
+    let v = Value::Object(
+        [
+            (
+                "schema_version".to_string(),
+                Value::String("x07.tests_manifest@0.1.0".to_string()),
+            ),
+            (
+                "tests".to_string(),
+                Value::Array(vec![Value::Object(
+                    [
+                        ("id".to_string(), Value::String("hello_v1".to_string())),
+                        ("world".to_string(), Value::String("solve-pure".to_string())),
+                        ("entry".to_string(), Value::String(test_entry.to_string())),
+                        ("expect".to_string(), Value::String("pass".to_string())),
+                    ]
+                    .into_iter()
+                    .collect(),
+                )]),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    );
+
+    let mut out = serde_json::to_vec_pretty(&v)?;
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    Ok(out)
+}
+
 fn tests_manifest_bytes() -> Result<Vec<u8>> {
     let v = Value::Object(
         [
@@ -1188,13 +1600,47 @@ fn tests_smoke_module_bytes() -> Result<Vec<u8>> {
 
 fn ensure_gitignore(path: &Path) -> Result<bool> {
     // Keep policy files committable by default, but ignore generated artifacts.
-    const REQUIRED: [&str; 3] = [".x07/deps/", ".x07/policies/_generated/", "target/"];
+    const REQUIRED: [&str; 8] = [
+        ".x07/deps/",
+        ".x07/tmp/",
+        ".x07/policies/_generated/",
+        "target/",
+        "dist/",
+        "artifacts/",
+        ".DS_Store",
+        "*.log",
+    ];
 
     let existing = match std::fs::read_to_string(path) {
         Ok(s) => s.replace("\r\n", "\n"),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(err) => return Err(err).with_context(|| format!("read {}", path.display())),
     };
+
+    if existing.is_empty() {
+        let out = "\
+# X07 deps + generated artifacts
+.x07/deps/
+.x07/tmp/
+.x07/policies/_generated/
+
+# Build outputs
+target/
+dist/
+artifacts/
+
+# Editor noise
+.DS_Store
+*.log
+";
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("create dir: {}", parent.display()))?;
+        }
+        std::fs::write(path, out).with_context(|| format!("write {}", path.display()))?;
+        return Ok(true);
+    }
 
     let missing: Vec<&str> = REQUIRED
         .into_iter()

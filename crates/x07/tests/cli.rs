@@ -273,21 +273,143 @@ fn x07_init_creates_project_skeleton() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
     assert_eq!(v["error"]["code"], "X07INIT_EXISTS");
+}
 
-    let dir2 = fresh_tmp_dir(&root, "tmp_x07_init_package");
-    if dir2.exists() {
-        std::fs::remove_dir_all(&dir2).expect("remove old tmp dir");
+#[test]
+fn x07_init_creates_package_skeleton() {
+    let root = repo_root();
+    let parent = fresh_tmp_dir(&root, "tmp_x07_init_package");
+    if parent.exists() {
+        std::fs::remove_dir_all(&parent).expect("remove old tmp dir");
     }
-    std::fs::create_dir_all(&dir2).expect("create tmp dir");
+    std::fs::create_dir_all(&parent).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir2, &["init", "--package"]);
+    let dir = parent.join("acme-hello-demo");
+    std::fs::create_dir_all(&dir).expect("create package dir");
+
+    let out = run_x07_in_dir(&dir, &["init", "--package"]);
     assert_eq!(
         out.status.code(),
         Some(0),
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(dir2.join("x07-package.json").is_file());
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "init");
+
+    for rel in [
+        "x07.json",
+        "x07.lock.json",
+        "x07-package.json",
+        "modules/ext/acme_hello_demo.x07.json",
+        "modules/ext/acme_hello_demo/tests.x07.json",
+        "tests/tests.json",
+        ".gitignore",
+    ] {
+        assert!(dir.join(rel).is_file(), "missing {}", rel);
+    }
+    assert!(
+        !dir.join("src").exists(),
+        "package scaffold must not create src/"
+    );
+    assert!(!dir.join("tests/smoke.x07.json").exists());
+
+    let pkg_doc: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("x07-package.json")).unwrap())
+            .expect("parse x07-package.json");
+    assert_eq!(pkg_doc["name"], "acme-hello-demo");
+    assert_eq!(pkg_doc["version"], "0.1.0");
+    assert_eq!(pkg_doc["module_root"], "modules");
+    assert_eq!(
+        pkg_doc["modules"]
+            .as_array()
+            .expect("x07-package.json modules[]")
+            .iter()
+            .map(|v| v.as_str().expect("modules[] string"))
+            .collect::<Vec<_>>(),
+        vec!["ext.acme_hello_demo", "ext.acme_hello_demo.tests"]
+    );
+    assert!(pkg_doc["description"]
+        .as_str()
+        .unwrap_or("")
+        .contains("x07 init --package"));
+    assert!(pkg_doc["docs"]
+        .as_str()
+        .unwrap_or("")
+        .contains("x07 pkg add"));
+
+    let proj_doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    assert_eq!(proj_doc["world"], "solve-pure");
+    assert_eq!(
+        proj_doc["entry"],
+        "modules/ext/acme_hello_demo/tests.x07.json"
+    );
+    assert_eq!(
+        proj_doc["module_roots"]
+            .as_array()
+            .expect("x07.json module_roots[]")
+            .iter()
+            .map(|v| v.as_str().expect("module_roots[] string"))
+            .collect::<Vec<_>>(),
+        vec!["modules"]
+    );
+
+    let out = run_x07_in_dir(&dir, &["test", "--manifest", "tests/tests.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
+    assert_eq!(v["summary"]["passed"], 1);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "pkg",
+            "pack",
+            "--package",
+            ".",
+            "--out",
+            "dist/acme-hello-demo-0.1.0.x07pkg",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(dir.join("dist/acme-hello-demo-0.1.0.x07pkg").is_file());
+
+    std::fs::remove_dir_all(&parent).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_init_package_rejects_template() {
+    let root = repo_root();
+    let parent = fresh_tmp_dir(&root, "tmp_x07_init_package_template_reject");
+    if parent.exists() {
+        std::fs::remove_dir_all(&parent).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&parent).expect("create tmp dir");
+
+    let dir = parent.join("acme-hello-demo");
+    std::fs::create_dir_all(&dir).expect("create package dir");
+
+    let out = run_x07_in_dir(&dir, &["init", "--package", "--template", "cli"]);
+    assert_eq!(out.status.code(), Some(20));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["error"]["code"], "X07INIT_ARGS");
+    assert!(!dir.join("x07.json").exists());
+    assert!(!dir.join("x07-package.json").exists());
+
+    std::fs::remove_dir_all(&parent).expect("cleanup tmp dir");
 }
 
 #[test]
