@@ -63,6 +63,10 @@ fn cli_compile_only_skips_solve() {
             .and_then(|ok| ok.as_bool()),
         Some(true)
     );
+    assert!(
+        v.get("compile").and_then(|c| c.get("guide_md")).is_none(),
+        "compile report should not include guide_md"
+    );
     assert!(v.get("solve").is_some_and(|s| s.is_null()));
 
     let _ = std::fs::remove_dir_all(&dir);

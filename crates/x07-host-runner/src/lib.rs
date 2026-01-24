@@ -120,7 +120,6 @@ pub struct CompilerResult {
     pub ok: bool,
     pub exit_status: i32,
     pub lang_id: String,
-    pub guide_md: String,
     pub native_requires: x07c::native::NativeRequires,
     pub c_source_size: usize,
     pub compiled_exe: Option<PathBuf>,
@@ -283,7 +282,6 @@ pub fn compile_program_with_options(
     extra_cc_args: &[String],
 ) -> Result<CompilerResult> {
     let lang_id = language::LANG_ID.to_string();
-    let guide_md = compile::guide_md();
 
     let compile_out = match compile::compile_program_to_c_with_meta(program, compile_options) {
         Ok(out) => out,
@@ -302,7 +300,6 @@ pub fn compile_program_with_options(
                 ok: false,
                 exit_status: 1,
                 lang_id,
-                guide_md,
                 native_requires: empty_native_requires(compile_options),
                 c_source_size: 0,
                 compiled_exe: None,
@@ -330,7 +327,6 @@ pub fn compile_program_with_options(
                 ok: false,
                 exit_status: 1,
                 lang_id,
-                guide_md,
                 native_requires,
                 c_source_size: c_source.len(),
                 compiled_exe: None,
@@ -350,7 +346,6 @@ pub fn compile_program_with_options(
             ok: false,
             exit_status: tool.exit_status,
             lang_id,
-            guide_md,
             native_requires,
             c_source_size: c_source.len(),
             compiled_exe: None,
@@ -398,7 +393,6 @@ pub fn compile_program_with_options(
         ok: true,
         exit_status: 0,
         lang_id,
-        guide_md,
         native_requires,
         c_source_size: c_source.len(),
         compiled_exe: Some(final_exe),

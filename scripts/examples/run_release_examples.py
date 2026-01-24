@@ -138,13 +138,6 @@ def _examples(root: Path, input_dir_file: Path) -> list[Example]:
     ]
 
 
-def _compact_report(report: dict) -> dict:
-    report = json.loads(json.dumps(report))
-    if isinstance(report.get("compile"), dict):
-        report["compile"].pop("guide_md", None)
-    return report
-
-
 def _print_metrics(report: dict, wall_ms: float) -> None:
     compile = report.get("compile") if report.get("mode") != "solve" else None
     solve = report.get("solve") if report.get("mode") != "solve" else report
@@ -225,10 +218,10 @@ def main() -> None:
                     f"cmd: {proc.args}\n"
                     f"stdout:\n{proc.stdout}\n"
                     f"stderr:\n{proc.stderr}\n"
-                )
+            )
 
             report = json.loads(proc.stdout)
-            compact = _compact_report(report)
+            compact = report
 
             solve = compact.get("solve") if compact.get("mode") != "solve" else compact
             solve_output_b64 = (

@@ -1,6 +1,7 @@
 [package]
 name = "x07-ext-db-redis-native"
-version = "0.0.29"
+version = "0.0.30"
+
 
 
 
