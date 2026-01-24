@@ -25,5 +25,4 @@ You may not:
 
 ## Contact
 
-Trademark contact: TBD.
-
+Trademark contact: support@x07lang.org
