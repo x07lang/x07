@@ -19,7 +19,7 @@ Need "python"
 Need "curl"
 
 $mode = $env:X07_INSTALL_SMOKE_MODE
-if ([string]::IsNullOrWhiteSpace($mode)) { $mode = "online" }
+if ([string]::IsNullOrWhiteSpace($mode)) { $mode = "local" }
 
 $installRoot = Join-Path $env:TEMP "x07root_$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
