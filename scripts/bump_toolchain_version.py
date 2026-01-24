@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 SEMVER_TAG_RE = re.compile(r"^v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)$")
+SEMVER_TAG_IN_TEXT_RE = re.compile(r"v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)")
 
 
 def read_text(path: Path) -> str:
@@ -81,34 +82,49 @@ def read_cargo_package_version(cargo_toml: Path) -> str:
     raise ValueError(f"missing [package].version in {cargo_toml}")
 
 
-def update_file_replace_literal(path: Path, *, old: str, new: str) -> bool:
-    src = read_text(path)
-    if old == new:
-        if new in src:
-            return False
-        raise ValueError(f"missing expected tag {new!r}")
-    if old in src:
-        out = src.replace(old, new)
-        if out != src:
-            write_text(path, out)
-            return True
-        return False
-    if new in src:
-        return False
-    raise ValueError(f"missing expected tag {old!r} (or already updated tag {new!r})")
+def replace_versioned_examples(*, rel_path: str, src: str, new_tag: str) -> str:
+    if rel_path == "docs/getting-started/install.md":
+        out, n = re.subn(
+            rf"(x07up override set\s+){SEMVER_TAG_IN_TEXT_RE.pattern}",
+            rf"\g<1>{new_tag}",
+            src,
+        )
+        if n == 0:
+            raise ValueError(f"missing expected x07up override example in {rel_path}")
+        return out
 
+    if rel_path == "docs/getting-started/installer.md":
+        out = src
+        out, n1 = re.subn(
+            rf"(x07up override set\s+){SEMVER_TAG_IN_TEXT_RE.pattern}",
+            rf"\g<1>{new_tag}",
+            out,
+        )
+        out, n2 = re.subn(
+            rf'(channel\s*=\s*"){SEMVER_TAG_IN_TEXT_RE.pattern}(")',
+            rf"\g<1>{new_tag}\g<2>",
+            out,
+        )
+        out, n3 = re.subn(
+            rf"(tag like `){SEMVER_TAG_IN_TEXT_RE.pattern}(`)",
+            rf"\g<1>{new_tag}\g<2>",
+            out,
+        )
+        if n1 == 0 or n2 == 0 or n3 == 0:
+            raise ValueError(f"missing expected pinned toolchain examples in {rel_path}")
+        return out
 
-def check_versioned_literal_file(path: Path, *, old: str, new: str) -> bool:
-    src = read_text(path)
-    if old == new:
-        if new in src:
-            return False
-        raise ValueError(f"missing expected tag {new!r}")
-    if old in src:
-        return True
-    if new in src:
-        return False
-    raise ValueError(f"missing expected tag {old!r} (or already updated tag {new!r})")
+    if rel_path in ("scripts/build_channels_json.py", "scripts/build_skills_pack.py"):
+        out, n = re.subn(
+            rf"(for example:\s*){SEMVER_TAG_IN_TEXT_RE.pattern}",
+            rf"\g<1>{new_tag}",
+            src,
+        )
+        if n == 0:
+            raise ValueError(f"missing expected example tag in {rel_path}")
+        return out
+
+    raise ValueError(f"unsupported versioned literal file: {rel_path}")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -154,17 +170,21 @@ def main(argv: list[str]) -> int:
     for path in versioned_literal_files:
         if not path.is_file():
             raise ValueError(f"missing expected file: {path.relative_to(repo_root)}")
-        if args.check:
-            try:
-                needs_update = check_versioned_literal_file(path, old=old_tag, new=new_tag)
-            except ValueError:
-                changed.append(str(path.relative_to(repo_root)))
-            else:
-                if needs_update:
-                    changed.append(str(path.relative_to(repo_root)))
-            continue
-        if update_file_replace_literal(path, old=old_tag, new=new_tag):
-            changed.append(str(path.relative_to(repo_root)))
+        rel = str(path.relative_to(repo_root))
+        src = read_text(path)
+        try:
+            out = replace_versioned_examples(rel_path=rel, src=src, new_tag=new_tag)
+        except ValueError:
+            if args.check:
+                changed.append(rel)
+                continue
+            raise
+        if out != src:
+            if args.check:
+                changed.append(rel)
+                continue
+            write_text(path, out)
+            changed.append(rel)
 
     if changed:
         changed = sorted(set(changed))
