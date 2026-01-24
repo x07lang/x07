@@ -194,14 +194,33 @@ def download_file(url: str, out: Path, expected_sha256: str, args: argparse.Name
 
 def safe_extract_tar_gz(archive: Path, out_dir: Path) -> None:
     try:
+        out_root = out_dir.resolve()
         with tarfile.open(archive, mode="r:gz") as tf:
-            members = tf.getmembers()
-            for m in members:
+            members: list[tarfile.TarInfo] = []
+            for m in tf.getmembers():
                 name = m.name
-                dest = (out_dir / name).resolve()
-                if not str(dest).startswith(str(out_dir.resolve()) + os.sep):
+
+                if not name:
+                    raise InstallError(12, "EXTRACT_FAILED", "tarball contains empty path")
+
+                if name.startswith(("/", "\\")) or Path(name).is_absolute() or ".." in Path(name).parts:
                     raise InstallError(12, "EXTRACT_FAILED", "tarball contains unsafe path", hint=name)
-            tf.extractall(out_dir, filter="data")
+
+                if m.issym() or m.islnk() or m.ischr() or m.isblk() or m.isfifo():
+                    raise InstallError(12, "EXTRACT_FAILED", "tarball contains unsupported member type", hint=name)
+                if not (m.isdir() or m.isreg()):
+                    raise InstallError(12, "EXTRACT_FAILED", "tarball contains unsupported member type", hint=name)
+
+                dest = (out_root / name).resolve()
+                if dest != out_root and not str(dest).startswith(str(out_root) + os.sep):
+                    raise InstallError(12, "EXTRACT_FAILED", "tarball contains unsafe path", hint=name)
+
+                members.append(m)
+
+            try:
+                tf.extractall(out_dir, filter="data")
+            except TypeError:
+                tf.extractall(out_dir, members=members)
     except InstallError:
         raise
     except Exception as e:
