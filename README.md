@@ -10,7 +10,7 @@ X07 is a programming language built from the ground up for **100% agentic coding
 
 > **X07 is under active development. APIs and tooling may change.**
 
-**[Documentation](https://x07lang.org)** · [FAQ](https://x07lang.org/docs/faq) · [Releases](https://github.com/x07lang/x07/releases)
+**[Documentation](https://x07lang.org)** · [FAQ](https://x07lang.org/docs/faq) · [Support](SUPPORT.md) · [Releases](https://github.com/x07lang/x07/releases)
 
 ---
 

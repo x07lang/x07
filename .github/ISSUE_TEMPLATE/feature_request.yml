@@ -3,6 +3,28 @@ description: Propose a new feature or a change to existing behavior.
 title: "feat: "
 labels: ["enhancement"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Use this form for concrete feature requests.**
+
+        - For open-ended questions or design exploration, start in Discussions.
+        - Some changes (especially those that affect a stable contract or spec) require an RFC.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - tooling
+        - stdlib
+        - packages / registry
+        - policy / sandboxing
+        - docs / examples / skills
+        - other
+    validations:
+      required: true
+
   - type: textarea
     id: summary
     attributes:
@@ -10,13 +32,23 @@ body:
       description: What should be added or changed?
     validations:
       required: true
+
   - type: textarea
     id: motivation
     attributes:
       label: Motivation
-      description: Why is this needed? What problem does it solve?
+      description: Why is this needed? What agent/human workflow does it unblock?
     validations:
       required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed design
+      description: Describe the proposed API/CLI/schema change, defaults, and precedence rules.
+    validations:
+      required: false
+
   - type: textarea
     id: alternatives
     attributes:
@@ -24,11 +56,25 @@ body:
       description: What alternatives did you consider?
     validations:
       required: false
+
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: Compatibility impact
+      description: Does this change affect an existing pinned contract (e.g., *_v1 wire formats or report schemas)?
+      options:
+        - no (additive only)
+        - maybe
+        - yes (breaking)
+    validations:
+      required: true
+
   - type: checkboxes
     id: rfc
     attributes:
-      label: RFC requirement
+      label: Process
       options:
-        - label: This change likely requires an RFC (see governance/RFC-REQUIREMENTS.md).
+        - label: I reviewed `governance/RFC-REQUIREMENTS.md` and believe this change does not require an RFC.
           required: false
-
+        - label: I believe this change requires an RFC and I’m willing to help write it.
+          required: false

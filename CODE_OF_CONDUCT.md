@@ -58,8 +58,14 @@ representative at an online or offline event.
 
 ## Enforcement
 
-To report issues, contact the project maintainers (see `governance/MAINTAINERS.md`).
-Reporting contact details must be provided before the first public release.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to
+the community leaders responsible for enforcement at:
+
+- conduct@x07lang.org
+
+For security-related reports, see `SECURITY.md`.
+
+Do not open public GitHub issues for Code of Conduct reports.
 
 ## Enforcement Guidelines
 

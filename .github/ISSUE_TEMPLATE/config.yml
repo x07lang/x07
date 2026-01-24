@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Questions / troubleshooting (GitHub Discussions)"
+    url: "https://github.com/x07lang/x07/discussions"
+    about: "Usage questions, help requests, and design discussion. Issues are for actionable bugs and accepted work items."
+  - name: "Documentation"
+    url: "https://x07lang.org/docs/"
+    about: "Read the canonical docs and agent portal. If a doc page is wrong, please file a docs bug with a link to the page."
+  - name: "Security vulnerability"
+    url: "https://github.com/x07lang/x07/security"
+    about: "Please report security issues privately (see SECURITY.md). Do not open public issues for security problems."
+  - name: "RFCs"
+    url: "https://github.com/x07lang/x07-rfcs"
+    about: "Large or contract-affecting changes may require an RFC."

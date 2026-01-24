@@ -4,6 +4,13 @@
 
 Participation in this project is governed by `CODE_OF_CONDUCT.md`.
 
+## Support / questions
+
+If you're unsure how to use X07 or need troubleshooting help, please use the support
+channels in `SUPPORT.md`.
+
+GitHub Issues are for actionable bugs and tracked work items.
+
 ## What changes require an RFC
 
 See `governance/RFC-REQUIREMENTS.md`. RFCs are submitted to `x07lang/x07-rfcs`.

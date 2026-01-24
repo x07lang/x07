@@ -1,8 +1,49 @@
 name: Bug report
-description: Report a problem in the X07 toolchain, stdlib, or docs.
+description: Report a concrete, reproducible problem in the X07 toolchain, stdlib, packages, policies, skills, or docs.
 title: "bug: "
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Issues are for actionable bugs and tracked work items.**
+
+        - For usage questions/troubleshooting, please use Discussions (see the issue chooser links).
+        - For security issues, please report privately (see SECURITY.md).
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the X07 ecosystem is affected?
+      options:
+        - tooling: x07 CLI
+        - tooling: x07c compiler backend
+        - tooling: x07 test harness
+        - tooling: x07 pkg / registry
+        - runner: solve-* (x07-host-runner)
+        - runner: run-os* (x07-os-runner)
+        - stdlib
+        - external packages
+        - policy / sandboxing
+        - docs (x07lang.org)
+        - skills / examples
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - blocker (cannot proceed)
+        - high (major behavior break / data loss risk)
+        - medium
+        - low
+    validations:
+      required: true
+
   - type: textarea
     id: summary
     attributes:
@@ -10,10 +51,11 @@ body:
       description: What happened?
     validations:
       required: true
+
   - type: textarea
     id: repro
     attributes:
-      label: Reproduction
+      label: Reproduction steps
       description: Minimal steps to reproduce.
       placeholder: |
         1. ...
@@ -21,23 +63,67 @@ body:
         3. ...
     validations:
       required: true
+
+  - type: textarea
+    id: commands
+    attributes:
+      label: Commands run
+      description: Paste the exact commands you ran (copy/paste).
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: reports
+    attributes:
+      label: Machine reports (JSON)
+      description: |
+        Paste the machine-readable JSON report(s) from X07 commands (stdout), or attach them as files.
+
+        Examples: x07 run (runner report), x07 lint/fmt/fix (x07c report), x07 test (x07test report), x07 pkg (pkg report).
+      render: json
+    validations:
+      required: false
+
   - type: textarea
     id: expected
     attributes:
       label: Expected behavior
     validations:
       required: true
+
   - type: textarea
     id: actual
     attributes:
       label: Actual behavior
     validations:
       required: true
+
   - type: input
-    id: version
+    id: toolchain
     attributes:
       label: Toolchain version
-      description: Output of `x07 --version` and `x07c --version` if available.
+      description: Output of `x07 --version` (and `x07up --version` if you used the installer).
+      placeholder: "x07 0.0.xx (...), x07up 0.0.xx (...)"
     validations:
       required: false
 
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS + version + arch (example: macOS 14.6 arm64; Ubuntu 24.04 x86_64).
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: triage
+    attributes:
+      label: Triage checklist
+      options:
+        - label: I verified this is not a security vulnerability (otherwise I will report privately).
+          required: true
+        - label: I can reproduce this on the latest stable toolchain (or I cannot upgrade and explained why).
+          required: false
+        - label: I searched existing issues and did not find a duplicate.
+          required: false
