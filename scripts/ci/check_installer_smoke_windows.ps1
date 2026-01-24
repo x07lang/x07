@@ -162,7 +162,7 @@ try {
   $roots = @()
   if ($runHost.target -and $runHost.target.resolved_module_roots) { $roots = $runHost.target.resolved_module_roots }
   $hasSrc = $false
-  foreach ($r in $roots) {
+  foreach ($r in @($roots)) {
     $norm = ([string]$r).Replace("\\","/").Trim().TrimEnd("/")
     if ($norm.EndsWith("/src") -or $norm -eq "src") { $hasSrc = $true }
   }
