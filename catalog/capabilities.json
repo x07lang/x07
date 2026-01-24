@@ -24,6 +24,14 @@
       "notes": "Prefer ext-net unless you need raw curl bindings."
     },
     {
+      "id": "net.curl",
+      "summary": "libcurl bindings (advanced; required by ext-net HTTP client backend).",
+      "canonical": { "name": "ext-curl-c", "version": "0.1.3" },
+      "worlds": ["run-os", "run-os-sandboxed"],
+      "status": "stable",
+      "notes": "Advanced: prefer net.http (ext-net) unless you need raw curl bindings."
+    },
+    {
       "id": "net.sockets",
       "summary": "Low-level sockets for OS worlds.",
       "canonical": { "name": "ext-sockets-c", "version": "0.1.3" },
@@ -34,6 +42,30 @@
       "id": "url.parse",
       "summary": "Parse and normalize URLs; stable URL primitives.",
       "canonical": { "name": "ext-url-rs", "version": "0.1.2" },
+      "status": "stable"
+    },
+    {
+      "id": "web.html",
+      "summary": "Extract links and visible text from HTML (crawler helpers).",
+      "canonical": { "name": "ext-html-lite-rs", "version": "0.1.0" },
+      "status": "experimental"
+    },
+    {
+      "id": "web.robots",
+      "summary": "Parse robots.txt allow/disallow rules.",
+      "canonical": { "name": "ext-robots-txt-rs", "version": "0.1.0" },
+      "status": "experimental"
+    },
+    {
+      "id": "web.sitemap",
+      "summary": "Parse sitemap XML and extract <loc> URLs.",
+      "canonical": { "name": "ext-sitemap-rs", "version": "0.1.0" },
+      "status": "experimental"
+    },
+    {
+      "id": "data.model",
+      "summary": "Typed DataModel values and deterministic codecs (JSON/TOML/YAML).",
+      "canonical": { "name": "ext-data-model", "version": "0.1.2" },
       "status": "stable"
     },
     {
@@ -86,9 +118,36 @@
       "status": "stable"
     },
     {
+      "id": "db.core",
+      "summary": "Database core interfaces and pooling for OS worlds.",
+      "canonical": { "name": "ext-db-core", "version": "0.1.2" },
+      "worlds": ["run-os", "run-os-sandboxed"],
+      "status": "experimental"
+    },
+    {
       "id": "db.sqlite",
       "summary": "SQLite client for OS worlds.",
       "canonical": { "name": "ext-db-sqlite", "version": "0.1.2" },
+      "worlds": ["run-os", "run-os-sandboxed"],
+      "status": "experimental"
+    },
+    {
+      "id": "db.postgres",
+      "summary": "Postgres client for OS worlds.",
+      "canonical": { "name": "ext-db-postgres", "version": "0.1.2" },
+      "worlds": ["run-os", "run-os-sandboxed"],
+      "status": "experimental"
+    },
+    {
+      "id": "fs.glob",
+      "summary": "Glob-like wildcard matching for ASCII paths/tokens.",
+      "canonical": { "name": "ext-glob-rs", "version": "0.1.0" },
+      "status": "experimental"
+    },
+    {
+      "id": "fs.walkdir",
+      "summary": "Directory traversal helpers for OS worlds.",
+      "canonical": { "name": "ext-walkdir-rs", "version": "0.1.0" },
       "worlds": ["run-os", "run-os-sandboxed"],
       "status": "experimental"
     }
@@ -96,11 +155,19 @@
   "aliases": {
     "http-client": "net.http",
     "crawler": "net.http",
+    "html": "web.html",
+    "robots": "web.robots",
+    "sitemap": "web.sitemap",
     "cli": "cli.args",
+    "data-model": "data.model",
     "filesystem": "fs.io",
+    "glob": "fs.glob",
+    "walkdir": "fs.walkdir",
     "json": "data.json",
     "yaml": "data.yaml",
     "regex": "text.regex",
-    "sqlite": "db.sqlite"
+    "sqlite": "db.sqlite",
+    "postgres": "db.postgres",
+    "postgres-client": "db.postgres"
   }
 }

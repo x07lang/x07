@@ -623,6 +623,21 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
     Ok((std::process::ExitCode::SUCCESS, report))
 }
 
+pub(crate) fn pkg_lock_for_init(
+    args: &LockArgs,
+) -> Result<(std::process::ExitCode, Option<String>)> {
+    let (code, report) = pkg_lock_report(args)?;
+    if report.ok {
+        return Ok((code, None));
+    }
+    let msg = report
+        .error
+        .as_ref()
+        .map(|e| format!("{}: {}", e.code, e.message))
+        .unwrap_or_else(|| "unknown error".to_string());
+    Ok((code, Some(msg)))
+}
+
 #[derive(Debug, Clone)]
 struct TransitiveResolution {
     changed: bool,

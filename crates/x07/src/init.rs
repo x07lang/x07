@@ -1,16 +1,62 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use serde::Serialize;
+use clap::{Args, ValueEnum};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use x07_contracts::{
     PACKAGE_MANIFEST_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSION,
     PROJECT_MANIFEST_SCHEMA_VERSION, X07AST_SCHEMA_VERSION,
 };
 
-#[derive(Debug, Clone, Copy)]
-pub struct InitOptions {
+#[derive(Debug, Clone, Args)]
+pub struct InitArgs {
+    /// Optional scaffold template.
+    #[arg(long, value_enum)]
+    pub template: Option<InitTemplate>,
+
+    /// Also create `x07-package.json` for publishable packages.
+    #[arg(long)]
     pub package: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+#[clap(rename_all = "kebab_case")]
+pub enum InitTemplate {
+    Cli,
+    HttpClient,
+    WebService,
+    FsTool,
+    SqliteApp,
+    PostgresClient,
+    Worker,
+}
+
+#[derive(Debug, Clone)]
+struct PkgRef {
+    name: String,
+    version: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CapabilitiesCatalog {
+    schema_version: String,
+    capabilities: Vec<CapabilityEntry>,
+    #[serde(default)]
+    aliases: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CapabilityEntry {
+    id: String,
+    canonical: CapabilityPackage,
+}
+
+#[derive(Debug, Deserialize)]
+struct CapabilityPackage {
+    name: String,
+    version: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -29,7 +75,122 @@ struct InitReport {
     error: Option<InitError>,
 }
 
-pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
+const CAPABILITIES_JSON_BYTES: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../catalog/capabilities.json"
+));
+
+const TEMPLATE_CLI_APP: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../examples/agent-gate/cli-ext-cli/src/app.x07.json"
+));
+const TEMPLATE_CLI_MAIN: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../examples/agent-gate/cli-ext-cli/src/main.x07.json"
+));
+
+const TEMPLATE_HTTP_CLIENT_APP: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../examples/agent-gate/http-client-get/src/app.x07.json"
+));
+const TEMPLATE_HTTP_CLIENT_MAIN: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../examples/agent-gate/http-client-get/src/main.x07.json"
+));
+
+fn ensure_trailing_newline(bytes: &[u8]) -> Vec<u8> {
+    let mut out = bytes.to_vec();
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    out
+}
+
+fn load_capabilities_catalog() -> Result<CapabilitiesCatalog> {
+    let cat: CapabilitiesCatalog = serde_json::from_slice(CAPABILITIES_JSON_BYTES)
+        .context("parse catalog/capabilities.json")?;
+    if cat.schema_version != "x07.capabilities@0.1.0" {
+        anyhow::bail!(
+            "unsupported capabilities schema_version: {:?}",
+            cat.schema_version
+        );
+    }
+    Ok(cat)
+}
+
+fn resolve_capability_id<'a>(cat: &'a CapabilitiesCatalog, id_or_alias: &'a str) -> &'a str {
+    cat.aliases
+        .get(id_or_alias)
+        .map(|s| s.as_str())
+        .unwrap_or(id_or_alias)
+}
+
+fn canonical_pkg_for_capability(cat: &CapabilitiesCatalog, id_or_alias: &str) -> Result<PkgRef> {
+    let id = resolve_capability_id(cat, id_or_alias);
+    let Some(entry) = cat.capabilities.iter().find(|c| c.id == id) else {
+        anyhow::bail!("unknown capability id: {id:?}");
+    };
+    Ok(PkgRef {
+        name: entry.canonical.name.clone(),
+        version: entry.canonical.version.clone(),
+    })
+}
+
+fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str] {
+    match template {
+        InitTemplate::Cli => &["cli", "data.model", "data.json"],
+        InitTemplate::HttpClient => &["http-client", "net.curl", "net.sockets", "url.parse"],
+        InitTemplate::WebService => &["net.http", "net.sockets", "url.parse"],
+        InitTemplate::FsTool => &["fs.io"],
+        InitTemplate::SqliteApp => &["db.core", "db.sqlite", "data.model", "fs.io"],
+        InitTemplate::PostgresClient => &["db.core", "db.postgres", "data.model"],
+        InitTemplate::Worker => &["log.basic"],
+    }
+}
+
+fn template_default_profile(template: InitTemplate) -> &'static str {
+    match template {
+        InitTemplate::Cli => "test",
+        InitTemplate::HttpClient
+        | InitTemplate::WebService
+        | InitTemplate::FsTool
+        | InitTemplate::SqliteApp
+        | InitTemplate::PostgresClient
+        | InitTemplate::Worker => "sandbox",
+    }
+}
+
+fn init_template_policy_template(template: InitTemplate) -> crate::policy::PolicyTemplate {
+    match template {
+        InitTemplate::Cli => crate::policy::PolicyTemplate::Cli,
+        InitTemplate::HttpClient => crate::policy::PolicyTemplate::HttpClient,
+        InitTemplate::WebService => crate::policy::PolicyTemplate::WebService,
+        InitTemplate::FsTool => crate::policy::PolicyTemplate::FsTool,
+        InitTemplate::SqliteApp => crate::policy::PolicyTemplate::SqliteApp,
+        InitTemplate::PostgresClient => crate::policy::PolicyTemplate::PostgresClient,
+        InitTemplate::Worker => crate::policy::PolicyTemplate::Worker,
+    }
+}
+
+fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> {
+    match template {
+        InitTemplate::Cli => Ok((
+            ensure_trailing_newline(TEMPLATE_CLI_APP),
+            ensure_trailing_newline(TEMPLATE_CLI_MAIN),
+        )),
+        InitTemplate::HttpClient => Ok((
+            ensure_trailing_newline(TEMPLATE_HTTP_CLIENT_APP),
+            ensure_trailing_newline(TEMPLATE_HTTP_CLIENT_MAIN),
+        )),
+        InitTemplate::WebService => Ok((app_module_web_service_bytes()?, main_entry_bytes()?)),
+        InitTemplate::FsTool
+        | InitTemplate::SqliteApp
+        | InitTemplate::PostgresClient
+        | InitTemplate::Worker => Ok((app_module_bytes()?, main_entry_bytes()?)),
+    }
+}
+
+pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
     let root = match std::env::current_dir() {
         Ok(p) => p,
         Err(err) => {
@@ -61,6 +222,11 @@ pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
         tests_smoke: root.join("tests").join("smoke.x07.json"),
     };
 
+    let policy_path = args.template.map(|t| {
+        let pt = init_template_policy_template(t);
+        root.join(crate::policy::default_base_policy_rel_path(pt))
+    });
+
     let mut conflicts = Vec::new();
     let mut required_paths: Vec<&PathBuf> = vec![
         &paths.project,
@@ -70,10 +236,15 @@ pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
         &paths.tests_manifest,
         &paths.tests_smoke,
     ];
-    if options.package {
+    if args.package {
         required_paths.push(&paths.package);
     }
     for p in required_paths {
+        if p.exists() {
+            conflicts.push(rel(&root, p));
+        }
+    }
+    if let Some(p) = &policy_path {
         if p.exists() {
             conflicts.push(rel(&root, p));
         }
@@ -164,12 +335,43 @@ pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::from(20));
     }
 
-    if let Err(err) = write_new_file(&paths.project, &project_json_bytes()?) {
+    let (deps, app_bytes, main_bytes) = match args.template {
+        Some(t) => {
+            let cat = load_capabilities_catalog()?;
+            let mut pkgs_by_name: BTreeMap<String, String> = BTreeMap::new();
+            for cap_id in template_base_capabilities(t) {
+                let pkg = canonical_pkg_for_capability(&cat, cap_id)?;
+                match pkgs_by_name.get(&pkg.name) {
+                    None => {
+                        pkgs_by_name.insert(pkg.name.clone(), pkg.version.clone());
+                    }
+                    Some(existing) if existing == &pkg.version => {}
+                    Some(existing) => {
+                        anyhow::bail!(
+                            "capabilities resolve to conflicting versions for {:?}: {:?} vs {:?}",
+                            pkg.name,
+                            existing,
+                            pkg.version
+                        );
+                    }
+                }
+            }
+            let deps: Vec<PkgRef> = pkgs_by_name
+                .into_iter()
+                .map(|(name, version)| PkgRef { name, version })
+                .collect();
+            let (app_bytes, main_bytes) = template_program_bytes(t)?;
+            (deps, app_bytes, main_bytes)
+        }
+        None => (Vec::new(), app_module_bytes()?, main_entry_bytes()?),
+    };
+
+    if let Err(err) = write_new_file(&paths.project, &project_json_bytes(args.template, &deps)?) {
         return print_io_error(&root, &created, "x07.json", err);
     }
     created.push(rel(&root, &paths.project));
 
-    if options.package {
+    if args.package {
         let pkg_name = sanitize_pkg_name(
             root.file_name()
                 .unwrap_or_default()
@@ -187,12 +389,12 @@ pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
     }
     created.push(rel(&root, &paths.lock));
 
-    if let Err(err) = write_new_file(&paths.app, &app_module_bytes()?) {
+    if let Err(err) = write_new_file(&paths.app, &app_bytes) {
         return print_io_error(&root, &created, "src/app.x07.json", err);
     }
     created.push(rel(&root, &paths.app));
 
-    if let Err(err) = write_new_file(&paths.main, &main_entry_bytes()?) {
+    if let Err(err) = write_new_file(&paths.main, &main_bytes) {
         return print_io_error(&root, &created, "src/main.x07.json", err);
     }
     created.push(rel(&root, &paths.main));
@@ -223,6 +425,46 @@ pub fn cmd_init(options: InitOptions) -> Result<std::process::ExitCode> {
             };
             println!("{}", serde_json::to_string(&report)?);
             return Ok(std::process::ExitCode::from(20));
+        }
+    }
+
+    if let Some(t) = args.template {
+        let Some(policy_path) = &policy_path else {
+            unreachable!("policy_path set when template is present");
+        };
+        let pt = init_template_policy_template(t);
+        let policy_bytes = crate::policy::render_base_policy_template_bytes(pt, None)?;
+        if let Err(err) = write_new_file(policy_path, &policy_bytes) {
+            return print_io_error(
+                &root,
+                &created,
+                crate::policy::default_base_policy_rel_path(pt),
+                err,
+            );
+        }
+        created.push(rel(&root, policy_path));
+
+        // Resolve/fetch dependencies and write an up-to-date lockfile.
+        let lock_args = crate::pkg::LockArgs {
+            project: paths.project.clone(),
+            index: None,
+            check: false,
+            offline: false,
+        };
+        let (code, err_msg) = crate::pkg::pkg_lock_for_init(&lock_args)?;
+        if let Some(msg) = err_msg {
+            let report = InitReport {
+                ok: false,
+                command: "init",
+                root: root.display().to_string(),
+                created,
+                error: Some(InitError {
+                    code: "X07INIT_PKG_LOCK".to_string(),
+                    message: msg,
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(code);
         }
     }
 
@@ -322,7 +564,34 @@ fn write_new_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     Ok(())
 }
 
-fn project_json_bytes() -> Result<Vec<u8>> {
+fn project_json_bytes(template: Option<InitTemplate>, deps: &[PkgRef]) -> Result<Vec<u8>> {
+    let (default_profile, policy_template) = match template {
+        None => ("test", crate::policy::PolicyTemplate::Cli),
+        Some(t) => (
+            template_default_profile(t),
+            init_template_policy_template(t),
+        ),
+    };
+
+    let deps_val = Value::Array(
+        deps.iter()
+            .map(|p| {
+                Value::Object(
+                    [
+                        ("name".to_string(), Value::String(p.name.clone())),
+                        ("version".to_string(), Value::String(p.version.clone())),
+                        (
+                            "path".to_string(),
+                            Value::String(format!(".x07/deps/{}/{}", p.name, p.version)),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                )
+            })
+            .collect(),
+    );
+
     let v = Value::Object(
         [
             (
@@ -338,14 +607,14 @@ fn project_json_bytes() -> Result<Vec<u8>> {
                 "module_roots".to_string(),
                 Value::Array(vec![Value::String("src".to_string())]),
             ),
-            ("dependencies".to_string(), Value::Array(Vec::new())),
+            ("dependencies".to_string(), deps_val),
             (
                 "lockfile".to_string(),
                 Value::String("x07.lock.json".to_string()),
             ),
             (
                 "default_profile".to_string(),
-                Value::String("test".to_string()),
+                Value::String(default_profile.to_string()),
             ),
             (
                 "profiles".to_string(),
@@ -381,8 +650,10 @@ fn project_json_bytes() -> Result<Vec<u8>> {
                                     (
                                         "policy".to_string(),
                                         Value::String(
-                                            ".x07/policies/base/cli.sandbox.base.policy.json"
-                                                .to_string(),
+                                            crate::policy::default_base_policy_rel_path(
+                                                policy_template,
+                                            )
+                                            .to_string(),
                                         ),
                                     ),
                                     ("auto_ffi".to_string(), Value::Bool(true)),
@@ -514,6 +785,276 @@ fn app_module_bytes() -> Result<Vec<u8>> {
         .into_iter()
         .collect(),
     );
+    x07c::x07ast::canon_value_jcs(&mut v);
+    let mut out = serde_json::to_string(&v)?.into_bytes();
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    Ok(out)
+}
+
+fn app_module_web_service_bytes() -> Result<Vec<u8>> {
+    let body = serde_json::json!([
+        "begin",
+        ["let", "caps", ["std.net.codec.caps_default_v1"]],
+        ["let", "caps_v", ["bytes.view", "caps"]],
+        [
+            "let",
+            "addr",
+            ["std.net.codec.addr_ipv4_v1", 127, 0, 0, 1, 30031]
+        ],
+        [
+            "let",
+            "ldoc",
+            ["std.net.tcp.listen_v1", ["bytes.view", "addr"], "caps_v"]
+        ],
+        ["let", "ldoc_v", ["bytes.view", "ldoc"]],
+        [
+            "if",
+            ["std.net.err.is_err_doc_v1", "ldoc_v"],
+            ["return", ["bytes.lit", "FAIL_listen"]],
+            0
+        ],
+        [
+            "let",
+            "listener",
+            ["std.net.tcp.listen_listener_handle_v1", "ldoc_v"]
+        ],
+        [
+            "if",
+            ["<=", "listener", 0],
+            ["return", ["bytes.lit", "FAIL_listen_handle"]],
+            0
+        ],
+        [
+            "let",
+            "bound_addr",
+            ["std.net.tcp.listen_bound_addr_v1", "ldoc_v"]
+        ],
+        [
+            "if",
+            ["<=", ["bytes.len", "bound_addr"], 0],
+            ["return", ["bytes.lit", "FAIL_bound_addr"]],
+            0
+        ],
+        [
+            "let",
+            "conn_doc",
+            [
+                "std.net.tcp.connect_v1",
+                ["bytes.view", "bound_addr"],
+                "caps_v"
+            ]
+        ],
+        ["let", "conn_v", ["bytes.view", "conn_doc"]],
+        [
+            "if",
+            ["std.net.err.is_err_doc_v1", "conn_v"],
+            ["return", ["bytes.lit", "FAIL_connect"]],
+            0
+        ],
+        [
+            "let",
+            "client",
+            ["std.net.tcp.connect_stream_handle_v1", "conn_v"]
+        ],
+        [
+            "if",
+            ["<=", "client", 0],
+            ["return", ["bytes.lit", "FAIL_client_handle"]],
+            0
+        ],
+        [
+            "let",
+            "acc_doc",
+            ["std.net.tcp.accept_v1", "listener", "caps_v"]
+        ],
+        ["let", "acc_v", ["bytes.view", "acc_doc"]],
+        [
+            "if",
+            ["std.net.err.is_err_doc_v1", "acc_v"],
+            ["return", ["bytes.lit", "FAIL_accept"]],
+            0
+        ],
+        [
+            "let",
+            "server",
+            ["std.net.tcp.accept_stream_handle_v1", "acc_v"]
+        ],
+        [
+            "if",
+            ["<=", "server", 0],
+            ["return", ["bytes.lit", "FAIL_server_handle"]],
+            0
+        ],
+        // bytes.lit cannot contain whitespace or escapes; build the request bytes explicitly.
+        ["let", "t_get", ["bytes.lit", "GET"]],
+        ["let", "t_path", ["bytes.lit", "/hello"]],
+        ["let", "t_http", ["bytes.lit", "HTTP/1.1"]],
+        ["let", "t_host", ["bytes.lit", "Host"]],
+        ["let", "t_localhost", ["bytes.lit", "localhost"]],
+        ["let", "req_buf", ["std.vec.with_capacity", 64]],
+        [
+            "set",
+            "req_buf",
+            ["std.vec.extend_bytes", "req_buf", ["bytes.view", "t_get"]]
+        ],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 32]],
+        [
+            "set",
+            "req_buf",
+            ["std.vec.extend_bytes", "req_buf", ["bytes.view", "t_path"]]
+        ],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 32]],
+        [
+            "set",
+            "req_buf",
+            ["std.vec.extend_bytes", "req_buf", ["bytes.view", "t_http"]]
+        ],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 13]],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 10]],
+        [
+            "set",
+            "req_buf",
+            ["std.vec.extend_bytes", "req_buf", ["bytes.view", "t_host"]]
+        ],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 58]],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 32]],
+        [
+            "set",
+            "req_buf",
+            [
+                "std.vec.extend_bytes",
+                "req_buf",
+                ["bytes.view", "t_localhost"]
+            ]
+        ],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 13]],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 10]],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 13]],
+        ["set", "req_buf", ["std.vec.push", "req_buf", 10]],
+        ["let", "req", ["std.vec.as_bytes", "req_buf"]],
+        [
+            "let",
+            "wdoc",
+            [
+                "std.net.io.write_all_v1",
+                "client",
+                ["bytes.view", "req"],
+                "caps_v"
+            ]
+        ],
+        ["let", "wdoc_v", ["bytes.view", "wdoc"]],
+        [
+            "if",
+            ["std.net.err.is_err_doc_v1", "wdoc_v"],
+            ["return", ["bytes.lit", "FAIL_write_req"]],
+            0
+        ],
+        [
+            "let",
+            "req_doc",
+            ["std.net.http.server.read_req_v1", "server", "caps_v"]
+        ],
+        ["let", "req_v", ["bytes.view", "req_doc"]],
+        [
+            "if",
+            ["std.net.err.is_err_doc_v1", "req_v"],
+            ["return", ["bytes.lit", "FAIL_read_req"]],
+            0
+        ],
+        [
+            "let",
+            "target",
+            ["std.net.http.server.req_target_v1", "req_v"]
+        ],
+        ["let", "expect", ["bytes.lit", "/hello"]],
+        [
+            "if",
+            [
+                "=",
+                [
+                    "bytes.eq",
+                    ["bytes.view", "target"],
+                    ["bytes.view", "expect"]
+                ],
+                0
+            ],
+            ["return", ["bytes.lit", "FAIL_target"]],
+            0
+        ],
+        ["let", "empty", ["bytes.alloc", 0]],
+        ["let", "body", ["bytes.lit", "hello"]],
+        [
+            "let",
+            "resp_doc",
+            [
+                "std.net.http.server.write_response_v1",
+                "server",
+                200,
+                ["bytes.view", "empty"],
+                ["bytes.view", "body"],
+                "caps_v"
+            ]
+        ],
+        ["let", "resp_v", ["bytes.view", "resp_doc"]],
+        [
+            "if",
+            ["std.net.err.is_err_doc_v1", "resp_v"],
+            ["return", ["bytes.lit", "FAIL_write_resp"]],
+            0
+        ],
+        [
+            "let",
+            "rdoc",
+            ["std.net.tcp.stream_read_v1", "client", 4096, "caps_v"]
+        ],
+        ["let", "rdoc_v", ["bytes.view", "rdoc"]],
+        [
+            "if",
+            ["std.net.err.is_err_doc_v1", "rdoc_v"],
+            ["return", ["bytes.lit", "FAIL_read_resp"]],
+            0
+        ],
+        [
+            "let",
+            "resp_bytes",
+            ["std.net.tcp.stream_read_payload_v1", "rdoc_v"]
+        ],
+        ["std.net.tcp.stream_close_v1", "client"],
+        ["std.net.tcp.stream_drop_v1", "client"],
+        ["std.net.tcp.stream_close_v1", "server"],
+        ["std.net.tcp.stream_drop_v1", "server"],
+        ["std.net.tcp.listener_close_v1", "listener"],
+        ["std.net.tcp.listener_drop_v1", "listener"],
+        "resp_bytes"
+    ]);
+
+    let mut v = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "app",
+        "imports": [
+          "std.net.codec",
+          "std.net.err",
+          "std.net.http.server",
+          "std.net.io",
+          "std.net.tcp",
+          "std.vec"
+        ],
+        "decls": [
+          { "kind": "export", "names": ["app.solve"] },
+          {
+            "kind": "defn",
+            "name": "app.solve",
+            "params": [ { "name": "b", "ty": "bytes_view" } ],
+            "result": "bytes",
+            "body": body
+          }
+        ]
+    });
+
+    // Keep output canonical for stable diffs and to match x07 fmt behavior.
     x07c::x07ast::canon_value_jcs(&mut v);
     let mut out = serde_json::to_string(&v)?.into_bytes();
     if out.last() != Some(&b'\n') {

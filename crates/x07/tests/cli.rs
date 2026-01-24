@@ -196,7 +196,7 @@ fn x07_test_finds_stdlib_lock_from_exe_when_missing() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -236,7 +236,7 @@ fn x07_init_creates_project_skeleton() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -268,7 +268,7 @@ fn x07_init_creates_project_skeleton() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], true);
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(20));
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
@@ -280,7 +280,7 @@ fn x07_init_creates_project_skeleton() {
     }
     std::fs::create_dir_all(&dir2).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir2, &["--init", "--package"]);
+    let out = run_x07_in_dir(&dir2, &["init", "--package"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -299,7 +299,7 @@ fn x07_pkg_add_updates_project_manifest() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(0));
 
     let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.0"]);
@@ -337,7 +337,7 @@ fn x07_pkg_add_sync_is_atomic_on_failure() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -384,7 +384,7 @@ fn x07_pkg_add_rejects_non_semver_versions() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(0));
 
     let before = std::fs::read(dir.join("x07.json")).expect("read x07.json");
@@ -457,7 +457,7 @@ fn x07_policy_init_cli_template_creates_base_policy() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(0));
 
     let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "cli"]);
@@ -511,7 +511,7 @@ fn x07_policy_init_all_templates_create_policies() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(0));
 
     let cases = [
@@ -596,7 +596,7 @@ fn x07_run_allow_host_materializes_policy() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(0));
 
     let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "http-client"]);
@@ -660,7 +660,7 @@ fn x07_run_os_sandboxed_allows_write_under_write_root() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -743,7 +743,7 @@ fn x07_run_errors_include_diagnostic_codes_and_hints() {
         std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(0));
     write_bytes(&dir.join("x07.json"), b"{ this is not json }\n");
 
@@ -761,7 +761,7 @@ fn x07_run_errors_include_diagnostic_codes_and_hints() {
         std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(0));
     write_bytes(&dir.join("x07.lock.json"), b"{ this is not json }\n");
 
@@ -787,7 +787,7 @@ fn x07_run_deny_host_removes_allow() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let out = run_x07_in_dir(&dir, &["--init"]);
+    let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(0));
 
     let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "http-client"]);

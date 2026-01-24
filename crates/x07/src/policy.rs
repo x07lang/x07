@@ -95,6 +95,32 @@ pub fn cmd_policy(args: PolicyArgs) -> Result<std::process::ExitCode> {
     }
 }
 
+pub(crate) fn default_base_policy_rel_path(template: PolicyTemplate) -> &'static str {
+    match template {
+        PolicyTemplate::Cli => ".x07/policies/base/cli.sandbox.base.policy.json",
+        PolicyTemplate::HttpClient => ".x07/policies/base/http-client.sandbox.base.policy.json",
+        PolicyTemplate::WebService => ".x07/policies/base/web-service.sandbox.base.policy.json",
+        PolicyTemplate::FsTool => ".x07/policies/base/fs-tool.sandbox.base.policy.json",
+        PolicyTemplate::SqliteApp => ".x07/policies/base/sqlite-app.sandbox.base.policy.json",
+        PolicyTemplate::PostgresClient => {
+            ".x07/policies/base/postgres-client.sandbox.base.policy.json"
+        }
+        PolicyTemplate::Worker => ".x07/policies/base/worker.sandbox.base.policy.json",
+    }
+}
+
+pub(crate) fn render_base_policy_template_bytes(
+    template: PolicyTemplate,
+    policy_id_override: Option<&str>,
+) -> Result<Vec<u8>> {
+    let policy = base_policy_template(template, policy_id_override);
+    let (bytes, value) = canonical_policy_bytes(policy)?;
+    if let Err(errors) = validate_run_os_policy_schema(&value) {
+        anyhow::bail!("rendered base policy template is not schema-valid: {errors:?}");
+    }
+    Ok(bytes)
+}
+
 fn cmd_policy_init(args: PolicyInitArgs) -> Result<std::process::ExitCode> {
     if let Some(id) = args.policy_id.as_deref() {
         validate_policy_id(id).map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -219,27 +245,7 @@ fn resolve_project_root(cwd: &Path, project: Option<&Path>) -> Result<(PathBuf, 
 fn resolve_out_path(project_root: &Path, args: &PolicyInitArgs) -> PathBuf {
     let rel = match (args.out.as_deref(), args.template) {
         (Some(out), _) => out.to_path_buf(),
-        (None, PolicyTemplate::Cli) => {
-            PathBuf::from(".x07/policies/base/cli.sandbox.base.policy.json")
-        }
-        (None, PolicyTemplate::HttpClient) => {
-            PathBuf::from(".x07/policies/base/http-client.sandbox.base.policy.json")
-        }
-        (None, PolicyTemplate::WebService) => {
-            PathBuf::from(".x07/policies/base/web-service.sandbox.base.policy.json")
-        }
-        (None, PolicyTemplate::FsTool) => {
-            PathBuf::from(".x07/policies/base/fs-tool.sandbox.base.policy.json")
-        }
-        (None, PolicyTemplate::SqliteApp) => {
-            PathBuf::from(".x07/policies/base/sqlite-app.sandbox.base.policy.json")
-        }
-        (None, PolicyTemplate::PostgresClient) => {
-            PathBuf::from(".x07/policies/base/postgres-client.sandbox.base.policy.json")
-        }
-        (None, PolicyTemplate::Worker) => {
-            PathBuf::from(".x07/policies/base/worker.sandbox.base.policy.json")
-        }
+        (None, template) => PathBuf::from(default_base_policy_rel_path(template)),
     };
 
     if rel.is_absolute() {

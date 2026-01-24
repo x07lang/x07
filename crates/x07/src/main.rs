@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -37,19 +39,14 @@ struct Cli {
     #[arg(long, global = true)]
     cli_specrows: bool,
 
-    #[arg(long, global = true)]
-    init: bool,
-
-    /// When used with `--init`, also create `x07-package.json` for publishable packages.
-    #[arg(long = "package", requires = "init")]
-    init_package: bool,
-
     #[command(subcommand)]
     command: Option<Command>,
 }
 
 #[derive(clap::Subcommand, Debug)]
 enum Command {
+    /// Create a new X07 project skeleton.
+    Init(init::InitArgs),
     /// Run deterministic test suites.
     Test(TestArgs),
     /// Run X07 programs via the appropriate runner.
@@ -192,6 +189,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         let path: Vec<&str> = match &cli.command {
             None => Vec::new(),
             Some(Command::Test(_)) => vec!["test"],
+            Some(Command::Init(_)) => vec!["init"],
             Some(Command::Run(_)) => vec!["run"],
             Some(Command::Guide(_)) => vec!["guide"],
             Some(Command::Doctor(_)) => vec!["doctor"],
@@ -240,24 +238,12 @@ fn try_main() -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::SUCCESS);
     }
 
-    if cli.init {
-        if cli.command.is_some() {
-            anyhow::bail!("--init cannot be combined with subcommands");
-        }
-        return init::cmd_init(init::InitOptions {
-            package: cli.init_package,
-        });
-    }
-
-    if cli.init_package {
-        anyhow::bail!("--package requires --init");
-    }
-
     let Some(command) = cli.command else {
         anyhow::bail!("missing subcommand (try --help)");
     };
 
     match command {
+        Command::Init(args) => init::cmd_init(args),
         Command::Test(args) => cmd_test(args),
         Command::Run(args) => run::cmd_run(*args),
         Command::Guide(args) => guide::cmd_guide(args),
