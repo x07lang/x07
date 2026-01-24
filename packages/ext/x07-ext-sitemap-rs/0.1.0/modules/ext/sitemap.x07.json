@@ -1,0 +1,112 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.sitemap",
+  "imports": [
+    "ext.xml",
+    "std.bytes",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.sitemap.urls_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.sitemap._collect_loc_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" },
+        { "name": "node", "ty": "i32" },
+        { "name": "out", "ty": "vec_u8" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["let", "kind", ["ext.xml.xml_tree_node_kind", "doc", "node"]],
+        [
+          "if",
+          ["!=", "kind", 1],
+          ["return", "out"],
+          0
+        ],
+        ["let", "name", ["ext.xml.xml_tree_node_name", "doc", "node"]],
+        [
+          "if",
+          ["=", ["std.bytes.eq", ["bytes.view", "name"], ["bytes.view", ["bytes.lit", "loc"]]], 1],
+          [
+            "begin",
+            ["let", "cc", ["ext.xml.xml_tree_child_count", "doc", "node"]],
+            [
+              "for",
+              "i",
+              0,
+              "cc",
+              [
+                "begin",
+                ["let", "child", ["ext.xml.xml_tree_child_at", "doc", "node", "i"]],
+                [
+                  "if",
+                  ["=", ["ext.xml.xml_tree_node_kind", "doc", "child"], 2],
+                  [
+                    "begin",
+                    ["let", "t", ["ext.xml.xml_tree_node_text", "doc", "child"]],
+                    ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "t"]]],
+                    ["set", "out", ["std.vec.push", "out", 10]],
+                    0
+                  ],
+                  0
+                ],
+                0
+              ],
+              0
+            ],
+            0
+          ],
+          0
+        ],
+        ["let", "cc2", ["ext.xml.xml_tree_child_count", "doc", "node"]],
+        [
+          "for",
+          "i",
+          0,
+          "cc2",
+          [
+            "begin",
+            ["let", "child", ["ext.xml.xml_tree_child_at", "doc", "node", "i"]],
+            [
+              "if",
+              ["=", ["ext.xml.xml_tree_node_kind", "doc", "child"], 1],
+              ["set", "out", ["ext.sitemap._collect_loc_v1", "doc", "child", "out"]],
+              0
+            ],
+            0
+          ],
+          0
+        ],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.sitemap.urls_v1",
+      "params": [
+        { "name": "xml_bytes", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "docb", ["ext.xml.xml_tree_parse", "xml_bytes"]],
+        ["let", "doc", ["bytes.view", "docb"]],
+        ["if", ["=", ["ext.xml.xml_tree_is_err", "doc"], 1], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "root", ["ext.xml.xml_tree_root", "doc"]],
+        ["if", ["<", "root", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "out", ["std.vec.with_capacity", 256]],
+        ["set", "out", ["ext.sitemap._collect_loc_v1", "doc", "root", "out"]],
+        ["std.vec.as_bytes", "out"]
+      ]
+    }
+  ]
+}

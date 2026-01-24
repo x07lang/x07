@@ -1,0 +1,18 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.glob/match_basic",
+      "world": "solve-pure",
+      "entry": "ext.glob.tests.test_match_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.glob/filter_lines_basic",
+      "world": "solve-pure",
+      "entry": "ext.glob.tests.test_filter_lines_basic",
+      "expect": "pass"
+    }
+  ]
+}
+

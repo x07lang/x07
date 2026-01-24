@@ -1,0 +1,274 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.html",
+  "imports": [
+    "std.bytes",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.html.links_abs_v1",
+        "ext.html.text_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.html._is_ws_v1",
+      "params": [
+        { "name": "c", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "if",
+        ["=", "c", 32],
+        1,
+        [
+          "if",
+          ["=", "c", 9],
+          1,
+          [
+            "if",
+            ["=", "c", 10],
+            1,
+            ["if", ["=", "c", 13], 1, 0]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.html._find_u8_from_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "start", "ty": "i32" },
+        { "name": "end", "ty": "i32" },
+        { "name": "target", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["for", "i", "start", "end", ["if", ["=", ["view.get_u8", "b", "i"], "target"], ["return", "i"], 0]],
+        -1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.html._skip_ws_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "start", "ty": "i32" },
+        { "name": "end", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        [
+          "for",
+          "i",
+          "start",
+          "end",
+          [
+            "begin",
+            ["let", "c", ["view.get_u8", "b", "i"]],
+            ["if", ["if", ["=", "c", 32], 1, ["=", "c", 9]], 0, ["return", "i"]],
+            0
+          ]
+        ],
+        "end"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.html.links_abs_v1",
+      "params": [
+        { "name": "html", "ty": "bytes_view" },
+        { "name": "origin", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "needle", ["bytes.lit", "href"]],
+        ["let", "http", ["bytes.lit", "http://"]],
+        ["let", "https", ["bytes.lit", "https://"]],
+        ["let", "n", ["view.len", "html"]],
+        ["let", "out", ["std.vec.with_capacity", 256]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            [
+              "if",
+              ["<u", ["+", "i", 4], ["+", "n", 1]],
+              [
+                "if",
+                ["=", ["std.bytes.cmp_range", "html", "i", 4, ["bytes.view", "needle"], 0, 4], 0],
+                [
+                  "begin",
+                  ["let", "pos1", ["ext.html._skip_ws_v1", "html", ["+", "i", 4], "n"]],
+                  [
+                    "if",
+                    ["if", ["<u", "pos1", "n"], ["=", ["view.get_u8", "html", "pos1"], 61], 0],
+                    [
+                      "begin",
+                      ["let", "pos2", ["ext.html._skip_ws_v1", "html", ["+", "pos1", 1], "n"]],
+                      [
+                        "if",
+                        ["<u", "pos2", "n"],
+                        [
+                          "begin",
+                          ["let", "q", ["view.get_u8", "html", "pos2"]],
+                          [
+                            "if",
+                            ["if", ["=", "q", 34], 1, ["=", "q", 39]],
+                            [
+                              "begin",
+                              ["let", "start", ["+", "pos2", 1]],
+                              ["let", "end", ["ext.html._find_u8_from_v1", "html", "start", "n", "q"]],
+                              [
+                                "if",
+                                ["<", "end", 0],
+                                0,
+                                [
+                                  "begin",
+                                  ["let", "link", ["view.slice", "html", "start", ["-", "end", "start"]]],
+                                  [
+                                    "if",
+                                    [">u", ["view.len", "link"], 0],
+                                    [
+                                      "begin",
+                                      ["let", "c0", ["view.get_u8", "link", 0]],
+                                      [
+                                        "if",
+                                        ["=", "c0", 47],
+                                        [
+                                          "begin",
+                                          ["let", "full", ["std.bytes.concat", "origin", "link"]],
+                                          ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "full"]]],
+                                          ["set", "out", ["std.vec.push", "out", 10]],
+                                          0
+                                        ],
+                                        [
+                                          "if",
+                                          ["=", ["std.bytes.starts_with", "link", ["bytes.view", "http"]], 1],
+                                          [
+                                            "begin",
+                                            ["set", "out", ["std.vec.extend_bytes", "out", "link"]],
+                                            ["set", "out", ["std.vec.push", "out", 10]],
+                                            0
+                                          ],
+                                          [
+                                            "if",
+                                            ["=", ["std.bytes.starts_with", "link", ["bytes.view", "https"]], 1],
+                                            [
+                                              "begin",
+                                              ["set", "out", ["std.vec.extend_bytes", "out", "link"]],
+                                              ["set", "out", ["std.vec.push", "out", 10]],
+                                              0
+                                            ],
+                                            0
+                                          ]
+                                        ]
+                                      ]
+                                    ],
+                                    0
+                                  ],
+                                  0
+                                ]
+                              ],
+                              0
+                            ],
+                            0
+                          ],
+                          0
+                        ],
+                        0
+                      ],
+                      0
+                    ],
+                    0
+                  ],
+                  0
+                ],
+                0
+              ],
+              0
+            ],
+            0
+          ]
+        ],
+        ["std.vec.as_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.html.text_v1",
+      "params": [
+        { "name": "html", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "html"]],
+        ["let", "out", ["std.vec.with_capacity", "n"]],
+        ["let", "in_tag", 0],
+        ["let", "pending_space", 0],
+        ["let", "any_out", 0],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "c", ["view.get_u8", "html", "i"]],
+            [
+              "if",
+              ["=", "in_tag", 1],
+              ["if", ["=", "c", 62], ["set", "in_tag", 0], 0],
+              [
+                "if",
+                ["=", "c", 60],
+                [
+                  "begin",
+                  ["set", "in_tag", 1],
+                  ["if", ["=", "any_out", 1], ["set", "pending_space", 1], 0],
+                  0
+                ],
+                [
+                  "if",
+                  ["=", ["ext.html._is_ws_v1", "c"], 1],
+                  ["if", ["=", "any_out", 1], ["set", "pending_space", 1], 0],
+                  [
+                    "begin",
+                    [
+                      "if",
+                      ["=", "pending_space", 1],
+                      [
+                        "begin",
+                        ["set", "out", ["std.vec.push", "out", 32]],
+                        ["set", "pending_space", 0],
+                        0
+                      ],
+                      0
+                    ],
+                    ["set", "out", ["std.vec.push", "out", "c"]],
+                    ["set", "any_out", 1],
+                    0
+                  ]
+                ]
+              ]
+            ],
+            0
+          ]
+        ],
+        ["std.vec.as_bytes", "out"]
+      ]
+    }
+  ]
+}

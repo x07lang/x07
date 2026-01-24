@@ -1,0 +1,38 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.sitemap.tests",
+  "imports": [
+    "ext.sitemap",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.sitemap.tests.test_urls_basic"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.sitemap.tests.test_urls_basic",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "xml", ["bytes.lit", "<urlset><url><loc>http://example.com/</loc></url></urlset>"]],
+        ["let", "got", ["ext.sitemap.urls_v1", ["bytes.view", "xml"]]],
+        ["let", "exp", ["vec_u8.with_capacity", 64]],
+        ["set", "exp", ["vec_u8.extend_bytes", "exp", ["bytes.lit", "http://example.com/"]]],
+        ["set", "exp", ["vec_u8.push", "exp", 10]],
+        ["let", "expected", ["vec_u8.into_bytes", "exp"]],
+        [
+          "try",
+          ["std.test.assert_bytes_eq", "got", "expected", ["std.test.code_assert_bytes_eq"]]
+        ],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}
+

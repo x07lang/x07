@@ -1,0 +1,62 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.html.tests",
+  "imports": [
+    "ext.html",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.html.tests.test_links_abs_basic",
+        "ext.html.tests.test_text_basic"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.html.tests.test_links_abs_basic",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "origin", ["bytes.lit", "http://example.com"]],
+        ["let", "html", ["bytes.lit", "<a href=\"/a\">a</a><a href='http://x07.io/'>b</a>"]],
+        ["let", "got", ["ext.html.links_abs_v1", ["bytes.view", "html"], ["bytes.view", "origin"]]],
+        ["let", "exp", ["vec_u8.with_capacity", 64]],
+        ["set", "exp", ["vec_u8.extend_bytes", "exp", ["bytes.lit", "http://example.com/a"]]],
+        ["set", "exp", ["vec_u8.push", "exp", 10]],
+        ["set", "exp", ["vec_u8.extend_bytes", "exp", ["bytes.lit", "http://x07.io/"]]],
+        ["set", "exp", ["vec_u8.push", "exp", 10]],
+        ["let", "expected", ["vec_u8.into_bytes", "exp"]],
+        [
+          "try",
+          ["std.test.assert_bytes_eq", "got", "expected", ["std.test.code_assert_bytes_eq"]]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.html.tests.test_text_basic",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "html", ["bytes.lit", "<h1>Hello</h1><p>world</p>"]],
+        ["let", "got", ["ext.html.text_v1", ["bytes.view", "html"]]],
+        ["let", "exp", ["vec_u8.with_capacity", 32]],
+        ["set", "exp", ["vec_u8.extend_bytes", "exp", ["bytes.lit", "Hello"]]],
+        ["set", "exp", ["vec_u8.push", "exp", 32]],
+        ["set", "exp", ["vec_u8.extend_bytes", "exp", ["bytes.lit", "world"]]],
+        ["let", "expected", ["vec_u8.into_bytes", "exp"]],
+        [
+          "try",
+          ["std.test.assert_bytes_eq", "got", "expected", ["std.test.code_assert_bytes_eq"]]
+        ],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}
