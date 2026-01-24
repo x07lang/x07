@@ -1,6 +1,3 @@
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
 param(
   [switch]$Help,
   [switch]$Yes,
@@ -13,6 +10,9 @@ param(
   [switch]$Quiet,
   [switch]$Json
 )
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
 $pinnedToolchain = -not [string]::IsNullOrWhiteSpace($Toolchain)
 

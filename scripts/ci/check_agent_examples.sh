@@ -64,6 +64,20 @@ die() {
   exit 1
 }
 
+extract_derived_policy_path() {
+  local stdout_log="$1"
+  local stderr_log="$2"
+  local line
+  line="$(grep -E '^x07 run: using derived policy ' "$stderr_log" | tail -n 1 || true)"
+  if [[ -z "$line" ]]; then
+    line="$(grep -E '^x07 run: using derived policy ' "$stdout_log" | tail -n 1 || true)"
+  fi
+  if [[ -z "$line" ]]; then
+    die "expected derived policy path line in $stderr_log or $stdout_log"
+  fi
+  printf '%s' "${line#x07 run: using derived policy }"
+}
+
 require_path() {
   local p="$1"
   [[ -e "$p" ]] || die "missing required path: $p"
@@ -74,6 +88,50 @@ copy_project() {
   local dst="$2"
   mkdir -p "$dst"
   cp -a "$root/$src_rel/." "$dst/"
+}
+
+seed_official_deps() {
+  local work="$1"
+  "$python_bin" - "$root" "$work" <<'PY'
+import json
+import shutil
+import sys
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+work = Path(sys.argv[2]).resolve()
+
+doc = json.loads((work / "x07.json").read_text(encoding="utf-8"))
+deps = doc.get("dependencies") or []
+if not isinstance(deps, list):
+    raise SystemExit("x07.json: dependencies must be an array")
+
+for dep in deps:
+    if not isinstance(dep, dict):
+        raise SystemExit(f"x07.json: dependency must be an object: {dep!r}")
+    name = dep.get("name")
+    version = dep.get("version")
+    rel_path = dep.get("path")
+    if not isinstance(name, str) or not name:
+        raise SystemExit(f"x07.json: dependency.name must be string: {dep!r}")
+    if not isinstance(version, str) or not version:
+        raise SystemExit(f"x07.json: dependency.version must be string: {dep!r}")
+    if not isinstance(rel_path, str) or not rel_path:
+        raise SystemExit(f"x07.json: dependency.path must be string: {dep!r}")
+
+    dst = work / rel_path
+    if dst.exists():
+        if dst.is_dir():
+            continue
+        raise SystemExit(f"dependency path exists but is not a directory: {dst}")
+
+    src = repo_root / "packages" / "ext" / f"x07-{name}" / version
+    if not src.is_dir():
+        raise SystemExit(f"missing official package dir for {name}@{version}: {src}")
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dst)
+PY
 }
 
 unwrap_and_check_wrapped_report() {
@@ -195,6 +253,7 @@ echo "==> agent example: cli-newline (solve-pure)"
 cli1_work="$tmp_dir/cli-newline"
 copy_project "examples/agent-gate/cli-newline" "$cli1_work"
 
+seed_official_deps "$cli1_work"
 pkg_lock_check "$cli1_work"
 fmt_check_all "$cli1_work"
 lint_check_one "$cli1_work" "solve-pure" "src/main.x07.json"
@@ -223,6 +282,7 @@ echo "==> agent example: cli-ext-cli (solve-pure + ext-cli)"
 cli2_work="$tmp_dir/cli-ext-cli"
 copy_project "examples/agent-gate/cli-ext-cli" "$cli2_work"
 
+seed_official_deps "$cli2_work"
 pkg_lock_check "$cli2_work"
 fmt_check_all "$cli2_work"
 lint_check_one "$cli2_work" "solve-pure" "src/main.x07.json"
@@ -248,50 +308,6 @@ echo "==> agent example: web-crawler-local (run-os-sandboxed + allow-host sugar)
 
 crawler_work="$tmp_dir/web-crawler-local"
 copy_project "examples/agent-gate/web-crawler-local" "$crawler_work"
-
-seed_official_deps() {
-  local work="$1"
-  "$python_bin" - "$root" "$work" <<'PY'
-import json
-import shutil
-import sys
-from pathlib import Path
-
-repo_root = Path(sys.argv[1]).resolve()
-work = Path(sys.argv[2]).resolve()
-
-doc = json.loads((work / "x07.json").read_text(encoding="utf-8"))
-deps = doc.get("dependencies") or []
-if not isinstance(deps, list):
-    raise SystemExit("x07.json: dependencies must be an array")
-
-for dep in deps:
-    if not isinstance(dep, dict):
-        raise SystemExit(f"x07.json: dependency must be an object: {dep!r}")
-    name = dep.get("name")
-    version = dep.get("version")
-    rel_path = dep.get("path")
-    if not isinstance(name, str) or not name:
-        raise SystemExit(f"x07.json: dependency.name must be string: {dep!r}")
-    if not isinstance(version, str) or not version:
-        raise SystemExit(f"x07.json: dependency.version must be string: {dep!r}")
-    if not isinstance(rel_path, str) or not rel_path:
-        raise SystemExit(f"x07.json: dependency.path must be string: {dep!r}")
-
-    dst = work / rel_path
-    if dst.exists():
-        if dst.is_dir():
-            continue
-        raise SystemExit(f"dependency path exists but is not a directory: {dst}")
-
-    src = repo_root / "packages" / "ext" / f"x07-{name}" / version
-    if not src.is_dir():
-        raise SystemExit(f"missing official package dir for {name}@{version}: {src}")
-
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(src, dst)
-PY
-}
 
 seed_official_deps "$crawler_work"
 pkg_lock_check "$crawler_work"
@@ -367,8 +383,9 @@ gen_dir="$crawler_work/.x07/policies/_generated"
 [[ -d "$gen_dir" ]] || die "expected derived policy dir to exist: $gen_dir"
 ls "$gen_dir"/*.json >/dev/null 2>&1 || die "expected a derived policy JSON under: $gen_dir"
 
-# Assert allow-host was merged into derived policy.
-policy_allow="$(ls -1 "$gen_dir"/*.json | sort | tail -n 1)"
+# Assert allow-host was merged into the derived policy that x07 run actually used.
+policy_allow="$(extract_derived_policy_path "$crawler_work/tmp/run.stdout" "$crawler_work/tmp/run.stderr")"
+[[ -f "$policy_allow" ]] || die "derived policy path missing: $policy_allow"
 "$python_bin" - "$policy_allow" "$host" "$port" <<'PY'
 import json, sys
 p=json.load(open(sys.argv[1], "r", encoding="utf-8"))
@@ -389,7 +406,6 @@ assert ok, (host, port, allow_hosts)
 PY
 
 # Now run with allow + deny for the same host, and ensure deny wins in the derived policy.
-gen_before="$(ls -1 "$gen_dir"/*.json | sort || true)"
 wrapped_3b="$(run_x07_run "web-crawler-local" "$crawler_work" \
   --profile sandbox \
   --allow-host "${host}:${port}" \
@@ -399,11 +415,8 @@ wrapped_3b="$(run_x07_run "web-crawler-local" "$crawler_work" \
 )"
 unwrap_and_check_wrapped_report "web-crawler-local" "$wrapped_3b" "$crawler_work/tmp/runner_deny.json" "os" "run-os-sandboxed" "true"
 
-gen_after="$(ls -1 "$gen_dir"/*.json | sort || true)"
-policy_deny="$(comm -13 <(printf '%s\n' "$gen_before") <(printf '%s\n' "$gen_after") | tail -n 1 || true)"
-if [[ -z "${policy_deny:-}" ]]; then
-  policy_deny="$(printf '%s\n' "$gen_after" | tail -n 1)"
-fi
+policy_deny="$(extract_derived_policy_path "$crawler_work/tmp/run.stdout" "$crawler_work/tmp/run.stderr")"
+[[ -f "$policy_deny" ]] || die "derived policy path missing: $policy_deny"
 "$python_bin" - "$policy_deny" "$host" "$port" <<'PY'
 import json, sys
 p=json.load(open(sys.argv[1], "r", encoding="utf-8"))
