@@ -37,7 +37,7 @@ Create a project:
 ```bash
 mkdir testing-demo
 cd testing-demo
-x07 --init
+x07 init
 ```
 
 ### Step 1: add world-specific test modules

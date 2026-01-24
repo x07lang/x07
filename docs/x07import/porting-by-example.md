@@ -53,7 +53,7 @@ This example imports a small, deterministic hex encoder/decoder.
 ```bash
 mkdir ext-hex-rs-demo
 cd ext-hex-rs-demo
-x07 --init --package
+x07 init --package
 rm -rf src
 mkdir -p import_sources/rust modules/ext/hex tests
 ```

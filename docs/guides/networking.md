@@ -2,25 +2,49 @@
 
 Networking is provided by external packages and only works in OS worlds (`run-os` / `run-os-sandboxed`).
 
-Packages:
+## Canonical (template + x07 run)
 
-- `ext-net` provides the agent-facing `std.net.*` modules (HTTP/TLS/DNS/TCP/UDP).
-- `ext-net` requires several official helper packages:
-  - `ext-curl-c` provides the `ext.curl.http` HTTP client used by `std.net.http.client`.
-  - `ext-sockets-c` provides the `ext.sockets.net` sockets adapter used by `std.net.tcp` / `std.net.udp` / `std.net.tls` (links against system OpenSSL).
-  - `ext-url-rs` provides HTTP parsing helpers used by `std.net.http.server`.
+Start from the HTTP client template (recommended):
 
-`ext-net` declares its required helper packages via `meta.requires_packages`, so `x07 pkg lock` will add and fetch them automatically.
-
-To discover available packages and versions, use the index catalog:
-
-- https://registry.x07.io/index/catalog.json
+```bash
+x07 init --template http-client
+```
 
 Before using OS networking, verify native prerequisites (C compiler + curl/openssl linkability):
 
 ```bash
 x07up doctor --json
 ```
+
+Sandboxed run (deny-by-default + explicit allowlist):
+
+```bash
+x07 run --profile sandbox --allow-host example.com:443 -- <your-cli-args...>
+```
+
+Trusted environment (unsandboxed):
+
+```bash
+x07 run --profile os -- <your-cli-args...>
+```
+
+## Packages
+
+Main package:
+
+- `ext-net` provides the agent-facing `std.net.*` modules (HTTP/TLS/DNS/TCP/UDP).
+
+`ext-net` requires several official helper packages:
+
+  - `ext-curl-c` provides the `ext.curl.http` HTTP client used by `std.net.http.client`.
+  - `ext-sockets-c` provides the `ext.sockets.net` sockets adapter used by `std.net.tcp` / `std.net.udp` / `std.net.tls` (links against system OpenSSL).
+  - `ext-url-rs` provides HTTP parsing helpers used by `std.net.http.server`.
+
+Some published package versions may omit `meta.requires_packages`, so do not rely on transitive auto-add for correctness. Use the capability map (or `x07 init --template http-client`) so the full canonical set is explicit.
+
+To discover available packages and versions, use the registry catalog:
+
+- https://registry.x07.io/index/catalog.json
 
 ## Canonical approach
 
@@ -33,13 +57,7 @@ x07up doctor --json
 
 ## Quick start
 
-1. Add `ext-net` to `x07.json` and sync the lockfile:
-
-   ```bash
-   x07 pkg add ext-net@0.1.2 --sync
-   ```
-
-2. Run in an OS world (required). By default, `x07 run` enables automatic FFI wiring for OS worlds:
+1. Run in an OS world (required). By default, `x07 run` enables automatic FFI wiring for OS worlds:
 
    ```bash
    # If your project defines profiles (recommended):
@@ -83,3 +101,10 @@ Networking logic should be tested through:
 - pure request/response transforms.
 
 See `examples/agent-gate/web-crawler-local` in the `x07` repo for an end-to-end sandboxed crawler that runs against a local fixture site (no public internet).
+
+## Expert appendix
+
+- Add packages manually (advanced): pick NAME@VERSION from `/agent/latest/catalog/capabilities.json` and run `x07 pkg add NAME@VERSION --sync`.
+- Debug runner behavior directly:
+  - solve worlds: `x07-host-runner --project x07.json`
+  - OS worlds: `x07-os-runner --project x07.json --world run-os`

@@ -21,16 +21,17 @@ Do not add `.x07/deps/*/modules` paths to `module_roots` manually.
 ```bash
 mkdir mypkg
 cd mypkg
-x07 --init
+x07 init
 
 # Browse packages at https://x07.io/packages
-x07 pkg add ext-base64-rs@0.1.2 --sync
+# Pick NAME@VERSION from the registry catalog (or the capability map for canonical picks).
+x07 pkg add NAME@VERSION --sync
 ```
 
 `x07 pkg lock` downloads dependencies into `.x07/deps/…` and writes `x07.lock.json`.
 Commit `x07.lock.json` to make builds reproducible.
 
-If any dependency declares required helper packages via `meta.requires_packages`, `x07 pkg lock` will also add those transitive deps to `x07.json` (and then lock them).
+Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add those transitive deps to `x07.json` before locking. Treat this as a convenience, not a contract; prefer the capability map and `x07 init --template ...` so the dependency set is explicit.
 
 When fetching is required, `x07 pkg lock` defaults to the official registry index.
 Override with `--index sparse+https://registry.x07.io/index/`, or use `--offline` to forbid network access.

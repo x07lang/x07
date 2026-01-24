@@ -10,6 +10,9 @@
 - [First project](getting-started/first-project.md)
 - [Agent workflow](getting-started/agent-workflow.md)
 
+## Agent
+- [Agent contracts](agent/contract.md)
+
 ## Recipes
 - [Patch-based recipes](recipes/index.md)
 
@@ -65,5 +68,6 @@
 ## Project
 - [About](about.md)
 - [Repositories](project/repositories.md)
+- [Package policy](project/package-policy.md)
 - [Governance](governance.md)
 - [Contributing](contributing.md)

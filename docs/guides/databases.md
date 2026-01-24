@@ -2,27 +2,40 @@
 
 Database access is provided by OS-world-only external packages that expose `std.db.*` modules.
 
+## Canonical (template + x07 run)
+
+Start from a DB template (recommended):
+
+```bash
+# Local file DB:
+x07 init --template sqlite-app
+
+# Remote DB client:
+x07 init --template postgres-client
+```
+
+Then run in an OS world:
+
+```bash
+x07 run --profile sandbox -- <your-cli-args...>
+```
+
 ## Packages
 
 Core interfaces (required):
 
-- `ext-db-core@0.1.2` (`std.db`, pooling, specs, DataModel conversion)
+- `ext-db-core` (`std.db`, pooling, specs, DataModel conversion)
 
 Drivers (pick the ones you need):
 
-- `ext-db-sqlite@0.1.2` (`std.db.sqlite`, `std.db.sqlite.pool`)
-- `ext-db-postgres@0.1.2` (`std.db.postgres`, `std.db.postgres.pool`)
-- `ext-db-mysql@0.1.2` (`std.db.mysql`, `std.db.mysql.pool`)
-- `ext-db-redis@0.1.2` (`std.db.redis`, `std.db.redis.pool`)
+- `ext-db-sqlite` (`std.db.sqlite`, `std.db.sqlite.pool`)
+- `ext-db-postgres` (`std.db.postgres`, `std.db.postgres.pool`)
+- `ext-db-mysql` (`std.db.mysql`, `std.db.mysql.pool`)
+- `ext-db-redis` (`std.db.redis`, `std.db.redis.pool`)
 
-## Add dependencies
+To discover available packages and versions, use the registry catalog:
 
-Example (SQLite):
-
-```bash
-x07 pkg add ext-db-core@0.1.2 --sync
-x07 pkg add ext-db-sqlite@0.1.2 --sync
-```
+- https://registry.x07.io/index/catalog.json
 
 ## Worlds and sandbox policy
 
@@ -58,3 +71,9 @@ Database query results are returned as **DataModel** documents, so you can:
 - pools are deterministic wrappers around OS connections
 - use async tasks for overlapping I/O
 - use OS multiprocessing only for CPU-heavy workloads (not for DB I/O)
+
+## Expert appendix
+
+- Add packages manually (advanced): pick NAME@VERSION from `/agent/latest/catalog/capabilities.json` and run `x07 pkg add NAME@VERSION --sync`.
+- Debug runner behavior directly:
+  - OS worlds: `x07-os-runner --project x07.json --world run-os`

@@ -9,7 +9,7 @@ X07 programs are stored as **x07AST JSON** (`*.x07.json`). Agents should modify 
 ```bash
 mkdir myapp
 cd myapp
-x07 --init
+x07 init
 ```
 
 This creates:
@@ -19,7 +19,7 @@ This creates:
 - `src/main.x07.json` (a minimal program)
 - `tests/tests.json` + `tests/smoke.x07.json` (a deterministic harness smoke test)
 
-If you are creating a publishable package, use `x07 --init --package` to also create `x07-package.json`.
+If you are creating a publishable package, use `x07 init --package` to also create `x07-package.json`.
 
 ## Make it return bytes
 

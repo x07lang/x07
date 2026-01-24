@@ -11,7 +11,7 @@ This tutorial is a practical workflow for building an OS-world X07 program under
 
 ## What you will do
 
-You will start from `x07 --init` and evolve the program through stages:
+You will start from `x07 init` and evolve the program through stages:
 
 1. No OS capabilities (echo input).
 2. Filesystem output (write `out/input.bin`).
@@ -36,10 +36,10 @@ Companion example (in the `x07` repo):
 ```bash
 mkdir sandbox-policy-demo
 cd sandbox-policy-demo
-x07 --init
+x07 init
 ```
 
-`x07 --init` creates a `sandbox` profile in `x07.json` that points at:
+`x07 init` creates a `sandbox` profile in `x07.json` that points at:
 
 - `.x07/policies/base/cli.sandbox.base.policy.json`
 
@@ -128,10 +128,11 @@ ls -la out/input.bin
 `std.net.*` is provided by `ext-net`:
 
 ```bash
-x07 pkg add ext-net@0.1.2 --sync
+# Pick NAME@VERSION from the registry catalog (or the capability map for canonical picks).
+x07 pkg add NAME@VERSION --sync
 ```
 
-`ext-net` declares helper packages via `meta.requires_packages`, so `--sync` will also resolve and fetch what it needs.
+Use the capability map for the canonical set (it includes `ext-net` plus required helper packages). Do not rely on `meta.requires_packages` being present in every published package version.
 
 ### 4.2 Switch the base policy to `http-client`
 

@@ -1,6 +1,6 @@
 # Agent quickstart (learn X07 from scratch)
 
-This page is a single entry point for LLM agents. X07 is a new language and most LLMs have little to no prior training data on it, so treat the repository + docs as the ground truth.
+This page is a single entry point for LLM agents. Use the published agent portal endpoints as the canonical source of schemas/skills/examples (see [Agent contracts](../agent/contract.md)).
 
 ## 0) The mental model
 
@@ -47,7 +47,7 @@ See also: [Install](install.md).
 ```bash
 mkdir myapp
 cd myapp
-x07 --init
+x07 init
 ```
 
 For agent rails (toolchain pin + skills + a self-recovery guide), run:
@@ -56,12 +56,12 @@ For agent rails (toolchain pin + skills + a self-recovery guide), run:
 x07up agent init --project . --pin stable --with-skills project
 ```
 
-`x07 --init` vs `x07up agent init`:
+`x07 init` vs `x07up agent init`:
 
 | Command | When to use | What it creates |
 |---|---|---|
-| `x07 --init` | minimal project skeleton | `x07.json`, `x07.lock.json`, `src/`, `tests/` |
-| `x07up agent init --project . ...` | autonomous agent rails | `AGENTS.md`, `x07-toolchain.toml`, optional skills install, and (if missing) the same project skeleton as `x07 --init` |
+| `x07 init` | minimal project skeleton | `x07.json`, `x07.lock.json`, `src/`, `tests/` |
+| `x07up agent init --project . ...` | autonomous agent rails | `AGENTS.md`, `x07-toolchain.toml`, optional skills install, and (if missing) the same project skeleton as `x07 init` |
 
 This creates:
 
@@ -70,7 +70,7 @@ This creates:
 - `src/` (a minimal program)
 - `tests/tests.json` + `tests/smoke.x07.json` (a deterministic harness smoke test)
 
-If you are creating a publishable package, use `x07 --init --package` to also create `x07-package.json`.
+If you are creating a publishable package, use `x07 init --package` to also create `x07-package.json`.
 
 See also: [Available skills](available-skills.md).
 
@@ -140,14 +140,15 @@ Discover packages and versions:
 Add a dependency:
 
 ```bash
-x07 pkg add ext-base64-rs@0.1.2 --sync
+# Pick NAME@VERSION from the registry catalog (or the capability map for canonical picks).
+x07 pkg add NAME@VERSION --sync
 ```
 
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
-- Official packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` will add and fetch these transitive deps automatically (and update `x07.json`).
+- Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 
 See also: [Packages & projects](../packages/index.md).
 

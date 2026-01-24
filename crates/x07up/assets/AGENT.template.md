@@ -108,7 +108,7 @@ Run with a derived policy:
 
 From a temp project:
 
-* `x07 --init`
+* `x07 init`
 * `x07 run --profile test --stdin --report wrapped --report-out .x07/run.last.json`
 
 ## “Expert tools” (only if explicitly asked)

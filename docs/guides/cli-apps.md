@@ -2,23 +2,35 @@
 
 X07 is intended to make it easy for agents to build robust command-line tools.
 
-## Canonical approach
+## Canonical (x07 init + x07 run)
 
-1. Treat runner `input` as your argument payload (for example: newline-separated fields or a small bytes encoding).
-2. Optionally use the external `ext-cli` package for a declarative spec and parsing helpers.
-3. Keep business logic pure so it can be tested in deterministic worlds.
+1. Start from the CLI template (recommended):
+
+   ```bash
+   x07 init --template cli
+   ```
+
+2. Keep business logic pure so it can be tested in deterministic worlds (`solve-*`).
+3. Run via the single front door:
+
+   ```bash
+   # Deterministic default (solve-* via x07.json profiles):
+   x07 run
+
+   # OS CLI run (argv_v1 is derived from args after --):
+   x07 run --profile os -- tool --help
+   ```
 
 ## Using `ext-cli`
 
 `ext-cli` parses a declarative CLI spec plus an `argv_v1` byte encoding.
 
-Add the package and sync the lockfile:
+If you didn’t start from `x07 init --template cli`, add the canonical CLI packages from the capability map (see [Agent contracts](../agent/contract.md)) and then sync the lockfile:
 
 ```bash
-x07 pkg add ext-cli@0.1.3 --sync
+# Pick NAME@VERSION from /agent/latest/catalog/capabilities.json.
+x07 pkg add NAME@VERSION --sync
 ```
-
-`ext-cli` declares its required helper packages via `meta.requires_packages`, so `x07 pkg lock` will add and fetch them automatically.
 
 `argv_v1` encoding:
 
@@ -61,3 +73,10 @@ Even for CLI apps, keep tests deterministic:
 - assert exact output bytes
 
 Then separately smoke-test in OS world.
+
+## Expert appendix
+
+- Raw input bytes (fixtures): `x07 run --profile test --input input.bin`
+- Debug runner behavior directly (advanced):
+  - solve worlds: `x07-host-runner --project x07.json`
+  - OS worlds: `x07-os-runner --project x07.json --world run-os`

@@ -1,8 +1,8 @@
 # Recipes (patch-based, runnable)
 
-These recipes are designed for coding agents: start from `x07 --init`, apply a small RFC 6902 JSON Patch, then run deterministically.
+These recipes are designed for coding agents: start from `x07 init`, apply a small RFC 6902 JSON Patch, then run deterministically.
 
-Each recipe assumes the default `x07 --init` skeleton:
+Each recipe assumes the default `x07 init` skeleton:
 
 - `src/app.x07.json` exports `app.solve` at JSON Pointer `/decls/1/body`
 - `x07.json.default_profile` is `test` (deterministic `solve-pure`)
@@ -12,7 +12,7 @@ For reference, these patches are also checked into the toolchain repo under `doc
 ## How to use a recipe
 
 ```bash
-x07 --init
+x07 init
 cat > /tmp/patch.json <<'JSON'
 [{"op":"replace","path":"/decls/1/body","value":["bytes.lit","example"]}]
 JSON
@@ -96,7 +96,8 @@ Expected: `solve_output_b64` decodes to `second`.
 This uses `ext.cli.parse_specrows` to parse `argv_v1`. Run it with `x07 run -- ...` so the toolchain encodes `argv_v1` for you.
 
 ```bash
-x07 pkg add ext-cli@0.1.3 --sync
+# Pick NAME@VERSION from the registry catalog (or the capability map for canonical picks).
+x07 pkg add NAME@VERSION --sync
 
 cat > /tmp/x07-ext-cli-name.patch.json <<'JSON'
 [
@@ -280,7 +281,8 @@ This fetches `https://example.com/` using `std.net.http.get_v1`, writes the body
 x07up doctor --json
 
 # Add networking stack (transitive helper packages are auto-added at lock time).
-x07 pkg add ext-net@0.1.2 --sync
+# Pick NAME@VERSION from the registry catalog (or the capability map for canonical picks).
+x07 pkg add NAME@VERSION --sync
 
 # Generate a base deny-by-default HTTP client policy.
 x07 policy init --template http-client

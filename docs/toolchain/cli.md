@@ -6,9 +6,9 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 ### New project skeleton
 
-- `x07 --init`
+- `x07 init`
   - Creates `x07.json` (with `test`/`os`/`sandbox` profiles), `x07.lock.json`, a minimal `src/` program, and a `tests/` harness (`tests/tests.json`).
-- `x07 --init --package`
+- `x07 init --package`
   - Also creates `x07-package.json` (required only for publishable packages).
 
 ### Doctor (platform prerequisites)
@@ -68,7 +68,7 @@ Notes:
 - `x07 pkg add` edits `x07.json` only (no network) unless you pass `--sync`.
 - `x07 pkg lock` uses the official registry index by default when fetching is required; override with `--index` or use `--offline`.
 - Use `x07 pkg lock --check` in CI to fail if `x07.lock.json` is out of date.
-- If any dependency declares required helper packages via `meta.requires_packages`, `x07 pkg lock` will add them to `x07.json` (and then lock them).
+- Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
 
 ### Build to C (project)
 

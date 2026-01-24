@@ -40,7 +40,7 @@ Companion example (in the `x07` repo):
 ```bash
 mkdir ext-hello-demo
 cd ext-hello-demo
-x07 --init --package
+x07 init --package
 ```
 
 Normalize the layout to the canonical “publishable modules” convention:
@@ -120,7 +120,7 @@ Replace `x07-package.json` with:
   "name": "ext-hello-demo",
   "version": "0.1.0",
   "description": "Tutorial package: ext.hello.hello_v1(name) -> bytes.",
-  "docs": "Tutorial package used in the x07lang.org publishing-by-example docs.\n\nModules:\n- ext.hello\n- ext.hello.tests\n\nUsage:\n- Add: x07 pkg add ext-hello-demo@0.1.0\n- Import: ext.hello\n- Call: ext.hello.hello_v1\n",
+  "docs": "Tutorial package used in the x07lang.org publishing-by-example docs.\n\nModules:\n- ext.hello\n- ext.hello.tests\n\nUsage:\n- Add: x07 pkg add ext-hello-demo@VERSION\n- Import: ext.hello\n- Call: ext.hello.hello_v1\n",
   "module_root": "modules",
   "modules": ["ext.hello", "ext.hello.tests"],
   "meta": {
@@ -196,8 +196,8 @@ In a fresh directory:
 
 ```bash
 mkdir -p /tmp/consume-hello && cd /tmp/consume-hello
-x07 --init
-x07 pkg add ext-hello-demo@0.1.0 --sync
+x07 init
+x07 pkg add ext-hello-demo@VERSION --sync
 ```
 
 Then import `ext.hello` and call `ext.hello.hello_v1`.
