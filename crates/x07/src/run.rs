@@ -10,7 +10,7 @@ use jsonschema::Draft;
 use serde::{Deserialize, Serialize};
 use serde_json::{value::RawValue, Value};
 use sha2::{Digest, Sha256};
-use x07_contracts::X07_RUN_REPORT_SCHEMA_VERSION;
+use x07_contracts::{PROJECT_LOCKFILE_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION};
 use x07_host_runner::CcProfile;
 use x07_worlds::WorldId;
 use x07c::project;
@@ -1981,6 +1981,18 @@ fn resolve_module_roots_for_wrapper(
                     try_collect_project_module_roots(project_path)
                 {
                     roots = project_roots;
+                } else if let Ok(manifest) = project::load_project_manifest(project_path) {
+                    // Best-effort: if the lockfile is missing or invalid, still include
+                    // the project's own module_roots for agent/debugging affordances.
+                    let empty_lock = project::Lockfile {
+                        schema_version: PROJECT_LOCKFILE_SCHEMA_VERSION.to_string(),
+                        dependencies: Vec::new(),
+                    };
+                    if let Ok(project_roots) =
+                        project::collect_module_roots(project_path, &manifest, &empty_lock)
+                    {
+                        roots = project_roots;
+                    }
                 }
             }
             if runner == RunnerKind::Os {
