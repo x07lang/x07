@@ -117,9 +117,14 @@ struct TestArgs {
     manifest: PathBuf,
 
     /// Module root directory for resolving module ids.
-    /// Defaults to the manifest directory.
+    /// May be passed multiple times.
+    ///
+    /// Defaults:
+    /// - if a project `x07.json` exists (searched upwards from the manifest dir), use the project's
+    ///   resolved module roots (including dependencies from the lockfile)
+    /// - otherwise, use the manifest directory
     #[arg(long, value_name = "DIR")]
-    module_root: Option<PathBuf>,
+    module_root: Vec<PathBuf>,
 
     #[arg(long, value_name = "PATH", default_value = "stdlib.lock")]
     stdlib_lock: PathBuf,
@@ -280,7 +285,8 @@ fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
 
     let module_root_used = args
         .module_root
-        .clone()
+        .first()
+        .cloned()
         .unwrap_or_else(|| validated.manifest_dir.clone());
     let module_roots = compute_test_module_roots(&args, &validated)?;
 
@@ -358,8 +364,8 @@ fn compute_test_module_roots(
     args: &TestArgs,
     validated: &ValidatedManifest,
 ) -> Result<Vec<PathBuf>> {
-    if let Some(module_root) = args.module_root.as_ref() {
-        return Ok(vec![module_root.clone()]);
+    if !args.module_root.is_empty() {
+        return Ok(args.module_root.clone());
     }
 
     let manifest_dir = &validated.manifest_dir;
@@ -1454,7 +1460,7 @@ impl X07TestReport {
             repeat: args.repeat,
             jobs: args.jobs,
             manifest_path: Some(args.manifest.display().to_string()),
-            module_root: args.module_root.as_ref().map(display_path),
+            module_root: args.module_root.first().map(display_path),
             stdlib_lock: Some(args.stdlib_lock.display().to_string()),
         };
 

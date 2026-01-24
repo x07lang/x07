@@ -1,0 +1,472 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.msgpack.tests",
+  "imports": [
+    "ext.msgpack.data_model",
+    "ext.data_model",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.msgpack.tests.test_vector_0",
+        "ext.msgpack.tests.test_vector_neg1",
+        "ext.msgpack.tests.test_vector_123",
+        "ext.msgpack.tests.test_vector_hi",
+        "ext.msgpack.tests.test_vector_map_len_b_aa",
+        "ext.msgpack.tests.test_vector_dec_1_23",
+        "ext.msgpack.tests.test_vector_big_pos",
+        "ext.msgpack.tests.test_vector_big_neg",
+        "ext.msgpack.tests.test_data_model_vectors",
+        "ext.msgpack.tests.test_data_model_roundtrip"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests._assert_vector_v1",
+      "params": [
+        { "name": "value", "ty": "bytes" },
+        { "name": "expect_msgpack", "ty": "bytes" }
+      ],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "doc", ["ext.data_model.doc_ok", ["bytes.view", "value"]]],
+        ["let", "emit", ["ext.msgpack.data_model.emit_v1", ["bytes.view", "doc"]]],
+        ["let", "emitv", ["bytes.view", "emit"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.msgpack.data_model.is_err", "emitv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "expectv", ["bytes.view", "expect_msgpack"]],
+        ["let", "emit_bytes", ["ext.msgpack.data_model.get_bytes", "emitv"]],
+        ["let", "emit_bytes_v", ["bytes.view", "emit_bytes"]],
+        ["try", ["std.test.assert_view_eq", "emit_bytes_v", "expectv", ["std.test.code_assert_view_eq"]]],
+        ["let", "parse", ["ext.msgpack.data_model.parse_v1", "expectv"]],
+        ["let", "pv", ["bytes.view", "parse"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.msgpack.data_model.is_err", "pv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.msgpack.data_model.get_bytes", "pv"], "value", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_vector_0",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "b0", ["bytes.lit", "0"]],
+        ["let", "n0", ["ext.data_model.value_number", ["bytes.view", "b0"]]],
+        ["let", "expect_0", ["bytes.alloc", 1]],
+        ["ext.msgpack.tests._assert_vector_v1", "n0", "expect_0"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_vector_neg1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "bneg1", ["bytes.lit", "-1"]],
+        ["let", "nneg1", ["ext.data_model.value_number", ["bytes.view", "bneg1"]]],
+        ["let", "expect_neg1", ["bytes.set_u8", ["bytes.alloc", 1], 0, 255]],
+        ["ext.msgpack.tests._assert_vector_v1", "nneg1", "expect_neg1"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_vector_123",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "b123", ["bytes.lit", "123"]],
+        ["let", "n123", ["ext.data_model.value_number", ["bytes.view", "b123"]]],
+        ["let", "expect_123", ["bytes.set_u8", ["bytes.alloc", 1], 0, 123]],
+        ["ext.msgpack.tests._assert_vector_v1", "n123", "expect_123"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_vector_hi",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "bhi", ["bytes.lit", "hi"]],
+        ["let", "shi", ["ext.data_model.value_string", ["bytes.view", "bhi"]]],
+        [
+          "let",
+          "expect_hi",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 3]],
+            ["set", "v", ["vec_u8.push", "v", 162]],
+            ["set", "v", ["vec_u8.push", "v", 104]],
+            ["set", "v", ["vec_u8.push", "v", 105]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        ["ext.msgpack.tests._assert_vector_v1", "shi", "expect_hi"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_vector_map_len_b_aa",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "b1", ["bytes.lit", "1"]],
+        ["let", "b2", ["bytes.lit", "2"]],
+        ["let", "v1", ["ext.data_model.value_number", ["bytes.view", "b1"]]],
+        ["let", "v2", ["ext.data_model.value_number", ["bytes.view", "b2"]]],
+        [
+          "let",
+          "map_len_b_aa",
+          [
+            "begin",
+            ["let", "entries", ["vec_u8.with_capacity", 64]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 2]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 1]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.lit", "b"]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v1"]]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", "v1"]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 2]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.lit", "aa"]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v2"]]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", "v2"]],
+            ["let", "eb", ["vec_u8.into_bytes", "entries"]],
+            ["ext.data_model.value_map_from_entries", ["bytes.view", "eb"]]
+          ]
+        ],
+        [
+          "let",
+          "expect_map_len_b_aa",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 8]],
+            ["set", "v", ["vec_u8.push", "v", 130]],
+            ["set", "v", ["vec_u8.push", "v", 162]],
+            ["set", "v", ["vec_u8.push", "v", 97]],
+            ["set", "v", ["vec_u8.push", "v", 97]],
+            ["set", "v", ["vec_u8.push", "v", 2]],
+            ["set", "v", ["vec_u8.push", "v", 161]],
+            ["set", "v", ["vec_u8.push", "v", 98]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        ["ext.msgpack.tests._assert_vector_v1", "map_len_b_aa", "expect_map_len_b_aa"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_vector_dec_1_23",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "b1_23", ["bytes.lit", "1.23"]],
+        ["let", "n123_dec", ["ext.data_model.value_number", ["bytes.view", "b1_23"]]],
+        [
+          "let",
+          "expect_dec_1_23",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 13]],
+            ["set", "v", ["vec_u8.push", "v", 199]],
+            ["set", "v", ["vec_u8.push", "v", 10]],
+            ["set", "v", ["vec_u8.push", "v", 2]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 2]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 123]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        ["ext.msgpack.tests._assert_vector_v1", "n123_dec", "expect_dec_1_23"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_vector_big_pos",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "bbig_pos", ["bytes.lit", "18446744073709551616"]],
+        ["let", "nbig_pos", ["ext.data_model.value_number", ["bytes.view", "bbig_pos"]]],
+        [
+          "let",
+          "expect_big_pos",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 13]],
+            ["set", "v", ["vec_u8.push", "v", 199]],
+            ["set", "v", ["vec_u8.push", "v", 10]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["for", "_", 0, 8, ["set", "v", ["vec_u8.push", "v", 0]]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        ["ext.msgpack.tests._assert_vector_v1", "nbig_pos", "expect_big_pos"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_vector_big_neg",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "bbig_neg", ["bytes.lit", "-18446744073709551617"]],
+        ["let", "nbig_neg", ["ext.data_model.value_number", ["bytes.view", "bbig_neg"]]],
+        [
+          "let",
+          "expect_big_neg",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 13]],
+            ["set", "v", ["vec_u8.push", "v", 199]],
+            ["set", "v", ["vec_u8.push", "v", 10]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 2]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["for", "_", 0, 7, ["set", "v", ["vec_u8.push", "v", 0]]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        ["ext.msgpack.tests._assert_vector_v1", "nbig_neg", "expect_big_neg"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_data_model_vectors",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "b0", ["bytes.lit", "0"]],
+        ["let", "bneg1", ["bytes.lit", "-1"]],
+        ["let", "b123", ["bytes.lit", "123"]],
+        ["let", "bhi", ["bytes.lit", "hi"]],
+        ["let", "b1_23", ["bytes.lit", "1.23"]],
+        ["let", "bbig_pos", ["bytes.lit", "18446744073709551616"]],
+        ["let", "bbig_neg", ["bytes.lit", "-18446744073709551617"]],
+        ["let", "b1", ["bytes.lit", "1"]],
+        ["let", "b2", ["bytes.lit", "2"]],
+        ["let", "n0", ["ext.data_model.value_number", ["bytes.view", "b0"]]],
+        ["let", "nneg1", ["ext.data_model.value_number", ["bytes.view", "bneg1"]]],
+        ["let", "n123", ["ext.data_model.value_number", ["bytes.view", "b123"]]],
+        ["let", "shi", ["ext.data_model.value_string", ["bytes.view", "bhi"]]],
+        ["let", "n123_dec", ["ext.data_model.value_number", ["bytes.view", "b1_23"]]],
+        ["let", "nbig_pos", ["ext.data_model.value_number", ["bytes.view", "bbig_pos"]]],
+        ["let", "nbig_neg", ["ext.data_model.value_number", ["bytes.view", "bbig_neg"]]],
+        [
+          "let",
+          "map_len_b_aa",
+          [
+            "begin",
+            ["let", "v1", ["ext.data_model.value_number", ["bytes.view", "b1"]]],
+            ["let", "v2", ["ext.data_model.value_number", ["bytes.view", "b2"]]],
+            ["let", "entries", ["vec_u8.with_capacity", 64]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 2]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 1]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.lit", "b"]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v1"]]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", "v1"]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 2]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.lit", "aa"]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v2"]]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", "v2"]],
+            ["let", "eb", ["vec_u8.into_bytes", "entries"]],
+            ["ext.data_model.value_map_from_entries", ["bytes.view", "eb"]]
+          ]
+        ],
+        ["let", "expect_0", ["bytes.alloc", 1]],
+        ["let", "expect_neg1", ["bytes.set_u8", ["bytes.alloc", 1], 0, 255]],
+        ["let", "expect_123", ["bytes.set_u8", ["bytes.alloc", 1], 0, 123]],
+        [
+          "let",
+          "expect_hi",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 3]],
+            ["set", "v", ["vec_u8.push", "v", 162]],
+            ["set", "v", ["vec_u8.push", "v", 104]],
+            ["set", "v", ["vec_u8.push", "v", 105]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        [
+          "let",
+          "expect_map_len_b_aa",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 8]],
+            ["set", "v", ["vec_u8.push", "v", 130]],
+            ["set", "v", ["vec_u8.push", "v", 162]],
+            ["set", "v", ["vec_u8.push", "v", 97]],
+            ["set", "v", ["vec_u8.push", "v", 97]],
+            ["set", "v", ["vec_u8.push", "v", 2]],
+            ["set", "v", ["vec_u8.push", "v", 161]],
+            ["set", "v", ["vec_u8.push", "v", 98]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        [
+          "let",
+          "expect_dec_1_23",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 13]],
+            ["set", "v", ["vec_u8.push", "v", 199]],
+            ["set", "v", ["vec_u8.push", "v", 10]],
+            ["set", "v", ["vec_u8.push", "v", 2]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 2]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 0]],
+            ["set", "v", ["vec_u8.push", "v", 123]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        [
+          "let",
+          "expect_big_pos",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 13]],
+            ["set", "v", ["vec_u8.push", "v", 199]],
+            ["set", "v", ["vec_u8.push", "v", 10]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["for", "_", 0, 8, ["set", "v", ["vec_u8.push", "v", 0]]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        [
+          "let",
+          "expect_big_neg",
+          [
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 13]],
+            ["set", "v", ["vec_u8.push", "v", 199]],
+            ["set", "v", ["vec_u8.push", "v", 10]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 2]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["for", "_", 0, 7, ["set", "v", ["vec_u8.push", "v", 0]]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["vec_u8.into_bytes", "v"]
+          ]
+        ],
+        ["try", ["ext.msgpack.tests._assert_vector_v1", "n0", "expect_0"]],
+        ["try", ["ext.msgpack.tests._assert_vector_v1", "nneg1", "expect_neg1"]],
+        ["try", ["ext.msgpack.tests._assert_vector_v1", "n123", "expect_123"]],
+        ["try", ["ext.msgpack.tests._assert_vector_v1", "shi", "expect_hi"]],
+        ["try", ["ext.msgpack.tests._assert_vector_v1", "map_len_b_aa", "expect_map_len_b_aa"]],
+        ["try", ["ext.msgpack.tests._assert_vector_v1", "n123_dec", "expect_dec_1_23"]],
+        ["try", ["ext.msgpack.tests._assert_vector_v1", "nbig_pos", "expect_big_pos"]],
+        ["try", ["ext.msgpack.tests._assert_vector_v1", "nbig_neg", "expect_big_neg"]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.tests.test_data_model_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "b1", ["bytes.lit", "1"]],
+        ["let", "b2", ["bytes.lit", "2"]],
+        ["let", "bhi", ["bytes.lit", "hi"]],
+        ["let", "v1", ["ext.data_model.value_number", ["bytes.view", "b1"]]],
+        ["let", "v2", ["ext.data_model.value_number", ["bytes.view", "b2"]]],
+        [
+          "let",
+          "seq",
+          [
+            "begin",
+            ["let", "elems", ["vec_u8.with_capacity", 64]],
+            ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", 2]]],
+            ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", ["bytes.len", "v1"]]]],
+            ["set", "elems", ["vec_u8.extend_bytes", "elems", "v1"]],
+            ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", ["bytes.len", "v2"]]]],
+            ["set", "elems", ["vec_u8.extend_bytes", "elems", "v2"]],
+            ["let", "eb", ["vec_u8.into_bytes", "elems"]],
+            ["ext.data_model.value_seq_from_elems", ["bytes.view", "eb"]]
+          ]
+        ],
+        [
+          "let",
+          "inner_map",
+          [
+            "begin",
+            ["let", "s", ["ext.data_model.value_string", ["bytes.view", "bhi"]]],
+            ["let", "entries", ["vec_u8.with_capacity", 64]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 1]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 1]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.lit", "c"]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "s"]]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", "s"]],
+            ["let", "eb", ["vec_u8.into_bytes", "entries"]],
+            ["ext.data_model.value_map_from_entries", ["bytes.view", "eb"]]
+          ]
+        ],
+        [
+          "let",
+          "outer_map",
+          [
+            "begin",
+            ["let", "entries", ["vec_u8.with_capacity", 128]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 2]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 1]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.lit", "a"]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "seq"]]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", "seq"]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 1]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.lit", "b"]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "inner_map"]]]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", "inner_map"]],
+            ["let", "eb", ["vec_u8.into_bytes", "entries"]],
+            ["ext.data_model.value_map_from_entries", ["bytes.view", "eb"]]
+          ]
+        ],
+        ["let", "doc", ["ext.data_model.doc_ok", ["bytes.view", "outer_map"]]],
+        ["let", "emit", ["ext.msgpack.data_model.emit_v1", ["bytes.view", "doc"]]],
+        ["let", "ev", ["bytes.view", "emit"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.msgpack.data_model.is_err", "ev"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "msgpack", ["ext.msgpack.data_model.get_bytes", "ev"]],
+        ["let", "parse", ["ext.msgpack.data_model.parse_v1", ["bytes.view", "msgpack"]]],
+        ["let", "pv", ["bytes.view", "parse"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.msgpack.data_model.is_err", "pv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.msgpack.data_model.get_bytes", "pv"], "outer_map", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-msgpack-rs@0.1.0"
+  }
+}

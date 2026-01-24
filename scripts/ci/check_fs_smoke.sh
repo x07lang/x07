@@ -83,4 +83,23 @@ run_suite() {
 run_suite "benchmarks/smoke/fs-os-smoke.json"
 run_suite "benchmarks/smoke/fs-os-sandboxed-policy-deny-smoke.json"
 
+echo "[fs-globwalk] running ext-path-glob-rs smoke (run-os)"
+PATH_GLOB_MODULE_ROOT="$(x07_ext_pkg_modules x07-ext-path-glob-rs)"
+GLOB_MODULE_ROOT="$(x07_ext_pkg_modules x07-ext-glob-rs)"
+if [[ ! -d "$PATH_GLOB_MODULE_ROOT" ]]; then
+  echo "ERROR: ext-path-glob-rs module root not found at $PATH_GLOB_MODULE_ROOT" >&2
+  exit 2
+fi
+if [[ ! -d "$GLOB_MODULE_ROOT" ]]; then
+  echo "ERROR: ext-glob-rs module root not found at $GLOB_MODULE_ROOT" >&2
+  exit 2
+fi
+"$X07_OS_RUNNER" \
+  --program "tests/external_os/fs_globwalk_smoke_ok/src/main.x07.json" \
+  --world run-os \
+  --module-root "$MODULE_ROOT" \
+  --module-root "$PATH_GLOB_MODULE_ROOT" \
+  --module-root "$GLOB_MODULE_ROOT" \
+  | "$python_bin" scripts/ci/assert_run_os_ok.py "fs-globwalk" --expect OK
+
 echo "[fs-smoke] OK"

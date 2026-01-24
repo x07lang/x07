@@ -25,6 +25,13 @@ Notes:
 
 Examples include:
 
+- text utilities (`ext-text`) + Unicode helpers (`ext-unicode-rs`)
+- BigInt (`ext-bigint-rs`) + Decimal (`ext-decimal-rs`)
+- compact codecs: CBOR (`ext-cbor-rs`), MessagePack (`ext-msgpack-rs`)
+- fast checksums: CRC32C / xxhash64 (`ext-checksum-rs`)
+- deterministic diff + patch (`ext-diff-rs`)
+- compression helpers: zstd framing (`ext-compress-rs`)
+- OS-world glob + walk + ignore (`ext-path-glob-rs`)
 - networking (HTTP/TLS, servers, client)
 - databases (sqlite/pg/mysql/redis)
 - filesystem utilities

@@ -1,0 +1,214 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "std.math.decimal",
+  "imports": [
+    "std.math.bigint",
+    "std.math.decimal.codec_v1"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.math.decimal.from_i32_v1",
+        "std.math.decimal.is_zero_v1",
+        "std.math.decimal.add_v1",
+        "std.math.decimal.mul_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal._make_unchecked",
+      "params": [
+        { "name": "sign", "ty": "i32" },
+        { "name": "scale", "ty": "i32" },
+        { "name": "mag", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "mag_len", ["view.len", "mag"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 9, "mag_len"]]],
+        ["set", "out", ["vec_u8.push", "out", "sign"]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "scale"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "mag_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, "mag_len"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal._zero",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "out", ["vec_u8.with_capacity", 9]],
+        ["set", "out", ["vec_u8.push", "out", 0]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", 0]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", 0]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.from_i32_v1",
+      "params": [{ "name": "x", "ty": "i32" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "bi", ["std.math.bigint.from_i32_v1", "x"]],
+        ["let", "biv", ["bytes.view", "bi"]],
+        ["let", "s", ["view.get_u8", "biv", 0]],
+        ["if", ["=", "s", 0], ["return", ["std.math.decimal._zero"]], 0],
+        ["let", "n", ["view.len", "biv"]],
+        ["let", "mag", ["view.slice", "biv", 1, ["-", "n", 1]]],
+        ["let", "raw", ["std.math.decimal._make_unchecked", "s", 0, "mag"]],
+        ["std.math.decimal.codec_v1.canon_v1", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.is_zero_v1",
+      "params": [{ "name": "v0", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "canon", ["std.math.decimal.codec_v1.canon_v1", "v0"]],
+        ["if", ["=", ["bytes.len", "canon"], 0], ["return", 0], 0],
+        ["=", ["bytes.get_u8", "canon", 0], 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal._to_bigint_unchecked",
+      "params": [{ "name": "canon", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "s", ["view.get_u8", "canon", 0]],
+        ["if", ["=", "s", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["let", "mag", ["std.math.decimal.codec_v1.mag_view_v1", "canon"]],
+        ["let", "mn", ["view.len", "mag"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 1, "mn"]]],
+        ["set", "out", ["vec_u8.push", "out", "s"]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, "mn"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal._mul_pow10_bigint",
+      "params": [
+        { "name": "v", "ty": "bytes" },
+        { "name": "k", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["<", "k", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", [">", "k", 10000], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "out", "v"],
+        [
+          "for",
+          "_",
+          0,
+          "k",
+          [
+            "begin",
+            ["set", "out", ["std.math.bigint.mul_i32_v1", ["bytes.view", "out"], 10]],
+            ["if", ["=", ["bytes.len", "out"], 0], ["return", ["bytes.alloc", 0]], 0]
+          ]
+        ],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.add_v1",
+      "params": [
+        { "name": "a0", "ty": "bytes_view" },
+        { "name": "b0", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "a_bytes", ["std.math.decimal.codec_v1.canon_v1", "a0"]],
+        ["let", "b_bytes", ["std.math.decimal.codec_v1.canon_v1", "b0"]],
+        ["if", ["=", ["bytes.len", "a_bytes"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", ["bytes.len", "b_bytes"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "sa", ["bytes.get_u8", "a_bytes", 0]],
+        ["let", "sb", ["bytes.get_u8", "b_bytes", 0]],
+        ["if", ["=", "sa", 0], ["return", "b_bytes"], 0],
+        ["if", ["=", "sb", 0], ["return", "a_bytes"], 0],
+        ["let", "a", ["bytes.view", "a_bytes"]],
+        ["let", "b", ["bytes.view", "b_bytes"]],
+        ["let", "scale_a", ["std.math.decimal.codec_v1.scale_v1", "a"]],
+        ["let", "scale_b", ["std.math.decimal.codec_v1.scale_v1", "b"]],
+        ["if", ["<", "scale_a", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["<", "scale_b", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "scale", ["if", ["<", "scale_a", "scale_b"], "scale_b", "scale_a"]],
+        ["let", "ma0", ["std.math.decimal._to_bigint_unchecked", "a"]],
+        ["let", "mb0", ["std.math.decimal._to_bigint_unchecked", "b"]],
+        ["let", "da", ["-", "scale", "scale_a"]],
+        ["let", "db", ["-", "scale", "scale_b"]],
+        ["let", "ma", ["std.math.decimal._mul_pow10_bigint", "ma0", "da"]],
+        ["if", ["=", ["bytes.len", "ma"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "mb", ["std.math.decimal._mul_pow10_bigint", "mb0", "db"]],
+        ["if", ["=", ["bytes.len", "mb"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "sum_bi", ["std.math.bigint.add_v1", ["bytes.view", "ma"], ["bytes.view", "mb"]]],
+        ["if", ["=", ["bytes.len", "sum_bi"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "sumv", ["bytes.view", "sum_bi"]],
+        ["let", "ss", ["view.get_u8", "sumv", 0]],
+        ["if", ["=", "ss", 0], ["return", ["std.math.decimal._zero"]], 0],
+        ["let", "sn", ["view.len", "sumv"]],
+        ["let", "mag", ["view.slice", "sumv", 1, ["-", "sn", 1]]],
+        ["let", "raw", ["std.math.decimal._make_unchecked", "ss", "scale", "mag"]],
+        ["std.math.decimal.codec_v1.canon_v1", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.mul_v1",
+      "params": [
+        { "name": "a0", "ty": "bytes_view" },
+        { "name": "b0", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "a_bytes", ["std.math.decimal.codec_v1.canon_v1", "a0"]],
+        ["let", "b_bytes", ["std.math.decimal.codec_v1.canon_v1", "b0"]],
+        ["if", ["=", ["bytes.len", "a_bytes"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", ["bytes.len", "b_bytes"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "a", ["bytes.view", "a_bytes"]],
+        ["let", "b", ["bytes.view", "b_bytes"]],
+        ["let", "sa", ["view.get_u8", "a", 0]],
+        ["let", "sb", ["view.get_u8", "b", 0]],
+        ["if", ["=", "sa", 0], ["return", ["std.math.decimal._zero"]], 0],
+        ["if", ["=", "sb", 0], ["return", ["std.math.decimal._zero"]], 0],
+        ["let", "scale_a", ["std.math.decimal.codec_v1.scale_v1", "a"]],
+        ["let", "scale_b", ["std.math.decimal.codec_v1.scale_v1", "b"]],
+        ["if", ["<", "scale_a", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["<", "scale_b", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "scale", ["+", "scale_a", "scale_b"]],
+        ["if", ["<", "scale", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "ma", ["std.math.decimal._to_bigint_unchecked", "a"]],
+        ["let", "mb", ["std.math.decimal._to_bigint_unchecked", "b"]],
+        ["let", "prod_bi", ["std.math.bigint.mul_v1", ["bytes.view", "ma"], ["bytes.view", "mb"]]],
+        ["if", ["=", ["bytes.len", "prod_bi"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "pv", ["bytes.view", "prod_bi"]],
+        ["let", "ps", ["view.get_u8", "pv", 0]],
+        ["if", ["=", "ps", 0], ["return", ["std.math.decimal._zero"]], 0],
+        ["let", "pn", ["view.len", "pv"]],
+        ["let", "mag", ["view.slice", "pv", 1, ["-", "pn", 1]]],
+        ["let", "raw", ["std.math.decimal._make_unchecked", "ps", "scale", "mag"]],
+        ["std.math.decimal.codec_v1.canon_v1", ["bytes.view", "raw"]]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-decimal-rs@0.1.0"
+  }
+}

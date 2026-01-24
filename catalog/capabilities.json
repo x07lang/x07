@@ -93,6 +93,63 @@
       "status": "stable"
     },
     {
+      "id": "data.cbor",
+      "summary": "CBOR encode/decode + DataModel integration.",
+      "canonical": { "name": "ext-cbor-rs", "version": "0.1.0" },
+      "alternatives": [{ "name": "ext-data-model", "version": "0.1.2" }],
+      "status": "experimental"
+    },
+    {
+      "id": "data.msgpack",
+      "summary": "MessagePack encode/decode + DataModel integration.",
+      "canonical": { "name": "ext-msgpack-rs", "version": "0.1.0" },
+      "alternatives": [{ "name": "ext-data-model", "version": "0.1.2" }],
+      "status": "experimental"
+    },
+    {
+      "id": "math.bigint",
+      "summary": "Big integer utilities (parse/format/codec_v1 + basic ops).",
+      "canonical": { "name": "ext-bigint-rs", "version": "0.1.0" },
+      "status": "experimental"
+    },
+    {
+      "id": "math.decimal",
+      "summary": "Fixed-point decimal utilities (parse/format/codec_v1 + basic ops).",
+      "canonical": { "name": "ext-decimal-rs", "version": "0.1.0" },
+      "status": "experimental"
+    },
+    {
+      "id": "text.core",
+      "summary": "Text utilities on bytes (trim/split/join/find/lines).",
+      "canonical": { "name": "ext-text", "version": "0.1.0" },
+      "alternatives": [{ "name": "ext-regex", "version": "0.2.2" }],
+      "status": "experimental"
+    },
+    {
+      "id": "text.unicode",
+      "summary": "Unicode helpers (normalize/casefold/segment + encodings).",
+      "canonical": { "name": "ext-unicode-rs", "version": "0.1.3" },
+      "status": "experimental"
+    },
+    {
+      "id": "checksum.fast",
+      "summary": "Fast non-cryptographic checksums (CRC32C, xxhash64).",
+      "canonical": { "name": "ext-checksum-rs", "version": "0.1.0" },
+      "status": "experimental"
+    },
+    {
+      "id": "diff.patch",
+      "summary": "Deterministic diff/patch helpers with stable patch_v1 encoding.",
+      "canonical": { "name": "ext-diff-rs", "version": "0.1.0" },
+      "status": "experimental"
+    },
+    {
+      "id": "compress.zstd",
+      "summary": "Zstd framing helpers (ext.zstd).",
+      "canonical": { "name": "ext-compress-rs", "version": "0.1.3" },
+      "status": "experimental"
+    },
+    {
       "id": "text.regex",
       "summary": "Regex match/search.",
       "canonical": { "name": "ext-regex", "version": "0.2.2" },
@@ -141,13 +198,20 @@
     {
       "id": "fs.glob",
       "summary": "Glob-like wildcard matching for ASCII paths/tokens.",
-      "canonical": { "name": "ext-glob-rs", "version": "0.1.0" },
+      "canonical": { "name": "ext-glob-rs", "version": "0.1.1" },
       "status": "experimental"
     },
     {
       "id": "fs.walkdir",
       "summary": "Directory traversal helpers for OS worlds.",
       "canonical": { "name": "ext-walkdir-rs", "version": "0.1.0" },
+      "worlds": ["run-os", "run-os-sandboxed"],
+      "status": "experimental"
+    },
+    {
+      "id": "fs.globwalk",
+      "summary": "Glob + walk + ignore helpers for OS worlds (deterministic ordering).",
+      "canonical": { "name": "ext-path-glob-rs", "version": "0.1.0" },
       "worlds": ["run-os", "run-os-sandboxed"],
       "status": "experimental"
     }
@@ -162,10 +226,21 @@
     "data-model": "data.model",
     "filesystem": "fs.io",
     "glob": "fs.glob",
+    "globwalk": "fs.globwalk",
     "walkdir": "fs.walkdir",
     "json": "data.json",
     "yaml": "data.yaml",
+    "cbor": "data.cbor",
+    "msgpack": "data.msgpack",
     "regex": "text.regex",
+    "text": "text.core",
+    "unicode": "text.unicode",
+    "bigint": "math.bigint",
+    "decimal": "math.decimal",
+    "checksum": "checksum.fast",
+    "diff": "diff.patch",
+    "patch": "diff.patch",
+    "zstd": "compress.zstd",
     "sqlite": "db.sqlite",
     "postgres": "db.postgres",
     "postgres-client": "db.postgres"

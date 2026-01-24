@@ -1,0 +1,153 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "std.text.split",
+  "imports": [
+    "std.text.ascii",
+    "std.text.slices"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.text.split.split_u8_view_v1",
+        "std.text.split.split_bytes_view_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.split.split_u8_view_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "sep", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": ["std.text.ascii.split_u8", "b", "sep"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.split._match_at",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "i", "ty": "i32" },
+        { "name": "sep", "ty": "bytes_view" },
+        { "name": "sep_len", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        [
+          "for",
+          "j",
+          0,
+          "sep_len",
+          [
+            "if",
+            [
+              "=",
+              ["=", ["view.get_u8", "b", ["+", "i", "j"]], ["view.get_u8", "sep", "j"]],
+              0
+            ],
+            ["return", 0],
+            0
+          ]
+        ],
+        1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.split.split_bytes_view_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "sep", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["let", "sep_len", ["view.len", "sep"]],
+        [
+          "if",
+          ["=", "sep_len", 0],
+          [
+            "begin",
+            ["let", "out", ["std.text.slices.builder_new_v1", 1]],
+            ["set", "out", ["std.text.slices.builder_push_v1", "out", 0, "n"]],
+            ["std.text.slices.builder_finish_v1", "out", 1]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["<", "n", "sep_len"],
+          [
+            "begin",
+            ["let", "out", ["std.text.slices.builder_new_v1", 1]],
+            ["set", "out", ["std.text.slices.builder_push_v1", "out", 0, "n"]],
+            ["std.text.slices.builder_finish_v1", "out", 1]
+          ],
+          0
+        ],
+        ["let", "count", 1],
+        ["let", "i", 0],
+        ["let", "limit", ["+", ["-", "n", "sep_len"], 1]],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "n", 1],
+          [
+            "if",
+            ["<u", "i", "limit"],
+            [
+              "if",
+              ["std.text.split._match_at", "b", "i", "sep", "sep_len"],
+              ["begin", ["set", "count", ["+", "count", 1]], ["set", "i", ["+", "i", "sep_len"]]],
+              ["set", "i", ["+", "i", 1]]
+            ],
+            0
+          ]
+        ],
+        ["let", "out", ["std.text.slices.builder_new_v1", "count"]],
+        ["let", "start", 0],
+        ["let", "emit", 0],
+        ["set", "i", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "n", 1],
+          [
+            "begin",
+            [
+              "if",
+              ["<u", "i", "limit"],
+              [
+                "if",
+                ["std.text.split._match_at", "b", "i", "sep", "sep_len"],
+                [
+                  "begin",
+                  ["set", "out", ["std.text.slices.builder_push_v1", "out", "start", ["-", "i", "start"]]],
+                  ["set", "emit", ["+", "emit", 1]],
+                  ["set", "i", ["+", "i", "sep_len"]],
+                  ["set", "start", "i"]
+                ],
+                ["set", "i", ["+", "i", 1]]
+              ],
+              0
+            ],
+            0
+          ]
+        ],
+        ["set", "out", ["std.text.slices.builder_push_v1", "out", "start", ["-", "n", "start"]]],
+        ["set", "emit", ["+", "emit", 1]],
+        ["std.text.slices.builder_finish_v1", "out", "emit"]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-text@0.1.0"
+  }
+}

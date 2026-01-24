@@ -1,0 +1,181 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.glob",
+  "imports": [
+    "std.text.ascii",
+    "std.text.slices",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.glob.match_v1",
+        "ext.glob.filter_lines_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.glob.match_v1",
+      "params": [
+        { "name": "pattern", "ty": "bytes_view" },
+        { "name": "text", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "pn", ["view.len", "pattern"]],
+        ["let", "tn", ["view.len", "text"]],
+        ["let", "i", 0],
+        ["let", "j", 0],
+        ["let", "star", -1],
+        ["let", "match", 0],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "tn", 1],
+          [
+            "if",
+            ["=", "done", 0],
+            [
+              "if",
+              [">=u", "i", "tn"],
+              ["set", "done", 1],
+              [
+                "begin",
+                [
+                  "if",
+                  ["<u", "j", "pn"],
+                  [
+                    "begin",
+                    ["let", "pc", ["view.get_u8", "pattern", "j"]],
+                    ["let", "tc", ["view.get_u8", "text", "i"]],
+                    [
+                      "if",
+                      ["if", ["=", "pc", 63], 1, ["=", "pc", "tc"]],
+                      [
+                        "begin",
+                        ["set", "i", ["+", "i", 1]],
+                        ["set", "j", ["+", "j", 1]],
+                        0
+                      ],
+                      [
+                        "if",
+                        ["=", "pc", 42],
+                        [
+                          "begin",
+                          ["set", "star", "j"],
+                          ["set", "match", "i"],
+                          ["set", "j", ["+", "j", 1]],
+                          0
+                        ],
+                        [
+                          "if",
+                          [">=", "star", 0],
+                          [
+                            "begin",
+                            ["set", "j", ["+", "star", 1]],
+                            ["set", "match", ["+", "match", 1]],
+                            ["set", "i", "match"],
+                            0
+                          ],
+                          ["return", 0]
+                        ]
+                      ]
+                    ],
+                    0
+                  ],
+                  [
+                    "if",
+                    [">=", "star", 0],
+                    [
+                      "begin",
+                      ["set", "j", ["+", "star", 1]],
+                      ["set", "match", ["+", "match", 1]],
+                      ["set", "i", "match"],
+                      0
+                    ],
+                    ["return", 0]
+                  ]
+                ],
+                0
+              ]
+            ],
+            0
+          ]
+        ],
+        ["let", "done2", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "pn", 1],
+          [
+            "if",
+            ["=", "done2", 0],
+            [
+              "if",
+              ["<u", "j", "pn"],
+              [
+                "if",
+                ["=", ["view.get_u8", "pattern", "j"], 42],
+                ["set", "j", ["+", "j", 1]],
+                ["set", "done2", 1]
+              ],
+              ["set", "done2", 1]
+            ],
+            0
+          ]
+        ],
+        ["if", ["=", "j", "pn"], 1, 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.glob.filter_lines_v1",
+      "params": [
+        { "name": "lines", "ty": "bytes_view" },
+        { "name": "pattern", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "sl", ["std.text.ascii.split_lines_view", "lines"]],
+        ["let", "slv", ["bytes.view", "sl"]],
+        ["let", "count", ["std.text.slices.count_v1", "slv"]],
+        ["let", "out", ["std.vec.with_capacity", 256]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "v", ["std.text.slices.view_at_v1", "lines", "slv", "i"]],
+            [
+              "if",
+              ["=", ["view.len", "v"], 0],
+              0,
+              [
+                "if",
+                ["=", ["ext.glob.match_v1", "pattern", "v"], 1],
+                [
+                  "begin",
+                  ["set", "out", ["std.vec.extend_bytes", "out", "v"]],
+                  ["set", "out", ["std.vec.push", "out", 10]],
+                  0
+                ],
+                0
+              ]
+            ],
+            0
+          ]
+        ],
+        ["std.vec.as_bytes", "out"]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,277 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.zstd",
+  "imports": [
+    "ext.error.context",
+    "std.u32"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.zstd.code_invalid_header",
+        "ext.zstd.code_output_limit",
+        "ext.zstd.code_truncated",
+        "ext.zstd.code_unsupported",
+        "ext.zstd.compress_store_v1",
+        "ext.zstd.decompress_v1",
+        "ext.zstd.err_code",
+        "ext.zstd.get_bytes",
+        "ext.zstd.get_view",
+        "ext.zstd.is_err",
+        "ext.zstd.out_len"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.code_invalid_header",
+      "params": [],
+      "result": "i32",
+      "body": 1
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.code_truncated",
+      "params": [],
+      "result": "i32",
+      "body": 2
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.code_output_limit",
+      "params": [],
+      "result": "i32",
+      "body": 3
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.code_unsupported",
+      "params": [],
+      "result": "i32",
+      "body": 4
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.is_err",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["begin", ["if", ["<", ["view.len", "doc"], 1], ["return", 1], 0], ["=", ["view.get_u8", "doc", 0], 0]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.err_code",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["ext.error.context.error_code", "doc"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.get_view",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes_view",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["<", "n", 2], ["return", ["view.slice", "doc", 0, 0]], 0],
+        ["if", ["=", ["view.get_u8", "doc", 0], 1], 0, ["return", ["view.slice", "doc", 0, 0]]],
+        ["view.slice", "doc", 1, ["-", "n", 1]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.get_bytes",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["view.to_bytes", ["ext.zstd.get_view", "doc"]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.out_len",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["view.len", ["ext.zstd.get_view", "doc"]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd._doc_ok",
+      "params": [{ "name": "v", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "v"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 1, "n"]]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "v", 0, "n"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd._check_header_v1",
+      "params": [{ "name": "src", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["<u", ["view.len", "src"], 13], ["return", 0], 0],
+        ["if", ["=", ["view.get_u8", "src", 0], 40], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "src", 1], 181], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "src", 2], 47], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "src", 3], 253], 0, ["return", 0]],
+        1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.compress_store_v1",
+      "params": [
+        { "name": "data", "ty": "bytes_view" },
+        { "name": "max_out_bytes", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "data"]],
+        ["if", ["<", "n", 0], ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_invalid_header"]]], 0],
+        ["let", "max_block", 2097151],
+        ["let", "blocks", ["if", ["=", "n", 0], 1, ["+", ["/", ["-", ["+", "n", "max_block"], 1], "max_block"], 0]]],
+        ["let", "out_size", ["+", 13, ["+", "n", ["*", 3, "blocks"]]]],
+        [
+          "if",
+          ["<", "max_out_bytes", 0],
+          0,
+          ["if", ["<u", "max_out_bytes", "out_size"], ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_output_limit"]]], 0]
+        ],
+        ["let", "out", ["vec_u8.with_capacity", "out_size"]],
+        ["set", "out", ["vec_u8.push", "out", 40]],
+        ["set", "out", ["vec_u8.push", "out", 181]],
+        ["set", "out", ["vec_u8.push", "out", 47]],
+        ["set", "out", ["vec_u8.push", "out", 253]],
+        ["set", "out", ["vec_u8.push", "out", 224]],
+        ["set", "out", ["std.u32.push_le", "out", "n"]],
+        ["set", "out", ["std.u32.push_le", "out", 0]],
+        ["let", "off", 0],
+        [
+          "for",
+          "bi",
+          0,
+          "blocks",
+          [
+            "begin",
+            ["let", "remain", ["-", "n", "off"]],
+            ["let", "chunk", ["if", ["<u", "remain", "max_block"], "remain", "max_block"]],
+            ["let", "last", ["if", ["=", ["+", "bi", 1], "blocks"], 1, 0]],
+            ["let", "hdr", ["|", ["<<u", "chunk", 3], "last"]],
+            ["set", "out", ["vec_u8.push", "out", ["&", "hdr", 255]]],
+            ["set", "out", ["vec_u8.push", "out", ["&", [">>u", "hdr", 8], 255]]],
+            ["set", "out", ["vec_u8.push", "out", ["&", [">>u", "hdr", 16], 255]]],
+            ["set", "out", ["vec_u8.extend_bytes_range", "out", "data", "off", "chunk"]],
+            ["set", "off", ["+", "off", "chunk"]],
+            0
+          ]
+        ],
+        ["let", "out_bytes", ["vec_u8.into_bytes", "out"]],
+        ["ext.zstd._doc_ok", ["bytes.view", "out_bytes"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.decompress_v1",
+      "params": [
+        { "name": "src", "ty": "bytes_view" },
+        { "name": "max_out_bytes", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["=", ["ext.zstd._check_header_v1", "src"], 1], 0, ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_invalid_header"]]]],
+        ["let", "n_src", ["view.len", "src"]],
+        ["let", "desc", ["view.get_u8", "src", 4]],
+        ["let", "dict_flag", ["&", "desc", 3]],
+        ["let", "checksum_flag", ["&", [">>u", "desc", 2], 1]],
+        ["let", "single_segment", ["&", [">>u", "desc", 5], 1]],
+        ["let", "fcs_flag", ["&", [">>u", "desc", 6], 3]],
+        ["if", ["=", "dict_flag", 0], 0, ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_unsupported"]]]],
+        ["if", ["=", "checksum_flag", 0], 0, ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_unsupported"]]]],
+        ["if", ["=", "single_segment", 1], 0, ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_unsupported"]]]],
+        ["if", ["=", "fcs_flag", 3], 0, ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_unsupported"]]]],
+        ["let", "off", 5],
+        ["if", ["<u", ["-", "n_src", "off"], 8], ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_truncated"]]], 0],
+        ["let", "size_lo", ["std.u32.read_le_at", "src", "off"]],
+        ["let", "size_hi", ["std.u32.read_le_at", "src", ["+", "off", 4]]],
+        ["if", ["=", "size_hi", 0], 0, ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_unsupported"]]]],
+        ["let", "expected_size", "size_lo"],
+        [
+          "if",
+          ["<", "max_out_bytes", 0],
+          0,
+          ["if", ["<u", "max_out_bytes", "expected_size"], ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_output_limit"]]], 0]
+        ],
+        ["set", "off", ["+", "off", 8]],
+        ["let", "out", ["vec_u8.with_capacity", "expected_size"]],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "n_src", 1],
+          [
+            "if",
+            ["=", "done", 0],
+            [
+              "begin",
+              ["if", ["<u", ["-", "n_src", "off"], 3], ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_truncated"]]], 0],
+              ["let", "b0", ["view.get_u8", "src", "off"]],
+              ["let", "b1", ["view.get_u8", "src", ["+", "off", 1]]],
+              ["let", "b2", ["view.get_u8", "src", ["+", "off", 2]]],
+              ["set", "off", ["+", "off", 3]],
+              ["let", "hdr", ["|", ["|", "b0", ["<<u", "b1", 8]], ["<<u", "b2", 16]]],
+              ["let", "last", ["&", "hdr", 1]],
+              ["let", "kind", ["&", [">>u", "hdr", 1], 3]],
+              ["let", "blen", [">>u", "hdr", 3]],
+              ["if", ["<u", ["-", "expected_size", ["vec_u8.len", "out"]], "blen"], ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_invalid_header"]]], 0],
+              [
+                "if",
+                ["=", "kind", 0],
+                [
+                  "begin",
+                  ["if", ["<u", ["-", "n_src", "off"], "blen"], ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_truncated"]]], 0],
+                  ["set", "out", ["vec_u8.extend_bytes_range", "out", "src", "off", "blen"]],
+                  ["set", "off", ["+", "off", "blen"]],
+                  0
+                ],
+                [
+                  "if",
+                  ["=", "kind", 1],
+                  [
+                    "begin",
+                    ["if", ["<u", ["-", "n_src", "off"], 1], ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_truncated"]]], 0],
+                    ["let", "v", ["view.get_u8", "src", "off"]],
+                    ["set", "off", ["+", "off", 1]],
+                    ["for", "_j", 0, "blen", ["set", "out", ["vec_u8.push", "out", "v"]]],
+                    0
+                  ],
+                  [
+                    "if",
+                    ["=", "kind", 2],
+                    ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_unsupported"]]],
+                    ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_invalid_header"]]]
+                  ]
+                ]
+              ],
+              ["if", ["=", "last", 1], ["set", "done", 1], 0],
+              0
+            ],
+            0
+          ]
+        ],
+        ["if", ["=", "done", 1], 0, ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_truncated"]]]],
+        ["if", ["=", ["vec_u8.len", "out"], "expected_size"], 0, ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_invalid_header"]]]],
+        ["if", ["=", "off", "n_src"], 0, ["return", ["ext.error.context.err_from_code", ["ext.zstd.code_invalid_header"]]]],
+        ["let", "out_bytes", ["vec_u8.into_bytes", "out"]],
+        ["ext.zstd._doc_ok", ["bytes.view", "out_bytes"]]
+      ]
+    }
+  ]
+}
+

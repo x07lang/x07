@@ -1,0 +1,336 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.diff.patch_v1",
+  "imports": [
+    "ext.error.context",
+    "std.u32"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.diff.patch_v1.code_invalid_patch",
+        "ext.diff.patch_v1.code_invalid_op",
+        "ext.diff.patch_v1.code_output_limit",
+        "ext.diff.patch_v1.code_truncated",
+        "ext.diff.patch_v1.err_code",
+        "ext.diff.patch_v1.from_parts_v1",
+        "ext.diff.patch_v1.get_bytes",
+        "ext.diff.patch_v1.get_view",
+        "ext.diff.patch_v1.is_err",
+        "ext.diff.patch_v1.apply_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.code_invalid_patch",
+      "params": [],
+      "result": "i32",
+      "body": 1
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.code_truncated",
+      "params": [],
+      "result": "i32",
+      "body": 2
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.code_output_limit",
+      "params": [],
+      "result": "i32",
+      "body": 3
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.code_invalid_op",
+      "params": [],
+      "result": "i32",
+      "body": 4
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.is_err",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["begin", ["if", ["<", ["view.len", "doc"], 1], ["return", 1], 0], ["=", ["view.get_u8", "doc", 0], 0]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.err_code",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["ext.error.context.error_code", "doc"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.get_view",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes_view",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["<", "n", 2], ["return", ["view.slice", "doc", 0, 0]], 0],
+        ["if", ["=", ["view.get_u8", "doc", 0], 1], 0, ["return", ["view.slice", "doc", 0, 0]]],
+        ["view.slice", "doc", 1, ["-", "n", 1]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.get_bytes",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["view.to_bytes", ["ext.diff.patch_v1.get_view", "doc"]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1._doc_ok",
+      "params": [{ "name": "v", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "v"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 1, "n"]]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "v", 0, "n"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1._push_header_v1",
+      "params": [{ "name": "out", "ty": "vec_u8" }],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.lit", "X07P"]]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.push", "out", 0]],
+        ["set", "out", ["vec_u8.push", "out", 0]],
+        ["set", "out", ["vec_u8.push", "out", 0]],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1._check_header_v1",
+      "params": [{ "name": "patch", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["<u", ["view.len", "patch"], 8], ["return", 0], 0],
+        ["if", ["=", ["view.get_u8", "patch", 0], 88], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "patch", 1], 48], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "patch", 2], 55], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "patch", 3], 80], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "patch", 4], 1], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "patch", 5], 0], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "patch", 6], 0], 0, ["return", 0]],
+        ["if", ["=", ["view.get_u8", "patch", 7], 0], 0, ["return", 0]],
+        1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.from_parts_v1",
+      "params": [
+        { "name": "prefix_copy_len", "ty": "i32" },
+        { "name": "delete_len", "ty": "i32" },
+        { "name": "insert", "ty": "bytes_view" },
+        { "name": "suffix_copy_len", "ty": "i32" },
+        { "name": "max_patch_bytes", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["<", "prefix_copy_len", 0], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]], 0],
+        ["if", ["<", "delete_len", 0], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]], 0],
+        ["if", ["<", "suffix_copy_len", 0], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]], 0],
+        ["let", "ins_len", ["view.len", "insert"]],
+        ["if", ["<", "ins_len", 0], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]], 0],
+        ["let", "cap_hint", ["+", 32, "ins_len"]],
+        ["let", "out", ["vec_u8.with_capacity", "cap_hint"]],
+        ["set", "out", ["ext.diff.patch_v1._push_header_v1", "out"]],
+        [
+          "if",
+          [">", "prefix_copy_len", 0],
+          [
+            "begin",
+            ["set", "out", ["vec_u8.push", "out", 0]],
+            ["set", "out", ["std.u32.push_le", "out", "prefix_copy_len"]],
+            0
+          ],
+          0
+        ],
+        [
+          "if",
+          [">", "delete_len", 0],
+          [
+            "begin",
+            ["set", "out", ["vec_u8.push", "out", 1]],
+            ["set", "out", ["std.u32.push_le", "out", "delete_len"]],
+            0
+          ],
+          0
+        ],
+        [
+          "if",
+          [">", "ins_len", 0],
+          [
+            "begin",
+            ["set", "out", ["vec_u8.push", "out", 2]],
+            ["set", "out", ["std.u32.push_le", "out", "ins_len"]],
+            ["set", "out", ["vec_u8.extend_bytes", "out", "insert"]],
+            0
+          ],
+          0
+        ],
+        [
+          "if",
+          [">", "suffix_copy_len", 0],
+          [
+            "begin",
+            ["set", "out", ["vec_u8.push", "out", 0]],
+            ["set", "out", ["std.u32.push_le", "out", "suffix_copy_len"]],
+            0
+          ],
+          0
+        ],
+        ["set", "out", ["vec_u8.push", "out", 255]],
+        ["let", "patch", ["vec_u8.into_bytes", "out"]],
+        [
+          "if",
+          ["<", "max_patch_bytes", 0],
+          ["ext.diff.patch_v1._doc_ok", ["bytes.view", "patch"]],
+          [
+            "if",
+            ["<u", ["bytes.len", "patch"], ["+", "max_patch_bytes", 1]],
+            ["ext.diff.patch_v1._doc_ok", ["bytes.view", "patch"]],
+            ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_output_limit"]]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.patch_v1.apply_v1",
+      "params": [
+        { "name": "before", "ty": "bytes_view" },
+        { "name": "patch", "ty": "bytes_view" },
+        { "name": "max_out_bytes", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["=", ["ext.diff.patch_v1._check_header_v1", "patch"], 1], 0, ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]]],
+        ["let", "n_patch", ["view.len", "patch"]],
+        ["let", "n_before", ["view.len", "before"]],
+        ["let", "off", 8],
+        ["let", "src_off", 0],
+        ["let", "out", ["vec_u8.with_capacity", 64]],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "n_patch", 1],
+          [
+            "if",
+            ["=", "done", 0],
+            [
+              "if",
+              [">=u", "off", "n_patch"],
+              ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_truncated"]]],
+              [
+                "begin",
+                ["let", "op", ["view.get_u8", "patch", "off"]],
+                ["set", "off", ["+", "off", 1]],
+                [
+                  "if",
+                  ["=", "op", 255],
+                  [
+                    "begin",
+                    ["if", ["=", "off", "n_patch"], 0, ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]]],
+                    ["set", "done", 1],
+                    0
+                  ],
+                  [
+                    "begin",
+                    ["if", ["<u", ["-", "n_patch", "off"], 4], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_truncated"]]], 0],
+                    ["let", "len", ["std.u32.read_le_at", "patch", "off"]],
+                    ["set", "off", ["+", "off", 4]],
+                    ["if", ["<", "len", 0], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]], 0],
+                    [
+                      "if",
+                      ["=", "op", 0],
+                      [
+                        "begin",
+                        ["if", ["<u", ["-", "n_before", "src_off"], "len"], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]], 0],
+                        [
+                          "if",
+                          ["<", "max_out_bytes", 0],
+                          0,
+                          [
+                            "begin",
+                            ["let", "out_len", ["vec_u8.len", "out"]],
+                            ["if", ["<u", "max_out_bytes", "out_len"], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_output_limit"]]], 0],
+                            ["if", ["<u", ["-", "max_out_bytes", "out_len"], "len"], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_output_limit"]]], 0],
+                            0
+                          ]
+                        ],
+                        ["set", "out", ["vec_u8.extend_bytes_range", "out", "before", "src_off", "len"]],
+                        ["set", "src_off", ["+", "src_off", "len"]],
+                        0
+                      ],
+                      [
+                        "if",
+                        ["=", "op", 1],
+                        [
+                          "begin",
+                          ["if", ["<u", ["-", "n_before", "src_off"], "len"], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]], 0],
+                          ["set", "src_off", ["+", "src_off", "len"]],
+                          0
+                        ],
+                        [
+                          "if",
+                          ["=", "op", 2],
+                          [
+                            "begin",
+                            ["if", ["<u", ["-", "n_patch", "off"], "len"], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_truncated"]]], 0],
+                            [
+                              "if",
+                              ["<", "max_out_bytes", 0],
+                              0,
+                              [
+                                "begin",
+                                ["let", "out_len", ["vec_u8.len", "out"]],
+                                ["if", ["<u", "max_out_bytes", "out_len"], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_output_limit"]]], 0],
+                                ["if", ["<u", ["-", "max_out_bytes", "out_len"], "len"], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_output_limit"]]], 0],
+                                0
+                              ]
+                            ],
+                            ["set", "out", ["vec_u8.extend_bytes_range", "out", "patch", "off", "len"]],
+                            ["set", "off", ["+", "off", "len"]],
+                            0
+                          ],
+                          ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_op"]]]
+                        ]
+                      ]
+                    ]
+                  ]
+                ],
+                0
+              ]
+            ],
+            0
+          ]
+        ],
+        ["if", ["=", "done", 1], 0, ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_truncated"]]]],
+        ["let", "out_bytes", ["vec_u8.into_bytes", "out"]],
+        ["ext.diff.patch_v1._doc_ok", ["bytes.view", "out_bytes"]]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "std.text.find",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.text.find.starts_with_v1",
+        "std.text.find.ends_with_v1",
+        "std.text.find.find_u8_v1",
+        "std.text.find.rfind_u8_v1",
+        "std.text.find.find_bytes_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.find.starts_with_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "prefix", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "bn", ["view.len", "b"]],
+        ["let", "pn", ["view.len", "prefix"]],
+        ["if", [">", "pn", "bn"], ["return", 0], 0],
+        [
+          "for",
+          "i",
+          0,
+          "pn",
+          [
+            "if",
+            [
+              "=",
+              ["=", ["view.get_u8", "b", "i"], ["view.get_u8", "prefix", "i"]],
+              0
+            ],
+            ["return", 0],
+            0
+          ]
+        ],
+        1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.find.ends_with_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "suffix", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "bn", ["view.len", "b"]],
+        ["let", "sn", ["view.len", "suffix"]],
+        ["if", [">", "sn", "bn"], ["return", 0], 0],
+        ["let", "off", ["-", "bn", "sn"]],
+        [
+          "for",
+          "i",
+          0,
+          "sn",
+          [
+            "if",
+            [
+              "=",
+              ["=", ["view.get_u8", "b", ["+", "off", "i"]], ["view.get_u8", "suffix", "i"]],
+              0
+            ],
+            ["return", 0],
+            0
+          ]
+        ],
+        1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.find.find_u8_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "needle", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["for", "i", 0, "n", ["if", ["=", ["view.get_u8", "b", "i"], "needle"], ["return", "i"], 0]],
+        ["-", 0, 1]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.find.rfind_u8_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "needle", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["let", "last", ["-", 0, 1]],
+        ["for", "i", 0, "n", ["if", ["=", ["view.get_u8", "b", "i"], "needle"], ["set", "last", "i"], 0]],
+        "last"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.find._match_at",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "i", "ty": "i32" },
+        { "name": "needle", "ty": "bytes_view" },
+        { "name": "nn", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        [
+          "for",
+          "j",
+          0,
+          "nn",
+          [
+            "if",
+            [
+              "=",
+              ["=", ["view.get_u8", "b", ["+", "i", "j"]], ["view.get_u8", "needle", "j"]],
+              0
+            ],
+            ["return", 0],
+            0
+          ]
+        ],
+        1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.find.find_bytes_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "needle", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["let", "nn", ["view.len", "needle"]],
+        ["if", ["=", "nn", 0], ["return", 0], 0],
+        ["if", ["<", "n", "nn"], ["return", ["-", 0, 1]], 0],
+        [
+          "for",
+          "i",
+          0,
+          ["+", ["-", "n", "nn"], 1],
+          ["if", ["std.text.find._match_at", "b", "i", "needle", "nn"], ["return", "i"], 0]
+        ],
+        ["-", 0, 1]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-text@0.1.0"
+  }
+}
+

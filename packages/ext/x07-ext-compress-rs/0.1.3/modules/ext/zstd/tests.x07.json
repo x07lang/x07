@@ -1,0 +1,82 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.zstd.tests",
+  "imports": [
+    "ext.zstd",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.zstd.tests.test_roundtrip_empty_v1",
+        "ext.zstd.tests.test_roundtrip_small_v1",
+        "ext.zstd.tests.test_err_invalid_magic_v1",
+        "ext.zstd.tests.test_err_output_limit_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.tests.test_roundtrip_empty_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "data", ["bytes.alloc", 0]],
+        ["let", "c", ["ext.zstd.compress_store_v1", ["bytes.view", "data"], -1]],
+        ["if", ["=", ["ext.zstd.is_err", ["bytes.view", "c"]], 1], ["return", ["result_i32.err", 1001]], 0],
+        ["let", "compressed", ["ext.zstd.get_bytes", ["bytes.view", "c"]]],
+        ["let", "d", ["ext.zstd.decompress_v1", ["bytes.view", "compressed"], 0]],
+        ["if", ["=", ["ext.zstd.is_err", ["bytes.view", "d"]], 1], ["return", ["result_i32.err", 1002]], 0],
+        ["let", "out", ["ext.zstd.get_bytes", ["bytes.view", "d"]]],
+        ["std.test.assert_bytes_eq", "out", "data", 1003]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.tests.test_roundtrip_small_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "data", ["bytes.lit", "hello"]],
+        ["let", "c", ["ext.zstd.compress_store_v1", ["bytes.view", "data"], -1]],
+        ["if", ["=", ["ext.zstd.is_err", ["bytes.view", "c"]], 1], ["return", ["result_i32.err", 2001]], 0],
+        ["let", "compressed", ["ext.zstd.get_bytes", ["bytes.view", "c"]]],
+        ["let", "d", ["ext.zstd.decompress_v1", ["bytes.view", "compressed"], 16]],
+        ["if", ["=", ["ext.zstd.is_err", ["bytes.view", "d"]], 1], ["return", ["result_i32.err", 2002]], 0],
+        ["let", "out", ["ext.zstd.get_bytes", ["bytes.view", "d"]]],
+        ["std.test.assert_bytes_eq", "out", "data", 2003]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.tests.test_err_invalid_magic_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "bad", ["bytes.lit", "NOPE"]],
+        ["let", "d", ["ext.zstd.decompress_v1", ["bytes.view", "bad"], 16]],
+        ["std.test.assert_true", ["=", ["ext.zstd.is_err", ["bytes.view", "d"]], 1], 3001]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zstd.tests.test_err_output_limit_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "data", ["bytes.lit", "hello"]],
+        ["let", "c", ["ext.zstd.compress_store_v1", ["bytes.view", "data"], -1]],
+        ["if", ["=", ["ext.zstd.is_err", ["bytes.view", "c"]], 1], ["return", ["result_i32.err", 4001]], 0],
+        ["let", "compressed", ["ext.zstd.get_bytes", ["bytes.view", "c"]]],
+        ["let", "d", ["ext.zstd.decompress_v1", ["bytes.view", "compressed"], 4]],
+        ["std.test.assert_true", ["=", ["ext.zstd.is_err", ["bytes.view", "d"]], 1], 4002]
+      ]
+    }
+  ]
+}
+

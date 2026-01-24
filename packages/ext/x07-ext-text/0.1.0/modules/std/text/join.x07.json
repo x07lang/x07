@@ -1,0 +1,107 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "std.text.join",
+  "imports": [
+    "std.text.slices"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.text.join.join_slices_u8_v1",
+        "std.text.join.join_slices_bytes_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.join.join_slices_u8_v1",
+      "params": [
+        { "name": "base", "ty": "bytes_view" },
+        { "name": "x7sl", "ty": "bytes_view" },
+        { "name": "sep", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "count", ["std.text.slices.count_v1", "x7sl"]],
+        ["if", ["<", "count", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", "count", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "out", ["vec_u8.with_capacity", 64]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            [
+              "if",
+              ["=", "i", 0],
+              0,
+              ["set", "out", ["vec_u8.push", "out", "sep"]]
+            ],
+            ["let", "v", ["std.text.slices.view_at_v1", "base", "x7sl", "i"]],
+            ["let", "n", ["view.len", "v"]],
+            ["set", "out", ["vec_u8.extend_bytes_range", "out", "v", 0, "n"]]
+          ]
+        ],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.join.join_slices_bytes_v1",
+      "params": [
+        { "name": "base", "ty": "bytes_view" },
+        { "name": "x7sl", "ty": "bytes_view" },
+        { "name": "sep", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "count", ["std.text.slices.count_v1", "x7sl"]],
+        ["if", ["<", "count", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", "count", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "sep_len", ["view.len", "sep"]],
+        ["let", "total", 0],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["if", ["=", "i", 0], 0, ["set", "total", ["+", "total", "sep_len"]]],
+            ["set", "total", ["+", "total", ["std.text.slices.len_v1", "x7sl", "i"]]]
+          ]
+        ],
+        ["let", "out", ["vec_u8.with_capacity", "total"]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            [
+              "if",
+              ["=", "i", 0],
+              0,
+              ["set", "out", ["vec_u8.extend_bytes_range", "out", "sep", 0, "sep_len"]]
+            ],
+            ["let", "v", ["std.text.slices.view_at_v1", "base", "x7sl", "i"]],
+            ["let", "n", ["view.len", "v"]],
+            ["set", "out", ["vec_u8.extend_bytes_range", "out", "v", 0, "n"]]
+          ]
+        ],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-text@0.1.0"
+  }
+}
+

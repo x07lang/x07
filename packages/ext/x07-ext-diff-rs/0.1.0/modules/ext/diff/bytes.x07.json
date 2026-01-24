@@ -1,0 +1,97 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "ext.diff.bytes",
+  "imports": [
+    "ext.diff.patch_v1"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.diff.bytes.patch_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.bytes.patch_v1",
+      "params": [
+        { "name": "before", "ty": "bytes_view" },
+        { "name": "after", "ty": "bytes_view" },
+        { "name": "max_patch_bytes", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "before"]],
+        ["let", "m", ["view.len", "after"]],
+        ["let", "min", ["if", ["<u", "n", "m"], "n", "m"]],
+        ["let", "p", 0],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "min", 1],
+          [
+            "if",
+            ["=", "done", 0],
+            [
+              "if",
+              ["<u", "p", "min"],
+              [
+                "begin",
+                [
+                  "if",
+                  ["=", ["view.get_u8", "before", "p"], ["view.get_u8", "after", "p"]],
+                  ["set", "p", ["+", "p", 1]],
+                  ["set", "done", 1]
+                ],
+                0
+              ],
+              ["set", "done", 1]
+            ],
+            0
+          ]
+        ],
+        ["let", "rem_b", ["-", "n", "p"]],
+        ["let", "rem_a", ["-", "m", "p"]],
+        ["let", "max_s", ["if", ["<u", "rem_b", "rem_a"], "rem_b", "rem_a"]],
+        ["let", "s", 0],
+        ["let", "done2", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "max_s", 1],
+          [
+            "if",
+            ["=", "done2", 0],
+            [
+              "if",
+              ["<u", "s", "max_s"],
+              [
+                "begin",
+                ["let", "bi", ["-", ["-", "n", 1], "s"]],
+                ["let", "ai", ["-", ["-", "m", 1], "s"]],
+                [
+                  "if",
+                  ["=", ["view.get_u8", "before", "bi"], ["view.get_u8", "after", "ai"]],
+                  ["set", "s", ["+", "s", 1]],
+                  ["set", "done2", 1]
+                ],
+                0
+              ],
+              ["set", "done2", 1]
+            ],
+            0
+          ]
+        ],
+        ["let", "delete_len", ["-", ["-", "n", "p"], "s"]],
+        ["let", "ins_len", ["-", ["-", "m", "p"], "s"]],
+        ["let", "insert", ["view.slice", "after", "p", "ins_len"]],
+        ["ext.diff.patch_v1.from_parts_v1", "p", "delete_len", "insert", "s", "max_patch_bytes"]
+      ]
+    }
+  ]
+}

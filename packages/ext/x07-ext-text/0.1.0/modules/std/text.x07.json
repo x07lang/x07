@@ -1,0 +1,35 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "std.text",
+  "imports": [
+    "std.text.ascii",
+    "std.text.utf8",
+    "std.text.slices",
+    "std.text.ws",
+    "std.text.lines",
+    "std.text.split",
+    "std.text.join",
+    "std.text.find"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.text.ascii",
+        "std.text.utf8",
+        "std.text.slices",
+        "std.text.ws",
+        "std.text.lines",
+        "std.text.split",
+        "std.text.join",
+        "std.text.find"
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-text@0.1.0"
+  }
+}
+

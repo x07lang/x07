@@ -1,0 +1,131 @@
+{
+  "schema_version": "x07.x07ast@0.1.0",
+  "kind": "module",
+  "module_id": "std.text.tests",
+  "imports": [
+    "std.test",
+    "std.text.find",
+    "std.text.join",
+    "std.text.slices",
+    "std.text.split",
+    "std.text.ws"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.text.tests.test_trim_ascii_whitespace",
+        "std.text.tests.test_split_bytes_view",
+        "std.text.tests.test_join_slices_u8",
+        "std.text.tests.test_find_bytes"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.tests.test_trim_ascii_whitespace",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "b",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 13]],
+              ["set", "v", ["vec_u8.push", "v", 32]],
+              ["set", "v", ["vec_u8.push", "v", 9]],
+              ["set", "v", ["vec_u8.push", "v", 10]],
+              ["set", "v", ["vec_u8.push", "v", 104]],
+              ["set", "v", ["vec_u8.push", "v", 101]],
+              ["set", "v", ["vec_u8.push", "v", 108]],
+              ["set", "v", ["vec_u8.push", "v", 108]],
+              ["set", "v", ["vec_u8.push", "v", 111]],
+              ["set", "v", ["vec_u8.push", "v", 13]],
+              ["set", "v", ["vec_u8.push", "v", 10]],
+              ["set", "v", ["vec_u8.push", "v", 9]],
+              ["set", "v", ["vec_u8.push", "v", 32]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "v", ["std.text.ws.trim_ascii_whitespace_view_v1", ["bytes.view", "b"]]],
+        ["try", ["std.test.assert_bytes_eq", ["view.to_bytes", "v"], ["bytes.lit", "hello"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.tests.test_split_bytes_view",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "b", ["bytes.lit", "a--b--c"]],
+        ["let", "sep", ["bytes.lit", "--"]],
+        ["let", "x7sl", ["std.text.split.split_bytes_view_v1", ["bytes.view", "b"], ["bytes.view", "sep"]]],
+        ["let", "xv", ["bytes.view", "x7sl"]],
+        ["try", ["std.test.assert_i32_eq", ["std.text.slices.count_v1", "xv"], 3, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.text.slices.copy_at_v1", ["bytes.view", "b"], "xv", 0], ["bytes.lit", "a"], ["std.test.code_assert_bytes_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.text.slices.copy_at_v1", ["bytes.view", "b"], "xv", 1], ["bytes.lit", "b"], ["std.test.code_assert_bytes_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.text.slices.copy_at_v1", ["bytes.view", "b"], "xv", 2], ["bytes.lit", "c"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.tests.test_join_slices_u8",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "b", ["bytes.lit", "a,b,c"]],
+        ["let", "x7sl", ["std.text.split.split_u8_view_v1", ["bytes.view", "b"], 44]],
+        ["let", "out", ["std.text.join.join_slices_u8_v1", ["bytes.view", "b"], ["bytes.view", "x7sl"], 124]],
+        ["try", ["std.test.assert_bytes_eq", "out", ["bytes.lit", "a|b|c"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.text.tests.test_find_bytes",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "b",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 11]],
+              ["set", "v", ["vec_u8.push", "v", 104]],
+              ["set", "v", ["vec_u8.push", "v", 101]],
+              ["set", "v", ["vec_u8.push", "v", 108]],
+              ["set", "v", ["vec_u8.push", "v", 108]],
+              ["set", "v", ["vec_u8.push", "v", 111]],
+              ["set", "v", ["vec_u8.push", "v", 32]],
+              ["set", "v", ["vec_u8.push", "v", 119]],
+              ["set", "v", ["vec_u8.push", "v", 111]],
+              ["set", "v", ["vec_u8.push", "v", 114]],
+              ["set", "v", ["vec_u8.push", "v", 108]],
+              ["set", "v", ["vec_u8.push", "v", 100]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "needle", ["bytes.lit", "world"]],
+        ["let", "prefix", ["bytes.lit", "hell"]],
+        ["let", "suffix", ["bytes.lit", "rld"]],
+        ["try", ["std.test.assert_i32_eq", ["std.text.find.find_bytes_v1", ["bytes.view", "b"], ["bytes.view", "needle"]], 6, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["std.text.find.starts_with_v1", ["bytes.view", "b"], ["bytes.view", "prefix"]], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["std.text.find.ends_with_v1", ["bytes.view", "b"], ["bytes.view", "suffix"]], 1, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}
