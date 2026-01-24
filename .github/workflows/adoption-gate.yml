@@ -54,6 +54,8 @@ jobs:
             clang \
             curl \
             git \
+            libcurl4-openssl-dev \
+            libssl-dev \
             openssl \
             pkg-config \
             python3 \
@@ -100,4 +102,3 @@ jobs:
     steps:
       - name: Gate
         run: echo "adoption-gate passed"
-

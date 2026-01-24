@@ -18,7 +18,7 @@ $pinnedToolchain = -not [string]::IsNullOrWhiteSpace($Toolchain)
 
 function Log([string]$msg) {
   if ($Quiet) { return }
-  Write-Host $msg 1>&2
+  [Console]::Error.WriteLine($msg)
 }
 
 function Fail([int]$exitCode, [string]$code, [string]$message, [string]$hint = "") {
@@ -46,8 +46,8 @@ function Fail([int]$exitCode, [string]$code, [string]$message, [string]$hint = "
   if ($Json) {
     $report | ConvertTo-Json -Depth 6
   } else {
-    Write-Error "$code: $message"
-    if ($hint) { Write-Host "hint: $hint" 1>&2 }
+    [Console]::Error.WriteLine(("{0}: {1}" -f $code, $message))
+    if ($hint) { [Console]::Error.WriteLine(("hint: {0}" -f $hint)) }
   }
   exit $exitCode
 }
@@ -64,7 +64,11 @@ if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
 
 Log "fetch channels manifest: $ChannelsUrl"
 try {
-  $manifestText = (Invoke-WebRequest -UseBasicParsing $ChannelsUrl).Content
+  if ((Get-Command Invoke-WebRequest).Parameters.ContainsKey("UseBasicParsing")) {
+    $manifestText = (Invoke-WebRequest -UseBasicParsing $ChannelsUrl).Content
+  } else {
+    $manifestText = (Invoke-WebRequest $ChannelsUrl).Content
+  }
   $manifest = $manifestText | ConvertFrom-Json
 } catch {
   Fail 10 "NETWORK_ERROR" "failed to download channels manifest" $_.Exception.Message
@@ -117,7 +121,11 @@ $x07upArchive = Join-Path $downloads $archiveName
 
 Log "download x07up: $x07upUrl"
 try {
-  Invoke-WebRequest -UseBasicParsing $x07upUrl -OutFile $x07upArchive
+  if ((Get-Command Invoke-WebRequest).Parameters.ContainsKey("UseBasicParsing")) {
+    Invoke-WebRequest -UseBasicParsing $x07upUrl -OutFile $x07upArchive
+  } else {
+    Invoke-WebRequest $x07upUrl -OutFile $x07upArchive
+  }
 } catch {
   Fail 10 "NETWORK_ERROR" "failed to download x07up archive" $_.Exception.Message
 }
