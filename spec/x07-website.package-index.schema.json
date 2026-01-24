@@ -69,6 +69,11 @@
       "enum": ["pure", "os-world-only"],
       "description": "Determinism tier declared by the package."
     },
+    "visibility": {
+      "type": "string",
+      "enum": ["canonical", "advanced", "experimental"],
+      "description": "Audience guidance for agents (used for canonical package recommendations)."
+    },
     "import_mode": {
       "type": "string",
       "enum": ["handwritten", "x07import", "ffi"],
@@ -147,6 +152,7 @@
           "items": { "$ref": "#/$defs/pkg_ref" }
         },
         "import_mode": { "$ref": "#/$defs/import_mode" },
+        "visibility": { "$ref": "#/$defs/visibility" },
         "ffi_libs": {
           "type": "array",
           "uniqueItems": true,
