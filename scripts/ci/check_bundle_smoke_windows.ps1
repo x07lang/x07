@@ -151,7 +151,7 @@ try {
 
     $expected = @("echo-argv","--alpha","A","--beta","B")
     if ($args.Count -ne $expected.Count) {
-      throw "argv_v1 arg count mismatch profile=$profile: got=$($args.Count) expected=$($expected.Count) args=$($args -join ' | ')"
+      throw "argv_v1 arg count mismatch profile=${profile}: got=$($args.Count) expected=$($expected.Count) args=$($args -join ' | ')"
     }
     for ($i = 0; $i -lt $expected.Count; $i++) {
       if ($args[$i] -ne $expected[$i]) {
