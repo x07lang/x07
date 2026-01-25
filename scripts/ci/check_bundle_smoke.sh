@@ -116,7 +116,7 @@ run_and_capture_stdout_bin() {
 
   if is_linux && [[ "${X07_BUNDLE_SMOKE_DOCKER:-1}" != "0" ]]; then
     if ! command -v docker >/dev/null 2>&1; then
-      if [[ "${CI:-}" == "true" ]]; then
+      if [[ "${CI:-}" == "true" ]] && [[ ! -f "/.dockerenv" ]]; then
         echo "ERROR: docker missing on Linux CI host (required for no-toolchain bundle gate)" >&2
         exit 2
       fi
