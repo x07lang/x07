@@ -155,7 +155,7 @@ try {
     }
     for ($i = 0; $i -lt $expected.Count; $i++) {
       if ($args[$i] -ne $expected[$i]) {
-        throw "argv_v1 mismatch profile=$profile at index=$i: got='$($args[$i])' expected='$($expected[$i])' all=$($args -join ' | ')"
+        throw "argv_v1 mismatch profile=$profile at index=${i}: got='$($args[$i])' expected='$($expected[$i])' all=$($args -join ' | ')"
       }
     }
 
