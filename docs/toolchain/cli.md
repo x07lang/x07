@@ -81,6 +81,16 @@ Notes:
 
 See: [Embedding in C](embedding-in-c.md).
 
+### Bundle a native executable (distribution)
+
+- `x07 bundle --project x07.json --profile os --out dist/mytool`
+  - Produces a native CLI executable (standard `argc/argv`, raw stdout).
+  - Runs without the X07 toolchain installed at runtime.
+- `x07 bundle --project x07.json --profile sandbox --out dist/mytool`
+  - Bundles a policy-enforced OS-world executable (requires a base policy via profile or `--policy`).
+
+Bundle report schema: `spec/x07-bundle.report.schema.json` (`schema_version: "x07.bundle.report@0.1.0"`).
+
 ### Running programs (canonical)
 
 Use `x07 run` as the canonical entry point for execution. Prefer intent-driven profiles (`x07.json.default_profile` + `x07.json.profiles`) so most invocations look like:

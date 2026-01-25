@@ -21,6 +21,8 @@ Executables produced by the X07 runners use a simple byte framing:
 
 `x07 run`, `x07-host-runner`, and `x07-os-runner` handle this framing automatically.
 
+This “framed I/O” executable ABI is designed for machine-driven execution. If you want a normal end-user CLI binary (no framing, standard `argc/argv`, raw stdout) use `x07 bundle`.
+
 ## Pick a world (deterministic vs OS)
 
 Worlds:
@@ -112,10 +114,27 @@ Common flags:
 
 - `--cc-profile default|size`
 - `--max-c-bytes <BYTES>`
-- `--compiled-out <PATH>` (write the produced executable)
+- `--compiled-out <PATH>` (write the produced runner executable; framed I/O)
 - `--compile-only` (deterministic `solve-*` worlds only; not valid with `--artifact`)
 - `--solve-fuel <N>`, `--max-memory-bytes <N>`, `--max-output-bytes <N>`, `--cpu-time-limit-seconds <N>`
 - `--auto-ffi` / `--no-auto-ffi` (OS worlds; collect/apply C FFI flags from dependencies)
+
+## Distribute a native executable (canonical): `x07 bundle`
+
+`x07 bundle` produces a native CLI executable that can be run directly (no framed I/O) and does not require the X07 toolchain at runtime.
+
+Examples:
+
+```bash
+# Bundle an OS-world CLI binary:
+x07 bundle --profile os --out dist/mytool
+./dist/mytool --help
+
+# Bundle a policy-enforced OS-world binary (requires a base policy via profile or --policy):
+x07 bundle --profile sandbox --out dist/mytool
+```
+
+The bundled binary encodes `argc/argv` to `argv_v1` input bytes and writes the program output bytes directly to stdout.
 
 ## Reports (stdout + optional file)
 

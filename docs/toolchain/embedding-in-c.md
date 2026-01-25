@@ -2,8 +2,10 @@
 
 `x07 build` compiles a project to a single C file. You can use the output either as:
 
-- a standalone executable (generated `main()`), or
+- a runner executable (generated `main()` with framed stdin/stdout), or
 - an embeddable library entry point (`x07_solve_v2`) in freestanding mode.
+
+For end-user distribution (a normal CLI binary that runs without the X07 toolchain installed), use `x07 bundle`.
 
 ## Generate C
 
@@ -71,7 +73,7 @@ clang -O2 -Ibuild -o test_embed test_embed.c build/program.c
 ./test_embed
 ```
 
-## Standalone mode (executable I/O framing)
+## Runner executable mode (framed I/O)
 
 The default (non-freestanding) output includes a `main()` that uses the standard X07 executable framing:
 

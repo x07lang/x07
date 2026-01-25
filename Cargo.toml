@@ -7,6 +7,7 @@ members = [
   "crates/x07c",
   "crates/x07up",
   "crates/x07-host-runner",
+  "crates/x07-runner-common",
   "crates/x07-pkg",
   "crates/x07-ext-db-native-core",
   "crates/x07-ext-db-mysql-native",

@@ -52,6 +52,10 @@ Canonical docs:
 
    If any dependency declares required helper packages via `meta.requires_packages`, `x07 pkg lock` may also update `x07.json` to add those transitive deps.
 
+8. If you need a distributable native executable (end-user CLI binary, no toolchain required at runtime), bundle it:
+   - `x07 bundle --profile os --out dist/app`
+   - `x07 bundle --profile sandbox --out dist/app` (policy enforced)
+
 Keep each iteration small and deterministic; if a repair loop does not converge quickly, stop and re-evaluate the approach.
 
 Note: paths above assume a project scaffold (`x07 init`). In a publishable package repo (`x07 init --package`), format/lint the

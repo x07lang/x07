@@ -21,6 +21,19 @@ X07 is intended to make it easy for agents to build robust command-line tools.
    x07 run --profile os -- tool --help
    ```
 
+4. Distribute a normal CLI binary (no toolchain required at runtime):
+
+   ```bash
+   x07 bundle --profile os --out dist/tool
+   ./dist/tool --help
+   ```
+
+   For policy-enforced distribution:
+
+   ```bash
+   x07 bundle --profile sandbox --out dist/tool
+   ```
+
 ## Using `ext-cli`
 
 `ext-cli` parses a declarative CLI spec plus an `argv_v1` byte encoding.

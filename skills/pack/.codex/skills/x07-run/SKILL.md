@@ -73,3 +73,10 @@ Optional wrapper (debuggable resolution envelope):
 
 - `x07 run --report wrapped`
 - Wrapper schema: `x07.run.report@0.1.0` (field `report` contains the raw runner report object).
+
+## Distribution (native executable)
+
+To produce a normal CLI executable (standard `argc/argv`, raw stdout) that runs without the X07 toolchain installed at runtime, use:
+
+- `x07 bundle --profile os --out dist/app`
+- `x07 bundle --profile sandbox --out dist/app` (policy enforced)

@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-bundle.report.schema.json",
+  "title": "X07 x07 bundle report v0.1.0",
+  "description": "Wrapper report emitted by `x07 bundle`. Includes target resolution + bundling metadata + the underlying runner report used to produce the native artifact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "runner", "world", "target", "bundle", "report"],
+  "properties": {
+    "schema_version": { "const": "x07.bundle.report@0.1.0" },
+
+    "runner": { "enum": ["host", "os"] },
+
+    "world": {
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "project_root", "lockfile", "resolved_module_roots"],
+      "properties": {
+        "kind": { "enum": ["project", "program", "artifact"] },
+        "path": { "type": "string" },
+        "project_root": { "type": ["string", "null"] },
+        "lockfile": { "type": ["string", "null"] },
+        "resolved_module_roots": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["out", "name", "abi", "policy"],
+      "properties": {
+        "out": {
+          "type": "string",
+          "description": "Path to the produced native executable."
+        },
+        "name": {
+          "type": "string",
+          "description": "Synthetic argv[0] injected by the wrapper (stable; usually derived from the output basename)."
+        },
+        "abi": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "enum": ["argv_v1"],
+              "description": "The wrapper encodes process args to argv_v1 input bytes."
+            }
+          }
+        },
+        "policy": {
+          "description": "Policy materialization info for run-os-sandboxed bundles; null for other worlds.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["base_policy", "effective_policy", "embedded_env_keys"],
+              "properties": {
+                "base_policy": { "type": "string" },
+                "effective_policy": { "type": "string" },
+                "embedded_env_keys": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          ]
+        },
+        "emit_dir": {
+          "type": ["string", "null"],
+          "description": "Optional directory where intermediate C sources/headers were emitted (debug/inspection)."
+        }
+      }
+    },
+
+    "report": { "type": "object" }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "runner": { "const": "host" } } },
+      "then": {
+        "properties": {
+          "report": { "$ref": "https://x07.io/spec/x07-host-runner.report.schema.json" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "runner": { "const": "os" } } },
+      "then": {
+        "properties": {
+          "report": { "$ref": "https://x07.io/spec/x07-os-runner.report.schema.json" }
+        }
+      }
+    },
+
+    {
+      "if": { "properties": { "world": { "const": "run-os-sandboxed" } } },
+      "then": {
+        "properties": {
+          "bundle": {
+            "properties": {
+              "policy": { "type": "object" }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "bundle": {
+            "properties": {
+              "policy": { "type": "null" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

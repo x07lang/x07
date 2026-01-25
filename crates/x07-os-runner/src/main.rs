@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -13,6 +12,7 @@ use x07_host_runner::{
     apply_cc_profile, compile_program_with_options, CcProfile, CompilerResult, RunnerConfig,
     RunnerResult,
 };
+use x07_runner_common::{auto_ffi, os_env, os_paths};
 use x07_worlds::WorldId;
 
 #[cfg(test)]
@@ -214,7 +214,7 @@ fn try_main() -> Result<std::process::ExitCode> {
 
             let module_roots = collect_module_roots_for_os(&cli)?;
             let auto_ffi_cc_args = if cli.auto_ffi {
-                collect_auto_ffi_cc_args(&module_roots)?
+                auto_ffi::collect_auto_ffi_cc_args(&module_roots)?
             } else {
                 Vec::new()
             };
@@ -303,7 +303,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 .with_context(|| format!("read entry: {}", entry_path.display()))?;
 
             let mut module_roots = project::collect_module_roots(project_path, &manifest, &lock)?;
-            let os_roots = default_os_module_roots()?;
+            let os_roots = os_paths::default_os_module_roots()?;
             for r in os_roots {
                 if !module_roots.contains(&r) {
                     module_roots.push(r);
@@ -311,8 +311,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             }
 
             if cli.auto_ffi {
-                extra_cc_args.extend(collect_auto_ffi_cc_args(&module_roots)?);
-                dedup_cc_args(&mut extra_cc_args);
+                extra_cc_args.extend(auto_ffi::collect_auto_ffi_cc_args(&module_roots)?);
             }
 
             let mut compile_options =
@@ -447,249 +446,13 @@ fn compile_runner_config(cli: &Cli, max_output_bytes: usize) -> RunnerConfig {
 
 fn collect_module_roots_for_os(cli: &Cli) -> Result<Vec<PathBuf>> {
     let mut roots = cli.module_root.clone();
-    let os_roots = default_os_module_roots()?;
+    let os_roots = os_paths::default_os_module_roots()?;
     for r in os_roots {
         if !roots.contains(&r) {
             roots.push(r);
         }
     }
     Ok(roots)
-}
-
-fn dedup_cc_args(args: &mut Vec<String>) {
-    let mut seen: HashSet<String> = HashSet::new();
-    args.retain(|a| seen.insert(a.clone()));
-}
-
-fn find_package_manifest_for_module_root(module_root: &Path) -> Option<PathBuf> {
-    let direct = module_root.join("x07-package.json");
-    if direct.is_file() {
-        return Some(direct);
-    }
-    let parent = module_root.parent()?.join("x07-package.json");
-    if parent.is_file() {
-        return Some(parent);
-    }
-    None
-}
-
-fn collect_auto_ffi_cc_args(module_roots: &[PathBuf]) -> Result<Vec<String>> {
-    let mut include_args: Vec<String> = Vec::new();
-    let mut source_args: Vec<String> = Vec::new();
-    let mut lib_search_args: Vec<String> = Vec::new();
-    let mut lib_args: Vec<String> = Vec::new();
-
-    let mut seen_packages: HashSet<PathBuf> = HashSet::new();
-    let mut seen_sources: HashSet<String> = HashSet::new();
-    let mut seen_includes: HashSet<String> = HashSet::new();
-    let mut seen_lib_search: HashSet<String> = HashSet::new();
-    let mut seen_libs: HashSet<String> = HashSet::new();
-
-    let mut need_openssl_prefix = false;
-    let mut need_winsock = false;
-
-    for module_root in module_roots {
-        let Some(manifest_path) = find_package_manifest_for_module_root(module_root) else {
-            continue;
-        };
-        if !manifest_path.is_file() {
-            continue;
-        }
-
-        let manifest_path = std::fs::canonicalize(&manifest_path).unwrap_or(manifest_path);
-        let pkg_root = manifest_path
-            .parent()
-            .context("package manifest missing parent dir")?
-            .to_path_buf();
-        if !seen_packages.insert(pkg_root.clone()) {
-            continue;
-        }
-
-        let txt = std::fs::read_to_string(&manifest_path)
-            .with_context(|| format!("read package manifest: {}", manifest_path.display()))?;
-        let doc: serde_json::Value = serde_json::from_str(&txt)
-            .with_context(|| format!("parse package manifest JSON: {}", manifest_path.display()))?;
-
-        let import_mode = doc
-            .get("meta")
-            .and_then(|v| v.get("import_mode"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        if import_mode != "ffi" {
-            continue;
-        }
-
-        let name = doc
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        if cfg!(windows) && name == "ext-sockets-c" {
-            need_winsock = true;
-        }
-
-        let mut ffi_libs: Vec<String> = Vec::new();
-        if let Some(libs) = doc
-            .get("meta")
-            .and_then(|v| v.get("ffi_libs"))
-            .and_then(|v| v.as_array())
-        {
-            for lib in libs {
-                if let Some(lib) = lib.as_str() {
-                    ffi_libs.push(lib.to_string());
-                }
-            }
-        }
-
-        if ffi_libs.iter().any(|l| l == "ssl" || l == "crypto") {
-            need_openssl_prefix = true;
-        }
-
-        let ffi_dir = pkg_root.join("ffi");
-        if !ffi_dir.is_dir() {
-            anyhow::bail!(
-                "package {:?} is meta.import_mode=ffi but missing ffi directory: {}",
-                name,
-                ffi_dir.display()
-            );
-        }
-
-        let mut c_files: Vec<PathBuf> = Vec::new();
-        for entry in std::fs::read_dir(&ffi_dir)
-            .with_context(|| format!("list ffi dir: {}", ffi_dir.display()))?
-        {
-            let entry =
-                entry.with_context(|| format!("read ffi dir entry: {}", ffi_dir.display()))?;
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("c") {
-                c_files.push(path);
-            }
-        }
-        c_files.sort();
-        if c_files.is_empty() {
-            anyhow::bail!(
-                "package {:?} is meta.import_mode=ffi but has no ffi/*.c sources: {}",
-                name,
-                ffi_dir.display()
-            );
-        }
-        for p in c_files {
-            let p = std::fs::canonicalize(&p).unwrap_or(p);
-            let arg = p.display().to_string();
-            if seen_sources.insert(arg.clone()) {
-                source_args.push(arg);
-            }
-        }
-
-        for lib in ffi_libs {
-            let arg = format!("-l{lib}");
-            if seen_libs.insert(arg.clone()) {
-                lib_args.push(arg);
-            }
-        }
-    }
-
-    if cfg!(target_os = "macos") && need_openssl_prefix {
-        if let Some(prefix) = brew_prefix_openssl() {
-            let inc = format!("-I{}", prefix.join("include").display());
-            if seen_includes.insert(inc.clone()) {
-                include_args.push(inc);
-            }
-
-            let libdir = prefix.join("lib");
-            let libdir_s = libdir.display().to_string();
-            let l = format!("-L{libdir_s}");
-            if seen_lib_search.insert(l.clone()) {
-                lib_search_args.push(l);
-            }
-            let r = format!("-Wl,-rpath,{libdir_s}");
-            if seen_lib_search.insert(r.clone()) {
-                lib_search_args.push(r);
-            }
-        }
-    }
-
-    if need_winsock {
-        let arg = "-lws2_32".to_string();
-        if seen_libs.insert(arg.clone()) {
-            lib_args.push(arg);
-        }
-    }
-
-    let mut out = Vec::new();
-    out.extend(include_args);
-    out.extend(source_args);
-    out.extend(lib_search_args);
-    out.extend(lib_args);
-    dedup_cc_args(&mut out);
-    Ok(out)
-}
-
-fn brew_prefix_openssl() -> Option<PathBuf> {
-    if !cfg!(target_os = "macos") {
-        return None;
-    }
-
-    for formula in ["openssl@3", "openssl@1.1", "openssl"] {
-        let out = Command::new("brew")
-            .args(["--prefix", formula])
-            .output()
-            .ok()?;
-        if !out.status.success() {
-            continue;
-        }
-        let prefix = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        if prefix.is_empty() {
-            continue;
-        }
-        let prefix = PathBuf::from(prefix);
-        if prefix.join("include").is_dir() && prefix.join("lib").is_dir() {
-            return Some(prefix);
-        }
-    }
-    None
-}
-
-fn default_os_module_roots() -> Result<Vec<PathBuf>> {
-    let mut checked: Vec<PathBuf> = Vec::new();
-
-    let rel = PathBuf::from("stdlib/os/0.2.0/modules");
-    checked.push(rel.clone());
-    if rel.is_dir() {
-        return Ok(vec![rel]);
-    }
-
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(exe_dir) = exe.parent() {
-            for base in [Some(exe_dir), exe_dir.parent()] {
-                let Some(base) = base else { continue };
-                let cand = base.join("stdlib/os/0.2.0/modules");
-                checked.push(cand.clone());
-                if cand.is_dir() {
-                    return Ok(vec![cand]);
-                }
-            }
-        }
-    }
-
-    let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if let Some(workspace_root) = crate_dir.parent().and_then(|p| p.parent()) {
-        let abs = workspace_root.join("stdlib/os/0.2.0/modules");
-        checked.push(abs.clone());
-        if abs.is_dir() {
-            return Ok(vec![abs]);
-        }
-    }
-
-    let checked = checked
-        .into_iter()
-        .map(|p| format!("  - {}", p.display()))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    anyhow::bail!(
-        "could not locate stdlib/os module root (expected stdlib/os/0.2.0/modules)\n\nlooked for:\n{checked}\n\nfix:\n  - install an official toolchain archive (it must include stdlib/os/0.2.0/modules), or\n  - run x07-os-runner from the x07 repo root"
-    );
 }
 
 fn load_policy(world: WorldId, policy_path: Option<&PathBuf>) -> Result<Option<policy::Policy>> {
@@ -891,253 +654,9 @@ fn run_child(inv: &RunInvocation<'_>) -> Result<ChildOutput> {
     }
 
     if let Some(pol) = inv.policy {
-        cmd.env("X07_OS_FS", if pol.fs.enabled { "1" } else { "0" });
-        cmd.env("X07_OS_NET", if pol.net.enabled { "1" } else { "0" });
-        cmd.env("X07_OS_DB", if pol.db.enabled { "1" } else { "0" });
-        cmd.env("X07_OS_ENV", if pol.env.enabled { "1" } else { "0" });
-        cmd.env("X07_OS_TIME", if pol.time.enabled { "1" } else { "0" });
-        cmd.env("X07_OS_PROC", if pol.process.enabled { "1" } else { "0" });
-        cmd.env(
-            "X07_OS_DENY_HIDDEN",
-            if pol.fs.deny_hidden { "1" } else { "0" },
-        );
-        cmd.env("X07_OS_FS_READ_ROOTS", pol.fs.read_roots.join(";"));
-        cmd.env("X07_OS_FS_WRITE_ROOTS", pol.fs.write_roots.join(";"));
-        cmd.env(
-            "X07_OS_FS_ALLOW_SYMLINKS",
-            if pol.fs.allow_symlinks { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_FS_ALLOW_MKDIR",
-            if pol.fs.allow_mkdir { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_FS_ALLOW_REMOVE",
-            if pol.fs.allow_remove { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_FS_ALLOW_RENAME",
-            if pol.fs.allow_rename { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_FS_ALLOW_WALK",
-            if pol.fs.allow_walk { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_FS_ALLOW_GLOB",
-            if pol.fs.allow_glob { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_FS_MAX_READ_BYTES",
-            pol.fs.max_read_bytes.to_string(),
-        );
-        cmd.env(
-            "X07_OS_FS_MAX_WRITE_BYTES",
-            pol.fs.max_write_bytes.to_string(),
-        );
-        cmd.env("X07_OS_FS_MAX_ENTRIES", pol.fs.max_entries.to_string());
-        cmd.env("X07_OS_FS_MAX_DEPTH", pol.fs.max_depth.to_string());
-        cmd.env("X07_OS_ENV_ALLOW_KEYS", pol.env.allow_keys.join(";"));
-        cmd.env("X07_OS_ENV_DENY_KEYS", pol.env.deny_keys.join(";"));
-        cmd.env(
-            "X07_OS_DB_SQLITE",
-            if pol.db.drivers.sqlite { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_DB_PG",
-            if pol.db.drivers.postgres { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_DB_MYSQL",
-            if pol.db.drivers.mysql { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_DB_REDIS",
-            if pol.db.drivers.redis { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_DB_SQLITE_READONLY_ONLY",
-            if pol.db.sqlite.readonly_only {
-                "1"
-            } else {
-                "0"
-            },
-        );
-        cmd.env(
-            "X07_OS_DB_SQLITE_ALLOW_CREATE",
-            if pol.db.sqlite.allow_create { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_DB_SQLITE_ALLOW_IN_MEMORY",
-            if pol.db.sqlite.allow_in_memory {
-                "1"
-            } else {
-                "0"
-            },
-        );
-        cmd.env(
-            "X07_OS_DB_SQLITE_ALLOW_PATHS",
-            pol.db.sqlite.allow_paths.join(";"),
-        );
-        cmd.env(
-            "X07_OS_DB_MAX_LIVE_CONNS",
-            pol.db.max_live_conns.to_string(),
-        );
-        cmd.env("X07_OS_DB_MAX_QUERIES", pol.db.max_queries.to_string());
-        cmd.env(
-            "X07_OS_DB_MAX_CONNECT_TIMEOUT_MS",
-            pol.db.connect_timeout_ms.to_string(),
-        );
-        cmd.env(
-            "X07_OS_DB_MAX_QUERY_TIMEOUT_MS",
-            pol.db.query_timeout_ms.to_string(),
-        );
-        cmd.env("X07_OS_DB_MAX_SQL_BYTES", pol.db.max_sql_bytes.to_string());
-        cmd.env("X07_OS_DB_MAX_ROWS", pol.db.max_rows.to_string());
-        cmd.env(
-            "X07_OS_DB_MAX_RESP_BYTES",
-            pol.db.max_resp_bytes.to_string(),
-        );
-        cmd.env("X07_OS_DB_NET_ALLOW_DNS", pol.db.net.allow_dns.join(";"));
-        cmd.env(
-            "X07_OS_DB_NET_ALLOW_CIDRS",
-            pol.db.net.allow_cidrs.join(";"),
-        );
-        cmd.env(
-            "X07_OS_DB_NET_ALLOW_PORTS",
-            pol.db
-                .net
-                .allow_ports
-                .iter()
-                .map(|p| p.to_string())
-                .collect::<Vec<_>>()
-                .join(","),
-        );
-        cmd.env(
-            "X07_OS_DB_NET_REQUIRE_TLS",
-            if pol.db.net.require_tls { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_DB_NET_REQUIRE_VERIFY",
-            if pol.db.net.require_verify { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_TIME_ALLOW_WALL_CLOCK",
-            if pol.time.allow_wall_clock { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_TIME_ALLOW_MONOTONIC",
-            if pol.time.allow_monotonic { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_TIME_ALLOW_SLEEP",
-            if pol.time.allow_sleep { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_TIME_MAX_SLEEP_MS",
-            pol.time.max_sleep_ms.to_string(),
-        );
-        cmd.env(
-            "X07_OS_TIME_ALLOW_LOCAL_TZID",
-            if pol.time.allow_local_tzid { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_PROC_ALLOW_EXIT",
-            if pol.process.allow_exit { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_PROC_ALLOW_SPAWN",
-            if pol.process.allow_spawn { "1" } else { "0" },
-        );
-        cmd.env("X07_OS_PROC_MAX_LIVE", pol.process.max_live.to_string());
-        cmd.env("X07_OS_PROC_MAX_SPAWNS", pol.process.max_spawns.to_string());
-        cmd.env(
-            "X07_OS_PROC_MAX_EXE_BYTES",
-            pol.process.max_exe_bytes.to_string(),
-        );
-        cmd.env("X07_OS_PROC_MAX_ARGS", pol.process.max_args.to_string());
-        cmd.env(
-            "X07_OS_PROC_MAX_ARG_BYTES",
-            pol.process.max_arg_bytes.to_string(),
-        );
-        cmd.env("X07_OS_PROC_MAX_ENV", pol.process.max_env.to_string());
-        cmd.env(
-            "X07_OS_PROC_MAX_ENV_KEY_BYTES",
-            pol.process.max_env_key_bytes.to_string(),
-        );
-        cmd.env(
-            "X07_OS_PROC_MAX_ENV_VAL_BYTES",
-            pol.process.max_env_val_bytes.to_string(),
-        );
-        cmd.env(
-            "X07_OS_PROC_MAX_RUNTIME_MS",
-            pol.process.max_runtime_ms.to_string(),
-        );
-        cmd.env(
-            "X07_OS_PROC_MAX_STDOUT_BYTES",
-            pol.process.max_stdout_bytes.to_string(),
-        );
-        cmd.env(
-            "X07_OS_PROC_MAX_STDERR_BYTES",
-            pol.process.max_stderr_bytes.to_string(),
-        );
-        cmd.env(
-            "X07_OS_PROC_MAX_TOTAL_BYTES",
-            pol.process.max_total_bytes.to_string(),
-        );
-        cmd.env(
-            "X07_OS_PROC_MAX_STDIN_BYTES",
-            pol.process.max_stdin_bytes.to_string(),
-        );
-        cmd.env(
-            "X07_OS_PROC_KILL_ON_DROP",
-            if pol.process.kill_on_drop { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_PROC_KILL_TREE",
-            if pol.process.kill_tree { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_PROC_ALLOW_CWD",
-            if pol.process.allow_cwd { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_PROC_ALLOW_CWD_ROOTS",
-            pol.process.allow_cwd_roots.join(";"),
-        );
-        cmd.env(
-            "X07_OS_PROC_ALLOW_EXEC",
-            if pol.process.allow_exec { "1" } else { "0" },
-        );
-        cmd.env("X07_OS_PROC_ALLOW_EXECS", pol.process.allow_execs.join(";"));
-        cmd.env(
-            "X07_OS_PROC_ALLOW_EXEC_PREFIXES",
-            pol.process.allow_exec_prefixes.join(";"),
-        );
-        cmd.env(
-            "X07_OS_PROC_ALLOW_ARGS_REGEX_LITE",
-            pol.process.allow_args_regex_lite.join(";"),
-        );
-        cmd.env(
-            "X07_OS_PROC_ALLOW_ENV_KEYS",
-            pol.process.allow_env_keys.join(";"),
-        );
-        cmd.env(
-            "X07_OS_NET_ALLOW_TCP",
-            if pol.net.allow_tcp { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_NET_ALLOW_UDP",
-            if pol.net.allow_udp { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_NET_ALLOW_DNS",
-            if pol.net.allow_dns { "1" } else { "0" },
-        );
-        cmd.env(
-            "X07_OS_NET_ALLOW_HOSTS",
-            encode_allow_hosts(&pol.net.allow_hosts),
-        );
+        for (k, v) in os_env::policy_to_env(pol) {
+            cmd.env(k, v);
+        }
     }
 
     #[cfg(unix)]
@@ -1340,20 +859,6 @@ fn run_os_artifact(inv: &RunInvocation<'_>) -> Result<RunnerResult> {
     })
 }
 
-fn encode_allow_hosts(hosts: &[policy::NetHost]) -> String {
-    let mut out = Vec::new();
-    for h in hosts {
-        let ports = h
-            .ports
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-        out.push(format!("{}:{}", h.host.trim(), ports));
-    }
-    out.join(";")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1487,7 +992,7 @@ mod tests {
         let program = std::fs::read(&program_path)
             .unwrap_or_else(|e| panic!("read {}: {e}", program_path.display()));
 
-        let module_roots = default_os_module_roots().expect("stdlib/os module roots");
+        let module_roots = os_paths::default_os_module_roots().expect("stdlib/os module roots");
         let compile_options = compile::CompileOptions {
             world,
             enable_fs: false,

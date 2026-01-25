@@ -16,6 +16,7 @@ Available skills:
 - `x07-agent-playbook`: agent-first workflow + design rails (toolchain-only)
 - `x07-language-guide`: canonical language + stdlib reference (`x07 guide`)
 - `x07-run`: canonical execution front door (dispatches to host/os runners)
+- `x07-bundle`: bundle a native executable for distribution (`x07 bundle`)
 - `x07-build-run`: compile+run deterministic solve-world programs (`x07-host-runner`)
 - `x07-lint-repair`: lint/fix/patch x07AST JSON (`x07 lint` / `x07 fix` / `x07 ast`)
 - `x07-format`: canonical x07AST JSON formatting (`x07 fmt`)

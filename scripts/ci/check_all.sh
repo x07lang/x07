@@ -72,5 +72,22 @@ step "canary gate"
 step "OS-world external packages smoke"
 ./scripts/ci/check_external_packages_os_smoke.sh
 
+step "bundle smoke (native executable, no toolchain)"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    # Prefer the native Windows gate to avoid MSYS text-mode quirks.
+    pwsh ./scripts/ci/check_bundle_smoke_windows.ps1
+    ;;
+  *)
+    # On Linux CI, prefer the stronger "no toolchain installed" check via docker.
+    # On WSL2, docker is typically unavailable; force the local fallback.
+    if [[ "$(uname -s)" == "Linux" ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+      X07_BUNDLE_SMOKE_DOCKER=0 ./scripts/ci/check_bundle_smoke.sh
+    else
+      ./scripts/ci/check_bundle_smoke.sh
+    fi
+    ;;
+esac
+
 echo
 echo "ok: all checks passed"

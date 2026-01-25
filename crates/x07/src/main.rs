@@ -18,6 +18,7 @@ use x07_worlds::WorldId;
 use x07c::project;
 
 mod ast;
+mod bundle;
 mod cli;
 mod doc;
 mod doctor;
@@ -25,6 +26,7 @@ mod guide;
 mod init;
 mod pkg;
 mod policy;
+mod policy_overrides;
 mod rr;
 mod run;
 mod toolchain;
@@ -51,6 +53,8 @@ enum Command {
     Test(TestArgs),
     /// Run X07 programs via the appropriate runner.
     Run(Box<run::RunArgs>),
+    /// Produce a distributable native executable (no toolchain required at runtime).
+    Bundle(Box<bundle::BundleArgs>),
     /// Print the built-in language + stdlib guide.
     Guide(guide::GuideArgs),
     /// Check platform prerequisites for OS worlds.
@@ -196,6 +200,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Test(_)) => vec!["test"],
             Some(Command::Init(_)) => vec!["init"],
             Some(Command::Run(_)) => vec!["run"],
+            Some(Command::Bundle(_)) => vec!["bundle"],
             Some(Command::Guide(_)) => vec!["guide"],
             Some(Command::Doctor(_)) => vec!["doctor"],
             Some(Command::Policy(args)) => match &args.cmd {
@@ -251,6 +256,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Init(args) => init::cmd_init(args),
         Command::Test(args) => cmd_test(args),
         Command::Run(args) => run::cmd_run(*args),
+        Command::Bundle(args) => bundle::cmd_bundle(*args),
         Command::Guide(args) => guide::cmd_guide(args),
         Command::Doctor(args) => doctor::cmd_doctor(args),
         Command::Policy(args) => policy::cmd_policy(args),

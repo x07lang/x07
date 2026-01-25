@@ -51,6 +51,13 @@ Denies apply after allows, so deny wins.
 
 See also: [Sandbox policy walkthrough](sandbox-policy-walkthrough.md).
 
+## Distribution (`x07 bundle`)
+
+To ship an OS-world program as a normal executable (no framed I/O, no toolchain required at runtime), use `x07 bundle`:
+
+- `x07 bundle --profile os --out dist/app`
+- `x07 bundle --profile sandbox --out dist/app` (policy enforced)
+
 ## Platform support
 
 X07 should treat these as Tier-1 OS platforms:

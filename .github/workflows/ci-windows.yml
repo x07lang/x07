@@ -9,7 +9,7 @@ jobs:
   windows:
     name: windows-latest
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     if: github.event_name != 'schedule'
     env:
       X07_PYTHON: python
@@ -75,7 +75,7 @@ jobs:
   wsl2:
     name: wsl2-ubuntu
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 105
     defaults:
       run:
         shell: wsl-bash {0}
