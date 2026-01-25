@@ -373,11 +373,11 @@ run_one_multi_bg_with_http_client "ext-net http server" \
 
 run_one_multi_bg_with_http_client "ext-net http server (loopback allow)" \
   "run-os-sandboxed" \
-  "tests/external_os/net_http_server/src/main.x07.json" \
+  "tests/external_os/net_http_server/src/main_30032.x07.json" \
   "tests/external_os/net_sockets/run-os-policy.loopback-allow.json" \
   "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
   "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
-  "127.0.0.1" "30031" \
+  "127.0.0.1" "30032" \
   "$(x07_ext_pkg_modules x07-ext-net)" \
   "$(x07_ext_pkg_modules x07-ext-sockets-c)" \
   "$(x07_ext_pkg_modules x07-ext-url-rs)"
