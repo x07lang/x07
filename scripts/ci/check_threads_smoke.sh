@@ -8,6 +8,14 @@ repo_root() {
 root="$(repo_root)"
 cd "$root"
 
+# Verbose output for Windows debugging
+verbose() {
+  echo "[threads-smoke] $*" >&2
+}
+
+verbose "uname: $(uname -s)"
+verbose "pwd: $(pwd)"
+
 ./scripts/ci/check_tools.sh >/dev/null
 
 python_bin="${X07_PYTHON:-}"
@@ -36,6 +44,9 @@ if [[ ! -x "$x07_bin" ]]; then
   echo "ERROR: x07 binary not found/executable at: $x07_bin" >&2
   exit 2
 fi
+
+verbose "x07_bin: $x07_bin"
+verbose "python_bin: $python_bin"
 
 # Temp workdir (Windows/MSYS2: keep under repo to avoid path issues).
 case "$(uname -s)" in
@@ -91,8 +102,10 @@ if [[ ! -f "$barrier_py" ]]; then
 fi
 
 http_fixture="$tmp_dir/threads-http-barrier"
+verbose "copying fixture to: $http_fixture"
 cp -R "$http_fixture_src" "$http_fixture"
 cd "$http_fixture"
+verbose "cd to: $(pwd)"
 
 mkdir -p .x07/deps
 
@@ -159,6 +172,7 @@ PY
 
 run_http_barrier_profile() {
   local profile="$1"
+  verbose "run_http_barrier_profile: $profile"
 
   local ready_json="$tmp_dir/barrier.${profile}.ready.json"
   local barrier_stdout="$tmp_dir/barrier.${profile}.stdout.json"
@@ -166,6 +180,7 @@ run_http_barrier_profile() {
 
   rm -f "$ready_json"
 
+  verbose "starting barrier server..."
   "$python_bin" "$barrier_py" \
     --bind 127.0.0.1 \
     --port 0 \
@@ -176,6 +191,7 @@ run_http_barrier_profile() {
     2>"$barrier_stderr" &
 
   barrier_pid="$!"
+  verbose "barrier_pid: $barrier_pid"
 
   for _ in $(seq 1 600); do
     if [[ -f "$ready_json" ]]; then
@@ -188,8 +204,11 @@ run_http_barrier_profile() {
     echo "ERROR: barrier server did not become ready" >&2
     echo "barrier stderr:" >&2
     cat "$barrier_stderr" >&2 || true
+    echo "barrier stdout:" >&2
+    cat "$barrier_stdout" >&2 || true
     exit 2
   fi
+  verbose "barrier server ready"
 
   "$python_bin" - "$ready_json" <<'PY'
 import json
@@ -212,8 +231,10 @@ PY
 )"
 
   local report_json="$tmp_dir/run.http.${profile}.report.json"
+  verbose "running x07 with profile: $profile, port: $port"
   if [[ "$profile" == "sandbox" ]]; then
     local allow_host="127.0.0.1:${port}"
+    verbose "allow_host: $allow_host"
     "$x07_bin" run \
       --project x07.json \
       --profile sandbox \
@@ -231,8 +252,10 @@ PY
       --report-out "$report_json" \
       >/dev/null
   fi
+  verbose "x07 run completed for profile: $profile"
 
   assert_report_ok "$report_json"
+  verbose "assertion passed for profile: $profile"
 
   if [[ -n "$barrier_pid" ]]; then
     for _ in $(seq 1 200); do
@@ -251,10 +274,14 @@ PY
   fi
 }
 
+verbose "running os profile test..."
 run_http_barrier_profile os
+verbose "running sandbox profile test..."
 run_http_barrier_profile sandbox
 echo "ok: threads-http-barrier"
+verbose "threads-http-barrier tests passed"
 
+verbose "starting threads-policy-deny-blocking test..."
 fixture_src="$root/ci/fixtures/concurrency/threads-policy-deny-blocking"
 if [[ ! -d "$fixture_src" ]]; then
   echo "ERROR: missing concurrency fixture dir: $fixture_src" >&2
