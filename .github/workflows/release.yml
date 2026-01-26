@@ -257,6 +257,7 @@ jobs:
               libssl-dev \
               libcurl4-openssl-dev \
               zlib1g-dev \
+              liblzma-dev \
               libsqlite3-dev \
               python3 \
               ca-certificates \
