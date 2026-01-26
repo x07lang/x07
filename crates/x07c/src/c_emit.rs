@@ -22430,6 +22430,7 @@ struct rt_os_proc_s {
 #endif
 
   uint32_t stdin_closed;
+  uint32_t stdin_close_requested;
   uint32_t stdout_closed;
   uint32_t stderr_closed;
 
@@ -23275,7 +23276,7 @@ static DWORD WINAPI rt_os_win_stdin_thread(LPVOID arg) {
       uint32_t pending = 0;
       if (p->stdin_off < p->stdin_buf.len) pending = p->stdin_buf.len - p->stdin_off;
       if (pending == 0) {
-        if (p->mode == RT_OS_PROC_MODE_CAPTURE) {
+        if (p->mode == RT_OS_PROC_MODE_CAPTURE || p->stdin_close_requested) {
           rt_os_win_close_handle(&p->win_stdin);
           p->stdin_closed = 1;
           rt_os_proc_unlock(p);
@@ -24518,7 +24519,7 @@ static int32_t rt_os_process_stdin_write_v1(ctx_t* ctx, int32_t handle, bytes_t 
     uint64_t total64 = 0;
 #if defined(_WIN32)
     rt_os_proc_lock(p);
-    if (p->stdin_closed || !p->win_stdin) {
+    if (p->stdin_closed || p->stdin_close_requested || !p->win_stdin) {
       rt_os_proc_unlock(p);
       return 0;
     }
@@ -24541,7 +24542,7 @@ static int32_t rt_os_process_stdin_write_v1(ctx_t* ctx, int32_t handle, bytes_t 
 
 #if defined(_WIN32)
   rt_os_proc_lock(p);
-  uint32_t is_closed = p->stdin_closed || !p->win_stdin;
+  uint32_t is_closed = p->stdin_closed || p->stdin_close_requested || !p->win_stdin;
   rt_os_proc_unlock(p);
   if (is_closed) return 0;
 
@@ -24572,21 +24573,16 @@ static int32_t rt_os_process_stdin_close_v1(ctx_t* ctx, int32_t handle) {
   if (p->mode != RT_OS_PROC_MODE_PIPED) rt_trap("os.process.stdin_close_v1 invalid proc mode");
 #if defined(_WIN32)
   rt_os_proc_lock(p);
-  if (!p->win_stdin || p->stdin_closed) {
+  if (!p->win_stdin || p->stdin_closed || p->stdin_close_requested) {
     rt_os_proc_unlock(p);
     return 0;
   }
 
-  rt_os_win_close_handle(&p->win_stdin);
-  p->stdin_closed = 1;
-  bytes_t old = p->stdin_buf;
-  p->stdin_buf = rt_bytes_empty(ctx);
-  p->stdin_off = 0;
+  p->stdin_close_requested = 1;
   HANDLE ev = p->win_stdin_event;
   rt_os_proc_unlock(p);
 
   if (ev) (void)SetEvent(ev);
-  rt_bytes_drop(ctx, &old);
   return 1;
 #else
   if (p->stdin_fd < 0 || p->stdin_closed) return 0;
