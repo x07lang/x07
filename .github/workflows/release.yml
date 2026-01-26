@@ -275,6 +275,7 @@ jobs:
               exit 2
             fi
 
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=clang
             cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli -p x07up
 
             # Smoke: compile+run a minimal solve-pure program.

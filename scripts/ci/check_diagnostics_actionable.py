@@ -22,15 +22,33 @@ def _find_x07_bin(root: Path) -> Path:
             return p
         raise SystemExit(f"ERROR: X07_BIN is set but not executable: {override}")
 
-    proc = subprocess.run(
-        ["bash", "-lc", "./scripts/ci/find_x07.sh"],
-        cwd=str(root),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            ["bash", "-c", "./scripts/ci/find_x07.sh"],
+            cwd=str(root),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except FileNotFoundError:
+        if os.name == "nt":
+            raise SystemExit("ERROR: bash is required to run scripts/ci/find_x07.sh on Windows")
+        proc = subprocess.run(
+            [str(root / "scripts/ci/find_x07.sh")],
+            cwd=str(root),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
     if proc.returncode != 0:
-        raise SystemExit(f"ERROR: scripts/ci/find_x07.sh failed:\n{proc.stderr.strip()}")
+        stdout = proc.stdout.rstrip()
+        stderr = proc.stderr.rstrip()
+        raise SystemExit(
+            "ERROR: scripts/ci/find_x07.sh failed:\n"
+            f"exit={proc.returncode}\n"
+            f"stdout:\n{stdout if stdout else '<empty>'}\n"
+            f"stderr:\n{stderr if stderr else '<empty>'}\n"
+        )
     out = proc.stdout.strip()
     if not out:
         raise SystemExit("ERROR: scripts/ci/find_x07.sh produced empty output")
