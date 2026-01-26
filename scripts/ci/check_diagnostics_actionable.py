@@ -22,10 +22,21 @@ def _find_x07_bin(root: Path) -> Path:
             return p
         raise SystemExit(f"ERROR: X07_BIN is set but not executable: {override}")
 
-    out = subprocess.check_output([str(root / "scripts" / "ci" / "find_x07.sh")], cwd=str(root), text=True).strip()
+    proc = subprocess.run(
+        ["bash", "-lc", "./scripts/ci/find_x07.sh"],
+        cwd=str(root),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if proc.returncode != 0:
+        raise SystemExit(f"ERROR: scripts/ci/find_x07.sh failed:\n{proc.stderr.strip()}")
+    out = proc.stdout.strip()
     if not out:
         raise SystemExit("ERROR: scripts/ci/find_x07.sh produced empty output")
-    p = (root / out).resolve() if not out.startswith("/") else Path(out).resolve()
+    if os.name == "nt" and len(out) >= 3 and out[0] == "/" and out[2] == "/" and out[1].isalpha():
+        out = f"{out[1].upper()}:{out[2:]}".replace("/", "\\")
+    p = (root / out).resolve() if not Path(out).is_absolute() else Path(out).resolve()
     if not p.is_file():
         raise SystemExit(f"ERROR: x07 binary not found: {p}")
     return p

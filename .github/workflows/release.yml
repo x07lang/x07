@@ -265,6 +265,7 @@ jobs:
             curl -sSf https://sh.rustup.rs | sh -s -- -y
           run: |
             set -euo pipefail
+            git config --global --add safe.directory "$(pwd)"
             source "$HOME/.cargo/env"
 
             tag="$(git describe --tags --exact-match)"
