@@ -51,12 +51,22 @@ esac
 keep_tmp="${X07_THREADS_SMOKE_KEEP_TMP:-}"
 barrier_pid=""
 cleanup() {
+  cd "$root" >/dev/null 2>&1 || true
+
   if [[ -n "$barrier_pid" ]]; then
     kill "$barrier_pid" >/dev/null 2>&1 || true
+    kill -9 "$barrier_pid" >/dev/null 2>&1 || true
+    wait "$barrier_pid" >/dev/null 2>&1 || true
     barrier_pid=""
   fi
   if [[ -z "$keep_tmp" ]]; then
-    rm -rf "$tmp_dir" || true
+    for _ in $(seq 1 20); do
+      rm -rf "$tmp_dir" >/dev/null 2>&1 || true
+      if [[ ! -e "$tmp_dir" ]]; then
+        break
+      fi
+      sleep 0.1
+    done
   else
     echo "[threads-smoke] kept tmp dir: $tmp_dir"
   fi
