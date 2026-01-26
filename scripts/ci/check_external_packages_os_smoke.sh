@@ -29,6 +29,36 @@ if [[ -z "${python_bin}" ]]; then
   fi
 fi
 
+pick_free_loopback_port() {
+  local start="$1"
+  local end="$2"
+  local exclude="${3:-}"
+  "$python_bin" - "$start" "$end" "$exclude" <<'PY'
+import socket
+import sys
+
+start = int(sys.argv[1])
+end = int(sys.argv[2])
+exclude_raw = sys.argv[3]
+exclude = int(exclude_raw) if exclude_raw else None
+
+for port in range(start, end + 1):
+    if exclude is not None and port == exclude:
+        continue
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", port))
+    except OSError:
+        continue
+    finally:
+        s.close()
+    print(port)
+    raise SystemExit(0)
+
+raise SystemExit(2)
+PY
+}
+
 ffi_lib_args() {
   local package_manifest="$1"
   "$python_bin" - "$package_manifest" <<'PY'
@@ -246,6 +276,16 @@ run_one_multi_bg_with_http_client() {
 
   local report="tmp/tmp/http_server_${world}_${port}.json"
   local stderr_path="${report}.stderr"
+  local input_bin="${report}.input.bin"
+  "$python_bin" - "$input_bin" "$port" <<'PY'
+import struct
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+port = int(sys.argv[2])
+path.write_bytes(struct.pack("<I", port))
+PY
   local client_timeout_s=20
   case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) client_timeout_s=60 ;;
@@ -261,6 +301,7 @@ run_one_multi_bg_with_http_client() {
       --program "$program" \
       --world "$world" \
       --policy "$policy" \
+      --input "$input_bin" \
       "${module_root_args[@]}" \
       >"$report" 2>"$stderr_path" &
   else
@@ -268,6 +309,7 @@ run_one_multi_bg_with_http_client() {
       --cpu-time-limit-seconds "$runner_timeout_s" \
       --program "$program" \
       --world "$world" \
+      --input "$input_bin" \
       "${module_root_args[@]}" \
       >"$report" 2>"$stderr_path" &
   fi
@@ -366,10 +408,12 @@ run_one_multi_bg_with_http_client "ext-net http server" \
   "" \
   "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
   "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
-  "127.0.0.1" "30031" \
+  "127.0.0.1" "$(pick_free_loopback_port 30000 30029)" \
   "$(x07_ext_pkg_modules x07-ext-net)" \
   "$(x07_ext_pkg_modules x07-ext-sockets-c)" \
   "$(x07_ext_pkg_modules x07-ext-url-rs)"
+
+http_server_port="$(pick_free_loopback_port 30000 30029)"
 
 run_one_multi_bg_with_http_client "ext-net http server (loopback allow)" \
   "run-os-sandboxed" \
@@ -377,7 +421,7 @@ run_one_multi_bg_with_http_client "ext-net http server (loopback allow)" \
   "tests/external_os/net_sockets/run-os-policy.loopback-allow.json" \
   "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
   "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
-  "127.0.0.1" "30032" \
+  "127.0.0.1" "$http_server_port" \
   "$(x07_ext_pkg_modules x07-ext-net)" \
   "$(x07_ext_pkg_modules x07-ext-sockets-c)" \
   "$(x07_ext_pkg_modules x07-ext-url-rs)"

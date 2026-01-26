@@ -252,6 +252,8 @@ jobs:
             apt-get update
             apt-get install -y --no-install-recommends \
               build-essential \
+              clang \
+              lld \
               pkg-config \
               libssl-dev \
               libcurl4-openssl-dev \
@@ -277,7 +279,8 @@ jobs:
 
             export CC=gcc
             export CXX=g++
-            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=gcc
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=clang
+            export RUSTFLAGS="-C link-arg=-fuse-ld=lld"
             cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli -p x07up
 
             # Smoke: compile+run a minimal solve-pure program.
