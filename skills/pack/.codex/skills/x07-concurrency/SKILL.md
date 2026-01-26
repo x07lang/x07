@@ -11,7 +11,7 @@ metadata:
 
 In deterministic `solve-*` worlds, X07 concurrency is deterministic and virtual (no OS threads); blocking points are explicit.
 
-In OS worlds (`run-os*`), use subprocess spawning for multi-core parallelism. In `run-os-sandboxed`, process spawning must be enabled by policy (start from `x07 policy init --template worker-parallel` when needed).
+In OS worlds (`run-os*`), use subprocess spawning for multi-core parallelism. In `run-os-sandboxed`, process spawning must be enabled by policy (start from `x07 policy init --template worker-parallel` when needed). Thread-backed blocking operations are gated by `policy.threads` (for example, `threads.max_blocking = 0` disables blocking operations).
 
 ## Canonical patterns
 

@@ -1,0 +1,28 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "app",
+  "imports": [],
+  "decls": [
+    { "kind": "export", "names": ["app.solve"] },
+    {
+      "kind": "defn",
+      "name": "app.solve",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        [
+          "let",
+          "_rc",
+          [
+            "os.fs.write_file",
+            ["bytes.lit", "out/deny.txt"],
+            ["bytes.lit", "DENIED"]
+          ]
+        ],
+        ["bytes.lit", "ok"]
+      ]
+    }
+  ]
+}

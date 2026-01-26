@@ -21735,6 +21735,11 @@ static uint32_t rt_os_env_enabled = 1;
 static uint32_t rt_os_time_enabled = 1;
 static uint32_t rt_os_proc_enabled = 1;
 
+static uint32_t rt_os_threads_enabled = 1;
+static uint32_t rt_os_threads_max_workers = 0;
+static uint32_t rt_os_threads_max_blocking = 4;
+static uint32_t rt_os_threads_max_queue = 1024;
+
 static uint32_t rt_os_deny_hidden = 0;
 static const char* rt_os_fs_read_roots = NULL;
 static const char* rt_os_fs_write_roots = NULL;
@@ -21804,6 +21809,11 @@ static void rt_os_policy_init(ctx_t* ctx) {
     rt_os_time_enabled = rt_os_env_u32("X07_OS_TIME", 0);
     rt_os_proc_enabled = rt_os_env_u32("X07_OS_PROC", 0);
 
+    rt_os_threads_enabled = rt_os_env_u32("X07_OS_THREADS", 1);
+    rt_os_threads_max_workers = rt_os_env_u32("X07_OS_THREADS_MAX_WORKERS", 0);
+    rt_os_threads_max_blocking = rt_os_env_u32("X07_OS_THREADS_MAX_BLOCKING", 4);
+    rt_os_threads_max_queue = rt_os_env_u32("X07_OS_THREADS_MAX_QUEUE", 1024);
+
     rt_os_deny_hidden = rt_os_env_u32("X07_OS_DENY_HIDDEN", 1);
     rt_os_fs_read_roots = getenv("X07_OS_FS_READ_ROOTS");
     rt_os_fs_write_roots = getenv("X07_OS_FS_WRITE_ROOTS");
@@ -21850,6 +21860,10 @@ static void rt_os_policy_init(ctx_t* ctx) {
     rt_os_env_enabled = 1;
     rt_os_time_enabled = 1;
     rt_os_proc_enabled = 1;
+    rt_os_threads_enabled = 1;
+    rt_os_threads_max_workers = 0;
+    rt_os_threads_max_blocking = 4;
+    rt_os_threads_max_queue = 1024;
     rt_os_deny_hidden = 0;
     rt_os_time_allow_wall_clock = 1;
     rt_os_time_allow_monotonic = 1;
@@ -22134,6 +22148,7 @@ static bytes_t rt_os_fs_read_file(ctx_t* ctx, bytes_t path) {
 
   if (rt_os_sandboxed) {
     rt_os_require(ctx, rt_os_fs_enabled, "os.fs disabled by policy");
+    if (rt_os_threads_max_blocking == 0) rt_trap("os.threads.blocking disabled by policy");
     bytes_view_t path_view = rt_bytes_view(ctx, path);
     if (!rt_fs_is_safe_rel_path(path_view)) rt_trap("os.fs.read_file unsafe path");
     if (rt_os_deny_hidden && rt_os_path_has_hidden_segment(path)) {
@@ -22181,6 +22196,7 @@ static uint32_t rt_os_fs_write_file(ctx_t* ctx, bytes_t path, bytes_t data) {
 
   if (rt_os_sandboxed) {
     rt_os_require(ctx, rt_os_fs_enabled, "os.fs disabled by policy");
+    if (rt_os_threads_max_blocking == 0) rt_trap("os.threads.blocking disabled by policy");
     bytes_view_t path_view = rt_bytes_view(ctx, path);
     if (!rt_fs_is_safe_rel_path(path_view)) rt_trap("os.fs.write_file unsafe path");
     if (rt_os_deny_hidden && rt_os_path_has_hidden_segment(path)) {

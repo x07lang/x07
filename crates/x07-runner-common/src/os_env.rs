@@ -49,6 +49,22 @@ pub fn policy_to_env(policy: &Policy) -> Vec<(String, String)> {
             bool_env(policy.process.enabled).to_string(),
         ),
         (
+            "X07_OS_THREADS".to_string(),
+            bool_env(policy.threads.enabled).to_string(),
+        ),
+        (
+            "X07_OS_THREADS_MAX_WORKERS".to_string(),
+            policy.threads.max_workers.to_string(),
+        ),
+        (
+            "X07_OS_THREADS_MAX_BLOCKING".to_string(),
+            policy.threads.max_blocking.to_string(),
+        ),
+        (
+            "X07_OS_THREADS_MAX_QUEUE".to_string(),
+            policy.threads.max_queue.to_string(),
+        ),
+        (
             "X07_OS_DENY_HIDDEN".to_string(),
             bool_env(policy.fs.deny_hidden).to_string(),
         ),

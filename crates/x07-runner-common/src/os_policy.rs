@@ -5,6 +5,14 @@ fn default_true() -> bool {
     true
 }
 
+fn default_threads_max_blocking() -> u64 {
+    4
+}
+
+fn default_threads_max_queue() -> u64 {
+    1024
+}
+
 fn default_process_max_exe_bytes() -> u64 {
     4096
 }
@@ -79,6 +87,29 @@ pub struct Language {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct Threads {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub max_workers: u64,
+    #[serde(default = "default_threads_max_blocking")]
+    pub max_blocking: u64,
+    #[serde(default = "default_threads_max_queue")]
+    pub max_queue: u64,
+}
+
+impl Default for Threads {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_workers: 0,
+            max_blocking: default_threads_max_blocking(),
+            max_queue: default_threads_max_queue(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Policy {
     pub schema_version: String,
     pub policy_id: String,
@@ -91,6 +122,8 @@ pub struct Policy {
     pub time: Time,
     #[serde(default)]
     pub language: Language,
+    #[serde(default)]
+    pub threads: Threads,
     pub process: Process,
 }
 
@@ -356,6 +389,25 @@ impl Policy {
         }
         if self.time.max_sleep_ms > 86_400_000 {
             return Err("policy.time.max_sleep_ms must be <= 86400000".to_string());
+        }
+
+        if self.threads.max_workers > 256 {
+            return Err(format!(
+                "policy.threads.max_workers must be 0..256 (got {})",
+                self.threads.max_workers
+            ));
+        }
+        if self.threads.max_blocking > 4096 {
+            return Err(format!(
+                "policy.threads.max_blocking must be 0..4096 (got {})",
+                self.threads.max_blocking
+            ));
+        }
+        if self.threads.max_queue > 1_000_000 {
+            return Err(format!(
+                "policy.threads.max_queue must be 0..1000000 (got {})",
+                self.threads.max_queue
+            ));
         }
 
         for (idx, v) in self.fs.read_roots.iter().enumerate() {

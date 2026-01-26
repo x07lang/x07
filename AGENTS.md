@@ -41,6 +41,7 @@ This repository contains Track B scaffolding, a deterministic native runner, a c
 - For deterministic collection outputs, use `std.*.emit_*` (for example: `std.hash_set.emit_u32le`, `std.hash_map.emit_kv_u32le_u32le`, `std.heap_u32.emit_u32le`).
 - For scan/trim/split without copying, prefer `bytes_view` + `view.*` builtins over copying helpers.
 - For deterministic concurrency, use `defasync` + `task.*` + `chan.bytes.*` (no OS threads).
+- In `run-os-sandboxed`, thread-backed blocking operations are gated by `policy.threads` (for example, `threads.max_blocking = 0` disables blocking operations).
 - For streaming parsing, prefer `std.io` / `std.io.bufread` (`io.read`, `bufread.fill`/`consume`) and world adapters (`std.fs.open_read`, `std.rr.send`, `std.kv.get_stream`) which return `iface` readers.
 
 ## Coding Style & Naming Conventions

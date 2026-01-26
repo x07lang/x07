@@ -336,6 +336,15 @@ fn base_process_policy() -> Value {
     })
 }
 
+fn base_threads_policy() -> Value {
+    serde_json::json!({
+        "enabled": true,
+        "max_workers": 0,
+        "max_blocking": 4,
+        "max_queue": 1024
+    })
+}
+
 fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&str>) -> Value {
     let mut policy = match template {
         PolicyTemplate::Cli => serde_json::json!({
@@ -363,6 +372,7 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
             "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
             "language": { "allow_unsafe": false, "allow_ffi": false },
+            "threads": base_threads_policy(),
             "process": base_process_policy()
         }),
         PolicyTemplate::HttpClient => serde_json::json!({
@@ -390,6 +400,7 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
             "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": true, "max_sleep_ms": 5000, "allow_local_tzid": false },
             "language": { "allow_unsafe": true, "allow_ffi": true },
+            "threads": base_threads_policy(),
             "process": base_process_policy()
         }),
         PolicyTemplate::WebService => serde_json::json!({
@@ -417,6 +428,7 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
             "env": { "enabled": true, "allow_keys": ["PORT", "HOST", "LOG_LEVEL"], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": true, "max_sleep_ms": 1000, "allow_local_tzid": false },
             "language": { "allow_unsafe": true, "allow_ffi": true },
+            "threads": base_threads_policy(),
             "process": base_process_policy()
         }),
         PolicyTemplate::FsTool => serde_json::json!({
@@ -444,6 +456,7 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
             "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
             "language": { "allow_unsafe": false, "allow_ffi": false },
+            "threads": base_threads_policy(),
             "process": base_process_policy()
         }),
         PolicyTemplate::SqliteApp => serde_json::json!({
@@ -488,6 +501,7 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
             "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
             "language": { "allow_unsafe": true, "allow_ffi": true },
+            "threads": base_threads_policy(),
             "process": base_process_policy()
         }),
         PolicyTemplate::PostgresClient => serde_json::json!({
@@ -533,6 +547,7 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
             "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": true, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
             "language": { "allow_unsafe": true, "allow_ffi": true },
+            "threads": base_threads_policy(),
             "process": base_process_policy()
         }),
         PolicyTemplate::Worker => serde_json::json!({
@@ -560,6 +575,7 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
             "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": false, "allow_sleep": true, "max_sleep_ms": 5000, "allow_local_tzid": false },
             "language": { "allow_unsafe": false, "allow_ffi": false },
+            "threads": base_threads_policy(),
             "process": base_process_policy()
         }),
         PolicyTemplate::WorkerParallel => serde_json::json!({
@@ -587,6 +603,7 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
             "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": false, "allow_sleep": true, "max_sleep_ms": 5000, "allow_local_tzid": false },
             "language": { "allow_unsafe": false, "allow_ffi": false },
+            "threads": base_threads_policy(),
             "process": {
               "enabled": true,
               "allow_spawn": true,

@@ -426,6 +426,44 @@
         }
       }
     },
+    "threads": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "max_workers",
+        "max_blocking",
+        "max_queue"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow the OS runner to use threads for concurrency (task scheduling) and blocking I/O offload."
+        },
+        "max_workers": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256,
+          "default": 0,
+          "description": "Maximum number of async worker threads. 0 means runner default."
+        },
+        "max_blocking": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096,
+          "default": 4,
+          "description": "Maximum number of blocking I/O threads. 0 disables blocking operations that require thread offload."
+        },
+        "max_queue": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000,
+          "default": 1024,
+          "description": "Maximum queued tasks across all schedulers. 0 means runner default."
+        }
+      }
+    },
     "process": {
       "type": "object",
       "additionalProperties": false,

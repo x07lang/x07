@@ -641,6 +641,12 @@ pub fn run_artifact_file(
     if exit_status == 0 && metrics.is_none() && trap.is_none() {
         trap = Some("missing metrics json line on stderr".to_string());
     }
+
+    if out.exit_signal.is_some() {
+        if let Some(msg) = parse_trap_stderr(&stderr) {
+            trap = Some(msg);
+        }
+    }
     let fuel_used = metrics.as_ref().and_then(|m| m.fuel_used);
     let heap_used = metrics.as_ref().and_then(|m| m.heap_used);
     let fs_read_file_calls = metrics.as_ref().and_then(|m| m.fs_read_file_calls);
@@ -719,6 +725,21 @@ pub fn parse_metrics(stderr: &[u8]) -> Option<MetricsLine> {
                 return Some(m);
             }
         }
+    }
+    None
+}
+
+pub fn parse_trap_stderr(stderr: &[u8]) -> Option<String> {
+    let text = std::str::from_utf8(stderr).ok()?;
+    for line in text.lines().rev() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('{') {
+            continue;
+        }
+        return Some(line.to_string());
     }
     None
 }

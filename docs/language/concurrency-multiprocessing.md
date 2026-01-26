@@ -3,6 +3,7 @@
 X07 intentionally separates:
 
 - **deterministic concurrency** (for tests and fixture worlds)
+- **OS threads** (for OS-world blocking/I/O concurrency; policy-gated)
 - **OS multiprocessing** (for production parallelism)
 
 ## Deterministic concurrency (async, single-core)
@@ -17,6 +18,18 @@ This enables:
 - deterministic pipelines,
 - repeatable performance measurements,
 - reproducible repair loops.
+
+## OS threads (policy-gated)
+
+In OS worlds, X07 can use threads for blocking and I/O-heavy work. In `run-os-sandboxed`, this is gated by policy.
+
+The `threads` policy section controls thread-backed blocking operations. Setting:
+
+- `threads.max_blocking = 0`
+
+disables blocking operations and produces a stable trap:
+
+- `os.threads.blocking disabled by policy`
 
 ## OS multiprocessing (multi-core)
 

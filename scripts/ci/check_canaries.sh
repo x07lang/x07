@@ -37,6 +37,9 @@ fi
 # Milestone 5: concurrency + parallelism in os + sandbox worlds.
 ./scripts/ci/check_concurrency_parallelism_smoke.sh >/dev/null
 
+# Milestone 6: threads policy enforcement in sandbox.
+./scripts/ci/check_threads_smoke.sh >/dev/null
+
 export X07C_BIN
 X07C_BIN="$(./scripts/ci/find_x07c.sh)"
 

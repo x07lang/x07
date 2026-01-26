@@ -20,6 +20,7 @@ Same as `run-os`, but enforced by policy:
 
 - allowlists for network destinations
 - allowlists for executable paths
+- thread limits for blocking operations
 - max live processes / connections
 - byte caps / timeouts
 

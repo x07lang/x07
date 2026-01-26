@@ -821,6 +821,12 @@ fn run_os_artifact(inv: &RunInvocation<'_>) -> Result<RunnerResult> {
         trap = Some("missing metrics json line on stderr".to_string());
     }
 
+    if out.exit_signal.is_some() {
+        if let Some(msg) = x07_host_runner::parse_trap_stderr(&out.stderr) {
+            trap = Some(msg);
+        }
+    }
+
     let fuel_used = metrics.as_ref().and_then(|m| m.fuel_used);
     let heap_used = metrics.as_ref().and_then(|m| m.heap_used);
     let fs_read_file_calls = metrics.as_ref().and_then(|m| m.fs_read_file_calls);
@@ -1127,6 +1133,7 @@ mod tests {
                 allow_local_tzid: false,
             },
             language: Default::default(),
+            threads: Default::default(),
             process,
         }
     }
