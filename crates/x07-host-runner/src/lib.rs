@@ -702,7 +702,7 @@ pub struct MetricsLine {
 }
 
 pub fn parse_metrics(stderr: &[u8]) -> Option<MetricsLine> {
-    let text = std::str::from_utf8(stderr).ok()?;
+    let text = String::from_utf8_lossy(stderr);
     for line in text.lines().rev() {
         let line = line.trim_start();
         if !line.starts_with('{') {
@@ -730,7 +730,7 @@ pub fn parse_metrics(stderr: &[u8]) -> Option<MetricsLine> {
 }
 
 pub fn parse_trap_stderr(stderr: &[u8]) -> Option<String> {
-    let text = std::str::from_utf8(stderr).ok()?;
+    let text = String::from_utf8_lossy(stderr);
     for line in text.lines().rev() {
         let line = line.trim();
         if line.is_empty() {
