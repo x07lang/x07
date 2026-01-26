@@ -13,6 +13,8 @@ use x07_host_runner::CcProfile;
 use x07_worlds::WorldId;
 use x07c::project;
 
+use crate::repair::{RepairArgs, RepairMode, RepairSummary};
+
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 const DEFAULT_SOLVE_FUEL: u64 = 50_000_000;
@@ -174,6 +176,9 @@ pub struct RunArgs {
 
     #[arg(long, value_name = "PATH")]
     pub report_out: Option<PathBuf>,
+
+    #[command(flatten)]
+    pub repair: RepairArgs,
 }
 
 #[derive(Debug, Serialize)]
@@ -191,6 +196,8 @@ struct WrappedReport {
     runner: &'static str,
     world: &'static str,
     target: WrappedTarget,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repair: Option<RepairSummary>,
     report: Box<RawValue>,
 }
 
@@ -275,6 +282,10 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
         selected_profile.as_ref(),
     )?;
     let runner = resolve_runner(&args, selected_profile.as_ref(), world)?;
+    let runner_bin = match runner {
+        RunnerKind::Host => resolve_sibling_or_path("x07-host-runner"),
+        RunnerKind::Os => resolve_sibling_or_path("x07-os-runner"),
+    };
 
     let cc_profile = resolve_cc_profile(&args, selected_profile.as_ref());
     let solve_fuel = args
@@ -341,6 +352,76 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
     if !args.module_root.is_empty() && target_kind != TargetKind::Program {
         anyhow::bail!("--module-root is only valid with --program");
     }
+
+    let mut staged_program: Option<PathBuf> = None;
+    let repair = match target_kind {
+        TargetKind::Artifact => None,
+        TargetKind::Program => {
+            let repair = crate::repair::maybe_repair_x07ast_file(&target_path, world, &args.repair)
+                .with_context(|| format!("repair program: {}", target_path.display()))?;
+            if args.repair.repair == RepairMode::Memory {
+                if let Some(r) = repair.as_ref() {
+                    let stage_id = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+                    let stage_dir = target_path
+                        .parent()
+                        .filter(|p| !p.as_os_str().is_empty())
+                        .unwrap_or(&cwd)
+                        .join(".x07")
+                        .join("repair")
+                        .join("_staged")
+                        .join(stage_id.to_string());
+                    std::fs::create_dir_all(&stage_dir).with_context(|| {
+                        format!("create repair staging dir: {}", stage_dir.display())
+                    })?;
+                    let staged_path = stage_dir.join(
+                        target_path
+                            .file_name()
+                            .unwrap_or_else(|| std::ffi::OsStr::new("program.x07.json")),
+                    );
+                    std::fs::write(&staged_path, r.formatted.as_bytes()).with_context(|| {
+                        format!("write staged repaired program: {}", staged_path.display())
+                    })?;
+                    staged_program = Some(staged_path);
+                }
+            }
+            repair
+        }
+        TargetKind::Project => {
+            let Some(project_path) = project_manifest.as_deref() else {
+                anyhow::bail!("internal error: missing project manifest for project target");
+            };
+            let manifest = project::load_project_manifest(project_path)
+                .with_context(|| format!("load project: {}", project_path.display()))?;
+            let base = project_path.parent().unwrap_or_else(|| Path::new("."));
+            let entry_path = base.join(&manifest.entry);
+
+            let repair = crate::repair::maybe_repair_x07ast_file(&entry_path, world, &args.repair)
+                .with_context(|| format!("repair entry: {}", entry_path.display()))?;
+            if args.repair.repair == RepairMode::Memory {
+                if let Some(r) = repair.as_ref() {
+                    let stage_id = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+                    let stage_dir = base
+                        .join(".x07")
+                        .join("repair")
+                        .join("_staged")
+                        .join(stage_id.to_string());
+                    std::fs::create_dir_all(&stage_dir).with_context(|| {
+                        format!("create repair staging dir: {}", stage_dir.display())
+                    })?;
+                    let staged_path = stage_dir.join(
+                        entry_path
+                            .file_name()
+                            .unwrap_or_else(|| std::ffi::OsStr::new("main.x07.json")),
+                    );
+                    std::fs::write(&staged_path, r.formatted.as_bytes()).with_context(|| {
+                        format!("write staged repaired entry: {}", staged_path.display())
+                    })?;
+                    staged_program = Some(staged_path);
+                }
+            }
+            repair
+        }
+    };
 
     let mut argv: Vec<String> = vec![
         "--cc-profile".to_string(),
@@ -448,11 +529,32 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
 
     match target_kind {
         TargetKind::Project => {
-            argv.push("--project".to_string());
-            argv.push(target_path.display().to_string());
+            if args.repair.repair == RepairMode::Memory {
+                let staged = staged_program
+                    .as_ref()
+                    .context("internal error: repair=memory but staged program missing")?;
+                argv.push("--program".to_string());
+                argv.push(staged.display().to_string());
+
+                let roots = resolve_module_roots_for_wrapper(
+                    runner,
+                    target_kind,
+                    &target_path,
+                    project_manifest.as_deref(),
+                    &args,
+                    &runner_bin,
+                )?;
+                for root in roots {
+                    argv.push("--module-root".to_string());
+                    argv.push(root.display().to_string());
+                }
+            } else {
+                argv.push("--project".to_string());
+                argv.push(target_path.display().to_string());
+            }
         }
         TargetKind::Program => {
-            let program = &target_path;
+            let program = staged_program.as_deref().unwrap_or(&target_path);
             argv.push("--program".to_string());
             argv.push(program.display().to_string());
 
@@ -472,16 +574,11 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
         }
     }
 
-    let bin = match runner {
-        RunnerKind::Host => resolve_sibling_or_path("x07-host-runner"),
-        RunnerKind::Os => resolve_sibling_or_path("x07-os-runner"),
-    };
-
-    let output = Command::new(&bin)
+    let output = Command::new(&runner_bin)
         .args(&argv)
         .stdin(Stdio::null())
         .output()
-        .with_context(|| format!("exec {}", bin.display()))?;
+        .with_context(|| format!("exec {}", runner_bin.display()))?;
 
     std::io::Write::write_all(&mut std::io::stderr(), &output.stderr).context("write stderr")?;
 
@@ -506,7 +603,7 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
                 &target_path,
                 project_manifest.as_deref(),
                 &args,
-                &bin,
+                &runner_bin,
             )?;
 
             let wrapped = WrappedReport {
@@ -526,6 +623,7 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
                         .map(|p| p.display().to_string())
                         .collect(),
                 },
+                repair: repair.as_ref().map(|r| r.summary.clone()),
                 report,
             };
 

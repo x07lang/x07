@@ -35,6 +35,7 @@ pub enum PolicyTemplate {
     SqliteApp,
     PostgresClient,
     Worker,
+    WorkerParallel,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -106,6 +107,9 @@ pub(crate) fn default_base_policy_rel_path(template: PolicyTemplate) -> &'static
             ".x07/policies/base/postgres-client.sandbox.base.policy.json"
         }
         PolicyTemplate::Worker => ".x07/policies/base/worker.sandbox.base.policy.json",
+        PolicyTemplate::WorkerParallel => {
+            ".x07/policies/base/worker-parallel.sandbox.base.policy.json"
+        }
     }
 }
 
@@ -187,6 +191,7 @@ fn cmd_policy_init(args: PolicyInitArgs) -> Result<std::process::ExitCode> {
                     PolicyTemplate::SqliteApp => "sqlite-app",
                     PolicyTemplate::PostgresClient => "postgres-client",
                     PolicyTemplate::Worker => "worker",
+                    PolicyTemplate::WorkerParallel => "worker-parallel",
                 },
                 project_root: project_root.display().to_string(),
                 out: out_rel,
@@ -556,6 +561,59 @@ fn base_policy_template(template: PolicyTemplate, policy_id_override: Option<&st
             "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": false, "allow_sleep": true, "max_sleep_ms": 5000, "allow_local_tzid": false },
             "language": { "allow_unsafe": false, "allow_ffi": false },
             "process": base_process_policy()
+        }),
+        PolicyTemplate::WorkerParallel => serde_json::json!({
+            "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+            "policy_id": "sandbox.worker-parallel.base",
+            "notes": "Base policy for compute workers that spawn subprocesses (parallelism). No fs/net/env by default. Allows bounded sleep for backoff. Allows exec under deps/x07/.",
+            "limits": { "cpu_ms": 300000, "wall_ms": 300000, "mem_bytes": 1073741824, "fds": 128, "procs": 1024, "core_dumps": false },
+            "fs": {
+              "enabled": false,
+              "read_roots": [],
+              "write_roots": [],
+              "deny_hidden": true,
+              "allow_symlinks": false,
+              "allow_mkdir": false,
+              "allow_remove": false,
+              "allow_rename": false,
+              "allow_walk": false,
+              "allow_glob": false,
+              "max_read_bytes": 0,
+              "max_write_bytes": 0,
+              "max_entries": 0,
+              "max_depth": 0
+            },
+            "net": { "enabled": false, "allow_dns": false, "allow_tcp": false, "allow_udp": false, "allow_hosts": [] },
+            "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
+            "time": { "enabled": true, "allow_monotonic": true, "allow_wall_clock": false, "allow_sleep": true, "max_sleep_ms": 5000, "allow_local_tzid": false },
+            "language": { "allow_unsafe": false, "allow_ffi": false },
+            "process": {
+              "enabled": true,
+              "allow_spawn": true,
+              "max_live": 16,
+              "max_spawns": 64,
+              "allow_exec": true,
+              "allow_exit": true,
+              "allow_execs": [],
+              "allow_exec_prefixes": ["deps/x07/"],
+              "allow_args_regex_lite": [],
+              "allow_env_keys": [],
+              "max_exe_bytes": 4096,
+              "max_args": 64,
+              "max_arg_bytes": 4096,
+              "max_env": 64,
+              "max_env_key_bytes": 256,
+              "max_env_val_bytes": 4096,
+              "max_runtime_ms": 60000,
+              "max_stdout_bytes": 10485760,
+              "max_stderr_bytes": 10485760,
+              "max_total_bytes": 16777216,
+              "max_stdin_bytes": 1048576,
+              "kill_on_drop": true,
+              "kill_tree": true,
+              "allow_cwd": false,
+              "allow_cwd_roots": []
+            }
         }),
     };
 

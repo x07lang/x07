@@ -14,8 +14,9 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 ### Doctor (platform prerequisites)
 
-- `x07up doctor --json`
-  - Checks toolchain integrity and host prerequisites (C compiler + common native deps).
+- `x07 doctor`
+  - Checks host prerequisites for OS worlds (C compiler + common native deps).
+  - Emits a JSON report to stdout.
 
 ### Guide (built-in language + stdlib reference)
 
@@ -60,6 +61,7 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 pkg add <name>@<version>`
 - `x07 pkg add <name>@<version> --sync`
 - `x07 pkg lock --project x07.json`
+- `x07 pkg provides <module-id>`
 - `x07 pkg pack --package <dir> --out <path>`
 - `x07 pkg login --index <registry_url>`
 - `x07 pkg publish --package <dir> --index <registry_url>`
@@ -98,6 +100,12 @@ Use `x07 run` as the canonical entry point for execution. Prefer intent-driven p
 - `x07 run`
 - `x07 run --profile os`
 - `x07 run --profile sandbox`
+
+`x07 run` runs the canonical auto-repair loop by default (format → lint → quickfix, repeatable). Control it with:
+
+- `x07 run --repair=off`
+- `x07 run --repair=memory`
+- `x07 run --repair=write` (default)
 
 For the complete guide (targets, worlds, input, fixtures, policies, reports), see [Running programs](running-programs.md).
 
@@ -154,11 +162,11 @@ Notes:
 
 ## Agent bootstrap recipe
 
-Canonical minimal sequence:
+Canonical minimal sequence (keep the loop simple; prefer `x07 run`):
 
 1. Discover CLIs: `x07 --cli-specrows`
-2. Format + lint: `x07 fmt` / `x07 lint` (use `--report-json` when you need wrapper reports)
-3. Repair: `x07 fix` and/or `x07 ast apply-patch`
-4. Execute + validate: `x07 run`, `x07 test`
+2. Iterate: `x07 run` (auto-repair by default; use `--repair=off` when debugging)
+3. Validate: `x07 test`
+4. Debug/repair explicitly (when needed): `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch`
 
 See: [Agent quickstart](../getting-started/agent-quickstart.md).

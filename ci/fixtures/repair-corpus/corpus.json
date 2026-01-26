@@ -41,6 +41,22 @@
       "fixed": "fixed.x07.json",
       "expect_codes": ["X07-WORLD-0001", "X07-ARITY-LET-0001"],
       "expect_quickfix": true
+    },
+    {
+      "id": "006_borrow_from_temporary",
+      "dir": "cases/006_borrow_from_temporary",
+      "broken": "broken.x07.json",
+      "fixed": "fixed.x07.json",
+      "expect_codes": ["X07-BORROW-0001"],
+      "expect_quickfix": true
+    },
+    {
+      "id": "007_use_after_move_bytes_concat",
+      "dir": "cases/007_use_after_move_bytes_concat",
+      "broken": "broken.x07.json",
+      "fixed": "fixed.x07.json",
+      "expect_codes": ["X07-MOVE-0001"],
+      "expect_quickfix": true
     }
   ]
 }

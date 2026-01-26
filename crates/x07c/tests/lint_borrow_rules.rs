@@ -4,7 +4,7 @@ use x07c::{lint, x07ast};
 #[test]
 fn lint_rejects_bytes_view_of_temporary() {
     let doc = json!({
-        "schema_version": "x07.x07ast@0.1.0",
+        "schema_version": "x07.x07ast@0.2.0",
         "kind": "entry",
         "module_id": "main",
         "imports": [],

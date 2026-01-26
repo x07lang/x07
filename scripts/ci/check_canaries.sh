@@ -21,6 +21,22 @@ if [[ -z "${python_bin}" ]]; then
   fi
 fi
 
+# Milestone 1: canonical repair loop is implicit in run/build.
+./scripts/ci/check_run_auto_repair.sh >/dev/null
+./scripts/ci/check_build_auto_repair.sh >/dev/null
+
+# Milestone 2: whitespace-capable literals / authoring ergonomics.
+./scripts/ci/check_text_literals_smoke.sh >/dev/null
+
+# Milestone 3: actionable diagnostics (ptr + suggested fix + quickfix).
+"$python_bin" scripts/ci/check_diagnostics_actionable.py >/dev/null
+
+# Milestone 4: package/module discovery (provides).
+./scripts/ci/check_pkg_provides_smoke.sh >/dev/null
+
+# Milestone 5: concurrency + parallelism in os + sandbox worlds.
+./scripts/ci/check_concurrency_parallelism_smoke.sh >/dev/null
+
 export X07C_BIN
 X07C_BIN="$(./scripts/ci/find_x07c.sh)"
 
@@ -46,6 +62,9 @@ X07C_BIN="$(./scripts/ci/find_x07c.sh)"
 "$python_bin" scripts/generate_stdlib_lock.py --stdlib-root stdlib/os --out stdlib.os.lock --check >/dev/null
 ./scripts/ci/check_x07import_diagnostics_sync.sh >/dev/null
 ./scripts/ci/check_x07import_generated.sh >/dev/null
+
+# Milestone 7: installer/docs contract stays consistent with release targets.
+./scripts/ci/check_install_docs_targets.sh >/dev/null
 
 solutions_dir="${X07_BENCH_SOLUTIONS:-benchmarks/solutions}"
 

@@ -13,7 +13,7 @@ x07 init --template http-client
 Before using OS networking, verify native prerequisites (C compiler + curl/openssl linkability):
 
 ```bash
-x07up doctor --json
+x07 doctor
 ```
 
 Sandboxed run (deny-by-default + explicit allowlist):

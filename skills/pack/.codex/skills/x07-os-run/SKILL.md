@@ -17,7 +17,7 @@ Use this skill when you need real OS I/O (fs/net/process/time) via `run-os` or p
 
 - Run the current project (unsandboxed):
   - `x07 run --profile os`
-  - (equivalently) `x07 run --os` or `x07 run --world run-os`
+  - (equivalently) `x07 run --world run-os`
 
 - Run a project explicitly (unsandboxed):
   - `x07 run --project x07.json --world run-os`
@@ -36,6 +36,7 @@ Use this skill when you need real OS I/O (fs/net/process/time) via `run-os` or p
   - `x07 policy init --template sqlite-app`
   - `x07 policy init --template postgres-client`
   - `x07 policy init --template worker`
+  - `x07 policy init --template worker-parallel`
 
 - Materialize a derived policy with explicit destinations (only in run-os-sandboxed):
   - `x07 run --project x07.json --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`

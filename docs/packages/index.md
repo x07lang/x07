@@ -16,6 +16,10 @@ When you run `x07 pkg lock`, dependencies are fetched into `.x07/deps/...` and p
 
 Do not add `.x07/deps/*/modules` paths to `module_roots` manually.
 
+If you see an `unknown module` compile error and you don’t know which package provides it, use:
+
+- `x07 pkg provides <module-id>`
+
 ## Quickstart
 
 ```bash

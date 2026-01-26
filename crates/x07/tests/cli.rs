@@ -863,7 +863,7 @@ fn x07_run_os_sandboxed_allows_write_under_write_root() {
     write_bytes(
         &dir.join("main.x07.json"),
         br#"{
-  "schema_version": "x07.x07ast@0.1.0",
+  "schema_version": "x07.x07ast@0.2.0",
   "kind": "entry",
   "module_id": "main",
   "imports": [],

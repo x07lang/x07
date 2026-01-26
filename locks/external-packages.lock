@@ -9,14 +9,14 @@
         {
           "module_id": "ext.aho_corasick.tests",
           "path": "packages/ext/x07-ext-aho-corasick-rs/0.1.0/modules/ext/aho_corasick/tests.x07.json",
-          "sha256": "70dc009b7d2f0d27cdae7d7201e4784da1845a98809944a735ca42939958ca81",
+          "sha256": "dbb83f57fc39042d357288c2ccf1e8c5281cb17fe34f77697a2846224c5fa5c2",
           "size_bytes": 3441
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.aho_corasick",
           "path": "packages/ext/x07-ext-aho-corasick-rs/0.1.0/modules/ext/aho_corasick.x07.json",
-          "sha256": "5b06392b5543e0239556440f080241c87ea0ed682bb771540f1feebeead606c3",
+          "sha256": "d970dfaae910e6f24d6279d82052b20592bf3ebe43013558e980d0b9e3cd1a29",
           "size_bytes": 16911,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_aho_corasick@0.1.0/aho_corasick.rs",
           "source_sha256": "bd31783ef27a7099aa6a1bd8fcc76d673c28ce43d3499863bac3c9faf7700f9a"
@@ -34,14 +34,14 @@
         {
           "module_id": "ext.aho_corasick.tests",
           "path": "packages/ext/x07-ext-aho-corasick-rs/0.1.1/modules/ext/aho_corasick/tests.x07.json",
-          "sha256": "70dc009b7d2f0d27cdae7d7201e4784da1845a98809944a735ca42939958ca81",
+          "sha256": "dbb83f57fc39042d357288c2ccf1e8c5281cb17fe34f77697a2846224c5fa5c2",
           "size_bytes": 3441
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.aho_corasick",
           "path": "packages/ext/x07-ext-aho-corasick-rs/0.1.1/modules/ext/aho_corasick.x07.json",
-          "sha256": "5b06392b5543e0239556440f080241c87ea0ed682bb771540f1feebeead606c3",
+          "sha256": "d970dfaae910e6f24d6279d82052b20592bf3ebe43013558e980d0b9e3cd1a29",
           "size_bytes": 16911,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_aho_corasick@0.1.0/aho_corasick.rs",
           "source_sha256": "bd31783ef27a7099aa6a1bd8fcc76d673c28ce43d3499863bac3c9faf7700f9a"
@@ -59,14 +59,14 @@
         {
           "module_id": "ext.aho_corasick.tests",
           "path": "packages/ext/x07-ext-aho-corasick-rs/0.1.2/modules/ext/aho_corasick/tests.x07.json",
-          "sha256": "70dc009b7d2f0d27cdae7d7201e4784da1845a98809944a735ca42939958ca81",
+          "sha256": "dbb83f57fc39042d357288c2ccf1e8c5281cb17fe34f77697a2846224c5fa5c2",
           "size_bytes": 3441
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.aho_corasick",
           "path": "packages/ext/x07-ext-aho-corasick-rs/0.1.2/modules/ext/aho_corasick.x07.json",
-          "sha256": "5b06392b5543e0239556440f080241c87ea0ed682bb771540f1feebeead606c3",
+          "sha256": "d970dfaae910e6f24d6279d82052b20592bf3ebe43013558e980d0b9e3cd1a29",
           "size_bytes": 16911,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_aho_corasick@0.1.0/aho_corasick.rs",
           "source_sha256": "bd31783ef27a7099aa6a1bd8fcc76d673c28ce43d3499863bac3c9faf7700f9a"
@@ -84,14 +84,14 @@
         {
           "module_id": "ext.base64.tests",
           "path": "packages/ext/x07-ext-base64-rs/0.1.0/modules/ext/base64/tests.x07.json",
-          "sha256": "fe6086d45dd3700e46e09bb17acfee9dd61dc69608d54431ee906d54a7ffc796",
+          "sha256": "a5a448d6afa9edef9b9e89f3766ff8f62cb030982d23a81000c8705b4babfff6",
           "size_bytes": 5188
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.base64",
           "path": "packages/ext/x07-ext-base64-rs/0.1.0/modules/ext/base64.x07.json",
-          "sha256": "def56ef0d1df2c9f450eb07bebaa0eada238146116444836c9e85d0c8935f56c",
+          "sha256": "7bd066aa9b9318bf6b714c31897dd3d20e95c4912379549b6c730408bae9e244",
           "size_bytes": 7007,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_base64@0.1.0/base64.rs",
           "source_sha256": "f36f072f4f6f389671d0671d403c0ae31d111f6d09188a0d61323af567659874"
@@ -109,14 +109,14 @@
         {
           "module_id": "ext.base64.tests",
           "path": "packages/ext/x07-ext-base64-rs/0.1.1/modules/ext/base64/tests.x07.json",
-          "sha256": "fe6086d45dd3700e46e09bb17acfee9dd61dc69608d54431ee906d54a7ffc796",
+          "sha256": "a5a448d6afa9edef9b9e89f3766ff8f62cb030982d23a81000c8705b4babfff6",
           "size_bytes": 5188
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.base64",
           "path": "packages/ext/x07-ext-base64-rs/0.1.1/modules/ext/base64.x07.json",
-          "sha256": "def56ef0d1df2c9f450eb07bebaa0eada238146116444836c9e85d0c8935f56c",
+          "sha256": "7bd066aa9b9318bf6b714c31897dd3d20e95c4912379549b6c730408bae9e244",
           "size_bytes": 7007,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_base64@0.1.0/base64.rs",
           "source_sha256": "f36f072f4f6f389671d0671d403c0ae31d111f6d09188a0d61323af567659874"
@@ -134,14 +134,14 @@
         {
           "module_id": "ext.base64.tests",
           "path": "packages/ext/x07-ext-base64-rs/0.1.2/modules/ext/base64/tests.x07.json",
-          "sha256": "fe6086d45dd3700e46e09bb17acfee9dd61dc69608d54431ee906d54a7ffc796",
+          "sha256": "a5a448d6afa9edef9b9e89f3766ff8f62cb030982d23a81000c8705b4babfff6",
           "size_bytes": 5188
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.base64",
           "path": "packages/ext/x07-ext-base64-rs/0.1.2/modules/ext/base64.x07.json",
-          "sha256": "def56ef0d1df2c9f450eb07bebaa0eada238146116444836c9e85d0c8935f56c",
+          "sha256": "7bd066aa9b9318bf6b714c31897dd3d20e95c4912379549b6c730408bae9e244",
           "size_bytes": 7007,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_base64@0.1.0/base64.rs",
           "source_sha256": "f36f072f4f6f389671d0671d403c0ae31d111f6d09188a0d61323af567659874"
@@ -159,31 +159,31 @@
         {
           "module_id": "std.math.bigint.codec_v1",
           "path": "packages/ext/x07-ext-bigint-rs/0.1.0/modules/std/math/bigint/codec_v1.x07.json",
-          "sha256": "0ac88130b51e73fdc52f486cf55c9416d5688cacb6602a2c3d2845a3cd51d2e5",
+          "sha256": "3978a37df1089902a65a5ae0c03a6b852e92677793458f46a48052cdd1865ace",
           "size_bytes": 3787
         },
         {
           "module_id": "std.math.bigint.fmt",
           "path": "packages/ext/x07-ext-bigint-rs/0.1.0/modules/std/math/bigint/fmt.x07.json",
-          "sha256": "a1c4d5a6b89a2d30eda1d52b0082d4e29399282c614c35eceed4b35d2ab2fbce",
+          "sha256": "fe5fef0d29040d22fd36461ac38a3805c8bce7e5de35fa46a2e88c40464b42c9",
           "size_bytes": 6004
         },
         {
           "module_id": "std.math.bigint.parse",
           "path": "packages/ext/x07-ext-bigint-rs/0.1.0/modules/std/math/bigint/parse.x07.json",
-          "sha256": "19abfae81e4e1c73ca90946b4f10efee987db896e7c96677a9557884004de2d1",
+          "sha256": "6dd4f647fbdeb3160783e149ed75305c83d47d31a449428e65c683a6ce92140a",
           "size_bytes": 5215
         },
         {
           "module_id": "std.math.bigint.tests",
           "path": "packages/ext/x07-ext-bigint-rs/0.1.0/modules/std/math/bigint/tests.x07.json",
-          "sha256": "61b589cc730489023bede49dd0746280c82eeb7f309a0d1314dd47b1f2f002d1",
+          "sha256": "af4b72f1346c35d3ef125ede0609ae205a7b2ebf2388666855c026ecb58c45a1",
           "size_bytes": 7658
         },
         {
           "module_id": "std.math.bigint",
           "path": "packages/ext/x07-ext-bigint-rs/0.1.0/modules/std/math/bigint.x07.json",
-          "sha256": "bc486e33e7a1c412c40196b920a6b42d1786401d3118a28035c562e170498655",
+          "sha256": "efb22181fad0445d366dc619718eeff120a5202d377c918a5021c55298f4762a",
           "size_bytes": 20114
         }
       ],
@@ -199,14 +199,14 @@
         {
           "module_id": "ext.byteorder.tests",
           "path": "packages/ext/x07-ext-byteorder-rs/0.1.0/modules/ext/byteorder/tests.x07.json",
-          "sha256": "9ec1079dbd972d75b1d03a22f94226ce6e9bf1f04c824340c0134b448612877b",
+          "sha256": "c83fb229f9eac7caa4470cb85d7e45fa7af04434390903840677542d814d079a",
           "size_bytes": 5395
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.byteorder",
           "path": "packages/ext/x07-ext-byteorder-rs/0.1.0/modules/ext/byteorder.x07.json",
-          "sha256": "c6321537ad06ace5e3b6357c0a14f6c14b30a9b142968224eff4f2e1ad9544c7",
+          "sha256": "c71c12efaa9affc60b94b72b24b345416eaaca2f1b8c45482b82c52b5f7f1397",
           "size_bytes": 3918,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_byteorder@0.1.0/byteorder.rs",
           "source_sha256": "e36c764995bfcf1cd53648f24f509d71b1fb7e7b7657c64ca14ee59ef51af465"
@@ -224,14 +224,14 @@
         {
           "module_id": "ext.byteorder.tests",
           "path": "packages/ext/x07-ext-byteorder-rs/0.1.1/modules/ext/byteorder/tests.x07.json",
-          "sha256": "9ec1079dbd972d75b1d03a22f94226ce6e9bf1f04c824340c0134b448612877b",
+          "sha256": "c83fb229f9eac7caa4470cb85d7e45fa7af04434390903840677542d814d079a",
           "size_bytes": 5395
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.byteorder",
           "path": "packages/ext/x07-ext-byteorder-rs/0.1.1/modules/ext/byteorder.x07.json",
-          "sha256": "c6321537ad06ace5e3b6357c0a14f6c14b30a9b142968224eff4f2e1ad9544c7",
+          "sha256": "c71c12efaa9affc60b94b72b24b345416eaaca2f1b8c45482b82c52b5f7f1397",
           "size_bytes": 3918,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_byteorder@0.1.0/byteorder.rs",
           "source_sha256": "e36c764995bfcf1cd53648f24f509d71b1fb7e7b7657c64ca14ee59ef51af465"
@@ -249,14 +249,14 @@
         {
           "module_id": "ext.byteorder.tests",
           "path": "packages/ext/x07-ext-byteorder-rs/0.1.2/modules/ext/byteorder/tests.x07.json",
-          "sha256": "9ec1079dbd972d75b1d03a22f94226ce6e9bf1f04c824340c0134b448612877b",
+          "sha256": "c83fb229f9eac7caa4470cb85d7e45fa7af04434390903840677542d814d079a",
           "size_bytes": 5395
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.byteorder",
           "path": "packages/ext/x07-ext-byteorder-rs/0.1.2/modules/ext/byteorder.x07.json",
-          "sha256": "c6321537ad06ace5e3b6357c0a14f6c14b30a9b142968224eff4f2e1ad9544c7",
+          "sha256": "c71c12efaa9affc60b94b72b24b345416eaaca2f1b8c45482b82c52b5f7f1397",
           "size_bytes": 3918,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_byteorder@0.1.0/byteorder.rs",
           "source_sha256": "e36c764995bfcf1cd53648f24f509d71b1fb7e7b7657c64ca14ee59ef51af465"
@@ -274,19 +274,19 @@
         {
           "module_id": "ext.cbor.data_model",
           "path": "packages/ext/x07-ext-cbor-rs/0.1.0/modules/ext/cbor/data_model.x07.json",
-          "sha256": "ea7cd130374f4a8e8da558561879967bc9cf1c75e2f406aca573b32cf5af8b02",
+          "sha256": "b42618962d7b249e68f81d687b328fb0e9e19287ab48cd7435f0ec7c417af44b",
           "size_bytes": 62812
         },
         {
           "module_id": "ext.cbor.tests",
           "path": "packages/ext/x07-ext-cbor-rs/0.1.0/modules/ext/cbor/tests.x07.json",
-          "sha256": "4311da8c67b40a1fcf50ff898a7fcd462b75cb37bccd5e7ee7c28b4ee011b869",
+          "sha256": "0df93a8a0923db2131d3ab5960f8ee49e9b61aab9f1ae92fc94cd2cfb57d860d",
           "size_bytes": 12262
         },
         {
           "module_id": "ext.cbor",
           "path": "packages/ext/x07-ext-cbor-rs/0.1.0/modules/ext/cbor.x07.json",
-          "sha256": "27ddc995fd07bfa14ba6c32c9b662d4127d0e2210949c16a300941d046ebdb77",
+          "sha256": "8e2bc2cd416c3ae23acb683e45f5587e59e9cfc8efd0f3983897c211cd849673",
           "size_bytes": 819
         }
       ],
@@ -302,19 +302,19 @@
         {
           "module_id": "ext.checksum.crc32c",
           "path": "packages/ext/x07-ext-checksum-rs/0.1.0/modules/ext/checksum/crc32c.x07.json",
-          "sha256": "223fc9d9d184de4f308798bd3ea6988fd3b2eaf065398997d63291a42b535c97",
+          "sha256": "a4098c5897401ffcfc7ee780ba1021a5dfd409a5abdc1eab38ab2c1905360144",
           "size_bytes": 2277
         },
         {
           "module_id": "ext.checksum.tests",
           "path": "packages/ext/x07-ext-checksum-rs/0.1.0/modules/ext/checksum/tests.x07.json",
-          "sha256": "2a2af8dcab825e6fb55283b104824dc2d8d111f82a2e55a0147b5f6d742593d5",
+          "sha256": "a9cae4569ee318217b4f8dc3b7d84a82f086bf7051607f045571d5d76abba8d6",
           "size_bytes": 2411
         },
         {
           "module_id": "ext.checksum.xxhash64",
           "path": "packages/ext/x07-ext-checksum-rs/0.1.0/modules/ext/checksum/xxhash64.x07.json",
-          "sha256": "7e8b746b45c2aa6e5d3bf613153a8035cd2a37a5938db75a7d67d197e3ec2d12",
+          "sha256": "92972da1f11a242ac57d628ca028131694b8114afdb37d66163bf1886079bb76",
           "size_bytes": 14053
         }
       ],
@@ -330,31 +330,31 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.0/modules/ext/cli/complete.x07.json",
-          "sha256": "237e9c80bf7899e17a39cb162edd417a0855611f4931f17c27a297ee778c0def",
+          "sha256": "04effd7ecf4f93fdb8c5623ecf68d841769dd8fb746eaef52705a92faa07296e",
           "size_bytes": 603
         },
         {
           "module_id": "ext.cli.help",
           "path": "packages/ext/x07-ext-cli/0.1.0/modules/ext/cli/help.x07.json",
-          "sha256": "18e095036361d6dc2fb1fa5123371d4d53963ba0ddfbee1f4c34e3b876e4286b",
+          "sha256": "04ba3a0130789c3476e17383876033181fa4098df208f66bc45521fd2cb93aeb",
           "size_bytes": 3394
         },
         {
           "module_id": "ext.cli.specrows",
           "path": "packages/ext/x07-ext-cli/0.1.0/modules/ext/cli/specrows.x07.json",
-          "sha256": "3238bdb0f673973cf7659ff27fa22f929cdad45b7267dd477b3ff75503aac77e",
+          "sha256": "16e7624d3519287881f2f5591c0bf64c3104ac1d6040cdf8248b7503ffb3ab9a",
           "size_bytes": 11029
         },
         {
           "module_id": "ext.cli.tests",
           "path": "packages/ext/x07-ext-cli/0.1.0/modules/ext/cli/tests.x07.json",
-          "sha256": "ef8b59a4532f93f829b9f10755180bc986751dbe774710eee2e2a39793d66468",
+          "sha256": "6bc6042a841977da90d5e8760eda6174ccb36295712b6dd6405606831c35250a",
           "size_bytes": 11234
         },
         {
           "module_id": "ext.cli",
           "path": "packages/ext/x07-ext-cli/0.1.0/modules/ext/cli.x07.json",
-          "sha256": "4f1078c93c98faf0d55c2cba9676e8844f2d150301be18e5c9624a6c5081870e",
+          "sha256": "f70ed5d407c0562897da77801a732b3d31d4f0777e7b24803e726210c5ba05a7",
           "size_bytes": 42108
         }
       ],
@@ -370,31 +370,31 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.1/modules/ext/cli/complete.x07.json",
-          "sha256": "237e9c80bf7899e17a39cb162edd417a0855611f4931f17c27a297ee778c0def",
+          "sha256": "04effd7ecf4f93fdb8c5623ecf68d841769dd8fb746eaef52705a92faa07296e",
           "size_bytes": 603
         },
         {
           "module_id": "ext.cli.help",
           "path": "packages/ext/x07-ext-cli/0.1.1/modules/ext/cli/help.x07.json",
-          "sha256": "18e095036361d6dc2fb1fa5123371d4d53963ba0ddfbee1f4c34e3b876e4286b",
+          "sha256": "04ba3a0130789c3476e17383876033181fa4098df208f66bc45521fd2cb93aeb",
           "size_bytes": 3394
         },
         {
           "module_id": "ext.cli.specrows",
           "path": "packages/ext/x07-ext-cli/0.1.1/modules/ext/cli/specrows.x07.json",
-          "sha256": "3238bdb0f673973cf7659ff27fa22f929cdad45b7267dd477b3ff75503aac77e",
+          "sha256": "16e7624d3519287881f2f5591c0bf64c3104ac1d6040cdf8248b7503ffb3ab9a",
           "size_bytes": 11029
         },
         {
           "module_id": "ext.cli.tests",
           "path": "packages/ext/x07-ext-cli/0.1.1/modules/ext/cli/tests.x07.json",
-          "sha256": "ef8b59a4532f93f829b9f10755180bc986751dbe774710eee2e2a39793d66468",
+          "sha256": "6bc6042a841977da90d5e8760eda6174ccb36295712b6dd6405606831c35250a",
           "size_bytes": 11234
         },
         {
           "module_id": "ext.cli",
           "path": "packages/ext/x07-ext-cli/0.1.1/modules/ext/cli.x07.json",
-          "sha256": "4f1078c93c98faf0d55c2cba9676e8844f2d150301be18e5c9624a6c5081870e",
+          "sha256": "f70ed5d407c0562897da77801a732b3d31d4f0777e7b24803e726210c5ba05a7",
           "size_bytes": 42108
         }
       ],
@@ -410,31 +410,31 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.2/modules/ext/cli/complete.x07.json",
-          "sha256": "dd0ef3e53f44d074b6a06a3ee023f5389e9d91b30ffcda6ca312e5bbc957f49d",
+          "sha256": "03914419076424f2238f1617c31718ca49d9a25050c9cd6b5a84522a23634c3a",
           "size_bytes": 616
         },
         {
           "module_id": "ext.cli.help",
           "path": "packages/ext/x07-ext-cli/0.1.2/modules/ext/cli/help.x07.json",
-          "sha256": "18e095036361d6dc2fb1fa5123371d4d53963ba0ddfbee1f4c34e3b876e4286b",
+          "sha256": "04ba3a0130789c3476e17383876033181fa4098df208f66bc45521fd2cb93aeb",
           "size_bytes": 3394
         },
         {
           "module_id": "ext.cli.specrows",
           "path": "packages/ext/x07-ext-cli/0.1.2/modules/ext/cli/specrows.x07.json",
-          "sha256": "3238bdb0f673973cf7659ff27fa22f929cdad45b7267dd477b3ff75503aac77e",
+          "sha256": "16e7624d3519287881f2f5591c0bf64c3104ac1d6040cdf8248b7503ffb3ab9a",
           "size_bytes": 11029
         },
         {
           "module_id": "ext.cli.tests",
           "path": "packages/ext/x07-ext-cli/0.1.2/modules/ext/cli/tests.x07.json",
-          "sha256": "ef8b59a4532f93f829b9f10755180bc986751dbe774710eee2e2a39793d66468",
+          "sha256": "6bc6042a841977da90d5e8760eda6174ccb36295712b6dd6405606831c35250a",
           "size_bytes": 11234
         },
         {
           "module_id": "ext.cli",
           "path": "packages/ext/x07-ext-cli/0.1.2/modules/ext/cli.x07.json",
-          "sha256": "4f1078c93c98faf0d55c2cba9676e8844f2d150301be18e5c9624a6c5081870e",
+          "sha256": "f70ed5d407c0562897da77801a732b3d31d4f0777e7b24803e726210c5ba05a7",
           "size_bytes": 42108
         }
       ],
@@ -450,31 +450,31 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.3/modules/ext/cli/complete.x07.json",
-          "sha256": "dd0ef3e53f44d074b6a06a3ee023f5389e9d91b30ffcda6ca312e5bbc957f49d",
+          "sha256": "03914419076424f2238f1617c31718ca49d9a25050c9cd6b5a84522a23634c3a",
           "size_bytes": 616
         },
         {
           "module_id": "ext.cli.help",
           "path": "packages/ext/x07-ext-cli/0.1.3/modules/ext/cli/help.x07.json",
-          "sha256": "18e095036361d6dc2fb1fa5123371d4d53963ba0ddfbee1f4c34e3b876e4286b",
+          "sha256": "04ba3a0130789c3476e17383876033181fa4098df208f66bc45521fd2cb93aeb",
           "size_bytes": 3394
         },
         {
           "module_id": "ext.cli.specrows",
           "path": "packages/ext/x07-ext-cli/0.1.3/modules/ext/cli/specrows.x07.json",
-          "sha256": "3238bdb0f673973cf7659ff27fa22f929cdad45b7267dd477b3ff75503aac77e",
+          "sha256": "16e7624d3519287881f2f5591c0bf64c3104ac1d6040cdf8248b7503ffb3ab9a",
           "size_bytes": 11029
         },
         {
           "module_id": "ext.cli.tests",
           "path": "packages/ext/x07-ext-cli/0.1.3/modules/ext/cli/tests.x07.json",
-          "sha256": "ef8b59a4532f93f829b9f10755180bc986751dbe774710eee2e2a39793d66468",
+          "sha256": "6bc6042a841977da90d5e8760eda6174ccb36295712b6dd6405606831c35250a",
           "size_bytes": 11234
         },
         {
           "module_id": "ext.cli",
           "path": "packages/ext/x07-ext-cli/0.1.3/modules/ext/cli.x07.json",
-          "sha256": "4f1078c93c98faf0d55c2cba9676e8844f2d150301be18e5c9624a6c5081870e",
+          "sha256": "f70ed5d407c0562897da77801a732b3d31d4f0777e7b24803e726210c5ba05a7",
           "size_bytes": 42108
         }
       ],
@@ -490,14 +490,14 @@
         {
           "module_id": "ext.compress.tests",
           "path": "packages/ext/x07-ext-compress-rs/0.1.0/modules/ext/compress/tests.x07.json",
-          "sha256": "0e6b778f745659ab6ccdf3ed42f6558619a717268c0788b067d8ce5702ee29da",
+          "sha256": "c725f052d5a2d31b10a97c8ffb5ac53920dc00ca08c92737e6c2f6ed69bcd6ef",
           "size_bytes": 6162
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.compress",
           "path": "packages/ext/x07-ext-compress-rs/0.1.0/modules/ext/compress.x07.json",
-          "sha256": "5441ee0797727abf20c04f9c83ca5272e5cc3ccd539be52b6ba79f886033414b",
+          "sha256": "a86c0f111fc452747a41eef3f380391021fde38c15dc66457fa856c11f7b355e",
           "size_bytes": 35716,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_compress@0.1.0/compress.rs",
           "source_sha256": "fe8c020515b1d4b04ef3e097346b462e0a235d3813ed70ade09212d6b036ddb3"
@@ -505,13 +505,13 @@
         {
           "module_id": "ext.zip.tests",
           "path": "packages/ext/x07-ext-compress-rs/0.1.0/modules/ext/zip/tests.x07.json",
-          "sha256": "009246742484ba4e38c4f093fb471c21f0a2926e7d461ef0f65fd096150e9e93",
+          "sha256": "bbb5355f928ea00fd5112a168130b42681ee8aa6676a335bb9bab22fa4faf1a9",
           "size_bytes": 13018
         },
         {
           "module_id": "ext.zip",
           "path": "packages/ext/x07-ext-compress-rs/0.1.0/modules/ext/zip.x07.json",
-          "sha256": "11d76ba87761076dc754932066467f2f151f6bc5c8dc587870c3f1071943549d",
+          "sha256": "196947fc69bc581d12d3839d9a9d902664df60e189c5cdec2f841df5f6e2997c",
           "size_bytes": 13990
         }
       ],
@@ -527,14 +527,14 @@
         {
           "module_id": "ext.compress.tests",
           "path": "packages/ext/x07-ext-compress-rs/0.1.1/modules/ext/compress/tests.x07.json",
-          "sha256": "0e6b778f745659ab6ccdf3ed42f6558619a717268c0788b067d8ce5702ee29da",
+          "sha256": "c725f052d5a2d31b10a97c8ffb5ac53920dc00ca08c92737e6c2f6ed69bcd6ef",
           "size_bytes": 6162
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.compress",
           "path": "packages/ext/x07-ext-compress-rs/0.1.1/modules/ext/compress.x07.json",
-          "sha256": "5441ee0797727abf20c04f9c83ca5272e5cc3ccd539be52b6ba79f886033414b",
+          "sha256": "a86c0f111fc452747a41eef3f380391021fde38c15dc66457fa856c11f7b355e",
           "size_bytes": 35716,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_compress@0.1.0/compress.rs",
           "source_sha256": "fe8c020515b1d4b04ef3e097346b462e0a235d3813ed70ade09212d6b036ddb3"
@@ -542,13 +542,13 @@
         {
           "module_id": "ext.zip.tests",
           "path": "packages/ext/x07-ext-compress-rs/0.1.1/modules/ext/zip/tests.x07.json",
-          "sha256": "009246742484ba4e38c4f093fb471c21f0a2926e7d461ef0f65fd096150e9e93",
+          "sha256": "bbb5355f928ea00fd5112a168130b42681ee8aa6676a335bb9bab22fa4faf1a9",
           "size_bytes": 13018
         },
         {
           "module_id": "ext.zip",
           "path": "packages/ext/x07-ext-compress-rs/0.1.1/modules/ext/zip.x07.json",
-          "sha256": "11d76ba87761076dc754932066467f2f151f6bc5c8dc587870c3f1071943549d",
+          "sha256": "196947fc69bc581d12d3839d9a9d902664df60e189c5cdec2f841df5f6e2997c",
           "size_bytes": 13990
         }
       ],
@@ -564,14 +564,14 @@
         {
           "module_id": "ext.compress.tests",
           "path": "packages/ext/x07-ext-compress-rs/0.1.2/modules/ext/compress/tests.x07.json",
-          "sha256": "0e6b778f745659ab6ccdf3ed42f6558619a717268c0788b067d8ce5702ee29da",
+          "sha256": "c725f052d5a2d31b10a97c8ffb5ac53920dc00ca08c92737e6c2f6ed69bcd6ef",
           "size_bytes": 6162
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.compress",
           "path": "packages/ext/x07-ext-compress-rs/0.1.2/modules/ext/compress.x07.json",
-          "sha256": "5441ee0797727abf20c04f9c83ca5272e5cc3ccd539be52b6ba79f886033414b",
+          "sha256": "a86c0f111fc452747a41eef3f380391021fde38c15dc66457fa856c11f7b355e",
           "size_bytes": 35716,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_compress@0.1.0/compress.rs",
           "source_sha256": "fe8c020515b1d4b04ef3e097346b462e0a235d3813ed70ade09212d6b036ddb3"
@@ -579,13 +579,13 @@
         {
           "module_id": "ext.zip.tests",
           "path": "packages/ext/x07-ext-compress-rs/0.1.2/modules/ext/zip/tests.x07.json",
-          "sha256": "009246742484ba4e38c4f093fb471c21f0a2926e7d461ef0f65fd096150e9e93",
+          "sha256": "bbb5355f928ea00fd5112a168130b42681ee8aa6676a335bb9bab22fa4faf1a9",
           "size_bytes": 13018
         },
         {
           "module_id": "ext.zip",
           "path": "packages/ext/x07-ext-compress-rs/0.1.2/modules/ext/zip.x07.json",
-          "sha256": "11d76ba87761076dc754932066467f2f151f6bc5c8dc587870c3f1071943549d",
+          "sha256": "196947fc69bc581d12d3839d9a9d902664df60e189c5cdec2f841df5f6e2997c",
           "size_bytes": 13990
         }
       ],
@@ -601,14 +601,14 @@
         {
           "module_id": "ext.compress.tests",
           "path": "packages/ext/x07-ext-compress-rs/0.1.3/modules/ext/compress/tests.x07.json",
-          "sha256": "0e6b778f745659ab6ccdf3ed42f6558619a717268c0788b067d8ce5702ee29da",
+          "sha256": "c725f052d5a2d31b10a97c8ffb5ac53920dc00ca08c92737e6c2f6ed69bcd6ef",
           "size_bytes": 6162
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.compress",
           "path": "packages/ext/x07-ext-compress-rs/0.1.3/modules/ext/compress.x07.json",
-          "sha256": "5441ee0797727abf20c04f9c83ca5272e5cc3ccd539be52b6ba79f886033414b",
+          "sha256": "a86c0f111fc452747a41eef3f380391021fde38c15dc66457fa856c11f7b355e",
           "size_bytes": 35716,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_compress@0.1.0/compress.rs",
           "source_sha256": "fe8c020515b1d4b04ef3e097346b462e0a235d3813ed70ade09212d6b036ddb3"
@@ -616,25 +616,25 @@
         {
           "module_id": "ext.zip.tests",
           "path": "packages/ext/x07-ext-compress-rs/0.1.3/modules/ext/zip/tests.x07.json",
-          "sha256": "009246742484ba4e38c4f093fb471c21f0a2926e7d461ef0f65fd096150e9e93",
+          "sha256": "bbb5355f928ea00fd5112a168130b42681ee8aa6676a335bb9bab22fa4faf1a9",
           "size_bytes": 13018
         },
         {
           "module_id": "ext.zip",
           "path": "packages/ext/x07-ext-compress-rs/0.1.3/modules/ext/zip.x07.json",
-          "sha256": "11d76ba87761076dc754932066467f2f151f6bc5c8dc587870c3f1071943549d",
+          "sha256": "196947fc69bc581d12d3839d9a9d902664df60e189c5cdec2f841df5f6e2997c",
           "size_bytes": 13990
         },
         {
           "module_id": "ext.zstd.tests",
           "path": "packages/ext/x07-ext-compress-rs/0.1.3/modules/ext/zstd/tests.x07.json",
-          "sha256": "78ee63061c1d933704c9d373d0ae8d85e5cdb63317bd3f2a00afd1fc6fff506b",
+          "sha256": "de6eb2735c6ef68cfd5f4c90ae0831e775e2dacf72de7f58aec9b3fc19fa0792",
           "size_bytes": 3132
         },
         {
           "module_id": "ext.zstd",
           "path": "packages/ext/x07-ext-compress-rs/0.1.3/modules/ext/zstd.x07.json",
-          "sha256": "c096034f6c04e5bfa53fcaf6c4792ffc3dac0748ba92157e1997c5072b375564",
+          "sha256": "c750c17f1de5be76575008f9471fb99cce03a967f183223976930152ac565faa",
           "size_bytes": 10803
         }
       ],
@@ -650,14 +650,14 @@
         {
           "module_id": "ext.crypto.tests",
           "path": "packages/ext/x07-ext-crypto-rs/0.1.0/modules/ext/crypto/tests.x07.json",
-          "sha256": "7cee062ebdb028e6cd019fd3f9f7cc3b1bfe8dd5d5faf158eb3bc224feb224b1",
+          "sha256": "3cfac55671550edd75f3c54b79658b650a7737e8b0cc037bf81a6e7d969b6e8d",
           "size_bytes": 11400
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.crypto",
           "path": "packages/ext/x07-ext-crypto-rs/0.1.0/modules/ext/crypto.x07.json",
-          "sha256": "cd0c680fe4fa9f58f3a3431266ee68b5737e8b0958575ef51c4b6de6837acbed",
+          "sha256": "149ccef3c321d0f3f8dd7edd402b728a90bbc202641ed8b9266cef8db92ceadf",
           "size_bytes": 47400,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_crypto@0.1.0/crypto.rs",
           "source_sha256": "df8ed43f0b7c0da0cef6f8029c6936e64a34cc38055e251538a6e3bf0e9a3415"
@@ -675,14 +675,14 @@
         {
           "module_id": "ext.crypto.tests",
           "path": "packages/ext/x07-ext-crypto-rs/0.1.1/modules/ext/crypto/tests.x07.json",
-          "sha256": "7cee062ebdb028e6cd019fd3f9f7cc3b1bfe8dd5d5faf158eb3bc224feb224b1",
+          "sha256": "3cfac55671550edd75f3c54b79658b650a7737e8b0cc037bf81a6e7d969b6e8d",
           "size_bytes": 11400
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.crypto",
           "path": "packages/ext/x07-ext-crypto-rs/0.1.1/modules/ext/crypto.x07.json",
-          "sha256": "cd0c680fe4fa9f58f3a3431266ee68b5737e8b0958575ef51c4b6de6837acbed",
+          "sha256": "149ccef3c321d0f3f8dd7edd402b728a90bbc202641ed8b9266cef8db92ceadf",
           "size_bytes": 47400,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_crypto@0.1.0/crypto.rs",
           "source_sha256": "df8ed43f0b7c0da0cef6f8029c6936e64a34cc38055e251538a6e3bf0e9a3415"
@@ -700,14 +700,14 @@
         {
           "module_id": "ext.crypto.tests",
           "path": "packages/ext/x07-ext-crypto-rs/0.1.2/modules/ext/crypto/tests.x07.json",
-          "sha256": "7cee062ebdb028e6cd019fd3f9f7cc3b1bfe8dd5d5faf158eb3bc224feb224b1",
+          "sha256": "3cfac55671550edd75f3c54b79658b650a7737e8b0cc037bf81a6e7d969b6e8d",
           "size_bytes": 11400
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.crypto",
           "path": "packages/ext/x07-ext-crypto-rs/0.1.2/modules/ext/crypto.x07.json",
-          "sha256": "cd0c680fe4fa9f58f3a3431266ee68b5737e8b0958575ef51c4b6de6837acbed",
+          "sha256": "149ccef3c321d0f3f8dd7edd402b728a90bbc202641ed8b9266cef8db92ceadf",
           "size_bytes": 47400,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_crypto@0.1.0/crypto.rs",
           "source_sha256": "df8ed43f0b7c0da0cef6f8029c6936e64a34cc38055e251538a6e3bf0e9a3415"
@@ -725,20 +725,20 @@
         {
           "module_id": "ext.csv.data_model",
           "path": "packages/ext/x07-ext-csv-rs/0.1.0/modules/ext/csv/data_model.x07.json",
-          "sha256": "e68ee1534ae173b31e7770e7b6a69a8890c16cac5484f30e134a75eca2a050df",
+          "sha256": "eea64c3ef4e7b7459f887035446ab7ef23e4ce924cf7de138f00314d5a05ae2b",
           "size_bytes": 4615
         },
         {
           "module_id": "ext.csv.tests",
           "path": "packages/ext/x07-ext-csv-rs/0.1.0/modules/ext/csv/tests.x07.json",
-          "sha256": "3932db2b6036a602a8f839e4059061cfe73bd0acbd9c229b643639c8837e2006",
+          "sha256": "4e6f95885687a9ee099558d5da52b64b131d81d4eb270db7c63d504c6737c480",
           "size_bytes": 6510
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.csv",
           "path": "packages/ext/x07-ext-csv-rs/0.1.0/modules/ext/csv.x07.json",
-          "sha256": "e2d26a45641acee4079bd8a6c000123b3ba9cd763c528130437d61cca216d633",
+          "sha256": "371b5311cd100ba3264a555ffd4b5563c31ac0b06c951489438971381f1fec4f",
           "size_bytes": 9859,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_csv@0.1.0/csv.rs",
           "source_sha256": "fd6a273c115628dae97b87e6430f53c56d89446f3c9fae6fcbaab8518efc5509"
@@ -756,20 +756,20 @@
         {
           "module_id": "ext.csv.data_model",
           "path": "packages/ext/x07-ext-csv-rs/0.1.1/modules/ext/csv/data_model.x07.json",
-          "sha256": "e68ee1534ae173b31e7770e7b6a69a8890c16cac5484f30e134a75eca2a050df",
+          "sha256": "eea64c3ef4e7b7459f887035446ab7ef23e4ce924cf7de138f00314d5a05ae2b",
           "size_bytes": 4615
         },
         {
           "module_id": "ext.csv.tests",
           "path": "packages/ext/x07-ext-csv-rs/0.1.1/modules/ext/csv/tests.x07.json",
-          "sha256": "3932db2b6036a602a8f839e4059061cfe73bd0acbd9c229b643639c8837e2006",
+          "sha256": "4e6f95885687a9ee099558d5da52b64b131d81d4eb270db7c63d504c6737c480",
           "size_bytes": 6510
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.csv",
           "path": "packages/ext/x07-ext-csv-rs/0.1.1/modules/ext/csv.x07.json",
-          "sha256": "e2d26a45641acee4079bd8a6c000123b3ba9cd763c528130437d61cca216d633",
+          "sha256": "371b5311cd100ba3264a555ffd4b5563c31ac0b06c951489438971381f1fec4f",
           "size_bytes": 9859,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_csv@0.1.0/csv.rs",
           "source_sha256": "fd6a273c115628dae97b87e6430f53c56d89446f3c9fae6fcbaab8518efc5509"
@@ -787,20 +787,20 @@
         {
           "module_id": "ext.csv.data_model",
           "path": "packages/ext/x07-ext-csv-rs/0.1.2/modules/ext/csv/data_model.x07.json",
-          "sha256": "e68ee1534ae173b31e7770e7b6a69a8890c16cac5484f30e134a75eca2a050df",
+          "sha256": "eea64c3ef4e7b7459f887035446ab7ef23e4ce924cf7de138f00314d5a05ae2b",
           "size_bytes": 4615
         },
         {
           "module_id": "ext.csv.tests",
           "path": "packages/ext/x07-ext-csv-rs/0.1.2/modules/ext/csv/tests.x07.json",
-          "sha256": "3932db2b6036a602a8f839e4059061cfe73bd0acbd9c229b643639c8837e2006",
+          "sha256": "4e6f95885687a9ee099558d5da52b64b131d81d4eb270db7c63d504c6737c480",
           "size_bytes": 6510
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.csv",
           "path": "packages/ext/x07-ext-csv-rs/0.1.2/modules/ext/csv.x07.json",
-          "sha256": "e2d26a45641acee4079bd8a6c000123b3ba9cd763c528130437d61cca216d633",
+          "sha256": "371b5311cd100ba3264a555ffd4b5563c31ac0b06c951489438971381f1fec4f",
           "size_bytes": 9859,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_csv@0.1.0/csv.rs",
           "source_sha256": "fd6a273c115628dae97b87e6430f53c56d89446f3c9fae6fcbaab8518efc5509"
@@ -821,13 +821,13 @@
         {
           "module_id": "ext.curl._ffi",
           "path": "packages/ext/x07-ext-curl-c/0.1.0/modules/ext/curl/_ffi.x07.json",
-          "sha256": "5b4691bb1f553b2cc20d24bd461eaf26c3e5a842537a74c0cf5f23c9aed2fff5",
+          "sha256": "d0f6a102b0e5693b0c08fe3183a0cedad0b905220d341896acec256f3e06df30",
           "size_bytes": 3889
         },
         {
           "module_id": "ext.curl.http",
           "path": "packages/ext/x07-ext-curl-c/0.1.0/modules/ext/curl/http.x07.json",
-          "sha256": "029b531f117042cba8ed364e339ab06cc01d7bd22e2f71af73985ba0d0b1ca67",
+          "sha256": "cd61c70c190555c34d89efe96b1fede41db2b878325f4f765d57a3418bf0eca0",
           "size_bytes": 23355
         }
       ],
@@ -846,13 +846,13 @@
         {
           "module_id": "ext.curl._ffi",
           "path": "packages/ext/x07-ext-curl-c/0.1.1/modules/ext/curl/_ffi.x07.json",
-          "sha256": "5b4691bb1f553b2cc20d24bd461eaf26c3e5a842537a74c0cf5f23c9aed2fff5",
+          "sha256": "d0f6a102b0e5693b0c08fe3183a0cedad0b905220d341896acec256f3e06df30",
           "size_bytes": 3889
         },
         {
           "module_id": "ext.curl.http",
           "path": "packages/ext/x07-ext-curl-c/0.1.1/modules/ext/curl/http.x07.json",
-          "sha256": "029b531f117042cba8ed364e339ab06cc01d7bd22e2f71af73985ba0d0b1ca67",
+          "sha256": "cd61c70c190555c34d89efe96b1fede41db2b878325f4f765d57a3418bf0eca0",
           "size_bytes": 23355
         }
       ],
@@ -871,13 +871,13 @@
         {
           "module_id": "ext.curl._ffi",
           "path": "packages/ext/x07-ext-curl-c/0.1.2/modules/ext/curl/_ffi.x07.json",
-          "sha256": "5b4691bb1f553b2cc20d24bd461eaf26c3e5a842537a74c0cf5f23c9aed2fff5",
+          "sha256": "d0f6a102b0e5693b0c08fe3183a0cedad0b905220d341896acec256f3e06df30",
           "size_bytes": 3889
         },
         {
           "module_id": "ext.curl.http",
           "path": "packages/ext/x07-ext-curl-c/0.1.2/modules/ext/curl/http.x07.json",
-          "sha256": "029b531f117042cba8ed364e339ab06cc01d7bd22e2f71af73985ba0d0b1ca67",
+          "sha256": "cd61c70c190555c34d89efe96b1fede41db2b878325f4f765d57a3418bf0eca0",
           "size_bytes": 23355
         }
       ],
@@ -896,13 +896,13 @@
         {
           "module_id": "ext.curl._ffi",
           "path": "packages/ext/x07-ext-curl-c/0.1.3/modules/ext/curl/_ffi.x07.json",
-          "sha256": "5b4691bb1f553b2cc20d24bd461eaf26c3e5a842537a74c0cf5f23c9aed2fff5",
+          "sha256": "d0f6a102b0e5693b0c08fe3183a0cedad0b905220d341896acec256f3e06df30",
           "size_bytes": 3889
         },
         {
           "module_id": "ext.curl.http",
           "path": "packages/ext/x07-ext-curl-c/0.1.3/modules/ext/curl/http.x07.json",
-          "sha256": "029b531f117042cba8ed364e339ab06cc01d7bd22e2f71af73985ba0d0b1ca67",
+          "sha256": "cd61c70c190555c34d89efe96b1fede41db2b878325f4f765d57a3418bf0eca0",
           "size_bytes": 23355
         }
       ],
@@ -918,49 +918,49 @@
         {
           "module_id": "ext.data_model.json.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.0/modules/ext/data_model/json/tests.x07.json",
-          "sha256": "ab56828796f458070e66b10511b1c1f786d4cf7c7f4cf5e475781144e0a694f5",
+          "sha256": "ce9de7eb5713df3e027f29eae8b1411c8c62499084a1d4ca5e9393d236e7fa72",
           "size_bytes": 3931
         },
         {
           "module_id": "ext.data_model.json",
           "path": "packages/ext/x07-ext-data-model/0.1.0/modules/ext/data_model/json.x07.json",
-          "sha256": "f695f4758365743e01d4e98543bc640e0e83dfbac8f67980f0834ee4d8c89f41",
+          "sha256": "2f29a7d945961c59c64567304d98a945d663c2bbcbb096a2a8d4052835585fa1",
           "size_bytes": 8350
         },
         {
           "module_id": "ext.data_model.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.0/modules/ext/data_model/tests.x07.json",
-          "sha256": "fa3fe4df0791826aa5f5afdb7aef47e6f07846643f0ec9d225b6ee56fb5d4ae7",
+          "sha256": "cc477b6f2e4cc08cd919b52070ec99812ef864a603dd17bfd416bbd4e6e47a63",
           "size_bytes": 9392
         },
         {
           "module_id": "ext.data_model.toml.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.0/modules/ext/data_model/toml/tests.x07.json",
-          "sha256": "eb9fd4b78485ed91b824e2f6fb68a83069f7cd8524225cc9e3caa91224fe4b81",
+          "sha256": "ee02e87ced10d869c5be944b1de3ed906ad84a17e75b6f17454e2fd0a9b0528e",
           "size_bytes": 8785
         },
         {
           "module_id": "ext.data_model.toml",
           "path": "packages/ext/x07-ext-data-model/0.1.0/modules/ext/data_model/toml.x07.json",
-          "sha256": "13af7f2d210e4b15b9823cb1ba5a2a4fe28ae04c7002d736c61aa8a1de3ed485",
+          "sha256": "5c75cf8f725a32cffa6e9c903d6034a224e9fb0d53fa6ddce9242e0d7867aa9e",
           "size_bytes": 13389
         },
         {
           "module_id": "ext.data_model.yaml.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.0/modules/ext/data_model/yaml/tests.x07.json",
-          "sha256": "913dc8e5c6d87f50d55bb652ed90cc4d0f451521b3e1b4c03a9b42a993b4727e",
+          "sha256": "91e1b0993974d03daa911b74f48b7a497a4898f80230f6f432aa645b633ddd14",
           "size_bytes": 1508
         },
         {
           "module_id": "ext.data_model.yaml",
           "path": "packages/ext/x07-ext-data-model/0.1.0/modules/ext/data_model/yaml.x07.json",
-          "sha256": "668b8004ace4f02dafeeb95410808cdc68d7c98d61f7a99cd0886094d99cf0e7",
+          "sha256": "81baa7a5657961053a8e561bf889f37e421984c5ceaa83d0f8e5909a365ed516",
           "size_bytes": 358
         },
         {
           "module_id": "ext.data_model",
           "path": "packages/ext/x07-ext-data-model/0.1.0/modules/ext/data_model.x07.json",
-          "sha256": "62ab24c6aa3ff6277ffaebb4574537f7ccc96c164426b8cf85ec9abecf029c05",
+          "sha256": "5917366961cdf8e9f00ce6a6ecdaf2243d0f48f7728a0d3ebf177a6ea7bac6cc",
           "size_bytes": 17624
         }
       ],
@@ -976,49 +976,49 @@
         {
           "module_id": "ext.data_model.json.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.1/modules/ext/data_model/json/tests.x07.json",
-          "sha256": "ab56828796f458070e66b10511b1c1f786d4cf7c7f4cf5e475781144e0a694f5",
+          "sha256": "ce9de7eb5713df3e027f29eae8b1411c8c62499084a1d4ca5e9393d236e7fa72",
           "size_bytes": 3931
         },
         {
           "module_id": "ext.data_model.json",
           "path": "packages/ext/x07-ext-data-model/0.1.1/modules/ext/data_model/json.x07.json",
-          "sha256": "f695f4758365743e01d4e98543bc640e0e83dfbac8f67980f0834ee4d8c89f41",
+          "sha256": "2f29a7d945961c59c64567304d98a945d663c2bbcbb096a2a8d4052835585fa1",
           "size_bytes": 8350
         },
         {
           "module_id": "ext.data_model.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.1/modules/ext/data_model/tests.x07.json",
-          "sha256": "fa3fe4df0791826aa5f5afdb7aef47e6f07846643f0ec9d225b6ee56fb5d4ae7",
+          "sha256": "cc477b6f2e4cc08cd919b52070ec99812ef864a603dd17bfd416bbd4e6e47a63",
           "size_bytes": 9392
         },
         {
           "module_id": "ext.data_model.toml.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.1/modules/ext/data_model/toml/tests.x07.json",
-          "sha256": "eb9fd4b78485ed91b824e2f6fb68a83069f7cd8524225cc9e3caa91224fe4b81",
+          "sha256": "ee02e87ced10d869c5be944b1de3ed906ad84a17e75b6f17454e2fd0a9b0528e",
           "size_bytes": 8785
         },
         {
           "module_id": "ext.data_model.toml",
           "path": "packages/ext/x07-ext-data-model/0.1.1/modules/ext/data_model/toml.x07.json",
-          "sha256": "13af7f2d210e4b15b9823cb1ba5a2a4fe28ae04c7002d736c61aa8a1de3ed485",
+          "sha256": "5c75cf8f725a32cffa6e9c903d6034a224e9fb0d53fa6ddce9242e0d7867aa9e",
           "size_bytes": 13389
         },
         {
           "module_id": "ext.data_model.yaml.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.1/modules/ext/data_model/yaml/tests.x07.json",
-          "sha256": "913dc8e5c6d87f50d55bb652ed90cc4d0f451521b3e1b4c03a9b42a993b4727e",
+          "sha256": "91e1b0993974d03daa911b74f48b7a497a4898f80230f6f432aa645b633ddd14",
           "size_bytes": 1508
         },
         {
           "module_id": "ext.data_model.yaml",
           "path": "packages/ext/x07-ext-data-model/0.1.1/modules/ext/data_model/yaml.x07.json",
-          "sha256": "668b8004ace4f02dafeeb95410808cdc68d7c98d61f7a99cd0886094d99cf0e7",
+          "sha256": "81baa7a5657961053a8e561bf889f37e421984c5ceaa83d0f8e5909a365ed516",
           "size_bytes": 358
         },
         {
           "module_id": "ext.data_model",
           "path": "packages/ext/x07-ext-data-model/0.1.1/modules/ext/data_model.x07.json",
-          "sha256": "62ab24c6aa3ff6277ffaebb4574537f7ccc96c164426b8cf85ec9abecf029c05",
+          "sha256": "5917366961cdf8e9f00ce6a6ecdaf2243d0f48f7728a0d3ebf177a6ea7bac6cc",
           "size_bytes": 17624
         }
       ],
@@ -1034,49 +1034,49 @@
         {
           "module_id": "ext.data_model.json.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.2/modules/ext/data_model/json/tests.x07.json",
-          "sha256": "ab56828796f458070e66b10511b1c1f786d4cf7c7f4cf5e475781144e0a694f5",
+          "sha256": "ce9de7eb5713df3e027f29eae8b1411c8c62499084a1d4ca5e9393d236e7fa72",
           "size_bytes": 3931
         },
         {
           "module_id": "ext.data_model.json",
           "path": "packages/ext/x07-ext-data-model/0.1.2/modules/ext/data_model/json.x07.json",
-          "sha256": "f695f4758365743e01d4e98543bc640e0e83dfbac8f67980f0834ee4d8c89f41",
+          "sha256": "2f29a7d945961c59c64567304d98a945d663c2bbcbb096a2a8d4052835585fa1",
           "size_bytes": 8350
         },
         {
           "module_id": "ext.data_model.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.2/modules/ext/data_model/tests.x07.json",
-          "sha256": "fa3fe4df0791826aa5f5afdb7aef47e6f07846643f0ec9d225b6ee56fb5d4ae7",
+          "sha256": "cc477b6f2e4cc08cd919b52070ec99812ef864a603dd17bfd416bbd4e6e47a63",
           "size_bytes": 9392
         },
         {
           "module_id": "ext.data_model.toml.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.2/modules/ext/data_model/toml/tests.x07.json",
-          "sha256": "eb9fd4b78485ed91b824e2f6fb68a83069f7cd8524225cc9e3caa91224fe4b81",
+          "sha256": "ee02e87ced10d869c5be944b1de3ed906ad84a17e75b6f17454e2fd0a9b0528e",
           "size_bytes": 8785
         },
         {
           "module_id": "ext.data_model.toml",
           "path": "packages/ext/x07-ext-data-model/0.1.2/modules/ext/data_model/toml.x07.json",
-          "sha256": "13af7f2d210e4b15b9823cb1ba5a2a4fe28ae04c7002d736c61aa8a1de3ed485",
+          "sha256": "5c75cf8f725a32cffa6e9c903d6034a224e9fb0d53fa6ddce9242e0d7867aa9e",
           "size_bytes": 13389
         },
         {
           "module_id": "ext.data_model.yaml.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.2/modules/ext/data_model/yaml/tests.x07.json",
-          "sha256": "913dc8e5c6d87f50d55bb652ed90cc4d0f451521b3e1b4c03a9b42a993b4727e",
+          "sha256": "91e1b0993974d03daa911b74f48b7a497a4898f80230f6f432aa645b633ddd14",
           "size_bytes": 1508
         },
         {
           "module_id": "ext.data_model.yaml",
           "path": "packages/ext/x07-ext-data-model/0.1.2/modules/ext/data_model/yaml.x07.json",
-          "sha256": "668b8004ace4f02dafeeb95410808cdc68d7c98d61f7a99cd0886094d99cf0e7",
+          "sha256": "81baa7a5657961053a8e561bf889f37e421984c5ceaa83d0f8e5909a365ed516",
           "size_bytes": 358
         },
         {
           "module_id": "ext.data_model",
           "path": "packages/ext/x07-ext-data-model/0.1.2/modules/ext/data_model.x07.json",
-          "sha256": "62ab24c6aa3ff6277ffaebb4574537f7ccc96c164426b8cf85ec9abecf029c05",
+          "sha256": "5917366961cdf8e9f00ce6a6ecdaf2243d0f48f7728a0d3ebf177a6ea7bac6cc",
           "size_bytes": 17624
         }
       ],
@@ -1092,31 +1092,31 @@
         {
           "module_id": "std.db.dm",
           "path": "packages/ext/x07-ext-db-core/0.1.0/modules/std/db/dm.x07.json",
-          "sha256": "f946d7bf2c436fe1b83590b878f68f8b22cfdd9d1a55e7ebc3fd46ec0004a113",
+          "sha256": "6c4ee76423e82e44bd75f167ff094d2c0d340685e9fa9012fd01bd0406f51fe2",
           "size_bytes": 2643
         },
         {
           "module_id": "std.db.params",
           "path": "packages/ext/x07-ext-db-core/0.1.0/modules/std/db/params.x07.json",
-          "sha256": "742c0c3accfe30e9198a29c9755a6565e270fe5f793ca7bda828c68ab0f4ee67",
+          "sha256": "3d970ea94e07b459117f5709ad84cb2d16db1ff211a394fa0acdc9eae0105416",
           "size_bytes": 4111
         },
         {
           "module_id": "std.db.pool",
           "path": "packages/ext/x07-ext-db-core/0.1.0/modules/std/db/pool.x07.json",
-          "sha256": "02341e0e0063327025648a06cddac09d457121d5ba20100342f06903aeffeb33",
+          "sha256": "9efde2ab062124fe5f8e5e17c362fdec80dddf1c87f7148732c63d4fb4851183",
           "size_bytes": 2660
         },
         {
           "module_id": "std.db.spec",
           "path": "packages/ext/x07-ext-db-core/0.1.0/modules/std/db/spec.x07.json",
-          "sha256": "db4c2b6075e93d5824917172992ef3e798c81a38a9a19ff6adcd562254c3d8f0",
+          "sha256": "12fdddb60be1c5e32674ab213860b5cd8f1dce70c07121049f8e96611140c6e2",
           "size_bytes": 9470
         },
         {
           "module_id": "std.db",
           "path": "packages/ext/x07-ext-db-core/0.1.0/modules/std/db.x07.json",
-          "sha256": "1d96f4fc902b10a69ea12a1367d8635f9a176bf4ec1cba137211f66a5b1750c2",
+          "sha256": "2cefc8bf968c6043ebd79068e82bae4c0ad688ccabb7990a9a059268d448d863",
           "size_bytes": 4949
         }
       ],
@@ -1132,31 +1132,31 @@
         {
           "module_id": "std.db.dm",
           "path": "packages/ext/x07-ext-db-core/0.1.1/modules/std/db/dm.x07.json",
-          "sha256": "f946d7bf2c436fe1b83590b878f68f8b22cfdd9d1a55e7ebc3fd46ec0004a113",
+          "sha256": "6c4ee76423e82e44bd75f167ff094d2c0d340685e9fa9012fd01bd0406f51fe2",
           "size_bytes": 2643
         },
         {
           "module_id": "std.db.params",
           "path": "packages/ext/x07-ext-db-core/0.1.1/modules/std/db/params.x07.json",
-          "sha256": "742c0c3accfe30e9198a29c9755a6565e270fe5f793ca7bda828c68ab0f4ee67",
+          "sha256": "3d970ea94e07b459117f5709ad84cb2d16db1ff211a394fa0acdc9eae0105416",
           "size_bytes": 4111
         },
         {
           "module_id": "std.db.pool",
           "path": "packages/ext/x07-ext-db-core/0.1.1/modules/std/db/pool.x07.json",
-          "sha256": "02341e0e0063327025648a06cddac09d457121d5ba20100342f06903aeffeb33",
+          "sha256": "9efde2ab062124fe5f8e5e17c362fdec80dddf1c87f7148732c63d4fb4851183",
           "size_bytes": 2660
         },
         {
           "module_id": "std.db.spec",
           "path": "packages/ext/x07-ext-db-core/0.1.1/modules/std/db/spec.x07.json",
-          "sha256": "db4c2b6075e93d5824917172992ef3e798c81a38a9a19ff6adcd562254c3d8f0",
+          "sha256": "12fdddb60be1c5e32674ab213860b5cd8f1dce70c07121049f8e96611140c6e2",
           "size_bytes": 9470
         },
         {
           "module_id": "std.db",
           "path": "packages/ext/x07-ext-db-core/0.1.1/modules/std/db.x07.json",
-          "sha256": "1d96f4fc902b10a69ea12a1367d8635f9a176bf4ec1cba137211f66a5b1750c2",
+          "sha256": "2cefc8bf968c6043ebd79068e82bae4c0ad688ccabb7990a9a059268d448d863",
           "size_bytes": 4949
         }
       ],
@@ -1172,31 +1172,31 @@
         {
           "module_id": "std.db.dm",
           "path": "packages/ext/x07-ext-db-core/0.1.2/modules/std/db/dm.x07.json",
-          "sha256": "f946d7bf2c436fe1b83590b878f68f8b22cfdd9d1a55e7ebc3fd46ec0004a113",
+          "sha256": "6c4ee76423e82e44bd75f167ff094d2c0d340685e9fa9012fd01bd0406f51fe2",
           "size_bytes": 2643
         },
         {
           "module_id": "std.db.params",
           "path": "packages/ext/x07-ext-db-core/0.1.2/modules/std/db/params.x07.json",
-          "sha256": "742c0c3accfe30e9198a29c9755a6565e270fe5f793ca7bda828c68ab0f4ee67",
+          "sha256": "3d970ea94e07b459117f5709ad84cb2d16db1ff211a394fa0acdc9eae0105416",
           "size_bytes": 4111
         },
         {
           "module_id": "std.db.pool",
           "path": "packages/ext/x07-ext-db-core/0.1.2/modules/std/db/pool.x07.json",
-          "sha256": "02341e0e0063327025648a06cddac09d457121d5ba20100342f06903aeffeb33",
+          "sha256": "9efde2ab062124fe5f8e5e17c362fdec80dddf1c87f7148732c63d4fb4851183",
           "size_bytes": 2660
         },
         {
           "module_id": "std.db.spec",
           "path": "packages/ext/x07-ext-db-core/0.1.2/modules/std/db/spec.x07.json",
-          "sha256": "db4c2b6075e93d5824917172992ef3e798c81a38a9a19ff6adcd562254c3d8f0",
+          "sha256": "12fdddb60be1c5e32674ab213860b5cd8f1dce70c07121049f8e96611140c6e2",
           "size_bytes": 9470
         },
         {
           "module_id": "std.db",
           "path": "packages/ext/x07-ext-db-core/0.1.2/modules/std/db.x07.json",
-          "sha256": "1d96f4fc902b10a69ea12a1367d8635f9a176bf4ec1cba137211f66a5b1750c2",
+          "sha256": "2cefc8bf968c6043ebd79068e82bae4c0ad688ccabb7990a9a059268d448d863",
           "size_bytes": 4949
         }
       ],
@@ -1212,19 +1212,19 @@
         {
           "module_id": "std.db.mysql.pool",
           "path": "packages/ext/x07-ext-db-mysql/0.1.0/modules/std/db/mysql/pool.x07.json",
-          "sha256": "8a9b75ee95d8c510f5cc15dc412aecdb00482be296d21db3864a839f87f974c4",
+          "sha256": "892f499a4d79d4b86a3d3122c883da7849d30e3f2a4326b5e41cae6845b3d955",
           "size_bytes": 3716
         },
         {
           "module_id": "std.db.mysql.spec",
           "path": "packages/ext/x07-ext-db-mysql/0.1.0/modules/std/db/mysql/spec.x07.json",
-          "sha256": "a5ebc8b1f869d1e1913d6da878408bc5e2fb069d792b256526deff224f6af757",
+          "sha256": "897252161ec22d5127ff108e7b9324035ebd4e50a7162351d3660784416d9809",
           "size_bytes": 4683
         },
         {
           "module_id": "std.db.mysql",
           "path": "packages/ext/x07-ext-db-mysql/0.1.0/modules/std/db/mysql.x07.json",
-          "sha256": "141dff46b666cac3cb9f67fe1dc28d219fb686dff369ff887002b2aefbdad3d7",
+          "sha256": "a02cc17d92a025e7bcdb04075df7fcc57825c2d85fd26cb4cc9d9ac9a2fa782f",
           "size_bytes": 6385
         }
       ],
@@ -1240,19 +1240,19 @@
         {
           "module_id": "std.db.mysql.pool",
           "path": "packages/ext/x07-ext-db-mysql/0.1.1/modules/std/db/mysql/pool.x07.json",
-          "sha256": "8a9b75ee95d8c510f5cc15dc412aecdb00482be296d21db3864a839f87f974c4",
+          "sha256": "892f499a4d79d4b86a3d3122c883da7849d30e3f2a4326b5e41cae6845b3d955",
           "size_bytes": 3716
         },
         {
           "module_id": "std.db.mysql.spec",
           "path": "packages/ext/x07-ext-db-mysql/0.1.1/modules/std/db/mysql/spec.x07.json",
-          "sha256": "a5ebc8b1f869d1e1913d6da878408bc5e2fb069d792b256526deff224f6af757",
+          "sha256": "897252161ec22d5127ff108e7b9324035ebd4e50a7162351d3660784416d9809",
           "size_bytes": 4683
         },
         {
           "module_id": "std.db.mysql",
           "path": "packages/ext/x07-ext-db-mysql/0.1.1/modules/std/db/mysql.x07.json",
-          "sha256": "141dff46b666cac3cb9f67fe1dc28d219fb686dff369ff887002b2aefbdad3d7",
+          "sha256": "a02cc17d92a025e7bcdb04075df7fcc57825c2d85fd26cb4cc9d9ac9a2fa782f",
           "size_bytes": 6385
         }
       ],
@@ -1268,19 +1268,19 @@
         {
           "module_id": "std.db.mysql.pool",
           "path": "packages/ext/x07-ext-db-mysql/0.1.2/modules/std/db/mysql/pool.x07.json",
-          "sha256": "8a9b75ee95d8c510f5cc15dc412aecdb00482be296d21db3864a839f87f974c4",
+          "sha256": "892f499a4d79d4b86a3d3122c883da7849d30e3f2a4326b5e41cae6845b3d955",
           "size_bytes": 3716
         },
         {
           "module_id": "std.db.mysql.spec",
           "path": "packages/ext/x07-ext-db-mysql/0.1.2/modules/std/db/mysql/spec.x07.json",
-          "sha256": "a5ebc8b1f869d1e1913d6da878408bc5e2fb069d792b256526deff224f6af757",
+          "sha256": "897252161ec22d5127ff108e7b9324035ebd4e50a7162351d3660784416d9809",
           "size_bytes": 4683
         },
         {
           "module_id": "std.db.mysql",
           "path": "packages/ext/x07-ext-db-mysql/0.1.2/modules/std/db/mysql.x07.json",
-          "sha256": "141dff46b666cac3cb9f67fe1dc28d219fb686dff369ff887002b2aefbdad3d7",
+          "sha256": "a02cc17d92a025e7bcdb04075df7fcc57825c2d85fd26cb4cc9d9ac9a2fa782f",
           "size_bytes": 6385
         }
       ],
@@ -1296,19 +1296,19 @@
         {
           "module_id": "std.db.pg.pool",
           "path": "packages/ext/x07-ext-db-postgres/0.1.0/modules/std/db/pg/pool.x07.json",
-          "sha256": "4469b3d5a9d1ead49e1f19a8d1264081932007f8dd717ab34b95747bd0f0b954",
+          "sha256": "78cdc229f6c574c2f444303f28480a44d38221a9a947c86756c31df36c3b20c4",
           "size_bytes": 3653
         },
         {
           "module_id": "std.db.pg.spec",
           "path": "packages/ext/x07-ext-db-postgres/0.1.0/modules/std/db/pg/spec.x07.json",
-          "sha256": "7207736a21cac5ed28f1377d7b2ebcda3815fa5dc76af04b3c99a2a809b9abc1",
+          "sha256": "abbfbe8732e81146cafdbbe2a5824fd3ffee0e1e6fe0072b40774702a917a361",
           "size_bytes": 4638
         },
         {
           "module_id": "std.db.pg",
           "path": "packages/ext/x07-ext-db-postgres/0.1.0/modules/std/db/pg.x07.json",
-          "sha256": "dfae84ae5f2f0993e3a418c6e86d8111c88528b3f39027a6796ef51010042c97",
+          "sha256": "07a48a66bb2447c8ff219e1d98b3ca36139c954bd5a4c76c95251770818a4139",
           "size_bytes": 6455
         }
       ],
@@ -1324,19 +1324,19 @@
         {
           "module_id": "std.db.pg.pool",
           "path": "packages/ext/x07-ext-db-postgres/0.1.1/modules/std/db/pg/pool.x07.json",
-          "sha256": "4469b3d5a9d1ead49e1f19a8d1264081932007f8dd717ab34b95747bd0f0b954",
+          "sha256": "78cdc229f6c574c2f444303f28480a44d38221a9a947c86756c31df36c3b20c4",
           "size_bytes": 3653
         },
         {
           "module_id": "std.db.pg.spec",
           "path": "packages/ext/x07-ext-db-postgres/0.1.1/modules/std/db/pg/spec.x07.json",
-          "sha256": "7207736a21cac5ed28f1377d7b2ebcda3815fa5dc76af04b3c99a2a809b9abc1",
+          "sha256": "abbfbe8732e81146cafdbbe2a5824fd3ffee0e1e6fe0072b40774702a917a361",
           "size_bytes": 4638
         },
         {
           "module_id": "std.db.pg",
           "path": "packages/ext/x07-ext-db-postgres/0.1.1/modules/std/db/pg.x07.json",
-          "sha256": "dfae84ae5f2f0993e3a418c6e86d8111c88528b3f39027a6796ef51010042c97",
+          "sha256": "07a48a66bb2447c8ff219e1d98b3ca36139c954bd5a4c76c95251770818a4139",
           "size_bytes": 6455
         }
       ],
@@ -1352,19 +1352,19 @@
         {
           "module_id": "std.db.pg.pool",
           "path": "packages/ext/x07-ext-db-postgres/0.1.2/modules/std/db/pg/pool.x07.json",
-          "sha256": "4469b3d5a9d1ead49e1f19a8d1264081932007f8dd717ab34b95747bd0f0b954",
+          "sha256": "78cdc229f6c574c2f444303f28480a44d38221a9a947c86756c31df36c3b20c4",
           "size_bytes": 3653
         },
         {
           "module_id": "std.db.pg.spec",
           "path": "packages/ext/x07-ext-db-postgres/0.1.2/modules/std/db/pg/spec.x07.json",
-          "sha256": "7207736a21cac5ed28f1377d7b2ebcda3815fa5dc76af04b3c99a2a809b9abc1",
+          "sha256": "abbfbe8732e81146cafdbbe2a5824fd3ffee0e1e6fe0072b40774702a917a361",
           "size_bytes": 4638
         },
         {
           "module_id": "std.db.pg",
           "path": "packages/ext/x07-ext-db-postgres/0.1.2/modules/std/db/pg.x07.json",
-          "sha256": "dfae84ae5f2f0993e3a418c6e86d8111c88528b3f39027a6796ef51010042c97",
+          "sha256": "07a48a66bb2447c8ff219e1d98b3ca36139c954bd5a4c76c95251770818a4139",
           "size_bytes": 6455
         }
       ],
@@ -1380,19 +1380,19 @@
         {
           "module_id": "std.db.redis.argv",
           "path": "packages/ext/x07-ext-db-redis/0.1.0/modules/std/db/redis/argv.x07.json",
-          "sha256": "a26241387604f2863f8ea730e9ab7cca93d870431a5f9b67000bbe78493c5e9c",
+          "sha256": "c23bf15732e7c858b99f7388187eefd37e1480ab72e4265a949e80d3e041f958",
           "size_bytes": 4704
         },
         {
           "module_id": "std.db.redis.spec",
           "path": "packages/ext/x07-ext-db-redis/0.1.0/modules/std/db/redis/spec.x07.json",
-          "sha256": "1e815635a475b866034626221ce8a07b3dbd1c4ad4a4ee59e7b7bd1faf86ddba",
+          "sha256": "48c2ba0c95272a364727ff0b2ccc204414eb074543460e768b9dc6bdb804dfa5",
           "size_bytes": 5204
         },
         {
           "module_id": "std.db.redis",
           "path": "packages/ext/x07-ext-db-redis/0.1.0/modules/std/db/redis.x07.json",
-          "sha256": "b20e33575ee0cdae02f9ab807b4766be62d02218ce7d171ebbe5ffb74f9485f6",
+          "sha256": "6fc61ee143a8dfccc3692e7fa61e469a07e0a2dc4c03ce3eea710ea2b0917111",
           "size_bytes": 3172
         }
       ],
@@ -1408,19 +1408,19 @@
         {
           "module_id": "std.db.redis.argv",
           "path": "packages/ext/x07-ext-db-redis/0.1.1/modules/std/db/redis/argv.x07.json",
-          "sha256": "a26241387604f2863f8ea730e9ab7cca93d870431a5f9b67000bbe78493c5e9c",
+          "sha256": "c23bf15732e7c858b99f7388187eefd37e1480ab72e4265a949e80d3e041f958",
           "size_bytes": 4704
         },
         {
           "module_id": "std.db.redis.spec",
           "path": "packages/ext/x07-ext-db-redis/0.1.1/modules/std/db/redis/spec.x07.json",
-          "sha256": "1e815635a475b866034626221ce8a07b3dbd1c4ad4a4ee59e7b7bd1faf86ddba",
+          "sha256": "48c2ba0c95272a364727ff0b2ccc204414eb074543460e768b9dc6bdb804dfa5",
           "size_bytes": 5204
         },
         {
           "module_id": "std.db.redis",
           "path": "packages/ext/x07-ext-db-redis/0.1.1/modules/std/db/redis.x07.json",
-          "sha256": "b20e33575ee0cdae02f9ab807b4766be62d02218ce7d171ebbe5ffb74f9485f6",
+          "sha256": "6fc61ee143a8dfccc3692e7fa61e469a07e0a2dc4c03ce3eea710ea2b0917111",
           "size_bytes": 3172
         }
       ],
@@ -1436,19 +1436,19 @@
         {
           "module_id": "std.db.redis.argv",
           "path": "packages/ext/x07-ext-db-redis/0.1.2/modules/std/db/redis/argv.x07.json",
-          "sha256": "a26241387604f2863f8ea730e9ab7cca93d870431a5f9b67000bbe78493c5e9c",
+          "sha256": "c23bf15732e7c858b99f7388187eefd37e1480ab72e4265a949e80d3e041f958",
           "size_bytes": 4704
         },
         {
           "module_id": "std.db.redis.spec",
           "path": "packages/ext/x07-ext-db-redis/0.1.2/modules/std/db/redis/spec.x07.json",
-          "sha256": "1e815635a475b866034626221ce8a07b3dbd1c4ad4a4ee59e7b7bd1faf86ddba",
+          "sha256": "48c2ba0c95272a364727ff0b2ccc204414eb074543460e768b9dc6bdb804dfa5",
           "size_bytes": 5204
         },
         {
           "module_id": "std.db.redis",
           "path": "packages/ext/x07-ext-db-redis/0.1.2/modules/std/db/redis.x07.json",
-          "sha256": "b20e33575ee0cdae02f9ab807b4766be62d02218ce7d171ebbe5ffb74f9485f6",
+          "sha256": "6fc61ee143a8dfccc3692e7fa61e469a07e0a2dc4c03ce3eea710ea2b0917111",
           "size_bytes": 3172
         }
       ],
@@ -1464,19 +1464,19 @@
         {
           "module_id": "std.db.sqlite.pool",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.0/modules/std/db/sqlite/pool.x07.json",
-          "sha256": "64955346cc766b7f4bceeffe934669dae0145e59e7c15419313de74ea14451fe",
+          "sha256": "a821a446185c97ccffaed02496f358e85a695a7b8334d23ebcc684597490a05e",
           "size_bytes": 3458
         },
         {
           "module_id": "std.db.sqlite.spec",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.0/modules/std/db/sqlite/spec.x07.json",
-          "sha256": "913e3c539ccc22de6d53b4ca4a4cf96c5ac71bc14f0a5197e48f0efd2c0faff6",
+          "sha256": "564e69341cafff595c6378fffa1f2b152188f5a73243143c32cf84ba2b2c896e",
           "size_bytes": 5593
         },
         {
           "module_id": "std.db.sqlite",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.0/modules/std/db/sqlite.x07.json",
-          "sha256": "70dad3bd2a321222f9cb0251e7716e8a972078d6311b9319a9f9eabec8068a2f",
+          "sha256": "1c6f188949a1e562b464dcece8303b38050dd799805bae4a338745e6147836ff",
           "size_bytes": 2655
         }
       ],
@@ -1492,19 +1492,19 @@
         {
           "module_id": "std.db.sqlite.pool",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.1/modules/std/db/sqlite/pool.x07.json",
-          "sha256": "64955346cc766b7f4bceeffe934669dae0145e59e7c15419313de74ea14451fe",
+          "sha256": "a821a446185c97ccffaed02496f358e85a695a7b8334d23ebcc684597490a05e",
           "size_bytes": 3458
         },
         {
           "module_id": "std.db.sqlite.spec",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.1/modules/std/db/sqlite/spec.x07.json",
-          "sha256": "913e3c539ccc22de6d53b4ca4a4cf96c5ac71bc14f0a5197e48f0efd2c0faff6",
+          "sha256": "564e69341cafff595c6378fffa1f2b152188f5a73243143c32cf84ba2b2c896e",
           "size_bytes": 5593
         },
         {
           "module_id": "std.db.sqlite",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.1/modules/std/db/sqlite.x07.json",
-          "sha256": "70dad3bd2a321222f9cb0251e7716e8a972078d6311b9319a9f9eabec8068a2f",
+          "sha256": "1c6f188949a1e562b464dcece8303b38050dd799805bae4a338745e6147836ff",
           "size_bytes": 2655
         }
       ],
@@ -1520,19 +1520,19 @@
         {
           "module_id": "std.db.sqlite.pool",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.2/modules/std/db/sqlite/pool.x07.json",
-          "sha256": "64955346cc766b7f4bceeffe934669dae0145e59e7c15419313de74ea14451fe",
+          "sha256": "a821a446185c97ccffaed02496f358e85a695a7b8334d23ebcc684597490a05e",
           "size_bytes": 3458
         },
         {
           "module_id": "std.db.sqlite.spec",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.2/modules/std/db/sqlite/spec.x07.json",
-          "sha256": "913e3c539ccc22de6d53b4ca4a4cf96c5ac71bc14f0a5197e48f0efd2c0faff6",
+          "sha256": "564e69341cafff595c6378fffa1f2b152188f5a73243143c32cf84ba2b2c896e",
           "size_bytes": 5593
         },
         {
           "module_id": "std.db.sqlite",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.2/modules/std/db/sqlite.x07.json",
-          "sha256": "70dad3bd2a321222f9cb0251e7716e8a972078d6311b9319a9f9eabec8068a2f",
+          "sha256": "1c6f188949a1e562b464dcece8303b38050dd799805bae4a338745e6147836ff",
           "size_bytes": 2655
         }
       ],
@@ -1548,31 +1548,31 @@
         {
           "module_id": "std.math.decimal.codec_v1",
           "path": "packages/ext/x07-ext-decimal-rs/0.1.0/modules/std/math/decimal/codec_v1.x07.json",
-          "sha256": "98de8a76cc059495cdacf68536e980051aef7b49c902a3ea86b0841051747e53",
+          "sha256": "7695a7dc0110f84bfe0b47ef93d728596e2542a2d8598e51555016c8e95e2baa",
           "size_bytes": 8523
         },
         {
           "module_id": "std.math.decimal.fmt",
           "path": "packages/ext/x07-ext-decimal-rs/0.1.0/modules/std/math/decimal/fmt.x07.json",
-          "sha256": "2bcb1a443ce7f9f50b358fa6a7d45a3f702d42383e36213eb33deb92e5c1ed24",
+          "sha256": "91550f79ea71d5efb998a101bbe1923a7135e1f872e710dae8f876c1092e3943",
           "size_bytes": 5601
         },
         {
           "module_id": "std.math.decimal.parse",
           "path": "packages/ext/x07-ext-decimal-rs/0.1.0/modules/std/math/decimal/parse.x07.json",
-          "sha256": "2e6b188c2e4476a0aca86ab2d59e26051ffdaa1f7017a3823142b2f13a26e08b",
+          "sha256": "dd1a74a50da6cdfb6cfe7cf1ce510a495a2e8befab96fc53099b6378a33fd341",
           "size_bytes": 8010
         },
         {
           "module_id": "std.math.decimal.tests",
           "path": "packages/ext/x07-ext-decimal-rs/0.1.0/modules/std/math/decimal/tests.x07.json",
-          "sha256": "d1477c30b782a2e163a1c97f42ccd58f68b49fffcb09b16a2da708c01dc4be56",
+          "sha256": "c0b61d6c0950953f88ba37078c13edcca98bdf394b4a537b6f339b91c0c06ed8",
           "size_bytes": 6505
         },
         {
           "module_id": "std.math.decimal",
           "path": "packages/ext/x07-ext-decimal-rs/0.1.0/modules/std/math/decimal.x07.json",
-          "sha256": "4ffaeec89e1445676cb24594a91ea476142368ba37237a5e519b320c1d619aca",
+          "sha256": "3555d5ca574433474e8053d68eb0cad6ffbaef3267b32ce0fb034ff3a9de32e1",
           "size_bytes": 8803
         }
       ],
@@ -1588,25 +1588,25 @@
         {
           "module_id": "ext.diff.bytes",
           "path": "packages/ext/x07-ext-diff-rs/0.1.0/modules/ext/diff/bytes.x07.json",
-          "sha256": "d64d5d7f19cea03443defa212706037780b0601caaba3b7e6b3569413d7624bc",
+          "sha256": "41dd2174689d2ae98ea869631195f333adafb0aa0e40154f6ebf137ade0696ce",
           "size_bytes": 2609
         },
         {
           "module_id": "ext.diff.lines",
           "path": "packages/ext/x07-ext-diff-rs/0.1.0/modules/ext/diff/lines.x07.json",
-          "sha256": "0805a09b7ea33680dae762003ea40418aea9dd24f30bc1e2e19571fd479272c4",
+          "sha256": "72ddfb7f6edc1e8d5812ac6460a9bbedefd8b134bec31763463ff39a2b5dbb47",
           "size_bytes": 5758
         },
         {
           "module_id": "ext.diff.patch_v1",
           "path": "packages/ext/x07-ext-diff-rs/0.1.0/modules/ext/diff/patch_v1.x07.json",
-          "sha256": "45b5a9345a883a361887dd7f2f5a3f95ee83206898228b167bf09c858e5f8857",
+          "sha256": "e95d545fc4e3c8eb19dcfadcdf8825f17a57b07a22a16188da456f4c1a00352c",
           "size_bytes": 12771
         },
         {
           "module_id": "ext.diff.tests",
           "path": "packages/ext/x07-ext-diff-rs/0.1.0/modules/ext/diff/tests.x07.json",
-          "sha256": "6ec02058ed16a2845f0c5958724415ce3b3f8780c7830df61dfb1e48df35620c",
+          "sha256": "2b2a2718a35598b53491142578b4c5e4aae77b55aaa2f28868abe8e7cbeed0c6",
           "size_bytes": 5611
         }
       ],
@@ -1622,25 +1622,25 @@
         {
           "module_id": "ext.error.chain",
           "path": "packages/ext/x07-ext-error/0.1.0/modules/ext/error/chain.x07.json",
-          "sha256": "35193a5265840747ef52bc8c386dc7b1d44abc780504ad0f2c3a857183a8aa67",
+          "sha256": "c030554da4403f7f68612cea7ec235edd076c9570eac0a64e9800c4352f98c7f",
           "size_bytes": 1531
         },
         {
           "module_id": "ext.error.context",
           "path": "packages/ext/x07-ext-error/0.1.0/modules/ext/error/context.x07.json",
-          "sha256": "95161e94aa65f48b4bc41eb26490108543b76f77148510191fa6f3c85627a7ac",
+          "sha256": "10c3939f6635e851a87db46ad1dcb4cceb205e4a861c4e23c1e17e1af1c7fbf0",
           "size_bytes": 5548
         },
         {
           "module_id": "ext.error.fmt",
           "path": "packages/ext/x07-ext-error/0.1.0/modules/ext/error/fmt.x07.json",
-          "sha256": "a9487a51312f93764103f52e8297e5398f315ed572f8b105dd6329d0ee8465dc",
+          "sha256": "48cfcf0b1ee0f977fd30a4c3626e5979633d4d8142ae2a040a01b40f566ba455",
           "size_bytes": 3461
         },
         {
           "module_id": "ext.error.tests",
           "path": "packages/ext/x07-ext-error/0.1.0/modules/ext/error/tests.x07.json",
-          "sha256": "ba8fdb32cb7e6a87c867817f80c4be7a28226ca0bec66047c7177ebf687282d8",
+          "sha256": "49fb5e57aab0fda9d7a19cb61f3cf1b0add2e7e451a6f3411d7f28d844d53586",
           "size_bytes": 4432
         }
       ],
@@ -1656,25 +1656,25 @@
         {
           "module_id": "ext.error.chain",
           "path": "packages/ext/x07-ext-error/0.1.1/modules/ext/error/chain.x07.json",
-          "sha256": "35193a5265840747ef52bc8c386dc7b1d44abc780504ad0f2c3a857183a8aa67",
+          "sha256": "c030554da4403f7f68612cea7ec235edd076c9570eac0a64e9800c4352f98c7f",
           "size_bytes": 1531
         },
         {
           "module_id": "ext.error.context",
           "path": "packages/ext/x07-ext-error/0.1.1/modules/ext/error/context.x07.json",
-          "sha256": "95161e94aa65f48b4bc41eb26490108543b76f77148510191fa6f3c85627a7ac",
+          "sha256": "10c3939f6635e851a87db46ad1dcb4cceb205e4a861c4e23c1e17e1af1c7fbf0",
           "size_bytes": 5548
         },
         {
           "module_id": "ext.error.fmt",
           "path": "packages/ext/x07-ext-error/0.1.1/modules/ext/error/fmt.x07.json",
-          "sha256": "a9487a51312f93764103f52e8297e5398f315ed572f8b105dd6329d0ee8465dc",
+          "sha256": "48cfcf0b1ee0f977fd30a4c3626e5979633d4d8142ae2a040a01b40f566ba455",
           "size_bytes": 3461
         },
         {
           "module_id": "ext.error.tests",
           "path": "packages/ext/x07-ext-error/0.1.1/modules/ext/error/tests.x07.json",
-          "sha256": "ba8fdb32cb7e6a87c867817f80c4be7a28226ca0bec66047c7177ebf687282d8",
+          "sha256": "49fb5e57aab0fda9d7a19cb61f3cf1b0add2e7e451a6f3411d7f28d844d53586",
           "size_bytes": 4432
         }
       ],
@@ -1690,25 +1690,25 @@
         {
           "module_id": "ext.error.chain",
           "path": "packages/ext/x07-ext-error/0.1.2/modules/ext/error/chain.x07.json",
-          "sha256": "35193a5265840747ef52bc8c386dc7b1d44abc780504ad0f2c3a857183a8aa67",
+          "sha256": "c030554da4403f7f68612cea7ec235edd076c9570eac0a64e9800c4352f98c7f",
           "size_bytes": 1531
         },
         {
           "module_id": "ext.error.context",
           "path": "packages/ext/x07-ext-error/0.1.2/modules/ext/error/context.x07.json",
-          "sha256": "95161e94aa65f48b4bc41eb26490108543b76f77148510191fa6f3c85627a7ac",
+          "sha256": "10c3939f6635e851a87db46ad1dcb4cceb205e4a861c4e23c1e17e1af1c7fbf0",
           "size_bytes": 5548
         },
         {
           "module_id": "ext.error.fmt",
           "path": "packages/ext/x07-ext-error/0.1.2/modules/ext/error/fmt.x07.json",
-          "sha256": "a9487a51312f93764103f52e8297e5398f315ed572f8b105dd6329d0ee8465dc",
+          "sha256": "48cfcf0b1ee0f977fd30a4c3626e5979633d4d8142ae2a040a01b40f566ba455",
           "size_bytes": 3461
         },
         {
           "module_id": "ext.error.tests",
           "path": "packages/ext/x07-ext-error/0.1.2/modules/ext/error/tests.x07.json",
-          "sha256": "ba8fdb32cb7e6a87c867817f80c4be7a28226ca0bec66047c7177ebf687282d8",
+          "sha256": "49fb5e57aab0fda9d7a19cb61f3cf1b0add2e7e451a6f3411d7f28d844d53586",
           "size_bytes": 4432
         }
       ],
@@ -1724,13 +1724,13 @@
         {
           "module_id": "std.os.fs.spec",
           "path": "packages/ext/x07-ext-fs/0.1.0/modules/std/os/fs/spec.x07.json",
-          "sha256": "e82b8646681471e39502f86fd0bfc240ebf25c9e0dd28aaff8670ce1359bba44",
+          "sha256": "1593e8eed5b16ec36f3bd310a38c8bc48d2ce7d51eba5829729cae50458c1787",
           "size_bytes": 5667
         },
         {
           "module_id": "std.os.fs",
           "path": "packages/ext/x07-ext-fs/0.1.0/modules/std/os/fs.x07.json",
-          "sha256": "7a977bc432d4ad28b8e8ea247de5b9e1da40a0ff1af92d2c50bf7c001b314897",
+          "sha256": "0439220cfcc7225d31f36f0482b4d96701d7aa67dacd7fd1ffd3b1f33a09d632",
           "size_bytes": 2167
         }
       ],
@@ -1746,13 +1746,13 @@
         {
           "module_id": "std.os.fs.spec",
           "path": "packages/ext/x07-ext-fs/0.1.1/modules/std/os/fs/spec.x07.json",
-          "sha256": "e82b8646681471e39502f86fd0bfc240ebf25c9e0dd28aaff8670ce1359bba44",
+          "sha256": "1593e8eed5b16ec36f3bd310a38c8bc48d2ce7d51eba5829729cae50458c1787",
           "size_bytes": 5667
         },
         {
           "module_id": "std.os.fs",
           "path": "packages/ext/x07-ext-fs/0.1.1/modules/std/os/fs.x07.json",
-          "sha256": "7a977bc432d4ad28b8e8ea247de5b9e1da40a0ff1af92d2c50bf7c001b314897",
+          "sha256": "0439220cfcc7225d31f36f0482b4d96701d7aa67dacd7fd1ffd3b1f33a09d632",
           "size_bytes": 2167
         }
       ],
@@ -1768,13 +1768,13 @@
         {
           "module_id": "std.os.fs.spec",
           "path": "packages/ext/x07-ext-fs/0.1.2/modules/std/os/fs/spec.x07.json",
-          "sha256": "e82b8646681471e39502f86fd0bfc240ebf25c9e0dd28aaff8670ce1359bba44",
+          "sha256": "1593e8eed5b16ec36f3bd310a38c8bc48d2ce7d51eba5829729cae50458c1787",
           "size_bytes": 5667
         },
         {
           "module_id": "std.os.fs",
           "path": "packages/ext/x07-ext-fs/0.1.2/modules/std/os/fs.x07.json",
-          "sha256": "7a977bc432d4ad28b8e8ea247de5b9e1da40a0ff1af92d2c50bf7c001b314897",
+          "sha256": "0439220cfcc7225d31f36f0482b4d96701d7aa67dacd7fd1ffd3b1f33a09d632",
           "size_bytes": 2167
         }
       ],
@@ -1790,13 +1790,13 @@
         {
           "module_id": "ext.glob.tests",
           "path": "packages/ext/x07-ext-glob-rs/0.1.0/modules/ext/glob/tests.x07.json",
-          "sha256": "9065a14b0e68d05b8c5333fa368a429e8631abeab2840d0edf91a8041e963463",
+          "sha256": "392b17012b3a583311c227f43192fbd395bf86d8655a26b36eaa236c39ead664",
           "size_bytes": 2326
         },
         {
           "module_id": "ext.glob",
           "path": "packages/ext/x07-ext-glob-rs/0.1.0/modules/ext/glob.x07.json",
-          "sha256": "9b5c30a6cb714053c68ad519016ec9244e5781f8c677082db54a1af7f10c665a",
+          "sha256": "10ce823183db98b09831cd6068ee6aa87f76005d53d4f5c42381922024ab1018",
           "size_bytes": 4928
         }
       ],
@@ -1812,13 +1812,13 @@
         {
           "module_id": "ext.glob.tests",
           "path": "packages/ext/x07-ext-glob-rs/0.1.1/modules/ext/glob/tests.x07.json",
-          "sha256": "9065a14b0e68d05b8c5333fa368a429e8631abeab2840d0edf91a8041e963463",
+          "sha256": "392b17012b3a583311c227f43192fbd395bf86d8655a26b36eaa236c39ead664",
           "size_bytes": 2326
         },
         {
           "module_id": "ext.glob",
           "path": "packages/ext/x07-ext-glob-rs/0.1.1/modules/ext/glob.x07.json",
-          "sha256": "09be73eab42fab44095d60c351aba09355c52eb93f82a2a43d03a767c907e935",
+          "sha256": "7ebef7f55f3bfc88af81f2daa21b4815142363fa7ffd26b274a7bafa82dd6af7",
           "size_bytes": 4888
         }
       ],
@@ -1834,14 +1834,14 @@
         {
           "module_id": "ext.hex.tests",
           "path": "packages/ext/x07-ext-hex-rs/0.1.0/modules/ext/hex/tests.x07.json",
-          "sha256": "c57818ab121025a3c021f9684221de60ddc22da7be66a9422e1797f22f91a0d7",
+          "sha256": "387db93bd8c983bcdca46d5e23e00009561bc232ff00c8efd970b882944d25b0",
           "size_bytes": 3412
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.hex",
           "path": "packages/ext/x07-ext-hex-rs/0.1.0/modules/ext/hex.x07.json",
-          "sha256": "ca6b41275cbf319ccfa260d29aa36311ed693134bdb0fe21561338692d90a38f",
+          "sha256": "1bbf93f356fd53726917ff8ab28b1a4559c99f91f0b6e94fabd6812a7b41a957",
           "size_bytes": 3284,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_hex@0.1.0/hex.rs",
           "source_sha256": "4058ced0244e0ea5b64041c65e07a19c175c0cf4cf422bb1abcea884c5adf36c"
@@ -1859,14 +1859,14 @@
         {
           "module_id": "ext.hex.tests",
           "path": "packages/ext/x07-ext-hex-rs/0.1.1/modules/ext/hex/tests.x07.json",
-          "sha256": "c57818ab121025a3c021f9684221de60ddc22da7be66a9422e1797f22f91a0d7",
+          "sha256": "387db93bd8c983bcdca46d5e23e00009561bc232ff00c8efd970b882944d25b0",
           "size_bytes": 3412
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.hex",
           "path": "packages/ext/x07-ext-hex-rs/0.1.1/modules/ext/hex.x07.json",
-          "sha256": "ca6b41275cbf319ccfa260d29aa36311ed693134bdb0fe21561338692d90a38f",
+          "sha256": "1bbf93f356fd53726917ff8ab28b1a4559c99f91f0b6e94fabd6812a7b41a957",
           "size_bytes": 3284,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_hex@0.1.0/hex.rs",
           "source_sha256": "4058ced0244e0ea5b64041c65e07a19c175c0cf4cf422bb1abcea884c5adf36c"
@@ -1884,14 +1884,14 @@
         {
           "module_id": "ext.hex.tests",
           "path": "packages/ext/x07-ext-hex-rs/0.1.2/modules/ext/hex/tests.x07.json",
-          "sha256": "c57818ab121025a3c021f9684221de60ddc22da7be66a9422e1797f22f91a0d7",
+          "sha256": "387db93bd8c983bcdca46d5e23e00009561bc232ff00c8efd970b882944d25b0",
           "size_bytes": 3412
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.hex",
           "path": "packages/ext/x07-ext-hex-rs/0.1.2/modules/ext/hex.x07.json",
-          "sha256": "ca6b41275cbf319ccfa260d29aa36311ed693134bdb0fe21561338692d90a38f",
+          "sha256": "1bbf93f356fd53726917ff8ab28b1a4559c99f91f0b6e94fabd6812a7b41a957",
           "size_bytes": 3284,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_hex@0.1.0/hex.rs",
           "source_sha256": "4058ced0244e0ea5b64041c65e07a19c175c0cf4cf422bb1abcea884c5adf36c"
@@ -1909,13 +1909,13 @@
         {
           "module_id": "ext.html.tests",
           "path": "packages/ext/x07-ext-html-lite-rs/0.1.0/modules/ext/html/tests.x07.json",
-          "sha256": "e4f5d4698b4942051081d06ac25b243ba817146071a3d5dc6072d6c88d1f6e25",
+          "sha256": "293fd84742d845388d31a26b6b59797ebcf19233a045e95790b8ac7e277c311e",
           "size_bytes": 2106
         },
         {
           "module_id": "ext.html",
           "path": "packages/ext/x07-ext-html-lite-rs/0.1.0/modules/ext/html.x07.json",
-          "sha256": "14ad2cfad6d58639dd695e6d94367b7331267af31477ae1bd47344da5692ed9d",
+          "sha256": "d40aa1403de38712df60fd1d58d2756f8f45ae516118b2cbb1aad056a3f4005e",
           "size_bytes": 8814
         }
       ],
@@ -1931,20 +1931,20 @@
         {
           "module_id": "ext.ini.data_model",
           "path": "packages/ext/x07-ext-ini-rs/0.1.0/modules/ext/ini/data_model.x07.json",
-          "sha256": "2961cb96df4703f9a139980257fae5fa9b38136f4135f1b7ba0b0b9ad9f734a8",
+          "sha256": "986d92f47fe58d13474af811a64f8bba5560b08eb680f35152d5cc479114f073",
           "size_bytes": 3969
         },
         {
           "module_id": "ext.ini.tests",
           "path": "packages/ext/x07-ext-ini-rs/0.1.0/modules/ext/ini/tests.x07.json",
-          "sha256": "71f0844a873b8fa09de98b86e0235a2699ff0c2991f5ccd61f2c9d1914a347ad",
+          "sha256": "2a5aad4ebc110179ee37aaf090f54f668e85a3af106556d59c068a10ddb2318f",
           "size_bytes": 3204
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.ini",
           "path": "packages/ext/x07-ext-ini-rs/0.1.0/modules/ext/ini.x07.json",
-          "sha256": "f2cbd793f52e03fe235789fb787945a131b560fc978ce46ced1309f1839f62f2",
+          "sha256": "526a1cba2fe7499118dfd43dd276308f15d9dcbc562492ec349f31b766782e23",
           "size_bytes": 12211,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_ini@0.1.0/ini.rs",
           "source_sha256": "c291529e224692ca0f9c3d0d93263496affdf4fe84e905ae590699321b783152"
@@ -1962,20 +1962,20 @@
         {
           "module_id": "ext.ini.data_model",
           "path": "packages/ext/x07-ext-ini-rs/0.1.1/modules/ext/ini/data_model.x07.json",
-          "sha256": "2961cb96df4703f9a139980257fae5fa9b38136f4135f1b7ba0b0b9ad9f734a8",
+          "sha256": "986d92f47fe58d13474af811a64f8bba5560b08eb680f35152d5cc479114f073",
           "size_bytes": 3969
         },
         {
           "module_id": "ext.ini.tests",
           "path": "packages/ext/x07-ext-ini-rs/0.1.1/modules/ext/ini/tests.x07.json",
-          "sha256": "71f0844a873b8fa09de98b86e0235a2699ff0c2991f5ccd61f2c9d1914a347ad",
+          "sha256": "2a5aad4ebc110179ee37aaf090f54f668e85a3af106556d59c068a10ddb2318f",
           "size_bytes": 3204
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.ini",
           "path": "packages/ext/x07-ext-ini-rs/0.1.1/modules/ext/ini.x07.json",
-          "sha256": "f2cbd793f52e03fe235789fb787945a131b560fc978ce46ced1309f1839f62f2",
+          "sha256": "526a1cba2fe7499118dfd43dd276308f15d9dcbc562492ec349f31b766782e23",
           "size_bytes": 12211,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_ini@0.1.0/ini.rs",
           "source_sha256": "c291529e224692ca0f9c3d0d93263496affdf4fe84e905ae590699321b783152"
@@ -1993,20 +1993,20 @@
         {
           "module_id": "ext.ini.data_model",
           "path": "packages/ext/x07-ext-ini-rs/0.1.2/modules/ext/ini/data_model.x07.json",
-          "sha256": "2961cb96df4703f9a139980257fae5fa9b38136f4135f1b7ba0b0b9ad9f734a8",
+          "sha256": "986d92f47fe58d13474af811a64f8bba5560b08eb680f35152d5cc479114f073",
           "size_bytes": 3969
         },
         {
           "module_id": "ext.ini.tests",
           "path": "packages/ext/x07-ext-ini-rs/0.1.2/modules/ext/ini/tests.x07.json",
-          "sha256": "71f0844a873b8fa09de98b86e0235a2699ff0c2991f5ccd61f2c9d1914a347ad",
+          "sha256": "2a5aad4ebc110179ee37aaf090f54f668e85a3af106556d59c068a10ddb2318f",
           "size_bytes": 3204
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.ini",
           "path": "packages/ext/x07-ext-ini-rs/0.1.2/modules/ext/ini.x07.json",
-          "sha256": "f2cbd793f52e03fe235789fb787945a131b560fc978ce46ced1309f1839f62f2",
+          "sha256": "526a1cba2fe7499118dfd43dd276308f15d9dcbc562492ec349f31b766782e23",
           "size_bytes": 12211,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_ini@0.1.0/ini.rs",
           "source_sha256": "c291529e224692ca0f9c3d0d93263496affdf4fe84e905ae590699321b783152"
@@ -2025,7 +2025,7 @@
           "generated_by": "x07import",
           "module_id": "ext.json.canon",
           "path": "packages/ext/x07-ext-json-rs/0.1.0/modules/ext/json/canon.x07.json",
-          "sha256": "447918b74e61c643321c982d8485a8a89a29ac1c8fdb45f415b9c53fc21bb8c1",
+          "sha256": "1d37a765b6668090b48f7ed483ab138dbb39cd6c1efe8d08f7c2d45c7bf8a7e4",
           "size_bytes": 18291,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_json@0.1.0/canon.rs",
           "source_sha256": "6e3a09dc1094a38fa1cd56e508d42fd0b6822898a1c22e75b20200803d59e34e"
@@ -2033,14 +2033,14 @@
         {
           "module_id": "ext.json.data_model",
           "path": "packages/ext/x07-ext-json-rs/0.1.0/modules/ext/json/data_model.x07.json",
-          "sha256": "bbc405e76e096df6d1e3619db09223066a46e33fd5afbf2508bbaae800323d89",
+          "sha256": "3f073dc7802d9bf8d9e31d0ef1a8abd3fe28b71beefe8a89ac9ed74aac99f4b9",
           "size_bytes": 15638
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.json.pointer",
           "path": "packages/ext/x07-ext-json-rs/0.1.0/modules/ext/json/pointer.x07.json",
-          "sha256": "9e680033236452b5097ce92096aac6bcd8264b23b5d318e5097a552cabd39cee",
+          "sha256": "7e069aace77e85e74360cbbeb48bafcd836fb93fb02736c2f14d7a765f6f0dfb",
           "size_bytes": 11495,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_json@0.1.0/pointer.rs",
           "source_sha256": "af033d64890f287b7beef6e36f765c896dba8bb80fb1d09ae4893eceff8a10f9"
@@ -2048,7 +2048,7 @@
         {
           "module_id": "ext.json.tests",
           "path": "packages/ext/x07-ext-json-rs/0.1.0/modules/ext/json/tests.x07.json",
-          "sha256": "c56869e1958182d0b58ea8d71313a503271945b9221c590cf0ae2e3c96027aa2",
+          "sha256": "5c6e285e6bf928f7311221e28c0f998b546976f7582bf49ead78cff7b5a2a534",
           "size_bytes": 8293
         }
       ],
@@ -2065,7 +2065,7 @@
           "generated_by": "x07import",
           "module_id": "ext.json.canon",
           "path": "packages/ext/x07-ext-json-rs/0.1.1/modules/ext/json/canon.x07.json",
-          "sha256": "447918b74e61c643321c982d8485a8a89a29ac1c8fdb45f415b9c53fc21bb8c1",
+          "sha256": "1d37a765b6668090b48f7ed483ab138dbb39cd6c1efe8d08f7c2d45c7bf8a7e4",
           "size_bytes": 18291,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_json@0.1.0/canon.rs",
           "source_sha256": "6e3a09dc1094a38fa1cd56e508d42fd0b6822898a1c22e75b20200803d59e34e"
@@ -2073,14 +2073,14 @@
         {
           "module_id": "ext.json.data_model",
           "path": "packages/ext/x07-ext-json-rs/0.1.1/modules/ext/json/data_model.x07.json",
-          "sha256": "bbc405e76e096df6d1e3619db09223066a46e33fd5afbf2508bbaae800323d89",
+          "sha256": "3f073dc7802d9bf8d9e31d0ef1a8abd3fe28b71beefe8a89ac9ed74aac99f4b9",
           "size_bytes": 15638
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.json.pointer",
           "path": "packages/ext/x07-ext-json-rs/0.1.1/modules/ext/json/pointer.x07.json",
-          "sha256": "9e680033236452b5097ce92096aac6bcd8264b23b5d318e5097a552cabd39cee",
+          "sha256": "7e069aace77e85e74360cbbeb48bafcd836fb93fb02736c2f14d7a765f6f0dfb",
           "size_bytes": 11495,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_json@0.1.0/pointer.rs",
           "source_sha256": "af033d64890f287b7beef6e36f765c896dba8bb80fb1d09ae4893eceff8a10f9"
@@ -2088,7 +2088,7 @@
         {
           "module_id": "ext.json.tests",
           "path": "packages/ext/x07-ext-json-rs/0.1.1/modules/ext/json/tests.x07.json",
-          "sha256": "c56869e1958182d0b58ea8d71313a503271945b9221c590cf0ae2e3c96027aa2",
+          "sha256": "5c6e285e6bf928f7311221e28c0f998b546976f7582bf49ead78cff7b5a2a534",
           "size_bytes": 8293
         }
       ],
@@ -2105,7 +2105,7 @@
           "generated_by": "x07import",
           "module_id": "ext.json.canon",
           "path": "packages/ext/x07-ext-json-rs/0.1.2/modules/ext/json/canon.x07.json",
-          "sha256": "447918b74e61c643321c982d8485a8a89a29ac1c8fdb45f415b9c53fc21bb8c1",
+          "sha256": "1d37a765b6668090b48f7ed483ab138dbb39cd6c1efe8d08f7c2d45c7bf8a7e4",
           "size_bytes": 18291,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_json@0.1.0/canon.rs",
           "source_sha256": "6e3a09dc1094a38fa1cd56e508d42fd0b6822898a1c22e75b20200803d59e34e"
@@ -2113,14 +2113,14 @@
         {
           "module_id": "ext.json.data_model",
           "path": "packages/ext/x07-ext-json-rs/0.1.2/modules/ext/json/data_model.x07.json",
-          "sha256": "bbc405e76e096df6d1e3619db09223066a46e33fd5afbf2508bbaae800323d89",
+          "sha256": "3f073dc7802d9bf8d9e31d0ef1a8abd3fe28b71beefe8a89ac9ed74aac99f4b9",
           "size_bytes": 15638
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.json.pointer",
           "path": "packages/ext/x07-ext-json-rs/0.1.2/modules/ext/json/pointer.x07.json",
-          "sha256": "9e680033236452b5097ce92096aac6bcd8264b23b5d318e5097a552cabd39cee",
+          "sha256": "7e069aace77e85e74360cbbeb48bafcd836fb93fb02736c2f14d7a765f6f0dfb",
           "size_bytes": 11495,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_json@0.1.0/pointer.rs",
           "source_sha256": "af033d64890f287b7beef6e36f765c896dba8bb80fb1d09ae4893eceff8a10f9"
@@ -2128,7 +2128,7 @@
         {
           "module_id": "ext.json.tests",
           "path": "packages/ext/x07-ext-json-rs/0.1.2/modules/ext/json/tests.x07.json",
-          "sha256": "c56869e1958182d0b58ea8d71313a503271945b9221c590cf0ae2e3c96027aa2",
+          "sha256": "5c6e285e6bf928f7311221e28c0f998b546976f7582bf49ead78cff7b5a2a534",
           "size_bytes": 8293
         }
       ],
@@ -2144,13 +2144,13 @@
         {
           "module_id": "ext.log.tests",
           "path": "packages/ext/x07-ext-log/0.1.0/modules/ext/log/tests.x07.json",
-          "sha256": "ff28963c90260a994b3b30444036abebf08b1f4782d974de11d63769510efb08",
+          "sha256": "a5abc72114858a4d56dc02897729c88bc2f29891c1f92265ebeb2b09b49e77ba",
           "size_bytes": 3801
         },
         {
           "module_id": "ext.log",
           "path": "packages/ext/x07-ext-log/0.1.0/modules/ext/log.x07.json",
-          "sha256": "2e9c65817b332b2c5452673343046b876a6b4b3d2281beff675975bcaac27abb",
+          "sha256": "ba76599087ca254ee75bf07fe2724f5507ef01028b4be96687ae1bb559700630",
           "size_bytes": 5991
         }
       ],
@@ -2166,13 +2166,13 @@
         {
           "module_id": "ext.log.tests",
           "path": "packages/ext/x07-ext-log/0.1.1/modules/ext/log/tests.x07.json",
-          "sha256": "ff28963c90260a994b3b30444036abebf08b1f4782d974de11d63769510efb08",
+          "sha256": "a5abc72114858a4d56dc02897729c88bc2f29891c1f92265ebeb2b09b49e77ba",
           "size_bytes": 3801
         },
         {
           "module_id": "ext.log",
           "path": "packages/ext/x07-ext-log/0.1.1/modules/ext/log.x07.json",
-          "sha256": "2e9c65817b332b2c5452673343046b876a6b4b3d2281beff675975bcaac27abb",
+          "sha256": "ba76599087ca254ee75bf07fe2724f5507ef01028b4be96687ae1bb559700630",
           "size_bytes": 5991
         }
       ],
@@ -2188,13 +2188,13 @@
         {
           "module_id": "ext.log.tests",
           "path": "packages/ext/x07-ext-log/0.1.2/modules/ext/log/tests.x07.json",
-          "sha256": "ff28963c90260a994b3b30444036abebf08b1f4782d974de11d63769510efb08",
+          "sha256": "a5abc72114858a4d56dc02897729c88bc2f29891c1f92265ebeb2b09b49e77ba",
           "size_bytes": 3801
         },
         {
           "module_id": "ext.log",
           "path": "packages/ext/x07-ext-log/0.1.2/modules/ext/log.x07.json",
-          "sha256": "2e9c65817b332b2c5452673343046b876a6b4b3d2281beff675975bcaac27abb",
+          "sha256": "ba76599087ca254ee75bf07fe2724f5507ef01028b4be96687ae1bb559700630",
           "size_bytes": 5991
         }
       ],
@@ -2210,25 +2210,25 @@
         {
           "module_id": "std.math.f64.spec",
           "path": "packages/ext/x07-ext-math/0.1.0/modules/std/math/f64/spec.x07.json",
-          "sha256": "b78b5e3124c2ee10bb01f4a89dc45961ec081f00c95da5c294f0d1864b4d1018",
+          "sha256": "a7c7ab5ef73f5f907974965d74c17c4cf4b4da6fe79e088a7a5cfbe2a71c4ee3",
           "size_bytes": 5129
         },
         {
           "module_id": "std.math.f64",
           "path": "packages/ext/x07-ext-math/0.1.0/modules/std/math/f64.x07.json",
-          "sha256": "e13dd1c137c75a1dd83b98f9db8d64004f11feb074255059ea5d25b310a08d99",
+          "sha256": "c3dad78e88549c511f43062d25c45ec00d13c5966d57508215809a1ba51d1cac",
           "size_bytes": 6983
         },
         {
           "module_id": "std.math.i32",
           "path": "packages/ext/x07-ext-math/0.1.0/modules/std/math/i32.x07.json",
-          "sha256": "46325dbbf3f23cc993be53958bd02ba8993118f39e5e8aa3b6125352ce55aa5f",
+          "sha256": "a80b59acdb5b51d652caa0ce9f0bae8b95887ad4074d27b5f218772dc052d807",
           "size_bytes": 981
         },
         {
           "module_id": "std.math",
           "path": "packages/ext/x07-ext-math/0.1.0/modules/std/math.x07.json",
-          "sha256": "5515808633a52b5c08e55d4da44cf5b81c2f41337cad0b7394dbf76dcdb69964",
+          "sha256": "79b7be30714629fc211ee107341254a11cbaa94fc5f1332bb4b83cf64747368a",
           "size_bytes": 251
         }
       ],
@@ -2244,25 +2244,25 @@
         {
           "module_id": "std.math.f64.spec",
           "path": "packages/ext/x07-ext-math/0.1.1/modules/std/math/f64/spec.x07.json",
-          "sha256": "b78b5e3124c2ee10bb01f4a89dc45961ec081f00c95da5c294f0d1864b4d1018",
+          "sha256": "a7c7ab5ef73f5f907974965d74c17c4cf4b4da6fe79e088a7a5cfbe2a71c4ee3",
           "size_bytes": 5129
         },
         {
           "module_id": "std.math.f64",
           "path": "packages/ext/x07-ext-math/0.1.1/modules/std/math/f64.x07.json",
-          "sha256": "e13dd1c137c75a1dd83b98f9db8d64004f11feb074255059ea5d25b310a08d99",
+          "sha256": "c3dad78e88549c511f43062d25c45ec00d13c5966d57508215809a1ba51d1cac",
           "size_bytes": 6983
         },
         {
           "module_id": "std.math.i32",
           "path": "packages/ext/x07-ext-math/0.1.1/modules/std/math/i32.x07.json",
-          "sha256": "46325dbbf3f23cc993be53958bd02ba8993118f39e5e8aa3b6125352ce55aa5f",
+          "sha256": "a80b59acdb5b51d652caa0ce9f0bae8b95887ad4074d27b5f218772dc052d807",
           "size_bytes": 981
         },
         {
           "module_id": "std.math",
           "path": "packages/ext/x07-ext-math/0.1.1/modules/std/math.x07.json",
-          "sha256": "5515808633a52b5c08e55d4da44cf5b81c2f41337cad0b7394dbf76dcdb69964",
+          "sha256": "79b7be30714629fc211ee107341254a11cbaa94fc5f1332bb4b83cf64747368a",
           "size_bytes": 251
         }
       ],
@@ -2278,25 +2278,25 @@
         {
           "module_id": "std.math.f64.spec",
           "path": "packages/ext/x07-ext-math/0.1.2/modules/std/math/f64/spec.x07.json",
-          "sha256": "b78b5e3124c2ee10bb01f4a89dc45961ec081f00c95da5c294f0d1864b4d1018",
+          "sha256": "a7c7ab5ef73f5f907974965d74c17c4cf4b4da6fe79e088a7a5cfbe2a71c4ee3",
           "size_bytes": 5129
         },
         {
           "module_id": "std.math.f64",
           "path": "packages/ext/x07-ext-math/0.1.2/modules/std/math/f64.x07.json",
-          "sha256": "e13dd1c137c75a1dd83b98f9db8d64004f11feb074255059ea5d25b310a08d99",
+          "sha256": "c3dad78e88549c511f43062d25c45ec00d13c5966d57508215809a1ba51d1cac",
           "size_bytes": 6983
         },
         {
           "module_id": "std.math.i32",
           "path": "packages/ext/x07-ext-math/0.1.2/modules/std/math/i32.x07.json",
-          "sha256": "46325dbbf3f23cc993be53958bd02ba8993118f39e5e8aa3b6125352ce55aa5f",
+          "sha256": "a80b59acdb5b51d652caa0ce9f0bae8b95887ad4074d27b5f218772dc052d807",
           "size_bytes": 981
         },
         {
           "module_id": "std.math",
           "path": "packages/ext/x07-ext-math/0.1.2/modules/std/math.x07.json",
-          "sha256": "5515808633a52b5c08e55d4da44cf5b81c2f41337cad0b7394dbf76dcdb69964",
+          "sha256": "79b7be30714629fc211ee107341254a11cbaa94fc5f1332bb4b83cf64747368a",
           "size_bytes": 251
         }
       ],
@@ -2312,14 +2312,14 @@
         {
           "module_id": "ext.memchr.tests",
           "path": "packages/ext/x07-ext-memchr-rs/0.1.0/modules/ext/memchr/tests.x07.json",
-          "sha256": "31da75f241bfd3bdf5e38f101253be55be1fa75f2dd00f90bba318f17189982d",
+          "sha256": "cbf2bf6f29e6f4ef0eb04296360f74b7a6514bf77aed7a775aa339e2d82ddd78",
           "size_bytes": 2323
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.memchr",
           "path": "packages/ext/x07-ext-memchr-rs/0.1.0/modules/ext/memchr.x07.json",
-          "sha256": "630880a432da87da314313330ee2843d13bdc0d073d7b265510c75aae081fd40",
+          "sha256": "9be36a5997903a6fdede9ea8e7fe83213421899ea234e5c9b4be07ce64f32e56",
           "size_bytes": 2996,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_memchr@0.1.0/memchr.rs",
           "source_sha256": "18e4980757622f5f748a6f430a2004f472e9945420ef947d739e5da205e43a04"
@@ -2337,14 +2337,14 @@
         {
           "module_id": "ext.memchr.tests",
           "path": "packages/ext/x07-ext-memchr-rs/0.1.1/modules/ext/memchr/tests.x07.json",
-          "sha256": "31da75f241bfd3bdf5e38f101253be55be1fa75f2dd00f90bba318f17189982d",
+          "sha256": "cbf2bf6f29e6f4ef0eb04296360f74b7a6514bf77aed7a775aa339e2d82ddd78",
           "size_bytes": 2323
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.memchr",
           "path": "packages/ext/x07-ext-memchr-rs/0.1.1/modules/ext/memchr.x07.json",
-          "sha256": "630880a432da87da314313330ee2843d13bdc0d073d7b265510c75aae081fd40",
+          "sha256": "9be36a5997903a6fdede9ea8e7fe83213421899ea234e5c9b4be07ce64f32e56",
           "size_bytes": 2996,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_memchr@0.1.0/memchr.rs",
           "source_sha256": "18e4980757622f5f748a6f430a2004f472e9945420ef947d739e5da205e43a04"
@@ -2362,14 +2362,14 @@
         {
           "module_id": "ext.memchr.tests",
           "path": "packages/ext/x07-ext-memchr-rs/0.1.2/modules/ext/memchr/tests.x07.json",
-          "sha256": "31da75f241bfd3bdf5e38f101253be55be1fa75f2dd00f90bba318f17189982d",
+          "sha256": "cbf2bf6f29e6f4ef0eb04296360f74b7a6514bf77aed7a775aa339e2d82ddd78",
           "size_bytes": 2323
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.memchr",
           "path": "packages/ext/x07-ext-memchr-rs/0.1.2/modules/ext/memchr.x07.json",
-          "sha256": "630880a432da87da314313330ee2843d13bdc0d073d7b265510c75aae081fd40",
+          "sha256": "9be36a5997903a6fdede9ea8e7fe83213421899ea234e5c9b4be07ce64f32e56",
           "size_bytes": 2996,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_memchr@0.1.0/memchr.rs",
           "source_sha256": "18e4980757622f5f748a6f430a2004f472e9945420ef947d739e5da205e43a04"
@@ -2387,19 +2387,19 @@
         {
           "module_id": "ext.msgpack.data_model",
           "path": "packages/ext/x07-ext-msgpack-rs/0.1.0/modules/ext/msgpack/data_model.x07.json",
-          "sha256": "d3c92d4e7d8e020a067e5f3f82ff40692849013be0f8b85257dea4b04b39662f",
+          "sha256": "42967415c193018f82bd803ef652a4b41263185e021f79e7eeb5a6af92d20279",
           "size_bytes": 41993
         },
         {
           "module_id": "ext.msgpack.tests",
           "path": "packages/ext/x07-ext-msgpack-rs/0.1.0/modules/ext/msgpack/tests.x07.json",
-          "sha256": "63332d5bd9ede73beeb4209d0cf79881dd6635f61a6c088a4497b7f3afc3dbec",
+          "sha256": "349b25080b505af20c5119f27dbe816cc1b49d64ab15db78a6d828b317729a47",
           "size_bytes": 20219
         },
         {
           "module_id": "ext.msgpack",
           "path": "packages/ext/x07-ext-msgpack-rs/0.1.0/modules/ext/msgpack.x07.json",
-          "sha256": "a5e39197a5152634af93986b02111f06e01f72bebc0a1995d60bc21db88cc768",
+          "sha256": "c71f1cde1bee8aaf64f9da036df8022deef4e2a74e20eaddc0aec58bd5def626",
           "size_bytes": 852
         }
       ],
@@ -2415,67 +2415,67 @@
         {
           "module_id": "std.net.codec",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/codec.x07.json",
-          "sha256": "307d39e67735b4f91929f3da03ee26592dc6669bb0ab9f3b9cddeccf8d9108ee",
+          "sha256": "cf0a9ec8e6a60ba101fc536a0c27de1fe68e851b23f6f0221e6b35ef6e1fe6e8",
           "size_bytes": 8632
         },
         {
           "module_id": "std.net.dns",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/dns.x07.json",
-          "sha256": "02e2ba8aaaf924ac2e12ead1aae311229129bebfcd7a16021c3c1e0f4a534493",
+          "sha256": "867c1a219895eb406f6cfd81ae288ce885c4f503ee9132a4fe9064923ebf337d",
           "size_bytes": 1837
         },
         {
           "module_id": "std.net.err",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/err.x07.json",
-          "sha256": "0b1127abecceabbc445b155373c54261965a207bd29effb4cafb4f5dea0ebe8c",
+          "sha256": "fe7332e87ae4ba0606018cf42685662ee9e8225efd0a5042c486c8ef56892b0b",
           "size_bytes": 2036
         },
         {
           "module_id": "std.net.http.client",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/http/client.x07.json",
-          "sha256": "50d52da6e451aa9beb4dfe159f1d048b2e74640a8aaf9f6e46eaeea216b46dff",
+          "sha256": "7a5b0045d1aec39e63b6d79912468e39a436d12741e4e14ccdd51df91b2f0d34",
           "size_bytes": 10653
         },
         {
           "module_id": "std.net.http.server",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/http/server.x07.json",
-          "sha256": "103f0a246e144ca890cc733721f47e8de4560f21d19b1cd889b6c0cc0438ad3d",
+          "sha256": "4d0b7adff387bda76b4425691367be15dd72333935fcb6b2b420196340a5e16e",
           "size_bytes": 12267
         },
         {
           "module_id": "std.net.http.spec",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/http/spec.x07.json",
-          "sha256": "a2388069be8768123729933dfea00015e79c09f61fc817c4eacf2ab48c4d1eb9",
+          "sha256": "21c66733fdab3a5561d0295a514d6c0f875aba9d8b428e23563a7132856844ee",
           "size_bytes": 26091
         },
         {
           "module_id": "std.net.http",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/http.x07.json",
-          "sha256": "b301e004fdfc6852ec2ee05a79abbc1b38e8bd9e4646dde947576c11fa492f79",
+          "sha256": "6dafbe8454be0042b1e28d1517254e2c2ff9e3ea91d213f3ee5a39add567fa57",
           "size_bytes": 3672
         },
         {
           "module_id": "std.net.io",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/io.x07.json",
-          "sha256": "92412ef5c6cf1fada2b46cf72e88c8511c2bf068c4491733e5d864a13ab1cc05",
+          "sha256": "f8af5435e10ca4053326e6bacf570968182922868b6dccec70676cfaee3bea46",
           "size_bytes": 1654
         },
         {
           "module_id": "std.net.tcp",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/tcp.x07.json",
-          "sha256": "0d50662c2459e64f40f3993b36196121aa56bf755fe3c7133793d7d4e5ef231a",
+          "sha256": "d22507235437cc2898b7e6613dfc35d4f26725026cc78d592835dc4835e49117",
           "size_bytes": 7576
         },
         {
           "module_id": "std.net.tls",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/tls.x07.json",
-          "sha256": "d594913b3133dec09a4a9d292e708cd81afcbf60e0c92bff52dc75cb8a510c55",
+          "sha256": "cf5c730a0627fe82dda1f794e3c8e31b04d8cdf0fe32270d8b3496155e96feee",
           "size_bytes": 2702
         },
         {
           "module_id": "std.net.udp",
           "path": "packages/ext/x07-ext-net/0.1.0/modules/std/net/udp.x07.json",
-          "sha256": "379ebfe41750978ae2589914cd850d173aeb463fbde66018beb1a0d24e6caaed",
+          "sha256": "e1353807a38186230ceadca1baab0b2ee3d12d1a683b3cacbbe34d9e1008588d",
           "size_bytes": 4822
         }
       ],
@@ -2491,67 +2491,67 @@
         {
           "module_id": "std.net.codec",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/codec.x07.json",
-          "sha256": "307d39e67735b4f91929f3da03ee26592dc6669bb0ab9f3b9cddeccf8d9108ee",
+          "sha256": "cf0a9ec8e6a60ba101fc536a0c27de1fe68e851b23f6f0221e6b35ef6e1fe6e8",
           "size_bytes": 8632
         },
         {
           "module_id": "std.net.dns",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/dns.x07.json",
-          "sha256": "02e2ba8aaaf924ac2e12ead1aae311229129bebfcd7a16021c3c1e0f4a534493",
+          "sha256": "867c1a219895eb406f6cfd81ae288ce885c4f503ee9132a4fe9064923ebf337d",
           "size_bytes": 1837
         },
         {
           "module_id": "std.net.err",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/err.x07.json",
-          "sha256": "0b1127abecceabbc445b155373c54261965a207bd29effb4cafb4f5dea0ebe8c",
+          "sha256": "fe7332e87ae4ba0606018cf42685662ee9e8225efd0a5042c486c8ef56892b0b",
           "size_bytes": 2036
         },
         {
           "module_id": "std.net.http.client",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/http/client.x07.json",
-          "sha256": "50d52da6e451aa9beb4dfe159f1d048b2e74640a8aaf9f6e46eaeea216b46dff",
+          "sha256": "7a5b0045d1aec39e63b6d79912468e39a436d12741e4e14ccdd51df91b2f0d34",
           "size_bytes": 10653
         },
         {
           "module_id": "std.net.http.server",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/http/server.x07.json",
-          "sha256": "103f0a246e144ca890cc733721f47e8de4560f21d19b1cd889b6c0cc0438ad3d",
+          "sha256": "4d0b7adff387bda76b4425691367be15dd72333935fcb6b2b420196340a5e16e",
           "size_bytes": 12267
         },
         {
           "module_id": "std.net.http.spec",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/http/spec.x07.json",
-          "sha256": "a2388069be8768123729933dfea00015e79c09f61fc817c4eacf2ab48c4d1eb9",
+          "sha256": "21c66733fdab3a5561d0295a514d6c0f875aba9d8b428e23563a7132856844ee",
           "size_bytes": 26091
         },
         {
           "module_id": "std.net.http",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/http.x07.json",
-          "sha256": "b301e004fdfc6852ec2ee05a79abbc1b38e8bd9e4646dde947576c11fa492f79",
+          "sha256": "6dafbe8454be0042b1e28d1517254e2c2ff9e3ea91d213f3ee5a39add567fa57",
           "size_bytes": 3672
         },
         {
           "module_id": "std.net.io",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/io.x07.json",
-          "sha256": "92412ef5c6cf1fada2b46cf72e88c8511c2bf068c4491733e5d864a13ab1cc05",
+          "sha256": "f8af5435e10ca4053326e6bacf570968182922868b6dccec70676cfaee3bea46",
           "size_bytes": 1654
         },
         {
           "module_id": "std.net.tcp",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/tcp.x07.json",
-          "sha256": "0d50662c2459e64f40f3993b36196121aa56bf755fe3c7133793d7d4e5ef231a",
+          "sha256": "d22507235437cc2898b7e6613dfc35d4f26725026cc78d592835dc4835e49117",
           "size_bytes": 7576
         },
         {
           "module_id": "std.net.tls",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/tls.x07.json",
-          "sha256": "d594913b3133dec09a4a9d292e708cd81afcbf60e0c92bff52dc75cb8a510c55",
+          "sha256": "cf5c730a0627fe82dda1f794e3c8e31b04d8cdf0fe32270d8b3496155e96feee",
           "size_bytes": 2702
         },
         {
           "module_id": "std.net.udp",
           "path": "packages/ext/x07-ext-net/0.1.1/modules/std/net/udp.x07.json",
-          "sha256": "379ebfe41750978ae2589914cd850d173aeb463fbde66018beb1a0d24e6caaed",
+          "sha256": "e1353807a38186230ceadca1baab0b2ee3d12d1a683b3cacbbe34d9e1008588d",
           "size_bytes": 4822
         }
       ],
@@ -2567,67 +2567,67 @@
         {
           "module_id": "std.net.codec",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/codec.x07.json",
-          "sha256": "307d39e67735b4f91929f3da03ee26592dc6669bb0ab9f3b9cddeccf8d9108ee",
+          "sha256": "cf0a9ec8e6a60ba101fc536a0c27de1fe68e851b23f6f0221e6b35ef6e1fe6e8",
           "size_bytes": 8632
         },
         {
           "module_id": "std.net.dns",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/dns.x07.json",
-          "sha256": "02e2ba8aaaf924ac2e12ead1aae311229129bebfcd7a16021c3c1e0f4a534493",
+          "sha256": "867c1a219895eb406f6cfd81ae288ce885c4f503ee9132a4fe9064923ebf337d",
           "size_bytes": 1837
         },
         {
           "module_id": "std.net.err",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/err.x07.json",
-          "sha256": "0b1127abecceabbc445b155373c54261965a207bd29effb4cafb4f5dea0ebe8c",
+          "sha256": "fe7332e87ae4ba0606018cf42685662ee9e8225efd0a5042c486c8ef56892b0b",
           "size_bytes": 2036
         },
         {
           "module_id": "std.net.http.client",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/http/client.x07.json",
-          "sha256": "50d52da6e451aa9beb4dfe159f1d048b2e74640a8aaf9f6e46eaeea216b46dff",
+          "sha256": "7a5b0045d1aec39e63b6d79912468e39a436d12741e4e14ccdd51df91b2f0d34",
           "size_bytes": 10653
         },
         {
           "module_id": "std.net.http.server",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/http/server.x07.json",
-          "sha256": "103f0a246e144ca890cc733721f47e8de4560f21d19b1cd889b6c0cc0438ad3d",
+          "sha256": "4d0b7adff387bda76b4425691367be15dd72333935fcb6b2b420196340a5e16e",
           "size_bytes": 12267
         },
         {
           "module_id": "std.net.http.spec",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/http/spec.x07.json",
-          "sha256": "a2388069be8768123729933dfea00015e79c09f61fc817c4eacf2ab48c4d1eb9",
+          "sha256": "21c66733fdab3a5561d0295a514d6c0f875aba9d8b428e23563a7132856844ee",
           "size_bytes": 26091
         },
         {
           "module_id": "std.net.http",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/http.x07.json",
-          "sha256": "b301e004fdfc6852ec2ee05a79abbc1b38e8bd9e4646dde947576c11fa492f79",
+          "sha256": "6dafbe8454be0042b1e28d1517254e2c2ff9e3ea91d213f3ee5a39add567fa57",
           "size_bytes": 3672
         },
         {
           "module_id": "std.net.io",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/io.x07.json",
-          "sha256": "92412ef5c6cf1fada2b46cf72e88c8511c2bf068c4491733e5d864a13ab1cc05",
+          "sha256": "f8af5435e10ca4053326e6bacf570968182922868b6dccec70676cfaee3bea46",
           "size_bytes": 1654
         },
         {
           "module_id": "std.net.tcp",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/tcp.x07.json",
-          "sha256": "0d50662c2459e64f40f3993b36196121aa56bf755fe3c7133793d7d4e5ef231a",
+          "sha256": "d22507235437cc2898b7e6613dfc35d4f26725026cc78d592835dc4835e49117",
           "size_bytes": 7576
         },
         {
           "module_id": "std.net.tls",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/tls.x07.json",
-          "sha256": "d594913b3133dec09a4a9d292e708cd81afcbf60e0c92bff52dc75cb8a510c55",
+          "sha256": "cf5c730a0627fe82dda1f794e3c8e31b04d8cdf0fe32270d8b3496155e96feee",
           "size_bytes": 2702
         },
         {
           "module_id": "std.net.udp",
           "path": "packages/ext/x07-ext-net/0.1.2/modules/std/net/udp.x07.json",
-          "sha256": "379ebfe41750978ae2589914cd850d173aeb463fbde66018beb1a0d24e6caaed",
+          "sha256": "e1353807a38186230ceadca1baab0b2ee3d12d1a683b3cacbbe34d9e1008588d",
           "size_bytes": 4822
         }
       ],
@@ -2647,25 +2647,25 @@
         {
           "module_id": "ext.openssl._ffi",
           "path": "packages/ext/x07-ext-openssl-c/0.1.0/modules/ext/openssl/_ffi.x07.json",
-          "sha256": "d60d0a3bcbb650f7c9a7c5ab26a17de48338addbde6a7736367dba8299287a3c",
+          "sha256": "3dd214f7da5308fa605a34d9fb3abed10a9d16ed4410d25ffdbcdd73b6a5bfc8",
           "size_bytes": 2742
         },
         {
           "module_id": "ext.openssl.ed25519",
           "path": "packages/ext/x07-ext-openssl-c/0.1.0/modules/ext/openssl/ed25519.x07.json",
-          "sha256": "bf544d650ddf4d25d5b9c51409866cfd7d590f5d133878a0d454ef66c6323c0e",
+          "sha256": "f2596ca4ad5fbb7ed5793c87121e2c7f1319309062056107ae2a5ea4c4d8fa8e",
           "size_bytes": 691
         },
         {
           "module_id": "ext.openssl.hash",
           "path": "packages/ext/x07-ext-openssl-c/0.1.0/modules/ext/openssl/hash.x07.json",
-          "sha256": "a024eea07b9753b7c37b8761cc7bf6b545f8bf4e79738dba85c36850fd6d296c",
+          "sha256": "a46bdfa5ccd2bec170aea8994b2eb904dac16c37f56edfad4f3fc0ef4d340558",
           "size_bytes": 4055
         },
         {
           "module_id": "ext.openssl.rand",
           "path": "packages/ext/x07-ext-openssl-c/0.1.0/modules/ext/openssl/rand.x07.json",
-          "sha256": "7d4807817f1a95545aeaa8acd9b5b1575f75168bb9c3712e71159ea73c38c9c4",
+          "sha256": "b3a04f6ae0ca2ed678592f22a22ed4cd2143579c5a9fae828d948cd23225f917",
           "size_bytes": 2319
         }
       ],
@@ -2685,25 +2685,25 @@
         {
           "module_id": "ext.openssl._ffi",
           "path": "packages/ext/x07-ext-openssl-c/0.1.1/modules/ext/openssl/_ffi.x07.json",
-          "sha256": "d60d0a3bcbb650f7c9a7c5ab26a17de48338addbde6a7736367dba8299287a3c",
+          "sha256": "3dd214f7da5308fa605a34d9fb3abed10a9d16ed4410d25ffdbcdd73b6a5bfc8",
           "size_bytes": 2742
         },
         {
           "module_id": "ext.openssl.ed25519",
           "path": "packages/ext/x07-ext-openssl-c/0.1.1/modules/ext/openssl/ed25519.x07.json",
-          "sha256": "bf544d650ddf4d25d5b9c51409866cfd7d590f5d133878a0d454ef66c6323c0e",
+          "sha256": "f2596ca4ad5fbb7ed5793c87121e2c7f1319309062056107ae2a5ea4c4d8fa8e",
           "size_bytes": 691
         },
         {
           "module_id": "ext.openssl.hash",
           "path": "packages/ext/x07-ext-openssl-c/0.1.1/modules/ext/openssl/hash.x07.json",
-          "sha256": "a024eea07b9753b7c37b8761cc7bf6b545f8bf4e79738dba85c36850fd6d296c",
+          "sha256": "a46bdfa5ccd2bec170aea8994b2eb904dac16c37f56edfad4f3fc0ef4d340558",
           "size_bytes": 4055
         },
         {
           "module_id": "ext.openssl.rand",
           "path": "packages/ext/x07-ext-openssl-c/0.1.1/modules/ext/openssl/rand.x07.json",
-          "sha256": "7d4807817f1a95545aeaa8acd9b5b1575f75168bb9c3712e71159ea73c38c9c4",
+          "sha256": "b3a04f6ae0ca2ed678592f22a22ed4cd2143579c5a9fae828d948cd23225f917",
           "size_bytes": 2319
         }
       ],
@@ -2723,25 +2723,25 @@
         {
           "module_id": "ext.openssl._ffi",
           "path": "packages/ext/x07-ext-openssl-c/0.1.2/modules/ext/openssl/_ffi.x07.json",
-          "sha256": "d60d0a3bcbb650f7c9a7c5ab26a17de48338addbde6a7736367dba8299287a3c",
+          "sha256": "3dd214f7da5308fa605a34d9fb3abed10a9d16ed4410d25ffdbcdd73b6a5bfc8",
           "size_bytes": 2742
         },
         {
           "module_id": "ext.openssl.ed25519",
           "path": "packages/ext/x07-ext-openssl-c/0.1.2/modules/ext/openssl/ed25519.x07.json",
-          "sha256": "bf544d650ddf4d25d5b9c51409866cfd7d590f5d133878a0d454ef66c6323c0e",
+          "sha256": "f2596ca4ad5fbb7ed5793c87121e2c7f1319309062056107ae2a5ea4c4d8fa8e",
           "size_bytes": 691
         },
         {
           "module_id": "ext.openssl.hash",
           "path": "packages/ext/x07-ext-openssl-c/0.1.2/modules/ext/openssl/hash.x07.json",
-          "sha256": "a024eea07b9753b7c37b8761cc7bf6b545f8bf4e79738dba85c36850fd6d296c",
+          "sha256": "a46bdfa5ccd2bec170aea8994b2eb904dac16c37f56edfad4f3fc0ef4d340558",
           "size_bytes": 4055
         },
         {
           "module_id": "ext.openssl.rand",
           "path": "packages/ext/x07-ext-openssl-c/0.1.2/modules/ext/openssl/rand.x07.json",
-          "sha256": "7d4807817f1a95545aeaa8acd9b5b1575f75168bb9c3712e71159ea73c38c9c4",
+          "sha256": "b3a04f6ae0ca2ed678592f22a22ed4cd2143579c5a9fae828d948cd23225f917",
           "size_bytes": 2319
         }
       ],
@@ -2761,25 +2761,25 @@
         {
           "module_id": "ext.openssl._ffi",
           "path": "packages/ext/x07-ext-openssl-c/0.1.3/modules/ext/openssl/_ffi.x07.json",
-          "sha256": "d60d0a3bcbb650f7c9a7c5ab26a17de48338addbde6a7736367dba8299287a3c",
+          "sha256": "3dd214f7da5308fa605a34d9fb3abed10a9d16ed4410d25ffdbcdd73b6a5bfc8",
           "size_bytes": 2742
         },
         {
           "module_id": "ext.openssl.ed25519",
           "path": "packages/ext/x07-ext-openssl-c/0.1.3/modules/ext/openssl/ed25519.x07.json",
-          "sha256": "bf544d650ddf4d25d5b9c51409866cfd7d590f5d133878a0d454ef66c6323c0e",
+          "sha256": "f2596ca4ad5fbb7ed5793c87121e2c7f1319309062056107ae2a5ea4c4d8fa8e",
           "size_bytes": 691
         },
         {
           "module_id": "ext.openssl.hash",
           "path": "packages/ext/x07-ext-openssl-c/0.1.3/modules/ext/openssl/hash.x07.json",
-          "sha256": "a024eea07b9753b7c37b8761cc7bf6b545f8bf4e79738dba85c36850fd6d296c",
+          "sha256": "a46bdfa5ccd2bec170aea8994b2eb904dac16c37f56edfad4f3fc0ef4d340558",
           "size_bytes": 4055
         },
         {
           "module_id": "ext.openssl.rand",
           "path": "packages/ext/x07-ext-openssl-c/0.1.3/modules/ext/openssl/rand.x07.json",
-          "sha256": "7d4807817f1a95545aeaa8acd9b5b1575f75168bb9c3712e71159ea73c38c9c4",
+          "sha256": "b3a04f6ae0ca2ed678592f22a22ed4cd2143579c5a9fae828d948cd23225f917",
           "size_bytes": 2319
         }
       ],
@@ -2795,25 +2795,25 @@
         {
           "module_id": "std.os.fs.glob",
           "path": "packages/ext/x07-ext-path-glob-rs/0.1.0/modules/std/os/fs/glob.x07.json",
-          "sha256": "20fe3de7c3dd144a1479d98c1fdf6147336d01f682e23c5360a279179d3fbad6",
+          "sha256": "75800b806bb4ca47ca9f5a87f460b7404922a8c73c5121a2b3da492b2e2efffd",
           "size_bytes": 863
         },
         {
           "module_id": "std.os.fs.globwalk.tests",
           "path": "packages/ext/x07-ext-path-glob-rs/0.1.0/modules/std/os/fs/globwalk/tests.x07.json",
-          "sha256": "0dade37be78e160239c17553fa36dc4c3864fd04134f47dffb336da8c6b9b155",
+          "sha256": "1964141a3226d85f31b884f5dfba5a2a01866d5f8b21f8b25e8be9e4e5d949e6",
           "size_bytes": 3020
         },
         {
           "module_id": "std.os.fs.ignore",
           "path": "packages/ext/x07-ext-path-glob-rs/0.1.0/modules/std/os/fs/ignore.x07.json",
-          "sha256": "9ae23b473fd4ff8cb8ec4945054ae05ccaf54a53878679948447c7470e26655b",
+          "sha256": "09cf3ee6c24077bdb959f82184139ad53285b48670dd647fa220d7a00c04d7a0",
           "size_bytes": 2685
         },
         {
           "module_id": "std.os.fs.walk",
           "path": "packages/ext/x07-ext-path-glob-rs/0.1.0/modules/std/os/fs/walk.x07.json",
-          "sha256": "17f5171950b10ca0d0ac085d187f4ee999a0a6c2ff8feba5764a7092b7daf95e",
+          "sha256": "23a9062d22e91435256e9f5882f997dbe7500cbe67b389a354fae2d11bf7e246",
           "size_bytes": 987
         }
       ],
@@ -2829,20 +2829,20 @@
         {
           "module_id": "ext.pb.data_model",
           "path": "packages/ext/x07-ext-pb-rs/0.1.0/modules/ext/pb/data_model.x07.json",
-          "sha256": "0641a13b3d923bf64dcd88807a07f654cea2604c2c9b7a5b8cf826176fabb1d9",
+          "sha256": "efa0af137dabeabe64efd6c2f0d9e8f7e5e5f6aeecdc551b638ad0e449705e9d",
           "size_bytes": 18999
         },
         {
           "module_id": "ext.pb.tests",
           "path": "packages/ext/x07-ext-pb-rs/0.1.0/modules/ext/pb/tests.x07.json",
-          "sha256": "4e647c5facd73560f73f3b57faec8d7b83d94d7165c6b451d3d1972e69b10813",
+          "sha256": "efcbb3f73f052f8e4e35b150024c28fb2c5a8094b84b54a11dd1f569481a25de",
           "size_bytes": 8750
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.pb.wire",
           "path": "packages/ext/x07-ext-pb-rs/0.1.0/modules/ext/pb/wire.x07.json",
-          "sha256": "6266ec7a8f7a92eb43e59c4be4b63dea2d97fd763629822b3f304ef79a0050df",
+          "sha256": "9cf22bd509ad772b443f6a1ab6ff68e2df2b5f8f76d59aad2b4b9f339629f541",
           "size_bytes": 23789,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_pb@0.1.0/wire.rs",
           "source_sha256": "90ede1ac6f58b10699d5b11f61e8ffa6b309ba484a45d4692a8200cf8871067f"
@@ -2860,20 +2860,20 @@
         {
           "module_id": "ext.pb.data_model",
           "path": "packages/ext/x07-ext-pb-rs/0.1.1/modules/ext/pb/data_model.x07.json",
-          "sha256": "0641a13b3d923bf64dcd88807a07f654cea2604c2c9b7a5b8cf826176fabb1d9",
+          "sha256": "efa0af137dabeabe64efd6c2f0d9e8f7e5e5f6aeecdc551b638ad0e449705e9d",
           "size_bytes": 18999
         },
         {
           "module_id": "ext.pb.tests",
           "path": "packages/ext/x07-ext-pb-rs/0.1.1/modules/ext/pb/tests.x07.json",
-          "sha256": "4e647c5facd73560f73f3b57faec8d7b83d94d7165c6b451d3d1972e69b10813",
+          "sha256": "efcbb3f73f052f8e4e35b150024c28fb2c5a8094b84b54a11dd1f569481a25de",
           "size_bytes": 8750
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.pb.wire",
           "path": "packages/ext/x07-ext-pb-rs/0.1.1/modules/ext/pb/wire.x07.json",
-          "sha256": "6266ec7a8f7a92eb43e59c4be4b63dea2d97fd763629822b3f304ef79a0050df",
+          "sha256": "9cf22bd509ad772b443f6a1ab6ff68e2df2b5f8f76d59aad2b4b9f339629f541",
           "size_bytes": 23789,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_pb@0.1.0/wire.rs",
           "source_sha256": "90ede1ac6f58b10699d5b11f61e8ffa6b309ba484a45d4692a8200cf8871067f"
@@ -2891,20 +2891,20 @@
         {
           "module_id": "ext.pb.data_model",
           "path": "packages/ext/x07-ext-pb-rs/0.1.2/modules/ext/pb/data_model.x07.json",
-          "sha256": "0641a13b3d923bf64dcd88807a07f654cea2604c2c9b7a5b8cf826176fabb1d9",
+          "sha256": "efa0af137dabeabe64efd6c2f0d9e8f7e5e5f6aeecdc551b638ad0e449705e9d",
           "size_bytes": 18999
         },
         {
           "module_id": "ext.pb.tests",
           "path": "packages/ext/x07-ext-pb-rs/0.1.2/modules/ext/pb/tests.x07.json",
-          "sha256": "4e647c5facd73560f73f3b57faec8d7b83d94d7165c6b451d3d1972e69b10813",
+          "sha256": "efcbb3f73f052f8e4e35b150024c28fb2c5a8094b84b54a11dd1f569481a25de",
           "size_bytes": 8750
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.pb.wire",
           "path": "packages/ext/x07-ext-pb-rs/0.1.2/modules/ext/pb/wire.x07.json",
-          "sha256": "6266ec7a8f7a92eb43e59c4be4b63dea2d97fd763629822b3f304ef79a0050df",
+          "sha256": "9cf22bd509ad772b443f6a1ab6ff68e2df2b5f8f76d59aad2b4b9f339629f541",
           "size_bytes": 23789,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_pb@0.1.0/wire.rs",
           "source_sha256": "90ede1ac6f58b10699d5b11f61e8ffa6b309ba484a45d4692a8200cf8871067f"
@@ -2922,13 +2922,13 @@
         {
           "module_id": "ext.regex.tests",
           "path": "packages/ext/x07-ext-regex/0.1.0/modules/ext/regex/tests.x07.json",
-          "sha256": "2bfeec0182331f2e8e01e26d62181d5838f59df37e62b0c1f3f4cac4ea13222c",
+          "sha256": "e8ec533e0e23e76e49eb328143888752085c533a35cd08718e61093e678d2cf4",
           "size_bytes": 36477
         },
         {
           "module_id": "ext.regex",
           "path": "packages/ext/x07-ext-regex/0.1.0/modules/ext/regex.x07.json",
-          "sha256": "da7d947f876e06cdb9a5bea96f58e39eb7661b5b31ca2efb0540c46c44ef205c",
+          "sha256": "e0c8947506f90082899ad284a122868ea894fd9b980783b1e192ae5a03e39b55",
           "size_bytes": 115158
         }
       ],
@@ -2944,13 +2944,13 @@
         {
           "module_id": "ext.regex.tests",
           "path": "packages/ext/x07-ext-regex/0.2.0/modules/ext/regex/tests.x07.json",
-          "sha256": "2bfeec0182331f2e8e01e26d62181d5838f59df37e62b0c1f3f4cac4ea13222c",
+          "sha256": "e8ec533e0e23e76e49eb328143888752085c533a35cd08718e61093e678d2cf4",
           "size_bytes": 36477
         },
         {
           "module_id": "ext.regex",
           "path": "packages/ext/x07-ext-regex/0.2.0/modules/ext/regex.x07.json",
-          "sha256": "c8d9dd8e70a3b4b290b361046a9f93cd13da42a074d1715c99b0ab12c4d25571",
+          "sha256": "4fff533e3e6755d0da319802e2b538b64a3f65e7af7bd68c0ac3e308db27e1f7",
           "size_bytes": 9125
         }
       ],
@@ -2966,13 +2966,13 @@
         {
           "module_id": "ext.regex.tests",
           "path": "packages/ext/x07-ext-regex/0.2.1/modules/ext/regex/tests.x07.json",
-          "sha256": "2bfeec0182331f2e8e01e26d62181d5838f59df37e62b0c1f3f4cac4ea13222c",
+          "sha256": "e8ec533e0e23e76e49eb328143888752085c533a35cd08718e61093e678d2cf4",
           "size_bytes": 36477
         },
         {
           "module_id": "ext.regex",
           "path": "packages/ext/x07-ext-regex/0.2.1/modules/ext/regex.x07.json",
-          "sha256": "c8d9dd8e70a3b4b290b361046a9f93cd13da42a074d1715c99b0ab12c4d25571",
+          "sha256": "4fff533e3e6755d0da319802e2b538b64a3f65e7af7bd68c0ac3e308db27e1f7",
           "size_bytes": 9125
         }
       ],
@@ -2988,13 +2988,13 @@
         {
           "module_id": "ext.regex.tests",
           "path": "packages/ext/x07-ext-regex/0.2.2/modules/ext/regex/tests.x07.json",
-          "sha256": "2bfeec0182331f2e8e01e26d62181d5838f59df37e62b0c1f3f4cac4ea13222c",
+          "sha256": "e8ec533e0e23e76e49eb328143888752085c533a35cd08718e61093e678d2cf4",
           "size_bytes": 36477
         },
         {
           "module_id": "ext.regex",
           "path": "packages/ext/x07-ext-regex/0.2.2/modules/ext/regex.x07.json",
-          "sha256": "c8d9dd8e70a3b4b290b361046a9f93cd13da42a074d1715c99b0ab12c4d25571",
+          "sha256": "4fff533e3e6755d0da319802e2b538b64a3f65e7af7bd68c0ac3e308db27e1f7",
           "size_bytes": 9125
         }
       ],
@@ -3010,13 +3010,13 @@
         {
           "module_id": "ext.robots.tests",
           "path": "packages/ext/x07-ext-robots-txt-rs/0.1.0/modules/ext/robots/tests.x07.json",
-          "sha256": "313b0cc0b32d9c347a9d63c7eee524cd6443da989104631e3e25f899b476378c",
+          "sha256": "e871c61d69ff9f19fa0402d73aae5905aca9f383e2e7d036d0cff8c8ad7db7b2",
           "size_bytes": 1880
         },
         {
           "module_id": "ext.robots",
           "path": "packages/ext/x07-ext-robots-txt-rs/0.1.0/modules/ext/robots.x07.json",
-          "sha256": "2a2bcec5fcfa355fa76a501ba916dd5cc9857d0243921e4d4dbfb9cfe5ce00c1",
+          "sha256": "c68ff6a17f426b9e0a1e68d2f24b58c9dffd7859cbd835f1bda908437652ba99",
           "size_bytes": 9188
         }
       ],
@@ -3032,14 +3032,14 @@
         {
           "module_id": "ext.semver.tests",
           "path": "packages/ext/x07-ext-semver-rs/0.1.0/modules/ext/semver/tests.x07.json",
-          "sha256": "0d22c2cc57187d99b7d0a3411e7014dff286fe2082c70ad209c8564eac952a26",
+          "sha256": "f936b792589474dec12feeca0212e389c319ba1a96ff9f9295fe9f78ad850c75",
           "size_bytes": 6267
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.semver",
           "path": "packages/ext/x07-ext-semver-rs/0.1.0/modules/ext/semver.x07.json",
-          "sha256": "f11ccb686defd31e9347f967f8e99883388cb0ec396c0e31e1a520ec129a4525",
+          "sha256": "0226eead3f857aa246d691de420335c9f5fffb18b841b1f456366deb32392852",
           "size_bytes": 14673,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_semver@0.1.0/semver.rs",
           "source_sha256": "4e80e6f177f60db3d0e6d79c44dde5323213add13eadd7b833aee50fc97d411f"
@@ -3057,14 +3057,14 @@
         {
           "module_id": "ext.semver.tests",
           "path": "packages/ext/x07-ext-semver-rs/0.1.1/modules/ext/semver/tests.x07.json",
-          "sha256": "0d22c2cc57187d99b7d0a3411e7014dff286fe2082c70ad209c8564eac952a26",
+          "sha256": "f936b792589474dec12feeca0212e389c319ba1a96ff9f9295fe9f78ad850c75",
           "size_bytes": 6267
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.semver",
           "path": "packages/ext/x07-ext-semver-rs/0.1.1/modules/ext/semver.x07.json",
-          "sha256": "f11ccb686defd31e9347f967f8e99883388cb0ec396c0e31e1a520ec129a4525",
+          "sha256": "0226eead3f857aa246d691de420335c9f5fffb18b841b1f456366deb32392852",
           "size_bytes": 14673,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_semver@0.1.0/semver.rs",
           "source_sha256": "4e80e6f177f60db3d0e6d79c44dde5323213add13eadd7b833aee50fc97d411f"
@@ -3082,14 +3082,14 @@
         {
           "module_id": "ext.semver.tests",
           "path": "packages/ext/x07-ext-semver-rs/0.1.2/modules/ext/semver/tests.x07.json",
-          "sha256": "0d22c2cc57187d99b7d0a3411e7014dff286fe2082c70ad209c8564eac952a26",
+          "sha256": "f936b792589474dec12feeca0212e389c319ba1a96ff9f9295fe9f78ad850c75",
           "size_bytes": 6267
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.semver",
           "path": "packages/ext/x07-ext-semver-rs/0.1.2/modules/ext/semver.x07.json",
-          "sha256": "f11ccb686defd31e9347f967f8e99883388cb0ec396c0e31e1a520ec129a4525",
+          "sha256": "0226eead3f857aa246d691de420335c9f5fffb18b841b1f456366deb32392852",
           "size_bytes": 14673,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_semver@0.1.0/semver.rs",
           "source_sha256": "4e80e6f177f60db3d0e6d79c44dde5323213add13eadd7b833aee50fc97d411f"
@@ -3107,13 +3107,13 @@
         {
           "module_id": "ext.sitemap.tests",
           "path": "packages/ext/x07-ext-sitemap-rs/0.1.0/modules/ext/sitemap/tests.x07.json",
-          "sha256": "28eeaf242c9eb2d10a9e3ad096346c05ab21c310469f90e56cfaaccf95aca964",
+          "sha256": "0b11aa65b6936a323eba184b7ce1c9edd888183fbcc74dcf8be0f7b7df7ce5a3",
           "size_bytes": 1043
         },
         {
           "module_id": "ext.sitemap",
           "path": "packages/ext/x07-ext-sitemap-rs/0.1.0/modules/ext/sitemap.x07.json",
-          "sha256": "629b3ad81f5091f6310744212e5a1bc01cfaca5bd6223c1ae4c58873ddbb160f",
+          "sha256": "76fa69566c67dc6de915f08aa0ac48ebe4d147686088b8eed911617efd8112ef",
           "size_bytes": 3150
         }
       ],
@@ -3133,13 +3133,13 @@
         {
           "module_id": "ext.sockets._ffi",
           "path": "packages/ext/x07-ext-sockets-c/0.1.0/modules/ext/sockets/_ffi.x07.json",
-          "sha256": "396adf1cb34e37d233f28cb70266bb7f8f4cedd230f1fb638eeea49da87723d6",
+          "sha256": "9752f467c1b46fbd6d60e0d50a3e55f15fdcac109348d586c7bcc4e24f31864b",
           "size_bytes": 7045
         },
         {
           "module_id": "ext.sockets.net",
           "path": "packages/ext/x07-ext-sockets-c/0.1.0/modules/ext/sockets/net.x07.json",
-          "sha256": "92487f6a921e9437c58f1084da340a9b3fcac0fbf26ccb311c15cc12985b7d69",
+          "sha256": "17265e8474646fd2866aa950bbb435da6ae3f410ddece65a62b09c0880b5b157",
           "size_bytes": 10712
         }
       ],
@@ -3159,13 +3159,13 @@
         {
           "module_id": "ext.sockets._ffi",
           "path": "packages/ext/x07-ext-sockets-c/0.1.1/modules/ext/sockets/_ffi.x07.json",
-          "sha256": "396adf1cb34e37d233f28cb70266bb7f8f4cedd230f1fb638eeea49da87723d6",
+          "sha256": "9752f467c1b46fbd6d60e0d50a3e55f15fdcac109348d586c7bcc4e24f31864b",
           "size_bytes": 7045
         },
         {
           "module_id": "ext.sockets.net",
           "path": "packages/ext/x07-ext-sockets-c/0.1.1/modules/ext/sockets/net.x07.json",
-          "sha256": "92487f6a921e9437c58f1084da340a9b3fcac0fbf26ccb311c15cc12985b7d69",
+          "sha256": "17265e8474646fd2866aa950bbb435da6ae3f410ddece65a62b09c0880b5b157",
           "size_bytes": 10712
         }
       ],
@@ -3185,13 +3185,13 @@
         {
           "module_id": "ext.sockets._ffi",
           "path": "packages/ext/x07-ext-sockets-c/0.1.2/modules/ext/sockets/_ffi.x07.json",
-          "sha256": "396adf1cb34e37d233f28cb70266bb7f8f4cedd230f1fb638eeea49da87723d6",
+          "sha256": "9752f467c1b46fbd6d60e0d50a3e55f15fdcac109348d586c7bcc4e24f31864b",
           "size_bytes": 7045
         },
         {
           "module_id": "ext.sockets.net",
           "path": "packages/ext/x07-ext-sockets-c/0.1.2/modules/ext/sockets/net.x07.json",
-          "sha256": "92487f6a921e9437c58f1084da340a9b3fcac0fbf26ccb311c15cc12985b7d69",
+          "sha256": "17265e8474646fd2866aa950bbb435da6ae3f410ddece65a62b09c0880b5b157",
           "size_bytes": 10712
         }
       ],
@@ -3211,13 +3211,13 @@
         {
           "module_id": "ext.sockets._ffi",
           "path": "packages/ext/x07-ext-sockets-c/0.1.3/modules/ext/sockets/_ffi.x07.json",
-          "sha256": "396adf1cb34e37d233f28cb70266bb7f8f4cedd230f1fb638eeea49da87723d6",
+          "sha256": "9752f467c1b46fbd6d60e0d50a3e55f15fdcac109348d586c7bcc4e24f31864b",
           "size_bytes": 7045
         },
         {
           "module_id": "ext.sockets.net",
           "path": "packages/ext/x07-ext-sockets-c/0.1.3/modules/ext/sockets/net.x07.json",
-          "sha256": "92487f6a921e9437c58f1084da340a9b3fcac0fbf26ccb311c15cc12985b7d69",
+          "sha256": "17265e8474646fd2866aa950bbb435da6ae3f410ddece65a62b09c0880b5b157",
           "size_bytes": 10712
         }
       ],
@@ -3233,13 +3233,13 @@
         {
           "module_id": "ext.streams.tests",
           "path": "packages/ext/x07-ext-streams/0.1.0/modules/ext/streams/tests.x07.json",
-          "sha256": "b4bdffb661b046849c4cd0c9c0e627780f69383bf09c2800768d5be0c33ea694",
+          "sha256": "54de20697cb47e25c5a9949ee01d3a607725ae819b736faf0ad2336c7bbdf1f3",
           "size_bytes": 5747
         },
         {
           "module_id": "ext.streams",
           "path": "packages/ext/x07-ext-streams/0.1.0/modules/ext/streams.x07.json",
-          "sha256": "0b58668d37c7d6777146fcb8f6d450c853c674e7a64b56745e15f5e7c0d566fe",
+          "sha256": "28e505dd7c1b6df6dc320a479d1e533eb8557ab3cc80aab3f5b85c33872d5c6d",
           "size_bytes": 2181
         }
       ],
@@ -3255,13 +3255,13 @@
         {
           "module_id": "ext.streams.tests",
           "path": "packages/ext/x07-ext-streams/0.1.1/modules/ext/streams/tests.x07.json",
-          "sha256": "b4bdffb661b046849c4cd0c9c0e627780f69383bf09c2800768d5be0c33ea694",
+          "sha256": "54de20697cb47e25c5a9949ee01d3a607725ae819b736faf0ad2336c7bbdf1f3",
           "size_bytes": 5747
         },
         {
           "module_id": "ext.streams",
           "path": "packages/ext/x07-ext-streams/0.1.1/modules/ext/streams.x07.json",
-          "sha256": "0b58668d37c7d6777146fcb8f6d450c853c674e7a64b56745e15f5e7c0d566fe",
+          "sha256": "28e505dd7c1b6df6dc320a479d1e533eb8557ab3cc80aab3f5b85c33872d5c6d",
           "size_bytes": 2181
         }
       ],
@@ -3277,13 +3277,13 @@
         {
           "module_id": "ext.streams.tests",
           "path": "packages/ext/x07-ext-streams/0.1.2/modules/ext/streams/tests.x07.json",
-          "sha256": "b4bdffb661b046849c4cd0c9c0e627780f69383bf09c2800768d5be0c33ea694",
+          "sha256": "54de20697cb47e25c5a9949ee01d3a607725ae819b736faf0ad2336c7bbdf1f3",
           "size_bytes": 5747
         },
         {
           "module_id": "ext.streams",
           "path": "packages/ext/x07-ext-streams/0.1.2/modules/ext/streams.x07.json",
-          "sha256": "0b58668d37c7d6777146fcb8f6d450c853c674e7a64b56745e15f5e7c0d566fe",
+          "sha256": "28e505dd7c1b6df6dc320a479d1e533eb8557ab3cc80aab3f5b85c33872d5c6d",
           "size_bytes": 2181
         }
       ],
@@ -3299,14 +3299,14 @@
         {
           "module_id": "ext.tar.tests",
           "path": "packages/ext/x07-ext-tar-rs/0.1.0/modules/ext/tar/tests.x07.json",
-          "sha256": "9e155bc32e92813c26da12cd26fb80022a96bea191896eaa1bb5b1a4de0fdc79",
+          "sha256": "cd7deef341027c26a7ee012d7ecac6fca701d6c9a84a591b64de4b97fe15f801",
           "size_bytes": 3331
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.tar",
           "path": "packages/ext/x07-ext-tar-rs/0.1.0/modules/ext/tar.x07.json",
-          "sha256": "dcfb43759b33c2a584b108e9efb1597f54b194ecbf2ab1bbf053392fd3ca993d",
+          "sha256": "2a73f6ea769101d95460304fd1ab15b2624b7cb22ed53bb1549af7c4d0064b2c",
           "size_bytes": 5490,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_tar@0.1.0/tar.rs",
           "source_sha256": "e92a8e74e5fa4141fe0fff9f5e3d6d0f7cf16fc7ce2e324d24f5fcc55e6c68c4"
@@ -3324,14 +3324,14 @@
         {
           "module_id": "ext.tar.tests",
           "path": "packages/ext/x07-ext-tar-rs/0.1.1/modules/ext/tar/tests.x07.json",
-          "sha256": "9e155bc32e92813c26da12cd26fb80022a96bea191896eaa1bb5b1a4de0fdc79",
+          "sha256": "cd7deef341027c26a7ee012d7ecac6fca701d6c9a84a591b64de4b97fe15f801",
           "size_bytes": 3331
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.tar",
           "path": "packages/ext/x07-ext-tar-rs/0.1.1/modules/ext/tar.x07.json",
-          "sha256": "dcfb43759b33c2a584b108e9efb1597f54b194ecbf2ab1bbf053392fd3ca993d",
+          "sha256": "2a73f6ea769101d95460304fd1ab15b2624b7cb22ed53bb1549af7c4d0064b2c",
           "size_bytes": 5490,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_tar@0.1.0/tar.rs",
           "source_sha256": "e92a8e74e5fa4141fe0fff9f5e3d6d0f7cf16fc7ce2e324d24f5fcc55e6c68c4"
@@ -3349,14 +3349,14 @@
         {
           "module_id": "ext.tar.tests",
           "path": "packages/ext/x07-ext-tar-rs/0.1.2/modules/ext/tar/tests.x07.json",
-          "sha256": "9e155bc32e92813c26da12cd26fb80022a96bea191896eaa1bb5b1a4de0fdc79",
+          "sha256": "cd7deef341027c26a7ee012d7ecac6fca701d6c9a84a591b64de4b97fe15f801",
           "size_bytes": 3331
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.tar",
           "path": "packages/ext/x07-ext-tar-rs/0.1.2/modules/ext/tar.x07.json",
-          "sha256": "dcfb43759b33c2a584b108e9efb1597f54b194ecbf2ab1bbf053392fd3ca993d",
+          "sha256": "2a73f6ea769101d95460304fd1ab15b2624b7cb22ed53bb1549af7c4d0064b2c",
           "size_bytes": 5490,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_tar@0.1.0/tar.rs",
           "source_sha256": "e92a8e74e5fa4141fe0fff9f5e3d6d0f7cf16fc7ce2e324d24f5fcc55e6c68c4"
@@ -3374,43 +3374,43 @@
         {
           "module_id": "std.text.find",
           "path": "packages/ext/x07-ext-text/0.1.0/modules/std/text/find.x07.json",
-          "sha256": "a9ea39948540672d2ce318fa9b37ecbeb39155775b6c66b73744af3a4e40f460",
+          "sha256": "24abdc6abb1568da5d3d96ade07f5eff63d602b6ab38f673e89fe7b83de2b525",
           "size_bytes": 4198
         },
         {
           "module_id": "std.text.join",
           "path": "packages/ext/x07-ext-text/0.1.0/modules/std/text/join.x07.json",
-          "sha256": "194169135ff465f44afa8fde3952f338c87df88b067b535bf0730cfc2009b8a1",
+          "sha256": "436799f5c3f04d042ef280c8ff1816d5d17d0e9fcd76554520cccfece75e9b47",
           "size_bytes": 2996
         },
         {
           "module_id": "std.text.lines",
           "path": "packages/ext/x07-ext-text/0.1.0/modules/std/text/lines.x07.json",
-          "sha256": "53a260f960afda9d9b1beae93131c2818d8725ea02479a3d85fedf77492db457",
+          "sha256": "eed5fe110a0d469673e59cdb4e2b4fd65580b76ae8122d963aa941e2fecdbce2",
           "size_bytes": 1650
         },
         {
           "module_id": "std.text.split",
           "path": "packages/ext/x07-ext-text/0.1.0/modules/std/text/split.x07.json",
-          "sha256": "1a369b48f4fca753b87996bdbe1bccae5602f37056d35e32d994153607b94eb3",
+          "sha256": "0e2228faa70693d4e9b414aea640fc017f4895b8efcc8c40777b0e353c071c9c",
           "size_bytes": 4040
         },
         {
           "module_id": "std.text.tests",
           "path": "packages/ext/x07-ext-text/0.1.0/modules/std/text/tests.x07.json",
-          "sha256": "cd406b50577db89c14027b2d612e00d05ae5aa501f1d51951f103d78d415b2d8",
+          "sha256": "93d2f0c49cf217666806430fcce6b152af95f51d9ecd979de3ddce5d67bb2138",
           "size_bytes": 5122
         },
         {
           "module_id": "std.text.ws",
           "path": "packages/ext/x07-ext-text/0.1.0/modules/std/text/ws.x07.json",
-          "sha256": "fe585b8a2df5794a3ca14c0f936ef3a809ceec66e608b7e12f7f32d296730520",
+          "sha256": "1b7cc125e83ef5d8b9519a40d7e5530871d38e4ba29ab9d5e4254a35c572a3b5",
           "size_bytes": 3988
         },
         {
           "module_id": "std.text",
           "path": "packages/ext/x07-ext-text/0.1.0/modules/std/text.x07.json",
-          "sha256": "e01b2eabe5101c6936b92ec5b3946e6501a46ad8393125c23e95a9d52842c8bd",
+          "sha256": "34c68b30839a56cfc0c9f3079c5b61a4860e98c7414e577e2d17dce202ac3cb7",
           "size_bytes": 645
         }
       ],
@@ -3426,44 +3426,44 @@
         {
           "module_id": "ext.time.civil",
           "path": "packages/ext/x07-ext-time-rs/0.1.0/modules/ext/time/civil.x07.json",
-          "sha256": "50dd7b54b28a90d34c53df8d3da6e7feb629b1988905c557fdddc799ec884825",
+          "sha256": "584e26b30c8fa4a01245a948b46fd3b95c7efb7d4a7c2012de407954ff09ce6f",
           "size_bytes": 13992
         },
         {
           "module_id": "ext.time.duration.tests",
           "path": "packages/ext/x07-ext-time-rs/0.1.0/modules/ext/time/duration/tests.x07.json",
-          "sha256": "b48b7587e33814e51790ab7a2b6d14fab2819f8c753f3eb250305f4125ca9eab",
+          "sha256": "0b0419e01529dcfd02660a4834c74781f36e33e2c585a3840670eb9742f5855e",
           "size_bytes": 6279
         },
         {
           "module_id": "ext.time.duration",
           "path": "packages/ext/x07-ext-time-rs/0.1.0/modules/ext/time/duration.x07.json",
-          "sha256": "3b1797cdbaa49d6e0685accc04917ef995a7451e076c2c6319ffc9dfb563eccb",
+          "sha256": "cd184532233fa1d0a7b1e1bd2b3925517b06c373da4f24973b8295c901e4b9dd",
           "size_bytes": 9912
         },
         {
           "module_id": "ext.time.instant",
           "path": "packages/ext/x07-ext-time-rs/0.1.0/modules/ext/time/instant.x07.json",
-          "sha256": "22a17c61edf39731a69d6a41f56dd4dd8fb029eebceb3698642f6b8aff0d7071",
+          "sha256": "8032bd5a972e7bea2d2e5a930db660ad8f7f937d948f9dbcd635e7b925b8afd7",
           "size_bytes": 2830
         },
         {
           "module_id": "ext.time.os",
           "path": "packages/ext/x07-ext-time-rs/0.1.0/modules/ext/time/os.x07.json",
-          "sha256": "5d4b60ef5f8ebdc7c0150cc71c1483d35b79d868838f4911520bd5718c0bae4a",
+          "sha256": "942339502e882cd60218e1e1e71c95c3962e018dbbb7f5f36a1f3108e7d2d19a",
           "size_bytes": 1093
         },
         {
           "module_id": "ext.time.rfc3339.tests",
           "path": "packages/ext/x07-ext-time-rs/0.1.0/modules/ext/time/rfc3339/tests.x07.json",
-          "sha256": "89d0b7f322e188df29751582b78bd6c7a7ba58200a4d875203143ffd53f68f01",
+          "sha256": "b1eb658f75060cb6669fcb265adb58c9cdf95b5574017d610618103a70b6bd76",
           "size_bytes": 9509
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.time.rfc3339",
           "path": "packages/ext/x07-ext-time-rs/0.1.0/modules/ext/time/rfc3339.x07.json",
-          "sha256": "327d0283f83463568b0448fe9779acb072db5948d5c667588913c98371b72df9",
+          "sha256": "26f922981cb9b53530d333042b02f079f6cc76d88d08ceadd7141b1d6ad6636a",
           "size_bytes": 24494,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_time@0.1.0/rfc3339.rs",
           "source_sha256": "59e9e1220778dbb4bca768c4c98af6ab12cf1f73b3d627a3f3933d24ce76e05f"
@@ -3471,7 +3471,7 @@
         {
           "module_id": "ext.time.tzdb",
           "path": "packages/ext/x07-ext-time-rs/0.1.0/modules/ext/time/tzdb.x07.json",
-          "sha256": "4d11fd9d8dddb5bc0e838a1947cc32b696a6e12de87f6947c2974a11ee856dd7",
+          "sha256": "f4813e5be848c3ba65d088813292c4170be4d49c66c533ae6d7db54e81208b5f",
           "size_bytes": 1716
         }
       ],
@@ -3487,44 +3487,44 @@
         {
           "module_id": "ext.time.civil",
           "path": "packages/ext/x07-ext-time-rs/0.1.1/modules/ext/time/civil.x07.json",
-          "sha256": "50dd7b54b28a90d34c53df8d3da6e7feb629b1988905c557fdddc799ec884825",
+          "sha256": "584e26b30c8fa4a01245a948b46fd3b95c7efb7d4a7c2012de407954ff09ce6f",
           "size_bytes": 13992
         },
         {
           "module_id": "ext.time.duration.tests",
           "path": "packages/ext/x07-ext-time-rs/0.1.1/modules/ext/time/duration/tests.x07.json",
-          "sha256": "b48b7587e33814e51790ab7a2b6d14fab2819f8c753f3eb250305f4125ca9eab",
+          "sha256": "0b0419e01529dcfd02660a4834c74781f36e33e2c585a3840670eb9742f5855e",
           "size_bytes": 6279
         },
         {
           "module_id": "ext.time.duration",
           "path": "packages/ext/x07-ext-time-rs/0.1.1/modules/ext/time/duration.x07.json",
-          "sha256": "3b1797cdbaa49d6e0685accc04917ef995a7451e076c2c6319ffc9dfb563eccb",
+          "sha256": "cd184532233fa1d0a7b1e1bd2b3925517b06c373da4f24973b8295c901e4b9dd",
           "size_bytes": 9912
         },
         {
           "module_id": "ext.time.instant",
           "path": "packages/ext/x07-ext-time-rs/0.1.1/modules/ext/time/instant.x07.json",
-          "sha256": "22a17c61edf39731a69d6a41f56dd4dd8fb029eebceb3698642f6b8aff0d7071",
+          "sha256": "8032bd5a972e7bea2d2e5a930db660ad8f7f937d948f9dbcd635e7b925b8afd7",
           "size_bytes": 2830
         },
         {
           "module_id": "ext.time.os",
           "path": "packages/ext/x07-ext-time-rs/0.1.1/modules/ext/time/os.x07.json",
-          "sha256": "5d4b60ef5f8ebdc7c0150cc71c1483d35b79d868838f4911520bd5718c0bae4a",
+          "sha256": "942339502e882cd60218e1e1e71c95c3962e018dbbb7f5f36a1f3108e7d2d19a",
           "size_bytes": 1093
         },
         {
           "module_id": "ext.time.rfc3339.tests",
           "path": "packages/ext/x07-ext-time-rs/0.1.1/modules/ext/time/rfc3339/tests.x07.json",
-          "sha256": "89d0b7f322e188df29751582b78bd6c7a7ba58200a4d875203143ffd53f68f01",
+          "sha256": "b1eb658f75060cb6669fcb265adb58c9cdf95b5574017d610618103a70b6bd76",
           "size_bytes": 9509
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.time.rfc3339",
           "path": "packages/ext/x07-ext-time-rs/0.1.1/modules/ext/time/rfc3339.x07.json",
-          "sha256": "327d0283f83463568b0448fe9779acb072db5948d5c667588913c98371b72df9",
+          "sha256": "26f922981cb9b53530d333042b02f079f6cc76d88d08ceadd7141b1d6ad6636a",
           "size_bytes": 24494,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_time@0.1.0/rfc3339.rs",
           "source_sha256": "59e9e1220778dbb4bca768c4c98af6ab12cf1f73b3d627a3f3933d24ce76e05f"
@@ -3532,7 +3532,7 @@
         {
           "module_id": "ext.time.tzdb",
           "path": "packages/ext/x07-ext-time-rs/0.1.1/modules/ext/time/tzdb.x07.json",
-          "sha256": "4d11fd9d8dddb5bc0e838a1947cc32b696a6e12de87f6947c2974a11ee856dd7",
+          "sha256": "f4813e5be848c3ba65d088813292c4170be4d49c66c533ae6d7db54e81208b5f",
           "size_bytes": 1716
         }
       ],
@@ -3548,44 +3548,44 @@
         {
           "module_id": "ext.time.civil",
           "path": "packages/ext/x07-ext-time-rs/0.1.2/modules/ext/time/civil.x07.json",
-          "sha256": "50dd7b54b28a90d34c53df8d3da6e7feb629b1988905c557fdddc799ec884825",
+          "sha256": "584e26b30c8fa4a01245a948b46fd3b95c7efb7d4a7c2012de407954ff09ce6f",
           "size_bytes": 13992
         },
         {
           "module_id": "ext.time.duration.tests",
           "path": "packages/ext/x07-ext-time-rs/0.1.2/modules/ext/time/duration/tests.x07.json",
-          "sha256": "b48b7587e33814e51790ab7a2b6d14fab2819f8c753f3eb250305f4125ca9eab",
+          "sha256": "0b0419e01529dcfd02660a4834c74781f36e33e2c585a3840670eb9742f5855e",
           "size_bytes": 6279
         },
         {
           "module_id": "ext.time.duration",
           "path": "packages/ext/x07-ext-time-rs/0.1.2/modules/ext/time/duration.x07.json",
-          "sha256": "3b1797cdbaa49d6e0685accc04917ef995a7451e076c2c6319ffc9dfb563eccb",
+          "sha256": "cd184532233fa1d0a7b1e1bd2b3925517b06c373da4f24973b8295c901e4b9dd",
           "size_bytes": 9912
         },
         {
           "module_id": "ext.time.instant",
           "path": "packages/ext/x07-ext-time-rs/0.1.2/modules/ext/time/instant.x07.json",
-          "sha256": "22a17c61edf39731a69d6a41f56dd4dd8fb029eebceb3698642f6b8aff0d7071",
+          "sha256": "8032bd5a972e7bea2d2e5a930db660ad8f7f937d948f9dbcd635e7b925b8afd7",
           "size_bytes": 2830
         },
         {
           "module_id": "ext.time.os",
           "path": "packages/ext/x07-ext-time-rs/0.1.2/modules/ext/time/os.x07.json",
-          "sha256": "5d4b60ef5f8ebdc7c0150cc71c1483d35b79d868838f4911520bd5718c0bae4a",
+          "sha256": "942339502e882cd60218e1e1e71c95c3962e018dbbb7f5f36a1f3108e7d2d19a",
           "size_bytes": 1093
         },
         {
           "module_id": "ext.time.rfc3339.tests",
           "path": "packages/ext/x07-ext-time-rs/0.1.2/modules/ext/time/rfc3339/tests.x07.json",
-          "sha256": "89d0b7f322e188df29751582b78bd6c7a7ba58200a4d875203143ffd53f68f01",
+          "sha256": "b1eb658f75060cb6669fcb265adb58c9cdf95b5574017d610618103a70b6bd76",
           "size_bytes": 9509
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.time.rfc3339",
           "path": "packages/ext/x07-ext-time-rs/0.1.2/modules/ext/time/rfc3339.x07.json",
-          "sha256": "327d0283f83463568b0448fe9779acb072db5948d5c667588913c98371b72df9",
+          "sha256": "26f922981cb9b53530d333042b02f079f6cc76d88d08ceadd7141b1d6ad6636a",
           "size_bytes": 24494,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_time@0.1.0/rfc3339.rs",
           "source_sha256": "59e9e1220778dbb4bca768c4c98af6ab12cf1f73b3d627a3f3933d24ce76e05f"
@@ -3593,7 +3593,7 @@
         {
           "module_id": "ext.time.tzdb",
           "path": "packages/ext/x07-ext-time-rs/0.1.2/modules/ext/time/tzdb.x07.json",
-          "sha256": "4d11fd9d8dddb5bc0e838a1947cc32b696a6e12de87f6947c2974a11ee856dd7",
+          "sha256": "f4813e5be848c3ba65d088813292c4170be4d49c66c533ae6d7db54e81208b5f",
           "size_bytes": 1716
         }
       ],
@@ -3609,20 +3609,20 @@
         {
           "module_id": "ext.toml.data_model",
           "path": "packages/ext/x07-ext-toml-rs/0.1.0/modules/ext/toml/data_model.x07.json",
-          "sha256": "c7617f688e1bf8f0aac60d9fe4f53aa108d41ddb23ce6f5d002825b51326bff6",
+          "sha256": "6b74559389f4ee8e721d275063202241a05d776615a2e75ef48c1aacdf97fde7",
           "size_bytes": 4172
         },
         {
           "module_id": "ext.toml.tests",
           "path": "packages/ext/x07-ext-toml-rs/0.1.0/modules/ext/toml/tests.x07.json",
-          "sha256": "9d772fb990187a98412f89e9b52999c45f0c047033d1a6aee23b274269113f83",
+          "sha256": "708fbdace958bfc29dbba992d68e1257ff9c9c335c41376702f3f2b9af3ec14c",
           "size_bytes": 4925
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.toml",
           "path": "packages/ext/x07-ext-toml-rs/0.1.0/modules/ext/toml.x07.json",
-          "sha256": "a50c1926da694a8b0e7431dd6b7e954cf955173ea6d8c6d26d675e668c7fac52",
+          "sha256": "f73d753b652da8805bf5282e2b124ae1aa28d083537e0894636d6ec27a9c816b",
           "size_bytes": 15966,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_toml@0.1.0/toml.rs",
           "source_sha256": "838ab1ddf9d20a90fc60aa0e5410e6ef52cc79b816512b5a7daebaaf84990c67"
@@ -3640,20 +3640,20 @@
         {
           "module_id": "ext.toml.data_model",
           "path": "packages/ext/x07-ext-toml-rs/0.1.1/modules/ext/toml/data_model.x07.json",
-          "sha256": "c7617f688e1bf8f0aac60d9fe4f53aa108d41ddb23ce6f5d002825b51326bff6",
+          "sha256": "6b74559389f4ee8e721d275063202241a05d776615a2e75ef48c1aacdf97fde7",
           "size_bytes": 4172
         },
         {
           "module_id": "ext.toml.tests",
           "path": "packages/ext/x07-ext-toml-rs/0.1.1/modules/ext/toml/tests.x07.json",
-          "sha256": "9d772fb990187a98412f89e9b52999c45f0c047033d1a6aee23b274269113f83",
+          "sha256": "708fbdace958bfc29dbba992d68e1257ff9c9c335c41376702f3f2b9af3ec14c",
           "size_bytes": 4925
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.toml",
           "path": "packages/ext/x07-ext-toml-rs/0.1.1/modules/ext/toml.x07.json",
-          "sha256": "a50c1926da694a8b0e7431dd6b7e954cf955173ea6d8c6d26d675e668c7fac52",
+          "sha256": "f73d753b652da8805bf5282e2b124ae1aa28d083537e0894636d6ec27a9c816b",
           "size_bytes": 15966,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_toml@0.1.0/toml.rs",
           "source_sha256": "838ab1ddf9d20a90fc60aa0e5410e6ef52cc79b816512b5a7daebaaf84990c67"
@@ -3671,20 +3671,20 @@
         {
           "module_id": "ext.toml.data_model",
           "path": "packages/ext/x07-ext-toml-rs/0.1.2/modules/ext/toml/data_model.x07.json",
-          "sha256": "c7617f688e1bf8f0aac60d9fe4f53aa108d41ddb23ce6f5d002825b51326bff6",
+          "sha256": "6b74559389f4ee8e721d275063202241a05d776615a2e75ef48c1aacdf97fde7",
           "size_bytes": 4172
         },
         {
           "module_id": "ext.toml.tests",
           "path": "packages/ext/x07-ext-toml-rs/0.1.2/modules/ext/toml/tests.x07.json",
-          "sha256": "9d772fb990187a98412f89e9b52999c45f0c047033d1a6aee23b274269113f83",
+          "sha256": "708fbdace958bfc29dbba992d68e1257ff9c9c335c41376702f3f2b9af3ec14c",
           "size_bytes": 4925
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.toml",
           "path": "packages/ext/x07-ext-toml-rs/0.1.2/modules/ext/toml.x07.json",
-          "sha256": "a50c1926da694a8b0e7431dd6b7e954cf955173ea6d8c6d26d675e668c7fac52",
+          "sha256": "f73d753b652da8805bf5282e2b124ae1aa28d083537e0894636d6ec27a9c816b",
           "size_bytes": 15966,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_toml@0.1.0/toml.rs",
           "source_sha256": "838ab1ddf9d20a90fc60aa0e5410e6ef52cc79b816512b5a7daebaaf84990c67"
@@ -3702,13 +3702,13 @@
         {
           "module_id": "ext.tracing.tests",
           "path": "packages/ext/x07-ext-tracing/0.1.0/modules/ext/tracing/tests.x07.json",
-          "sha256": "7bdc45dcee61c824ad991c171ad279defdba6ba528c4737179745681a0024b52",
+          "sha256": "c34288c1065c840af171fa2967b44fc652f76e1967c9dba21c2ea43776b773b9",
           "size_bytes": 6030
         },
         {
           "module_id": "ext.tracing",
           "path": "packages/ext/x07-ext-tracing/0.1.0/modules/ext/tracing.x07.json",
-          "sha256": "a9a689e7254ebe4383e768f23620ef090fd26e04d0d5f7500c9666f5926c27a3",
+          "sha256": "93dbcf7ed19017f3903a0d7365df716eedec16273e3fa41fa17ef6922d5cd134",
           "size_bytes": 8938
         }
       ],
@@ -3724,13 +3724,13 @@
         {
           "module_id": "ext.tracing.tests",
           "path": "packages/ext/x07-ext-tracing/0.1.1/modules/ext/tracing/tests.x07.json",
-          "sha256": "7bdc45dcee61c824ad991c171ad279defdba6ba528c4737179745681a0024b52",
+          "sha256": "c34288c1065c840af171fa2967b44fc652f76e1967c9dba21c2ea43776b773b9",
           "size_bytes": 6030
         },
         {
           "module_id": "ext.tracing",
           "path": "packages/ext/x07-ext-tracing/0.1.1/modules/ext/tracing.x07.json",
-          "sha256": "a9a689e7254ebe4383e768f23620ef090fd26e04d0d5f7500c9666f5926c27a3",
+          "sha256": "93dbcf7ed19017f3903a0d7365df716eedec16273e3fa41fa17ef6922d5cd134",
           "size_bytes": 8938
         }
       ],
@@ -3746,13 +3746,13 @@
         {
           "module_id": "ext.tracing.tests",
           "path": "packages/ext/x07-ext-tracing/0.1.2/modules/ext/tracing/tests.x07.json",
-          "sha256": "7bdc45dcee61c824ad991c171ad279defdba6ba528c4737179745681a0024b52",
+          "sha256": "c34288c1065c840af171fa2967b44fc652f76e1967c9dba21c2ea43776b773b9",
           "size_bytes": 6030
         },
         {
           "module_id": "ext.tracing",
           "path": "packages/ext/x07-ext-tracing/0.1.2/modules/ext/tracing.x07.json",
-          "sha256": "a9a689e7254ebe4383e768f23620ef090fd26e04d0d5f7500c9666f5926c27a3",
+          "sha256": "93dbcf7ed19017f3903a0d7365df716eedec16273e3fa41fa17ef6922d5cd134",
           "size_bytes": 8938
         }
       ],
@@ -3768,14 +3768,14 @@
         {
           "module_id": "ext.u64.tests",
           "path": "packages/ext/x07-ext-u64-rs/0.1.0/modules/ext/u64/tests.x07.json",
-          "sha256": "5a992a379bf32286c2fb8064886ac410090ea087a2de971eb87b750454b61422",
+          "sha256": "8acd02e86b77581ab09af420b183744208400be2718e69f76685df59e0a3a3b1",
           "size_bytes": 1037
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.u64",
           "path": "packages/ext/x07-ext-u64-rs/0.1.0/modules/ext/u64.x07.json",
-          "sha256": "782c75d52f6f1b2f25402ee12184e6be049764a918484c39cba00171ce0c34a0",
+          "sha256": "8aa73796dd0e881123a2f477842884069ce6ecfc0977d68775df60647681486d",
           "size_bytes": 5876,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_u64@0.1.0/u64.rs",
           "source_sha256": "2d441cada45c22c608e79443f83e83a8d1cd3b2724a6f9bab6ec1217350f9a22"
@@ -3793,14 +3793,14 @@
         {
           "module_id": "ext.u64.tests",
           "path": "packages/ext/x07-ext-u64-rs/0.1.1/modules/ext/u64/tests.x07.json",
-          "sha256": "5a992a379bf32286c2fb8064886ac410090ea087a2de971eb87b750454b61422",
+          "sha256": "8acd02e86b77581ab09af420b183744208400be2718e69f76685df59e0a3a3b1",
           "size_bytes": 1037
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.u64",
           "path": "packages/ext/x07-ext-u64-rs/0.1.1/modules/ext/u64.x07.json",
-          "sha256": "782c75d52f6f1b2f25402ee12184e6be049764a918484c39cba00171ce0c34a0",
+          "sha256": "8aa73796dd0e881123a2f477842884069ce6ecfc0977d68775df60647681486d",
           "size_bytes": 5876,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_u64@0.1.0/u64.rs",
           "source_sha256": "2d441cada45c22c608e79443f83e83a8d1cd3b2724a6f9bab6ec1217350f9a22"
@@ -3818,14 +3818,14 @@
         {
           "module_id": "ext.u64.tests",
           "path": "packages/ext/x07-ext-u64-rs/0.1.2/modules/ext/u64/tests.x07.json",
-          "sha256": "5a992a379bf32286c2fb8064886ac410090ea087a2de971eb87b750454b61422",
+          "sha256": "8acd02e86b77581ab09af420b183744208400be2718e69f76685df59e0a3a3b1",
           "size_bytes": 1037
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.u64",
           "path": "packages/ext/x07-ext-u64-rs/0.1.2/modules/ext/u64.x07.json",
-          "sha256": "782c75d52f6f1b2f25402ee12184e6be049764a918484c39cba00171ce0c34a0",
+          "sha256": "8aa73796dd0e881123a2f477842884069ce6ecfc0977d68775df60647681486d",
           "size_bytes": 5876,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_u64@0.1.0/u64.rs",
           "source_sha256": "2d441cada45c22c608e79443f83e83a8d1cd3b2724a6f9bab6ec1217350f9a22"
@@ -3843,14 +3843,14 @@
         {
           "module_id": "ext.unicode.tests",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.0/modules/ext/unicode/tests.x07.json",
-          "sha256": "2c8fa57a54863e8a499cc15ba53bffb89823d00db1c3103650626c03a4563e33",
+          "sha256": "6cfd3f3d2a715ce771764cece29f9e1f4aa6e87d7fbe3a26454a0e06ea3196f2",
           "size_bytes": 8034
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.unicode",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.0/modules/ext/unicode.x07.json",
-          "sha256": "71f2a6e389b9b2a6c0d687738c10137141c4dfc1086797821e9ca97bfe406f6b",
+          "sha256": "e76229e1027439fed7b39de8f3fd23cf93d25ae86eb1bc04898a0c58d911295a",
           "size_bytes": 24327,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_unicode@0.1.0/unicode.rs",
           "source_sha256": "28ff379b4d89a5afafdca336859399e52729241c0133f624509bd8e454e3f101"
@@ -3868,14 +3868,14 @@
         {
           "module_id": "ext.unicode.tests",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.1/modules/ext/unicode/tests.x07.json",
-          "sha256": "2c8fa57a54863e8a499cc15ba53bffb89823d00db1c3103650626c03a4563e33",
+          "sha256": "6cfd3f3d2a715ce771764cece29f9e1f4aa6e87d7fbe3a26454a0e06ea3196f2",
           "size_bytes": 8034
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.unicode",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.1/modules/ext/unicode.x07.json",
-          "sha256": "71f2a6e389b9b2a6c0d687738c10137141c4dfc1086797821e9ca97bfe406f6b",
+          "sha256": "e76229e1027439fed7b39de8f3fd23cf93d25ae86eb1bc04898a0c58d911295a",
           "size_bytes": 24327,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_unicode@0.1.0/unicode.rs",
           "source_sha256": "28ff379b4d89a5afafdca336859399e52729241c0133f624509bd8e454e3f101"
@@ -3893,14 +3893,14 @@
         {
           "module_id": "ext.unicode.tests",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.2/modules/ext/unicode/tests.x07.json",
-          "sha256": "2c8fa57a54863e8a499cc15ba53bffb89823d00db1c3103650626c03a4563e33",
+          "sha256": "6cfd3f3d2a715ce771764cece29f9e1f4aa6e87d7fbe3a26454a0e06ea3196f2",
           "size_bytes": 8034
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.unicode",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.2/modules/ext/unicode.x07.json",
-          "sha256": "71f2a6e389b9b2a6c0d687738c10137141c4dfc1086797821e9ca97bfe406f6b",
+          "sha256": "e76229e1027439fed7b39de8f3fd23cf93d25ae86eb1bc04898a0c58d911295a",
           "size_bytes": 24327,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_unicode@0.1.0/unicode.rs",
           "source_sha256": "28ff379b4d89a5afafdca336859399e52729241c0133f624509bd8e454e3f101"
@@ -3918,32 +3918,32 @@
         {
           "module_id": "ext.unicode.casefold",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.3/modules/ext/unicode/casefold.x07.json",
-          "sha256": "c76b94d2104ce04a89e669f9b6cc33d957480c39c8c232d48c2ab51b8768d659",
+          "sha256": "af8e51983408f1e01dd5c96bceeb00c2e079657d88effff7134bb39cf4209162",
           "size_bytes": 1518
         },
         {
           "module_id": "ext.unicode.normalize",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.3/modules/ext/unicode/normalize.x07.json",
-          "sha256": "b147e10b96571dd958d1f48dad934380fff6fd1fe44127a456ebfa9d423c9079",
+          "sha256": "7730910a774be59ddd9acc1d017d361ac39cf07343498f092047b1f3b674da6d",
           "size_bytes": 470
         },
         {
           "module_id": "ext.unicode.segment",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.3/modules/ext/unicode/segment.x07.json",
-          "sha256": "fb4333255c4cbeb04f45104ca5a9e84a00022360a8e4b9965e9c65f5d29912ef",
+          "sha256": "3ad319edf09ecb3db1998bd01579fdd5d1b68318f7f3d3b7d1495d6ee5218e19",
           "size_bytes": 479
         },
         {
           "module_id": "ext.unicode.tests",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.3/modules/ext/unicode/tests.x07.json",
-          "sha256": "5fb7d3a1c5ba981849460becc4253041ab13e659ca41e101b0ca607d44f91c37",
+          "sha256": "52016c3da47fddb02ff89ad79e2965a1a9ab9c59b338a6393fffd3512f39b502",
           "size_bytes": 16957
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.unicode",
           "path": "packages/ext/x07-ext-unicode-rs/0.1.3/modules/ext/unicode.x07.json",
-          "sha256": "c5546525088baff2ce77b44384258ab00360a1022363de3613f8f87b4b0891be",
+          "sha256": "fed557ebb8d3c8df0ba496cefe493a330c33321562d1b5015673204e47e0cf17",
           "size_bytes": 24327,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_unicode@0.1.0/unicode.rs",
           "source_sha256": "28ff379b4d89a5afafdca336859399e52729241c0133f624509bd8e454e3f101"
@@ -3962,7 +3962,7 @@
           "generated_by": "x07import",
           "module_id": "ext.http_types",
           "path": "packages/ext/x07-ext-url-rs/0.1.0/modules/ext/http_types.x07.json",
-          "sha256": "5171964fc69186ac2a3c0ad47374aecc806d7a3e4da4d7a1eab4131e4ca75914",
+          "sha256": "73fba2b09c167ff67d7e0134ce4a2772d67b1cb33f362f167fd48628ebec23d7",
           "size_bytes": 5761,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/http_types.rs",
           "source_sha256": "9f650494ab231cbbdc5e5b682dd8f56348eef406e40558a75222e852ed964eb3"
@@ -3970,14 +3970,14 @@
         {
           "module_id": "ext.httparse.tests",
           "path": "packages/ext/x07-ext-url-rs/0.1.0/modules/ext/httparse/tests.x07.json",
-          "sha256": "c443adfd7866e5b4c473bade2cc37c29f22c183b124dbbce64b92870cf61577a",
+          "sha256": "0df25b863309f3bf4435c4780ce7da280547393cf695120fddcbda714b1eb017",
           "size_bytes": 11514
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.httparse",
           "path": "packages/ext/x07-ext-url-rs/0.1.0/modules/ext/httparse.x07.json",
-          "sha256": "bd4b8aa1922eaa9a1b5d0576d1ab736b95dd99c6d825dc2b81d4dadf1b12d3b7",
+          "sha256": "bd9566354c94ea1c70c508fe8e3243ada7358f4c277d5581c3a8cd4bb5225cd3",
           "size_bytes": 18964,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/httparse.rs",
           "source_sha256": "3e6bb3c2ad7bb0ccc927c309635429a841ff412cabea9c6129fc36cd20783fa8"
@@ -3986,7 +3986,7 @@
           "generated_by": "x07import",
           "module_id": "ext.url.encode",
           "path": "packages/ext/x07-ext-url-rs/0.1.0/modules/ext/url/encode.x07.json",
-          "sha256": "59504cd9b79c5004d32b0491ae0959fff7303a1dff23371365ad2487984beaea",
+          "sha256": "47fe442ce37fda0dae17a77817f1b816ba1da2bd4441197fda0cbd802e7afcf3",
           "size_bytes": 2847,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/encode.rs",
           "source_sha256": "b2473d5902aee55edb140760fb8237f271b35839d7dc26583febb2401cf70582"
@@ -3995,7 +3995,7 @@
           "generated_by": "x07import",
           "module_id": "ext.url.parse",
           "path": "packages/ext/x07-ext-url-rs/0.1.0/modules/ext/url/parse.x07.json",
-          "sha256": "5ab79da774e480523d55adcf196d6f9bba2acc8a2e778c9f6a290e75b73e0767",
+          "sha256": "4c9712ed662c4b2ddad7009bfd146939bea392f7ceef8b50f7e9c2efbe8485c3",
           "size_bytes": 8517,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/url.rs",
           "source_sha256": "02af720530c016a525f6869734bd0cefbc61d4c5d22b04fe6a8e999866d25875"
@@ -4003,7 +4003,7 @@
         {
           "module_id": "ext.url.tests",
           "path": "packages/ext/x07-ext-url-rs/0.1.0/modules/ext/url/tests.x07.json",
-          "sha256": "4118ae2b3099d5171bebbb510ef8ca7f97d977ccf9dd43dc2a0dda5f66df91fb",
+          "sha256": "a91cd3c06d14609a88110d9182e898338459707f40dd0a4a6ab53dac2a31ef04",
           "size_bytes": 2553
         }
       ],
@@ -4020,7 +4020,7 @@
           "generated_by": "x07import",
           "module_id": "ext.http_types",
           "path": "packages/ext/x07-ext-url-rs/0.1.1/modules/ext/http_types.x07.json",
-          "sha256": "5171964fc69186ac2a3c0ad47374aecc806d7a3e4da4d7a1eab4131e4ca75914",
+          "sha256": "73fba2b09c167ff67d7e0134ce4a2772d67b1cb33f362f167fd48628ebec23d7",
           "size_bytes": 5761,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/http_types.rs",
           "source_sha256": "9f650494ab231cbbdc5e5b682dd8f56348eef406e40558a75222e852ed964eb3"
@@ -4028,14 +4028,14 @@
         {
           "module_id": "ext.httparse.tests",
           "path": "packages/ext/x07-ext-url-rs/0.1.1/modules/ext/httparse/tests.x07.json",
-          "sha256": "c443adfd7866e5b4c473bade2cc37c29f22c183b124dbbce64b92870cf61577a",
+          "sha256": "0df25b863309f3bf4435c4780ce7da280547393cf695120fddcbda714b1eb017",
           "size_bytes": 11514
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.httparse",
           "path": "packages/ext/x07-ext-url-rs/0.1.1/modules/ext/httparse.x07.json",
-          "sha256": "bd4b8aa1922eaa9a1b5d0576d1ab736b95dd99c6d825dc2b81d4dadf1b12d3b7",
+          "sha256": "bd9566354c94ea1c70c508fe8e3243ada7358f4c277d5581c3a8cd4bb5225cd3",
           "size_bytes": 18964,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/httparse.rs",
           "source_sha256": "3e6bb3c2ad7bb0ccc927c309635429a841ff412cabea9c6129fc36cd20783fa8"
@@ -4044,7 +4044,7 @@
           "generated_by": "x07import",
           "module_id": "ext.url.encode",
           "path": "packages/ext/x07-ext-url-rs/0.1.1/modules/ext/url/encode.x07.json",
-          "sha256": "59504cd9b79c5004d32b0491ae0959fff7303a1dff23371365ad2487984beaea",
+          "sha256": "47fe442ce37fda0dae17a77817f1b816ba1da2bd4441197fda0cbd802e7afcf3",
           "size_bytes": 2847,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/encode.rs",
           "source_sha256": "b2473d5902aee55edb140760fb8237f271b35839d7dc26583febb2401cf70582"
@@ -4053,7 +4053,7 @@
           "generated_by": "x07import",
           "module_id": "ext.url.parse",
           "path": "packages/ext/x07-ext-url-rs/0.1.1/modules/ext/url/parse.x07.json",
-          "sha256": "5ab79da774e480523d55adcf196d6f9bba2acc8a2e778c9f6a290e75b73e0767",
+          "sha256": "4c9712ed662c4b2ddad7009bfd146939bea392f7ceef8b50f7e9c2efbe8485c3",
           "size_bytes": 8517,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/url.rs",
           "source_sha256": "02af720530c016a525f6869734bd0cefbc61d4c5d22b04fe6a8e999866d25875"
@@ -4061,7 +4061,7 @@
         {
           "module_id": "ext.url.tests",
           "path": "packages/ext/x07-ext-url-rs/0.1.1/modules/ext/url/tests.x07.json",
-          "sha256": "4118ae2b3099d5171bebbb510ef8ca7f97d977ccf9dd43dc2a0dda5f66df91fb",
+          "sha256": "a91cd3c06d14609a88110d9182e898338459707f40dd0a4a6ab53dac2a31ef04",
           "size_bytes": 2553
         }
       ],
@@ -4078,7 +4078,7 @@
           "generated_by": "x07import",
           "module_id": "ext.http_types",
           "path": "packages/ext/x07-ext-url-rs/0.1.2/modules/ext/http_types.x07.json",
-          "sha256": "5171964fc69186ac2a3c0ad47374aecc806d7a3e4da4d7a1eab4131e4ca75914",
+          "sha256": "73fba2b09c167ff67d7e0134ce4a2772d67b1cb33f362f167fd48628ebec23d7",
           "size_bytes": 5761,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/http_types.rs",
           "source_sha256": "9f650494ab231cbbdc5e5b682dd8f56348eef406e40558a75222e852ed964eb3"
@@ -4086,14 +4086,14 @@
         {
           "module_id": "ext.httparse.tests",
           "path": "packages/ext/x07-ext-url-rs/0.1.2/modules/ext/httparse/tests.x07.json",
-          "sha256": "c443adfd7866e5b4c473bade2cc37c29f22c183b124dbbce64b92870cf61577a",
+          "sha256": "0df25b863309f3bf4435c4780ce7da280547393cf695120fddcbda714b1eb017",
           "size_bytes": 11514
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.httparse",
           "path": "packages/ext/x07-ext-url-rs/0.1.2/modules/ext/httparse.x07.json",
-          "sha256": "bd4b8aa1922eaa9a1b5d0576d1ab736b95dd99c6d825dc2b81d4dadf1b12d3b7",
+          "sha256": "bd9566354c94ea1c70c508fe8e3243ada7358f4c277d5581c3a8cd4bb5225cd3",
           "size_bytes": 18964,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/httparse.rs",
           "source_sha256": "3e6bb3c2ad7bb0ccc927c309635429a841ff412cabea9c6129fc36cd20783fa8"
@@ -4102,7 +4102,7 @@
           "generated_by": "x07import",
           "module_id": "ext.url.encode",
           "path": "packages/ext/x07-ext-url-rs/0.1.2/modules/ext/url/encode.x07.json",
-          "sha256": "59504cd9b79c5004d32b0491ae0959fff7303a1dff23371365ad2487984beaea",
+          "sha256": "47fe442ce37fda0dae17a77817f1b816ba1da2bd4441197fda0cbd802e7afcf3",
           "size_bytes": 2847,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/encode.rs",
           "source_sha256": "b2473d5902aee55edb140760fb8237f271b35839d7dc26583febb2401cf70582"
@@ -4111,7 +4111,7 @@
           "generated_by": "x07import",
           "module_id": "ext.url.parse",
           "path": "packages/ext/x07-ext-url-rs/0.1.2/modules/ext/url/parse.x07.json",
-          "sha256": "5ab79da774e480523d55adcf196d6f9bba2acc8a2e778c9f6a290e75b73e0767",
+          "sha256": "4c9712ed662c4b2ddad7009bfd146939bea392f7ceef8b50f7e9c2efbe8485c3",
           "size_bytes": 8517,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_url@0.1.0/url.rs",
           "source_sha256": "02af720530c016a525f6869734bd0cefbc61d4c5d22b04fe6a8e999866d25875"
@@ -4119,7 +4119,7 @@
         {
           "module_id": "ext.url.tests",
           "path": "packages/ext/x07-ext-url-rs/0.1.2/modules/ext/url/tests.x07.json",
-          "sha256": "4118ae2b3099d5171bebbb510ef8ca7f97d977ccf9dd43dc2a0dda5f66df91fb",
+          "sha256": "a91cd3c06d14609a88110d9182e898338459707f40dd0a4a6ab53dac2a31ef04",
           "size_bytes": 2553
         }
       ],
@@ -4135,14 +4135,14 @@
         {
           "module_id": "ext.uuid.tests",
           "path": "packages/ext/x07-ext-uuid-rs/0.1.0/modules/ext/uuid/tests.x07.json",
-          "sha256": "9ffef281852e93318b7c658a3983f8427be3095557be8a0a7fcdc0b422fd538c",
+          "sha256": "523b948a78bdbddf2b3a318e8fd3f527dc25d75b158b256e27817f5678dee0f9",
           "size_bytes": 4779
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.uuid",
           "path": "packages/ext/x07-ext-uuid-rs/0.1.0/modules/ext/uuid.x07.json",
-          "sha256": "edbffa00a8d85db6f93710df08ef63e183b2d6b213be9572e7e2a5d02f91bb21",
+          "sha256": "77c4337d031de3352bfc7cc8bf3ac8b663567823b88a2304926388a4d4473662",
           "size_bytes": 4093,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_uuid@0.1.0/uuid.rs",
           "source_sha256": "60f1a1d38c3c2d846a9f0e1d387b34e46afe3efab458306336fb079bd5b81913"
@@ -4160,14 +4160,14 @@
         {
           "module_id": "ext.uuid.tests",
           "path": "packages/ext/x07-ext-uuid-rs/0.1.1/modules/ext/uuid/tests.x07.json",
-          "sha256": "9ffef281852e93318b7c658a3983f8427be3095557be8a0a7fcdc0b422fd538c",
+          "sha256": "523b948a78bdbddf2b3a318e8fd3f527dc25d75b158b256e27817f5678dee0f9",
           "size_bytes": 4779
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.uuid",
           "path": "packages/ext/x07-ext-uuid-rs/0.1.1/modules/ext/uuid.x07.json",
-          "sha256": "edbffa00a8d85db6f93710df08ef63e183b2d6b213be9572e7e2a5d02f91bb21",
+          "sha256": "77c4337d031de3352bfc7cc8bf3ac8b663567823b88a2304926388a4d4473662",
           "size_bytes": 4093,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_uuid@0.1.0/uuid.rs",
           "source_sha256": "60f1a1d38c3c2d846a9f0e1d387b34e46afe3efab458306336fb079bd5b81913"
@@ -4185,14 +4185,14 @@
         {
           "module_id": "ext.uuid.tests",
           "path": "packages/ext/x07-ext-uuid-rs/0.1.2/modules/ext/uuid/tests.x07.json",
-          "sha256": "9ffef281852e93318b7c658a3983f8427be3095557be8a0a7fcdc0b422fd538c",
+          "sha256": "523b948a78bdbddf2b3a318e8fd3f527dc25d75b158b256e27817f5678dee0f9",
           "size_bytes": 4779
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.uuid",
           "path": "packages/ext/x07-ext-uuid-rs/0.1.2/modules/ext/uuid.x07.json",
-          "sha256": "edbffa00a8d85db6f93710df08ef63e183b2d6b213be9572e7e2a5d02f91bb21",
+          "sha256": "77c4337d031de3352bfc7cc8bf3ac8b663567823b88a2304926388a4d4473662",
           "size_bytes": 4093,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_uuid@0.1.0/uuid.rs",
           "source_sha256": "60f1a1d38c3c2d846a9f0e1d387b34e46afe3efab458306336fb079bd5b81913"
@@ -4210,7 +4210,7 @@
         {
           "module_id": "ext.walkdir",
           "path": "packages/ext/x07-ext-walkdir-rs/0.1.0/modules/ext/walkdir.x07.json",
-          "sha256": "2484deabdd6a75ddf3a1cdc4934092b4d965444ecf01f852e0bf6234b51e30d2",
+          "sha256": "ec15d1c59519bf0cec45edb49d808c84fd7e003d150f2e7c1d11c3521b7651b2",
           "size_bytes": 972
         }
       ],
@@ -4226,20 +4226,20 @@
         {
           "module_id": "ext.xml.data_model",
           "path": "packages/ext/x07-ext-xml-rs/0.1.0/modules/ext/xml/data_model.x07.json",
-          "sha256": "7312dae7006a9061ed41cfdfed6836e8215860d1350cf01d0cff8f8273dc53a9",
+          "sha256": "48fdcba136ff1e8af783837275f148f8c58db17c4ad569af4818df1da13a56c1",
           "size_bytes": 6221
         },
         {
           "module_id": "ext.xml.tests",
           "path": "packages/ext/x07-ext-xml-rs/0.1.0/modules/ext/xml/tests.x07.json",
-          "sha256": "e81b1f0a981d43b6db0548859d743ca5ff987c80432645ebcc5745316fb14a47",
+          "sha256": "1b33e9fe27ff51e67d482de8234d548dc9d3a0c01f2d90a7ce0031254788b728",
           "size_bytes": 10804
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.xml",
           "path": "packages/ext/x07-ext-xml-rs/0.1.0/modules/ext/xml.x07.json",
-          "sha256": "848197be822dc96b809b78183bc59f39c5c463e5462d12d2ade4c8a7d4c4c5b3",
+          "sha256": "3b7bd7e0a516bf43ed88267c336532ad95e8d8fe86461e0884ce03ec4b48e134",
           "size_bytes": 69457,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_xml@0.1.0/xml.rs",
           "source_sha256": "8a3658d54c87d4c3df5e1d605cb7ce0c04efd0c55e2f025aeddbb26dce13c084"
@@ -4257,20 +4257,20 @@
         {
           "module_id": "ext.xml.data_model",
           "path": "packages/ext/x07-ext-xml-rs/0.1.1/modules/ext/xml/data_model.x07.json",
-          "sha256": "7312dae7006a9061ed41cfdfed6836e8215860d1350cf01d0cff8f8273dc53a9",
+          "sha256": "48fdcba136ff1e8af783837275f148f8c58db17c4ad569af4818df1da13a56c1",
           "size_bytes": 6221
         },
         {
           "module_id": "ext.xml.tests",
           "path": "packages/ext/x07-ext-xml-rs/0.1.1/modules/ext/xml/tests.x07.json",
-          "sha256": "e81b1f0a981d43b6db0548859d743ca5ff987c80432645ebcc5745316fb14a47",
+          "sha256": "1b33e9fe27ff51e67d482de8234d548dc9d3a0c01f2d90a7ce0031254788b728",
           "size_bytes": 10804
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.xml",
           "path": "packages/ext/x07-ext-xml-rs/0.1.1/modules/ext/xml.x07.json",
-          "sha256": "848197be822dc96b809b78183bc59f39c5c463e5462d12d2ade4c8a7d4c4c5b3",
+          "sha256": "3b7bd7e0a516bf43ed88267c336532ad95e8d8fe86461e0884ce03ec4b48e134",
           "size_bytes": 69457,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_xml@0.1.0/xml.rs",
           "source_sha256": "8a3658d54c87d4c3df5e1d605cb7ce0c04efd0c55e2f025aeddbb26dce13c084"
@@ -4288,20 +4288,20 @@
         {
           "module_id": "ext.xml.data_model",
           "path": "packages/ext/x07-ext-xml-rs/0.1.2/modules/ext/xml/data_model.x07.json",
-          "sha256": "7312dae7006a9061ed41cfdfed6836e8215860d1350cf01d0cff8f8273dc53a9",
+          "sha256": "48fdcba136ff1e8af783837275f148f8c58db17c4ad569af4818df1da13a56c1",
           "size_bytes": 6221
         },
         {
           "module_id": "ext.xml.tests",
           "path": "packages/ext/x07-ext-xml-rs/0.1.2/modules/ext/xml/tests.x07.json",
-          "sha256": "e81b1f0a981d43b6db0548859d743ca5ff987c80432645ebcc5745316fb14a47",
+          "sha256": "1b33e9fe27ff51e67d482de8234d548dc9d3a0c01f2d90a7ce0031254788b728",
           "size_bytes": 10804
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.xml",
           "path": "packages/ext/x07-ext-xml-rs/0.1.2/modules/ext/xml.x07.json",
-          "sha256": "848197be822dc96b809b78183bc59f39c5c463e5462d12d2ade4c8a7d4c4c5b3",
+          "sha256": "3b7bd7e0a516bf43ed88267c336532ad95e8d8fe86461e0884ce03ec4b48e134",
           "size_bytes": 69457,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_xml@0.1.0/xml.rs",
           "source_sha256": "8a3658d54c87d4c3df5e1d605cb7ce0c04efd0c55e2f025aeddbb26dce13c084"
@@ -4319,20 +4319,20 @@
         {
           "module_id": "ext.yaml.data_model",
           "path": "packages/ext/x07-ext-yaml-rs/0.1.0/modules/ext/yaml/data_model.x07.json",
-          "sha256": "137f2fca3908815fb2d62108efa509a191551f899a4d57fbaa383cbdaac7cc47",
+          "sha256": "b951193be94d66caac63d69a38615650349dde537a3a02dd2301012681bde178",
           "size_bytes": 1702
         },
         {
           "module_id": "ext.yaml.tests",
           "path": "packages/ext/x07-ext-yaml-rs/0.1.0/modules/ext/yaml/tests.x07.json",
-          "sha256": "f6f38d00ce080034b3980f79c7f4acdb69bd80125cf815005c3bfe62db830ae5",
+          "sha256": "a6edd5347f2f19597e99f0fc680d18f795b003949e8a8d7b47670ca33ba6e734",
           "size_bytes": 9905
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.yaml",
           "path": "packages/ext/x07-ext-yaml-rs/0.1.0/modules/ext/yaml.x07.json",
-          "sha256": "0a460b6478fef535f806d259170783a42651dde4ba32fde06c3fb0109da72746",
+          "sha256": "4b890a05e5fb3ee14371959446de20ddc5b74028366350d71a73452022c0696b",
           "size_bytes": 26948,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_yaml@0.1.0/yaml.rs",
           "source_sha256": "d44a8bfd1f159123b9205cd8889190eccc343dd6b0052c65251001794d5a4cbb"
@@ -4350,20 +4350,20 @@
         {
           "module_id": "ext.yaml.data_model",
           "path": "packages/ext/x07-ext-yaml-rs/0.1.1/modules/ext/yaml/data_model.x07.json",
-          "sha256": "137f2fca3908815fb2d62108efa509a191551f899a4d57fbaa383cbdaac7cc47",
+          "sha256": "b951193be94d66caac63d69a38615650349dde537a3a02dd2301012681bde178",
           "size_bytes": 1702
         },
         {
           "module_id": "ext.yaml.tests",
           "path": "packages/ext/x07-ext-yaml-rs/0.1.1/modules/ext/yaml/tests.x07.json",
-          "sha256": "f6f38d00ce080034b3980f79c7f4acdb69bd80125cf815005c3bfe62db830ae5",
+          "sha256": "a6edd5347f2f19597e99f0fc680d18f795b003949e8a8d7b47670ca33ba6e734",
           "size_bytes": 9905
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.yaml",
           "path": "packages/ext/x07-ext-yaml-rs/0.1.1/modules/ext/yaml.x07.json",
-          "sha256": "0a460b6478fef535f806d259170783a42651dde4ba32fde06c3fb0109da72746",
+          "sha256": "4b890a05e5fb3ee14371959446de20ddc5b74028366350d71a73452022c0696b",
           "size_bytes": 26948,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_yaml@0.1.0/yaml.rs",
           "source_sha256": "d44a8bfd1f159123b9205cd8889190eccc343dd6b0052c65251001794d5a4cbb"
@@ -4381,20 +4381,20 @@
         {
           "module_id": "ext.yaml.data_model",
           "path": "packages/ext/x07-ext-yaml-rs/0.1.2/modules/ext/yaml/data_model.x07.json",
-          "sha256": "137f2fca3908815fb2d62108efa509a191551f899a4d57fbaa383cbdaac7cc47",
+          "sha256": "b951193be94d66caac63d69a38615650349dde537a3a02dd2301012681bde178",
           "size_bytes": 1702
         },
         {
           "module_id": "ext.yaml.tests",
           "path": "packages/ext/x07-ext-yaml-rs/0.1.2/modules/ext/yaml/tests.x07.json",
-          "sha256": "f6f38d00ce080034b3980f79c7f4acdb69bd80125cf815005c3bfe62db830ae5",
+          "sha256": "a6edd5347f2f19597e99f0fc680d18f795b003949e8a8d7b47670ca33ba6e734",
           "size_bytes": 9905
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.yaml",
           "path": "packages/ext/x07-ext-yaml-rs/0.1.2/modules/ext/yaml.x07.json",
-          "sha256": "0a460b6478fef535f806d259170783a42651dde4ba32fde06c3fb0109da72746",
+          "sha256": "4b890a05e5fb3ee14371959446de20ddc5b74028366350d71a73452022c0696b",
           "size_bytes": 26948,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_yaml@0.1.0/yaml.rs",
           "source_sha256": "d44a8bfd1f159123b9205cd8889190eccc343dd6b0052c65251001794d5a4cbb"
@@ -4415,13 +4415,13 @@
         {
           "module_id": "ext.zlib._ffi",
           "path": "packages/ext/x07-ext-zlib-c/0.1.0/modules/ext/zlib/_ffi.x07.json",
-          "sha256": "322900a6c8227e9207265ce6ab9b71c219ed743c6b1a9968745f84b7e27e9ca6",
+          "sha256": "ffce866bfc69c5d4eca4f2c23002326ef393d28cf1b013cc9f4f78c945fd107d",
           "size_bytes": 2693
         },
         {
           "module_id": "ext.zlib",
           "path": "packages/ext/x07-ext-zlib-c/0.1.0/modules/ext/zlib.x07.json",
-          "sha256": "4f57aaeff64c45e2f16913c7dffa4616a601e5ccf9064c13246a134563db7e03",
+          "sha256": "c7d7ca2b2dfa317ff13ae7d4c22909337457b6241730b2abc8105d2955bb7137",
           "size_bytes": 6346
         }
       ],
@@ -4440,13 +4440,13 @@
         {
           "module_id": "ext.zlib._ffi",
           "path": "packages/ext/x07-ext-zlib-c/0.1.1/modules/ext/zlib/_ffi.x07.json",
-          "sha256": "322900a6c8227e9207265ce6ab9b71c219ed743c6b1a9968745f84b7e27e9ca6",
+          "sha256": "ffce866bfc69c5d4eca4f2c23002326ef393d28cf1b013cc9f4f78c945fd107d",
           "size_bytes": 2693
         },
         {
           "module_id": "ext.zlib",
           "path": "packages/ext/x07-ext-zlib-c/0.1.1/modules/ext/zlib.x07.json",
-          "sha256": "4f57aaeff64c45e2f16913c7dffa4616a601e5ccf9064c13246a134563db7e03",
+          "sha256": "c7d7ca2b2dfa317ff13ae7d4c22909337457b6241730b2abc8105d2955bb7137",
           "size_bytes": 6346
         }
       ],
@@ -4465,13 +4465,13 @@
         {
           "module_id": "ext.zlib._ffi",
           "path": "packages/ext/x07-ext-zlib-c/0.1.2/modules/ext/zlib/_ffi.x07.json",
-          "sha256": "322900a6c8227e9207265ce6ab9b71c219ed743c6b1a9968745f84b7e27e9ca6",
+          "sha256": "ffce866bfc69c5d4eca4f2c23002326ef393d28cf1b013cc9f4f78c945fd107d",
           "size_bytes": 2693
         },
         {
           "module_id": "ext.zlib",
           "path": "packages/ext/x07-ext-zlib-c/0.1.2/modules/ext/zlib.x07.json",
-          "sha256": "4f57aaeff64c45e2f16913c7dffa4616a601e5ccf9064c13246a134563db7e03",
+          "sha256": "c7d7ca2b2dfa317ff13ae7d4c22909337457b6241730b2abc8105d2955bb7137",
           "size_bytes": 6346
         }
       ],
@@ -4490,13 +4490,13 @@
         {
           "module_id": "ext.zlib._ffi",
           "path": "packages/ext/x07-ext-zlib-c/0.1.3/modules/ext/zlib/_ffi.x07.json",
-          "sha256": "322900a6c8227e9207265ce6ab9b71c219ed743c6b1a9968745f84b7e27e9ca6",
+          "sha256": "ffce866bfc69c5d4eca4f2c23002326ef393d28cf1b013cc9f4f78c945fd107d",
           "size_bytes": 2693
         },
         {
           "module_id": "ext.zlib",
           "path": "packages/ext/x07-ext-zlib-c/0.1.3/modules/ext/zlib.x07.json",
-          "sha256": "4f57aaeff64c45e2f16913c7dffa4616a601e5ccf9064c13246a134563db7e03",
+          "sha256": "c7d7ca2b2dfa317ff13ae7d4c22909337457b6241730b2abc8105d2955bb7137",
           "size_bytes": 6346
         }
       ],
@@ -4506,6 +4506,6 @@
       "version": "0.1.3"
     }
   ],
-  "packages_hash": "98035cfac8df45fd6be565f8a7df381668ce54cedeb25e86cb2370ead39f15f3",
+  "packages_hash": "b04152eb3ae2b35fd9b448f1c1a4f345c9771efd3dd115976fe42d187eb77914",
   "packages_root": "packages/ext"
 }

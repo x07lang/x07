@@ -294,6 +294,11 @@ pub fn compile_program_with_options(
                         "x07 pkg add {}@{} --sync",
                         spec.name, spec.version
                     ));
+                    msg.push_str("\n\nhint: ");
+                    msg.push_str(&format!("x07 pkg provides {module_id}"));
+                } else {
+                    msg.push_str("\n\nhint: ");
+                    msg.push_str(&format!("x07 pkg provides {module_id}"));
                 }
             }
             return Ok(CompilerResult {
@@ -448,6 +453,14 @@ fn best_package_spec_for_module(module_id: &str) -> Option<PackageSpec> {
         std::sync::OnceLock::new();
     let map = MAP.get_or_init(|| build_module_to_package_map(EXTERNAL_PACKAGES_LOCK_JSON));
     map.get(module_id).cloned()
+}
+
+/// Offline catalog lookup: returns the best known external package (name, version)
+/// that provides `module_id`, based on `locks/external-packages.lock` embedded into
+/// the host runner at build time.
+pub fn best_external_package_for_module(module_id: &str) -> Option<(String, String)> {
+    let spec = best_package_spec_for_module(module_id)?;
+    Some((spec.name, spec.version))
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1099,6 +1112,11 @@ pub fn compile_bundle_exe(
                         "x07 pkg add {}@{} --sync",
                         spec.name, spec.version
                     ));
+                    msg.push_str("\n\nhint: ");
+                    msg.push_str(&format!("x07 pkg provides {module_id}"));
+                } else {
+                    msg.push_str("\n\nhint: ");
+                    msg.push_str(&format!("x07 pkg provides {module_id}"));
                 }
             }
             return Ok(BundleCompileOutput {

@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 
 pub fn entry(imports: &[&str], decls: Vec<Value>, solve: Value) -> Vec<u8> {
     serde_json::to_vec(&json!({
-        "schema_version": "x07.x07ast@0.1.0",
+        "schema_version": "x07.x07ast@0.2.0",
         "kind": "entry",
         "module_id": "main",
         "imports": imports,

@@ -9,6 +9,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 use x07_pkg::SparseIndexClient;
+use x07_runner_common::os_paths;
+use x07c::builtin_modules;
 use x07c::project;
 
 use crate::util;
@@ -16,6 +18,7 @@ use crate::util;
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 const DEFAULT_INDEX_URL: &str = "sparse+https://registry.x07.io/index/";
+const PKG_PROVIDES_REPORT_SCHEMA_VERSION: &str = "x07.pkg.provides.report@0.1.0";
 
 #[derive(Debug, Args)]
 pub struct PkgArgs {
@@ -31,6 +34,8 @@ pub enum PkgCommand {
     Pack(PackArgs),
     /// Resolve project dependencies and write `x07.lock.json`.
     Lock(LockArgs),
+    /// Find packages that provide a given module id.
+    Provides(ProvidesArgs),
     /// Store a registry token for `pkg publish`.
     Login(LoginArgs),
     /// Publish a package archive to an index.
@@ -88,6 +93,21 @@ pub struct LockArgs {
     /// Disallow network access and reuse existing `.x07/deps` contents.
     #[arg(long)]
     pub offline: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ProvidesArgs {
+    /// Project manifest path (`x07.json`).
+    #[arg(long, value_name = "PATH", default_value = "x07.json")]
+    pub project: PathBuf,
+
+    /// Emit a machine-readable JSON report to stdout (default: true).
+    #[arg(long, default_value_t = true)]
+    pub report_json: bool,
+
+    /// Module id to resolve.
+    #[arg(value_name = "MODULE_ID")]
+    pub module_id: String,
 }
 
 #[derive(Debug, Args)]
@@ -191,9 +211,154 @@ pub fn cmd_pkg(args: PkgArgs) -> Result<std::process::ExitCode> {
         PkgCommand::Add(args) => cmd_pkg_add(args),
         PkgCommand::Pack(args) => cmd_pkg_pack(args),
         PkgCommand::Lock(args) => cmd_pkg_lock(args),
+        PkgCommand::Provides(args) => cmd_pkg_provides(args),
         PkgCommand::Login(args) => cmd_pkg_login(args),
         PkgCommand::Publish(args) => cmd_pkg_publish(args),
     }
+}
+
+#[derive(Debug, Serialize)]
+struct ProvidesProvider {
+    kind: &'static str,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    module_root: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ProvidesReport {
+    schema_version: &'static str,
+    ok: bool,
+    module_id: String,
+    providers: Vec<ProvidesProvider>,
+}
+
+fn cmd_pkg_provides(args: ProvidesArgs) -> Result<std::process::ExitCode> {
+    if !args.report_json {
+        anyhow::bail!(
+            "--report-json=false is not supported (stdout is reserved for machine output)"
+        );
+    }
+
+    let project_path = util::resolve_existing_path_upwards(&args.project);
+    let project_root = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+
+    let manifest =
+        project::load_project_manifest(&project_path).context("load project manifest")?;
+
+    let module_id = args.module_id.trim().to_string();
+    if module_id.is_empty() {
+        anyhow::bail!("module id must be non-empty");
+    }
+
+    let mut providers: Vec<ProvidesProvider> = Vec::new();
+
+    // Built-in modules (bundled into the compiler for solve-* worlds).
+    if builtin_modules::builtin_module_source(&module_id).is_some() {
+        providers.push(ProvidesProvider {
+            kind: "builtin",
+            name: module_id.clone(),
+            version: None,
+            module_root: None,
+        });
+    }
+
+    // Local module roots (project-owned code).
+    let mut rel = PathBuf::new();
+    for seg in module_id.split('.') {
+        rel.push(seg);
+    }
+    rel.set_extension("x07.json");
+    for root in &manifest.module_roots {
+        let abs_root = project_root.join(root);
+        if abs_root.join(&rel).is_file() {
+            providers.push(ProvidesProvider {
+                kind: "local",
+                name: module_id.clone(),
+                version: None,
+                module_root: Some(abs_root.display().to_string()),
+            });
+        }
+    }
+
+    // Toolchain OS stdlib module roots (used by run-os / run-os-sandboxed).
+    for root in os_paths::default_os_module_roots_best_effort_from_exe(
+        std::env::current_exe().ok().as_deref(),
+    ) {
+        if root.join(&rel).is_file() {
+            providers.push(ProvidesProvider {
+                kind: "os-stdlib",
+                name: module_id.clone(),
+                version: None,
+                module_root: Some(root.display().to_string()),
+            });
+        }
+    }
+
+    // Locked dependencies (installed deps under .x07/deps).
+    let lock_path = project::default_lockfile_path(&project_path, &manifest);
+    if lock_path.is_file() {
+        let lock_bytes = std::fs::read(&lock_path)
+            .with_context(|| format!("read lockfile: {}", lock_path.display()))?;
+        let lock: project::Lockfile = serde_json::from_slice(&lock_bytes)
+            .with_context(|| format!("parse lockfile: {}", lock_path.display()))?;
+        project::verify_lockfile(&project_path, &manifest, &lock)?;
+
+        for dep in &lock.dependencies {
+            if dep.modules_sha256.contains_key(&module_id) {
+                let root = project_root.join(&dep.path).join(&dep.module_root);
+                providers.push(ProvidesProvider {
+                    kind: "dependency",
+                    name: dep.name.clone(),
+                    version: Some(dep.version.clone()),
+                    module_root: Some(root.display().to_string()),
+                });
+            }
+        }
+    }
+
+    // Offline catalog (bundled into the host runner).
+    if let Some((name, version)) = x07_host_runner::best_external_package_for_module(&module_id) {
+        providers.push(ProvidesProvider {
+            kind: "catalog",
+            name,
+            version: Some(version),
+            module_root: None,
+        });
+    }
+
+    providers.sort_by(|a, b| {
+        (
+            a.kind,
+            a.name.as_str(),
+            a.version.as_deref().unwrap_or(""),
+            a.module_root.as_deref().unwrap_or(""),
+        )
+            .cmp(&(
+                b.kind,
+                b.name.as_str(),
+                b.version.as_deref().unwrap_or(""),
+                b.module_root.as_deref().unwrap_or(""),
+            ))
+    });
+
+    let report = ProvidesReport {
+        schema_version: PKG_PROVIDES_REPORT_SCHEMA_VERSION,
+        ok: !providers.is_empty(),
+        module_id,
+        providers,
+    };
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(if report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(1)
+    })
 }
 
 fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {

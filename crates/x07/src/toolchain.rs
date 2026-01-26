@@ -10,6 +10,8 @@ use x07c::lint;
 use x07c::project;
 use x07c::x07ast;
 
+use crate::repair::{RepairArgs, RepairMode};
+
 #[derive(Debug, Clone, Args)]
 pub struct FmtArgs {
     #[arg(long)]
@@ -65,6 +67,9 @@ pub struct BuildArgs {
     /// Override the generated C source size budget (in bytes).
     #[arg(long, value_name = "BYTES")]
     pub max_c_bytes: Option<usize>,
+
+    #[command(flatten)]
+    pub repair: RepairArgs,
 }
 
 #[derive(Debug, Serialize)]
@@ -356,42 +361,15 @@ pub fn cmd_fix(args: FixArgs) -> Result<std::process::ExitCode> {
         }
     };
 
-    let lint_options = x07c::world_config::lint_options_for_world(args.world);
-
-    let (final_report, formatted) = (|| -> Result<(diagnostics::Report, String)> {
-        for _pass in 0..5 {
-            let doc_bytes = serde_json::to_vec(&doc)?;
-            let mut file =
-                x07ast::parse_x07ast_json(&doc_bytes).map_err(|e| anyhow::anyhow!("{e}"))?;
-            x07ast::canonicalize_x07ast_file(&mut file);
-            let report = lint::lint_file(&file, lint_options);
-
-            let mut any_applied = false;
-            for d in &report.diagnostics {
-                let Some(q) = &d.quickfix else { continue };
-                if q.kind != diagnostics::QuickfixKind::JsonPatch {
-                    continue;
-                }
-                x07c::json_patch::apply_patch(&mut doc, &q.patch)
-                    .map_err(|e| anyhow::anyhow!("apply patch failed: {e}"))?;
-                any_applied = true;
-            }
-            if !any_applied {
-                break;
-            }
-        }
-
-        let doc_bytes = serde_json::to_vec(&doc)?;
-        let mut file = x07ast::parse_x07ast_json(&doc_bytes).map_err(|e| anyhow::anyhow!("{e}"))?;
-        x07ast::canonicalize_x07ast_file(&mut file);
-        let final_report = lint::lint_file(&file, lint_options);
-
-        let mut v = x07ast::x07ast_file_to_value(&file);
-        x07ast::canon_value_jcs(&mut v);
-        let formatted = serde_json::to_string(&v)? + "\n";
-        Ok((final_report, formatted))
-    })()
-    .context("fix")?;
+    let repair_mode = if args.write {
+        RepairMode::Write
+    } else {
+        RepairMode::Memory
+    };
+    let repair_result = crate::repair::repair_x07ast_file_doc(&mut doc, args.world, 5, repair_mode)
+        .context("fix")?;
+    let formatted = repair_result.formatted;
+    let final_report = repair_result.final_report;
 
     if args.write {
         if let Err(err) = std::fs::write(&args.input, formatted.as_bytes()) {
@@ -455,12 +433,19 @@ pub fn cmd_build(args: BuildArgs) -> Result<std::process::ExitCode> {
         .unwrap_or_else(|| std::path::Path::new("."));
     let program_path = base.join(&manifest.entry);
 
-    let program_bytes = std::fs::read(&program_path)
-        .with_context(|| format!("read entry: {}", program_path.display()))?;
-
     let module_roots = project::collect_module_roots(&args.project, &manifest, &lock)?;
     let world = x07c::world_config::parse_world_id(&manifest.world)
         .with_context(|| format!("invalid project world {:?}", manifest.world))?;
+
+    let repair_result = crate::repair::maybe_repair_x07ast_file(&program_path, world, &args.repair)
+        .with_context(|| format!("repair entry: {}", program_path.display()))?;
+    let program_bytes = if let Some(r) = repair_result {
+        r.formatted.into_bytes()
+    } else {
+        std::fs::read(&program_path)
+            .with_context(|| format!("read entry: {}", program_path.display()))?
+    };
+
     let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
     if args.freestanding {
         options.emit_main = false;

@@ -81,26 +81,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-fixture_src="$root/ci/fixtures/bundle/echo-argv"
-if [[ ! -d "$fixture_src" ]]; then
-  echo "ERROR: missing bundle fixture dir: $fixture_src" >&2
-  exit 2
-fi
-
-fixture="$tmp_dir/echo-argv"
-cp -R "$fixture_src" "$fixture"
-
-cd "$fixture"
-
-step "policy init (sandbox base policy)"
-"$x07_bin" policy init --template cli --project x07.json --emit report >"$tmp_dir/policy.init.report.json"
-
-policy_path="$fixture/.x07/policies/base/cli.sandbox.base.policy.json"
-if [[ ! -f "$policy_path" ]]; then
-  echo "ERROR: policy init did not create expected file: $policy_path" >&2
-  exit 2
-fi
-
 exe_ext=""
 if is_windows; then
   exe_ext=".exe"
@@ -137,6 +117,9 @@ run_and_capture_stdout_bin() {
   local run_dir="$outdir/run"
   mkdir -p "$run_dir"
   cp -f "$outdir/$bin_name" "$run_dir/$bin_name"
+  if [[ -d "$outdir/deps" ]]; then
+    cp -R "$outdir/deps" "$run_dir/deps"
+  fi
 
   if is_windows; then
     (cd "$run_dir" && "./$bin_name" --alpha A --beta B >"$stdout_bin") 2>"$stderr_txt"
@@ -184,55 +167,133 @@ print(f"ok: argv_v1 ({profile})")
 PY
 }
 
+assert_stdout_ok() {
+  local stdout_bin="$1"
+  local fixture="$2"
+  local profile="$3"
+
+  "$python_bin" - "$stdout_bin" "$fixture" "$profile" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+fixture = sys.argv[2]
+profile = sys.argv[3]
+
+data = path.read_bytes()
+if data != b"ok":
+    raise SystemExit(f"[{fixture}::{profile}] expected stdout b'ok', got: {data!r}")
+print(f"ok: stdout 'ok' ({fixture}::{profile})")
+PY
+}
+
+./scripts/build_os_helpers.sh >/dev/null
+
+fixtures=(echo-argv async-only process-async-join)
 profiles=(test os sandbox)
 
-for profile in "${profiles[@]}"; do
-  step "bundle: profile=$profile"
-
-  outdir="$tmp_dir/out/$profile"
-  mkdir -p "$outdir"
-
-  bin_name="echo-argv${exe_ext}"
-  out_bin="$outdir/$bin_name"
-
-  emit_dir="$outdir/emit"
-  mkdir -p "$emit_dir"
-
-  report="$outdir/bundle.report.json"
-
-  # `x07 bundle` must print x07.bundle.report@0.1.0 JSON to stdout (machine-clean).
-  "$x07_bin" bundle \
-    --project x07.json \
-    --profile "$profile" \
-    --out "$out_bin" \
-    --emit-dir "$emit_dir" \
-    >"$report"
-
-  if [[ ! -f "$out_bin" ]]; then
-    echo "ERROR: bundle did not produce expected binary: $out_bin" >&2
-    echo "report:" >&2
-    sed -n '1,120p' "$report" >&2 || true
+for fixture_name in "${fixtures[@]}"; do
+  fixture_src="$root/ci/fixtures/bundle/$fixture_name"
+  if [[ ! -d "$fixture_src" ]]; then
+    echo "ERROR: missing bundle fixture dir: $fixture_src" >&2
     exit 2
   fi
 
-  if ! is_windows; then
-    chmod 0755 "$out_bin" >/dev/null 2>&1 || true
-  fi
+  fixture="$tmp_dir/$fixture_name"
+  cp -R "$fixture_src" "$fixture"
 
-  stdout_bin="$outdir/stdout.bin"
-  stderr_txt="$outdir/stderr.txt"
+  cd "$fixture"
 
-  step "run bundled binary (no toolchain): profile=$profile"
-  run_and_capture_stdout_bin "$outdir" "$bin_name" "$stdout_bin" "$stderr_txt"
+  template=""
+  policy_path=""
+  case "$fixture_name" in
+    echo-argv)
+      template="cli"
+      policy_path="$fixture/.x07/policies/base/cli.sandbox.base.policy.json"
+      ;;
+    async-only)
+      template="worker"
+      policy_path="$fixture/.x07/policies/base/worker.sandbox.base.policy.json"
+      ;;
+    process-async-join)
+      template="worker-parallel"
+      policy_path="$fixture/.x07/policies/base/worker-parallel.sandbox.base.policy.json"
+      ;;
+    *)
+      echo "ERROR: unknown fixture: $fixture_name" >&2
+      exit 2
+      ;;
+  esac
 
-  if [[ ! -f "$stdout_bin" ]]; then
-    echo "ERROR: missing stdout capture: $stdout_bin" >&2
-    [[ -f "$stderr_txt" ]] && { echo "stderr:" >&2; cat "$stderr_txt" >&2; }
+  step "policy init (sandbox base policy): fixture=$fixture_name template=$template"
+  "$x07_bin" policy init --template "$template" --project x07.json --emit report >"$tmp_dir/${fixture_name}.policy.init.report.json"
+
+  if [[ ! -f "$policy_path" ]]; then
+    echo "ERROR: policy init did not create expected file: $policy_path" >&2
     exit 2
   fi
 
-  step "validate argv_v1 output: profile=$profile"
-  assert_argv_v1 "$stdout_bin" "$profile"
+  for profile in "${profiles[@]}"; do
+    step "bundle: fixture=$fixture_name profile=$profile"
+
+    outdir="$tmp_dir/out/$fixture_name/$profile"
+    mkdir -p "$outdir"
+
+    bin_name="${fixture_name}${exe_ext}"
+    out_bin="$outdir/$bin_name"
+
+    emit_dir="$outdir/emit"
+    mkdir -p "$emit_dir"
+
+    report="$outdir/bundle.report.json"
+
+    # `x07 bundle` must print x07.bundle.report@0.1.0 JSON to stdout (machine-clean).
+    "$x07_bin" bundle \
+      --project x07.json \
+      --profile "$profile" \
+      --out "$out_bin" \
+      --emit-dir "$emit_dir" \
+      >"$report"
+
+    if [[ ! -f "$out_bin" ]]; then
+      echo "ERROR: bundle did not produce expected binary: $out_bin" >&2
+      echo "report:" >&2
+      sed -n '1,120p' "$report" >&2 || true
+      exit 2
+    fi
+
+    if ! is_windows; then
+      chmod 0755 "$out_bin" >/dev/null 2>&1 || true
+    fi
+
+    if [[ "$fixture_name" == "process-async-join" ]]; then
+      mkdir -p "$outdir/deps/x07"
+      cp -f "$root/deps/x07/x07-proc-echo" "$outdir/deps/x07/x07-proc-echo"
+      if [[ -f "$root/deps/x07/x07-proc-echo.exe" ]]; then
+        cp -f "$root/deps/x07/x07-proc-echo.exe" "$outdir/deps/x07/x07-proc-echo.exe"
+      fi
+      chmod 0755 "$outdir/deps/x07/x07-proc-echo" >/dev/null 2>&1 || true
+    fi
+
+    stdout_bin="$outdir/stdout.bin"
+    stderr_txt="$outdir/stderr.txt"
+
+    step "run bundled binary (no toolchain): fixture=$fixture_name profile=$profile"
+    run_and_capture_stdout_bin "$outdir" "$bin_name" "$stdout_bin" "$stderr_txt"
+
+    if [[ ! -f "$stdout_bin" ]]; then
+      echo "ERROR: missing stdout capture: $stdout_bin" >&2
+      [[ -f "$stderr_txt" ]] && { echo "stderr:" >&2; cat "$stderr_txt" >&2; }
+      exit 2
+    fi
+
+    step "validate output: fixture=$fixture_name profile=$profile"
+    if [[ "$fixture_name" == "echo-argv" ]]; then
+      assert_argv_v1 "$stdout_bin" "$profile"
+    else
+      assert_stdout_ok "$stdout_bin" "$fixture_name" "$profile"
+    fi
+  done
 done
 
 echo

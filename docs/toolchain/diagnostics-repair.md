@@ -22,7 +22,9 @@ Agents should never scrape text; they should parse the structured payload.
 
 ## Repair loop
 
-See [Repair loop](repair-loop.md) for the canonical command sequence (format → lint → quickfix/patch → re-lint → test).
+`x07 run`, `x07 build`, and `x07 bundle` run the canonical repair loop automatically by default (format → lint → quickfix, repeatable).
+
+For explicit control (or when you want the raw reports), use `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch` and see [Repair loop](repair-loop.md).
 
 ## Output contracts (agent-friendly)
 

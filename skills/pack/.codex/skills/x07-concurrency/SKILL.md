@@ -9,7 +9,9 @@ metadata:
 
 # x07-concurrency
 
-X07 concurrency is deterministic and virtual (no OS threads); blocking points are explicit.
+In deterministic `solve-*` worlds, X07 concurrency is deterministic and virtual (no OS threads); blocking points are explicit.
+
+In OS worlds (`run-os*`), use subprocess spawning for multi-core parallelism. In `run-os-sandboxed`, process spawning must be enabled by policy (start from `x07 policy init --template worker-parallel` when needed).
 
 ## Canonical patterns
 

@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "entry",
+  "module_id": "main",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "defasync",
+      "name": "main.worker",
+      "params": [],
+      "result": "bytes",
+      "body": ["bytes.lit", "ok"]
+    }
+  ],
+  "solve": ["begin", ["let", "t", ["main.worker"]], ["task.spawn", "t"], ["await", "t"]]
+}

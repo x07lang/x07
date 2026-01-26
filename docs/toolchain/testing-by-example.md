@@ -53,7 +53,7 @@ Replace `tests/smoke.x07.json` with:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.1.0",
+  "schema_version": "x07.x07ast@0.2.0",
   "kind": "module",
   "module_id": "smoke",
   "imports": ["std.test"],
@@ -78,7 +78,7 @@ Create `tests/smoke_fs.x07.json`:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.1.0",
+  "schema_version": "x07.x07ast@0.2.0",
   "kind": "module",
   "module_id": "smoke_fs",
   "imports": ["std.test", "std.fs"],

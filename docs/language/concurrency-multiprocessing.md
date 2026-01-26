@@ -25,6 +25,12 @@ In OS worlds, X07 can spawn subprocesses:
 - the OS schedules them across cores
 - policies limit what can be spawned, how many, and resource bounds
 
+In `run-os-sandboxed`, process spawning must be explicitly enabled by policy. If your program needs to spawn helper processes for parallel work, start from:
+
+- `x07 policy init --template worker-parallel`
+
+If you don’t need process spawning, prefer the stricter `worker` template.
+
 This provides a safe default path to “real parallel work” without bringing nondeterminism into the deterministic test substrate.
 
 Guideline:

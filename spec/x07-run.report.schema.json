@@ -32,6 +32,17 @@
         "resolved_module_roots": { "type": "array", "items": { "type": "string" } }
       }
     },
+    "repair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "iterations", "applied_ops_count", "last_lint_ok"],
+      "properties": {
+        "mode": { "enum": ["off", "memory", "write"] },
+        "iterations": { "type": "integer", "minimum": 0 },
+        "applied_ops_count": { "type": "integer", "minimum": 0 },
+        "last_lint_ok": { "type": "boolean" }
+      }
+    },
     "report": { "type": "object" }
   },
   "allOf": [

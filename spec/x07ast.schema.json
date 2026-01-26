@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07ast.schema.json",
-  "title": "X07 x07AST v0.1.0",
+  "title": "X07 x07AST v0.2.0",
   "description": "Canonical, JSON-based AST carrier for LLM-first X07 program generation and repair. Expressions are encoded as JSON S-expressions (json-sexpr).",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "kind", "module_id", "imports", "decls"],
   "properties": {
-    "schema_version": { "const": "x07.x07ast@0.1.0" },
+    "schema_version": { "const": "x07.x07ast@0.2.0" },
     "kind": {
       "type": "string",
       "enum": ["entry", "module"],
@@ -90,12 +90,27 @@
       ]
     },
     "sexpr_list": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 100000,
-      "prefixItems": [{ "$ref": "#/$defs/atom" }],
-      "items": { "$ref": "#/$defs/sexpr" },
-      "description": "A list expression; first element is the head atom (form/callee), rest are arguments/subexpressions."
+      "description": "A list expression; first element is the head atom (form/callee), rest are arguments/subexpressions.",
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [{ "const": "bytes.lit" }, { "$ref": "#/$defs/text" }]
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100000,
+          "prefixItems": [{ "$ref": "#/$defs/atom" }],
+          "items": { "$ref": "#/$defs/sexpr" }
+        }
+      ]
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 1048576,
+      "description": "UTF-8 text literal (whitespace allowed)."
     },
     "param": {
       "type": "object",

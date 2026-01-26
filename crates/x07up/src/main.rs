@@ -1320,7 +1320,7 @@ fn check_host_runner_smoke(root: &Path, tag: &str) -> Result<()> {
     let input = tmp.join("input.bin");
     std::fs::write(
         &prog,
-        br#"{"schema_version":"x07.x07ast@0.1.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}"#,
+        br#"{"schema_version":"x07.x07ast@0.2.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}"#,
     )?;
     std::fs::write(&input, b"hi")?;
 

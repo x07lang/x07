@@ -32,20 +32,20 @@ An autonomous agent should follow a loop like:
 
 1. Read task/spec + `AGENTS.md`
 2. Modify code **only through structured patches** (JSON Patch)
-3. Run deterministic checks:
-   - `x07 lint`
+3. Iterate in deterministic worlds:
+   - `x07 run` (auto-repair by default via `--repair=...`)
    - `x07 test`
-   - optional: benchmark suites (for performance budgets)
+   - optional: `x07 lint` for raw diagnostics (`x07diag`)
 4. If it fails:
    - parse `x07diag` output
-   - apply a suggested quickfix (`x07 fix`), or produce a new patch and apply it with `x07 ast apply-patch`
+   - apply a suggested quickfix (`x07 fix`) or produce a new patch and apply it with `x07 ast apply-patch`
 5. Repeat until green
 
 See also: [Repair loop](../toolchain/repair-loop.md) and [Running programs](../toolchain/running-programs.md).
 
 If you want a good mental model for “AI-native engineering”, see OpenAI’s Codex guide on building AI-native engineering teams.
 
-When OS access is required, prefer explicit profiles (for example `x07 run --profile os` / `x07 run --profile sandbox`) and run `x07up doctor --json` early to catch platform prerequisites.
+When OS access is required, prefer explicit profiles (for example `x07 run --profile os` / `x07 run --profile sandbox`) and run `x07 doctor` early to catch platform prerequisites.
 
 ## Canonical by-example workflow (CI-gated, offline)
 

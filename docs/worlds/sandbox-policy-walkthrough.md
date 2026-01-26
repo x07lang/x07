@@ -25,7 +25,7 @@ You will start from `x07 init` and evolve the program through stages:
 
 For the HTTP stage:
 
-- Run `x07up doctor --json` and install the suggested native prerequisites (libcurl/OpenSSL, C compiler, etc).
+- Run `x07 doctor` and install the suggested native prerequisites (libcurl/OpenSSL, C compiler, etc).
 
 Companion example (in the `x07` repo):
 
@@ -86,7 +86,7 @@ Replace `src/app.x07.json` with:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.1.0",
+  "schema_version": "x07.x07ast@0.2.0",
   "kind": "module",
   "module_id": "app",
   "imports": ["std.os.fs"],
@@ -162,7 +162,7 @@ Replace `src/app.x07.json` with:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.1.0",
+  "schema_version": "x07.x07ast@0.2.0",
   "kind": "module",
   "module_id": "app",
   "imports": ["std.fmt", "std.net.http", "std.net.http.spec", "std.os.fs"],

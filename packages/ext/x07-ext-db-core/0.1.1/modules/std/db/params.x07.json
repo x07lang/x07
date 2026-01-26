@@ -219,5 +219,5 @@
   ],
   "kind": "module",
   "module_id": "std.db.params",
-  "schema_version": "x07.x07ast@0.1.0"
+  "schema_version": "x07.x07ast@0.2.0"
 }

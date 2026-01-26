@@ -8,11 +8,11 @@
       "package_manifest_sha256": "c535707f5fd4296005f848cdde77369a1fd0ee66eaf1a5611b4c65049e59531c",
       "module_root": "modules",
       "modules_sha256": {
-        "std.math.bigint": "bc486e33e7a1c412c40196b920a6b42d1786401d3118a28035c562e170498655",
-        "std.math.bigint.codec_v1": "0ac88130b51e73fdc52f486cf55c9416d5688cacb6602a2c3d2845a3cd51d2e5",
-        "std.math.bigint.fmt": "a1c4d5a6b89a2d30eda1d52b0082d4e29399282c614c35eceed4b35d2ab2fbce",
-        "std.math.bigint.parse": "19abfae81e4e1c73ca90946b4f10efee987db896e7c96677a9557884004de2d1",
-        "std.math.bigint.tests": "61b589cc730489023bede49dd0746280c82eeb7f309a0d1314dd47b1f2f002d1"
+        "std.math.bigint": "efb22181fad0445d366dc619718eeff120a5202d377c918a5021c55298f4762a",
+        "std.math.bigint.codec_v1": "3978a37df1089902a65a5ae0c03a6b852e92677793458f46a48052cdd1865ace",
+        "std.math.bigint.fmt": "fe5fef0d29040d22fd36461ac38a3805c8bce7e5de35fa46a2e88c40464b42c9",
+        "std.math.bigint.parse": "6dd4f647fbdeb3160783e149ed75305c83d47d31a449428e65c683a6ce92140a",
+        "std.math.bigint.tests": "af4b72f1346c35d3ef125ede0609ae205a7b2ebf2388666855c026ecb58c45a1"
       }
     },
     {
@@ -22,9 +22,9 @@
       "package_manifest_sha256": "0ea50d60a96cb2746743a628014f0783097f8f957022ce07e49b4d8faca52af5",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.cbor": "27ddc995fd07bfa14ba6c32c9b662d4127d0e2210949c16a300941d046ebdb77",
-        "ext.cbor.data_model": "ea7cd130374f4a8e8da558561879967bc9cf1c75e2f406aca573b32cf5af8b02",
-        "ext.cbor.tests": "4311da8c67b40a1fcf50ff898a7fcd462b75cb37bccd5e7ee7c28b4ee011b869"
+        "ext.cbor": "8e2bc2cd416c3ae23acb683e45f5587e59e9cfc8efd0f3983897c211cd849673",
+        "ext.cbor.data_model": "b42618962d7b249e68f81d687b328fb0e9e19287ab48cd7435f0ec7c417af44b",
+        "ext.cbor.tests": "0df93a8a0923db2131d3ab5960f8ee49e9b61aab9f1ae92fc94cd2cfb57d860d"
       }
     },
     {
@@ -34,14 +34,14 @@
       "package_manifest_sha256": "e44b9b6ddcc7e758536a65d721e8ddbfc6c424c92ed35eea09757707bc7d4a78",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.data_model": "62ab24c6aa3ff6277ffaebb4574537f7ccc96c164426b8cf85ec9abecf029c05",
-        "ext.data_model.json": "f695f4758365743e01d4e98543bc640e0e83dfbac8f67980f0834ee4d8c89f41",
-        "ext.data_model.json.tests": "ab56828796f458070e66b10511b1c1f786d4cf7c7f4cf5e475781144e0a694f5",
-        "ext.data_model.tests": "fa3fe4df0791826aa5f5afdb7aef47e6f07846643f0ec9d225b6ee56fb5d4ae7",
-        "ext.data_model.toml": "13af7f2d210e4b15b9823cb1ba5a2a4fe28ae04c7002d736c61aa8a1de3ed485",
-        "ext.data_model.toml.tests": "eb9fd4b78485ed91b824e2f6fb68a83069f7cd8524225cc9e3caa91224fe4b81",
-        "ext.data_model.yaml": "668b8004ace4f02dafeeb95410808cdc68d7c98d61f7a99cd0886094d99cf0e7",
-        "ext.data_model.yaml.tests": "913dc8e5c6d87f50d55bb652ed90cc4d0f451521b3e1b4c03a9b42a993b4727e"
+        "ext.data_model": "5917366961cdf8e9f00ce6a6ecdaf2243d0f48f7728a0d3ebf177a6ea7bac6cc",
+        "ext.data_model.json": "2f29a7d945961c59c64567304d98a945d663c2bbcbb096a2a8d4052835585fa1",
+        "ext.data_model.json.tests": "ce9de7eb5713df3e027f29eae8b1411c8c62499084a1d4ca5e9393d236e7fa72",
+        "ext.data_model.tests": "cc477b6f2e4cc08cd919b52070ec99812ef864a603dd17bfd416bbd4e6e47a63",
+        "ext.data_model.toml": "5c75cf8f725a32cffa6e9c903d6034a224e9fb0d53fa6ddce9242e0d7867aa9e",
+        "ext.data_model.toml.tests": "ee02e87ced10d869c5be944b1de3ed906ad84a17e75b6f17454e2fd0a9b0528e",
+        "ext.data_model.yaml": "81baa7a5657961053a8e561bf889f37e421984c5ceaa83d0f8e5909a365ed516",
+        "ext.data_model.yaml.tests": "91e1b0993974d03daa911b74f48b7a497a4898f80230f6f432aa645b633ddd14"
       }
     },
     {
@@ -51,11 +51,11 @@
       "package_manifest_sha256": "e22b76572e96312298884762c2901a34b5d01723f4c85dbeb9642e3bc5e65cb1",
       "module_root": "modules",
       "modules_sha256": {
-        "std.math.decimal": "4ffaeec89e1445676cb24594a91ea476142368ba37237a5e519b320c1d619aca",
-        "std.math.decimal.codec_v1": "98de8a76cc059495cdacf68536e980051aef7b49c902a3ea86b0841051747e53",
-        "std.math.decimal.fmt": "2bcb1a443ce7f9f50b358fa6a7d45a3f702d42383e36213eb33deb92e5c1ed24",
-        "std.math.decimal.parse": "2e6b188c2e4476a0aca86ab2d59e26051ffdaa1f7017a3823142b2f13a26e08b",
-        "std.math.decimal.tests": "d1477c30b782a2e163a1c97f42ccd58f68b49fffcb09b16a2da708c01dc4be56"
+        "std.math.decimal": "3555d5ca574433474e8053d68eb0cad6ffbaef3267b32ce0fb034ff3a9de32e1",
+        "std.math.decimal.codec_v1": "7695a7dc0110f84bfe0b47ef93d728596e2542a2d8598e51555016c8e95e2baa",
+        "std.math.decimal.fmt": "91550f79ea71d5efb998a101bbe1923a7135e1f872e710dae8f876c1092e3943",
+        "std.math.decimal.parse": "dd1a74a50da6cdfb6cfe7cf1ce510a495a2e8befab96fc53099b6378a33fd341",
+        "std.math.decimal.tests": "c0b61d6c0950953f88ba37078c13edcca98bdf394b4a537b6f339b91c0c06ed8"
       }
     },
     {
@@ -65,10 +65,10 @@
       "package_manifest_sha256": "34d6ed661c267e550bea1af6688799341e0a5f557189633fd12665e21993fdae",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.error.chain": "35193a5265840747ef52bc8c386dc7b1d44abc780504ad0f2c3a857183a8aa67",
-        "ext.error.context": "95161e94aa65f48b4bc41eb26490108543b76f77148510191fa6f3c85627a7ac",
-        "ext.error.fmt": "a9487a51312f93764103f52e8297e5398f315ed572f8b105dd6329d0ee8465dc",
-        "ext.error.tests": "ba8fdb32cb7e6a87c867817f80c4be7a28226ca0bec66047c7177ebf687282d8"
+        "ext.error.chain": "c030554da4403f7f68612cea7ec235edd076c9570eac0a64e9800c4352f98c7f",
+        "ext.error.context": "10c3939f6635e851a87db46ad1dcb4cceb205e4a861c4e23c1e17e1af1c7fbf0",
+        "ext.error.fmt": "48cfcf0b1ee0f977fd30a4c3626e5979633d4d8142ae2a040a01b40f566ba455",
+        "ext.error.tests": "49fb5e57aab0fda9d7a19cb61f3cf1b0add2e7e451a6f3411d7f28d844d53586"
       }
     }
   ]

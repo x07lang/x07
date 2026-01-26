@@ -4,12 +4,12 @@ IMPORTANT:
 - Output ONLY one JSON object (no preamble).
 - Do NOT wrap the JSON in Markdown code fences.
 - Do NOT output extra prose.
-- Must satisfy x07AST schema_version `x07.x07ast@0.1.0`.
+- Must satisfy x07AST schema_version `x07.x07ast@0.2.0`.
 
 Program encoding: UTF-8 JSON text.
 
 Entry program object fields:
-- `schema_version`: `x07.x07ast@0.1.0`
+- `schema_version`: `x07.x07ast@0.2.0`
 - `kind`: `entry`
 - `module_id`: `main`
 - `imports`: array of module IDs (e.g. `std.bytes`)
@@ -20,6 +20,7 @@ Entry program object fields:
 
 - i32: JSON numbers in range -2147483648..2147483647
 - atom: JSON strings with no whitespace
+- text: JSON strings (whitespace allowed; JSON escapes apply)
 - list: JSON arrays: `["head", arg1, arg2, ...]` (head is an atom string; list must be non-empty)
 
 ## Types
@@ -59,7 +60,7 @@ Move rules (critical):
 
 Echo (returns input):
 ```json
-{"schema_version":"x07.x07ast@0.1.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
+{"schema_version":"x07.x07ast@0.2.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
 ```
 
 Arity reminder:
@@ -424,10 +425,10 @@ For copy/slice/concat/reverse/take/drop helpers, use `std.bytes.*` module functi
 
 Bytes literals:
 
-- `["bytes.lit","token"]` -> bytes (UTF-8 of the atom string; no whitespace)
+- `["bytes.lit","text"]` -> bytes (UTF-8 of the JSON string; whitespace allowed)
   - Example: `["bytes.lit","config.bin"]` produces `b"config.bin"`.
-  - The token characters are literal (underscores stay underscores); there are no escape sequences.
-  - For whitespace/newlines/arbitrary bytes, build a `vec_u8` and convert with `std.vec.as_bytes`.
+  - JSON escapes apply (e.g. `\n`, `\t`, `\uXXXX`).
+  - For arbitrary (non-UTF-8) bytes, build a `vec_u8` and convert with `std.vec.as_bytes`.
 
 ## Views
 

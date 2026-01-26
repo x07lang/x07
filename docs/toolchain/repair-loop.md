@@ -4,6 +4,19 @@ X07 tooling is designed so agents can converge on a correct program by iterating
 
 Prefer running the repair loop in `solve-pure` (or another `solve-*` world) so failures are reproducible.
 
+## Automatic repair (recommended)
+
+`x07 run`, `x07 build`, and `x07 bundle` run the repair loop automatically by default.
+
+Control it with:
+
+- `--repair=write` (default): write repairs back to source files
+- `--repair=memory`: stage repaired copies under `.x07/repair/_staged/`
+- `--repair=off`: disable auto-repair
+- `--repair-max-iters N`: bound iterations (default: 3)
+
+Use the manual loop below when you need explicit control (or when you’re working with raw `*.x07.json` files outside a project wrapper).
+
 ## The loop (single file)
 
 ### 1) Format (canonicalize)

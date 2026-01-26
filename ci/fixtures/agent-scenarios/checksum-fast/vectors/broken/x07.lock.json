@@ -8,9 +8,9 @@
       "package_manifest_sha256": "7a1090728c214cf9a96743908a0f39a19aa8e01b5298dee52331d9746b4071e5",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.checksum.crc32c": "223fc9d9d184de4f308798bd3ea6988fd3b2eaf065398997d63291a42b535c97",
-        "ext.checksum.tests": "2a2af8dcab825e6fb55283b104824dc2d8d111f82a2e55a0147b5f6d742593d5",
-        "ext.checksum.xxhash64": "7e8b746b45c2aa6e5d3bf613153a8035cd2a37a5938db75a7d67d197e3ec2d12"
+        "ext.checksum.crc32c": "a4098c5897401ffcfc7ee780ba1021a5dfd409a5abdc1eab38ab2c1905360144",
+        "ext.checksum.tests": "a9cae4569ee318217b4f8dc3b7d84a82f086bf7051607f045571d5d76abba8d6",
+        "ext.checksum.xxhash64": "92972da1f11a242ac57d628ca028131694b8114afdb37d66163bf1886079bb76"
       }
     },
     {
@@ -20,10 +20,9 @@
       "package_manifest_sha256": "81b3647ff8410a7488bebfabdbb277fe6b836dbdd8cccb19bb496f7c6f804f1d",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.u64": "782c75d52f6f1b2f25402ee12184e6be049764a918484c39cba00171ce0c34a0",
-        "ext.u64.tests": "5a992a379bf32286c2fb8064886ac410090ea087a2de971eb87b750454b61422"
+        "ext.u64": "8aa73796dd0e881123a2f477842884069ce6ecfc0977d68775df60647681486d",
+        "ext.u64.tests": "8acd02e86b77581ab09af420b183744208400be2718e69f76685df59e0a3a3b1"
       }
     }
   ]
 }
-

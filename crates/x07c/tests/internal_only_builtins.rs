@@ -40,7 +40,7 @@ fn compile_rejects_internal_only_builtins_in_entry_program() {
 #[test]
 fn compile_rejects_internal_only_builtins_in_filesystem_modules() {
     let module = r#"{
-  "schema_version":"x07.x07ast@0.1.0",
+  "schema_version":"x07.x07ast@0.2.0",
   "kind":"module",
   "module_id":"app.internal",
   "imports":[],

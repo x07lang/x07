@@ -533,7 +533,14 @@ fn expr_from_json_sexpr(v: &Value, ptr: &str) -> Result<Expr, X07AstError> {
             let mut out = Vec::with_capacity(items.len());
             out.push(Expr::Ident(head.to_string()));
             for (idx, item) in items.iter().enumerate().skip(1) {
-                out.push(expr_from_json_sexpr(item, &format!("{ptr}/{idx}"))?);
+                let item_ptr = format!("{ptr}/{idx}");
+                if head == "bytes.lit" && idx == 1 {
+                    if let Value::String(s) = item {
+                        out.push(Expr::Ident(s.to_string()));
+                        continue;
+                    }
+                }
+                out.push(expr_from_json_sexpr(item, &item_ptr)?);
             }
             Ok(Expr::List(out))
         }

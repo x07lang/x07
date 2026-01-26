@@ -10,7 +10,7 @@ fn lint_quickfix_wraps_for_varargs_body_in_begin() {
     let mut doc = parse_doc(
         r#"
         {
-          "schema_version":"x07.x07ast@0.1.0",
+          "schema_version":"x07.x07ast@0.2.0",
           "kind":"entry",
           "module_id":"main",
           "imports":[],
@@ -55,7 +55,7 @@ fn lint_quickfix_rewrites_let_with_body_into_begin() {
     let mut doc = parse_doc(
         r#"
         {
-          "schema_version":"x07.x07ast@0.1.0",
+          "schema_version":"x07.x07ast@0.2.0",
           "kind":"entry",
           "module_id":"main",
           "imports":[],
@@ -95,7 +95,7 @@ fn lint_quickfix_removes_forbidden_imports() {
     let mut doc = parse_doc(
         r#"
         {
-          "schema_version":"x07.x07ast@0.1.0",
+          "schema_version":"x07.x07ast@0.2.0",
           "kind":"entry",
           "module_id":"main",
           "imports":["std.fs","std.bytes"],

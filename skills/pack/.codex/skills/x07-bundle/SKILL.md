@@ -11,6 +11,8 @@ metadata:
 
 Use `x07 bundle` to produce a native executable that can be run directly on the target machine without the X07 toolchain installed at runtime.
 
+`x07 bundle` runs the canonical auto-repair loop by default (`--repair=...`), so it can format/lint/apply quickfixes before compiling. Use `--repair=off` when debugging.
+
 ## Canonical commands
 
 - Bundle an OS-world CLI executable:

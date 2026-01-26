@@ -8,12 +8,12 @@
       "package_manifest_sha256": "a6ee3c4c6438b8a9c122e5bddb0adbbb0f10ca15551dd73854517f2360859a10",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.compress": "5441ee0797727abf20c04f9c83ca5272e5cc3ccd539be52b6ba79f886033414b",
-        "ext.compress.tests": "0e6b778f745659ab6ccdf3ed42f6558619a717268c0788b067d8ce5702ee29da",
-        "ext.zip": "11d76ba87761076dc754932066467f2f151f6bc5c8dc587870c3f1071943549d",
-        "ext.zip.tests": "009246742484ba4e38c4f093fb471c21f0a2926e7d461ef0f65fd096150e9e93",
-        "ext.zstd": "c096034f6c04e5bfa53fcaf6c4792ffc3dac0748ba92157e1997c5072b375564",
-        "ext.zstd.tests": "78ee63061c1d933704c9d373d0ae8d85e5cdb63317bd3f2a00afd1fc6fff506b"
+        "ext.compress": "a86c0f111fc452747a41eef3f380391021fde38c15dc66457fa856c11f7b355e",
+        "ext.compress.tests": "c725f052d5a2d31b10a97c8ffb5ac53920dc00ca08c92737e6c2f6ed69bcd6ef",
+        "ext.zip": "196947fc69bc581d12d3839d9a9d902664df60e189c5cdec2f841df5f6e2997c",
+        "ext.zip.tests": "bbb5355f928ea00fd5112a168130b42681ee8aa6676a335bb9bab22fa4faf1a9",
+        "ext.zstd": "c750c17f1de5be76575008f9471fb99cce03a967f183223976930152ac565faa",
+        "ext.zstd.tests": "de6eb2735c6ef68cfd5f4c90ae0831e775e2dacf72de7f58aec9b3fc19fa0792"
       }
     },
     {
@@ -23,10 +23,10 @@
       "package_manifest_sha256": "34d6ed661c267e550bea1af6688799341e0a5f557189633fd12665e21993fdae",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.error.chain": "35193a5265840747ef52bc8c386dc7b1d44abc780504ad0f2c3a857183a8aa67",
-        "ext.error.context": "95161e94aa65f48b4bc41eb26490108543b76f77148510191fa6f3c85627a7ac",
-        "ext.error.fmt": "a9487a51312f93764103f52e8297e5398f315ed572f8b105dd6329d0ee8465dc",
-        "ext.error.tests": "ba8fdb32cb7e6a87c867817f80c4be7a28226ca0bec66047c7177ebf687282d8"
+        "ext.error.chain": "c030554da4403f7f68612cea7ec235edd076c9570eac0a64e9800c4352f98c7f",
+        "ext.error.context": "10c3939f6635e851a87db46ad1dcb4cceb205e4a861c4e23c1e17e1af1c7fbf0",
+        "ext.error.fmt": "48cfcf0b1ee0f977fd30a4c3626e5979633d4d8142ae2a040a01b40f566ba455",
+        "ext.error.tests": "49fb5e57aab0fda9d7a19cb61f3cf1b0add2e7e451a6f3411d7f28d844d53586"
       }
     }
   ]

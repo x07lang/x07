@@ -33,7 +33,7 @@ This repository contains Track B scaffolding, a deterministic native runner, a c
 
 ## Canonical X07 surface
 
-- Canonical solver source format: x07AST JSON (`*.x07.json`, `x07.x07ast@0.1.0`) with expressions encoded as JSON S-expressions (json-sexpr).
+- Canonical solver source format: x07AST JSON (`*.x07.json`, `x07.x07ast@0.2.0`) with expressions encoded as JSON S-expressions (json-sexpr).
 - Built-in stdlib version: `stdlib/std/0.1.1/`.
 - Use `vec_u8.with_capacity` (not `vec_u8.new`) and `std.vec.as_bytes` (finalize a builder without copying).
 - Prefer range builtins for performance: `vec_u8.extend_bytes_range` and `bytes.cmp_range`.

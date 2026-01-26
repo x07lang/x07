@@ -15,6 +15,7 @@ use x07_worlds::WorldId;
 use x07c::project;
 
 use crate::policy_overrides::{PolicyOverrides, PolicyResolution};
+use crate::repair::RepairArgs;
 
 const DEFAULT_SOLVE_FUEL: u64 = 50_000_000;
 const DEFAULT_MAX_MEMORY_BYTES: usize = 64 * 1024 * 1024;
@@ -106,6 +107,9 @@ pub struct BundleArgs {
     /// May be passed multiple times.
     #[arg(long, value_name = "DIR")]
     pub module_root: Vec<PathBuf>,
+
+    #[command(flatten)]
+    pub repair: RepairArgs,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -575,8 +579,14 @@ fn prepare_project_target(
     project::verify_lockfile(project_path, &manifest, &lock)?;
 
     let entry_path = base.join(&manifest.entry);
-    let program = std::fs::read(&entry_path)
-        .with_context(|| format!("read entry: {}", entry_path.display()))?;
+    let repair_result = crate::repair::maybe_repair_x07ast_file(&entry_path, world, &args.repair)
+        .with_context(|| format!("repair entry: {}", entry_path.display()))?;
+    let program = if let Some(r) = repair_result {
+        r.formatted.into_bytes()
+    } else {
+        std::fs::read(&entry_path)
+            .with_context(|| format!("read entry: {}", entry_path.display()))?
+    };
 
     let mut module_roots = project::collect_module_roots(project_path, &manifest, &lock)?;
     if world.is_standalone_only() {
@@ -615,8 +625,14 @@ fn prepare_program_target(
             program_path.display()
         );
     }
-    let program = std::fs::read(program_path)
-        .with_context(|| format!("read program: {}", program_path.display()))?;
+    let repair_result = crate::repair::maybe_repair_x07ast_file(program_path, world, &args.repair)
+        .with_context(|| format!("repair program: {}", program_path.display()))?;
+    let program = if let Some(r) = repair_result {
+        r.formatted.into_bytes()
+    } else {
+        std::fs::read(program_path)
+            .with_context(|| format!("read program: {}", program_path.display()))?
+    };
 
     let mut module_roots = args.module_root.clone();
     if world.is_standalone_only() {

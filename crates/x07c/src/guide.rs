@@ -25,6 +25,7 @@ pub fn guide_md() -> String {
     out.push_str("## Expression Encoding (json-sexpr)\n\n");
     out.push_str("- i32: JSON numbers in range -2147483648..2147483647\n");
     out.push_str("- atom: JSON strings with no whitespace\n");
+    out.push_str("- text: JSON strings (whitespace allowed; JSON escapes apply)\n");
     out.push_str("- list: JSON arrays: `[\"head\", arg1, arg2, ...]` (head is an atom string; list must be non-empty)\n\n");
 
     out.push_str("## Types\n\n");
@@ -441,14 +442,12 @@ pub fn guide_md() -> String {
 
     out.push_str("Bytes literals:\n\n");
     out.push_str(
-        "- `[\"bytes.lit\",\"token\"]` -> bytes (UTF-8 of the atom string; no whitespace)\n",
+        "- `[\"bytes.lit\",\"text\"]` -> bytes (UTF-8 of the JSON string; whitespace allowed)\n",
     );
     out.push_str("  - Example: `[\"bytes.lit\",\"config.bin\"]` produces `b\"config.bin\"`.\n");
+    out.push_str("  - JSON escapes apply (e.g. `\\n`, `\\t`, `\\uXXXX`).\n");
     out.push_str(
-        "  - The token characters are literal (underscores stay underscores); there are no escape sequences.\n",
-    );
-    out.push_str(
-        "  - For whitespace/newlines/arbitrary bytes, build a `vec_u8` and convert with `std.vec.as_bytes`.\n\n",
+        "  - For arbitrary (non-UTF-8) bytes, build a `vec_u8` and convert with `std.vec.as_bytes`.\n\n",
     );
 
     out.push_str("## Views\n\n");

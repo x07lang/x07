@@ -34,6 +34,7 @@ Use `x07 policy init` to generate a schema-valid starting point (then extend it 
 - `x07 policy init --template sqlite-app`
 - `x07 policy init --template postgres-client`
 - `x07 policy init --template worker`
+- `x07 policy init --template worker-parallel`
 
 ### Allow/deny networking destinations (CLI convenience)
 

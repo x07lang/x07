@@ -18,28 +18,27 @@ See `references/tooling.md`.
 
 Execution should go through `x07 run` (single front door). The standalone runner binaries (`x07-host-runner`, `x07-os-runner`) remain available for expert usage, but are not part of the default agent loop.
 
-If the task needs OS worlds or native deps (curl/openssl, etc), run `x07up doctor --json` early and follow its suggestions.
+If the task needs OS worlds or native deps (curl/openssl, etc), run `x07 doctor` early and follow its suggestions.
 
 Canonical docs:
 
 - https://x07lang.org/docs/toolchain/repair-loop/
 - https://x07lang.org/docs/toolchain/running-programs/
 
-## Single canonical agent loop (edit → format → lint → run)
+## Single canonical agent loop (edit → run → test)
 
 1. Create or edit x07AST JSON (`*.x07.json`).
-2. Canonicalize formatting:
-   - `x07 fmt --input src/main.x07.json --write --report-json`
-3. Lint (world-gating + structural checks):
-   - `x07 lint --input src/main.x07.json --world solve-pure --report-json`
-4. Apply tool-provided quickfixes (when available):
-   - `x07 fix --input src/main.x07.json --world solve-pure --write --report-json`
-5. If a targeted structural change is needed, apply an explicit JSON Patch:
-   - `x07 ast apply-patch --in src/main.x07.json --patch /tmp/repair.patch.json --out src/main.x07.json --validate`
-6. Run in the correct capability world (canonical: `x07 run`):
+2. Run in the correct capability world (canonical: `x07 run`):
    - deterministic solve worlds (recommended default): `x07 run`
    - OS worlds (unsandboxed): `x07 run --profile os`
-   - OS worlds (policy-enforced): `x07 policy init --template <cli|http-client|web-service|fs-tool|sqlite-app|postgres-client|worker>` (starting point; review and extend), then `x07 run --profile sandbox` (optionally add `--allow-host ...` / `--deny-host ...` to materialize derived policies)
+   - OS worlds (policy-enforced): `x07 policy init --template <cli|http-client|web-service|fs-tool|sqlite-app|postgres-client|worker|worker-parallel>` (starting point; review and extend), then `x07 run --profile sandbox` (optionally add `--allow-host ...` / `--deny-host ...` to materialize derived policies)
+
+   `x07 run` runs the canonical auto-repair loop by default (format → lint → quickfix, repeatable). Use:
+
+   - `--repair=off` to disable auto-repair (debugging)
+   - `--repair=memory` to stage repairs under `.x07/repair/_staged/` without editing source files
+   - `--repair=write` (default) to write repairs back to source files
+   - `--repair-max-iters N` to bound iterations (default: 3)
 
    For CLI-style programs that expect `argv_v1`, pass process args after `--` and `x07 run` will encode them into input bytes:
    - `x07 run --profile os -- tool --help`
@@ -47,14 +46,17 @@ Canonical docs:
    Expert backends (use only when you need runner-only flags or are debugging runner behavior):
    - solve worlds: `x07-host-runner --project x07.json`
    - OS worlds: `x07-os-runner --project x07.json --world run-os`
-7. If the project uses dependencies, update the lockfile:
+3. If the project uses dependencies, update the lockfile:
    - `x07 pkg lock --project x07.json`
 
    If any dependency declares required helper packages via `meta.requires_packages`, `x07 pkg lock` may also update `x07.json` to add those transitive deps.
 
-8. If you need a distributable native executable (end-user CLI binary, no toolchain required at runtime), bundle it:
+4. If you need a distributable native executable (end-user CLI binary, no toolchain required at runtime), bundle it:
    - `x07 bundle --profile os --out dist/app`
    - `x07 bundle --profile sandbox --out dist/app` (policy enforced)
+
+5. If you need explicit diagnostics or tighter control than the default auto-repair loop:
+   - `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch`
 
 Keep each iteration small and deterministic; if a repair loop does not converge quickly, stop and re-evaluate the approach.
 
@@ -99,6 +101,8 @@ Common non-web building blocks for agents:
 - `fs.globwalk` → `ext-path-glob-rs` (run-os*)
 
 Add deps with `x07 pkg add NAME@VERSION --sync` (choose `NAME@VERSION` from the capability map).
+
+If you don’t know which package provides an import, use `x07 pkg provides <module-id>`.
 
 ## Agent-first design rails
 

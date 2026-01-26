@@ -121,7 +121,7 @@ fn compile_accepts_multi_expr_defn_and_defasync_bodies() {
 fn compile_accepts_x07ast_json_entry() {
     let program = r#"
       {
-        "schema_version": "x07.x07ast@0.1.0",
+        "schema_version": "x07.x07ast@0.2.0",
         "kind": "entry",
         "module_id": "main",
         "imports": [],

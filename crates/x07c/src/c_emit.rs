@@ -1537,7 +1537,7 @@ impl<'a> Emitter<'a> {
                     let ident = args[0].as_ident().ok_or_else(|| {
                         CompilerError::new(
                             CompileErrorKind::Parse,
-                            "bytes.lit expects an identifier".to_string(),
+                            "bytes.lit expects a text string".to_string(),
                         )
                     })?;
                     let lit_bytes = ident.as_bytes();
@@ -7786,7 +7786,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let ident = args[0].as_ident().ok_or_else(|| {
             CompilerError::new(
                 CompileErrorKind::Parse,
-                "bytes.lit expects an identifier".to_string(),
+                "bytes.lit expects a text string".to_string(),
             )
         })?;
         let lit_bytes = ident.as_bytes();
@@ -14678,7 +14678,7 @@ impl InferCtx {
                         if args[0].as_ident().is_none() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Parse,
-                                "bytes.lit expects an identifier".to_string(),
+                                "bytes.lit expects a text string".to_string(),
                             ));
                         }
                         Ok(Ty::Bytes)

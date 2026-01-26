@@ -27,6 +27,7 @@ mod init;
 mod pkg;
 mod policy;
 mod policy_overrides;
+mod repair;
 mod rr;
 mod run;
 mod toolchain;
@@ -232,6 +233,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Add(_)) => vec!["pkg", "add"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
+                Some(pkg::PkgCommand::Provides(_)) => vec!["pkg", "provides"],
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
                 Some(pkg::PkgCommand::Publish(_)) => vec!["pkg", "publish"],
             },

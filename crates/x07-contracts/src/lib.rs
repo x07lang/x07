@@ -4,7 +4,7 @@
 //! appear in machine-readable I/O. Versioning rules are defined in
 //! `docs/versioning-policy.md`.
 
-pub const X07AST_SCHEMA_VERSION: &str = "x07.x07ast@0.1.0";
+pub const X07AST_SCHEMA_VERSION: &str = "x07.x07ast@0.2.0";
 pub const X07DIAG_SCHEMA_VERSION: &str = "x07.x07diag@0.1.0";
 pub const X07TEST_SCHEMA_VERSION: &str = "x07.x07test@0.2.0";
 

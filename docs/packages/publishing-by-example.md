@@ -66,7 +66,7 @@ acme-hello-demo/
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.1.0",
+  "schema_version": "x07.x07ast@0.2.0",
   "kind": "module",
   "module_id": "ext.acme_hello_demo",
   "imports": [],
@@ -94,7 +94,7 @@ acme-hello-demo/
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.1.0",
+  "schema_version": "x07.x07ast@0.2.0",
   "kind": "module",
   "module_id": "ext.acme_hello_demo.tests",
   "imports": ["ext.acme_hello_demo", "std.test"],

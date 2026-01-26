@@ -109,9 +109,9 @@ for t in \
   sqlite-app \
   postgres-client \
   worker \
+  worker-parallel \
 ; do
   check_template "$t"
 done
 
 printf 'OK %s\n' "$(basename "$0")"
-

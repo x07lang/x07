@@ -1,1 +1,1 @@
-{"decls":[],"imports":[],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.1.0","solve":["begin",["let","n",["bytes.len","input"]],["for","i",0,"n",["if",["=",["bytes.get_u8","input","i"],10],["return",["codec.write_u32_le","i"]],0]],["codec.write_u32_le","n"]]}
+{"decls":[],"imports":[],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.2.0","solve":["begin",["let","n",["bytes.len","input"]],["for","i",0,"n",["if",["=",["bytes.get_u8","input","i"],10],["return",["codec.write_u32_le","i"]],0]],["codec.write_u32_le","n"]]}

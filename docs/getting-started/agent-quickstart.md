@@ -16,7 +16,7 @@ Prerequisites (macOS / Linux):
 
 - `python3` (3.10+)
 - optional: `curl` (used for downloads when available)
-- for OS worlds / native deps (for example `ext-curl-c`): a C toolchain and libcurl headers (`x07up doctor --json` reports missing deps)
+- for OS worlds / native deps (for example `ext-curl-c`): a C toolchain and libcurl headers (`x07 doctor` reports missing deps)
 
 macOS / Linux (CI-safe, no profile edits, JSON report):
 
@@ -43,7 +43,7 @@ x07 --cli-specrows
 If you plan to use OS worlds (`run-os*`) with native deps (for example `ext-net` / `ext-curl-c` / `ext-sockets-c`), run:
 
 ```bash
-x07up doctor --json
+x07 doctor
 ```
 
 See also: [Install](install.md).
@@ -80,20 +80,15 @@ If you are creating a publishable package repo (for `x07 pkg publish`), use `x07
 
 See also: [Available skills](available-skills.md).
 
-## 3) The core loop: fmt → lint → run → test
-
-Format and lint a single file:
-
-```bash
-x07 fmt --input src/main.x07.json --write
-x07 lint --input src/main.x07.json --world solve-pure
-```
+## 3) The core loop: run → test (auto-repair)
 
 Run:
 
 ```bash
 x07 run
 ```
+
+`x07 run` runs the canonical auto-repair loop by default (format → lint → quickfix, repeatable). Use `--repair=off` when debugging, or `--repair=memory` to stage repairs without editing source files.
 
 See: [Running programs](../toolchain/running-programs.md).
 
@@ -115,6 +110,8 @@ Two canonical repair mechanisms:
 
 - **Quickfixes**: `x07 fix` applies the tool-provided `quickfix` JSON patches deterministically.
 - **Explicit patches**: `x07 ast apply-patch` applies RFC 6902 JSON Patch.
+
+Note: `x07 run`, `x07 build`, and `x07 bundle` apply quickfixes automatically by default (`--repair=...`). Use the explicit loop below when you want raw diagnostics or tighter control.
 
 Example loop:
 
@@ -153,6 +150,7 @@ x07 pkg add NAME@VERSION --sync
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
+- If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 

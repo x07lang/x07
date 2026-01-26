@@ -11,6 +11,8 @@ metadata:
 
 Use this skill when an X07 file fails linting and the agent needs a deterministic converge loop.
 
+Note: `x07 run`, `x07 build`, and `x07 bundle` run the same auto-repair loop by default (`--repair=...`). Use this skill when you want raw diagnostics or tighter control.
+
 ## Canonical converge loop
 
 1. Lint (machine-readable JSON report):

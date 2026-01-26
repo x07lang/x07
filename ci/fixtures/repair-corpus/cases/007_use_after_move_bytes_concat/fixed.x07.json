@@ -1,0 +1,1 @@
+{"decls":[],"imports":[],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.2.0","solve":["begin",["let","b",["bytes.lit","hi"]],["bytes.concat",["view.to_bytes",["bytes.view","b"]],"b"]]}

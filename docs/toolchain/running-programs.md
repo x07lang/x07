@@ -11,6 +11,23 @@ Exactly one target mode is used:
 - `x07 run --program path/to/main.x07.json`: compile+run a single file (module roots are inferred unless `--module-root` is provided).
 - `x07 run --artifact path/to/exe`: run a precompiled executable (runner output only; no project metadata).
 
+## Auto-repair (default)
+
+By default, `x07 run` performs a bounded repair loop on the entry program before compiling:
+
+- canonicalize formatting
+- lint (world-aware)
+- apply any JSON Patch quickfixes (`x07diag`)
+- repeat up to `--repair-max-iters` (default: 3)
+
+Control it with:
+
+- `--repair=write` (default): write repairs back to the source file
+- `--repair=memory`: stage a repaired copy under `.x07/repair/_staged/` and compile/run that
+- `--repair=off`: disable auto-repair
+
+When using `--report wrapped`, the wrapper includes a `repair` summary object when repair is enabled.
+
 ## Executable I/O framing (advanced)
 
 Executables produced by the X07 runners use a simple byte framing:
@@ -39,7 +56,7 @@ Recommended: define intent-driven profiles in your project (`x07.json.default_pr
 World resolution precedence is:
 
 1. `--world ...`
-2. `--os` / `--host`
+2. `--os` / `--host` (legacy shorthand; prefer `--profile` or `--world`)
 3. `--profile ...` (or `default_profile`)
 4. project manifest `world`
 5. default: `solve-pure`
@@ -54,7 +71,7 @@ By default, `x07 run` chooses the runner from the selected world:
 You can override this with:
 
 - `--runner auto|host|os`
-- `--host` / `--os` (shorthand; also affects world selection if `--world` is not set)
+- `--host` / `--os` (legacy shorthand; also affects world selection if `--world` is not set)
 
 The host runner is only valid for `solve-*` worlds, and the OS runner is only valid for `run-os*` worlds.
 
@@ -154,5 +171,6 @@ If compilation fails because a module can’t be resolved, the report will have:
 
 Fix:
 
+- discover candidates: `x07 pkg provides <module-id>`
 - for packages: add the dependency (`x07 pkg add <name>@<ver> --sync`) so `x07.lock.json` provides module roots, or
 - for standalone `--program` runs: ensure the module exists under a `--module-root` directory.

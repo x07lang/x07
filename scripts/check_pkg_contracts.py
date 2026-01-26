@@ -104,7 +104,7 @@ def _write_exported_defn_module(
     *, path: Path, module_id: str, imports: list[str], fn_name: str, body_expr: object
 ) -> None:
     doc = {
-        "schema_version": "x07.x07ast@0.1.0",
+        "schema_version": "x07.x07ast@0.2.0",
         "kind": "module",
         "module_id": module_id,
         "imports": imports,
@@ -264,7 +264,7 @@ def main(argv: list[str]) -> int:
         )
 
         meta_module_doc = {
-            "schema_version": "x07.x07ast@0.1.0",
+            "schema_version": "x07.x07ast@0.2.0",
             "kind": "module",
             "module_id": "meta.main",
             "imports": ["base.util"],
@@ -335,7 +335,7 @@ def main(argv: list[str]) -> int:
         (trans_project_dir / "src" / "main.x07.json").write_text(
             json.dumps(
                 {
-                    "schema_version": "x07.x07ast@0.1.0",
+                    "schema_version": "x07.x07ast@0.2.0",
                     "kind": "entry",
                     "module_id": "main",
                     "imports": ["meta.main"],

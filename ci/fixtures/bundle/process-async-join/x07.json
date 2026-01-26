@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "src/main.x07.json",
+  "module_roots": ["src"],
+  "dependencies": [],
+  "default_profile": "test",
+  "profiles": {
+    "test": { "world": "run-os" },
+    "os": { "world": "run-os" },
+    "sandbox": {
+      "world": "run-os-sandboxed",
+      "policy": ".x07/policies/base/worker-parallel.sandbox.base.policy.json"
+    }
+  }
+}

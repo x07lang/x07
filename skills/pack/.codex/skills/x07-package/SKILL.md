@@ -29,6 +29,9 @@ Use this skill when:
 - Generate or update a project lockfile:
   - `x07 pkg lock --project x07.json`
 
+- Reverse-lookup which package provides a module:
+  - `x07 pkg provides <module-id>`
+
 - Verify a lockfile is up to date (CI mode):
   - `x07 pkg lock --project x07.json --check`
 

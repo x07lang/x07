@@ -290,6 +290,7 @@ fn lint_expr(expr: &Expr, ptr: &str, options: LintOptions, diagnostics: &mut Vec
             let head = items[0].as_ident().unwrap_or("");
             lint_core_arity(head, items, ptr, diagnostics);
             lint_core_borrow_rules(head, items, ptr, diagnostics);
+            lint_core_move_rules(head, items, ptr, diagnostics);
             lint_world_heads(head, ptr, options, diagnostics);
 
             for (idx, item) in items.iter().enumerate() {
@@ -490,13 +491,30 @@ fn lint_core_borrow_rules(
             .to_string(),
     ];
     if head == "bytes.view" || head == "bytes.subview" {
-        notes.push("Bind the bytes to a variable first, then call bytes.view/bytes.subview on that variable.".to_string());
+        notes.push(
+            "Suggested fix: bind the bytes to a variable first, then call bytes.view/bytes.subview on that variable.".to_string(),
+        );
     } else if head == "vec_u8.as_view" {
         notes.push(
-            "Bind the vec_u8 to a variable first, then call vec_u8.as_view on that variable."
-                .to_string(),
+            "Suggested fix: bind the vec_u8 to a variable first, then call vec_u8.as_view on that variable.".to_string(),
         );
     }
+
+    let tmp = "_x07_tmp";
+    let mut call_items: Vec<Expr> = Vec::with_capacity(items.len());
+    call_items.push(Expr::Ident(head.to_string()));
+    call_items.push(Expr::Ident(tmp.to_string()));
+    call_items.extend(items.iter().skip(2).cloned());
+
+    let fixed = Expr::List(vec![
+        Expr::Ident("begin".to_string()),
+        Expr::List(vec![
+            Expr::Ident("let".to_string()),
+            Expr::Ident(tmp.to_string()),
+            owner.clone(),
+        ]),
+        Expr::List(call_items),
+    ]);
 
     diagnostics.push(Diagnostic {
         code: "X07-BORROW-0001".to_string(),
@@ -507,7 +525,74 @@ fn lint_core_borrow_rules(
         notes,
         related: Vec::new(),
         data: Default::default(),
-        quickfix: None,
+        quickfix: Some(Quickfix {
+            kind: QuickfixKind::JsonPatch,
+            patch: vec![PatchOp::Replace {
+                path: ptr.to_string(),
+                value: x07ast::expr_to_value(&fixed),
+            }],
+            note: Some(format!("Introduce let binding for {head} owner")),
+        }),
+    });
+}
+
+fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<Diagnostic>) {
+    if head != "bytes.concat" || items.len() != 3 {
+        return;
+    }
+
+    let Some(a) = items.get(1).and_then(Expr::as_ident) else {
+        return;
+    };
+    let Some(b) = items.get(2).and_then(Expr::as_ident) else {
+        return;
+    };
+    if a != b {
+        return;
+    }
+
+    let mut notes = vec![
+        "This operation moves owned values. Using the same identifier twice will trigger a use-after-move during compilation."
+            .to_string(),
+        "Suggested fix: copy one side (for example: [\"bytes.concat\", [\"view.to_bytes\", [\"bytes.view\", name]], name])."
+            .to_string(),
+    ];
+
+    let fixed = Expr::List(vec![
+        Expr::Ident("bytes.concat".to_string()),
+        Expr::List(vec![
+            Expr::Ident("view.to_bytes".to_string()),
+            Expr::List(vec![
+                Expr::Ident("bytes.view".to_string()),
+                Expr::Ident(a.to_string()),
+            ]),
+        ]),
+        Expr::Ident(a.to_string()),
+    ]);
+
+    diagnostics.push(Diagnostic {
+        code: "X07-MOVE-0001".to_string(),
+        severity: Severity::Error,
+        stage: Stage::Lint,
+        message: "bytes.concat uses the same identifier twice".to_string(),
+        loc: Some(Location::X07Ast {
+            ptr: format!("{ptr}/2"),
+        }),
+        notes: {
+            // Keep a stable note set for repair-corpus goldens.
+            notes.sort();
+            notes
+        },
+        related: Vec::new(),
+        data: Default::default(),
+        quickfix: Some(Quickfix {
+            kind: QuickfixKind::JsonPatch,
+            patch: vec![PatchOp::Replace {
+                path: ptr.to_string(),
+                value: x07ast::expr_to_value(&fixed),
+            }],
+            note: Some("Copy one side to avoid use-after-move".to_string()),
+        }),
     });
 }
 

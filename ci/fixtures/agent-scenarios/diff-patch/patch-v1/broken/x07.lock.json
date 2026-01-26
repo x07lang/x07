@@ -8,10 +8,10 @@
       "package_manifest_sha256": "c32ee60e77bd76095394215241487e49e34fce9a09209e6d18f1e0b1202184d8",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.diff.bytes": "d64d5d7f19cea03443defa212706037780b0601caaba3b7e6b3569413d7624bc",
-        "ext.diff.lines": "0805a09b7ea33680dae762003ea40418aea9dd24f30bc1e2e19571fd479272c4",
-        "ext.diff.patch_v1": "45b5a9345a883a361887dd7f2f5a3f95ee83206898228b167bf09c858e5f8857",
-        "ext.diff.tests": "6ec02058ed16a2845f0c5958724415ce3b3f8780c7830df61dfb1e48df35620c"
+        "ext.diff.bytes": "41dd2174689d2ae98ea869631195f333adafb0aa0e40154f6ebf137ade0696ce",
+        "ext.diff.lines": "72ddfb7f6edc1e8d5812ac6460a9bbedefd8b134bec31763463ff39a2b5dbb47",
+        "ext.diff.patch_v1": "e95d545fc4e3c8eb19dcfadcdf8825f17a57b07a22a16188da456f4c1a00352c",
+        "ext.diff.tests": "2b2a2718a35598b53491142578b4c5e4aae77b55aaa2f28868abe8e7cbeed0c6"
       }
     },
     {
@@ -21,10 +21,10 @@
       "package_manifest_sha256": "34d6ed661c267e550bea1af6688799341e0a5f557189633fd12665e21993fdae",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.error.chain": "35193a5265840747ef52bc8c386dc7b1d44abc780504ad0f2c3a857183a8aa67",
-        "ext.error.context": "95161e94aa65f48b4bc41eb26490108543b76f77148510191fa6f3c85627a7ac",
-        "ext.error.fmt": "a9487a51312f93764103f52e8297e5398f315ed572f8b105dd6329d0ee8465dc",
-        "ext.error.tests": "ba8fdb32cb7e6a87c867817f80c4be7a28226ca0bec66047c7177ebf687282d8"
+        "ext.error.chain": "c030554da4403f7f68612cea7ec235edd076c9570eac0a64e9800c4352f98c7f",
+        "ext.error.context": "10c3939f6635e851a87db46ad1dcb4cceb205e4a861c4e23c1e17e1af1c7fbf0",
+        "ext.error.fmt": "48cfcf0b1ee0f977fd30a4c3626e5979633d4d8142ae2a040a01b40f566ba455",
+        "ext.error.tests": "49fb5e57aab0fda9d7a19cb61f3cf1b0add2e7e451a6f3411d7f28d844d53586"
       }
     }
   ]

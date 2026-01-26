@@ -1,1 +1,1 @@
-{"decls":[{"kind":"export","names":["std.prng.lcg_next_u32"]},{"body":["prng.lcg_next_u32","state"],"kind":"defn","name":"std.prng.lcg_next_u32","params":[{"name":"state","ty":"i32"}],"result":"i32"}],"imports":[],"kind":"module","module_id":"std.prng","schema_version":"x07.x07ast@0.1.0"}
+{"decls":[{"kind":"export","names":["std.prng.lcg_next_u32"]},{"body":["prng.lcg_next_u32","state"],"kind":"defn","name":"std.prng.lcg_next_u32","params":[{"name":"state","ty":"i32"}],"result":"i32"}],"imports":[],"kind":"module","module_id":"std.prng","schema_version":"x07.x07ast@0.2.0"}

@@ -38,6 +38,7 @@ Machine entrypoint used by `x07up`:
 When you have the toolchain installed, prefer local validation + repair:
 
 - `x07 guide` (language + stdlib reference)
-- `x07 fmt`, `x07 lint`, `x07 fix` (canonical edit loop)
+- `x07 run`, `x07 build`, `x07 bundle` (canonical loop; auto-repair by default via `--repair=...`)
+- `x07 fmt`, `x07 lint`, `x07 fix` (explicit diagnostics + repair)
+- `x07 pkg provides <module-id>` (deterministic module/package discovery)
 - `x07 --cli-specrows` (machine-readable CLI surface)
-

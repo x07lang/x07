@@ -23,17 +23,17 @@ Quickstart and full installer reference:
 - A C compiler toolchain (`clang`/`gcc` on macOS/Linux; MSVC or clang-cl on Windows)
 - Linux: libcurl development headers for packages that link libcurl (for example `ext-curl-c`)
 
-Run `x07up doctor --json` for a machine-readable environment report and install suggestions.
+After installing, run `x07 doctor` for a machine-readable environment report and install suggestions.
 
 ## Supported platforms
 
 Prebuilt toolchains (via `x07up`) are currently published for:
 
 - macOS (Apple Silicon + Intel)
-- Linux (x86_64 glibc)
+- Linux (x86_64 glibc + ARM64 glibc)
 - Windows (x86_64)
 
-Other targets (for example Linux ARM64) currently require building from source.
+Other targets (for example Linux musl/Alpine) currently require building from source.
 
 See [platform support and smoke tests](../worlds/os-worlds.md#platform-support).
 
@@ -86,7 +86,8 @@ Verify:
 - `x07 --help`
 - `x07 run --help`
 - `x07 ast apply-patch --help`
-- `x07up doctor --json` (toolchain + host prerequisites)
+- `x07 doctor` (host prerequisites for OS worlds)
+- `x07up doctor --json` (installer/toolchain + host prerequisites)
 - optional (advanced): `x07c --help`, `x07-host-runner --help`, `x07-os-runner --help`
 
 ### Pin a toolchain per project
@@ -94,7 +95,7 @@ Verify:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.0.35
+x07up override set v0.0.36
 ```
 
 This makes toolchain selection deterministic for agents and CI.
@@ -124,7 +125,7 @@ If Gatekeeper blocks the binary:
 
 X07 compiles to C and invokes a system C compiler.
 
-Run `x07up doctor --json` for a machine-readable environment report and install suggestions.
+Run `x07 doctor` for a machine-readable environment report and install suggestions.
 
 Install:
 

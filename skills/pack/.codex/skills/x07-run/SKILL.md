@@ -14,6 +14,13 @@ Use this skill for normal program execution. `x07 run` dispatches to:
 - `x07-host-runner` for deterministic `solve-*` worlds
 - `x07-os-runner` for `run-os*` worlds
 
+`x07 run` runs the canonical auto-repair loop by default (format → lint → quickfix, repeatable). Control it with:
+
+- `--repair=off`
+- `--repair=memory`
+- `--repair=write` (default)
+- `--repair-max-iters N` (default: 3)
+
 ## Canonical commands
 
 - Run the current project (auto-discovers `x07.json`):
@@ -25,7 +32,7 @@ Use this skill for normal program execution. `x07 run` dispatches to:
   - `x07 run --profile sandbox`
 
 - Check platform prerequisites for OS worlds (C compiler + common native deps):
-  - `x07up doctor --json`
+  - `x07 doctor`
 
 - Run a deterministic fixture world:
   - `x07 run --world solve-fs --fixtures fixtures`
@@ -38,6 +45,7 @@ Use this skill for normal program execution. `x07 run` dispatches to:
   - `x07 policy init --template sqlite-app`
   - `x07 policy init --template postgres-client`
   - `x07 policy init --template worker`
+  - `x07 policy init --template worker-parallel`
 
   Policies are starting points: review and extend them for your app (roots, env keys, subprocess allowlists, limits).
   For net-enabled templates, keep `net.allow_hosts: []` in the base policy and use `--allow-host` / `--deny-host` to materialize derived policies for specific destinations.
@@ -73,6 +81,7 @@ Optional wrapper (debuggable resolution envelope):
 
 - `x07 run --report wrapped`
 - Wrapper schema: `x07.run.report@0.1.0` (field `report` contains the raw runner report object).
+  - When repair is enabled, the wrapper includes a `repair` summary object.
 
 ## Distribution (native executable)
 
