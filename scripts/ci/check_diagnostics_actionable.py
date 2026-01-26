@@ -22,42 +22,44 @@ def _find_x07_bin(root: Path) -> Path:
             return p
         raise SystemExit(f"ERROR: X07_BIN is set but not executable: {override}")
 
-    try:
-        proc = subprocess.run(
-            ["bash", "-c", "./scripts/ci/find_x07.sh"],
-            cwd=str(root),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-    except FileNotFoundError:
+    def is_executable(path: Path) -> bool:
+        if not path.is_file():
+            return False
         if os.name == "nt":
-            raise SystemExit("ERROR: bash is required to run scripts/ci/find_x07.sh on Windows")
-        proc = subprocess.run(
-            [str(root / "scripts/ci/find_x07.sh")],
-            cwd=str(root),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+            return True
+        return os.access(path, os.X_OK)
+
+    candidates = [
+        root / "target" / "debug" / "x07",
+        root / "target" / "debug" / "x07.exe",
+        root / "target" / "release" / "x07",
+        root / "target" / "release" / "x07.exe",
+    ]
+
+    for candidate in candidates:
+        if is_executable(candidate):
+            return candidate
+
+    proc = subprocess.run(
+        ["cargo", "build", "-p", "x07"],
+        cwd=str(root),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
     if proc.returncode != 0:
-        stdout = proc.stdout.rstrip()
-        stderr = proc.stderr.rstrip()
         raise SystemExit(
-            "ERROR: scripts/ci/find_x07.sh failed:\n"
+            "ERROR: cargo build -p x07 failed:\n"
             f"exit={proc.returncode}\n"
-            f"stdout:\n{stdout if stdout else '<empty>'}\n"
-            f"stderr:\n{stderr if stderr else '<empty>'}\n"
+            f"stdout:\n{proc.stdout.rstrip() if proc.stdout else '<empty>'}\n"
+            f"stderr:\n{proc.stderr.rstrip() if proc.stderr else '<empty>'}\n"
         )
-    out = proc.stdout.strip()
-    if not out:
-        raise SystemExit("ERROR: scripts/ci/find_x07.sh produced empty output")
-    if os.name == "nt" and len(out) >= 3 and out[0] == "/" and out[2] == "/" and out[1].isalpha():
-        out = f"{out[1].upper()}:{out[2:]}".replace("/", "\\")
-    p = (root / out).resolve() if not Path(out).is_absolute() else Path(out).resolve()
-    if not p.is_file():
-        raise SystemExit(f"ERROR: x07 binary not found: {p}")
-    return p
+
+    for candidate in candidates:
+        if is_executable(candidate):
+            return candidate
+
+    raise SystemExit("ERROR: missing x07 binary (build with `cargo build -p x07`)")
 
 
 def _run_json(*cmd: str, cwd: Path) -> tuple[int, Any]:
