@@ -81,14 +81,30 @@ try {
 
     Step "start local artifacts server"
     $serverJson = Join-Path $env:TEMP "x07_server_$([Guid]::NewGuid().ToString('N')).json"
+    $serverStdout = Join-Path $env:TEMP "x07_server_$([Guid]::NewGuid().ToString('N'))_stdout.txt"
+    $serverStderr = Join-Path $env:TEMP "x07_server_$([Guid]::NewGuid().ToString('N'))_stderr.txt"
     Remove-Item -Force $serverJson -ErrorAction SilentlyContinue
-    $serverProc = Start-Process -PassThru -NoNewWindow -FilePath "python" -ArgumentList @("scripts/ci/local_http_server.py","--root",$artifacts,"--ready-json",$serverJson,"--quiet")
+    Remove-Item -Force $serverStdout -ErrorAction SilentlyContinue
+    Remove-Item -Force $serverStderr -ErrorAction SilentlyContinue
+    $serverProc = Start-Process -PassThru -NoNewWindow -FilePath "python" -ArgumentList @("scripts/ci/local_http_server.py","--root",$artifacts,"--ready-json",$serverJson,"--quiet") -RedirectStandardOutput $serverStdout -RedirectStandardError $serverStderr
 
-    for ($i = 0; $i -lt 100; $i++) {
+    $deadline = (Get-Date).AddSeconds(30)
+    while ((Get-Date) -lt $deadline) {
       if (Test-Path $serverJson) { break }
-      Start-Sleep -Milliseconds 50
+      if ($serverProc -and $serverProc.HasExited) { break }
+      Start-Sleep -Milliseconds 100
+      if ($serverProc) { try { $serverProc.Refresh() } catch {} }
     }
-    if (-not (Test-Path $serverJson)) { throw "local server did not publish ready json" }
+    if (-not (Test-Path $serverJson)) {
+      $stdoutText = ""
+      $stderrText = ""
+      if (Test-Path $serverStdout) { $stdoutText = (Get-Content $serverStdout -Raw).TrimEnd() }
+      if (Test-Path $serverStderr) { $stderrText = (Get-Content $serverStderr -Raw).TrimEnd() }
+      if ($serverProc -and $serverProc.HasExited) {
+        throw ("local server exited (exit=$($serverProc.ExitCode))`nstdout:`n$stdoutText`nstderr:`n$stderrText")
+      }
+      throw ("local server did not publish ready json`nstdout:`n$stdoutText`nstderr:`n$stderrText")
+    }
     $serverInfo = Get-Content $serverJson -Raw | ConvertFrom-Json
     $baseUrl = [string]$serverInfo.url
     $baseUrl = $baseUrl.TrimEnd("/")
