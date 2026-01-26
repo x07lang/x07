@@ -161,7 +161,6 @@ try {
         Copy-Item -Force $helperSrc (Join-Path $depsDir "x07-proc-echo.exe")
         Copy-Item -Force $helperSrc (Join-Path $depsDir "x07-proc-echo")
       }
-    }
 
       Step "run bundled binary via cmd.exe (binary-safe stdout redirection): fixture=$fixtureName profile=$profile"
       $runDir = Join-Path $outdir "run"
