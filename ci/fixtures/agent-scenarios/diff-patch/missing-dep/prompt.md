@@ -10,6 +10,6 @@ Goal:
 Expected workflow:
 
 1. Run `x07 run` and read the compile error.
-2. Apply the suggested fix: `x07 pkg add ext-diff-rs@0.1.0 --sync`.
+2. Apply the suggested fix: `x07 pkg add ext-diff-rs@0.1.1 --sync`.
 3. Re-run `x07 run` and verify it succeeds.
 

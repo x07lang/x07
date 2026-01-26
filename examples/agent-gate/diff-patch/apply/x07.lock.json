@@ -3,9 +3,9 @@
   "dependencies": [
     {
       "name": "ext-diff-rs",
-      "version": "0.1.0",
-      "path": ".x07/deps/ext-diff-rs/0.1.0",
-      "package_manifest_sha256": "c32ee60e77bd76095394215241487e49e34fce9a09209e6d18f1e0b1202184d8",
+      "version": "0.1.1",
+      "path": ".x07/deps/ext-diff-rs/0.1.1",
+      "package_manifest_sha256": "5719688d0a64006cd640da82fcaf76e4291a93c42bd8ed69f36ed1e53c0fa522",
       "module_root": "modules",
       "modules_sha256": {
         "ext.diff.bytes": "41dd2174689d2ae98ea869631195f333adafb0aa0e40154f6ebf137ade0696ce",
@@ -16,9 +16,9 @@
     },
     {
       "name": "ext-error",
-      "version": "0.1.2",
-      "path": ".x07/deps/ext-error/0.1.2",
-      "package_manifest_sha256": "34d6ed661c267e550bea1af6688799341e0a5f557189633fd12665e21993fdae",
+      "version": "0.1.3",
+      "path": ".x07/deps/ext-error/0.1.3",
+      "package_manifest_sha256": "723a31c95753dd8c096ad51d3a073f14c56d7915884aa4742ca1229f15e77e88",
       "module_root": "modules",
       "modules_sha256": {
         "ext.error.chain": "c030554da4403f7f68612cea7ec235edd076c9570eac0a64e9800c4352f98c7f",

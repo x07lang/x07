@@ -1,0 +1,119 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.diff.tests",
+  "imports": [
+    "ext.diff.bytes",
+    "ext.diff.lines",
+    "ext.diff.patch_v1",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.diff.tests.test_bytes_roundtrip_basic",
+        "ext.diff.tests.test_lines_roundtrip_basic",
+        "ext.diff.tests.test_patch_apply_err_invalid_magic",
+        "ext.diff.tests.test_patch_apply_err_truncated",
+        "ext.diff.tests.test_patch_apply_err_output_limit"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.tests.test_bytes_roundtrip_basic",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "v_before", ["vec_u8.with_capacity", 11]],
+        ["set", "v_before", ["vec_u8.extend_bytes", "v_before", ["bytes.lit", "hello"]]],
+        ["set", "v_before", ["vec_u8.push", "v_before", 32]],
+        ["set", "v_before", ["vec_u8.extend_bytes", "v_before", ["bytes.lit", "world"]]],
+        ["let", "before", ["vec_u8.into_bytes", "v_before"]],
+        ["let", "v_after", ["vec_u8.with_capacity", 17]],
+        ["set", "v_after", ["vec_u8.extend_bytes", "v_after", ["bytes.lit", "hello"]]],
+        ["set", "v_after", ["vec_u8.push", "v_after", 32]],
+        ["set", "v_after", ["vec_u8.extend_bytes", "v_after", ["bytes.lit", "brave"]]],
+        ["set", "v_after", ["vec_u8.push", "v_after", 32]],
+        ["set", "v_after", ["vec_u8.extend_bytes", "v_after", ["bytes.lit", "world"]]],
+        ["let", "after", ["vec_u8.into_bytes", "v_after"]],
+        ["let", "patch_doc", ["ext.diff.bytes.patch_v1", ["bytes.view", "before"], ["bytes.view", "after"], -1]],
+        ["if", ["=", ["ext.diff.patch_v1.is_err", ["bytes.view", "patch_doc"]], 1], ["return", ["result_i32.err", 1001]], 0],
+        ["let", "patch", ["ext.diff.patch_v1.get_bytes", ["bytes.view", "patch_doc"]]],
+        ["let", "out_doc", ["ext.diff.patch_v1.apply_v1", ["bytes.view", "before"], ["bytes.view", "patch"], 1024]],
+        ["if", ["=", ["ext.diff.patch_v1.is_err", ["bytes.view", "out_doc"]], 1], ["return", ["result_i32.err", 1002]], 0],
+        ["let", "out", ["ext.diff.patch_v1.get_bytes", ["bytes.view", "out_doc"]]],
+        ["std.test.assert_bytes_eq", "out", "after", 1003]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.tests.test_lines_roundtrip_basic",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "before", ["bytes.lit", "a\\nline2\\nline3\\n"]],
+        ["let", "after", ["bytes.lit", "a\\nline2\\nNEW\\nline3\\n"]],
+        ["let", "patch_doc", ["ext.diff.lines.patch_v1", ["bytes.view", "before"], ["bytes.view", "after"], -1]],
+        ["if", ["=", ["ext.diff.patch_v1.is_err", ["bytes.view", "patch_doc"]], 1], ["return", ["result_i32.err", 2001]], 0],
+        ["let", "patch", ["ext.diff.patch_v1.get_bytes", ["bytes.view", "patch_doc"]]],
+        ["let", "out_doc", ["ext.diff.patch_v1.apply_v1", ["bytes.view", "before"], ["bytes.view", "patch"], 1024]],
+        ["if", ["=", ["ext.diff.patch_v1.is_err", ["bytes.view", "out_doc"]], 1], ["return", ["result_i32.err", 2002]], 0],
+        ["let", "out", ["ext.diff.patch_v1.get_bytes", ["bytes.view", "out_doc"]]],
+        ["std.test.assert_bytes_eq", "out", "after", 2003]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.tests.test_patch_apply_err_invalid_magic",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "before", ["bytes.lit", "abc"]],
+        ["let", "patch", ["bytes.lit", "NOPE"]],
+        ["let", "doc", ["ext.diff.patch_v1.apply_v1", ["bytes.view", "before"], ["bytes.view", "patch"], 100]],
+        ["std.test.assert_true", ["=", ["ext.diff.patch_v1.is_err", ["bytes.view", "doc"]], 1], 3001]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.tests.test_patch_apply_err_truncated",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "before", ["bytes.lit", "abc"]],
+        ["let", "p", ["vec_u8.with_capacity", 16]],
+        ["set", "p", ["vec_u8.extend_bytes", "p", ["bytes.lit", "X07P"]]],
+        ["set", "p", ["vec_u8.push", "p", 1]],
+        ["set", "p", ["vec_u8.push", "p", 0]],
+        ["set", "p", ["vec_u8.push", "p", 0]],
+        ["set", "p", ["vec_u8.push", "p", 0]],
+        ["set", "p", ["vec_u8.push", "p", 0]],
+        ["set", "p", ["vec_u8.push", "p", 10]],
+        ["let", "patch", ["vec_u8.into_bytes", "p"]],
+        ["let", "doc", ["ext.diff.patch_v1.apply_v1", ["bytes.view", "before"], ["bytes.view", "patch"], 100]],
+        ["std.test.assert_true", ["=", ["ext.diff.patch_v1.is_err", ["bytes.view", "doc"]], 1], 4001]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.tests.test_patch_apply_err_output_limit",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "before", ["bytes.lit", "abc"]],
+        ["let", "after", ["bytes.lit", "abcXYZ"]],
+        ["let", "patch_doc", ["ext.diff.bytes.patch_v1", ["bytes.view", "before"], ["bytes.view", "after"], -1]],
+        ["if", ["=", ["ext.diff.patch_v1.is_err", ["bytes.view", "patch_doc"]], 1], ["return", ["result_i32.err", 5001]], 0],
+        ["let", "patch", ["ext.diff.patch_v1.get_bytes", ["bytes.view", "patch_doc"]]],
+        ["let", "doc", ["ext.diff.patch_v1.apply_v1", ["bytes.view", "before"], ["bytes.view", "patch"], 3]],
+        ["std.test.assert_true", ["=", ["ext.diff.patch_v1.is_err", ["bytes.view", "doc"]], 1], 5002]
+      ]
+    }
+  ]
+}

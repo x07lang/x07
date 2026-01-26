@@ -2,15 +2,26 @@
   "schema_version": "x07.project@0.2.0",
   "world": "solve-pure",
   "entry": "src/main.x07.json",
-  "module_roots": ["src"],
+  "module_roots": [
+    "src"
+  ],
   "dependencies": [
-    { "name": "ext-compress-rs", "version": "0.1.3", "path": ".x07/deps/ext-compress-rs/0.1.3" },
-    { "name": "ext-error", "version": "0.1.2", "path": ".x07/deps/ext-error/0.1.2" }
+    {
+      "name": "ext-compress-rs",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-compress-rs/0.1.4"
+    },
+    {
+      "name": "ext-error",
+      "version": "0.1.3",
+      "path": ".x07/deps/ext-error/0.1.3"
+    }
   ],
   "lockfile": "x07.lock.json",
   "default_profile": "test",
   "profiles": {
-    "test": { "world": "solve-pure" }
+    "test": {
+      "world": "solve-pure"
+    }
   }
 }
-

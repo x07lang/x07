@@ -10,6 +10,6 @@ Goal:
 Expected workflow:
 
 1. Run `x07 run` and read the compile error.
-2. Apply the suggested fix: `x07 pkg add ext-compress-rs@0.1.3 --sync`.
+2. Apply the suggested fix: `x07 pkg add ext-compress-rs@0.1.4 --sync`.
 3. Re-run `x07 run` and verify it succeeds.
 

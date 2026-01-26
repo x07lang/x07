@@ -1,0 +1,21 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-db-redis",
+  "description": "Redis client for std.db (run-os only).",
+  "docs": "Redis client for std.db (run-os only).\n\nModules:\n- std.db.redis\n- std.db.redis.spec\n- std.db.redis.argv\n\nUsage:\n- Add dependency: x07 pkg add ext-db-redis@0.1.3\n- Import the modules listed above.\n",
+  "version": "0.1.3",
+  "module_root": "modules",
+  "modules": [
+    "std.db.redis",
+    "std.db.redis.spec",
+    "std.db.redis.argv"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

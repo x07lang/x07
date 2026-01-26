@@ -424,7 +424,7 @@ fn x07_pkg_add_updates_project_manifest() {
     let out = run_x07_in_dir(&dir, &["init"]);
     assert_eq!(out.status.code(), Some(0));
 
-    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.0"]);
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.3"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -440,10 +440,10 @@ fn x07_pkg_add_updates_project_manifest() {
     let deps = doc["dependencies"].as_array().expect("dependencies[]");
     assert_eq!(deps.len(), 1);
     assert_eq!(deps[0]["name"], "ext-hex-rs");
-    assert_eq!(deps[0]["version"], "0.1.0");
-    assert_eq!(deps[0]["path"], ".x07/deps/ext-hex-rs/0.1.0");
+    assert_eq!(deps[0]["version"], "0.1.3");
+    assert_eq!(deps[0]["path"], ".x07/deps/ext-hex-rs/0.1.3");
 
-    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.0"]);
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.3"]);
     assert_eq!(out.status.code(), Some(20));
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
@@ -543,7 +543,7 @@ fn x07_pkg_lock_offline_uses_official_packages_when_available() {
     assert_eq!(out.status.code(), Some(0));
 
     // Add without syncing so the dependency is declared but not present on disk yet.
-    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.0"]);
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.3"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -551,7 +551,7 @@ fn x07_pkg_lock_offline_uses_official_packages_when_available() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let dep_manifest = dir.join(".x07/deps/ext-hex-rs/0.1.0/x07-package.json");
+    let dep_manifest = dir.join(".x07/deps/ext-hex-rs/0.1.3/x07-package.json");
     assert!(
         !dep_manifest.is_file(),
         "expected dep not to be present before pkg lock: {}",
@@ -597,13 +597,13 @@ fn x07_pkg_pack_includes_ffi_dir() {
     }
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
-    let package_dir = root.join("packages/ext/x07-ext-curl-c/0.1.3");
+    let package_dir = root.join("packages/ext/x07-ext-curl-c/0.1.4");
     assert!(
         package_dir.join("ffi/curl_shim.c").is_file(),
         "missing fixture file"
     );
 
-    let out_path = dir.join("ext-curl-c-0.1.3.x07pkg");
+    let out_path = dir.join("ext-curl-c-0.1.4.x07pkg");
     let out = run_x07(&[
         "pkg",
         "pack",

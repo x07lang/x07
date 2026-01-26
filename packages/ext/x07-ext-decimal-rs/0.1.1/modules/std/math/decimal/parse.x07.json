@@ -1,0 +1,219 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "std.math.decimal.parse",
+  "imports": [
+    "ext.error.context",
+    "std.math.bigint",
+    "std.math.decimal.codec_v1"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.math.decimal.parse.parse_dec_v1",
+        "std.math.decimal.parse.is_err",
+        "std.math.decimal.parse.err_code",
+        "std.math.decimal.parse.get_bytes"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.parse.is_err",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["begin", ["if", ["<", ["view.len", "doc"], 1], ["return", 1], 0], ["=", ["view.get_u8", "doc", 0], 0]]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.parse.err_code",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["ext.error.context.error_code", "doc"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.parse.get_bytes",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["<", "n", 2], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", ["view.get_u8", "doc", 0], 1], 0, ["return", ["bytes.alloc", 0]]],
+        ["view.to_bytes", ["view.slice", "doc", 1, ["-", "n", 1]]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.parse._doc_ok",
+      "params": [{ "name": "v", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "v"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 1, "n"]]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "v", 0, "n"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.parse._make_unchecked",
+      "params": [
+        { "name": "sign", "ty": "i32" },
+        { "name": "scale", "ty": "i32" },
+        { "name": "mag", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "mag_len", ["view.len", "mag"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 9, "mag_len"]]],
+        ["set", "out", ["vec_u8.push", "out", "sign"]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "scale"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "mag_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, "mag_len"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.parse.parse_dec_v1",
+      "params": [{ "name": "s", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "s"]],
+        ["if", ["=", "n", 0], ["return", ["ext.error.context.err_from_code", 1]], 0],
+        ["let", "i", 0],
+        ["let", "sign", 1],
+        [
+          "if",
+          ["<u", 0, "n"],
+          [
+            "begin",
+            ["let", "c0", ["view.get_u8", "s", 0]],
+            [
+              "if",
+              ["=", "c0", 45],
+              ["begin", ["set", "sign", 2], ["set", "i", 1]],
+              ["if", ["=", "c0", 43], ["set", "i", 1], 0]
+            ]
+          ],
+          0
+        ],
+        ["if", [">=u", "i", "n"], ["return", ["ext.error.context.err_from_code", 1]], 0],
+        ["let", "mag", ["vec_u8.push", ["vec_u8.with_capacity", 1], 0]],
+        ["let", "scale", 0],
+        ["let", "seen_dot", 0],
+        ["let", "seen_digit", 0],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "n", 1],
+          [
+            "if",
+            ["=", "done", 0],
+            [
+              "if",
+              ["<u", "i", "n"],
+              [
+                "begin",
+                ["let", "c", ["view.get_u8", "s", "i"]],
+                [
+                  "if",
+                  ["=", "c", 46],
+                  [
+                    "begin",
+                    ["if", ["=", "seen_dot", 1], ["return", ["ext.error.context.err_from_code", 3]], 0],
+                    ["set", "seen_dot", 1],
+                    ["set", "i", ["+", "i", 1]]
+                  ],
+                  [
+                    "begin",
+                    ["if", ["<u", "c", 48], ["return", ["ext.error.context.err_from_code", 2]], 0],
+                    ["if", [">=u", "c", 58], ["return", ["ext.error.context.err_from_code", 2]], 0],
+                    ["let", "digit", ["-", "c", 48]],
+                    ["let", "mlen", ["vec_u8.len", "mag"]],
+                    ["let", "carry", "digit"],
+                    ["let", "j", 0],
+                    [
+                      "for",
+                      "_",
+                      0,
+                      "mlen",
+                      [
+                        "begin",
+                        ["let", "idx", ["-", ["-", "mlen", 1], "j"]],
+                        ["let", "b", ["vec_u8.get", "mag", "idx"]],
+                        ["let", "prod", ["+", ["*", "b", 10], "carry"]],
+                        ["set", "mag", ["vec_u8.set", "mag", "idx", ["&", "prod", 255]]],
+                        ["set", "carry", [">>u", "prod", 8]],
+                        ["set", "j", ["+", "j", 1]]
+                      ]
+                    ],
+                    [
+                      "if",
+                      [">", "carry", 0],
+                      [
+                        "begin",
+                        ["let", "old", "mag"],
+                        ["let", "oldv", ["vec_u8.as_view", "old"]],
+                        ["let", "new", ["vec_u8.with_capacity", ["+", "mlen", 4]]],
+                        [
+                          "if",
+                          ["<u", "carry", 256],
+                          ["set", "new", ["vec_u8.push", "new", "carry"]],
+                          [
+                            "begin",
+                            ["set", "new", ["vec_u8.push", "new", ["&", [">>u", "carry", 8], 255]]],
+                            ["set", "new", ["vec_u8.push", "new", ["&", "carry", 255]]]
+                          ]
+                        ],
+                        ["set", "new", ["vec_u8.extend_bytes_range", "new", "oldv", 0, "mlen"]],
+                        ["set", "mag", "new"]
+                      ],
+                      0
+                    ],
+                    ["set", "seen_digit", 1],
+                    ["if", ["=", "seen_dot", 1], ["set", "scale", ["+", "scale", 1]], 0],
+                    ["set", "i", ["+", "i", 1]]
+                  ]
+                ]
+              ],
+              ["set", "done", 1]
+            ],
+            0
+          ]
+        ],
+        ["if", ["=", "seen_digit", 0], ["return", ["ext.error.context.err_from_code", 1]], 0],
+        ["set", "mag", ["std.math.bigint._trim_mag_vec", "mag"]],
+        [
+          "if",
+          ["if", ["=", ["vec_u8.len", "mag"], 1], ["=", ["vec_u8.get", "mag", 0], 0], 0],
+          [
+            "begin",
+            ["let", "empty", ["view.slice", "s", 0, 0]],
+            ["let", "raw0", ["std.math.decimal.parse._make_unchecked", 0, 0, "empty"]],
+            ["let", "zero", ["std.math.decimal.codec_v1.canon_v1", ["bytes.view", "raw0"]]],
+            ["std.math.decimal.parse._doc_ok", ["bytes.view", "zero"]]
+          ],
+          0
+        ],
+        ["let", "magv", ["vec_u8.as_view", "mag"]],
+        ["let", "raw", ["std.math.decimal.parse._make_unchecked", "sign", "scale", "magv"]],
+        ["let", "canon", ["std.math.decimal.codec_v1.canon_v1", ["bytes.view", "raw"]]],
+        ["if", ["=", ["bytes.len", "canon"], 0], ["return", ["ext.error.context.err_from_code", 4]], 0],
+        ["std.math.decimal.parse._doc_ok", ["bytes.view", "canon"]]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-decimal-rs@0.1.0"
+  }
+}

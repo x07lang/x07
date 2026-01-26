@@ -21,9 +21,9 @@ set -e
 if [[ "$code" -eq 0 ]]; then
   die "expected broken project to fail x07 run"
 fi
-assert_wrapped_compile_error_contains "fs-globwalk/missing-dep (broken)" "$wrapped" "x07 pkg add ext-path-glob-rs@0.1.0 --sync"
+assert_wrapped_compile_error_contains "fs-globwalk/missing-dep (broken)" "$wrapped" "x07 pkg add ext-path-glob-rs@0.1.1 --sync"
 
-(cd "$work" && "$X07_BIN" pkg add ext-path-glob-rs@0.1.0 --sync --project x07.json >/dev/null)
+(cd "$work" && "$X07_BIN" pkg add ext-path-glob-rs@0.1.1 --sync --project x07.json >/dev/null)
 (cd "$work" && "$X07_BIN" pkg lock --check --offline --project x07.json >/dev/null)
 
 wrapped_ok="$(run_wrapped "fs-globwalk/missing-dep (fixed)" "$work" --profile os)"

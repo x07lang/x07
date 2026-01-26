@@ -23,8 +23,6 @@
     "requires_packages": [
       "ext-url-rs@0.1.2"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }
-

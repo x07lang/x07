@@ -1,0 +1,39 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.walkdir",
+  "imports": [
+    "std.os.fs"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.walkdir.walk_glob_sorted_text_v1",
+        "ext.walkdir.walk_sorted_text_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.walkdir.walk_glob_sorted_text_v1",
+      "params": [
+        { "name": "root", "ty": "bytes" },
+        { "name": "glob", "ty": "bytes" },
+        { "name": "caps", "ty": "bytes" }
+      ],
+      "result": "result_bytes",
+      "body": ["std.os.fs.walk_glob_sorted_text_v1", "root", "glob", "caps"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.walkdir.walk_sorted_text_v1",
+      "params": [
+        { "name": "root", "ty": "bytes" },
+        { "name": "caps", "ty": "bytes" }
+      ],
+      "result": "result_bytes",
+      "body": ["std.os.fs.walk_glob_sorted_text_v1", "root", ["bytes.lit", "**/*"], "caps"]
+    }
+  ]
+}
+

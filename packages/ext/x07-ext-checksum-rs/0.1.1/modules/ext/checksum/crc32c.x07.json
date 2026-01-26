@@ -1,0 +1,88 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.checksum.crc32c",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.checksum.crc32c.sum_u32_v1",
+        "ext.checksum.crc32c.sum_u32_le_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.crc32c._table_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "poly", -2097792136],
+        ["let", "out", ["vec_u8.with_capacity", ["*", 256, 4]]],
+        [
+          "for",
+          "i",
+          0,
+          256,
+          [
+            "begin",
+            ["let", "c", "i"],
+            [
+              "for",
+              "_",
+              0,
+              8,
+              [
+                "if",
+                ["=", ["&", "c", 1], 1],
+                ["set", "c", ["^", [">>u", "c", 1], "poly"]],
+                ["set", "c", [">>u", "c", 1]]
+              ]
+            ],
+            ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "c"]]]
+          ]
+        ],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.crc32c.sum_u32_v1",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "table_b", ["ext.checksum.crc32c._table_v1"]],
+        ["let", "table", ["bytes.view", "table_b"]],
+        ["let", "crc", ["-", 0, 1]],
+        ["let", "n", ["view.len", "b"]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "x", ["view.get_u8", "b", "i"]],
+            ["let", "idx", ["&", ["^", "crc", "x"], 255]],
+            ["let", "t", ["codec.read_u32_le", "table", ["*", "idx", 4]]],
+            ["set", "crc", ["^", [">>u", "crc", 8], "t"]]
+          ]
+        ],
+        ["^", "crc", ["-", 0, 1]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.crc32c.sum_u32_le_v1",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["codec.write_u32_le", ["ext.checksum.crc32c.sum_u32_v1", "b"]]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-checksum-rs@0.1.0"
+  }
+}

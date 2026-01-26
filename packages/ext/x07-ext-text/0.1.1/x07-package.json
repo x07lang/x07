@@ -1,0 +1,31 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-text",
+  "description": "Text utilities (trim/split/join/find/lines) built on bytes.",
+  "docs": "Text utilities (trim/split/join/find/lines) built on bytes.\n\nModules:\n- std.text\n- std.text.ws\n- std.text.lines\n- std.text.split\n- std.text.join\n- std.text.find\n- std.text.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-text@0.1.1 --sync\n- Import std.text (or specific modules).\n\nNotes:\n- Bytes-first (explicit UTF-8 helpers live in std.text.utf8 / ext.unicode).\n- Determinism: pure\n",
+  "version": "0.1.1",
+  "module_root": "modules",
+  "modules": [
+    "std.text",
+    "std.text.ws",
+    "std.text.lines",
+    "std.text.split",
+    "std.text.join",
+    "std.text.find",
+    "std.text.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

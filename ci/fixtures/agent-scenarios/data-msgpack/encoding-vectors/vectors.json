@@ -1,9 +1,8 @@
 {
   "schema_version": "x07.fixture.vectors@0.1.0",
-  "package": "ext-msgpack-rs@0.1.0",
+  "package": "ext-msgpack-rs@0.1.1",
   "tests": [
     "ext.msgpack.tests.test_data_model_vectors",
     "ext.msgpack.tests.test_data_model_roundtrip"
   ]
 }
-

@@ -1,0 +1,175 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.log",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.log.level_error",
+        "ext.log.level_warn",
+        "ext.log.level_info",
+        "ext.log.level_debug",
+        "ext.log.level_trace",
+        "ext.log.level_name",
+        "ext.log.record",
+        "ext.log.is_valid_record",
+        "ext.log.record_level",
+        "ext.log.record_target",
+        "ext.log.record_msg",
+        "ext.log.format_record"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.level_error",
+      "params": [],
+      "result": "i32",
+      "body": 1
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.level_warn",
+      "params": [],
+      "result": "i32",
+      "body": 2
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.level_info",
+      "params": [],
+      "result": "i32",
+      "body": 3
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.level_debug",
+      "params": [],
+      "result": "i32",
+      "body": 4
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.level_trace",
+      "params": [],
+      "result": "i32",
+      "body": 5
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.level_name",
+      "params": [
+        {"name": "level", "ty": "i32"}
+      ],
+      "result": "bytes",
+      "body": ["if", ["=", "level", 1], ["bytes.lit", "error"], ["if", ["=", "level", 2], ["bytes.lit", "warn"], ["if", ["=", "level", 3], ["bytes.lit", "info"], ["if", ["=", "level", 4], ["bytes.lit", "debug"], ["if", ["=", "level", 5], ["bytes.lit", "trace"], ["bytes.lit", "unknown"]]]]]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.record",
+      "params": [
+        {"name": "level", "ty": "i32"},
+        {"name": "target", "ty": "bytes_view"},
+        {"name": "msg", "ty": "bytes_view"}
+      ],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "target_len", ["view.len", "target"]],
+        ["let", "msg_len", ["view.len", "msg"]],
+        ["let", "v", ["vec_u8.with_capacity", ["+", ["+", 10, "target_len"], "msg_len"]]],
+        ["set", "v", ["vec_u8.push", "v", 0]],
+        ["set", "v", ["vec_u8.push", "v", "level"]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", "target_len"]]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", "target"]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", "msg_len"]]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", "msg"]],
+        ["vec_u8.into_bytes", "v"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.is_valid_record",
+      "params": [
+        {"name": "rec", "ty": "bytes_view"}
+      ],
+      "result": "i32",
+      "body": ["begin",
+        ["let", "n", ["view.len", "rec"]],
+        ["if", ["<u", "n", 10], ["return", 0], 0],
+        ["if", ["!=", ["view.get_u8", "rec", 0], 0], ["return", 0], 0],
+        ["let", "target_len", ["codec.read_u32_le", "rec", 2]],
+        ["let", "after_target", ["+", 6, "target_len"]],
+        ["if", ["<u", "n", ["+", "after_target", 4]], ["return", 0], 0],
+        ["let", "msg_len", ["codec.read_u32_le", "rec", "after_target"]],
+        ["let", "expected", ["+", ["+", "after_target", 4], "msg_len"]],
+        ["=", "n", "expected"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.record_level",
+      "params": [
+        {"name": "rec", "ty": "bytes_view"}
+      ],
+      "result": "i32",
+      "body": ["if", ["ext.log.is_valid_record", "rec"], ["view.get_u8", "rec", 1], 0]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.record_target",
+      "params": [
+        {"name": "rec", "ty": "bytes_view"}
+      ],
+      "result": "bytes",
+      "body": ["begin",
+        ["if", ["=", ["ext.log.is_valid_record", "rec"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "target_len", ["codec.read_u32_le", "rec", 2]],
+        ["view.to_bytes", ["view.slice", "rec", 6, "target_len"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.record_msg",
+      "params": [
+        {"name": "rec", "ty": "bytes_view"}
+      ],
+      "result": "bytes",
+      "body": ["begin",
+        ["if", ["=", ["ext.log.is_valid_record", "rec"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "target_len", ["codec.read_u32_le", "rec", 2]],
+        ["let", "after_target", ["+", 6, "target_len"]],
+        ["let", "msg_len", ["codec.read_u32_le", "rec", "after_target"]],
+        ["view.to_bytes", ["view.slice", "rec", ["+", "after_target", 4], "msg_len"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.log.format_record",
+      "params": [
+        {"name": "rec", "ty": "bytes_view"}
+      ],
+      "result": "bytes",
+      "body": ["begin",
+        ["if", ["=", ["ext.log.is_valid_record", "rec"], 0], ["return", ["bytes.lit", "invalid_ext.log_record"]], 0],
+        ["let", "level", ["ext.log.record_level", "rec"]],
+        ["let", "target_len", ["codec.read_u32_le", "rec", 2]],
+        ["let", "after_target", ["+", 6, "target_len"]],
+        ["let", "msg_len", ["codec.read_u32_le", "rec", "after_target"]],
+        ["let", "level_name", ["ext.log.level_name", "level"]],
+        ["let", "extra", ["+", 2, ["if", [">", "target_len", 0], 1, 0]]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", ["+", ["+", ["bytes.len", "level_name"], "extra"], "target_len"], "msg_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.view", "level_name"]]],
+        ["if", [">", "target_len", 0], ["begin",
+          ["set", "out", ["vec_u8.push", "out", 32]],
+          ["set", "out", ["vec_u8.extend_bytes", "out", ["view.slice", "rec", 6, "target_len"]]],
+          0
+        ], 0],
+        ["set", "out", ["vec_u8.push", "out", 58]],
+        ["set", "out", ["vec_u8.push", "out", 32]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["view.slice", "rec", ["+", "after_target", 4], "msg_len"]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    }
+  ]
+}

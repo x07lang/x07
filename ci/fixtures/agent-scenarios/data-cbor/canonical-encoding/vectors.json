@@ -1,9 +1,8 @@
 {
   "schema_version": "x07.fixture.vectors@0.1.0",
-  "package": "ext-cbor-rs@0.1.0",
+  "package": "ext-cbor-rs@0.1.1",
   "tests": [
     "ext.cbor.tests.test_data_model_vectors",
     "ext.cbor.tests.test_data_model_roundtrip"
   ]
 }
-

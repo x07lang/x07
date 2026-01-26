@@ -1,5 +1,5 @@
 diff --git a/ci/fixtures/agent-scenarios/text-core/missing-dep/broken/x07.json b/ci/fixtures/agent-scenarios/text-core/missing-dep/expected/x07.json
-index f4ea51e..91ad4d0 100644
+index f4ea51e..a7f7690 100644
 --- a/ci/fixtures/agent-scenarios/text-core/missing-dep/broken/x07.json
 +++ b/ci/fixtures/agent-scenarios/text-core/missing-dep/expected/x07.json
 @@ -1,13 +1,22 @@
@@ -10,8 +10,8 @@ index f4ea51e..91ad4d0 100644
 +  "dependencies": [
 +    {
 +      "name": "ext-text",
-+      "path": ".x07/deps/ext-text/0.1.0",
-+      "version": "0.1.0"
++      "path": ".x07/deps/ext-text/0.1.1",
++      "version": "0.1.1"
 +    }
 +  ],
    "entry": "src/main.x07.json",
@@ -34,30 +34,29 @@ index f4ea51e..91ad4d0 100644
  }
 -
 diff --git a/ci/fixtures/agent-scenarios/text-core/missing-dep/broken/x07.lock.json b/ci/fixtures/agent-scenarios/text-core/missing-dep/expected/x07.lock.json
-index 52ca7bf..920fcb4 100644
+index d7f8feb..b3dd79c 100644
 --- a/ci/fixtures/agent-scenarios/text-core/missing-dep/broken/x07.lock.json
 +++ b/ci/fixtures/agent-scenarios/text-core/missing-dep/expected/x07.lock.json
-@@ -1,5 +1,21 @@
+@@ -1,4 +1,21 @@
  {
    "schema_version": "x07.lock@0.2.0",
 -  "dependencies": []
 +  "dependencies": [
 +    {
 +      "name": "ext-text",
-+      "version": "0.1.0",
-+      "path": ".x07/deps/ext-text/0.1.0",
-+      "package_manifest_sha256": "a9585757c82dc68e54503b7ea20f04a9b94b72f9cf7c5d367c204414d37bc45d",
++      "version": "0.1.1",
++      "path": ".x07/deps/ext-text/0.1.1",
++      "package_manifest_sha256": "d43ba1e2b4b9e87a62086e286d276f2ba46700a129a0899b866c72c3ad009ae1",
 +      "module_root": "modules",
 +      "modules_sha256": {
-+        "std.text": "e01b2eabe5101c6936b92ec5b3946e6501a46ad8393125c23e95a9d52842c8bd",
-+        "std.text.find": "a9ea39948540672d2ce318fa9b37ecbeb39155775b6c66b73744af3a4e40f460",
-+        "std.text.join": "194169135ff465f44afa8fde3952f338c87df88b067b535bf0730cfc2009b8a1",
-+        "std.text.lines": "53a260f960afda9d9b1beae93131c2818d8725ea02479a3d85fedf77492db457",
-+        "std.text.split": "1a369b48f4fca753b87996bdbe1bccae5602f37056d35e32d994153607b94eb3",
-+        "std.text.tests": "cd406b50577db89c14027b2d612e00d05ae5aa501f1d51951f103d78d415b2d8",
-+        "std.text.ws": "fe585b8a2df5794a3ca14c0f936ef3a809ceec66e608b7e12f7f32d296730520"
++        "std.text": "34c68b30839a56cfc0c9f3079c5b61a4860e98c7414e577e2d17dce202ac3cb7",
++        "std.text.find": "24abdc6abb1568da5d3d96ade07f5eff63d602b6ab38f673e89fe7b83de2b525",
++        "std.text.join": "436799f5c3f04d042ef280c8ff1816d5d17d0e9fcd76554520cccfece75e9b47",
++        "std.text.lines": "eed5fe110a0d469673e59cdb4e2b4fd65580b76ae8122d963aa941e2fecdbce2",
++        "std.text.split": "0e2228faa70693d4e9b414aea640fc017f4895b8efcc8c40777b0e353c071c9c",
++        "std.text.tests": "93d2f0c49cf217666806430fcce6b152af95f51d9ecd979de3ddce5d67bb2138",
++        "std.text.ws": "1b7cc125e83ef5d8b9519a40d7e5530871d38e4ba29ab9d5e4254a35c572a3b5"
 +      }
 +    }
 +  ]
  }
--

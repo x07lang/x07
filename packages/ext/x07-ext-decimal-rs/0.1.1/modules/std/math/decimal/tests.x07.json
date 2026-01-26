@@ -1,0 +1,112 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "std.math.decimal.tests",
+  "imports": [
+    "std.math.decimal",
+    "std.math.decimal.fmt",
+    "std.math.decimal.parse",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.math.decimal.tests.test_parse_and_format",
+        "std.math.decimal.tests.test_add_and_mul"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.tests._parse_ok",
+      "params": [{ "name": "s", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["std.math.decimal.parse.parse_dec_v1", "s"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.tests._fmt_ok",
+      "params": [{ "name": "v", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["std.math.decimal.fmt.format_dec_v1", "v"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.tests.test_parse_and_format",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "s0", ["bytes.lit", "0"]],
+        ["let", "d0_doc", ["std.math.decimal.tests._parse_ok", ["bytes.view", "s0"]]],
+        ["let", "d0_docv", ["bytes.view", "d0_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.parse.is_err", "d0_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "d0", ["std.math.decimal.parse.get_bytes", "d0_docv"]],
+        ["let", "d0_fmt_doc", ["std.math.decimal.tests._fmt_ok", ["bytes.view", "d0"]]],
+        ["let", "d0_fmt_docv", ["bytes.view", "d0_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.fmt.is_err", "d0_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.decimal.fmt.get_bytes", "d0_fmt_docv"], ["bytes.lit", "0"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "s1", ["bytes.lit", "001.2300"]],
+        ["let", "d1_doc", ["std.math.decimal.tests._parse_ok", ["bytes.view", "s1"]]],
+        ["let", "d1_docv", ["bytes.view", "d1_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.parse.is_err", "d1_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "d1", ["std.math.decimal.parse.get_bytes", "d1_docv"]],
+        ["let", "d1_fmt_doc", ["std.math.decimal.tests._fmt_ok", ["bytes.view", "d1"]]],
+        ["let", "d1_fmt_docv", ["bytes.view", "d1_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.fmt.is_err", "d1_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.decimal.fmt.get_bytes", "d1_fmt_docv"], ["bytes.lit", "1.23"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "s2", ["bytes.lit", "-0.00"]],
+        ["let", "d2_doc", ["std.math.decimal.tests._parse_ok", ["bytes.view", "s2"]]],
+        ["let", "d2_docv", ["bytes.view", "d2_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.parse.is_err", "d2_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "d2", ["std.math.decimal.parse.get_bytes", "d2_docv"]],
+        ["let", "d2_fmt_doc", ["std.math.decimal.tests._fmt_ok", ["bytes.view", "d2"]]],
+        ["let", "d2_fmt_docv", ["bytes.view", "d2_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.fmt.is_err", "d2_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.decimal.fmt.get_bytes", "d2_fmt_docv"], ["bytes.lit", "0"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "s3", ["bytes.lit", ".5"]],
+        ["let", "d3_doc", ["std.math.decimal.tests._parse_ok", ["bytes.view", "s3"]]],
+        ["let", "d3_docv", ["bytes.view", "d3_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.parse.is_err", "d3_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "d3", ["std.math.decimal.parse.get_bytes", "d3_docv"]],
+        ["let", "d3_fmt_doc", ["std.math.decimal.tests._fmt_ok", ["bytes.view", "d3"]]],
+        ["let", "d3_fmt_docv", ["bytes.view", "d3_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.fmt.is_err", "d3_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.decimal.fmt.get_bytes", "d3_fmt_docv"], ["bytes.lit", "0.5"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.decimal.tests.test_add_and_mul",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "a_s", ["bytes.lit", "1.20"]],
+        ["let", "b_s", ["bytes.lit", "3.4"]],
+        ["let", "a_doc", ["std.math.decimal.tests._parse_ok", ["bytes.view", "a_s"]]],
+        ["let", "b_doc", ["std.math.decimal.tests._parse_ok", ["bytes.view", "b_s"]]],
+        ["let", "a", ["std.math.decimal.parse.get_bytes", ["bytes.view", "a_doc"]]],
+        ["let", "b", ["std.math.decimal.parse.get_bytes", ["bytes.view", "b_doc"]]],
+        ["let", "sum", ["std.math.decimal.add_v1", ["bytes.view", "a"], ["bytes.view", "b"]]],
+        ["let", "sum_fmt_doc", ["std.math.decimal.tests._fmt_ok", ["bytes.view", "sum"]]],
+        ["let", "sum_fmt_docv", ["bytes.view", "sum_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.fmt.is_err", "sum_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.decimal.fmt.get_bytes", "sum_fmt_docv"], ["bytes.lit", "4.6"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "m_s", ["bytes.lit", "1.2"]],
+        ["let", "n_s", ["bytes.lit", "3"]],
+        ["let", "m_doc", ["std.math.decimal.tests._parse_ok", ["bytes.view", "m_s"]]],
+        ["let", "n_doc", ["std.math.decimal.tests._parse_ok", ["bytes.view", "n_s"]]],
+        ["let", "m", ["std.math.decimal.parse.get_bytes", ["bytes.view", "m_doc"]]],
+        ["let", "n", ["std.math.decimal.parse.get_bytes", ["bytes.view", "n_doc"]]],
+        ["let", "prod", ["std.math.decimal.mul_v1", ["bytes.view", "m"], ["bytes.view", "n"]]],
+        ["let", "prod_fmt_doc", ["std.math.decimal.tests._fmt_ok", ["bytes.view", "prod"]]],
+        ["let", "prod_fmt_docv", ["bytes.view", "prod_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.decimal.fmt.is_err", "prod_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.decimal.fmt.get_bytes", "prod_fmt_docv"], ["bytes.lit", "3.6"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

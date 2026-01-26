@@ -1,0 +1,175 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "std.math.bigint.fmt",
+  "imports": [
+    "ext.error.context",
+    "std.math.bigint",
+    "std.math.bigint.codec_v1"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.math.bigint.fmt.format_dec_v1",
+        "std.math.bigint.fmt.is_err",
+        "std.math.bigint.fmt.err_code",
+        "std.math.bigint.fmt.get_bytes"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.fmt.is_err",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["begin", ["if", ["<", ["view.len", "doc"], 1], ["return", 1], 0], ["=", ["view.get_u8", "doc", 0], 0]]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.fmt.err_code",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["ext.error.context.error_code", "doc"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.fmt.get_bytes",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["<", "n", 2], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", ["view.get_u8", "doc", 0], 1], 0, ["return", ["bytes.alloc", 0]]],
+        ["view.to_bytes", ["view.slice", "doc", 1, ["-", "n", 1]]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.fmt._doc_ok",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 1, "n"]]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "b", 0, "n"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.fmt._mag_is_zero_vec",
+      "params": [{ "name": "v", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "v"]],
+        ["if", ["=", "n", 0], ["return", 1], 0],
+        ["if", ["=", "n", 1], ["return", ["=", ["view.get_u8", "v", 0], 0]], 0],
+        ["for", "i", 0, "n", ["if", ["=", ["view.get_u8", "v", "i"], 0], 0, ["return", 0]]],
+        1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.fmt._trim_mag_vec",
+      "params": [{ "name": "v", "ty": "vec_u8" }],
+      "result": "vec_u8",
+      "body": ["std.math.bigint._trim_mag_vec", "v"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.fmt.format_dec_v1",
+      "params": [{ "name": "v0", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "canon_bytes", ["std.math.bigint.codec_v1.canon_v1", "v0"]],
+        ["if", ["=", ["bytes.len", "canon_bytes"], 0], ["return", ["ext.error.context.err_from_code", 1]], 0],
+        ["let", "canon", ["bytes.view", "canon_bytes"]],
+        ["let", "s", ["view.get_u8", "canon", 0]],
+        [
+          "if",
+          ["=", "s", 0],
+          [
+            "begin",
+            ["let", "z", ["bytes.lit", "0"]],
+            ["return", ["std.math.bigint.fmt._doc_ok", ["bytes.view", "z"]]],
+            0
+          ],
+          0
+        ],
+        ["let", "magv0", ["std.math.bigint.codec_v1.mag_view_v1", "canon"]],
+        ["let", "mn0", ["view.len", "magv0"]],
+        [
+          "if",
+          ["=", "mn0", 0],
+          [
+            "begin",
+            ["let", "z", ["bytes.lit", "0"]],
+            ["return", ["std.math.bigint.fmt._doc_ok", ["bytes.view", "z"]]],
+            0
+          ],
+          0
+        ],
+        ["let", "work", ["vec_u8.with_capacity", "mn0"]],
+        ["set", "work", ["vec_u8.extend_bytes_range", "work", "magv0", 0, "mn0"]],
+        ["set", "work", ["std.math.bigint.fmt._trim_mag_vec", "work"]],
+        ["let", "digits_rev", ["vec_u8.with_capacity", 64]],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          0,
+          10000,
+          [
+              "if",
+              ["=", "done", 0],
+              [
+                "if",
+                ["std.math.bigint.fmt._mag_is_zero_vec", ["vec_u8.as_view", "work"]],
+                ["set", "done", 1],
+                [
+                  "begin",
+                  ["let", "wlen", ["vec_u8.len", "work"]],
+                  ["let", "rem", 0],
+                [
+                  "for",
+                  "i",
+                  0,
+                  "wlen",
+                  [
+                    "begin",
+                    ["let", "b", ["vec_u8.get", "work", "i"]],
+                    ["let", "val", ["+", ["*", "rem", 256], "b"]],
+                    ["let", "q", ["/", "val", 10]],
+                    ["set", "rem", ["%", "val", 10]],
+                    ["set", "work", ["vec_u8.set", "work", "i", "q"]]
+                  ]
+                ],
+                ["set", "work", ["std.math.bigint.fmt._trim_mag_vec", "work"]],
+                ["set", "digits_rev", ["vec_u8.push", "digits_rev", ["+", 48, "rem"]]],
+                ["if", ["std.math.bigint.fmt._mag_is_zero_vec", ["vec_u8.as_view", "work"]], ["set", "done", 1], 0]
+              ]
+            ],
+            0
+          ]
+        ],
+        ["let", "dn", ["vec_u8.len", "digits_rev"]],
+        ["if", ["=", "dn", 0], ["set", "digits_rev", ["vec_u8.push", "digits_rev", 48]], 0],
+        ["set", "dn", ["vec_u8.len", "digits_rev"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", "dn", 1]]],
+        ["if", ["=", "s", 2], ["set", "out", ["vec_u8.push", "out", 45]], 0],
+        ["for", "j", 0, "dn", ["set", "out", ["vec_u8.push", "out", ["vec_u8.get", "digits_rev", ["-", ["-", "dn", 1], "j"]]]]],
+        ["let", "str_bytes", ["vec_u8.into_bytes", "out"]],
+        ["std.math.bigint.fmt._doc_ok", ["bytes.view", "str_bytes"]]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-bigint-rs@0.1.0"
+  }
+}

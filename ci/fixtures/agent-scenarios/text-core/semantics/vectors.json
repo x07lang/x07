@@ -1,9 +1,8 @@
 {
   "schema_version": "x07.fixture.vectors@0.1.0",
-  "package": "ext-text@0.1.0",
+  "package": "ext-text@0.1.1",
   "tests": [
     "std.text.tests.test_trim_ascii_whitespace",
     "std.text.tests.test_split_bytes_view"
   ]
 }
-

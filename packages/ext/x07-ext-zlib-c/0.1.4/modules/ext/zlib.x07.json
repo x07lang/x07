@@ -1,0 +1,151 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.zlib",
+  "imports": ["ext.zlib._ffi"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.zlib.compress",
+        "ext.zlib.decompress",
+        "ext.zlib.gzip_decompress",
+        "ext.zlib.inflate_raw"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zlib.compress",
+      "params": [{"name": "data", "ty": "bytes_view"}],
+      "result": "result_bytes",
+      "body": ["begin",
+        ["let", "src_len", ["view.len", "data"]],
+        ["if", ["=", "src_len", 0],
+          ["result_bytes.ok", ["bytes.alloc", 0]],
+          ["begin",
+            ["let", "src_ptr", ["view.as_ptr", "data"]],
+            ["let", "handle", 0],
+            ["let", "handle_ptr", ["unsafe", ["ptr.cast", "ptr_mut_i32", ["addr_of_mut", "handle"]]]],
+            ["let", "ret", ["unsafe", ["ext.zlib._ffi.compress_alloc", "src_ptr", "src_len", "handle_ptr"]]],
+            ["if", ["=", "ret", 0],
+              ["begin",
+                ["let", "h", ["unsafe", ["ptr.read_i32", "handle_ptr"]]],
+                ["let", "actual_len", ["unsafe", ["ext.zlib._ffi.buf_len", "h"]]],
+                ["let", "buf_ptr", ["unsafe", ["ext.zlib._ffi.buf_ptr", "h"]]],
+                ["let", "out", ["vec_u8.with_capacity", "actual_len"]],
+                ["for", "i", 0, "actual_len", ["set", "out", ["vec_u8.push", "out", ["unsafe", ["ptr.read_u8", ["ptr.add", "buf_ptr", "i"]]]]]],
+                ["let", "bytes", ["vec_u8.into_bytes", "out"]],
+                ["let", "_", ["unsafe", ["ext.zlib._ffi.buf_free", "h"]]],
+                ["result_bytes.ok", "bytes"]
+              ],
+              ["result_bytes.err", "ret"]
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zlib.decompress",
+      "params": [
+        {"name": "data", "ty": "bytes_view"},
+        {"name": "max_size", "ty": "i32"}
+      ],
+      "result": "result_bytes",
+      "body": ["begin",
+        ["let", "src_len", ["view.len", "data"]],
+        ["if", ["=", "src_len", 0],
+          ["result_bytes.ok", ["bytes.alloc", 0]],
+          ["begin",
+            ["let", "src_ptr", ["view.as_ptr", "data"]],
+            ["let", "handle", 0],
+            ["let", "handle_ptr", ["unsafe", ["ptr.cast", "ptr_mut_i32", ["addr_of_mut", "handle"]]]],
+            ["let", "ret", ["unsafe", ["ext.zlib._ffi.uncompress_alloc", "src_ptr", "src_len", "max_size", "handle_ptr"]]],
+            ["if", ["=", "ret", 0],
+              ["begin",
+                ["let", "h", ["unsafe", ["ptr.read_i32", "handle_ptr"]]],
+                ["let", "actual_len", ["unsafe", ["ext.zlib._ffi.buf_len", "h"]]],
+                ["let", "buf_ptr", ["unsafe", ["ext.zlib._ffi.buf_ptr", "h"]]],
+                ["let", "out", ["vec_u8.with_capacity", "actual_len"]],
+                ["for", "i", 0, "actual_len", ["set", "out", ["vec_u8.push", "out", ["unsafe", ["ptr.read_u8", ["ptr.add", "buf_ptr", "i"]]]]]],
+                ["let", "bytes", ["vec_u8.into_bytes", "out"]],
+                ["let", "_", ["unsafe", ["ext.zlib._ffi.buf_free", "h"]]],
+                ["result_bytes.ok", "bytes"]
+              ],
+              ["result_bytes.err", "ret"]
+            ]
+          ]
+        ]
+      ]
+    }
+    ,
+    {
+      "kind": "defn",
+      "name": "ext.zlib.gzip_decompress",
+      "params": [
+        {"name": "data", "ty": "bytes_view"},
+        {"name": "max_size", "ty": "i32"}
+      ],
+      "result": "result_bytes",
+      "body": ["begin",
+        ["let", "src_len", ["view.len", "data"]],
+        ["if", ["=", "src_len", 0],
+          ["result_bytes.ok", ["bytes.alloc", 0]],
+          ["begin",
+            ["let", "src_ptr", ["view.as_ptr", "data"]],
+            ["let", "handle", 0],
+            ["let", "handle_ptr", ["unsafe", ["ptr.cast", "ptr_mut_i32", ["addr_of_mut", "handle"]]]],
+            ["let", "ret", ["unsafe", ["ext.zlib._ffi.gzip_decompress_alloc", "src_ptr", "src_len", "max_size", "handle_ptr"]]],
+            ["if", ["=", "ret", 0],
+              ["begin",
+                ["let", "h", ["unsafe", ["ptr.read_i32", "handle_ptr"]]],
+                ["let", "actual_len", ["unsafe", ["ext.zlib._ffi.buf_len", "h"]]],
+                ["let", "buf_ptr", ["unsafe", ["ext.zlib._ffi.buf_ptr", "h"]]],
+                ["let", "out", ["vec_u8.with_capacity", "actual_len"]],
+                ["for", "i", 0, "actual_len", ["set", "out", ["vec_u8.push", "out", ["unsafe", ["ptr.read_u8", ["ptr.add", "buf_ptr", "i"]]]]]],
+                ["let", "bytes", ["vec_u8.into_bytes", "out"]],
+                ["let", "_", ["unsafe", ["ext.zlib._ffi.buf_free", "h"]]],
+                ["result_bytes.ok", "bytes"]
+              ],
+              ["result_bytes.err", "ret"]
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.zlib.inflate_raw",
+      "params": [
+        {"name": "data", "ty": "bytes_view"},
+        {"name": "max_size", "ty": "i32"}
+      ],
+      "result": "result_bytes",
+      "body": ["begin",
+        ["let", "src_len", ["view.len", "data"]],
+        ["if", ["=", "src_len", 0],
+          ["result_bytes.ok", ["bytes.alloc", 0]],
+          ["begin",
+            ["let", "src_ptr", ["view.as_ptr", "data"]],
+            ["let", "handle", 0],
+            ["let", "handle_ptr", ["unsafe", ["ptr.cast", "ptr_mut_i32", ["addr_of_mut", "handle"]]]],
+            ["let", "ret", ["unsafe", ["ext.zlib._ffi.inflate_raw_alloc", "src_ptr", "src_len", "max_size", "handle_ptr"]]],
+            ["if", ["=", "ret", 0],
+              ["begin",
+                ["let", "h", ["unsafe", ["ptr.read_i32", "handle_ptr"]]],
+                ["let", "actual_len", ["unsafe", ["ext.zlib._ffi.buf_len", "h"]]],
+                ["let", "buf_ptr", ["unsafe", ["ext.zlib._ffi.buf_ptr", "h"]]],
+                ["let", "out", ["vec_u8.with_capacity", "actual_len"]],
+                ["for", "i", 0, "actual_len", ["set", "out", ["vec_u8.push", "out", ["unsafe", ["ptr.read_u8", ["ptr.add", "buf_ptr", "i"]]]]]],
+                ["let", "bytes", ["vec_u8.into_bytes", "out"]],
+                ["let", "_", ["unsafe", ["ext.zlib._ffi.buf_free", "h"]]],
+                ["result_bytes.ok", "bytes"]
+              ],
+              ["result_bytes.err", "ret"]
+            ]
+          ]
+        ]
+      ]
+    }
+  ]
+}

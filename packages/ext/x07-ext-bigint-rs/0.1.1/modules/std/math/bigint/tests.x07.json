@@ -1,0 +1,137 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "std.math.bigint.tests",
+  "imports": [
+    "std.math.bigint",
+    "std.math.bigint.fmt",
+    "std.math.bigint.parse",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.math.bigint.tests.test_parse_and_format",
+        "std.math.bigint.tests.test_add_and_mul",
+        "std.math.bigint.tests.test_factorial_100"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.tests._parse_ok",
+      "params": [{ "name": "s", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["std.math.bigint.parse.parse_dec_v1", "s"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.tests._fmt_ok",
+      "params": [{ "name": "v", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["std.math.bigint.fmt.format_dec_v1", "v"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.tests.test_parse_and_format",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "z_s", ["bytes.lit", "0"]],
+        ["let", "z_doc", ["std.math.bigint.tests._parse_ok", ["bytes.view", "z_s"]]],
+        ["let", "z_docv", ["bytes.view", "z_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.parse.is_err", "z_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "z", ["std.math.bigint.parse.get_bytes", "z_docv"]],
+        ["try", ["std.test.assert_i32_eq", ["bytes.len", "z"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["bytes.get_u8", "z", 0], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "z_fmt_doc", ["std.math.bigint.tests._fmt_ok", ["bytes.view", "z"]]],
+        ["let", "z_fmt_docv", ["bytes.view", "z_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.fmt.is_err", "z_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.bigint.fmt.get_bytes", "z_fmt_docv"], ["bytes.lit", "0"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "n_s", ["bytes.lit", "-123"]],
+        ["let", "n_doc", ["std.math.bigint.tests._parse_ok", ["bytes.view", "n_s"]]],
+        ["let", "n_docv", ["bytes.view", "n_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.parse.is_err", "n_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "n", ["std.math.bigint.parse.get_bytes", "n_docv"]],
+        ["let", "n_fmt_doc", ["std.math.bigint.tests._fmt_ok", ["bytes.view", "n"]]],
+        ["let", "n_fmt_docv", ["bytes.view", "n_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.fmt.is_err", "n_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.bigint.fmt.get_bytes", "n_fmt_docv"], ["bytes.lit", "-123"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "p2_s", ["bytes.lit", "12"]],
+        ["let", "p2_doc", ["std.math.bigint.tests._parse_ok", ["bytes.view", "p2_s"]]],
+        ["let", "p2_docv", ["bytes.view", "p2_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.parse.is_err", "p2_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "p2", ["std.math.bigint.parse.get_bytes", "p2_docv"]],
+        ["let", "p2_fmt_doc", ["std.math.bigint.tests._fmt_ok", ["bytes.view", "p2"]]],
+        ["let", "p2_fmt_docv", ["bytes.view", "p2_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.fmt.is_err", "p2_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.bigint.fmt.get_bytes", "p2_fmt_docv"], ["bytes.lit", "12"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "p_s", ["bytes.lit", "4567"]],
+        ["let", "p_doc", ["std.math.bigint.tests._parse_ok", ["bytes.view", "p_s"]]],
+        ["let", "p_docv", ["bytes.view", "p_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.parse.is_err", "p_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "p", ["std.math.bigint.parse.get_bytes", "p_docv"]],
+        ["let", "p_fmt_doc", ["std.math.bigint.tests._fmt_ok", ["bytes.view", "p"]]],
+        ["let", "p_fmt_docv", ["bytes.view", "p_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.fmt.is_err", "p_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.bigint.fmt.get_bytes", "p_fmt_docv"], ["bytes.lit", "4567"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.tests.test_add_and_mul",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "a", ["std.math.bigint.from_i32_v1", 500]],
+        ["let", "b", ["std.math.bigint.from_i32_v1", 500]],
+        ["let", "sum", ["std.math.bigint.add_v1", ["bytes.view", "a"], ["bytes.view", "b"]]],
+        ["let", "sum_fmt_doc", ["std.math.bigint.tests._fmt_ok", ["bytes.view", "sum"]]],
+        ["let", "sum_fmt_docv", ["bytes.view", "sum_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.fmt.is_err", "sum_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.bigint.fmt.get_bytes", "sum_fmt_docv"], ["bytes.lit", "1000"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "m", ["std.math.bigint.mul_i32_v1", ["bytes.view", "sum"], 7]],
+        ["let", "m_fmt_doc", ["std.math.bigint.tests._fmt_ok", ["bytes.view", "m"]]],
+        ["let", "m_fmt_docv", ["bytes.view", "m_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.fmt.is_err", "m_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.bigint.fmt.get_bytes", "m_fmt_docv"], ["bytes.lit", "7000"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "x", ["std.math.bigint.from_i32_v1", 1234]],
+        ["let", "y", ["std.math.bigint.from_i32_v1", 5678]],
+        ["let", "xy", ["std.math.bigint.mul_v1", ["bytes.view", "x"], ["bytes.view", "y"]]],
+        ["let", "xy_fmt_doc", ["std.math.bigint.tests._fmt_ok", ["bytes.view", "xy"]]],
+        ["let", "xy_fmt_docv", ["bytes.view", "xy_fmt_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.fmt.is_err", "xy_fmt_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", ["std.math.bigint.fmt.get_bytes", "xy_fmt_docv"], ["bytes.lit", "7006652"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.tests.test_factorial_100",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "acc", ["std.math.bigint.from_i32_v1", 1]],
+        ["for", "i", 2, 101, ["set", "acc", ["std.math.bigint.mul_i32_v1", ["bytes.view", "acc"], "i"]]],
+        ["let", "got_doc", ["std.math.bigint.tests._fmt_ok", ["bytes.view", "acc"]]],
+        ["let", "got_docv", ["bytes.view", "got_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["std.math.bigint.fmt.is_err", "got_docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "got", ["std.math.bigint.fmt.get_bytes", "got_docv"]],
+        [
+          "let",
+          "expected",
+          [
+            "bytes.lit",
+            "93326215443944152681699238856266700490715968264381621468592963895217599993229915608941463976156518286253697920827223758251185210916864000000000000000000000000"
+          ]
+        ],
+        ["try", ["std.test.assert_bytes_eq", "got", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

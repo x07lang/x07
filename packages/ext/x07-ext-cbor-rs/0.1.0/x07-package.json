@@ -27,7 +27,6 @@
       "ext-bigint-rs@0.1.0",
       "ext-decimal-rs@0.1.0"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }

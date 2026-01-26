@@ -1,0 +1,339 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.checksum.xxhash64",
+  "imports": [
+    "ext.u64"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.checksum.xxhash64.sum_u64_le_v1",
+        "ext.checksum.xxhash64.sum_u64_le_seed0_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._add_u64",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "b", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "a_lo", ["codec.read_u32_le", "a", 0]],
+        ["let", "a_hi", ["codec.read_u32_le", "a", 4]],
+        ["let", "b_lo", ["codec.read_u32_le", "b", 0]],
+        ["let", "b_hi", ["codec.read_u32_le", "b", 4]],
+        ["let", "sum_lo", ["ext.u64.add_lo", "a_lo", "b_lo"]],
+        ["let", "sum_hi", ["ext.u64.add_hi", "a_lo", "a_hi", "b_lo", "b_hi", "sum_lo"]],
+        ["ext.u64.to_bytes_le", "sum_lo", "sum_hi"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._add_const",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "c_lo", "ty": "i32" },
+        { "name": "c_hi", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "a_lo", ["codec.read_u32_le", "a", 0]],
+        ["let", "a_hi", ["codec.read_u32_le", "a", 4]],
+        ["let", "sum_lo", ["ext.u64.add_lo", "a_lo", "c_lo"]],
+        ["let", "sum_hi", ["ext.u64.add_hi", "a_lo", "a_hi", "c_lo", "c_hi", "sum_lo"]],
+        ["ext.u64.to_bytes_le", "sum_lo", "sum_hi"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._sub_const",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "c_lo", "ty": "i32" },
+        { "name": "c_hi", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "a_lo", ["codec.read_u32_le", "a", 0]],
+        ["let", "a_hi", ["codec.read_u32_le", "a", 4]],
+        ["let", "diff_lo", ["ext.u64.sub_lo", "a_lo", "c_lo"]],
+        ["let", "diff_hi", ["ext.u64.sub_hi", "a_lo", "a_hi", "c_lo", "c_hi", "diff_lo"]],
+        ["ext.u64.to_bytes_le", "diff_lo", "diff_hi"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._xor_u64",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "b", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "a_lo", ["codec.read_u32_le", "a", 0]],
+        ["let", "a_hi", ["codec.read_u32_le", "a", 4]],
+        ["let", "b_lo", ["codec.read_u32_le", "b", 0]],
+        ["let", "b_hi", ["codec.read_u32_le", "b", 4]],
+        ["ext.u64.to_bytes_le", ["^", "a_lo", "b_lo"], ["^", "a_hi", "b_hi"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._shr_u",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "n", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "lo", ["codec.read_u32_le", "a", 0]],
+        ["let", "hi", ["codec.read_u32_le", "a", 4]],
+        ["let", "out_lo", ["ext.u64.shr_u_lo", "lo", "hi", "n"]],
+        ["let", "out_hi", ["ext.u64.shr_u_hi", "lo", "hi", "n"]],
+        ["ext.u64.to_bytes_le", "out_lo", "out_hi"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._rotl",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "n", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "lo", ["codec.read_u32_le", "a", 0]],
+        ["let", "hi", ["codec.read_u32_le", "a", 4]],
+        ["let", "k", ["&", "n", 63]],
+        ["if", ["=", "k", 0], ["return", ["view.to_bytes", "a"]], 0],
+        ["let", "rr", ["-", 64, "k"]],
+        ["let", "out_lo", ["ext.u64.rotr_lo", "lo", "hi", "rr"]],
+        ["let", "out_hi", ["ext.u64.rotr_hi", "lo", "hi", "rr"]],
+        ["ext.u64.to_bytes_le", "out_lo", "out_hi"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._mul_const",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "b_lo", "ty": "i32" },
+        { "name": "b_hi", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "a_lo", ["codec.read_u32_le", "a", 0]],
+        ["let", "a_hi", ["codec.read_u32_le", "a", 4]],
+        ["let", "p0_lo", ["ext.u64.mul_u32_lo", "a_lo", "b_lo"]],
+        ["let", "p0_hi", ["ext.u64.mul_u32_hi", "a_lo", "b_lo"]],
+        ["let", "p1_lo", ["ext.u64.mul_u32_lo", "a_lo", "b_hi"]],
+        ["let", "p2_lo", ["ext.u64.mul_u32_lo", "a_hi", "b_lo"]],
+        ["ext.u64.to_bytes_le", "p0_lo", ["+", ["+", "p0_hi", "p1_lo"], "p2_lo"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._round",
+      "params": [
+        { "name": "acc", "ty": "bytes_view" },
+        { "name": "lane", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "p2", ["ext.checksum.xxhash64._mul_const", "lane", 668265295, -1028477379]],
+        ["let", "acc1", ["ext.checksum.xxhash64._add_u64", "acc", ["bytes.view", "p2"]]],
+        ["let", "rot", ["ext.checksum.xxhash64._rotl", ["bytes.view", "acc1"], 31]],
+        ["ext.checksum.xxhash64._mul_const", ["bytes.view", "rot"], -2048144761, -1640531535]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._merge_round",
+      "params": [
+        { "name": "acc", "ty": "bytes_view" },
+        { "name": "val", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "zero", ["ext.u64.to_bytes_le", 0, 0]],
+        ["let", "r", ["ext.checksum.xxhash64._round", ["bytes.view", "zero"], "val"]],
+        ["let", "acc_xor", ["ext.checksum.xxhash64._xor_u64", "acc", ["bytes.view", "r"]]],
+        ["let", "mul", ["ext.checksum.xxhash64._mul_const", ["bytes.view", "acc_xor"], -2048144761, -1640531535]],
+        ["ext.checksum.xxhash64._add_const", ["bytes.view", "mul"], -1028477341, -2048144777]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._avalanche",
+      "params": [{ "name": "h0", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "t1", ["ext.checksum.xxhash64._shr_u", "h0", 33]],
+        ["let", "h1", ["ext.checksum.xxhash64._xor_u64", "h0", ["bytes.view", "t1"]]],
+        ["let", "h2", ["ext.checksum.xxhash64._mul_const", ["bytes.view", "h1"], 668265295, -1028477379]],
+        ["let", "t2", ["ext.checksum.xxhash64._shr_u", ["bytes.view", "h2"], 29]],
+        ["let", "h3", ["ext.checksum.xxhash64._xor_u64", ["bytes.view", "h2"], ["bytes.view", "t2"]]],
+        ["let", "h4", ["ext.checksum.xxhash64._mul_const", ["bytes.view", "h3"], -1640531463, 374761393]],
+        ["let", "t3", ["ext.checksum.xxhash64._shr_u", ["bytes.view", "h4"], 32]],
+        ["ext.checksum.xxhash64._xor_u64", ["bytes.view", "h4"], ["bytes.view", "t3"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64._read_u64_le",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "lo", ["codec.read_u32_le", "b", "off"]],
+        ["let", "hi", ["codec.read_u32_le", "b", ["+", "off", 4]]],
+        ["ext.u64.to_bytes_le", "lo", "hi"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64.sum_u64_le_seed0_v1",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["ext.checksum.xxhash64.sum_u64_le_v1", "b", 0, 0]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.xxhash64.sum_u64_le_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "seed_lo", "ty": "i32" },
+        { "name": "seed_hi", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "len", ["view.len", "b"]],
+        ["let", "seed", ["ext.u64.to_bytes_le", "seed_lo", "seed_hi"]],
+        ["let", "p", 0],
+        ["let", "h", ["bytes.alloc", 8]],
+        [
+          "if",
+          [">=", "len", 32],
+          [
+            "begin",
+            ["let", "v1", ["ext.checksum.xxhash64._add_const", ["bytes.view", "seed"], -2048144761, -1640531535]],
+            ["set", "v1", ["ext.checksum.xxhash64._add_const", ["bytes.view", "v1"], 668265295, -1028477379]],
+            ["let", "v2", ["ext.checksum.xxhash64._add_const", ["bytes.view", "seed"], 668265295, -1028477379]],
+            ["let", "v3", ["view.to_bytes", ["bytes.view", "seed"]]],
+            ["let", "v4", ["ext.checksum.xxhash64._sub_const", ["bytes.view", "seed"], -2048144761, -1640531535]],
+            ["let", "blocks", ["/", "len", 32]],
+            [
+              "for",
+              "blk",
+              0,
+              "blocks",
+              [
+                "begin",
+                ["let", "off", ["*", "blk", 32]],
+                ["let", "x1", ["ext.checksum.xxhash64._read_u64_le", "b", "off"]],
+                ["set", "v1", ["ext.checksum.xxhash64._round", ["bytes.view", "v1"], ["bytes.view", "x1"]]],
+                ["let", "x2", ["ext.checksum.xxhash64._read_u64_le", "b", ["+", "off", 8]]],
+                ["set", "v2", ["ext.checksum.xxhash64._round", ["bytes.view", "v2"], ["bytes.view", "x2"]]],
+                ["let", "x3", ["ext.checksum.xxhash64._read_u64_le", "b", ["+", "off", 16]]],
+                ["set", "v3", ["ext.checksum.xxhash64._round", ["bytes.view", "v3"], ["bytes.view", "x3"]]],
+                ["let", "x4", ["ext.checksum.xxhash64._read_u64_le", "b", ["+", "off", 24]]],
+                ["set", "v4", ["ext.checksum.xxhash64._round", ["bytes.view", "v4"], ["bytes.view", "x4"]]]
+              ]
+            ],
+            ["set", "p", ["*", "blocks", 32]],
+            ["let", "r1", ["ext.checksum.xxhash64._rotl", ["bytes.view", "v1"], 1]],
+            ["let", "r2", ["ext.checksum.xxhash64._rotl", ["bytes.view", "v2"], 7]],
+            ["let", "r3", ["ext.checksum.xxhash64._rotl", ["bytes.view", "v3"], 12]],
+            ["let", "r4", ["ext.checksum.xxhash64._rotl", ["bytes.view", "v4"], 18]],
+            ["let", "t12", ["ext.checksum.xxhash64._add_u64", ["bytes.view", "r1"], ["bytes.view", "r2"]]],
+            ["let", "t34", ["ext.checksum.xxhash64._add_u64", ["bytes.view", "r3"], ["bytes.view", "r4"]]],
+            ["set", "h", ["ext.checksum.xxhash64._add_u64", ["bytes.view", "t12"], ["bytes.view", "t34"]]],
+            ["set", "h", ["ext.checksum.xxhash64._merge_round", ["bytes.view", "h"], ["bytes.view", "v1"]]],
+            ["set", "h", ["ext.checksum.xxhash64._merge_round", ["bytes.view", "h"], ["bytes.view", "v2"]]],
+            ["set", "h", ["ext.checksum.xxhash64._merge_round", ["bytes.view", "h"], ["bytes.view", "v3"]]],
+            ["set", "h", ["ext.checksum.xxhash64._merge_round", ["bytes.view", "h"], ["bytes.view", "v4"]]]
+          ],
+          [
+            "begin",
+            ["set", "h", ["ext.checksum.xxhash64._add_const", ["bytes.view", "seed"], 374761413, 668265263]]
+          ]
+        ],
+        ["set", "h", ["ext.checksum.xxhash64._add_const", ["bytes.view", "h"], "len", 0]],
+        ["let", "lanes8", ["/", ["-", "len", "p"], 8]],
+        ["let", "zero", ["ext.u64.to_bytes_le", 0, 0]],
+        [
+          "for",
+          "j",
+          0,
+          "lanes8",
+          [
+            "begin",
+            ["let", "off", ["+", "p", ["*", "j", 8]]],
+            ["let", "lane", ["ext.checksum.xxhash64._read_u64_le", "b", "off"]],
+            ["let", "k1", ["ext.checksum.xxhash64._round", ["bytes.view", "zero"], ["bytes.view", "lane"]]],
+            ["set", "h", ["ext.checksum.xxhash64._xor_u64", ["bytes.view", "h"], ["bytes.view", "k1"]]],
+            ["set", "h", ["ext.checksum.xxhash64._rotl", ["bytes.view", "h"], 27]],
+            ["set", "h", ["ext.checksum.xxhash64._mul_const", ["bytes.view", "h"], -2048144761, -1640531535]],
+            ["set", "h", ["ext.checksum.xxhash64._add_const", ["bytes.view", "h"], -1028477341, -2048144777]]
+          ]
+        ],
+        ["set", "p", ["+", "p", ["*", "lanes8", 8]]],
+        [
+          "if",
+          ["<=", ["+", "p", 4], "len"],
+          [
+            "begin",
+            ["let", "lane32", ["codec.read_u32_le", "b", "p"]],
+            ["let", "lane_u64", ["ext.u64.to_bytes_le", "lane32", 0]],
+            ["let", "m", ["ext.checksum.xxhash64._mul_const", ["bytes.view", "lane_u64"], -2048144761, -1640531535]],
+            ["set", "h", ["ext.checksum.xxhash64._xor_u64", ["bytes.view", "h"], ["bytes.view", "m"]]],
+            ["set", "h", ["ext.checksum.xxhash64._rotl", ["bytes.view", "h"], 23]],
+            ["set", "h", ["ext.checksum.xxhash64._mul_const", ["bytes.view", "h"], 668265295, -1028477379]],
+            ["set", "h", ["ext.checksum.xxhash64._add_const", ["bytes.view", "h"], -1640531463, 374761393]],
+            ["set", "p", ["+", "p", 4]]
+          ],
+          0
+        ],
+        [
+          "for",
+          "i",
+          "p",
+          "len",
+          [
+            "begin",
+            ["let", "byte", ["view.get_u8", "b", "i"]],
+            ["let", "prod_lo", ["ext.u64.mul_u64_u32_lo", 374761413, 668265263, "byte"]],
+            ["let", "prod_hi", ["ext.u64.mul_u64_u32_hi", 374761413, 668265263, "byte"]],
+            ["let", "b_u64", ["ext.u64.to_bytes_le", "prod_lo", "prod_hi"]],
+            ["set", "h", ["ext.checksum.xxhash64._xor_u64", ["bytes.view", "h"], ["bytes.view", "b_u64"]]],
+            ["set", "h", ["ext.checksum.xxhash64._rotl", ["bytes.view", "h"], 11]],
+            ["set", "h", ["ext.checksum.xxhash64._mul_const", ["bytes.view", "h"], -2048144761, -1640531535]]
+          ]
+        ],
+        ["ext.checksum.xxhash64._avalanche", ["bytes.view", "h"]]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-checksum-rs@0.1.0"
+  }
+}

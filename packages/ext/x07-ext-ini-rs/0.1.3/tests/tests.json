@@ -1,0 +1,9 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {"id": "ext.ini/parse_basic", "world": "solve-pure", "entry": "ext.ini.tests.test_parse_basic", "expect": "pass"},
+    {"id": "ext.ini/quoted_value", "world": "solve-pure", "entry": "ext.ini.tests.test_quoted_value", "expect": "pass"},
+    {"id": "ext.ini/dup_key_is_err", "world": "solve-pure", "entry": "ext.ini.tests.test_dup_key_is_err", "expect": "pass"}
+  ]
+}
+

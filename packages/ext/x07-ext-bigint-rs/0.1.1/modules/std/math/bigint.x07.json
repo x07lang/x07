@@ -1,0 +1,555 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "std.math.bigint",
+  "imports": [
+    "std.math.bigint.codec_v1"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.math.bigint.from_i32_v1",
+        "std.math.bigint.is_zero_v1",
+        "std.math.bigint.neg_v1",
+        "std.math.bigint.abs_v1",
+        "std.math.bigint.cmp_v1",
+        "std.math.bigint.add_v1",
+        "std.math.bigint.sub_v1",
+        "std.math.bigint.mul_v1",
+        "std.math.bigint.mul_i32_v1",
+        "std.math.bigint._trim_mag_vec"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.from_i32_v1",
+      "params": [{ "name": "x", "ty": "i32" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["=", "x", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["let", "sign", ["if", ["<", "x", 0], 2, 1]],
+        ["let", "abs", ["if", ["<", "x", 0], ["-", 0, "x"], "x"]],
+        ["let", "b0", ["&", [">>u", "abs", 24], 255]],
+        ["let", "b1", ["&", [">>u", "abs", 16], 255]],
+        ["let", "b2", ["&", [">>u", "abs", 8], 255]],
+        ["let", "b3", ["&", "abs", 255]],
+        ["let", "out", ["vec_u8.with_capacity", 5]],
+        ["set", "out", ["vec_u8.push", "out", "sign"]],
+        [
+          "if",
+          ["!=", "b0", 0],
+          [
+            "begin",
+            ["set", "out", ["vec_u8.push", "out", "b0"]],
+            ["set", "out", ["vec_u8.push", "out", "b1"]],
+            ["set", "out", ["vec_u8.push", "out", "b2"]],
+            ["set", "out", ["vec_u8.push", "out", "b3"]]
+          ],
+          [
+            "if",
+            ["!=", "b1", 0],
+            [
+              "begin",
+              ["set", "out", ["vec_u8.push", "out", "b1"]],
+              ["set", "out", ["vec_u8.push", "out", "b2"]],
+              ["set", "out", ["vec_u8.push", "out", "b3"]]
+            ],
+            [
+              "if",
+              ["!=", "b2", 0],
+              ["begin", ["set", "out", ["vec_u8.push", "out", "b2"]], ["set", "out", ["vec_u8.push", "out", "b3"]]],
+              ["set", "out", ["vec_u8.push", "out", "b3"]]
+            ]
+          ]
+        ],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.is_zero_v1",
+      "params": [{ "name": "v", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["std.math.bigint.codec_v1.is_zero_v1", "v"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.neg_v1",
+      "params": [{ "name": "v", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "canon", ["std.math.bigint.codec_v1.canon_v1", "v"]],
+        ["if", ["=", ["bytes.len", "canon"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "s", ["bytes.get_u8", "canon", 0]],
+        ["if", ["=", "s", 0], ["return", "canon"], 0],
+        ["let", "cv", ["bytes.view", "canon"]],
+        ["let", "n", ["view.len", "cv"]],
+        ["let", "out", ["vec_u8.with_capacity", "n"]],
+        ["set", "out", ["vec_u8.push", "out", ["if", ["=", "s", 1], 2, 1]]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "cv", 1, ["-", "n", 1]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.abs_v1",
+      "params": [{ "name": "v", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "canon", ["std.math.bigint.codec_v1.canon_v1", "v"]],
+        ["if", ["=", ["bytes.len", "canon"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "s", ["bytes.get_u8", "canon", 0]],
+        ["if", ["=", "s", 2], 0, ["return", "canon"]],
+        ["let", "cv", ["bytes.view", "canon"]],
+        ["let", "n", ["view.len", "cv"]],
+        ["let", "out", ["vec_u8.with_capacity", "n"]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "cv", 1, ["-", "n", 1]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint._cmp_mag_be",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "b", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "an", ["view.len", "a"]],
+        ["let", "bn", ["view.len", "b"]],
+        ["if", ["<", "an", "bn"], ["return", -1], 0],
+        ["if", [">", "an", "bn"], ["return", 1], 0],
+        [
+          "for",
+          "i",
+          0,
+          "an",
+          [
+            "begin",
+            ["let", "ac", ["view.get_u8", "a", "i"]],
+            ["let", "bc", ["view.get_u8", "b", "i"]],
+            ["if", ["<", "ac", "bc"], ["return", -1], 0],
+            ["if", [">", "ac", "bc"], ["return", 1], 0]
+          ]
+        ],
+        0
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.cmp_v1",
+      "params": [
+        { "name": "a0", "ty": "bytes_view" },
+        { "name": "b0", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "a_bytes", ["std.math.bigint.codec_v1.canon_v1", "a0"]],
+        ["let", "b_bytes", ["std.math.bigint.codec_v1.canon_v1", "b0"]],
+        ["if", ["=", ["bytes.len", "a_bytes"], 0], ["return", 0], 0],
+        ["if", ["=", ["bytes.len", "b_bytes"], 0], ["return", 0], 0],
+        ["let", "a", ["bytes.view", "a_bytes"]],
+        ["let", "b", ["bytes.view", "b_bytes"]],
+        ["let", "sa", ["view.get_u8", "a", 0]],
+        ["let", "sb", ["view.get_u8", "b", 0]],
+        ["if", ["=", "sa", 0], ["if", ["=", "sb", 0], ["return", 0], ["return", ["if", ["=", "sb", 2], 1, -1]]], 0],
+        ["if", ["=", "sb", 0], ["return", ["if", ["=", "sa", 2], -1, 1]], 0],
+        ["if", ["!=", "sa", "sb"], ["return", ["if", ["=", "sa", 2], -1, 1]], 0],
+        ["let", "am", ["std.math.bigint.codec_v1.mag_view_v1", "a"]],
+        ["let", "bm", ["std.math.bigint.codec_v1.mag_view_v1", "b"]],
+        ["let", "cmp", ["std.math.bigint._cmp_mag_be", "am", "bm"]],
+        ["if", ["=", "sa", 1], "cmp", ["-", 0, "cmp"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint._mag_add_be",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "b", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "an", ["view.len", "a"]],
+        ["let", "bn", ["view.len", "b"]],
+        ["let", "n", ["if", ["<", "an", "bn"], "bn", "an"]],
+        ["let", "out_rev", ["vec_u8.with_capacity", ["+", "n", 1]]],
+        ["let", "carry", 0],
+        ["let", "i", 0],
+        [
+          "for",
+          "_",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "ai", ["if", ["<u", "i", "an"], ["view.get_u8", "a", ["-", ["-", "an", 1], "i"]], 0]],
+            ["let", "bi", ["if", ["<u", "i", "bn"], ["view.get_u8", "b", ["-", ["-", "bn", 1], "i"]], 0]],
+            ["let", "sum", ["+", ["+", "ai", "bi"], "carry"]],
+            ["set", "out_rev", ["vec_u8.push", "out_rev", ["&", "sum", 255]]],
+            ["set", "carry", [">>u", "sum", 8]],
+            ["set", "i", ["+", "i", 1]]
+          ]
+        ],
+        ["if", [">", "carry", 0], ["set", "out_rev", ["vec_u8.push", "out_rev", "carry"]], 0],
+        ["let", "rn", ["vec_u8.len", "out_rev"]],
+        ["let", "out", ["vec_u8.with_capacity", "rn"]],
+        ["for", "j", 0, "rn", ["set", "out", ["vec_u8.push", "out", ["vec_u8.get", "out_rev", ["-", ["-", "rn", 1], "j"]]]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint._trim_mag_vec",
+      "params": [{ "name": "v", "ty": "vec_u8" }],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["let", "n", ["vec_u8.len", "v"]],
+        ["if", ["=", "n", 0], ["return", ["vec_u8.push", ["vec_u8.with_capacity", 1], 0]], 0],
+        ["let", "i", 0],
+        ["let", "found", 0],
+        [
+          "for",
+          "_",
+          0,
+          "n",
+          [
+            "if",
+            ["=", "found", 0],
+            [
+              "if",
+              ["=", ["vec_u8.get", "v", "i"], 0],
+              ["set", "i", ["+", "i", 1]],
+              ["set", "found", 1]
+            ],
+            0
+          ]
+        ],
+        ["if", ["=", "found", 0], ["return", ["vec_u8.push", ["vec_u8.with_capacity", 1], 0]], 0],
+        ["if", ["=", "i", 0], ["return", "v"], 0],
+        ["if", [">=u", "i", "n"], ["return", ["vec_u8.push", ["vec_u8.with_capacity", 1], 0]], 0],
+        ["let", "out", ["vec_u8.with_capacity", ["-", "n", "i"]]],
+        ["for", "j", "i", "n", ["set", "out", ["vec_u8.push", "out", ["vec_u8.get", "v", "j"]]]],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint._mag_sub_be",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "b", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "an", ["view.len", "a"]],
+        ["let", "bn", ["view.len", "b"]],
+        ["let", "out_rev", ["vec_u8.with_capacity", "an"]],
+        ["let", "borrow", 0],
+        ["let", "i", 0],
+        [
+          "for",
+          "_",
+          0,
+          "an",
+          [
+            "begin",
+            ["let", "ai", ["view.get_u8", "a", ["-", ["-", "an", 1], "i"]]],
+            ["let", "bi", ["if", ["<u", "i", "bn"], ["view.get_u8", "b", ["-", ["-", "bn", 1], "i"]], 0]],
+            ["let", "x", ["-", ["-", "ai", "bi"], "borrow"]],
+            [
+              "if",
+              ["<", "x", 0],
+              ["begin", ["set", "x", ["+", "x", 256]], ["set", "borrow", 1]],
+              ["set", "borrow", 0]
+            ],
+            ["set", "out_rev", ["vec_u8.push", "out_rev", "x"]],
+            ["set", "i", ["+", "i", 1]]
+          ]
+        ],
+        ["let", "rn", ["vec_u8.len", "out_rev"]],
+        ["let", "tmp", ["vec_u8.with_capacity", "rn"]],
+        ["for", "j", 0, "rn", ["set", "tmp", ["vec_u8.push", "tmp", ["vec_u8.get", "out_rev", ["-", ["-", "rn", 1], "j"]]]]],
+        ["let", "trimmed", ["std.math.bigint._trim_mag_vec", "tmp"]],
+        ["vec_u8.into_bytes", "trimmed"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint._make_signed",
+      "params": [
+        { "name": "sign", "ty": "i32" },
+        { "name": "mag", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "mag"]],
+        ["if", ["=", "n", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["if", ["=", ["view.get_u8", "mag", 0], 0], ["return", ["bytes.alloc", 1]], 0],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 1, "n"]]],
+        ["set", "out", ["vec_u8.push", "out", "sign"]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, "n"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.add_v1",
+      "params": [
+        { "name": "a0", "ty": "bytes_view" },
+        { "name": "b0", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "a_bytes", ["std.math.bigint.codec_v1.canon_v1", "a0"]],
+        ["let", "b_bytes", ["std.math.bigint.codec_v1.canon_v1", "b0"]],
+        ["if", ["=", ["bytes.len", "a_bytes"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", ["bytes.len", "b_bytes"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "sa", ["bytes.get_u8", "a_bytes", 0]],
+        ["let", "sb", ["bytes.get_u8", "b_bytes", 0]],
+        ["if", ["=", "sa", 0], ["return", "b_bytes"], 0],
+        ["if", ["=", "sb", 0], ["return", "a_bytes"], 0],
+        ["let", "a", ["bytes.view", "a_bytes"]],
+        ["let", "b", ["bytes.view", "b_bytes"]],
+        ["let", "am", ["std.math.bigint.codec_v1.mag_view_v1", "a"]],
+        ["let", "bm", ["std.math.bigint.codec_v1.mag_view_v1", "b"]],
+        [
+          "if",
+          ["=", "sa", "sb"],
+          [
+            "begin",
+            ["let", "mag", ["std.math.bigint._mag_add_be", "am", "bm"]],
+            ["std.math.bigint._make_signed", "sa", ["bytes.view", "mag"]]
+          ],
+          [
+            "begin",
+            ["let", "cmp", ["std.math.bigint._cmp_mag_be", "am", "bm"]],
+            ["if", ["=", "cmp", 0], ["return", ["bytes.alloc", 1]], 0],
+            [
+              "if",
+              [">", "cmp", 0],
+              [
+                "begin",
+                ["let", "mag", ["std.math.bigint._mag_sub_be", "am", "bm"]],
+                ["std.math.bigint._make_signed", "sa", ["bytes.view", "mag"]]
+              ],
+              [
+                "begin",
+                ["let", "mag", ["std.math.bigint._mag_sub_be", "bm", "am"]],
+                ["std.math.bigint._make_signed", "sb", ["bytes.view", "mag"]]
+              ]
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.sub_v1",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "b", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "nb", ["std.math.bigint.neg_v1", "b"]],
+        ["std.math.bigint.add_v1", "a", ["bytes.view", "nb"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint._mag_mul_small_be",
+      "params": [
+        { "name": "mag", "ty": "bytes_view" },
+        { "name": "k", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "mag"]],
+        ["let", "out_rev", ["vec_u8.with_capacity", ["+", "n", 8]]],
+        ["let", "carry", 0],
+        ["let", "i", 0],
+        [
+          "for",
+          "_",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "b", ["view.get_u8", "mag", ["-", ["-", "n", 1], "i"]]],
+            ["let", "prod", ["+", ["*", "b", "k"], "carry"]],
+            ["set", "out_rev", ["vec_u8.push", "out_rev", ["&", "prod", 255]]],
+            ["set", "carry", [">>u", "prod", 8]],
+            ["set", "i", ["+", "i", 1]]
+          ]
+        ],
+        [
+          "for",
+          "_",
+          0,
+          16,
+          [
+            "if",
+            [">", "carry", 0],
+            [
+              "begin",
+              ["set", "out_rev", ["vec_u8.push", "out_rev", ["&", "carry", 255]]],
+              ["set", "carry", [">>u", "carry", 8]]
+            ],
+            0
+          ]
+        ],
+        ["let", "rn", ["vec_u8.len", "out_rev"]],
+        ["let", "tmp", ["vec_u8.with_capacity", "rn"]],
+        ["for", "j", 0, "rn", ["set", "tmp", ["vec_u8.push", "tmp", ["vec_u8.get", "out_rev", ["-", ["-", "rn", 1], "j"]]]]],
+        ["let", "trimmed", ["std.math.bigint._trim_mag_vec", "tmp"]],
+        ["vec_u8.into_bytes", "trimmed"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint._mag_mul_be",
+      "params": [
+        { "name": "a", "ty": "bytes_view" },
+        { "name": "b", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "an", ["view.len", "a"]],
+        ["let", "bn", ["view.len", "b"]],
+        ["if", ["=", "an", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["if", ["=", "bn", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["let", "rn", ["+", "an", "bn"]],
+        ["let", "rev", ["vec_u8.with_capacity", "rn"]],
+        ["for", "_", 0, "rn", ["set", "rev", ["vec_u8.push", "rev", 0]]],
+        [
+          "for",
+          "i",
+          0,
+          "an",
+          [
+            "begin",
+            ["let", "ai", ["view.get_u8", "a", ["-", ["-", "an", 1], "i"]]],
+            ["let", "carry", 0],
+            [
+              "for",
+              "j",
+              0,
+              "bn",
+              [
+                "begin",
+                ["let", "bj", ["view.get_u8", "b", ["-", ["-", "bn", 1], "j"]]],
+                ["let", "idx", ["+", "i", "j"]],
+                ["let", "cur", ["vec_u8.get", "rev", "idx"]],
+                ["let", "prod", ["+", ["+", ["*", "ai", "bj"], "cur"], "carry"]],
+                ["set", "rev", ["vec_u8.set", "rev", "idx", ["&", "prod", 255]]],
+                ["set", "carry", [">>u", "prod", 8]]
+              ]
+            ],
+            ["let", "k", ["+", "i", "bn"]],
+            [
+              "for",
+              "_",
+              0,
+              16,
+              [
+                "if",
+                [">", "carry", 0],
+                [
+                  "begin",
+                  ["if", ["<u", "k", "rn"], 0, ["return", ["bytes.alloc", 0]]],
+                  ["let", "cur", ["vec_u8.get", "rev", "k"]],
+                  ["let", "sum", ["+", "cur", ["&", "carry", 255]]],
+                  ["set", "rev", ["vec_u8.set", "rev", "k", ["&", "sum", 255]]],
+                  ["set", "carry", [">>u", "carry", 8]],
+                  ["if", ["<u", "sum", "cur"], ["set", "carry", ["+", "carry", 1]], 0],
+                  ["set", "k", ["+", "k", 1]]
+                ],
+                0
+              ]
+            ]
+          ]
+        ],
+        ["let", "tmp", ["vec_u8.with_capacity", "rn"]],
+        ["for", "t", 0, "rn", ["set", "tmp", ["vec_u8.push", "tmp", ["vec_u8.get", "rev", ["-", ["-", "rn", 1], "t"]]]]],
+        ["set", "tmp", ["std.math.bigint._trim_mag_vec", "tmp"]],
+        ["vec_u8.into_bytes", "tmp"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.mul_i32_v1",
+      "params": [
+        { "name": "a0", "ty": "bytes_view" },
+        { "name": "k0", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["=", "k0", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["let", "a_bytes", ["std.math.bigint.codec_v1.canon_v1", "a0"]],
+        ["if", ["=", ["bytes.len", "a_bytes"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "a", ["bytes.view", "a_bytes"]],
+        ["let", "sa", ["view.get_u8", "a", 0]],
+        ["if", ["=", "sa", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["let", "sk", ["if", ["<", "k0", 0], 2, 1]],
+        ["let", "k", ["if", ["<", "k0", 0], ["-", 0, "k0"], "k0"]],
+        ["let", "am", ["std.math.bigint.codec_v1.mag_view_v1", "a"]],
+        ["let", "mag", ["std.math.bigint._mag_mul_small_be", "am", "k"]],
+        ["if", ["=", ["bytes.len", "mag"], 1], ["if", ["=", ["bytes.get_u8", "mag", 0], 0], ["return", ["bytes.alloc", 1]], 0], 0],
+        ["let", "out_sign", ["if", ["=", "sa", "sk"], 1, 2]],
+        ["std.math.bigint._make_signed", "out_sign", ["bytes.view", "mag"]]
+      ]
+    }
+    ,
+    {
+      "kind": "defn",
+      "name": "std.math.bigint.mul_v1",
+      "params": [
+        { "name": "a0", "ty": "bytes_view" },
+        { "name": "b0", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "a_bytes", ["std.math.bigint.codec_v1.canon_v1", "a0"]],
+        ["let", "b_bytes", ["std.math.bigint.codec_v1.canon_v1", "b0"]],
+        ["if", ["=", ["bytes.len", "a_bytes"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", ["bytes.len", "b_bytes"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "a", ["bytes.view", "a_bytes"]],
+        ["let", "b", ["bytes.view", "b_bytes"]],
+        ["let", "sa", ["view.get_u8", "a", 0]],
+        ["let", "sb", ["view.get_u8", "b", 0]],
+        ["if", ["=", "sa", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["if", ["=", "sb", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["let", "am", ["std.math.bigint.codec_v1.mag_view_v1", "a"]],
+        ["let", "bm", ["std.math.bigint.codec_v1.mag_view_v1", "b"]],
+        ["let", "mag", ["std.math.bigint._mag_mul_be", "am", "bm"]],
+        ["if", ["=", ["bytes.len", "mag"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", ["bytes.len", "mag"], 1], ["if", ["=", ["bytes.get_u8", "mag", 0], 0], ["return", ["bytes.alloc", 1]], 0], 0],
+        ["let", "out_sign", ["if", ["=", "sa", "sb"], 1, 2]],
+        ["std.math.bigint._make_signed", "out_sign", ["bytes.view", "mag"]]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-bigint-rs@0.1.0"
+  }
+}

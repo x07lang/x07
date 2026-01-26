@@ -1,0 +1,59 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.unicode/utf8_u32le_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.unicode.tests.test_utf8_u32le_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.unicode/latin1_decode",
+      "world": "solve-pure",
+      "entry": "ext.unicode.tests.test_latin1_decode",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.unicode/windows1252_decode_and_error",
+      "world": "solve-pure",
+      "entry": "ext.unicode.tests.test_windows1252_decode_and_error",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.unicode/utf16le_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.unicode.tests.test_utf16le_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.unicode/nfkc_basic",
+      "world": "solve-pure",
+      "entry": "ext.unicode.tests.test_nfkc_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.unicode/grapheme_slices_basic",
+      "world": "solve-pure",
+      "entry": "ext.unicode.tests.test_grapheme_slices_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.unicode/normalize_nfkc_basic_v1",
+      "world": "solve-pure",
+      "entry": "ext.unicode.tests.test_normalize_nfkc_basic_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.unicode/casefold_basic_v1",
+      "world": "solve-pure",
+      "entry": "ext.unicode.tests.test_casefold_basic_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.unicode/segment_grapheme_slices_v1",
+      "world": "solve-pure",
+      "entry": "ext.unicode.tests.test_segment_grapheme_slices_v1",
+      "expect": "pass"
+    }
+  ]
+}

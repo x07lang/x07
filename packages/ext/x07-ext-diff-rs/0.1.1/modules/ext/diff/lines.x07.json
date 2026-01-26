@@ -1,0 +1,165 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.diff.lines",
+  "imports": [
+    "ext.error.context",
+    "ext.diff.patch_v1",
+    "std.text.slices"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.diff.lines.split_lines_including_newline_v1",
+        "ext.diff.lines.patch_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.lines.split_lines_including_newline_v1",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["let", "out", ["std.text.slices.builder_new_v1", 0]],
+        ["let", "count", 0],
+        ["let", "start", 0],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            [
+              "if",
+              ["=", ["view.get_u8", "b", "i"], 10],
+              [
+                "begin",
+                ["let", "end", ["+", "i", 1]],
+                ["set", "out", ["std.text.slices.builder_push_v1", "out", "start", ["-", "end", "start"]]],
+                ["set", "count", ["+", "count", 1]],
+                ["set", "start", "end"],
+                0
+              ],
+              0
+            ],
+            0
+          ]
+        ],
+        [
+          "if",
+          ["<u", "start", "n"],
+          [
+            "begin",
+            ["set", "out", ["std.text.slices.builder_push_v1", "out", "start", ["-", "n", "start"]]],
+            ["set", "count", ["+", "count", 1]],
+            0
+          ],
+          0
+        ],
+        ["std.text.slices.builder_finish_v1", "out", "count"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.diff.lines.patch_v1",
+      "params": [
+        { "name": "before", "ty": "bytes_view" },
+        { "name": "after", "ty": "bytes_view" },
+        { "name": "max_patch_bytes", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "before_len", ["view.len", "before"]],
+        ["let", "after_len", ["view.len", "after"]],
+        ["let", "b_slices_b", ["ext.diff.lines.split_lines_including_newline_v1", "before"]],
+        ["let", "a_slices_b", ["ext.diff.lines.split_lines_including_newline_v1", "after"]],
+        ["let", "b_slices", ["bytes.view", "b_slices_b"]],
+        ["let", "a_slices", ["bytes.view", "a_slices_b"]],
+        ["let", "bn", ["std.text.slices.count_v1", "b_slices"]],
+        ["let", "an", ["std.text.slices.count_v1", "a_slices"]],
+        ["let", "min", ["if", ["<u", "bn", "an"], "bn", "an"]],
+        ["let", "p", 0],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "min", 1],
+          [
+            "if",
+            ["=", "done", 0],
+            [
+              "if",
+              ["<u", "p", "min"],
+              [
+                "begin",
+                ["let", "vb", ["std.text.slices.view_at_v1", "before", "b_slices", "p"]],
+                ["let", "va", ["std.text.slices.view_at_v1", "after", "a_slices", "p"]],
+                [
+                  "if",
+                  ["view.eq", "vb", "va"],
+                  ["set", "p", ["+", "p", 1]],
+                  ["set", "done", 1]
+                ],
+                0
+              ],
+              ["set", "done", 1]
+            ],
+            0
+          ]
+        ],
+        ["let", "rem_b", ["-", "bn", "p"]],
+        ["let", "rem_a", ["-", "an", "p"]],
+        ["let", "max_s", ["if", ["<u", "rem_b", "rem_a"], "rem_b", "rem_a"]],
+        ["let", "s", 0],
+        ["let", "done2", 0],
+        [
+          "for",
+          "_",
+          0,
+          ["+", "max_s", 1],
+          [
+            "if",
+            ["=", "done2", 0],
+            [
+              "if",
+              ["<u", "s", "max_s"],
+              [
+                "begin",
+                ["let", "bi", ["-", ["-", "bn", 1], "s"]],
+                ["let", "ai", ["-", ["-", "an", 1], "s"]],
+                ["let", "vb", ["std.text.slices.view_at_v1", "before", "b_slices", "bi"]],
+                ["let", "va", ["std.text.slices.view_at_v1", "after", "a_slices", "ai"]],
+                [
+                  "if",
+                  ["view.eq", "vb", "va"],
+                  ["set", "s", ["+", "s", 1]],
+                  ["set", "done2", 1]
+                ],
+                0
+              ],
+              ["set", "done2", 1]
+            ],
+            0
+          ]
+        ],
+        ["let", "prefix_end_b", ["if", ["=", "p", 0], 0, ["if", ["<u", "p", "bn"], ["std.text.slices.start_v1", "b_slices", "p"], "before_len"]]],
+        ["let", "prefix_end_a", ["if", ["=", "p", 0], 0, ["if", ["<u", "p", "an"], ["std.text.slices.start_v1", "a_slices", "p"], "after_len"]]],
+        ["let", "suffix_start_b", ["if", ["=", "s", 0], "before_len", ["std.text.slices.start_v1", "b_slices", ["-", "bn", "s"]]]],
+        ["let", "suffix_start_a", ["if", ["=", "s", 0], "after_len", ["std.text.slices.start_v1", "a_slices", ["-", "an", "s"]]]],
+        ["if", ["<u", "suffix_start_b", "prefix_end_b"], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]], 0],
+        ["if", ["<u", "suffix_start_a", "prefix_end_a"], ["return", ["ext.error.context.err_from_code", ["ext.diff.patch_v1.code_invalid_patch"]]], 0],
+        ["let", "delete_len", ["-", "suffix_start_b", "prefix_end_b"]],
+        ["let", "ins_len", ["-", "suffix_start_a", "prefix_end_a"]],
+        ["let", "insert", ["view.slice", "after", "prefix_end_a", "ins_len"]],
+        ["let", "suffix_copy_len", ["-", "before_len", "suffix_start_b"]],
+        ["ext.diff.patch_v1.from_parts_v1", "prefix_end_b", "delete_len", "insert", "suffix_copy_len", "max_patch_bytes"]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,251 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.robots",
+  "imports": [
+    "ext.url.parse",
+    "std.bytes",
+    "std.text.ascii",
+    "std.text.slices",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.robots.allowed_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.robots._ascii_lower_bytes_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["let", "out", ["std.vec.with_capacity", "n"]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "c", ["view.get_u8", "b", "i"]],
+            [
+              "if",
+              ["if", [">=u", "c", 65], ["<u", "c", 91], 0],
+              ["set", "out", ["std.vec.push", "out", ["+", "c", 32]]],
+              ["set", "out", ["std.vec.push", "out", "c"]]
+            ],
+            0
+          ],
+          0
+        ],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.robots.allowed_v1",
+      "params": [
+        { "name": "robots_txt", "ty": "bytes_view" },
+        { "name": "user_agent", "ty": "bytes_view" },
+        { "name": "url", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "ua_lower", ["ext.robots._ascii_lower_bytes_v1", "user_agent"]],
+        ["let", "parsed", ["ext.url.parse.url_parse", "url"]],
+        ["let", "path", ["ext.url.parse.url_path", ["bytes.view", "parsed"], "url"]],
+        ["let", "path_v", ["bytes.view", "path"]],
+        ["let", "prefix_user_agent", ["bytes.lit", "user-agent:"]],
+        ["let", "prefix_allow", ["bytes.lit", "allow:"]],
+        ["let", "prefix_disallow", ["bytes.lit", "disallow:"]],
+        ["let", "prefix_user_agent_v", ["bytes.view", "prefix_user_agent"]],
+        ["let", "prefix_allow_v", ["bytes.view", "prefix_allow"]],
+        ["let", "prefix_disallow_v", ["bytes.view", "prefix_disallow"]],
+        ["let", "best_type", 0],
+        ["let", "best_allow_len", -1],
+        ["let", "best_disallow_len", -1],
+        ["let", "cur_type", 0],
+        ["let", "cur_allow_len", -1],
+        ["let", "cur_disallow_len", -1],
+        ["let", "cur_has_rule", 0],
+        ["let", "sl", ["std.text.ascii.split_lines_view", "robots_txt"]],
+        ["let", "slv", ["bytes.view", "sl"]],
+        ["let", "count", ["std.text.slices.count_v1", "slv"]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "line0", ["std.text.slices.view_at_v1", "robots_txt", "slv", "i"]],
+            [
+              "if",
+              ["=", ["view.len", "line0"], 0],
+              0,
+              [
+                "begin",
+                ["let", "hash", ["std.bytes.find_u8", "line0", 35]],
+                [
+                  "let",
+                  "line",
+                  [
+                    "if",
+                    ["<", "hash", 0],
+                    "line0",
+                    ["view.slice", "line0", 0, "hash"]
+                  ]
+                ],
+                [
+                  "if",
+                  ["=", ["view.len", "line"], 0],
+                  0,
+                  [
+                    "begin",
+                    ["let", "lower", ["ext.robots._ascii_lower_bytes_v1", "line"]],
+                    ["let", "lv", ["bytes.view", "lower"]],
+                    [
+                      "if",
+                      ["=", ["std.bytes.starts_with", "lv", "prefix_user_agent_v"], 1],
+                      [
+                        "begin",
+                        [
+                          "if",
+                          ["=", "cur_has_rule", 1],
+                          [
+                            "begin",
+                            [
+                              "if",
+                              [">", "cur_type", "best_type"],
+                              [
+                                "begin",
+                                ["set", "best_type", "cur_type"],
+                                ["set", "best_allow_len", "cur_allow_len"],
+                                ["set", "best_disallow_len", "cur_disallow_len"]
+                              ],
+                              0
+                            ],
+                            ["set", "cur_type", 0],
+                            ["set", "cur_allow_len", -1],
+                            ["set", "cur_disallow_len", -1],
+                            ["set", "cur_has_rule", 0],
+                            0
+                          ],
+                          0
+                        ],
+                        ["let", "n", ["view.len", "line"]],
+                        ["let", "vlen", ["-", "n", 11]],
+                        ["let", "value", ["if", [">", "vlen", 0], ["view.slice", "line", 11, "vlen"], ["view.slice", "line", "n", 0]]],
+                        ["let", "value_lower", ["ext.robots._ascii_lower_bytes_v1", "value"]],
+                        [
+                          "if",
+                          ["=", ["std.bytes.eq", ["bytes.view", "value_lower"], ["bytes.view", ["bytes.lit", "*"]]], 1],
+                          ["if", ["<", "cur_type", 1], ["set", "cur_type", 1], 0],
+                          [
+                            "if",
+                            ["=", ["std.bytes.eq", ["bytes.view", "value_lower"], ["bytes.view", "ua_lower"]], 1],
+                            ["set", "cur_type", 2],
+                            0
+                          ]
+                        ],
+                        0
+                      ],
+                      [
+                        "if",
+                        ["=", ["std.bytes.starts_with", "lv", "prefix_allow_v"], 1],
+                        [
+                          "begin",
+                          ["set", "cur_has_rule", 1],
+                          ["let", "n", ["view.len", "line"]],
+                          ["let", "vlen", ["-", "n", 6]],
+                          ["let", "pat", ["if", [">", "vlen", 0], ["view.slice", "line", 6, "vlen"], ["view.slice", "line", "n", 0]]],
+                          [
+                            "if",
+                            [">", ["view.len", "pat"], 0],
+                            [
+                              "if",
+                              ["=", ["std.bytes.starts_with", "path_v", "pat"], 1],
+                              [
+                                "begin",
+                                ["let", "plen", ["view.len", "pat"]],
+                                ["if", [">", "plen", "cur_allow_len"], ["set", "cur_allow_len", "plen"], 0],
+                                0
+                              ],
+                              0
+                            ],
+                            0
+                          ],
+                          0
+                        ],
+                        [
+                          "if",
+                          ["=", ["std.bytes.starts_with", "lv", "prefix_disallow_v"], 1],
+                          [
+                            "begin",
+                            ["set", "cur_has_rule", 1],
+                            ["let", "n", ["view.len", "line"]],
+                            ["let", "vlen", ["-", "n", 9]],
+                            ["let", "pat", ["if", [">", "vlen", 0], ["view.slice", "line", 9, "vlen"], ["view.slice", "line", "n", 0]]],
+                            [
+                              "if",
+                              [">", ["view.len", "pat"], 0],
+                              [
+                                "if",
+                                ["=", ["std.bytes.starts_with", "path_v", "pat"], 1],
+                                [
+                                  "begin",
+                                  ["let", "plen", ["view.len", "pat"]],
+                                  ["if", [">", "plen", "cur_disallow_len"], ["set", "cur_disallow_len", "plen"], 0],
+                                  0
+                                ],
+                                0
+                              ],
+                              0
+                            ],
+                            0
+                          ],
+                          0
+                        ]
+                      ]
+                    ],
+                    0
+                  ]
+                ],
+                0
+              ]
+            ],
+            0
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "cur_has_rule", 1],
+          [
+            "if",
+            [">", "cur_type", "best_type"],
+            [
+              "begin",
+              ["set", "best_type", "cur_type"],
+              ["set", "best_allow_len", "cur_allow_len"],
+              ["set", "best_disallow_len", "cur_disallow_len"],
+              0
+            ],
+            0
+          ],
+          0
+        ],
+        ["if", ["=", "best_type", 0], ["return", 1], 0],
+        ["if", [">=", "best_allow_len", "best_disallow_len"], 1, 0]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.checksum.tests",
+  "imports": [
+    "ext.checksum.crc32c",
+    "ext.checksum.xxhash64",
+    "ext.u64",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.checksum.tests.test_crc32c_vectors",
+        "ext.checksum.tests.test_xxhash64_vectors"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.tests.test_crc32c_vectors",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "empty", ["bytes.lit", ""]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.checksum.crc32c.sum_u32_le_v1", ["bytes.view", "empty"]], ["codec.write_u32_le", 0], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "s", ["bytes.lit", "123456789"]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.checksum.crc32c.sum_u32_le_v1", ["bytes.view", "s"]], ["codec.write_u32_le", -486108541], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "abc", ["bytes.lit", "abc"]],
+        ["try", ["std.test.assert_bytes_eq", ["ext.checksum.crc32c.sum_u32_le_v1", ["bytes.view", "abc"]], ["codec.write_u32_le", 910901175], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.checksum.tests.test_xxhash64_vectors",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "empty", ["bytes.lit", ""]],
+        ["let", "got0", ["ext.checksum.xxhash64.sum_u64_le_seed0_v1", ["bytes.view", "empty"]]],
+        ["let", "exp0", ["ext.u64.to_bytes_le", 1373170073, -280569033]],
+        ["try", ["std.test.assert_bytes_eq", "got0", "exp0", ["std.test.code_assert_bytes_eq"]]],
+        ["let", "a", ["bytes.lit", "a"]],
+        ["let", "got1", ["ext.checksum.xxhash64.sum_u64_le_seed0_v1", ["bytes.view", "a"]]],
+        ["let", "exp1", ["ext.u64.to_bytes_le", -1450414501, -766589711]],
+        ["try", ["std.test.assert_bytes_eq", "got1", "exp1", ["std.test.code_assert_bytes_eq"]]],
+        ["let", "abc", ["bytes.lit", "abc"]],
+        ["let", "got2", ["ext.checksum.xxhash64.sum_u64_le_seed0_v1", ["bytes.view", "abc"]]],
+        ["let", "exp2", ["ext.u64.to_bytes_le", -1384707687, 1153182965]],
+        ["try", ["std.test.assert_bytes_eq", "got2", "exp2", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

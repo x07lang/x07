@@ -20,7 +20,6 @@
       "run-os",
       "run-os-sandboxed"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }

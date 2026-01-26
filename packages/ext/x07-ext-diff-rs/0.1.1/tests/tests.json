@@ -1,0 +1,36 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.diff/bytes_roundtrip_basic",
+      "world": "solve-pure",
+      "entry": "ext.diff.tests.test_bytes_roundtrip_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.diff/lines_roundtrip_basic",
+      "world": "solve-pure",
+      "entry": "ext.diff.tests.test_lines_roundtrip_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.diff/patch_apply_err_invalid_magic",
+      "world": "solve-pure",
+      "entry": "ext.diff.tests.test_patch_apply_err_invalid_magic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.diff/patch_apply_err_truncated",
+      "world": "solve-pure",
+      "entry": "ext.diff.tests.test_patch_apply_err_truncated",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.diff/patch_apply_err_output_limit",
+      "world": "solve-pure",
+      "entry": "ext.diff.tests.test_patch_apply_err_output_limit",
+      "expect": "pass"
+    }
+  ]
+}
+

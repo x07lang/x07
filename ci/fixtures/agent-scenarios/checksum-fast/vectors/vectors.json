@@ -1,9 +1,8 @@
 {
   "schema_version": "x07.fixture.vectors@0.1.0",
-  "package": "ext-checksum-rs@0.1.0",
+  "package": "ext-checksum-rs@0.1.1",
   "tests": [
     "ext.checksum.tests.test_crc32c_vectors",
     "ext.checksum.tests.test_xxhash64_vectors"
   ]
 }
-

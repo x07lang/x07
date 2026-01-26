@@ -1,0 +1,44 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.error.chain",
+  "imports": ["ext.error.context"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.error.chain.chain_errors",
+        "ext.error.chain.wrap_error"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.chain.chain_errors",
+      "params": [{"name": "outer", "ty": "bytes_view"}, {"name": "inner", "ty": "bytes_view"}],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "inner_msg", ["ext.error.context.error_msg", "inner"]],
+        ["let", "inner_msg_view", ["bytes.view", "inner_msg"]],
+        ["let", "result", ["ext.error.context.with_context", "outer", "inner_msg_view"]],
+        ["let", "count", ["ext.error.context.context_count", "inner"]],
+        ["for", "i", 0, "count", ["begin",
+          ["let", "ctx", ["ext.error.context.get_context", "inner", "i"]],
+          ["let", "ctx_view", ["bytes.view", "ctx"]],
+          ["set", "result", ["ext.error.context.with_context", ["bytes.view", "result"], "ctx_view"]],
+          0
+        ]],
+        "result"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.error.chain.wrap_error",
+      "params": [{"name": "inner", "ty": "bytes_view"}, {"name": "wrapper_msg", "ty": "bytes_view"}],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "wrapper", ["ext.error.context.err_from_msg", "wrapper_msg"]],
+        ["ext.error.chain.chain_errors", ["bytes.view", "wrapper"], "inner"]
+      ]
+    }
+  ]
+}

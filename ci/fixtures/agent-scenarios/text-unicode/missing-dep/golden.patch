@@ -1,5 +1,5 @@
 diff --git a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/x07.json b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/x07.json
-index f4ea51e..843d3f8 100644
+index f4ea51e..1b00bed 100644
 --- a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/x07.json
 +++ b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/x07.json
 @@ -1,13 +1,22 @@
@@ -10,8 +10,8 @@ index f4ea51e..843d3f8 100644
 +  "dependencies": [
 +    {
 +      "name": "ext-unicode-rs",
-+      "path": ".x07/deps/ext-unicode-rs/0.1.3",
-+      "version": "0.1.3"
++      "path": ".x07/deps/ext-unicode-rs/0.1.4",
++      "version": "0.1.4"
 +    }
 +  ],
    "entry": "src/main.x07.json",
@@ -34,28 +34,27 @@ index f4ea51e..843d3f8 100644
  }
 -
 diff --git a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/x07.lock.json b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/x07.lock.json
-index 52ca7bf..27feeee 100644
+index d7f8feb..a493220 100644
 --- a/ci/fixtures/agent-scenarios/text-unicode/missing-dep/broken/x07.lock.json
 +++ b/ci/fixtures/agent-scenarios/text-unicode/missing-dep/expected/x07.lock.json
-@@ -1,5 +1,19 @@
+@@ -1,4 +1,19 @@
  {
    "schema_version": "x07.lock@0.2.0",
 -  "dependencies": []
 +  "dependencies": [
 +    {
 +      "name": "ext-unicode-rs",
-+      "version": "0.1.3",
-+      "path": ".x07/deps/ext-unicode-rs/0.1.3",
-+      "package_manifest_sha256": "511721ac6657be61cd1668f68fad5fba659713f946c85a3c2bb128e2cbe33919",
++      "version": "0.1.4",
++      "path": ".x07/deps/ext-unicode-rs/0.1.4",
++      "package_manifest_sha256": "1a33b3f8bb839b46e198ceae5e837d07f2668540e4661b767ded398b88076895",
 +      "module_root": "modules",
 +      "modules_sha256": {
-+        "ext.unicode": "c5546525088baff2ce77b44384258ab00360a1022363de3613f8f87b4b0891be",
-+        "ext.unicode.casefold": "c76b94d2104ce04a89e669f9b6cc33d957480c39c8c232d48c2ab51b8768d659",
-+        "ext.unicode.normalize": "b147e10b96571dd958d1f48dad934380fff6fd1fe44127a456ebfa9d423c9079",
-+        "ext.unicode.segment": "fb4333255c4cbeb04f45104ca5a9e84a00022360a8e4b9965e9c65f5d29912ef",
-+        "ext.unicode.tests": "5fb7d3a1c5ba981849460becc4253041ab13e659ca41e101b0ca607d44f91c37"
++        "ext.unicode": "fed557ebb8d3c8df0ba496cefe493a330c33321562d1b5015673204e47e0cf17",
++        "ext.unicode.casefold": "af8e51983408f1e01dd5c96bceeb00c2e079657d88effff7134bb39cf4209162",
++        "ext.unicode.normalize": "7730910a774be59ddd9acc1d017d361ac39cf07343498f092047b1f3b674da6d",
++        "ext.unicode.segment": "3ad319edf09ecb3db1998bd01579fdd5d1b68318f7f3d3b7d1495d6ee5218e19",
++        "ext.unicode.tests": "52016c3da47fddb02ff89ad79e2965a1a9ab9c59b338a6393fffd3512f39b502"
 +      }
 +    }
 +  ]
  }
--

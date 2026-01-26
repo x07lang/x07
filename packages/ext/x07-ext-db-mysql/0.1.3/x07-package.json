@@ -1,0 +1,21 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-db-mysql",
+  "description": "MySQL driver for std.db (run-os only).",
+  "docs": "MySQL driver for std.db (run-os only).\n\nModules:\n- std.db.mysql\n- std.db.mysql.spec\n- std.db.mysql.pool\n\nUsage:\n- Add dependency: x07 pkg add ext-db-mysql@0.1.3\n- Import the modules listed above.\n",
+  "version": "0.1.3",
+  "module_root": "modules",
+  "modules": [
+    "std.db.mysql",
+    "std.db.mysql.spec",
+    "std.db.mysql.pool"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

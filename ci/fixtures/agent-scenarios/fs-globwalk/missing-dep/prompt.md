@@ -10,6 +10,6 @@ Goal:
 Expected workflow:
 
 1. Run `x07 run --profile os` and read the compile error.
-2. Apply the suggested fix: `x07 pkg add ext-path-glob-rs@0.1.0 --sync`.
+2. Apply the suggested fix: `x07 pkg add ext-path-glob-rs@0.1.1 --sync`.
 3. Re-run `x07 run --profile os` and verify it succeeds.
 

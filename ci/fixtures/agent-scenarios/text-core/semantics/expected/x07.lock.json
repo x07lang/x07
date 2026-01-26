@@ -3,9 +3,9 @@
   "dependencies": [
     {
       "name": "ext-text",
-      "version": "0.1.0",
-      "path": ".x07/deps/ext-text/0.1.0",
-      "package_manifest_sha256": "a9585757c82dc68e54503b7ea20f04a9b94b72f9cf7c5d367c204414d37bc45d",
+      "version": "0.1.1",
+      "path": ".x07/deps/ext-text/0.1.1",
+      "package_manifest_sha256": "d43ba1e2b4b9e87a62086e286d276f2ba46700a129a0899b866c72c3ad009ae1",
       "module_root": "modules",
       "modules_sha256": {
         "std.text": "34c68b30839a56cfc0c9f3079c5b61a4860e98c7414e577e2d17dce202ac3cb7",

@@ -32,7 +32,7 @@ fn unknown_module_includes_pkg_add_hint_when_available() {
 
     let msg = compile.compile_error.unwrap_or_default();
     assert!(
-        msg.contains("x07 pkg add ext-text@0.1.0 --sync"),
+        msg.contains("x07 pkg add ext-text@0.1.1 --sync"),
         "compile_error={msg:?}"
     );
 }

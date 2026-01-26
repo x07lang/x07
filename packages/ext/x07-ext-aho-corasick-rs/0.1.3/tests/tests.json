@@ -1,0 +1,23 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.aho_corasick/compile_find_standard",
+      "world": "solve-pure",
+      "entry": "ext.aho_corasick.tests.test_compile_find_standard",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.aho_corasick/compile_empty_needle_err",
+      "world": "solve-pure",
+      "entry": "ext.aho_corasick.tests.test_compile_empty_needle_err",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.aho_corasick/exec_invalid_compiled_err",
+      "world": "solve-pure",
+      "entry": "ext.aho_corasick.tests.test_exec_invalid_compiled_err",
+      "expect": "pass"
+    }
+  ]
+}
