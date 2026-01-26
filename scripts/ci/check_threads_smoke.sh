@@ -231,7 +231,10 @@ PY
 )"
 
   local report_json="$tmp_dir/run.http.${profile}.report.json"
+  local run_stdout="$tmp_dir/run.http.${profile}.stdout.log"
+  local run_stderr="$tmp_dir/run.http.${profile}.stderr.log"
   verbose "running x07 with profile: $profile, port: $port"
+  local run_rc=0
   if [[ "$profile" == "sandbox" ]]; then
     local allow_host="127.0.0.1:${port}"
     verbose "allow_host: $allow_host"
@@ -242,7 +245,7 @@ PY
       --allow-host "$allow_host" \
       --report runner \
       --report-out "$report_json" \
-      >/dev/null
+      >"$run_stdout" 2>"$run_stderr" || run_rc="$?"
   else
     "$x07_bin" run \
       --project x07.json \
@@ -250,7 +253,17 @@ PY
       --input input.bin \
       --report runner \
       --report-out "$report_json" \
-      >/dev/null
+      >"$run_stdout" 2>"$run_stderr" || run_rc="$?"
+  fi
+  if [[ "$run_rc" -ne 0 ]]; then
+    echo "ERROR: x07 run failed for profile: $profile (exit code: $run_rc)" >&2
+    echo "=== x07 stdout ===" >&2
+    cat "$run_stdout" >&2 || true
+    echo "=== x07 stderr ===" >&2
+    cat "$run_stderr" >&2 || true
+    echo "=== report json ===" >&2
+    cat "$report_json" >&2 || true
+    exit 1
   fi
   verbose "x07 run completed for profile: $profile"
 
