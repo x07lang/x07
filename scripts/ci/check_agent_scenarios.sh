@@ -31,10 +31,7 @@ export X07_BIN="$x07_bin"
 
 export X07_REPO_ROOT="$root"
 
-# Ensure runners exist for x07 run.
-if [[ ! -x "target/debug/x07-host-runner" && ! -x "target/release/x07-host-runner" ]]; then
-  cargo build -p x07-host-runner -p x07-os-runner >/dev/null
-fi
+./scripts/ci/ensure_runners.sh
 
 # OS-world agent scenarios rely on the ext-fs native backend.
 ./scripts/ci/ensure_ext_fs_backend.sh >/dev/null

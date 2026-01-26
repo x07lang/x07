@@ -27,10 +27,7 @@ if [[ "$x07_bin" != /* ]]; then
   x07_bin="$root/$x07_bin"
 fi
 
-# Ensure runners exist for x07 run (repo CI builds them earlier, but allow standalone execution).
-if [[ ! -x "target/debug/x07-host-runner" && ! -x "target/release/x07-host-runner" ]]; then
-  cargo build -p x07-host-runner -p x07-os-runner >/dev/null
-fi
+./scripts/ci/ensure_runners.sh
 
 # Ensure the native ext-fs backend exists (required by OS-world examples).
 ./scripts/ci/ensure_ext_fs_backend.sh >/dev/null

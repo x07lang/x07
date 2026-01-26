@@ -8,6 +8,8 @@ cd "$ROOT"
 
 X07_BIN="${X07_BIN:-$(./scripts/ci/find_x07.sh)}"
 
+./scripts/ci/ensure_runners.sh
+
 # Ensure helper binaries exist (x07-proc-echo used by process spawn).
 ./scripts/build_os_helpers.sh
 

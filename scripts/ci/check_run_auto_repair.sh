@@ -8,6 +8,8 @@ cd "$ROOT"
 
 X07_BIN="${X07_BIN:-$(./scripts/ci/find_x07.sh)}"
 
+./scripts/ci/ensure_runners.sh
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
