@@ -9,18 +9,52 @@ set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
-# Force a deterministic, repo-root target dir so downstream scripts can find artifacts.
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT_DIR/target}"
-
 cargo_cmd="${X07_CARGO:-cargo}"
+user_target_dir="${CARGO_TARGET_DIR:-}"
+
+host_target_dir=""
+cargo_target_dir_env=""
+if [[ "$cargo_cmd" == "cross" ]]; then
+  if [[ -n "$user_target_dir" ]]; then
+    if [[ "$user_target_dir" == /* ]]; then
+      case "$user_target_dir" in
+        "$ROOT_DIR"/*)
+          cargo_target_dir_env="${user_target_dir#"$ROOT_DIR"/}"
+          host_target_dir="$user_target_dir"
+          ;;
+        *)
+          echo "ERROR: cross build requires CARGO_TARGET_DIR under repo root (got: $user_target_dir)" >&2
+          exit 2
+          ;;
+      esac
+    else
+      cargo_target_dir_env="$user_target_dir"
+      host_target_dir="$ROOT_DIR/$user_target_dir"
+    fi
+  else
+    cargo_target_dir_env="target"
+    host_target_dir="$ROOT_DIR/target"
+  fi
+else
+  if [[ -n "$user_target_dir" ]]; then
+    if [[ "$user_target_dir" == /* ]]; then
+      host_target_dir="$user_target_dir"
+    else
+      host_target_dir="$ROOT_DIR/$user_target_dir"
+    fi
+  else
+    host_target_dir="$ROOT_DIR/target"
+  fi
+  cargo_target_dir_env="$host_target_dir"
+fi
 
 TARGET_TRIPLE=""
-TARGET_RELEASE_DIR="$ROOT_DIR/target/release"
+TARGET_RELEASE_DIR="$host_target_dir/release"
 
 override_target="${X07_CARGO_TARGET:-}"
 if [[ -n "$override_target" ]]; then
   TARGET_TRIPLE="$override_target"
-  TARGET_RELEASE_DIR="$ROOT_DIR/target/$TARGET_TRIPLE/release"
+  TARGET_RELEASE_DIR="$host_target_dir/$TARGET_TRIPLE/release"
 fi
 
 case "$(uname -s)" in
@@ -36,7 +70,7 @@ case "$(uname -s)" in
     cc_lc="$(printf '%s' "$cc" | tr '[:upper:]' '[:lower:]')"
     if [[ -n "$cc_lc" && "$cc_lc" != *cl.exe && "$cc_lc" != *clang-cl* ]]; then
       TARGET_TRIPLE="x86_64-pc-windows-gnu"
-      TARGET_RELEASE_DIR="$ROOT_DIR/target/$TARGET_TRIPLE/release"
+      TARGET_RELEASE_DIR="$host_target_dir/$TARGET_TRIPLE/release"
       if [[ "$cargo_cmd" == "cargo" || "$cargo_cmd" == */cargo ]] && command -v rustup >/dev/null 2>&1; then
         rustup target add "$TARGET_TRIPLE" >/dev/null
       else
@@ -50,9 +84,9 @@ esac
 (
   cd "$ROOT_DIR"
   if [[ -n "$TARGET_TRIPLE" ]]; then
-    "$cargo_cmd" build --manifest-path crates/x07-ext-fs-native/Cargo.toml --release --target "$TARGET_TRIPLE"
+    CARGO_TARGET_DIR="$cargo_target_dir_env" "$cargo_cmd" build --manifest-path crates/x07-ext-fs-native/Cargo.toml --release --target "$TARGET_TRIPLE"
   else
-    "$cargo_cmd" build --manifest-path crates/x07-ext-fs-native/Cargo.toml --release
+    CARGO_TARGET_DIR="$cargo_target_dir_env" "$cargo_cmd" build --manifest-path crates/x07-ext-fs-native/Cargo.toml --release
   fi
 )
 

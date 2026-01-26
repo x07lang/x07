@@ -60,40 +60,95 @@ if [[ -z "$manifest" || -z "$lib_name" || -z "$header" ]]; then
   exit 2
 fi
 
-if [[ "$manifest" != /* ]]; then
-  manifest="$root/$manifest"
-fi
-if [[ "$header" != /* ]]; then
-  header="$root/$header"
-fi
-
-if [[ ! -f "$manifest" ]]; then
-  echo "ERROR: manifest not found: $manifest" >&2
-  exit 2
-fi
-if [[ ! -f "$header" ]]; then
-  echo "ERROR: header not found: $header" >&2
-  exit 2
-fi
-
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$root/target}"
-
 cargo_cmd="${X07_CARGO:-cargo}"
 target="${X07_CARGO_TARGET:-}"
 
-cargo_args=(build --manifest-path "$manifest" --release)
+host_manifest="$manifest"
+manifest_for_build="$manifest"
+if [[ "$host_manifest" != /* ]]; then
+  host_manifest="$root/$host_manifest"
+fi
+
+if [[ "$cargo_cmd" == "cross" ]]; then
+  if [[ "$manifest_for_build" == /* ]]; then
+    case "$manifest_for_build" in
+      "$root"/*)
+        manifest_for_build="${manifest_for_build#"$root"/}"
+        ;;
+      *)
+        echo "ERROR: cross build requires --manifest under repo root (got: $manifest_for_build)" >&2
+        exit 2
+        ;;
+    esac
+  fi
+else
+  manifest_for_build="$host_manifest"
+fi
+
+host_header="$header"
+if [[ "$host_header" != /* ]]; then
+  host_header="$root/$host_header"
+fi
+
+if [[ ! -f "$host_manifest" ]]; then
+  echo "ERROR: manifest not found: $host_manifest" >&2
+  exit 2
+fi
+if [[ ! -f "$host_header" ]]; then
+  echo "ERROR: header not found: $host_header" >&2
+  exit 2
+fi
+
+user_target_dir="${CARGO_TARGET_DIR:-}"
+host_target_dir=""
+cargo_target_dir_env=""
+if [[ "$cargo_cmd" == "cross" ]]; then
+  if [[ -n "$user_target_dir" ]]; then
+    if [[ "$user_target_dir" == /* ]]; then
+      case "$user_target_dir" in
+        "$root"/*)
+          cargo_target_dir_env="${user_target_dir#"$root"/}"
+          host_target_dir="$user_target_dir"
+          ;;
+        *)
+          echo "ERROR: cross build requires CARGO_TARGET_DIR under repo root (got: $user_target_dir)" >&2
+          exit 2
+          ;;
+      esac
+    else
+      cargo_target_dir_env="$user_target_dir"
+      host_target_dir="$root/$user_target_dir"
+    fi
+  else
+    cargo_target_dir_env="target"
+    host_target_dir="$root/target"
+  fi
+else
+  if [[ -n "$user_target_dir" ]]; then
+    if [[ "$user_target_dir" == /* ]]; then
+      host_target_dir="$user_target_dir"
+    else
+      host_target_dir="$root/$user_target_dir"
+    fi
+  else
+    host_target_dir="$root/target"
+  fi
+  cargo_target_dir_env="$host_target_dir"
+fi
+
+cargo_args=(build --manifest-path "$manifest_for_build" --release)
 if [[ -n "$target" ]]; then
   cargo_args+=(--target "$target")
 fi
 
 (
   cd "$root"
-  "$cargo_cmd" "${cargo_args[@]}"
+  CARGO_TARGET_DIR="$cargo_target_dir_env" "$cargo_cmd" "${cargo_args[@]}"
 )
 
-build_out="$CARGO_TARGET_DIR/release"
+build_out="$host_target_dir/release"
 if [[ -n "$target" ]]; then
-  build_out="$CARGO_TARGET_DIR/$target/release"
+  build_out="$host_target_dir/$target/release"
 fi
 
 lib_candidates=(
@@ -119,7 +174,7 @@ fi
 deps_dir="$root/deps/x07"
 mkdir -p "$deps_dir/include"
 
-cp -f "$header" "$deps_dir/include/$(basename "$header")"
+cp -f "$host_header" "$deps_dir/include/$(basename "$host_header")"
 
 staged_lib=""
 if [[ "$lib_path" == *.a ]]; then
@@ -133,4 +188,3 @@ fi
 echo "Staged:"
 echo "  $deps_dir/include/$(basename "$header")"
 echo "  $staged_lib"
-
