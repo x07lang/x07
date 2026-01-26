@@ -238,78 +238,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (arm64)
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross (aarch64)
+        uses: taiki-e/install-action@v2
         with:
-          platforms: arm64
+          tool: cross
 
       - name: Build and package (aarch64)
-        uses: uraimo/run-on-arch-action@v2
-        with:
-          arch: aarch64
-          distro: ubuntu22.04
-          install: |
-            apt-get update
-            apt-get install -y --no-install-recommends \
-              build-essential \
-              clang \
-              lld \
-              pkg-config \
-              libssl-dev \
-              libcurl4-openssl-dev \
-              zlib1g-dev \
-              liblzma-dev \
-              libsqlite3-dev \
-              python3 \
-              ca-certificates \
-              curl \
-              git
-            curl -sSf https://sh.rustup.rs | sh -s -- -y
-          run: |
-            set -euo pipefail
-            git config --global --add safe.directory "$(pwd)"
-            source "$HOME/.cargo/env"
+        shell: bash
+        run: |
+          set -euo pipefail
 
-            tag="$(git describe --tags --exact-match)"
-            target="$(rustc -vV | awk -F': ' '/^host:/{print $2}')"
-            if [[ -z "$tag" || -z "$target" ]]; then
-              echo "ERROR: failed to detect tag/target (tag=$tag target=$target)" >&2
-              exit 2
-            fi
+          tag="${GITHUB_REF_NAME}"
+          target="aarch64-unknown-linux-gnu"
 
-            export CC=clang
-            export CXX=clang++
-            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=clang
-            export RUSTFLAGS="-C link-arg=-fuse-ld=lld"
-            cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli -p x07up
+          cross build --release --target "$target" -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli -p x07up
 
-            # Smoke: compile+run a minimal solve-pure program.
-            tmp="$(mktemp -d)"
-            cat >"${tmp}/program.x07.json" <<'JSON'
-            {"schema_version":"x07.x07ast@0.2.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
-            JSON
-            printf 'hi' >"${tmp}/input.bin"
-            target/release/x07-host-runner --program "${tmp}/program.x07.json" --world solve-pure --input "${tmp}/input.bin" \
-              | python3 -c 'import base64,json,sys; report=json.load(sys.stdin); expected=base64.b64encode(b"hi").decode("ascii"); assert report.get("exit_code")==0, report; out=(report.get("solve") or {}).get("solve_output_b64"); assert out==expected, (out, expected)'
+          export X07_CARGO=cross
+          export X07_CARGO_TARGET="$target"
 
-            ./scripts/build_ext_regex.sh
-            ./scripts/build_ext_fs.sh
-            ./scripts/build_ext_math.sh
-            ./scripts/build_ext_time.sh
-            ./scripts/build_ext_db_sqlite.sh
-            ./scripts/build_ext_db_pg.sh
-            ./scripts/build_ext_db_mysql.sh
-            ./scripts/build_ext_db_redis.sh
+          ./scripts/build_ext_regex.sh
+          ./scripts/build_ext_fs.sh
+          ./scripts/build_ext_math.sh
+          ./scripts/build_ext_time.sh
+          ./scripts/build_ext_db_sqlite.sh
+          ./scripts/build_ext_db_pg.sh
+          ./scripts/build_ext_db_mysql.sh
+          ./scripts/build_ext_db_redis.sh
 
-            mkdir -p dist
-            scripts/build_toolchain_tarball.sh --tag "$tag" --platform Linux --out "dist/x07-${tag}-${target}.tar.gz"
+          mkdir -p dist
+          scripts/build_toolchain_tarball.sh --tag "$tag" --platform Linux --target-dir "target/${target}" --out "dist/x07-${tag}-${target}.tar.gz"
 
-            stage="dist/.tmp_x07up_${tag}_${target}"
-            rm -rf "$stage"
-            mkdir -p "$stage"
-            cp -f "target/release/x07up" "$stage/x07up"
-            chmod 0755 "$stage/x07up"
-            tar -czf "dist/x07up-${tag}-${target}.tar.gz" -C "$stage" x07up
+          stage="dist/.tmp_x07up_${tag}_${target}"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp -f "target/${target}/release/x07up" "$stage/x07up"
+          chmod 0755 "$stage/x07up"
+          tar -czf "dist/x07up-${tag}-${target}.tar.gz" -C "$stage" x07up
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
