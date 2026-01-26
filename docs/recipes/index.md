@@ -5,6 +5,7 @@ These recipes are designed for coding agents: start from `x07 init`, apply a sma
 Each recipe assumes the default `x07 init` skeleton:
 
 - `src/app.x07.json` exports `app.solve` at JSON Pointer `/decls/1/body`
+- `src/main.x07.json` calls `app.solve` under JSON Pointer `/solve`
 - `x07.json.default_profile` is `test` (deterministic `solve-pure`)
 
 For reference, these patches are also checked into the toolchain repo under `docs/recipes/patches/`.
@@ -171,14 +172,24 @@ This adds a `defasync` and uses `task.spawn` + `await`.
 ```bash
 cat > /tmp/x07-async-hello.patch.json <<'JSON'
 [
-  {"op":"add","path":"/decls/-","value":{"kind":"defasync","name":"app.hello_task","params":[],"result":"bytes","body":["bytes.lit","hello_from_task"]}},
-  {"op":"replace","path":"/decls/1/body","value":["begin",["let","h",["app.hello_task"]],["task.spawn","h"],["await","h"]]}
+  {"op":"add","path":"/decls/0/names/-","value":"app.hello_task"},
+  {"op":"add","path":"/decls/-","value":{"kind":"defasync","name":"app.hello_task","params":[],"result":"bytes","body":["bytes.lit","hello_from_task"]}}
 ]
 JSON
 
 x07 ast apply-patch --in src/app.x07.json --patch /tmp/x07-async-hello.patch.json --out src/app.x07.json --validate
 x07 fmt --input src/app.x07.json --write
 x07 lint --input src/app.x07.json --world solve-pure
+
+cat > /tmp/x07-async-hello.main.patch.json <<'JSON'
+[
+  {"op":"replace","path":"/solve","value":["begin",["let","h",["app.hello_task"]],["task.spawn","h"],["await","h"]]}
+]
+JSON
+
+x07 ast apply-patch --in src/main.x07.json --patch /tmp/x07-async-hello.main.patch.json --out src/main.x07.json --validate
+x07 fmt --input src/main.x07.json --write
+x07 lint --input src/main.x07.json --world solve-pure
 x07 run
 ```
 

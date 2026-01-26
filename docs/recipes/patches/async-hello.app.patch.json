@@ -1,6 +1,11 @@
 [
   {
     "op": "add",
+    "path": "/decls/0/names/-",
+    "value": "app.hello_task"
+  },
+  {
+    "op": "add",
     "path": "/decls/-",
     "value": {
       "kind": "defasync",
@@ -12,27 +17,5 @@
         "hello_from_task"
       ]
     }
-  },
-  {
-    "op": "replace",
-    "path": "/decls/1/body",
-    "value": [
-      "begin",
-      [
-        "let",
-        "h",
-        [
-          "app.hello_task"
-        ]
-      ],
-      [
-        "task.spawn",
-        "h"
-      ],
-      [
-        "await",
-        "h"
-      ]
-    ]
   }
 ]

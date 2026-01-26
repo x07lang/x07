@@ -1,0 +1,26 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "app",
+  "imports": ["std.net.http.client", "std.net.http.spec"],
+  "decls": [
+    { "kind": "export", "names": ["app.fetch_ok"] },
+    {
+      "kind": "defasync",
+      "name": "app.fetch_ok",
+      "params": [{ "name": "url", "ty": "bytes" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "caps", ["std.net.http.spec.caps_default_v1"]],
+        ["let", "resp", ["std.net.http.client.get_v1", "url", "caps"]],
+        [
+          "if",
+          ["=", ["std.net.http.client.resp_is_err_v1", ["bytes.view", "resp"]], 1],
+          ["bytes.lit", "err"],
+          ["bytes.lit", "ok"]
+        ]
+      ]
+    }
+  ]
+}

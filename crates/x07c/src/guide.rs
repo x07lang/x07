@@ -165,6 +165,9 @@ pub fn guide_md() -> String {
     out.push_str("- `[\"task.yield\"]` -> `i32`\n");
     out.push_str("- `[\"task.sleep\", ticks_i32]` -> `i32` (virtual time ticks)\n");
     out.push_str("- `[\"task.cancel\", task_handle]` -> `i32`\n\n");
+    out.push_str(
+        "Note: `await` / `task.join.bytes` are only allowed in `solve` expressions and inside `defasync` bodies (not inside `defn`).\n\n",
+    );
     out.push_str("Channels (bytes payloads):\n\n");
     out.push_str("- `[\"chan.bytes.new\", cap_i32]` -> `i32`\n");
     out.push_str("- `[\"chan.bytes.try_send\", chan_handle, bytes_view]` -> `i32` (0 full; 1 sent; 2 closed)\n");

@@ -16,6 +16,7 @@ In OS worlds (`run-os*`), use subprocess spawning for multi-core parallelism. In
 ## Canonical patterns
 
 - Use `defasync` + `task.*` + `chan.bytes.*` for deterministic concurrency.
+- Keep `await` / `task.join.bytes` in `solve` expressions or inside `defasync` (they are not allowed inside `defn`).
 - Avoid implicit sources of nondeterminism (OS clocks, random, network) in solve worlds.
 - Keep scheduling decisions explicit and data-driven (inputs → outputs), so runs are replayable.
 

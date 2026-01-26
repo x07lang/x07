@@ -1,0 +1,25 @@
+[
+  {
+    "op": "replace",
+    "path": "/solve",
+    "value": [
+      "begin",
+      [
+        "let",
+        "h",
+        [
+          "app.hello_task"
+        ]
+      ],
+      [
+        "task.spawn",
+        "h"
+      ],
+      [
+        "await",
+        "h"
+      ]
+    ]
+  }
+]
+

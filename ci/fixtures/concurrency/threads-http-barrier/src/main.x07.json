@@ -1,0 +1,28 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "entry",
+  "module_id": "main",
+  "imports": ["app"],
+  "decls": [],
+  "solve": [
+    "begin",
+    ["let", "h1", ["app.fetch_ok", ["view.to_bytes", "input"]]],
+    ["let", "h2", ["app.fetch_ok", ["view.to_bytes", "input"]]],
+    ["task.spawn", "h1"],
+    ["task.spawn", "h2"],
+    ["let", "r1", ["await", "h1"]],
+    ["let", "r2", ["await", "h2"]],
+    ["let", "ok_bytes", ["bytes.lit", "ok"]],
+    [
+      "let",
+      "ok1",
+      ["bytes.eq", ["bytes.view", "r1"], ["bytes.view", "ok_bytes"]]
+    ],
+    [
+      "let",
+      "ok2",
+      ["bytes.eq", ["bytes.view", "r2"], ["bytes.view", "ok_bytes"]]
+    ],
+    ["if", ["!=", ["*", "ok1", "ok2"], 0], ["bytes.lit", "OK"], ["bytes.lit", "FAIL"]]
+  ]
+}

@@ -169,6 +169,8 @@ To get concurrency, create multiple tasks before waiting on them (and avoid bloc
 - `["task.sleep", ticks_i32]` -> `i32` (virtual time ticks)
 - `["task.cancel", task_handle]` -> `i32`
 
+Note: `await` / `task.join.bytes` are only allowed in `solve` expressions and inside `defasync` bodies (not inside `defn`).
+
 Channels (bytes payloads):
 
 - `["chan.bytes.new", cap_i32]` -> `i32`
