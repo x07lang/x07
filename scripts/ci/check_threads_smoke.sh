@@ -207,7 +207,7 @@ import pathlib
 import sys
 
 info = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-print(info["port"])
+sys.stdout.write(str(info["port"]))
 PY
 )"
 
