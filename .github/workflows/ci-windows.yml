@@ -7,8 +7,8 @@ on:
 
 jobs:
   windows:
-    name: windows-latest
-    runs-on: windows-latest
+    name: windows-2022
+    runs-on: windows-2022
     timeout-minutes: 60
     if: github.event_name != 'schedule'
     env:
@@ -74,7 +74,7 @@ jobs:
 
   wsl2:
     name: wsl2-ubuntu
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 105
     defaults:
       run:

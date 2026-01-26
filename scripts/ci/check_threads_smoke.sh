@@ -167,7 +167,7 @@ run_http_barrier_profile() {
 
   barrier_pid="$!"
 
-  for _ in $(seq 1 200); do
+  for _ in $(seq 1 600); do
     if [[ -f "$ready_json" ]]; then
       break
     fi
