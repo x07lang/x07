@@ -24624,7 +24624,11 @@ static uint32_t rt_os_process_join_exit_poll(ctx_t* ctx, int32_t handle, int32_t
   rt_os_proc_t* p = rt_os_proc_from_handle(ctx, handle, &idx);
   (void)idx;
 
+#if defined(_WIN32)
+  if (p->state != RT_OS_PROC_STATE_RUNNING || (p->exited && p->stdout_closed && p->stderr_closed)) {
+#else
   if (p->state != RT_OS_PROC_STATE_RUNNING || p->exited) {
+#endif
     if (out) *out = 1;
     return UINT32_C(1);
   }
@@ -24657,7 +24661,11 @@ static int32_t rt_os_process_join_exit_v1(ctx_t* ctx, int32_t handle) {
     rt_os_proc_t* p = rt_os_proc_from_handle(ctx, handle, &idx);
     (void)idx;
 
+#if defined(_WIN32)
+    if (p->state != RT_OS_PROC_STATE_RUNNING || (p->exited && p->stdout_closed && p->stderr_closed)) return 1;
+#else
     if (p->state != RT_OS_PROC_STATE_RUNNING || p->exited) return 1;
+#endif
 
     if (!rt_sched_step(ctx)) rt_sched_deadlock();
   }
@@ -24780,9 +24788,8 @@ static uint32_t rt_os_process_poll_all(ctx_t* ctx, int poll_timeout_ms) {
   for (uint32_t i = 0; i < ctx->os_procs_len; i++) {
     rt_os_proc_t* p = &ctx->os_procs[i];
     if (p->state != RT_OS_PROC_STATE_RUNNING) continue;
-    uint32_t was_exited = p->exited;
     rt_os_proc_try_wait(p);
-    if (!was_exited && p->exited) {
+    if (p->exited && p->stdout_closed && p->stderr_closed) {
       uint32_t reason_id = rt_os_proc_handle_u32(i, p->gen);
       rt_os_proc_wake_exit_waiters(ctx, p, reason_id);
     }
@@ -24803,9 +24810,8 @@ static uint32_t rt_os_process_poll_all(ctx_t* ctx, int poll_timeout_ms) {
     rt_os_proc_t* p = &ctx->os_procs[i];
     if (p->state != RT_OS_PROC_STATE_RUNNING) continue;
 
-    uint32_t was_exited = p->exited;
     rt_os_proc_try_wait(p);
-    if (!was_exited && p->exited) {
+    if (p->exited && p->stdout_closed && p->stderr_closed) {
       uint32_t reason_id = rt_os_proc_handle_u32(i, p->gen);
       rt_os_proc_wake_exit_waiters(ctx, p, reason_id);
     }
