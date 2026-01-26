@@ -251,7 +251,6 @@ jobs:
           install: |
             apt-get update
             apt-get install -y --no-install-recommends \
-              clang \
               build-essential \
               pkg-config \
               libssl-dev \
@@ -276,9 +275,9 @@ jobs:
               exit 2
             fi
 
-            export CC=clang
-            export CXX=clang++
-            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=clang
+            export CC=gcc
+            export CXX=g++
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=gcc
             cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli -p x07up
 
             # Smoke: compile+run a minimal solve-pure program.
