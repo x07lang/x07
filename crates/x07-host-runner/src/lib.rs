@@ -642,7 +642,7 @@ pub fn run_artifact_file(
         trap = Some("missing metrics json line on stderr".to_string());
     }
 
-    if out.exit_signal.is_some() {
+    if exit_status != 0 || out.exit_signal.is_some() {
         if let Some(msg) = parse_trap_stderr(&stderr) {
             trap = Some(msg);
         }

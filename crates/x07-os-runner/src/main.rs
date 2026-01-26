@@ -821,7 +821,7 @@ fn run_os_artifact(inv: &RunInvocation<'_>) -> Result<RunnerResult> {
         trap = Some("missing metrics json line on stderr".to_string());
     }
 
-    if out.exit_signal.is_some() {
+    if out.exit_status != 0 || out.exit_signal.is_some() {
         if let Some(msg) = x07_host_runner::parse_trap_stderr(&out.stderr) {
             trap = Some(msg);
         }

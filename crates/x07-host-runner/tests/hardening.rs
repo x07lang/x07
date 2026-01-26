@@ -218,6 +218,32 @@ fn stdout_cap_does_not_hang() {
 }
 
 #[test]
+fn nonzero_exit_uses_last_stderr_line_as_trap() {
+    let (dir, exe) = compile_c_artifact(
+        r#"
+          #include <stdio.h>
+
+          int main(void) {
+            fputs("os.threads.blocking disabled by policy\n", stderr);
+            fflush(stderr);
+            return 1;
+          }
+        "#,
+    );
+
+    let cfg = base_config();
+    let res = run_artifact_file(&cfg, &exe, b"ignored").expect("runner ok");
+    assert!(!res.ok);
+    assert_ne!(res.exit_status, 0);
+    assert_eq!(
+        res.trap.as_deref(),
+        Some("os.threads.blocking disabled by policy")
+    );
+
+    rm_rf(&dir);
+}
+
+#[test]
 fn fs_read_rejects_reserved_x07_dirs() {
     let fixture = create_temp_dir("x07_fixture");
 
