@@ -97,7 +97,7 @@ pub fn collect_auto_ffi_cc_args(module_roots: &[PathBuf]) -> Result<Vec<String>>
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        if cfg!(windows) && name == "ext-sockets-c" {
+        if cfg!(windows) && (name == "ext-sockets-c" || name == "ext-curl-c") {
             need_winsock = true;
         }
 
