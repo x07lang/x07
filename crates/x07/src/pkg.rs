@@ -17,7 +17,7 @@ use crate::util;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-const DEFAULT_INDEX_URL: &str = "sparse+https://registry.x07.io/index/";
+pub(crate) const DEFAULT_INDEX_URL: &str = "sparse+https://registry.x07.io/index/";
 const PKG_PROVIDES_REPORT_SCHEMA_VERSION: &str = "x07.pkg.provides.report@0.1.0";
 
 #[derive(Debug, Args)]

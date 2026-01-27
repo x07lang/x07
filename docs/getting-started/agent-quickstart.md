@@ -62,6 +62,7 @@ x07 init
 - `x07.lock.json`
 - `x07-toolchain.toml` (pins `stable` and declares `docs` + `skills`)
 - `AGENT.md` (self-recovery guide + canonical commands)
+- `.agent/docs/README.md` (stub that points to offline docs)
 - `.agent/skills/` (project-scoped skills pack)
 - `src/` (a minimal program)
 - `tests/tests.json` + `tests/smoke.x07.json` (a harness smoke test)

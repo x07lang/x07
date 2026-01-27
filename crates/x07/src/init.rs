@@ -12,6 +12,7 @@ use x07_contracts::{
 
 const X07_TOOLCHAIN_TOML: &str = "x07-toolchain.toml";
 const X07_AGENT_DIR: &str = ".agent";
+const PACKAGE_INIT_VERSION: &str = "0.1.0";
 
 const AGENT_TEMPLATE_MD: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -268,7 +269,7 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
     let policy_path = root.join(crate::policy::default_base_policy_rel_path(policy_template));
 
     let mut conflicts = Vec::new();
-    let required_paths: [&PathBuf; 9] = [
+    let required_paths: [&PathBuf; 10] = [
         &paths.project,
         &paths.lock,
         &paths.app,
@@ -276,6 +277,7 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
         &paths.tests_manifest,
         &paths.tests_smoke,
         &agent_paths.toolchain_toml,
+        &agent_paths.agent_docs_readme,
         &agent_paths.agent_md,
         &agent_paths.agent_skills_dir,
     ];
@@ -591,6 +593,7 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
         &paths.module_tests,
         &paths.tests_manifest,
         &agent_paths.toolchain_toml,
+        &agent_paths.agent_docs_readme,
         &agent_paths.agent_md,
         &agent_paths.agent_skills_dir,
     ] {
@@ -766,8 +769,8 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
         command: "init",
         root: root.display().to_string(),
         created,
-        notes: init_notes(),
-        next_steps: init_next_steps(),
+        notes: init_package_notes(),
+        next_steps: init_package_next_steps(&pkg_name, PACKAGE_INIT_VERSION),
         error: None,
     };
     println!("{}", serde_json::to_string(&report)?);
@@ -801,6 +804,7 @@ struct PackageInitPaths {
 struct AgentKitPaths {
     toolchain_toml: PathBuf,
     agent_dir: PathBuf,
+    agent_docs_readme: PathBuf,
     agent_md: PathBuf,
     agent_skills_dir: PathBuf,
 }
@@ -808,10 +812,12 @@ struct AgentKitPaths {
 impl AgentKitPaths {
     fn new(root: &Path) -> Self {
         let agent_dir = root.join(X07_AGENT_DIR);
+        let agent_docs_readme = agent_dir.join("docs").join("README.md");
         Self {
             toolchain_toml: root.join(X07_TOOLCHAIN_TOML),
             agent_md: root.join("AGENT.md"),
             agent_skills_dir: agent_dir.join("skills"),
+            agent_docs_readme,
             agent_dir,
         }
     }
@@ -859,6 +865,7 @@ fn init_notes() -> Vec<String> {
     vec![
         "Agent kit: AGENT.md (self-recovery + canonical commands)".to_string(),
         format!("Toolchain pin: {X07_TOOLCHAIN_TOML} (channel=stable; components=docs+skills)"),
+        format!("Project docs: {X07_AGENT_DIR}/docs/ (README.md points to offline docs)"),
         format!("Project skills: {X07_AGENT_DIR}/skills/"),
         "Offline docs: x07up docs path --json".to_string(),
         "Skills status: x07up skills status --json".to_string(),
@@ -869,6 +876,25 @@ fn init_next_steps() -> Vec<String> {
     vec![
         "x07 run".to_string(),
         "x07 test --manifest tests/tests.json".to_string(),
+    ]
+}
+
+fn init_package_notes() -> Vec<String> {
+    let mut notes = vec!["Package repo: x07-package.json (publish contract)".to_string()];
+    notes.extend(init_notes());
+    notes
+}
+
+fn init_package_next_steps(name: &str, version: &str) -> Vec<String> {
+    vec![
+        "Edit x07-package.json: set description/docs; bump version".to_string(),
+        "x07 test --manifest tests/tests.json".to_string(),
+        format!("x07 pkg pack --package . --out dist/{name}-{version}.x07pkg"),
+        format!("x07 pkg login --index {}", crate::pkg::DEFAULT_INDEX_URL),
+        format!(
+            "x07 pkg publish --index {} --package .",
+            crate::pkg::DEFAULT_INDEX_URL
+        ),
     ]
 }
 
@@ -890,6 +916,11 @@ fn init_agent_kit(root: &Path, paths: &AgentKitPaths, created: &mut Vec<String>)
         )
     })?;
     created.push(rel(root, &paths.agent_skills_dir));
+
+    let agent_docs_readme = agent_docs_readme_bytes();
+    write_new_file(&paths.agent_docs_readme, &agent_docs_readme)
+        .with_context(|| format!("write {}", paths.agent_docs_readme.display()))?;
+    created.push(rel(root, &paths.agent_docs_readme));
 
     let docs_root = toolchain_docs_root(&toolchain_root);
     let toolchain_version = toolchain_id_for_agent_md(&toolchain_root);
@@ -966,6 +997,20 @@ fn toolchain_id_for_agent_md(toolchain_root: &Path) -> String {
         return name.to_string();
     }
     fallback
+}
+
+fn agent_docs_readme_bytes() -> Vec<u8> {
+    let mut out = format!(
+        "This directory is part of the X07 agent kit.\n\n\
+Offline docs are installed with the toolchain (see `{X07_TOOLCHAIN_TOML}`: components = [\"docs\", \"skills\"]).\n\n\
+Find the local docs root:\n\n\
+- `x07up docs path --json`\n"
+    )
+    .into_bytes();
+    if out.last() != Some(&b'\n') {
+        out.push(b'\n');
+    }
+    out
 }
 
 fn resolve_skills_pack_root(toolchain_root: &Path) -> Result<PathBuf> {
@@ -1258,7 +1303,7 @@ fn package_project_json_bytes(entry_rel: &str) -> Result<Vec<u8>> {
 }
 
 fn package_json_bytes(name: &str, ids: &PackageIds) -> Result<Vec<u8>> {
-    let version = "0.1.0";
+    let version = PACKAGE_INIT_VERSION;
     let docs = format!(
         "Starter package generated by `x07 init --package`.\n\nModules:\n- {}\n- {}\n\nUsage:\n- Add: x07 pkg add {}@{} --sync\n- Import: {}\n- Call: {}\n\nDev:\n- Test: x07 test --manifest tests/tests.json\n- Pack: x07 pkg pack --package . --out dist/{}-{}.x07pkg\n",
         ids.module_id,

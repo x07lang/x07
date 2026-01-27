@@ -8,6 +8,26 @@ X07 supports a Cargo-like workflow:
 
 For a copy/paste end-to-end tutorial, see: [Publishing by example](publishing-by-example.md).
 
+## Quickstart (package repo)
+
+Create a publishable package repo:
+
+```bash
+mkdir mypkg
+cd mypkg
+x07 init --package
+```
+
+Then follow the canonical workflow (also printed in the init JSON report):
+
+```bash
+# Edit x07-package.json: set description/docs; bump version
+x07 test --manifest tests/tests.json
+x07 pkg pack --package . --out dist/<name>-<version>.x07pkg
+x07 pkg login --index sparse+https://registry.x07.io/index/
+x07 pkg publish --index sparse+https://registry.x07.io/index/ --package .
+```
+
 ## Source-only packages
 
 Packages publish only x07AST JSON sources.

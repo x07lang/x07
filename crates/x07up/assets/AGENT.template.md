@@ -7,7 +7,7 @@ This repository is an X07 project. You are a coding agent. Your job is to make c
 - Run: `x07 run` (single front door; emits JSON reports)
 - Test: `x07 test` (JSON report; deterministic suites)
 - Policies: `x07 policy init` and `x07 run --allow-host/--deny-host/...` (derived policy generation)
-- Packages: `x07 pkg add`, `x07 pkg lock` (prefer combined flows when available)
+- Packages: `x07 pkg add`, `x07 pkg lock`, `x07 pkg pack`, `x07 pkg login`, `x07 pkg publish`
 
 Avoid calling low-level binaries directly (`x07c`, `x07-host-runner`, `x07-os-runner`) unless the task explicitly requires “expert mode”.
 
@@ -20,6 +20,13 @@ Avoid calling low-level binaries directly (`x07c`, `x07-host-runner`, `x07-os-ru
 If any of the above are missing, run:
 - `x07up show --json`
 - `x07up doctor --json`
+
+## Agent kit files (repo-local)
+
+- `AGENT.md`: this file.
+- `x07-toolchain.toml`: pins a channel and declares toolchain components (`docs`, `skills`).
+- `.agent/skills/`: project-scoped skills pack (if present).
+- `.agent/docs/README.md`: optional stub that points to the offline docs root.
 
 ## Standard recovery loop (run this, in order)
 When something fails (compile/run/test), follow this loop *without asking for help first*:
@@ -42,6 +49,24 @@ When something fails (compile/run/test), follow this loop *without asking for he
 - Decode base64 payloads deterministically (example below).
 
 Only after (1)-(5) should you change code again.
+
+## Package repos (`x07-package.json`)
+
+If this repo contains `x07-package.json`, treat it as a publishable package repo.
+
+Canonical authoring workflow:
+
+1) Edit `x07-package.json`: set `description`/`docs`, then bump `version`.
+
+2) Run tests:
+- `x07 test --manifest tests/tests.json`
+
+3) Pack (sanity check + artifact):
+- `x07 pkg pack --package . --out dist/<name>-<version>.x07pkg`
+
+4) Login + publish to the official registry:
+- `x07 pkg login --index sparse+https://registry.x07.io/index/`
+- `x07 pkg publish --index sparse+https://registry.x07.io/index/ --package .`
 
 ## Decoding base64 fields (copy/paste)
 Many runner reports use base64 fields for binary outputs. Use this exact snippet:
@@ -118,4 +143,3 @@ From a temp project:
 * `x07-os-runner` (OS runner)
 
 If you must use them, preserve the report JSON and include the exact invocation.
-

@@ -32,7 +32,11 @@ x07 init
 x07 pkg add NAME@VERSION --sync
 ```
 
-If you are creating a publishable package repo, start with `x07 init --package` instead of `x07 init`.
+`x07 init` also writes the agent kit (`AGENT.md`, `x07-toolchain.toml`, `.agent/skills/`, and `.agent/docs/README.md`).
+
+If you are creating a publishable package repo, start with `x07 init --package` instead of `x07 init`
+(it creates `x07-package.json`, `modules/`, `tests/`, and the same agent kit). Follow the `next_steps` in the init JSON report
+for the canonical pack/login/publish workflow.
 
 `x07 pkg lock` downloads dependencies into `.x07/deps/…` and writes `x07.lock.json`.
 Commit `x07.lock.json` to make builds reproducible.

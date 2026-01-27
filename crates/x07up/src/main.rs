@@ -648,6 +648,15 @@ fn cmd_install(
         )?;
     }
 
+    reporter.progress("");
+    reporter.progress("next: create a project");
+    reporter.progress("  mkdir myapp && cd myapp && x07 init");
+    reporter.progress("  x07 run");
+    reporter.progress("  x07 test --manifest tests/tests.json");
+    reporter.progress("");
+    reporter.progress("next: create a publishable package repo");
+    reporter.progress("  mkdir mypkg && cd mypkg && x07 init --package");
+
     Ok(std::process::ExitCode::SUCCESS)
 }
 

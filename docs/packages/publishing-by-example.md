@@ -48,9 +48,16 @@ This creates a publish-ready repo:
 ```text
 acme-hello-demo/
   .gitignore
+  AGENT.md
+  x07-toolchain.toml
   x07.json
   x07.lock.json
   x07-package.json
+  .agent/
+    docs/
+      README.md
+    skills/
+      ...
   modules/
     ext/
       acme_hello_demo.x07.json

@@ -246,6 +246,31 @@ fn x07_init_creates_project_skeleton() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], true);
     assert_eq!(v["command"], "init");
+    assert_eq!(
+        v["notes"]
+            .as_array()
+            .expect("notes[]")
+            .iter()
+            .map(|v| v.as_str().expect("notes[] string"))
+            .collect::<Vec<_>>(),
+        vec![
+            "Agent kit: AGENT.md (self-recovery + canonical commands)",
+            "Toolchain pin: x07-toolchain.toml (channel=stable; components=docs+skills)",
+            "Project docs: .agent/docs/ (README.md points to offline docs)",
+            "Project skills: .agent/skills/",
+            "Offline docs: x07up docs path --json",
+            "Skills status: x07up skills status --json",
+        ]
+    );
+    assert_eq!(
+        v["next_steps"]
+            .as_array()
+            .expect("next_steps[]")
+            .iter()
+            .map(|v| v.as_str().expect("next_steps[] string"))
+            .collect::<Vec<_>>(),
+        vec!["x07 run", "x07 test --manifest tests/tests.json",]
+    );
 
     for rel in [
         "x07.json",
@@ -254,6 +279,7 @@ fn x07_init_creates_project_skeleton() {
         "src/main.x07.json",
         "x07-toolchain.toml",
         "AGENT.md",
+        ".agent/docs/README.md",
         ".agent/skills/README.md",
         ".agent/skills/x07-agent-playbook/SKILL.md",
         ".gitignore",
@@ -302,6 +328,38 @@ fn x07_init_creates_package_skeleton() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], true);
     assert_eq!(v["command"], "init");
+    assert_eq!(
+        v["notes"]
+            .as_array()
+            .expect("notes[]")
+            .iter()
+            .map(|v| v.as_str().expect("notes[] string"))
+            .collect::<Vec<_>>(),
+        vec![
+            "Package repo: x07-package.json (publish contract)",
+            "Agent kit: AGENT.md (self-recovery + canonical commands)",
+            "Toolchain pin: x07-toolchain.toml (channel=stable; components=docs+skills)",
+            "Project docs: .agent/docs/ (README.md points to offline docs)",
+            "Project skills: .agent/skills/",
+            "Offline docs: x07up docs path --json",
+            "Skills status: x07up skills status --json",
+        ]
+    );
+    assert_eq!(
+        v["next_steps"]
+            .as_array()
+            .expect("next_steps[]")
+            .iter()
+            .map(|v| v.as_str().expect("next_steps[] string"))
+            .collect::<Vec<_>>(),
+        vec![
+            "Edit x07-package.json: set description/docs; bump version",
+            "x07 test --manifest tests/tests.json",
+            "x07 pkg pack --package . --out dist/acme-hello-demo-0.1.0.x07pkg",
+            "x07 pkg login --index sparse+https://registry.x07.io/index/",
+            "x07 pkg publish --index sparse+https://registry.x07.io/index/ --package .",
+        ]
+    );
 
     for rel in [
         "x07.json",
@@ -309,6 +367,7 @@ fn x07_init_creates_package_skeleton() {
         "x07-package.json",
         "x07-toolchain.toml",
         "AGENT.md",
+        ".agent/docs/README.md",
         ".agent/skills/README.md",
         ".agent/skills/x07-agent-playbook/SKILL.md",
         "modules/ext/acme_hello_demo.x07.json",

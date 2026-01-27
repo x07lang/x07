@@ -220,4 +220,12 @@ if ($Json) {
 } else {
   Write-Host "ok: installed X07 to $Root"
   Write-Host $pathHint
+  Write-Host ""
+  Write-Host "next: create a project"
+  Write-Host "  mkdir myapp; cd myapp; x07 init"
+  Write-Host "  x07 run"
+  Write-Host "  x07 test --manifest tests/tests.json"
+  Write-Host ""
+  Write-Host "next: create a publishable package repo"
+  Write-Host "  mkdir mypkg; cd mypkg; x07 init --package"
 }
