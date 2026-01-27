@@ -155,7 +155,7 @@ try {
   Step "smoke: x07 help"
   x07 --help | Out-Null
 
-  Step "smoke: init+run (host profile)"
+  Step "smoke: init+run (os profile)"
   $proj = Join-Path $env:TEMP "x07proj_$([Guid]::NewGuid().ToString('N'))"
   New-Item -ItemType Directory -Force -Path $proj | Out-Null
   Set-Location $proj
@@ -164,19 +164,19 @@ try {
   "hello" | Set-Content -NoNewline -Encoding ascii "input.bin"
 
   New-Item -ItemType Directory -Force -Path (Join-Path $proj ".x07") | Out-Null
-  x07 run --profile test --input input.bin --report wrapped --report-out .x07\run.host.json | Out-Null
+  x07 run --profile os --input input.bin --report wrapped --report-out .x07\run.os.json | Out-Null
 
-  $runHost = Get-Content ".x07\run.host.json" -Raw | ConvertFrom-Json
-  if ($runHost.schema_version -ne "x07.run.report@0.1.0") { throw "wrapped report schema_version mismatch" }
-  if ($runHost.runner -ne "host") { throw "expected runner=host" }
-  $rep = $runHost.report
+  $runOs = Get-Content ".x07\run.os.json" -Raw | ConvertFrom-Json
+  if ($runOs.schema_version -ne "x07.run.report@0.1.0") { throw "wrapped report schema_version mismatch" }
+  if ($runOs.runner -ne "os") { throw "expected runner=os" }
+  $rep = $runOs.report
   if ($null -eq $rep) { throw "missing report object" }
-  if ($rep.exit_code -ne 0) { throw "host run exit_code != 0" }
-  if ($rep.compile.ok -ne $true) { throw "host compile not ok" }
-  if ($rep.solve.ok -ne $true) { throw "host solve not ok" }
+  if ($rep.exit_code -ne 0) { throw "os run exit_code != 0" }
+  if ($rep.compile.ok -ne $true) { throw "os compile not ok" }
+  if ($rep.solve.ok -ne $true) { throw "os solve not ok" }
 
   $roots = @()
-  if ($runHost.target) { $roots = @($runHost.target.resolved_module_roots) }
+  if ($runOs.target) { $roots = @($runOs.target.resolved_module_roots) }
 
   $projManifest = Get-Content "x07.json" -Raw | ConvertFrom-Json
   $expectedRoots = @()

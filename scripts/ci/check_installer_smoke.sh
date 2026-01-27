@@ -189,35 +189,37 @@ PY
 step "smoke: x07 help"
 x07 --help >/dev/null
 
-step "smoke: init+run (host profile)"
+step "smoke: init+run (os profile)"
 proj="$tmp/proj"
 mkdir -p "$proj"
 cd "$proj"
 x07 init >/dev/null
 
 printf "hello" > input.bin
-x07 run --profile test --input input.bin --report wrapped --report-out .x07/run.host.json >/dev/null
+x07 run --profile os --input input.bin --report wrapped --report-out .x07/run.os.json >/dev/null
 
-"$python_bin" - ".x07/run.host.json" <<'PY'
+"$python_bin" - ".x07/run.os.json" <<'PY'
 import json, sys
 doc = json.load(open(sys.argv[1], "r", encoding="utf-8"))
 if doc.get("schema_version") != "x07.run.report@0.1.0":
     raise SystemExit("ERROR: wrapped report schema_version mismatch")
-if doc.get("runner") != "host":
-    raise SystemExit("ERROR: expected runner=host")
+if doc.get("runner") != "os":
+    raise SystemExit("ERROR: expected runner=os")
 rep = doc.get("report") or {}
 if rep.get("exit_code") not in (0, "0"):
     sys.stderr.write(json.dumps(doc, indent=2, sort_keys=True) + "\n")
-    raise SystemExit("ERROR: host run exit_code != 0")
+    raise SystemExit("ERROR: os run exit_code != 0")
 compile_ok = (rep.get("compile") or {}).get("ok")
 solve_ok = (rep.get("solve") or {}).get("ok")
 if compile_ok is not True or solve_ok is not True:
     sys.stderr.write(json.dumps(doc, indent=2, sort_keys=True) + "\n")
-    raise SystemExit("ERROR: host run compile/solve not ok")
+    raise SystemExit("ERROR: os run compile/solve not ok")
 roots = doc.get("target", {}).get("resolved_module_roots") or []
 if not any(r.replace("\\","/").endswith("/src") or r == "src" for r in roots):
     raise SystemExit("ERROR: expected src in resolved_module_roots")
-print("ok: host wrapped report ok")
+if not any(r.replace("\\","/").endswith("stdlib/os/0.2.0/modules") for r in roots):
+    raise SystemExit("ERROR: expected stdlib/os module root for os runner")
+print("ok: os wrapped report ok")
 PY
 
 step "smoke: test harness baseline (stdlib.lock fallback)"
@@ -238,32 +240,6 @@ if not Path(stdlib_lock).is_file():
     raise SystemExit(f"ERROR: invocation.stdlib_lock does not exist: {stdlib_lock}")
 print("ok: x07 test ok")
 PY
-
-step "smoke: run (os profile) if compiler is present"
-if command -v cc >/dev/null 2>&1 || command -v clang >/dev/null 2>&1 || command -v gcc >/dev/null 2>&1; then
-  x07 run --profile os --input input.bin --report wrapped --report-out .x07/run.os.json >/dev/null
-  "$python_bin" - ".x07/run.os.json" <<'PY'
-import json, sys
-doc = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-if doc.get("schema_version") != "x07.run.report@0.1.0":
-    raise SystemExit("ERROR: wrapped report schema_version mismatch")
-if doc.get("runner") != "os":
-    raise SystemExit("ERROR: expected runner=os")
-rep = doc.get("report") or {}
-if rep.get("exit_code") not in (0, "0"):
-    raise SystemExit("ERROR: os run exit_code != 0")
-compile_ok = (rep.get("compile") or {}).get("ok")
-solve_ok = (rep.get("solve") or {}).get("ok")
-if compile_ok is not True or solve_ok is not True:
-    raise SystemExit("ERROR: os run compile/solve not ok")
-roots = doc.get("target", {}).get("resolved_module_roots") or []
-if not any(r.replace("\\","/").endswith("stdlib/os/0.2.0/modules") for r in roots):
-    raise SystemExit("ERROR: expected stdlib/os module root for os runner")
-print("ok: os wrapped report ok")
-PY
-else
-  echo "warn: no C compiler detected; skipping os profile smoke"
-fi
 
 step "smoke: agent init produces AGENT.md"
 x07up agent init --project "$proj" --with-skills project >/dev/null
