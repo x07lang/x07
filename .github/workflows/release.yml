@@ -188,8 +188,8 @@ jobs:
           New-Item -ItemType Directory -Force "$stage/bin" | Out-Null
           New-Item -ItemType Directory -Force "$stage/deps/x07" | Out-Null
           New-Item -ItemType Directory -Force "$stage/stdlib/os/0.2.0" | Out-Null
-          New-Item -ItemType Directory -Force "$stage/docs" | Out-Null
-          New-Item -ItemType Directory -Force "$stage/.codex/skills" | Out-Null
+          New-Item -ItemType Directory -Force "$stage/.agent/docs" | Out-Null
+          New-Item -ItemType Directory -Force "$stage/.agent/skills" | Out-Null
 
           $bins = @("x07","x07c","x07-host-runner","x07-os-runner","x07import-cli")
           foreach ($b in $bins) {
@@ -198,8 +198,8 @@ jobs:
 
           Copy-Item -Force "deps/x07/native_backends.json" "$stage/deps/x07/native_backends.json"
           Copy-Item -Recurse -Force "stdlib/os/0.2.0/modules" "$stage/stdlib/os/0.2.0"
-          Copy-Item -Recurse -Force "docs/*" "$stage/docs"
-          Copy-Item -Recurse -Force "skills/pack/.codex/skills/*" "$stage/.codex/skills"
+          Copy-Item -Recurse -Force "docs/*" "$stage/.agent/docs"
+          Copy-Item -Recurse -Force "skills/pack/.agent/skills/*" "$stage/.agent/skills"
 
           $out = "dist/x07-$tag-$target.zip"
           Compress-Archive -Path "$stage/*" -DestinationPath $out -Force
