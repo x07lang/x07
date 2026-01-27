@@ -67,7 +67,7 @@ x07up agent init --project . --pin stable --with-skills project
 | Command | When to use | What it creates |
 |---|---|---|
 | `x07 init` | minimal project skeleton | `x07.json`, `x07.lock.json`, `src/`, `tests/` |
-| `x07up agent init --project . ...` | autonomous agent rails | `AGENTS.md`, `x07-toolchain.toml`, optional skills install, and (if missing) the same project skeleton as `x07 init` |
+| `x07up agent init --project . ...` | autonomous agent rails | `AGENT.md`, `x07-toolchain.toml`, optional skills install, and (if missing) the same project skeleton as `x07 init` |
 
 This creates:
 

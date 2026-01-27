@@ -53,3 +53,25 @@ def parse_x07import_meta(module_path: Path) -> tuple[str, str | None] | None:
         return src_path.strip(), sha.strip()
     return src_path.strip(), None
 
+
+def resolve_x07import_source_path(src_path_str: str) -> Path | None:
+    root = repo_root()
+
+    raw = Path(src_path_str)
+    if raw.is_absolute():
+        if raw.exists():
+            return raw
+    else:
+        rel = root / raw
+        if rel.exists():
+            return rel
+
+    norm = src_path_str.replace("\\", "/").lstrip("/")
+    old_prefix = "tests/x07import/fixtures/import_sources/"
+    new_prefix = "labs/x07import/fixtures/import_sources/"
+    if norm.startswith(old_prefix):
+        mapped = root / (new_prefix + norm[len(old_prefix) :])
+        if mapped.exists():
+            return mapped
+
+    return None

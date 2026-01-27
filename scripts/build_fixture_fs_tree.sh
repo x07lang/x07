@@ -28,7 +28,7 @@ if [[ ! -d "$SRC_DIR" ]]; then
 fi
 
 SRC_ABS="$(cd "$SRC_DIR" && pwd)"
-DEST_DIR="$ROOT/benchmarks/fixtures/fs/$FIXTURE_ID"
+DEST_DIR="$ROOT/ci/fixtures/bench/fs/$FIXTURE_ID"
 
 if [[ -e "$DEST_DIR" ]]; then
   chmod -R u+w "$DEST_DIR" >/dev/null 2>&1 || true

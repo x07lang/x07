@@ -8,7 +8,7 @@ mod x07_program;
 #[test]
 fn solve_rr_fetches_response_fixture() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../benchmarks/fixtures/rr/solve-rr/phaseH2-suite-rr@0.1.0");
+        .join("../../ci/fixtures/bench/rr/solve-rr/phaseH2-suite-rr@0.1.0");
 
     let cfg = RunnerConfig {
         world: WorldId::SolveRr,
@@ -54,7 +54,7 @@ fn solve_rr_fetches_response_fixture() {
 #[test]
 fn solve_rr_defaults_fixture_index_json_when_index_not_specified() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../benchmarks/fixtures/rr/solve-rr/phaseH2-suite-rr@0.1.0");
+        .join("../../ci/fixtures/bench/rr/solve-rr/phaseH2-suite-rr@0.1.0");
 
     let cfg = RunnerConfig {
         world: WorldId::SolveRr,

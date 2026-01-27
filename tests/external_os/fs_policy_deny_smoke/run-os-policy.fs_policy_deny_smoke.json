@@ -10,7 +10,7 @@
   },
   "fs": {
     "enabled": true,
-    "read_roots": ["benchmarks/fixtures/os/fs-smoke-v1/allowed"],
+    "read_roots": ["ci/fixtures/bench/os/fs-smoke-v1/allowed"],
     "write_roots": [],
     "deny_hidden": true,
     "allow_symlinks": false,

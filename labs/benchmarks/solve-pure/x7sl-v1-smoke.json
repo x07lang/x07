@@ -1,0 +1,83 @@
+{
+  "schema_version": "x07.bench_suite@0.1.0",
+  "suite_id": "solve-pure/x7sl-v1@0.1.1",
+  "world": "solve-pure",
+  "fixture_root": "ci/fixtures/bench/pure/solve-pure/x7sl-v1@0.1.1",
+  "tasks": [
+    {
+      "task_id": "text_ascii_split_lines_x7sl_v1",
+      "description": "Given input bytes (ASCII text), output an X7SL v1 slice list of lines (split on LF 0x0A). If a line ends with CRLF, the CR is excluded from the slice. Trailing empty line after a final LF is not emitted. Output MUST be X7SL v1 bytes.",
+      "assertions": {},
+      "cases": [
+        {
+          "case_id": "simple_lf",
+          "input_file": "text_ascii_split_lines_x7sl_v1/simple_lf.in",
+          "expected_file": "text_ascii_split_lines_x7sl_v1/simple_lf.out",
+          "assertions": {}
+        },
+        {
+          "case_id": "crlf_and_last_line",
+          "input_file": "text_ascii_split_lines_x7sl_v1/crlf_and_last_line.in",
+          "expected_file": "text_ascii_split_lines_x7sl_v1/crlf_and_last_line.out",
+          "assertions": {}
+        }
+      ]
+    },
+    {
+      "task_id": "text_ascii_split_u8_x7sl_v1",
+      "description": "Given input bytes, split on comma (0x2C) and output an X7SL v1 slice list of segments. Empty segments from consecutive separators MUST be included. Output MUST be X7SL v1 bytes.",
+      "assertions": {},
+      "cases": [
+        {
+          "case_id": "simple",
+          "input_file": "text_ascii_split_u8_x7sl_v1/simple.in",
+          "expected_file": "text_ascii_split_u8_x7sl_v1/simple.out",
+          "assertions": {}
+        }
+      ]
+    },
+    {
+      "task_id": "text_ascii_split_u8_x7sl_v1_edgecases",
+      "description": "Given input bytes, split on newline (0x0A) using std.text.ascii.split_u8 over a bytes_view, and output the slice list as X7SL v1 bytes. Edgecases MUST be handled: empty input, leading separator, trailing separator, and consecutive separators. Empty segments MUST be included (because split emits separators+1 segments). Output MUST be X7SL v1 bytes.",
+      "assertions": {},
+      "cases": [
+        {
+          "case_id": "empty",
+          "input_file": "text_ascii_split_u8_x7sl_v1_edgecases/empty.in",
+          "expected_file": "text_ascii_split_u8_x7sl_v1_edgecases/empty.out",
+          "assertions": {}
+        },
+        {
+          "case_id": "no_sep",
+          "input_file": "text_ascii_split_u8_x7sl_v1_edgecases/no_sep.in",
+          "expected_file": "text_ascii_split_u8_x7sl_v1_edgecases/no_sep.out",
+          "assertions": {}
+        },
+        {
+          "case_id": "leading_sep",
+          "input_file": "text_ascii_split_u8_x7sl_v1_edgecases/leading_sep.in",
+          "expected_file": "text_ascii_split_u8_x7sl_v1_edgecases/leading_sep.out",
+          "assertions": {}
+        },
+        {
+          "case_id": "trailing_sep",
+          "input_file": "text_ascii_split_u8_x7sl_v1_edgecases/trailing_sep.in",
+          "expected_file": "text_ascii_split_u8_x7sl_v1_edgecases/trailing_sep.out",
+          "assertions": {}
+        },
+        {
+          "case_id": "consecutive_sep",
+          "input_file": "text_ascii_split_u8_x7sl_v1_edgecases/consecutive_sep.in",
+          "expected_file": "text_ascii_split_u8_x7sl_v1_edgecases/consecutive_sep.out",
+          "assertions": {}
+        },
+        {
+          "case_id": "only_sep",
+          "input_file": "text_ascii_split_u8_x7sl_v1_edgecases/only_sep.in",
+          "expected_file": "text_ascii_split_u8_x7sl_v1_edgecases/only_sep.out",
+          "assertions": {}
+        }
+      ]
+    }
+  ]
+}

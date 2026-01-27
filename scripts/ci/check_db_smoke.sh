@@ -98,16 +98,16 @@ run_suite() {
     --module-root "$HEX_ROOT"
 }
 
-run_suite "benchmarks/smoke/db-sqlite-os-sandboxed-smoke.json"
-run_suite "benchmarks/smoke/db-sqlite-os-sandboxed-policy-deny-smoke.json"
-run_suite "benchmarks/smoke/db-pool-fairness-os-sandboxed-smoke.json"
-run_suite "benchmarks/smoke/db-pool-max-concurrency-os-sandboxed-smoke.json"
-run_suite "benchmarks/smoke/db-pool-no-leak-close-os-sandboxed-smoke.json"
+run_suite "ci/suites/smoke/db-sqlite-os-sandboxed-smoke.json"
+run_suite "ci/suites/smoke/db-sqlite-os-sandboxed-policy-deny-smoke.json"
+run_suite "ci/suites/smoke/db-pool-fairness-os-sandboxed-smoke.json"
+run_suite "ci/suites/smoke/db-pool-max-concurrency-os-sandboxed-smoke.json"
+run_suite "ci/suites/smoke/db-pool-no-leak-close-os-sandboxed-smoke.json"
 
 if [[ "${X07_DB_NETWORK_SMOKE:-}" == "1" ]]; then
-  run_suite "benchmarks/smoke/db-pg-os-sandboxed-smoke.json"
-  run_suite "benchmarks/smoke/db-mysql-os-sandboxed-smoke.json"
-  run_suite "benchmarks/smoke/db-redis-os-sandboxed-smoke.json"
+  run_suite "ci/suites/smoke/db-pg-os-sandboxed-smoke.json"
+  run_suite "ci/suites/smoke/db-mysql-os-sandboxed-smoke.json"
+  run_suite "ci/suites/smoke/db-redis-os-sandboxed-smoke.json"
 else
   echo "[db-smoke] skipping network DB smokes (set X07_DB_NETWORK_SMOKE=1)"
 fi

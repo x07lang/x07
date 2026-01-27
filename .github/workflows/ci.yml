@@ -41,8 +41,8 @@ jobs:
             libsqlite3-dev
       - name: Build runner binaries (needed by x07 run tests)
         run: cargo build -p x07-host-runner -p x07-os-runner
-      - name: cargo test --workspace
-        run: cargo test --workspace
+      - name: cargo test
+        run: cargo test
 
   clippy:
     name: ci / clippy
@@ -146,7 +146,7 @@ jobs:
             libcurl4-openssl-dev \
             zlib1g-dev \
             libsqlite3-dev
-      - name: Canary gate (includes determinism suites)
+      - name: Canary gate
         shell: bash
         run: ./scripts/ci/check_canaries.sh
 

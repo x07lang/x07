@@ -80,8 +80,8 @@ run_suite() {
     --module-root "$MODULE_ROOT"
 }
 
-run_suite "benchmarks/smoke/fs-os-smoke.json"
-run_suite "benchmarks/smoke/fs-os-sandboxed-policy-deny-smoke.json"
+run_suite "ci/suites/smoke/fs-os-smoke.json"
+run_suite "ci/suites/smoke/fs-os-sandboxed-policy-deny-smoke.json"
 
 echo "[fs-globwalk] running ext-path-glob-rs smoke (run-os)"
 PATH_GLOB_MODULE_ROOT="$(x07_ext_pkg_modules x07-ext-path-glob-rs)"

@@ -1,0 +1,237 @@
+{
+  "suite_id": "phaseH2-suite@0.1.0",
+  "world": "solve-fs",
+  "fixture_root": "ci/fixtures/bench/fs/solve-fs/phaseH2-suite-fs@0.1.0",
+  "fs_root": "root",
+  "fs_latency_index": "latency.json",
+  "tasks": [
+    {
+      "task_id": "fs/canon_json_file",
+      "description": "Read a JSON file from the fixture filesystem and canonicalize it.\n\nInput: UTF-8 path relative to fixture root (e.g. `config/app.json`).\nOutput: canonical JSON (minified, keys sorted).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-fs@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true,
+        "capabilities_required": [
+          "fs.read_file"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "Y29uZmlnL2FwcC5qc29u",
+          "expected_b64": "eyJmaWxlcyI6WyJkYXRhL2EudHh0IiwiZGF0YS9iLnR4dCIsImRhdGEvYy50eHQiXSwicmVwb3J0IjoicGhhc2VIMl9mcyIsInRocmVzaG9sZCI6Mn0=",
+          "name": "app_json",
+          "assertions": {
+            "min_fs_read_file_calls": 1,
+            "max_fs_read_file_calls": 1,
+            "max_memcpy_bytes": 2048,
+            "max_realloc_calls": 1,
+            "max_peak_live_bytes": 16384
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "fs/csv_sum_scores_u32le",
+      "description": "Read a CSV file from the fixture filesystem and sum the numeric second column.\n\nInput: path to a UTF-8 file whose non-empty lines are `name,number`.\nOutput: 4-byte u32 little-endian sum of the numbers.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-fs@0.1.1",
+          "x07:stdlib-csv@0.1.1",
+          "x07:stdlib-parse@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true,
+        "capabilities_required": [
+          "fs.read_file"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "ZGF0YS9zY29yZXMuY3N2",
+          "expected_b64": "BgAAAA==",
+          "name": "scores",
+          "assertions": {
+            "min_fs_read_file_calls": 1,
+            "max_fs_read_file_calls": 1,
+            "max_memcpy_bytes": 1024,
+            "max_realloc_calls": 0,
+            "max_peak_live_bytes": 8192
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "fs/jsonl_count_error_u32le",
+      "description": "Read a JSONL (JSON per line) file and count lines where `level==\"error\"`.\n\nInput: path to a UTF-8 file containing one JSON object per line.\nOutput: 4-byte u32 little-endian count of records with field `level` exactly equal to the string `error`.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-fs@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-text@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true,
+        "capabilities_required": [
+          "fs.read_file"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "ZGF0YS9ldmVudHMuanNvbmw=",
+          "expected_b64": "AgAAAA==",
+          "name": "events",
+          "assertions": {
+            "min_fs_read_file_calls": 1,
+            "max_fs_read_file_calls": 1,
+            "max_memcpy_bytes": 2048,
+            "max_realloc_calls": 1,
+            "max_peak_live_bytes": 16384
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "fs/list_dir_sorted",
+      "description": "List directory entries in deterministic sorted order.\n\nInput: UTF-8 path to a directory (e.g. `data`).\nOutput: UTF-8 lines of filenames (not full paths) sorted lexicographically, separated by `\\n` with no trailing newline.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-fs@0.1.1",
+          "x07:stdlib-path@0.1.1"
+        ],
+        "capabilities_required": [
+          "fs.list_dir"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "ZGF0YQ==",
+          "expected_b64": "YS50eHQKYi50eHQKYmlnLmpzb24KYy50eHQKZXZlbnRzLmpzb25sCnNjb3Jlcy5jc3YKdXNlcnMuY3N2",
+          "name": "data_dir"
+        }
+      ]
+    },
+    {
+      "task_id": "fs/parallel_concat_ordered",
+      "description": "Deterministic async pipeline over fixture FS reads.\n\nInput: UTF-8 newline-separated file paths. A final trailing newline may be present.\nBehavior:\n  - spawn one task per path to read that file (async)\n  - join results in *the same order as the input list* (not completion order)\nOutput: concatenation of all file contents.\n\nLatency model: the runner provides per-path latency ticks via `fs_latency_index`.\nThis task rewards concurrency by gating max virtual time.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-fs@0.1.1",
+          "x07:stdlib-io@0.1.1",
+          "x07:stdlib-text@0.1.1"
+        ],
+        "capabilities_required": [
+          "fs.read_file"
+        ],
+        "sched_stats_required": true,
+        "replay_required": true,
+        "replay_runs": 3
+      },
+      "cases": [
+        {
+          "input_b64": "ZGF0YS9hLnR4dApkYXRhL2IudHh0CmRhdGEvYy50eHQK",
+          "expected_b64": "YWxwaGEKYmV0YQpvbmUKdHdvCnRocmVlCngK",
+          "name": "abc",
+          "assertions": {
+            "min_tasks_spawned": 3,
+            "max_tasks_spawned": 8,
+            "max_virtual_time_ticks": 35,
+            "min_fs_read_file_calls": 3,
+            "max_fs_read_file_calls": 3
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "fs/big_json_count_ok_u32le",
+      "description": "Stream-count objects in a large JSON array without copying.\n\nInput: path to a JSON file containing an array of objects with boolean field `ok`.\nOutput: 4-byte u32 little-endian count of objects where `ok` is true.\n\nThis task is meant to reward view-based streaming parsers:\n  - avoid copying slices/lines\n  - avoid building a full AST for the whole array",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-fs@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-bytes@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true,
+        "capabilities_required": [
+          "fs.read_file"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "ZGF0YS9iaWcuanNvbg==",
+          "expected_b64": "VgUAAA==",
+          "name": "big",
+          "assertions": {
+            "min_fs_read_file_calls": 1,
+            "max_fs_read_file_calls": 1,
+            "max_memcpy_bytes": 4096,
+            "max_realloc_calls": 1,
+            "max_peak_live_bytes": 16384
+          }
+        }
+      ]
+    }
+  ]
+}

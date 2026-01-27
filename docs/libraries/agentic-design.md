@@ -67,11 +67,11 @@ For large projects, keep a small `arch/` folder:
 
 ## The architecture contract
 
-Add `AGENTS.md` to every repo. Use this template:
+Add `AGENT.md` to every repo. Use this template:
 
 ---
 
-# AGENTS.md (template)
+# AGENT.md (template)
 
 ## Purpose
 One paragraph: what the system does.

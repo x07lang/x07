@@ -47,6 +47,8 @@ if [[ -z "${python_bin}" ]]; then
   fi
 fi
 
+run_quiet "check_prod_surface_lean" "$python_bin" scripts/ci/check_prod_surface_lean.py
+
 # Milestone 1: canonical repair loop is implicit in run/build.
 run_quiet "check_run_auto_repair" ./scripts/ci/check_run_auto_repair.sh
 run_quiet "check_build_auto_repair" ./scripts/ci/check_build_auto_repair.sh
@@ -94,18 +96,5 @@ run_quiet "check_x07import_generated" ./scripts/ci/check_x07import_generated.sh
 
 # Milestone 7: installer/docs contract stays consistent with release targets.
 run_quiet "check_install_docs_targets" ./scripts/ci/check_install_docs_targets.sh
-
-solutions_dir="${X07_BENCH_SOLUTIONS:-benchmarks/solutions}"
-
-if [[ ! -d "$solutions_dir" ]]; then
-  echo "ERROR: missing solutions dir: $solutions_dir" >&2
-  exit 1
-fi
-
-"$python_bin" scripts/bench/run_bench_suite.py --suite benchmarks/solve-pure/phaseH1-smoke.json --solutions "$solutions_dir"
-"$python_bin" scripts/bench/run_bench_suite.py --suite benchmarks/solve-full/phaseH2-smoke.json --solutions "$solutions_dir"
-"$python_bin" scripts/bench/run_bench_suite.py --suite benchmarks/solve-pure/emitters-v1-suite.json --solutions "$solutions_dir"
-X07_BENCH_MODULE_ROOT="stdlib/std/0.1.1/modules:$(x07_ext_pkg_modules x07-ext-cli):$(x07_ext_pkg_modules x07-ext-data-model):$(x07_ext_pkg_modules x07-ext-json-rs)" \
-  "$python_bin" scripts/bench/run_bench_suite.py --suite benchmarks/solve-pure/cli-v1-specrows-determinism.json --solutions "$solutions_dir"
 
 echo "ok: canary gate passed"

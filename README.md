@@ -109,7 +109,8 @@ x07/
 │   ├── x07-host-runner # Deterministic native runner
 │   └── x07-os-runner   # Standalone OS runner
 ├── stdlib/         # Standard library
-├── benchmarks/     # Benchmark suites + fixtures
+├── ci/             # Release-blocking fixtures + suites
+├── labs/           # Optional benchmarks, perf, fuzz, eval tooling
 └── scripts/        # Tooling and CI scripts
 ```
 

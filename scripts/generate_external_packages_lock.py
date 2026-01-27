@@ -12,6 +12,7 @@ from lockgen_common import (
     SEMVER_RE,
     die as _die,
     parse_x07import_meta as _parse_x07import_meta,
+    resolve_x07import_source_path as _resolve_x07import_source_path,
     repo_root as _repo_root,
     sha256_file as _sha256_file,
     stable_canon as _stable_canon,
@@ -37,11 +38,9 @@ def _module_from_path(pkg_root: Path, file_path: Path) -> dict[str, Any]:
     x07import_src = _parse_x07import_meta(file_path)
     if x07import_src is not None:
         src_path_str, header_sha = x07import_src
-        src_path = Path(src_path_str)
-        if not src_path.is_absolute():
-            src_path = _repo_root() / src_path
-        if not src_path.exists():
-            _die(f"ERROR: x07import source missing for {file_path}: {src_path}")
+        src_path = _resolve_x07import_source_path(src_path_str)
+        if src_path is None:
+            _die(f"ERROR: x07import source missing for {file_path}: {src_path_str}")
         src_sha = _sha256_file(src_path)
         if header_sha is not None and header_sha != src_sha:
             _die(

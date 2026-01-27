@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-exclude = ["fuzz"]
+exclude = ["labs/fuzz"]
 members = [
   "crates/x07-contracts",
   "crates/x07",
@@ -22,6 +22,29 @@ members = [
   "crates/x07-os-runner",
   "crates/x07import-core",
   "crates/x07import-cli",
+  "crates/x07-proc-echo",
+  "crates/x07-proc-worker-frame-echo",
+]
+
+default-members = [
+  "crates/x07-contracts",
+  "crates/x07",
+  "crates/x07c",
+  "crates/x07up",
+  "crates/x07-host-runner",
+  "crates/x07-runner-common",
+  "crates/x07-pkg",
+  "crates/x07-ext-db-native-core",
+  "crates/x07-ext-db-mysql-native",
+  "crates/x07-ext-db-pg-native",
+  "crates/x07-ext-db-redis-native",
+  "crates/x07-ext-db-sqlite-native",
+  "crates/x07-ext-fs-native",
+  "crates/x07-ext-regex-native",
+  "crates/x07-math-native",
+  "crates/x07-time-native",
+  "crates/x07-worlds",
+  "crates/x07-os-runner",
   "crates/x07-proc-echo",
   "crates/x07-proc-worker-frame-echo",
 ]

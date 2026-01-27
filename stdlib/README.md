@@ -11,8 +11,8 @@ See `docs/packages/index.md` for package and workspace basics.
 
 ## Stdlib import sources
 
-Some modules are generated deterministically by `x07import` from reference sources in `tests/x07import/fixtures/import_sources/`:
+Some modules are generated deterministically by `x07import` from reference sources in `labs/x07import/fixtures/import_sources/`:
 
-- Manifest: `tests/x07import/fixtures/import_sources/manifest.json`
+- Manifest: `labs/x07import/fixtures/import_sources/manifest.json`
 - Drift check: `./scripts/ci/check_x07import_generated.sh`
 - Diagnostics sync: `./scripts/ci/check_x07import_diagnostics_sync.sh`

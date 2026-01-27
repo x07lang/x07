@@ -1,0 +1,18 @@
+{
+  "schema_version": "x07import.manifest@0.1.0",
+  "entries": [
+    {
+      "module_id": "ext.hex",
+      "kind": "rust",
+      "source": "examples/tutorials/x07import_rust_hex_pkg/import_sources/rust/hex.rs",
+      "out_root": "examples/tutorials/x07import_rust_hex_pkg/modules"
+    },
+    {
+      "module_id": "ext.smoke",
+      "kind": "c",
+      "source": "examples/tutorials/x07import_c_smoke_pkg/import_sources/c/smoke.c",
+      "out_root": "examples/tutorials/x07import_c_smoke_pkg/modules"
+    }
+  ]
+}
+

@@ -80,6 +80,6 @@ run_suite() {
     --module-root "$MODULE_ROOT"
 }
 
-run_suite "benchmarks/smoke/regex-smoke.json"
+run_suite "ci/suites/smoke/regex-smoke.json"
 
 echo "[regex-smoke] OK"

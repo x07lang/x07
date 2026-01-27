@@ -46,7 +46,7 @@
     "max_rows": 10000,
     "max_resp_bytes": 8388608,
     "sqlite": {
-      "allow_paths": ["benchmarks/fixtures/db/sqlite/v1/app.db"],
+      "allow_paths": ["ci/fixtures/bench/db/sqlite/v1/app.db"],
       "readonly_only": false,
       "allow_create": false,
       "allow_in_memory": true

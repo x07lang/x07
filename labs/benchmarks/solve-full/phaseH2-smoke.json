@@ -1,0 +1,115 @@
+{
+  "world": "solve-full",
+  "fixture_root": "ci/fixtures/bench/full/solve-full/phaseH2-suite-full@0.1.0",
+  "fs_root": "fs/root",
+  "fs_latency_index": "fs/latency.json",
+  "rr_index": "rr/index.json",
+  "kv_seed": "kv/seed.json",
+  "suite_id": "phaseH2-smoke@0.1.0",
+  "tasks": [
+    {
+      "task_id": "full/mini_app_report_v1",
+      "description": "Mini-app benchmark: config \u2192 fs \u2192 rr \u2192 kv(cache) \u2192 report.\n\nInput: UTF-8 path to a JSON config file under the fixture FS (e.g. `config/full_app.json`).\nConfig schema (only these fields are needed):\n  - report: string\n  - local_scores: path to a headerless CSV file `name,number`\n  - local_events: path to a JSONL file (object per line) with field `level`\n  - user_keys: array of 1-byte RR keys (strings of length 1)\n  - kv_prefix: string prefix for cache keys\n\nProgram requirements:\n  1) Read config JSON.\n  2) Read local_scores and compute score_sum = sum(second column as i32/u32).\n  3) Read local_events and compute errors = count(lines where level==\"error\").\n  4) For each key in user_keys (in-order):\n      - cache_key = kv_prefix + key\n      - if kv.get(cache_key) is present: use cached canonical JSON\n      - else:\n          * rr.fetch(key) \u2192 JSON body\n          * canonicalize JSON (minified + sorted keys)\n          * kv.set(cache_key, canonical_json)\n      - parse JSON and extract `name` as UTF-8\n  5) Output a canonical JSON object:\n       {\"errors\":<u32>,\"names\":[...],\"report\":<string>,\"score_sum\":<u32>}\n\nDeterminism requirements:\n  - output must be canonical JSON (keys sorted, minified)\n  - scheduler replay must be stable\n  - rr fetches should be done concurrently across distinct keys when possible",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 4,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-fs@0.1.1",
+          "x07:stdlib-rr@0.1.1",
+          "x07:stdlib-kv@0.1.1",
+          "x07:stdlib-io@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-csv@0.1.1",
+          "x07:stdlib-text@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true,
+        "sched_stats_required": true,
+        "replay_required": true,
+        "replay_runs": 3,
+        "capabilities_required": [
+          "fs.read_file",
+          "rr.fetch",
+          "kv.get",
+          "kv.set"
+        ]
+      },
+      "cases": [
+        {
+          "name": "full_app",
+          "input_b64": "Y29uZmlnL2Z1bGxfYXBwLmpzb24=",
+          "expected_b64": "eyJlcnJvcnMiOjIsIm5hbWVzIjpbImFsaWNlIiwiYm9iIiwiYWxpY2UiXSwicmVwb3J0IjoicGhhc2VIMl9mdWxsIiwic2NvcmVfc3VtIjo2fQ==",
+          "assertions": {
+            "min_fs_read_file_calls": 3,
+            "max_fs_read_file_calls": 4,
+            "min_rr_request_calls": 2,
+            "max_rr_request_calls": 2,
+            "min_kv_get_calls": 3,
+            "max_kv_get_calls": 4,
+            "min_kv_set_calls": 2,
+            "max_kv_set_calls": 2,
+            "min_tasks_spawned": 2,
+            "max_tasks_spawned": 16,
+            "max_virtual_time_ticks": 90,
+            "max_memcpy_bytes": 8192,
+            "max_realloc_calls": 4,
+            "max_peak_live_bytes": 32768
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "full/cache_rr_bodies_in_kv_concat",
+      "description": "Cache RR bodies in KV and emit concatenation in-order.\n\nInput format: first byte `n`, then `n` RR keys (1 byte each).\nBehavior:\n  - for each key occurrence (in-order):\n      * try kv.get(key) (raw key bytes) to see if body cached\n      * if missing: rr.fetch(key) -> body, then kv.set(key, body)\n      * append body to output (in the same order as input)\nOutput: concatenation of bodies.\n\nConcurrency requirement:\n  - fetch distinct missing keys concurrently to minimize virtual time.\nDeterminism:\n  - output order is input order, regardless of completion order.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 3,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-rr@0.1.1",
+          "x07:stdlib-kv@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "sched_stats_required": true,
+        "replay_required": true,
+        "replay_runs": 3,
+        "capabilities_required": [
+          "rr.fetch",
+          "kv.get",
+          "kv.set"
+        ]
+      },
+      "cases": [
+        {
+          "name": "AABA",
+          "input_b64": "BEFBQkE=",
+          "expected_b64": "eyJpZCI6NywibmFtZSI6ImFsaWNlIiwic2NvcmUiOjEwfXsiaWQiOjcsIm5hbWUiOiJhbGljZSIsInNjb3JlIjoxMH17ImlkIjo0MiwibmFtZSI6ImJvYiIsInNjb3JlIjoyMH17ImlkIjo3LCJuYW1lIjoiYWxpY2UiLCJzY29yZSI6MTB9",
+          "assertions": {
+            "min_rr_request_calls": 2,
+            "max_rr_request_calls": 2,
+            "min_kv_get_calls": 4,
+            "max_kv_get_calls": 4,
+            "min_kv_set_calls": 2,
+            "max_kv_set_calls": 2,
+            "min_tasks_spawned": 2,
+            "max_tasks_spawned": 16,
+            "max_virtual_time_ticks": 45
+          }
+        }
+      ]
+    }
+  ]
+}

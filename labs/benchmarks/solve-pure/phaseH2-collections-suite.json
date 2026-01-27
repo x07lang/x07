@@ -1,0 +1,430 @@
+{
+  "suite_id": "phaseH2-collections-suite@0.1.0",
+  "world": "solve-pure",
+  "fixture_root": "ci/fixtures/bench/pure/solve-pure/phaseH2-collections-suite-pure@0.1.0",
+  "tasks": [
+    {
+      "task_id": "pure/collections_small_map_bytes_u32_smoke",
+      "description": "Build a small deterministic map from byte keys to u32 values and query it.\n\nInput:\n- u32_le n\n- repeated n times: [u32_le key_len][key_bytes][u32_le val]\n- [u32_le query_len][query_bytes]\n\nSemantics:\n- Insert entries in order; if a key repeats, the last value wins.\n- Output is 4 bytes u32_le: the value for query key, or 0 if missing.\n\nThis task is meant to exercise `std.small_map` (sorted packed representation).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-small_map@0.1.1",
+          "x07:stdlib-small_map@0.1.1/std.small_map.put_bytes_u32"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true,
+        "max_realloc_calls": 0
+      },
+      "cases": [
+        {
+          "input_b64": "AwAAAAEAAABhBQAAAAEAAABiAgAAAAEAAABjCQAAAAEAAABi",
+          "expected_b64": "AgAAAA==",
+          "name": "get_existing"
+        },
+        {
+          "input_b64": "BAAAAAEAAABhAQAAAAEAAABiAgAAAAEAAABhBwAAAAEAAABjAwAAAAEAAABh",
+          "expected_b64": "BwAAAA==",
+          "name": "overwrite_last_wins"
+        },
+        {
+          "input_b64": "AgAAAAEAAABhAQAAAAEAAABiAgAAAAEAAAB6",
+          "expected_b64": "AAAAAA==",
+          "name": "missing_is_zero"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_small_set_unique_sorted_smoke",
+      "description": "Deduplicate newline-separated tokens and emit them sorted.\n\nInput: ASCII bytes with newline-separated tokens (optional trailing newline).\nOutput: ASCII bytes with unique tokens sorted lexicographically (bytewise), joined by '\\n' with no trailing newline.\n\nThis task is meant to exercise `std.small_set` (sorted packed representation).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-small_set@0.1.1",
+          "x07:stdlib-small_set@0.1.1/std.small_set.insert_bytes"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "YgphCmEKYwo=",
+          "expected_b64": "YQpiCmM=",
+          "name": "dedup_sort"
+        },
+        {
+          "input_b64": "egp6Cg==",
+          "expected_b64": "eg==",
+          "name": "all_same"
+        },
+        {
+          "input_b64": "",
+          "expected_b64": "",
+          "name": "empty"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_hash_fnv1a32_determinism",
+      "description": "Compute a deterministic 32-bit hash of the input.\n\nInput: bytes.\nOutput: 8 bytes: u32_le hash repeated twice.\n\nHash function: FNV-1a 32-bit, as implemented by `std.hash.fnv1a32_bytes`.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-hash@0.1.1",
+          "x07:stdlib-hash@0.1.1/std.hash.fnv1a32_bytes"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "aGVsbG8=",
+          "expected_b64": "qyyfT6ssn08=",
+          "name": "hello"
+        },
+        {
+          "input_b64": "",
+          "expected_b64": "xZ0cgcWdHIE=",
+          "name": "empty"
+        },
+        {
+          "input_b64": "YWJjZGVm",
+          "expected_b64": "KopH/yqKR/8=",
+          "name": "abcdef"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_hash_map_count_distinct_u32_64k",
+      "description": "Count distinct u32 keys using a deterministic hash map.\n\nInput: bytes with length divisible by 4, interpreted as a sequence of u32_le keys.\nOutput: 4 bytes u32_le: number of distinct keys.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-hash_map@0.1.1",
+          "x07:stdlib-hash_map@0.1.1/std.hash_map.with_capacity_u32",
+          "x07:stdlib-hash_map@0.1.1/std.hash_map.set_u32"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true
+      },
+      "cases": [
+        {
+          "input_b64": "AQAAAAIAAAABAAAAAwAAAA==",
+          "expected_b64": "AwAAAA==",
+          "name": "small"
+        },
+        {
+          "input_file": "hash_map_count_distinct/keys_64k_unique.bin",
+          "expected_file": "hash_map_count_distinct/keys_64k_unique.u32le",
+          "name": "keys_64k_unique"
+        },
+        {
+          "input_file": "hash_map_count_distinct/keys_64k_dup4096.bin",
+          "expected_file": "hash_map_count_distinct/keys_64k_dup4096.u32le",
+          "name": "keys_64k_dup4096"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_hash_set_word_count_view_256k",
+      "description": "Count distinct lowercase words using a view-key hash set (no per-token copying).\n\nInput: ASCII bytes.\nWord definition: maximal runs of lowercase letters [a-z]. Non-letters are separators.\nOutput: 4 bytes u32_le: the number of distinct words.\n\nThis task is meant to exercise `std.hash_set.view_*` with keys as (start,len) ranges into `input`.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-hash_set@0.1.1",
+          "x07:stdlib-hash_set@0.1.1/std.hash_set.view_insert"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true
+      },
+      "cases": [
+        {
+          "input_b64": "YSBhIGIKYw==",
+          "expected_b64": "AwAAAA==",
+          "name": "small"
+        },
+        {
+          "input_file": "word_count_view/words_64k.txt",
+          "expected_file": "word_count_view/words_64k.u32le",
+          "name": "words_64k"
+        },
+        {
+          "input_file": "word_count_view/words_256k.txt",
+          "expected_file": "word_count_view/words_256k.u32le",
+          "name": "words_256k"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_btree_range_sum_u32",
+      "description": "Answer inclusive-exclusive range sum queries using an ordered map.\n\nInput:\n- u32_le n_pairs\n- repeated n_pairs times: [u32_le key][u32_le val]\n- u32_le n_queries\n- repeated n_queries times: [u32_le lo][u32_le hi] (range is lo <= key < hi)\n\nSemantics:\n- If a key appears multiple times in the pairs list, the last value wins.\n- Output is 4 bytes u32_le: the sum of all values for keys in each query range, summed over all queries, modulo 2^32.\n\nThis task is meant to exercise `std.btree_map` (ordered u32->u32).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-btree_map@0.1.1",
+          "x07:stdlib-btree_map@0.1.1/std.btree_map.put_u32_u32"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "AwAAAAEAAAAKAAAABQAAAAEAAAADAAAAAgAAAAIAAAAAAAAABAAAAAQAAAAKAAAA",
+          "expected_b64": "DQAAAA==",
+          "name": "small1"
+        },
+        {
+          "input_b64": "AwAAAAIAAAABAAAAAgAAAAUAAAAEAAAABwAAAAIAAAACAAAAAwAAAAAAAAAFAAAA",
+          "expected_b64": "EQAAAA==",
+          "name": "small2"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_btree_sorted_emit_u32",
+      "description": "Emit sorted unique u32 keys.\n\nInput: bytes with length divisible by 4, interpreted as a sequence of u32_le keys.\nOutput: bytes containing the sorted unique keys as u32_le, in ascending order.\n\nThis task is meant to exercise `std.btree_set` (ordered u32 set).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-btree_set@0.1.1",
+          "x07:stdlib-btree_set@0.1.1/std.btree_set.insert_u32"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "AwAAAAEAAAACAAAAAgAAAA==",
+          "expected_b64": "AQAAAAIAAAADAAAA",
+          "name": "small"
+        },
+        {
+          "input_file": "btree_sorted_emit/keys_perm_4096.bin",
+          "expected_file": "btree_sorted_emit/keys_sorted_4096.bin",
+          "name": "keys_perm_4096"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_deque_sliding_window_sum",
+      "description": "Compute a checksum of sliding window sums using a growable deque.\n\nInput:\n- u32_le window_size w (w >= 1)\n- u32_le stream values\n\nOutput: 4 bytes u32_le checksum.\n\nAlgorithm:\n- Maintain a window of the last w values.\n- For each position where the window is full, add the window sum into the checksum.\n- All arithmetic is modulo 2^32.\n\nThis task is meant to exercise `std.deque_u32`.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-deque_u32@0.1.1",
+          "x07:stdlib-deque_u32@0.1.1/std.deque_u32.front_or",
+          "x07:stdlib-deque_u32@0.1.1/std.deque_u32.push_back",
+          "x07:stdlib-deque_u32@0.1.1/std.deque_u32.pop_front"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true
+      },
+      "cases": [
+        {
+          "input_b64": "AwAAAAEAAAACAAAAAwAAAAQAAAAFAAAA",
+          "expected_b64": "GwAAAA==",
+          "name": "small"
+        },
+        {
+          "input_file": "deque_sliding_window_sum/stream_4096_w64.bin",
+          "expected_file": "deque_sliding_window_sum/stream_4096_w64.u32le",
+          "name": "stream_4096_w64"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_heap_topk_checksum",
+      "description": "Compute a checksum of the k smallest values using a min-heap.\n\nInput:\n- u32_le k\n- u32_le list values\n\nOutput: 4 bytes u32_le checksum: sum of the k smallest values (k is clamped to the input length), modulo 2^32.\n\nThis task is meant to exercise `std.heap_u32`.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-heap_u32@0.1.1",
+          "x07:stdlib-heap_u32@0.1.1/std.heap_u32.min_or",
+          "x07:stdlib-heap_u32@0.1.1/std.heap_u32.pop_min",
+          "x07:stdlib-heap_u32@0.1.1/std.heap_u32.push",
+          "x07:stdlib-heap_u32@0.1.1/std.heap_u32.with_capacity"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true
+      },
+      "cases": [
+        {
+          "input_b64": "AwAAAAUAAAABAAAABAAAAAIAAAADAAAACQAAAA==",
+          "expected_b64": "BgAAAA==",
+          "name": "small"
+        },
+        {
+          "input_file": "heap_topk_checksum/list_4096_k128.bin",
+          "expected_file": "heap_topk_checksum/list_4096_k128.u32le",
+          "name": "list_4096_k128"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_bitset_intersection_count_u16",
+      "description": "Compute intersection size between two u16 sets using a bitset.\n\nInput:\n- u32_le n_a\n- n_a u32_le values (only low 16 bits are used)\n- u32_le n_b\n- n_b u32_le values (only low 16 bits are used)\n\nOutput: 4 bytes u32_le: the size of the intersection.\n\nThis task is meant to exercise `std.bitset`.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-bitset@0.1.1",
+          "x07:stdlib-bitset@0.1.1/std.bitset.intersection_count"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true
+      },
+      "cases": [
+        {
+          "input_b64": "BAAAAAEAAAACAAAAAwAAAAoAAAADAAAAAwAAAAQAAAAKAAAA",
+          "expected_b64": "AgAAAA==",
+          "name": "small"
+        },
+        {
+          "input_file": "bitset_intersection_count/sets_5000_5000.bin",
+          "expected_file": "bitset_intersection_count/sets_5000_5000.u32le",
+          "name": "sets_5000_5000"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_slab_handle_reuse_u32",
+      "description": "Allocate, free, and re-allocate slab handles with deterministic reuse.\n\nInput:\n- u32_le cap\n- u32_le n_free\n- repeated n_free times: u32_le handle_to_free\n- u32_le n_alloc2\n\nAlgorithm:\n- Create slab with capacity cap.\n- Allocate cap handles (the initial handles should be 1..cap).\n- Free the provided handles in order.\n- Allocate n_alloc2 more handles.\n\nOutput: n_alloc2 handles as u32_le, in allocation order.\n\nThis task is meant to exercise `std.slab`.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-slab@0.1.1",
+          "x07:stdlib-slab@0.1.1/std.slab.alloc_u32",
+          "x07:stdlib-slab@0.1.1/std.slab.free_head_u32",
+          "x07:stdlib-slab@0.1.1/std.slab.free_u32"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "BAAAAAIAAAACAAAABAAAAAIAAAA=",
+          "expected_b64": "BAAAAAIAAAA=",
+          "name": "lifo_reuse_1"
+        },
+        {
+          "input_b64": "BQAAAAMAAAABAAAAAgAAAAMAAAADAAAA",
+          "expected_b64": "AwAAAAIAAAABAAAA",
+          "name": "lifo_reuse_2"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/collections_lru_cache_ops_checksum",
+      "description": "Execute u32 LRU cache operations and return checksums.\n\nInput:\n- u32_le cap\n- u32_le n_ops\n- repeated n_ops times: [u32_le kind][u32_le key][u32_le val]\n  - kind=0: get(key) (val ignored)\n  - kind=1: put(key,val)\n\nOutput: 8 bytes:\n- u32_le put_checksum: sum of per-put inserted flags (1 if inserted, 0 if updated)\n- u32_le get_checksum: sum of get(key) results\n\nGet semantics:\n- v_opt = std.lru_cache.peek_u32_opt(cache, key)\n- if v_opt is Some, cache = std.lru_cache.touch_u32(cache, key)\n- value = unwrap_or(v_opt, 0)\n\nPut semantics:\n- inserted = 1 if peek_u32_opt(cache, key) is None else 0\n- cache = std.lru_cache.put_u32(cache, key, val)\n\nAll arithmetic is modulo 2^32.\n\nThis task is meant to exercise `std.lru_cache`.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-lru_cache@0.1.1",
+          "x07:stdlib-lru_cache@0.1.1/std.lru_cache.new_u32",
+          "x07:stdlib-lru_cache@0.1.1/std.lru_cache.peek_u32_opt",
+          "x07:stdlib-lru_cache@0.1.1/std.lru_cache.put_u32",
+          "x07:stdlib-lru_cache@0.1.1/std.lru_cache.touch_u32"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true
+      },
+      "cases": [
+        {
+          "input_b64": "AgAAAAcAAAABAAAAAQAAAAoAAAABAAAAAgAAABQAAAAAAAAAAQAAAAAAAAABAAAAAwAAAB4AAAAAAAAAAgAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAwAAAAAAAAA=",
+          "expected_b64": "AwAAADIAAAA=",
+          "name": "cap2_evicts"
+        },
+        {
+          "input_b64": "AQAAAAYAAAABAAAAAQAAAAEAAAABAAAAAQAAAAIAAAAAAAAAAQAAAAAAAAABAAAAAgAAAAUAAAAAAAAAAQAAAAAAAAAAAAAAAgAAAAAAAAA=",
+          "expected_b64": "AgAAAAcAAAA=",
+          "name": "cap1_updates"
+        }
+      ]
+    }
+  ]
+}

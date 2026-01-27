@@ -8,7 +8,7 @@ mod x07_program;
 #[test]
 fn solve_kv_reads_from_seeded_store() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../benchmarks/fixtures/kv/solve-kv/phaseH2-suite-kv@0.1.0");
+        .join("../../ci/fixtures/bench/kv/solve-kv/phaseH2-suite-kv@0.1.0");
 
     let cfg = RunnerConfig {
         world: WorldId::SolveKv,

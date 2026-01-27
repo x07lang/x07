@@ -80,9 +80,9 @@ run_suite() {
     --module-root "$MODULE_ROOT"
 }
 
-run_suite "benchmarks/smoke/time-pure-smoke.json"
-run_suite "benchmarks/smoke/time-tzdb-smoke.json"
-run_suite "benchmarks/smoke/time-os-smoke.json"
-run_suite "benchmarks/smoke/time-os-sandboxed-policy-deny-now-smoke.json"
+run_suite "ci/suites/smoke/time-pure-smoke.json"
+run_suite "ci/suites/smoke/time-tzdb-smoke.json"
+run_suite "ci/suites/smoke/time-os-smoke.json"
+run_suite "ci/suites/smoke/time-os-sandboxed-policy-deny-now-smoke.json"
 
 echo "[time-smoke] OK"

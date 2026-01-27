@@ -1,0 +1,397 @@
+{
+  "suite_id": "phaseH2-suite@0.1.0",
+  "world": "solve-pure",
+  "fixture_root": "ci/fixtures/bench/pure/solve-pure/phaseH2-suite-pure@0.1.0",
+  "tasks": [
+    {
+      "task_id": "pure/text_word_freq_sorted",
+      "description": "Compute word frequencies from ASCII text and emit a deterministic sorted report.\n\nInput: UTF-8/ASCII bytes containing text.\nOutput: ASCII bytes containing lines `word=count` (lowercase), sorted by `word` ascending, joined by `\\n` with no trailing newline.\nWord definition: maximal runs of ASCII letters [A-Za-z]. Non-letters are separators.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-text@0.1.1",
+          "x07:stdlib-map@0.1.1"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "QSBhIGI=",
+          "expected_b64": "YT0yCmI9MQ==",
+          "name": "case1"
+        },
+        {
+          "input_b64": "SGVsbG8gaGVsbG8gSEVMTE8=",
+          "expected_b64": "aGVsbG89Mw==",
+          "name": "case2"
+        },
+        {
+          "input_b64": "",
+          "expected_b64": "",
+          "name": "case3"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/text_utf8_count_codepoints_u32le",
+      "description": "Count UTF-8 codepoints deterministically.\n\nInput: bytes.\nOutput: 4 bytes (u32 little-endian):\n  - if input is valid UTF-8: number of Unicode scalar values/codepoints\n  - else: 0xFFFFFFFF",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-text@0.1.1"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "aGVsbG8=",
+          "expected_b64": "BQAAAA==",
+          "name": "hello"
+        },
+        {
+          "input_b64": "4oKs",
+          "expected_b64": "AQAAAA==",
+          "name": "euro"
+        },
+        {
+          "input_b64": "0J/RgNC40LLQtdGC",
+          "expected_b64": "BgAAAA==",
+          "name": "cyrillic"
+        },
+        {
+          "input_b64": "/w==",
+          "expected_b64": "/////w==",
+          "name": "invalid"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/json_canonicalize_small",
+      "description": "Canonicalize JSON deterministically.\n\nInput: UTF-8 JSON text.\nOutput: UTF-8 JSON text, minified (no spaces/newlines) with all object keys sorted lexicographically.\nArrays keep their original order. Only JSON features present in the inputs must be supported.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-json@0.1.1"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "eyJiIjoyLCJhIjoxfQ==",
+          "expected_b64": "eyJhIjoxLCJiIjoyfQ==",
+          "name": "obj_sort1"
+        },
+        {
+          "input_b64": "eyJhIjpbMywyLDFdLCJiIjp7InkiOjAsIngiOjF9fQ==",
+          "expected_b64": "eyJhIjpbMywyLDFdLCJiIjp7IngiOjEsInkiOjB9fQ==",
+          "name": "nested"
+        },
+        {
+          "input_b64": "W3sieiI6MCwiYWEiOnRydWUsImIiOmZhbHNlfV0=",
+          "expected_b64": "W3siYWEiOnRydWUsImIiOmZhbHNlLCJ6IjowfV0=",
+          "name": "array_obj"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/json_stream_key_count_u32le",
+      "description": "Stream-parse JSON and count total object keys.\n\nInput: UTF-8 JSON text that is an array of objects. Objects contain only string keys and JSON primitive values.\nOutput: 4 bytes u32 little-endian: the total count of keys across all objects.\n\nThis task is meant to reward streaming + views (avoid building a full in-memory AST for large inputs).",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-bytes@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true
+      },
+      "cases": [
+        {
+          "input_b64": "W3siYSI6MSwiYiI6Mn0seyJjIjozfV0=",
+          "expected_b64": "AwAAAA==",
+          "name": "small",
+          "assertions": {
+            "max_memcpy_bytes": 512,
+            "max_realloc_calls": 0,
+            "max_peak_live_bytes": 8192
+          }
+        },
+        {
+          "input_file": "json_stream_key_count/array_4096_2keys.json",
+          "expected_file": "json_stream_key_count/array_4096_2keys.u32le",
+          "name": "array_4096_2keys",
+          "assertions": {
+            "max_memcpy_bytes": 4096,
+            "max_realloc_calls": 1,
+            "max_peak_live_bytes": 16384
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "pure/parse_i32_format_roundtrip",
+      "description": "Parse an i32 from ASCII and re-format it canonically.\n\nInput: ASCII bytes containing optional surrounding whitespace and an integer literal.\nAccepted syntax: optional leading '+' or '-', then digits. Leading zeros allowed.\nOutput:\n  - if parse succeeds and fits in signed 32-bit: canonical ASCII decimal with no leading '+' and no leading zeros; '-0' formats as '0'\n  - else: ASCII 'ERR'",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-parse@0.1.1",
+          "x07:stdlib-text@0.1.1"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "IDAwMTIg",
+          "expected_b64": "MTI=",
+          "name": "c1"
+        },
+        {
+          "input_b64": "LTA=",
+          "expected_b64": "MA==",
+          "name": "c2"
+        },
+        {
+          "input_b64": "KzU=",
+          "expected_b64": "NQ==",
+          "name": "c3"
+        },
+        {
+          "input_b64": "YWJj",
+          "expected_b64": "RVJS",
+          "name": "c4"
+        },
+        {
+          "input_b64": "MjE0NzQ4MzY0OA==",
+          "expected_b64": "RVJS",
+          "name": "c5"
+        },
+        {
+          "input_b64": "LTIxNDc0ODM2NDg=",
+          "expected_b64": "LTIxNDc0ODM2NDg=",
+          "name": "c6"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/csv_sum_second_col_i32le",
+      "description": "Parse a tiny CSV (no header) and sum the second column.\n\nInput: UTF-8/ASCII bytes. Each non-empty line is `name,number`.\nOutput:\n  - if all lines are valid and numbers fit i32: 4-byte i32 little-endian sum\n  - else: ASCII 'ERR'\n\nNote: This is a pure task. No filesystem access.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-csv@0.1.1",
+          "x07:stdlib-parse@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true
+      },
+      "cases": [
+        {
+          "input_b64": "YSwxCmIsMgo=",
+          "expected_b64": "AwAAAA==",
+          "name": "ok1",
+          "assertions": {
+            "max_memcpy_bytes": 512,
+            "max_realloc_calls": 0,
+            "max_peak_live_bytes": 8192
+          }
+        },
+        {
+          "input_b64": "eCwtNQp4LDEwCg==",
+          "expected_b64": "BQAAAA==",
+          "name": "ok2",
+          "assertions": {
+            "max_memcpy_bytes": 512,
+            "max_realloc_calls": 0,
+            "max_peak_live_bytes": 8192
+          }
+        },
+        {
+          "input_b64": "YmFkCg==",
+          "expected_b64": "RVJS",
+          "name": "err",
+          "assertions": {
+            "max_memcpy_bytes": 512,
+            "max_realloc_calls": 0,
+            "max_peak_live_bytes": 8192
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "pure/regex_lite_count_matches_u32le",
+      "description": "Count non-overlapping regex-lite matches.\n\nInput encoding: PATTERN (bytes) + 0x00 + TEXT (bytes).\nPattern syntax (regex-lite v1):\n  - literals: any ASCII letter byte [A-Za-z]\n  - '.' matches any single byte\n  - '*' after an atom means 0+ repeats (greedy)\nNo groups, no alternation, no escapes.\n\nOutput: 4-byte u32 little-endian: number of non-overlapping matches found left-to-right.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-regex-lite@0.1.1"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "YWIAeHhhYnl5YWI=",
+          "expected_b64": "AgAAAA==",
+          "name": "c1"
+        },
+        {
+          "input_b64": "YS4AYTFhMmEz",
+          "expected_b64": "AwAAAA==",
+          "name": "c2"
+        },
+        {
+          "input_b64": "YSpiAGFhYWJhYmI=",
+          "expected_b64": "AwAAAA==",
+          "name": "c3"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/prng_x07rand32_v1_stream",
+      "description": "Deterministic PRNG stream (X07RAND32 v1).\n\nInput: seed_u64_le || n_u32_le.\nOutput: n * u32_le values concatenated.\n\nX07RAND32 v1 spec:\n  - internal state is a u64 initialized to seed\n  - for each output:\n      state = state + 0x9E3779B97F4A7C15 (mod 2^64)\n      z = state\n      z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9 (mod 2^64)\n      z = (z ^ (z >> 27)) * 0x94D049BB133111EB (mod 2^64)\n      z = (z ^ (z >> 31))\n      output_u32 = high32(z)",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-prng@0.1.1"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "AAAAAAAAAAAEAAAA",
+          "expected_b64": "Oagg4mqeeG4YXcQGqLiL+A==",
+          "name": "seed1"
+        },
+        {
+          "input_b64": "Fc1bBwAAAAADAAAA",
+          "expected_b64": "2XQ8IhjdkXoxCA4x",
+          "name": "seed2"
+        },
+        {
+          "input_b64": "//////////8CAAAA",
+          "expected_b64": "d3HZ5Gf4n+k=",
+          "name": "seed3"
+        }
+      ]
+    },
+    {
+      "task_id": "pure/spawn_join_checksums",
+      "description": "Concurrency core: parse input as (u32le nseg, u32le seg_len, then nseg segments).\nSpawn >= nseg tasks. Each task computes sum(segment) mod 256 (u8).\nJoin tasks and output nseg bytes (checksums) in segment order.\nMust be deterministic under the fixed scheduler; replay gate enabled.",
+      "assertions": {
+        "sched_stats_required": true,
+        "replay_required": true,
+        "replay_runs": 3
+      },
+      "cases": [
+        {
+          "name": "8x4096",
+          "input_file": "spawn_join_checksums/inputs/checksum_segments_8x4096.bin",
+          "expected_file": "spawn_join_checksums/expected/checksum_segments_8x4096.out",
+          "assertions": {
+            "min_tasks_spawned": 8,
+            "max_tasks_spawned": 16,
+            "max_virtual_time_ticks": 0
+          }
+        },
+        {
+          "name": "32x4096",
+          "input_file": "spawn_join_checksums/inputs/checksum_segments_32x4096.bin",
+          "expected_file": "spawn_join_checksums/expected/checksum_segments_32x4096.out",
+          "assertions": {
+            "min_tasks_spawned": 32,
+            "max_tasks_spawned": 64,
+            "max_virtual_time_ticks": 0
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "pure/chan_pipeline_upper_ascii",
+      "description": "Pipeline core: uppercase ASCII.\nInput is arbitrary bytes; treat bytes 0x61..0x7a as 'a'..'z' and convert to 'A'..'Z'.\nAll other bytes unchanged.\nImplement as a bounded pipeline using >=4 worker tasks + channels (or equivalent).\nOutput must equal the transformed bytes.\nDeterministic scheduler replay gate enabled.",
+      "assertions": {
+        "sched_stats_required": true,
+        "replay_required": true,
+        "replay_runs": 3
+      },
+      "cases": [
+        {
+          "name": "64KB",
+          "input_file": "chan_pipeline_upper_ascii/inputs/uppercase_65536.txt",
+          "expected_file": "chan_pipeline_upper_ascii/expected/uppercase_65536.out",
+          "assertions": {
+            "min_tasks_spawned": 4,
+            "max_tasks_spawned": 32,
+            "max_virtual_time_ticks": 0
+          }
+        },
+        {
+          "name": "256KB",
+          "input_file": "chan_pipeline_upper_ascii/inputs/uppercase_262144.txt",
+          "expected_file": "chan_pipeline_upper_ascii/expected/uppercase_262144.out",
+          "assertions": {
+            "min_tasks_spawned": 4,
+            "max_tasks_spawned": 32,
+            "max_virtual_time_ticks": 0
+          }
+        }
+      ]
+    }
+  ]
+}

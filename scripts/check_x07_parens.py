@@ -8,7 +8,7 @@ Design goals:
 
 Usage:
   python3 scripts/check_x07_parens.py
-  python3 scripts/check_x07_parens.py stdlib benchmarks
+  python3 scripts/check_x07_parens.py stdlib examples tests
   python3 scripts/check_x07_parens.py --glob 'stdlib/**/modules/**/*.x07.json'
 """
 
@@ -27,7 +27,6 @@ from typing import List
 DEFAULT_ROOTS = [
     "stdlib",
     "examples",
-    "benchmarks/solutions",
     "tests",
 ]
 

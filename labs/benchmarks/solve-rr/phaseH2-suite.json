@@ -1,0 +1,193 @@
+{
+  "suite_id": "phaseH2-suite@0.1.0",
+  "world": "solve-rr",
+  "fixture_root": "ci/fixtures/bench/rr/solve-rr/phaseH2-suite-rr@0.1.0",
+  "rr_index": "index.json",
+  "tasks": [
+    {
+      "task_id": "rr/fetch_and_canon_if_json",
+      "description": "Fetch a deterministic request/response fixture by key.\n\nInput: 1-byte request key.\nBehavior:\n  - call `rr.fetch(key)` to get a response record (status, headers, body)\n  - if content-type is `application/json`, canonicalize the UTF-8 JSON body (minified, keys sorted) and output it\n  - otherwise, output the raw body bytes unchanged",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-rr@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true,
+        "capabilities_required": [
+          "rr.fetch"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "QQ==",
+          "expected_b64": "eyJpZCI6NywibmFtZSI6ImFsaWNlIiwic2NvcmUiOjEwfQ==",
+          "name": "A_json",
+          "assertions": {
+            "min_rr_request_calls": 1,
+            "max_rr_request_calls": 1,
+            "max_memcpy_bytes": 2048,
+            "max_realloc_calls": 1,
+            "max_peak_live_bytes": 16384
+          }
+        },
+        {
+          "input_b64": "Qw==",
+          "expected_b64": "UE9ORw==",
+          "name": "C_bin",
+          "assertions": {
+            "min_rr_request_calls": 1,
+            "max_rr_request_calls": 1,
+            "max_memcpy_bytes": 512,
+            "max_realloc_calls": 0,
+            "max_peak_live_bytes": 8192
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "rr/fetch_json_extract_name",
+      "description": "Fetch a JSON fixture by key and extract the `name` string.\n\nInput: 1-byte request key (A or B).\nOutput: UTF-8 bytes of the JSON field `name`.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-rr@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-text@0.1.1"
+        ],
+        "capabilities_required": [
+          "rr.fetch"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "QQ==",
+          "expected_b64": "YWxpY2U=",
+          "name": "A",
+          "assertions": {
+            "min_rr_request_calls": 1,
+            "max_rr_request_calls": 1
+          }
+        },
+        {
+          "input_b64": "Qg==",
+          "expected_b64": "Ym9i",
+          "name": "B",
+          "assertions": {
+            "min_rr_request_calls": 1,
+            "max_rr_request_calls": 1
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "rr/parallel_fetch_concat_ordered",
+      "description": "Deterministic concurrent RR fetch pipeline.\n\nInput format: first byte `n`, then `n` request keys (1 byte each).\nBehavior:\n  - spawn one task per key to fetch the response body (async)\n  - join bodies in the *same order as the input keys*\nOutput: concatenation of bodies.\n\nThe RR fixture index provides per-key latency ticks; this task rewards concurrency by gating max virtual time.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-rr@0.1.1",
+          "x07:stdlib-io@0.1.1",
+          "x07:stdlib-text@0.1.1"
+        ],
+        "sched_stats_required": true,
+        "replay_required": true,
+        "replay_runs": 3,
+        "capabilities_required": [
+          "rr.fetch"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "A0FDQg==",
+          "expected_b64": "eyJpZCI6NywibmFtZSI6ImFsaWNlIiwic2NvcmUiOjEwfVBPTkd7ImlkIjo0MiwibmFtZSI6ImJvYiIsInNjb3JlIjoyMH0=",
+          "name": "ACB",
+          "assertions": {
+            "min_rr_request_calls": 3,
+            "max_rr_request_calls": 3,
+            "min_tasks_spawned": 3,
+            "max_tasks_spawned": 8,
+            "max_virtual_time_ticks": 45
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "rr/race_fastest_body",
+      "description": "Deterministic \"race\" between two RR requests.\n\nInput format: first byte `2`, then two 1-byte request keys.\nBehavior:\n  - spawn both requests concurrently\n  - return the body of whichever completes first (lower latency); ties break by smaller key byte.\nOutput: body bytes of the winning request.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-rr@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "sched_stats_required": true,
+        "replay_required": true,
+        "replay_runs": 3,
+        "capabilities_required": [
+          "rr.fetch"
+        ]
+      },
+      "cases": [
+        {
+          "input_b64": "AkFC",
+          "expected_b64": "eyJpZCI6NDIsIm5hbWUiOiJib2IiLCJzY29yZSI6MjB9",
+          "name": "A_vs_B",
+          "assertions": {
+            "min_rr_request_calls": 2,
+            "max_rr_request_calls": 2,
+            "min_tasks_spawned": 2,
+            "max_tasks_spawned": 4,
+            "max_virtual_time_ticks": 25
+          }
+        },
+        {
+          "input_b64": "AkFD",
+          "expected_b64": "UE9ORw==",
+          "name": "A_vs_C",
+          "assertions": {
+            "min_rr_request_calls": 2,
+            "max_rr_request_calls": 2,
+            "min_tasks_spawned": 2,
+            "max_tasks_spawned": 4,
+            "max_virtual_time_ticks": 10
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -103,7 +103,7 @@ fn difftest_ascii_normalize_lines_and_tokenize() {
     let module_id = "x07import_test.text.ascii";
     let src = import_rust_module(
         module_id,
-        "tests/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
     );
     write_module(&module_root, module_id, &src);
 
@@ -144,7 +144,7 @@ fn difftest_ascii_views() {
     let module_id = "x07import_test.text.ascii";
     let src = import_rust_module(
         module_id,
-        "tests/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
     );
     write_module(&module_root, module_id, &src);
 
@@ -196,7 +196,7 @@ fn difftest_ascii_split_helpers() {
     let module_id = "x07import_test.text.ascii";
     let src = import_rust_module(
         module_id,
-        "tests/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
     );
     write_module(&module_root, module_id, &src);
 
@@ -243,7 +243,7 @@ fn difftest_ascii_to_upper_u8() {
     let module_id = "x07import_test.text.ascii";
     let src = import_rust_module(
         module_id,
-        "tests/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs",
     );
     write_module(&module_root, module_id, &src);
 
@@ -276,7 +276,7 @@ fn difftest_utf8_validate_or_empty() {
     let module_id = "x07import_test.text.utf8";
     let src = import_rust_module(
         module_id,
-        "tests/x07import/fixtures/import_sources/rust/std_text_utf8@0.1.1/utf8.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_text_utf8@0.1.1/utf8.rs",
     );
     write_module(&module_root, module_id, &src);
 
@@ -308,7 +308,7 @@ fn difftest_utf8_count_codepoints_or_neg1() {
     let module_id = "x07import_test.text.utf8";
     let src = import_rust_module(
         module_id,
-        "tests/x07import/fixtures/import_sources/rust/std_text_utf8@0.1.1/utf8.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_text_utf8@0.1.1/utf8.rs",
     );
     write_module(&module_root, module_id, &src);
 
@@ -344,7 +344,7 @@ fn difftest_regex_lite_find_literal() {
     let module_id = "x07import_test.regex-lite";
     let src = import_rust_module(
         module_id,
-        "tests/x07import/fixtures/import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs",
     );
     write_module(&module_root, module_id, &src);
 
@@ -379,7 +379,7 @@ fn difftest_regex_lite_is_match_literal() {
     let module_id = "x07import_test.regex-lite";
     let src = import_rust_module(
         module_id,
-        "tests/x07import/fixtures/import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs",
     );
     write_module(&module_root, module_id, &src);
 
@@ -414,7 +414,7 @@ fn difftest_regex_lite_count_matches_u32le() {
     let module_id = "x07import_test.regex-lite";
     let src = import_rust_module(
         module_id,
-        "tests/x07import/fixtures/import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs",
     );
     write_module(&module_root, module_id, &src);
 
@@ -444,14 +444,14 @@ fn difftest_codec_and_fmt_wrappers() {
     let codec_id = "x07import_test.codec";
     let codec_src = import_rust_module(
         codec_id,
-        "tests/x07import/fixtures/import_sources/rust/std_codec@0.1.1/codec.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_codec@0.1.1/codec.rs",
     );
     write_module(&module_root, codec_id, &codec_src);
 
     let fmt_id = "x07import_test.fmt";
     let fmt_src = import_rust_module(
         fmt_id,
-        "tests/x07import/fixtures/import_sources/rust/std_fmt@0.1.1/fmt.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_fmt@0.1.1/fmt.rs",
     );
     write_module(&module_root, fmt_id, &fmt_src);
 
@@ -478,7 +478,7 @@ fn difftest_codec_read_u32_le() {
     let codec_id = "x07import_test.codec";
     let codec_src = import_rust_module(
         codec_id,
-        "tests/x07import/fixtures/import_sources/rust/std_codec@0.1.1/codec.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_codec@0.1.1/codec.rs",
     );
     write_module(&module_root, codec_id, &codec_src);
 
@@ -506,7 +506,7 @@ fn difftest_fmt_u32_to_dec() {
     let fmt_id = "x07import_test.fmt";
     let fmt_src = import_rust_module(
         fmt_id,
-        "tests/x07import/fixtures/import_sources/rust/std_fmt@0.1.1/fmt.rs",
+        "labs/x07import/fixtures/import_sources/rust/std_fmt@0.1.1/fmt.rs",
     );
     write_module(&module_root, fmt_id, &fmt_src);
 
@@ -773,7 +773,7 @@ mod rt {
 )]
 mod ascii_ref {
     use super::rt::*;
-    include!("../../../tests/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs");
+    include!("../../../labs/x07import/fixtures/import_sources/rust/std_text_ascii@0.1.1/ascii.rs");
 }
 
 #[allow(
@@ -783,7 +783,7 @@ mod ascii_ref {
 )]
 mod utf8_ref {
     use super::rt::*;
-    include!("../../../tests/x07import/fixtures/import_sources/rust/std_text_utf8@0.1.1/utf8.rs");
+    include!("../../../labs/x07import/fixtures/import_sources/rust/std_text_utf8@0.1.1/utf8.rs");
 }
 
 #[allow(
@@ -794,7 +794,7 @@ mod utf8_ref {
 mod regex_ref {
     use super::rt::*;
     include!(
-        "../../../tests/x07import/fixtures/import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs"
+        "../../../labs/x07import/fixtures/import_sources/rust/std_regex_lite@0.1.1/regex_lite.rs"
     );
 }
 
@@ -805,7 +805,7 @@ mod regex_ref {
 )]
 mod codec_ref {
     use super::rt::*;
-    include!("../../../tests/x07import/fixtures/import_sources/rust/std_codec@0.1.1/codec.rs");
+    include!("../../../labs/x07import/fixtures/import_sources/rust/std_codec@0.1.1/codec.rs");
 }
 
 #[allow(
@@ -815,5 +815,5 @@ mod codec_ref {
 )]
 mod fmt_ref {
     use super::rt::*;
-    include!("../../../tests/x07import/fixtures/import_sources/rust/std_fmt@0.1.1/fmt.rs");
+    include!("../../../labs/x07import/fixtures/import_sources/rust/std_fmt@0.1.1/fmt.rs");
 }

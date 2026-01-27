@@ -1,0 +1,177 @@
+{
+  "suite_id": "phaseH2-suite@0.1.0",
+  "world": "solve-kv",
+  "fixture_root": "ci/fixtures/bench/kv/solve-kv/phaseH2-suite-kv@0.1.0",
+  "kv_seed": "seed.json",
+  "tasks": [
+    {
+      "task_id": "kv/get_score_u32le",
+      "description": "Read a JSON value from the deterministic KV store and extract `score`.\n\nInput: key bytes.\nBehavior:\n  - `kv.get(key)` returns bytes or empty if missing\n  - if value is JSON object containing integer field `score`, output that as u32 little-endian\n  - otherwise output 0 as u32 little-endian",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-kv@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-parse@0.1.1"
+        ],
+        "capabilities_required": [
+          "kv.get"
+        ]
+      },
+      "cases": [
+        {
+          "name": "A",
+          "input_b64": "QQ==",
+          "expected_b64": "CgAAAA==",
+          "assertions": {
+            "min_kv_get_calls": 1,
+            "max_kv_get_calls": 1
+          }
+        },
+        {
+          "name": "B",
+          "input_b64": "Qg==",
+          "expected_b64": "FAAAAA==",
+          "assertions": {
+            "min_kv_get_calls": 1,
+            "max_kv_get_calls": 1
+          }
+        },
+        {
+          "name": "missing",
+          "input_b64": "WA==",
+          "expected_b64": "AAAAAA==",
+          "assertions": {
+            "min_kv_get_calls": 1,
+            "max_kv_get_calls": 1
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "kv/sum_unique_scores_u32le",
+      "description": "Deduplicate keys and sum their `score` fields from KV.\n\nInput: UTF-8 newline-separated keys. Final trailing newline may be present.\nBehavior:\n  - for each *unique* key: kv.get -> parse JSON -> extract `score` (missing treated as 0)\n  - sum scores across unique keys\nOutput: u32 little-endian sum.\n\nThis task rewards building a small deterministic set/map and avoiding repeated KV reads.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-kv@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-set@0.1.1",
+          "x07:stdlib-text@0.1.1"
+        ],
+        "capabilities_required": [
+          "kv.get"
+        ]
+      },
+      "cases": [
+        {
+          "name": "ABA",
+          "input_b64": "QQpCCkEK",
+          "expected_b64": "HgAAAA==",
+          "assertions": {
+            "min_kv_get_calls": 2,
+            "max_kv_get_calls": 2
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "kv/set_get_canon_json",
+      "description": "Canonicalize JSON before storing in KV.\n\nInput format:\n  - u8 key_len\n  - key bytes (length key_len)\n  - remaining bytes: UTF-8 JSON text\n\nBehavior:\n  - canonicalize JSON (minified, keys sorted)\n  - kv.set(key, canonical_json)\n  - kv.get(key) and return stored bytes\nOutput: canonical JSON bytes.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-kv@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true,
+        "capabilities_required": [
+          "kv.get",
+          "kv.set"
+        ]
+      },
+      "cases": [
+        {
+          "name": "Z_obj",
+          "input_b64": "AVp7ImIiOjIsImEiOjF9",
+          "expected_b64": "eyJhIjoxLCJiIjoyfQ==",
+          "assertions": {
+            "min_kv_set_calls": 1,
+            "max_kv_set_calls": 1,
+            "min_kv_get_calls": 1,
+            "max_kv_get_calls": 1,
+            "max_memcpy_bytes": 2048,
+            "max_realloc_calls": 1,
+            "max_peak_live_bytes": 16384
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "kv/parallel_get_sum_u32le",
+      "description": "Deterministic concurrent KV reads with latency modeling.\n\nInput format: first byte `n`, then `n` keys (1 byte each).\nBehavior:\n  - spawn one task per key to kv.get and parse JSON `score`\n  - sum scores across all keys (including duplicates), missing treated as 0\nOutput: u32 little-endian sum.\n\nLatency model: each KV entry has latency_ticks in the seed file.\nThis task rewards concurrency by gating max virtual time.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 2,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-kv@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "sched_stats_required": true,
+        "replay_required": true,
+        "replay_runs": 3,
+        "capabilities_required": [
+          "kv.get"
+        ]
+      },
+      "cases": [
+        {
+          "name": "ABA",
+          "input_b64": "A0FCQQ==",
+          "expected_b64": "KAAAAA==",
+          "assertions": {
+            "min_kv_get_calls": 3,
+            "max_kv_get_calls": 3,
+            "min_tasks_spawned": 3,
+            "max_tasks_spawned": 8,
+            "max_virtual_time_ticks": 30
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -85,8 +85,8 @@ run_suite() {
     --module-root "$MODULE_ROOT"
 }
 
-run_suite "benchmarks/smoke/math-f64-bits-smoke.json"
-run_suite "benchmarks/smoke/math-f64-api-smoke.json"
-run_suite "benchmarks/smoke/math-f64-libm-smoke.json"
+run_suite "ci/suites/smoke/math-f64-bits-smoke.json"
+run_suite "ci/suites/smoke/math-f64-api-smoke.json"
+run_suite "ci/suites/smoke/math-f64-libm-smoke.json"
 
 echo "[math-smoke] OK"

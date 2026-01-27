@@ -49,7 +49,7 @@ python3 scripts/examples/run_web_crawler.py --config examples/release/web_crawle
 Manual runner invocation:
 
 ```bash
-cargo run -p x07-os-runner -- \
+x07 run --repair=off \
   --project examples/release/web_crawler.x07project.json \
   --world run-os \
   --input examples/release/web_crawler/config.example.yaml \

@@ -15,7 +15,7 @@ So the workflow is built into the ecosystem:
 
 Every serious X07 project should include:
 
-- `AGENTS.md`
+- `AGENT.md`
 
 This is a short, structured contract that tells the agent:
 
@@ -30,7 +30,7 @@ Use the template in: [Agentic design patterns](../libraries/agentic-design.md#th
 
 An autonomous agent should follow a loop like:
 
-1. Read task/spec + `AGENTS.md`
+1. Read task/spec + `AGENT.md`
 2. Modify code **only through structured patches** (JSON Patch)
 3. Iterate in deterministic worlds:
    - `x07 run` (auto-repair by default via `--repair=...`)

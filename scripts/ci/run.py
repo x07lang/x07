@@ -120,18 +120,20 @@ def jobs_for_profile(profile: str, root: Path) -> list[Job]:
         return pr_jobs
 
     if profile == "nightly":
-        return pr_jobs + [
-            Job("suites.h1h2", ["bash", "scripts/ci/check_suites_h1h2.sh"]),
-            Job("asan.c-backend", ["bash", "scripts/ci/check_asan_c_backend.sh"]),
-            Job("perf.baseline", ["bash", "scripts/ci/check_perf_baseline.sh"]),
-        ]
+        jobs = pr_jobs + [Job("asan.c-backend", ["bash", "scripts/ci/check_asan_c_backend.sh"])]
+
+        suites = root / "labs" / "scripts" / "ci" / "check_suites_h1h2.sh"
+        if suites.is_file():
+            jobs.append(Job("labs.suites", ["bash", str(suites)]))
+
+        perf = root / "labs" / "scripts" / "ci" / "check_perf_baseline.sh"
+        if perf.is_file():
+            jobs.append(Job("labs.perf-baseline", ["bash", str(perf)]))
+
+        return jobs
 
     if profile == "release":
-        return pr_jobs + [
-            Job("suites.h1h2", ["bash", "scripts/ci/check_suites_h1h2.sh"]),
-            Job("asan.c-backend", ["bash", "scripts/ci/check_asan_c_backend.sh"]),
-            Job("perf.baseline", ["bash", "scripts/ci/check_perf_baseline.sh"]),
-        ]
+        return pr_jobs + [Job("asan.c-backend", ["bash", "scripts/ci/check_asan_c_backend.sh"])]
 
     raise ValueError(f"unknown profile: {profile!r}")
 
