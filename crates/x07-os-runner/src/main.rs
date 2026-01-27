@@ -79,6 +79,36 @@ struct Cli {
 }
 
 fn main() -> std::process::ExitCode {
+    // Windows defaults to a 1MiB stack, which is not enough for our current compiler recursion
+    // depth (for example, larger template and example projects). Run the real entrypoint on a
+    // larger-stack thread to keep behavior consistent across platforms.
+    let handle = std::thread::Builder::new()
+        .name("x07-os-runner".to_string())
+        .stack_size(8 * 1024 * 1024)
+        .spawn(run);
+
+    match handle {
+        Ok(handle) => match handle.join() {
+            Ok(code) => code,
+            Err(panic) => {
+                if let Some(message) = panic.downcast_ref::<&str>() {
+                    eprintln!("x07-os-runner panicked: {message}");
+                } else if let Some(message) = panic.downcast_ref::<String>() {
+                    eprintln!("x07-os-runner panicked: {message}");
+                } else {
+                    eprintln!("x07-os-runner panicked");
+                }
+                std::process::ExitCode::from(2)
+            }
+        },
+        Err(err) => {
+            eprintln!("failed to spawn x07-os-runner thread: {err}");
+            run()
+        }
+    }
+}
+
+fn run() -> std::process::ExitCode {
     match try_main() {
         Ok(code) => code,
         Err(err) => {
