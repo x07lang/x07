@@ -134,7 +134,7 @@ unwrap_and_check_wrapped_report() {
   local wrapped_path="$2"
   local runner_out="$3"
   local want_runner="$4"   # "host" or "os" (or "" to skip)
-  local want_world="$5"    # e.g. "solve-pure" (or "" to skip)
+  local want_world="$5"    # e.g. "run-os" (or "" to skip)
   local require_deps="$6"  # "true" or "false"
 
   "$python_bin" - "$name" "$wrapped_path" "$runner_out" "$want_runner" "$want_world" "$require_deps" <<'PY'
@@ -244,7 +244,7 @@ require_path "ci/fixtures/www"
 # Example 1: CLI parsing (newline payload)
 # ----------------------------
 
-echo "==> agent example: cli-newline (solve-pure)"
+echo "==> agent example: cli-newline (run-os)"
 
 cli1_work="$tmp_dir/cli-newline"
 copy_project "examples/agent-gate/cli-newline" "$cli1_work"
@@ -252,7 +252,7 @@ copy_project "examples/agent-gate/cli-newline" "$cli1_work"
 seed_official_deps "$cli1_work"
 pkg_lock_check "$cli1_work"
 fmt_check_all "$cli1_work"
-lint_check_one "$cli1_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$cli1_work" "run-os" "src/main.x07.json"
 
 url_1="https://example.invalid/"
 depth_1="2"
@@ -261,8 +261,8 @@ mkdir -p "$cli1_work/out"
 mkdir -p "$cli1_work/tmp"
 printf "%s\n%s\n%s\n" "$url_1" "$depth_1" "$out_1" >"$cli1_work/tmp/input.txt"
 
-wrapped_1="$(run_x07_run "cli-newline" "$cli1_work" --profile test --input "tmp/input.txt")"
-unwrap_and_check_wrapped_report "cli-newline" "$wrapped_1" "$cli1_work/tmp/runner.json" "host" "solve-pure" "false"
+wrapped_1="$(run_x07_run "cli-newline" "$cli1_work" --profile os --input "tmp/input.txt")"
+unwrap_and_check_wrapped_report "cli-newline" "$wrapped_1" "$cli1_work/tmp/runner.json" "os" "run-os" "false"
 
 expected_1="url=${url_1}"$'\n'"depth=${depth_1}"$'\n'"out=${out_1}"$'\n'
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "cli-newline" --path "$cli1_work/tmp/runner.json" --expect "$expected_1" >/dev/null
@@ -273,7 +273,7 @@ echo "ok: cli-newline"
 # Example 2: CLI parsing (ext-cli + argv_v1 via `x07 run -- ...`)
 # ----------------------------
 
-echo "==> agent example: cli-ext-cli (solve-pure + ext-cli)"
+echo "==> agent example: cli-ext-cli (run-os + ext-cli)"
 
 cli2_work="$tmp_dir/cli-ext-cli"
 copy_project "examples/agent-gate/cli-ext-cli" "$cli2_work"
@@ -281,15 +281,15 @@ copy_project "examples/agent-gate/cli-ext-cli" "$cli2_work"
 seed_official_deps "$cli2_work"
 pkg_lock_check "$cli2_work"
 fmt_check_all "$cli2_work"
-lint_check_one "$cli2_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$cli2_work" "run-os" "src/main.x07.json"
 
 url_2="https://example.invalid/"
 depth_2="3"
 out_2="out/results.txt"
 mkdir -p "$cli2_work/out"
 
-wrapped_2="$(run_x07_run "cli-ext-cli" "$cli2_work" --profile test -- tool --url "$url_2" --depth "$depth_2" --out "$out_2")"
-unwrap_and_check_wrapped_report "cli-ext-cli" "$wrapped_2" "$cli2_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_2="$(run_x07_run "cli-ext-cli" "$cli2_work" --profile os -- tool --url "$url_2" --depth "$depth_2" --out "$out_2")"
+unwrap_and_check_wrapped_report "cli-ext-cli" "$wrapped_2" "$cli2_work/tmp/runner.json" "os" "run-os" "true"
 
 expected_2="url=${url_2}"$'\n'"depth=${depth_2}"$'\n'"out=${out_2}"$'\n'
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "cli-ext-cli" --path "$cli2_work/tmp/runner.json" --expect "$expected_2" >/dev/null
@@ -297,10 +297,10 @@ expected_2="url=${url_2}"$'\n'"depth=${depth_2}"$'\n'"out=${out_2}"$'\n'
 echo "ok: cli-ext-cli"
 
 # ----------------------------
-# Example 3: Text utils (solve-pure + ext-text)
+# Example 3: Text utils (run-os + ext-text)
 # ----------------------------
 
-echo "==> agent example: text-utils (solve-pure + ext-text)"
+echo "==> agent example: text-utils (run-os + ext-text)"
 
 text_work="$tmp_dir/text-utils"
 copy_project "examples/agent-gate/text-core/text-utils" "$text_work"
@@ -308,10 +308,10 @@ copy_project "examples/agent-gate/text-core/text-utils" "$text_work"
 seed_official_deps "$text_work"
 pkg_lock_check "$text_work"
 fmt_check_all "$text_work"
-lint_check_one "$text_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$text_work" "run-os" "src/main.x07.json"
 
-wrapped_3="$(run_x07_run "text-utils" "$text_work" --profile test)"
-unwrap_and_check_wrapped_report "text-utils" "$wrapped_3" "$text_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_3="$(run_x07_run "text-utils" "$text_work" --profile os)"
+unwrap_and_check_wrapped_report "text-utils" "$wrapped_3" "$text_work/tmp/runner.json" "os" "run-os" "true"
 
 expected_3="hello|world"$'\n'
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "text-utils" --path "$text_work/tmp/runner.json" --expect "$expected_3" >/dev/null
@@ -319,10 +319,10 @@ expected_3="hello|world"$'\n'
 echo "ok: text-utils"
 
 # ----------------------------
-# Example 4: BigInt factorial (solve-pure + ext-bigint-rs)
+# Example 4: BigInt factorial (run-os + ext-bigint-rs)
 # ----------------------------
 
-echo "==> agent example: factorial-100 (solve-pure + ext-bigint-rs)"
+echo "==> agent example: factorial-100 (run-os + ext-bigint-rs)"
 
 bigint_work="$tmp_dir/factorial-100"
 copy_project "examples/agent-gate/math-bigint/factorial-100" "$bigint_work"
@@ -330,10 +330,10 @@ copy_project "examples/agent-gate/math-bigint/factorial-100" "$bigint_work"
 seed_official_deps "$bigint_work"
 pkg_lock_check "$bigint_work"
 fmt_check_all "$bigint_work"
-lint_check_one "$bigint_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$bigint_work" "run-os" "src/main.x07.json"
 
-wrapped_4="$(run_x07_run "factorial-100" "$bigint_work" --profile test)"
-unwrap_and_check_wrapped_report "factorial-100" "$wrapped_4" "$bigint_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_4="$(run_x07_run "factorial-100" "$bigint_work" --profile os)"
+unwrap_and_check_wrapped_report "factorial-100" "$wrapped_4" "$bigint_work/tmp/runner.json" "os" "run-os" "true"
 
 expected_4="ok"$'\n'
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "factorial-100" --path "$bigint_work/tmp/runner.json" --expect "$expected_4" >/dev/null
@@ -341,10 +341,10 @@ expected_4="ok"$'\n'
 echo "ok: factorial-100"
 
 # ----------------------------
-# Example 5: Decimal money formatting (solve-pure + ext-decimal-rs)
+# Example 5: Decimal money formatting (run-os + ext-decimal-rs)
 # ----------------------------
 
-echo "==> agent example: money-format (solve-pure + ext-decimal-rs)"
+echo "==> agent example: money-format (run-os + ext-decimal-rs)"
 
 decimal_work="$tmp_dir/money-format"
 copy_project "examples/agent-gate/math-decimal/money-format" "$decimal_work"
@@ -352,20 +352,20 @@ copy_project "examples/agent-gate/math-decimal/money-format" "$decimal_work"
 seed_official_deps "$decimal_work"
 pkg_lock_check "$decimal_work"
 fmt_check_all "$decimal_work"
-lint_check_one "$decimal_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$decimal_work" "run-os" "src/main.x07.json"
 
-wrapped_5="$(run_x07_run "money-format" "$decimal_work" --profile test)"
-unwrap_and_check_wrapped_report "money-format" "$wrapped_5" "$decimal_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_5="$(run_x07_run "money-format" "$decimal_work" --profile os)"
+unwrap_and_check_wrapped_report "money-format" "$wrapped_5" "$decimal_work/tmp/runner.json" "os" "run-os" "true"
 
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "money-format" --path "$decimal_work/tmp/runner.json" --expect "$expected_4" >/dev/null
 
 echo "ok: money-format"
 
 # ----------------------------
-# Example 6: Unicode normalize + casefold (solve-pure + ext-unicode-rs)
+# Example 6: Unicode normalize + casefold (run-os + ext-unicode-rs)
 # ----------------------------
 
-echo "==> agent example: normalize-casefold (solve-pure + ext-unicode-rs)"
+echo "==> agent example: normalize-casefold (run-os + ext-unicode-rs)"
 
 unicode_work="$tmp_dir/normalize-casefold"
 copy_project "examples/agent-gate/text-unicode/normalize-casefold" "$unicode_work"
@@ -373,20 +373,20 @@ copy_project "examples/agent-gate/text-unicode/normalize-casefold" "$unicode_wor
 seed_official_deps "$unicode_work"
 pkg_lock_check "$unicode_work"
 fmt_check_all "$unicode_work"
-lint_check_one "$unicode_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$unicode_work" "run-os" "src/main.x07.json"
 
-wrapped_6="$(run_x07_run "normalize-casefold" "$unicode_work" --profile test)"
-unwrap_and_check_wrapped_report "normalize-casefold" "$wrapped_6" "$unicode_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_6="$(run_x07_run "normalize-casefold" "$unicode_work" --profile os)"
+unwrap_and_check_wrapped_report "normalize-casefold" "$wrapped_6" "$unicode_work/tmp/runner.json" "os" "run-os" "true"
 
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "normalize-casefold" --path "$unicode_work/tmp/runner.json" --expect "$expected_4" >/dev/null
 
 echo "ok: normalize-casefold"
 
 # ----------------------------
-# Example 7: CBOR roundtrip (solve-pure + ext-cbor-rs)
+# Example 7: CBOR roundtrip (run-os + ext-cbor-rs)
 # ----------------------------
 
-echo "==> agent example: cbor-roundtrip (solve-pure + ext-cbor-rs)"
+echo "==> agent example: cbor-roundtrip (run-os + ext-cbor-rs)"
 
 cbor_work="$tmp_dir/data-cbor"
 copy_project "examples/agent-gate/data-cbor/roundtrip" "$cbor_work"
@@ -394,20 +394,20 @@ copy_project "examples/agent-gate/data-cbor/roundtrip" "$cbor_work"
 seed_official_deps "$cbor_work"
 pkg_lock_check "$cbor_work"
 fmt_check_all "$cbor_work"
-lint_check_one "$cbor_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$cbor_work" "run-os" "src/main.x07.json"
 
-wrapped_7="$(run_x07_run "data-cbor" "$cbor_work" --profile test)"
-unwrap_and_check_wrapped_report "data-cbor" "$wrapped_7" "$cbor_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_7="$(run_x07_run "data-cbor" "$cbor_work" --profile os)"
+unwrap_and_check_wrapped_report "data-cbor" "$wrapped_7" "$cbor_work/tmp/runner.json" "os" "run-os" "true"
 
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "data-cbor" --path "$cbor_work/tmp/runner.json" --expect "$expected_4" >/dev/null
 
 echo "ok: data-cbor"
 
 # ----------------------------
-# Example 8: MessagePack roundtrip (solve-pure + ext-msgpack-rs)
+# Example 8: MessagePack roundtrip (run-os + ext-msgpack-rs)
 # ----------------------------
 
-echo "==> agent example: msgpack-roundtrip (solve-pure + ext-msgpack-rs)"
+echo "==> agent example: msgpack-roundtrip (run-os + ext-msgpack-rs)"
 
 msgpack_work="$tmp_dir/data-msgpack"
 copy_project "examples/agent-gate/data-msgpack/roundtrip" "$msgpack_work"
@@ -415,20 +415,20 @@ copy_project "examples/agent-gate/data-msgpack/roundtrip" "$msgpack_work"
 seed_official_deps "$msgpack_work"
 pkg_lock_check "$msgpack_work"
 fmt_check_all "$msgpack_work"
-lint_check_one "$msgpack_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$msgpack_work" "run-os" "src/main.x07.json"
 
-wrapped_8="$(run_x07_run "data-msgpack" "$msgpack_work" --profile test)"
-unwrap_and_check_wrapped_report "data-msgpack" "$wrapped_8" "$msgpack_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_8="$(run_x07_run "data-msgpack" "$msgpack_work" --profile os)"
+unwrap_and_check_wrapped_report "data-msgpack" "$wrapped_8" "$msgpack_work/tmp/runner.json" "os" "run-os" "true"
 
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "data-msgpack" --path "$msgpack_work/tmp/runner.json" --expect "$expected_4" >/dev/null
 
 echo "ok: data-msgpack"
 
 # ----------------------------
-# Example 9: Checksums (solve-pure + ext-checksum-rs)
+# Example 9: Checksums (run-os + ext-checksum-rs)
 # ----------------------------
 
-echo "==> agent example: checksum-smoke (solve-pure + ext-checksum-rs)"
+echo "==> agent example: checksum-smoke (run-os + ext-checksum-rs)"
 
 checksum_work="$tmp_dir/checksum-fast"
 copy_project "examples/agent-gate/checksum-fast/smoke" "$checksum_work"
@@ -436,20 +436,20 @@ copy_project "examples/agent-gate/checksum-fast/smoke" "$checksum_work"
 seed_official_deps "$checksum_work"
 pkg_lock_check "$checksum_work"
 fmt_check_all "$checksum_work"
-lint_check_one "$checksum_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$checksum_work" "run-os" "src/main.x07.json"
 
-wrapped_9="$(run_x07_run "checksum-fast" "$checksum_work" --profile test)"
-unwrap_and_check_wrapped_report "checksum-fast" "$wrapped_9" "$checksum_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_9="$(run_x07_run "checksum-fast" "$checksum_work" --profile os)"
+unwrap_and_check_wrapped_report "checksum-fast" "$wrapped_9" "$checksum_work/tmp/runner.json" "os" "run-os" "true"
 
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "checksum-fast" --path "$checksum_work/tmp/runner.json" --expect "$expected_4" >/dev/null
 
 echo "ok: checksum-fast"
 
 # ----------------------------
-# Example 10: Diff/patch apply (solve-pure + ext-diff-rs)
+# Example 10: Diff/patch apply (run-os + ext-diff-rs)
 # ----------------------------
 
-echo "==> agent example: diff-patch-apply (solve-pure + ext-diff-rs)"
+echo "==> agent example: diff-patch-apply (run-os + ext-diff-rs)"
 
 diff_work="$tmp_dir/diff-patch"
 copy_project "examples/agent-gate/diff-patch/apply" "$diff_work"
@@ -457,20 +457,20 @@ copy_project "examples/agent-gate/diff-patch/apply" "$diff_work"
 seed_official_deps "$diff_work"
 pkg_lock_check "$diff_work"
 fmt_check_all "$diff_work"
-lint_check_one "$diff_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$diff_work" "run-os" "src/main.x07.json"
 
-wrapped_10="$(run_x07_run "diff-patch" "$diff_work" --profile test)"
-unwrap_and_check_wrapped_report "diff-patch" "$wrapped_10" "$diff_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_10="$(run_x07_run "diff-patch" "$diff_work" --profile os)"
+unwrap_and_check_wrapped_report "diff-patch" "$wrapped_10" "$diff_work/tmp/runner.json" "os" "run-os" "true"
 
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "diff-patch" --path "$diff_work/tmp/runner.json" --expect "$expected_4" >/dev/null
 
 echo "ok: diff-patch"
 
 # ----------------------------
-# Example 11: zstd roundtrip (solve-pure + ext-compress-rs)
+# Example 11: zstd roundtrip (run-os + ext-compress-rs)
 # ----------------------------
 
-echo "==> agent example: compress-zstd (solve-pure + ext-compress-rs)"
+echo "==> agent example: compress-zstd (run-os + ext-compress-rs)"
 
 zstd_work="$tmp_dir/compress-zstd"
 copy_project "examples/agent-gate/compress-zstd/roundtrip" "$zstd_work"
@@ -478,10 +478,10 @@ copy_project "examples/agent-gate/compress-zstd/roundtrip" "$zstd_work"
 seed_official_deps "$zstd_work"
 pkg_lock_check "$zstd_work"
 fmt_check_all "$zstd_work"
-lint_check_one "$zstd_work" "solve-pure" "src/main.x07.json"
+lint_check_one "$zstd_work" "run-os" "src/main.x07.json"
 
-wrapped_11="$(run_x07_run "compress-zstd" "$zstd_work" --profile test)"
-unwrap_and_check_wrapped_report "compress-zstd" "$wrapped_11" "$zstd_work/tmp/runner.json" "host" "solve-pure" "true"
+wrapped_11="$(run_x07_run "compress-zstd" "$zstd_work" --profile os)"
+unwrap_and_check_wrapped_report "compress-zstd" "$wrapped_11" "$zstd_work/tmp/runner.json" "os" "run-os" "true"
 
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "compress-zstd" --path "$zstd_work/tmp/runner.json" --expect "$expected_4" >/dev/null
 

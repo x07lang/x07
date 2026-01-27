@@ -24,7 +24,7 @@ The canonical source is **x07AST JSON** (`*.x07.json`), not text files. Patches 
 
 ### Deterministic Execution
 
-The primary execution model (`solve-*` worlds) is **resource-bounded and reproducible**. Agents can iterate through build → run → diff cycles without heisenbugs. Same input, same output, every time.
+X07’s tooling is designed for reproducible, machine-driven repair loops: stable error codes, structured reports, and explicit resource budgets.
 
 ### Single Canonical Approach
 
@@ -36,7 +36,7 @@ Errors are **structured identifiers with actionable fixes** designed for LLM con
 
 ### Explicit Capability Worlds
 
-Side effects are opt-in. `solve-pure` is deterministic bytes → bytes. `run-os*` worlds enable real OS access. The boundary is explicit, not implicit.
+Side effects are opt-in. Programs run in OS worlds, and sandboxing is explicit and policy-driven.
 
 ### High Performance
 
@@ -71,29 +71,27 @@ Advanced: toolchain archives are also available under https://github.com/x07lang
 ### Run a Program
 
 ```bash
-x07 run --program program.x07.json --world solve-pure --input input.bin
+mkdir myapp
+cd myapp
+x07 init
+x07 run
 ```
 
 ### Agent Tooling
 
 ```bash
 x07 fmt --input program.x07.json --write
-x07 lint --input program.x07.json --world solve-pure
-x07 fix --input program.x07.json --world solve-pure --write
+x07 lint --input program.x07.json
+x07 fix --input program.x07.json --write
 x07 ast apply-patch --in program.x07.json --patch patch.json --out program.x07.json --validate
 ```
 
 ---
 
-## Capability Worlds
+## OS Worlds
 
 | World | Description |
 |-------|-------------|
-| `solve-pure` | Pure bytes → bytes, no I/O |
-| `solve-fs` | Read-only fixture filesystem |
-| `solve-rr` | Deterministic request/response (fixture-backed) |
-| `solve-kv` | Deterministic key/value store |
-| `solve-full` | fs + rr + kv combined |
 | `run-os` | Real OS access (non-deterministic) |
 | `run-os-sandboxed` | Policy-restricted OS access |
 

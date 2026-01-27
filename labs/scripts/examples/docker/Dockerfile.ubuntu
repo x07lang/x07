@@ -19,4 +19,4 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /work
 COPY . /work
 
-CMD ["python3", "scripts/examples/run_release_examples.py", "--all", "--cargo-profile", "release"]
+CMD ["python3", "labs/scripts/examples/run_release_examples.py", "--all", "--cargo-profile", "release"]

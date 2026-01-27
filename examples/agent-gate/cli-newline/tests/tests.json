@@ -3,7 +3,7 @@
   "tests": [
     {
       "id": "smoke/cli_newline",
-      "world": "solve-pure",
+      "world": "run-os",
       "entry": "smoke.cli_newline",
       "expect": "pass"
     }

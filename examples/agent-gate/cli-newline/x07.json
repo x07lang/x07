@@ -1,12 +1,12 @@
 {
   "schema_version": "x07.project@0.2.0",
-  "world": "solve-pure",
+  "world": "run-os",
   "entry": "src/main.x07.json",
   "module_roots": ["src"],
   "dependencies": [],
   "lockfile": "x07.lock.json",
-  "default_profile": "test",
+  "default_profile": "os",
   "profiles": {
-    "test": { "world": "solve-pure" }
+    "os": { "world": "run-os" }
   }
 }

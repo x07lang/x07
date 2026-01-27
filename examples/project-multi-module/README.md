@@ -4,7 +4,7 @@ This directory is a standalone X07 project that demonstrates:
 
 - multi-module compilation via `(import ...)`
 - a local path dependency package (with a lockfile)
-- using `x07c build` to compile deterministically
+- using `x07 build` to compile to C
 
 ## Files
 
@@ -20,4 +20,4 @@ From repo root:
 
 - Regenerate lockfile: `x07 pkg lock --project examples/project-multi-module/x07.json`
 - Compile to C: `x07 build --project examples/project-multi-module/x07.json --out target/project-multi-module/example.c`
-- Compile+run (deterministic): `x07 run --repair=off --project examples/project-multi-module/x07.json --world solve-pure --input /dev/null`
+- Compile+run: `printf '' | x07 run --repair=off --project examples/project-multi-module/x07.json --stdin`

@@ -3,15 +3,14 @@
   "tests": [
     {
       "id": "pure_add",
-      "world": "solve-pure",
+      "world": "run-os",
       "entry": "demo.tests_pure.test_add",
       "expect": "pass"
     },
     {
       "id": "fs_read",
-      "world": "solve-fs",
+      "world": "run-os",
       "entry": "demo.tests_fs.test_fixture_read",
-      "fixture_root": "fixtures/fs_read",
       "expect": "pass"
     }
   ]

@@ -9,11 +9,6 @@
   "meta": {
     "determinism_tier": "pure",
     "worlds_allowed": [
-      "solve-pure",
-      "solve-fs",
-      "solve-rr",
-      "solve-kv",
-      "solve-full",
       "run-os",
       "run-os-sandboxed"
     ],

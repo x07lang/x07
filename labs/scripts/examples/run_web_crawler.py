@@ -127,7 +127,7 @@ def main() -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("examples/release/web_crawler/config.example.yaml"),
+        default=Path("labs/examples/release/web_crawler/config.example.yaml"),
         help="Path to crawler YAML config (passed as --input to x07-os-runner).",
     )
     parser.add_argument("--compiled-out", type=Path, default=None)
@@ -138,7 +138,7 @@ def main() -> None:
     _ensure_ext_fs_staged(root)
     runner = _os_runner_exe(root, args.cargo_profile)
 
-    release = root / "examples" / "release"
+    release = root / "labs" / "examples" / "release"
     project = release / "web_crawler.x07project.json"
     if not project.exists():
         raise RuntimeError(f"missing {project}")
@@ -212,4 +212,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

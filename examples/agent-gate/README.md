@@ -16,8 +16,8 @@ They are intentionally small and deterministic.
 
 ## Projects
 
-- `cli-newline`: newline input payload parsing in `solve-pure` (has `tests/`)
-- `cli-ext-cli`: `ext-cli` parsing + lockfile deps in `solve-pure` (has `tests/`)
+- `cli-newline`: newline input payload parsing (has `tests/`)
+- `cli-ext-cli`: `ext-cli` parsing + lockfile deps (has `tests/`)
 - `web-crawler-local`: `run-os-sandboxed` HTTP crawl against a local fixture site (policy-gated)
 
 ## Run the gate locally

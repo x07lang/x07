@@ -1,6 +1,6 @@
 {
   "schema_version": "x07.project@0.2.0",
-  "world": "solve-pure",
+  "world": "run-os",
   "entry": "src/main.x07.json",
   "module_roots": [
     "src"
@@ -40,6 +40,10 @@
   "lockfile": "x07.lock.json",
   "default_profile": "sandbox",
   "profiles": {
+    "os": {
+      "world": "run-os",
+      "auto_ffi": true
+    },
     "sandbox": {
       "world": "run-os-sandboxed",
       "policy": ".x07/policies/base/http-client.sandbox.base.policy.json",

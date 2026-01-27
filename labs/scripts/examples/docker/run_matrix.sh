@@ -15,5 +15,5 @@ run_one() {
   docker run --rm "${tag}"
 }
 
-run_one "debian" "scripts/examples/docker/Dockerfile.debian"
-run_one "ubuntu" "scripts/examples/docker/Dockerfile.ubuntu"
+run_one "debian" "labs/scripts/examples/docker/Dockerfile.debian"
+run_one "ubuntu" "labs/scripts/examples/docker/Dockerfile.ubuntu"

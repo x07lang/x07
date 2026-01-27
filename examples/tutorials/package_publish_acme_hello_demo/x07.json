@@ -1,6 +1,6 @@
 {
   "schema_version": "x07.project@0.2.0",
-  "world": "solve-pure",
+  "world": "run-os",
   "entry": "modules/ext/acme_hello_demo/tests.x07.json",
   "module_roots": ["modules"],
   "lockfile": "x07.lock.json",

@@ -11,11 +11,11 @@ OS-world example program that:
 
 ## Config schema
 
-See `examples/release/web_crawler/config.example.yaml` for a runnable template.
+See `labs/examples/release/web_crawler/config.example.yaml` for a runnable template.
 
 Required:
 - `base_url` (string) — `http://...` or `https://...`
-- `output_path` (string) — uses `/` separators (Windows too); relative to `examples/release/` when run via `--project`.
+- `output_path` (string) — uses `/` separators (Windows too); relative to `labs/examples/release/` when run via `--project`.
 
 Optional:
 - `max_depth` (int, default `1`)
@@ -43,22 +43,22 @@ bash scripts/build_ext_fs.sh
 Run via the helper script (prints decoded output + runner metrics):
 
 ```bash
-python3 scripts/examples/run_web_crawler.py --config examples/release/web_crawler/config.example.yaml
+python3 labs/scripts/examples/run_web_crawler.py --config labs/examples/release/web_crawler/config.example.yaml
 ```
 
 Manual runner invocation:
 
 ```bash
 x07 run --repair=off \
-  --project examples/release/web_crawler.x07project.json \
+  --project labs/examples/release/web_crawler.x07project.json \
   --world run-os \
-  --input examples/release/web_crawler/config.example.yaml \
+  --input labs/examples/release/web_crawler/config.example.yaml \
   --auto-ffi
 ```
 
 Output:
 
-- With the default config, the URL list is written to `examples/release/target/web_crawler/urls.txt` (because `output_path` is relative to `examples/release/`).
+- With the default config, the URL list is written to `labs/examples/release/target/web_crawler/urls.txt` (because `output_path` is relative to `labs/examples/release/`).
 
 ## Windows
 

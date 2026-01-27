@@ -3,7 +3,7 @@
   "tests": [
     {
       "id": "hello_v1",
-      "world": "solve-pure",
+      "world": "run-os",
       "entry": "ext.acme_hello_demo.tests.test_hello_v1",
       "expect": "pass"
     }

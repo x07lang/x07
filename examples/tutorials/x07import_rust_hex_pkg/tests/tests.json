@@ -3,7 +3,7 @@
   "tests": [
     {
       "id": "encode_decode_roundtrip",
-      "world": "solve-pure",
+      "world": "run-os",
       "entry": "ext.hex.tests.test_encode_decode_roundtrip",
       "expect": "pass"
     }

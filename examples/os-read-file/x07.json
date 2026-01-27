@@ -1,19 +1,21 @@
 {
   "schema_version": "x07.project@0.2.0",
   "world": "run-os",
-  "entry": "src/main.x07.json",
-  "module_roots": ["src"],
+  "entry": "read_file_by_stdin.x07.json",
+  "module_roots": [
+    "."
+  ],
   "dependencies": [],
   "lockfile": "x07.lock.json",
-  "default_profile": "sandbox",
+  "default_profile": "os",
   "profiles": {
     "os": {
       "world": "run-os"
     },
     "sandbox": {
       "world": "run-os-sandboxed",
-      "policy": ".x07/policies/base/cli.sandbox.base.policy.json",
-      "auto_ffi": true
+      "policy": "run-os-policy.example.json"
     }
   }
 }
+

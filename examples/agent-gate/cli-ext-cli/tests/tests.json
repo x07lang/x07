@@ -3,7 +3,7 @@
   "tests": [
     {
       "id": "smoke/cli_ext_cli",
-      "world": "solve-pure",
+      "world": "run-os",
       "entry": "smoke.cli_ext_cli",
       "expect": "pass"
     }

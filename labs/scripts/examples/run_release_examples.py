@@ -41,14 +41,14 @@ def _run(cmd: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 
 def _ensure_release_fixtures(root: Path) -> None:
-    fixtures_dir = root / "examples" / "release" / "fixtures"
+    fixtures_dir = root / "labs" / "examples" / "release" / "fixtures"
     artifact_path = fixtures_dir / "artifact_audit.tar.gz"
     zip_path = fixtures_dir / "zip_grep.zip"
     if artifact_path.exists() and zip_path.exists():
         return
 
-    gen = root / "scripts" / "examples" / "generate_release_fixtures.py"
-    print("Generating examples/release/fixtures (tar.gz + zip)...")
+    gen = root / "labs" / "scripts" / "examples" / "generate_release_fixtures.py"
+    print("Generating labs/examples/release/fixtures (tar.gz + zip)...")
     proc = _run([sys.executable, str(gen)], cwd=root)
     if proc.returncode != 0:
         raise RuntimeError(
@@ -90,7 +90,7 @@ class Example:
 
 
 def _examples(root: Path, input_dir_file: Path) -> list[Example]:
-    release = root / "examples" / "release"
+    release = root / "labs" / "examples" / "release"
     return [
         Example(
             name="artifact_audit",

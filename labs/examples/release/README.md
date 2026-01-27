@@ -21,19 +21,19 @@ This directory contains larger x07 programs intended to exercise a wide surface 
 Generate sample inputs (tar.gz + zip) once:
 
 ```bash
-python3 scripts/examples/generate_release_fixtures.py
+python3 labs/scripts/examples/generate_release_fixtures.py
 ```
 
 Run the example harness (prints decoded output + key metrics):
 
 ```bash
-python3 scripts/examples/run_release_examples.py --all
+python3 labs/scripts/examples/run_release_examples.py --all
 ```
 
 ## Running on Linux distros (Docker)
 
 ```bash
-bash scripts/examples/docker/run_matrix.sh
+bash labs/scripts/examples/docker/run_matrix.sh
 ```
 
 ## Web crawler (run-os)
@@ -49,11 +49,11 @@ bash scripts/build_ext_fs.sh
 Run via the helper script (prints decoded output + key metrics from the JSON report):
 
 ```bash
-python3 scripts/examples/run_web_crawler.py --config examples/release/web_crawler/config.example.yaml
+python3 labs/scripts/examples/run_web_crawler.py --config labs/examples/release/web_crawler/config.example.yaml
 ```
 
 ## Windows / WSL2
 
-Use the same `python3 scripts/examples/run_release_examples.py --all` command inside WSL2 (Ubuntu/Debian). For native Windows, build with MSVC or clang and run `cargo run -p x07-host-runner -- ...` (see `scripts/examples/run_release_examples.py` for the exact flags).
+Use the same `python3 labs/scripts/examples/run_release_examples.py --all` command inside WSL2 (Ubuntu/Debian). For native Windows, build with MSVC or clang and run `cargo run -p x07-host-runner -- ...` (see `labs/scripts/examples/run_release_examples.py` for the exact flags).
 
 For the web crawler example, prefer running inside WSL2 (same commands as Linux). Native Windows builds require a C toolchain plus `libcurl` headers/libs available on your toolchain’s include/lib search paths.
