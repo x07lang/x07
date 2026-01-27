@@ -3,9 +3,9 @@
   "description": "Fast deterministic canaries (smoke suites + emitters).",
   "pre_score_canaries": [],
   "score_suites": [
-    "benchmarks/solve-pure/phaseH1-smoke.json",
-    "benchmarks/solve-full/phaseH2-smoke.json",
-    "benchmarks/solve-pure/emitters-v1-suite.json"
+    "labs/benchmarks/solve-pure/phaseH1-smoke.json",
+    "labs/benchmarks/solve-full/phaseH2-smoke.json",
+    "labs/benchmarks/solve-pure/emitters-v1-suite.json"
   ],
   "debug_suites": []
 }

@@ -1,7 +1,7 @@
 {
   "schema_version": "x07.perf_baseline@0.1.0",
   "suites": {
-    "benchmarks/solve-full/phaseH2-smoke.json": {
+    "labs/benchmarks/solve-full/phaseH2-smoke.json": {
       "tasks": {
         "full/cache_rr_bodies_in_kv_concat": {
           "c_source_size": 128348,
@@ -27,7 +27,7 @@
         }
       }
     },
-    "benchmarks/solve-pure/emitters-v1-suite.json": {
+    "labs/benchmarks/solve-pure/emitters-v1-suite.json": {
       "tasks": {
         "pure/emitters_btree_map_emit_kv_u32le_u32le_sorted_by_key": {
           "c_source_size": 137954,
@@ -152,7 +152,7 @@
         }
       }
     },
-    "benchmarks/solve-pure/phaseH1-smoke.json": {
+    "labs/benchmarks/solve-pure/phaseH1-smoke.json": {
       "tasks": {
         "canary/std_json_canonicalize_small": {
           "c_source_size": 305320,
