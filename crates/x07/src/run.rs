@@ -58,15 +58,15 @@ pub struct RunArgs {
     pub profile: Option<String>,
 
     /// Force runner selection.
-    #[arg(long, value_enum, conflicts_with_all = ["host", "os"])]
+    #[arg(long, value_enum, conflicts_with_all = ["host", "os"], hide = true)]
     pub runner: Option<RunnerMode>,
 
-    /// Force deterministic host runner selection (`solve-*` worlds).
-    #[arg(long)]
+    /// Force deterministic host runner selection.
+    #[arg(long, hide = true)]
     pub host: bool,
 
-    /// Force OS runner selection (`run-os*` worlds).
-    #[arg(long)]
+    /// Force OS runner selection.
+    #[arg(long, hide = true)]
     pub os: bool,
 
     #[arg(long, conflicts_with_all = ["stdin", "input_b64"], value_name = "PATH")]
@@ -96,29 +96,29 @@ pub struct RunArgs {
     #[arg(long, value_name = "PATH")]
     pub compiled_out: Option<PathBuf>,
 
-    #[arg(long)]
+    #[arg(long, hide = true)]
     pub compile_only: bool,
 
     #[arg(long, value_name = "PATH")]
     pub module_root: Vec<PathBuf>,
 
     /// A base directory for fixtures (shorthand for world-specific fixture dirs).
-    #[arg(long, value_name = "DIR")]
+    #[arg(long, value_name = "DIR", hide = true)]
     pub fixtures: Option<PathBuf>,
 
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_fs_dir: Option<PathBuf>,
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_fs_root: Option<PathBuf>,
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_fs_latency_index: Option<PathBuf>,
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_rr_dir: Option<PathBuf>,
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_rr_index: Option<PathBuf>,
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_kv_dir: Option<PathBuf>,
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_kv_seed: Option<PathBuf>,
 
     /// Policy JSON (required for `run-os-sandboxed`; not a hardened sandbox).

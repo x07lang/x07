@@ -78,7 +78,8 @@ enum Command {
     Pkg(pkg::PkgArgs),
     /// Inspect module exports and signatures.
     Doc(doc::DocArgs),
-    /// Record solve-rr fixtures.
+    /// Record RR fixtures.
+    #[command(hide = true)]
     Rr(rr::RrArgs),
 }
 
@@ -134,7 +135,7 @@ struct TestArgs {
     #[arg(long, value_name = "PATH", default_value = "stdlib.lock")]
     stdlib_lock: PathBuf,
 
-    #[arg(long, value_enum)]
+    #[arg(long, value_enum, hide = true)]
     world: Option<WorldId>,
 
     #[arg(long, value_name = "SUBSTR")]

@@ -21721,7 +21721,7 @@ static void rt_hex_bytes(const uint8_t* bytes, uint32_t len, char* out) {
 "#;
 
 const RUNTIME_C_OS: &str = r#"
-// Standalone OS runtime helpers (Phase H3).
+// Standalone OS runtime helpers.
 //
 // These helpers are only compiled into binaries produced for standalone-only
 // worlds (run-os, run-os-sandboxed).

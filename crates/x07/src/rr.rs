@@ -17,7 +17,7 @@ pub struct RrArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum RrCommand {
-    /// Record an HTTP response into a solve-rr fixture directory.
+    /// Record an HTTP response into an RR fixture directory.
     Record(RecordArgs),
 }
 
