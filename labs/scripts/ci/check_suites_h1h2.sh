@@ -25,6 +25,6 @@ if [[ ! -d "$solutions_dir" ]]; then
   exit 1
 fi
 
-"$python_bin" labs/scripts/bench/run_bench_suite.py --suite labs/benchmarks/bundles/phaseH1H2.json --solutions "$solutions_dir"
+"$python_bin" labs/scripts/bench/run_bench_suite.py --suite labs/benchmarks/bundles/regression.json --solutions "$solutions_dir"
 
-echo "ok: H1/H2 suites pass with reference solutions"
+echo "ok: regression suites pass with reference solutions"

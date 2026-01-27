@@ -229,7 +229,7 @@ Replace `x07-package.json` with:
   "modules": ["ext.hex", "ext.hex.tests"],
   "meta": {
     "determinism_tier": "pure",
-    "worlds_allowed": ["solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full", "run-os", "run-os-sandboxed"],
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
     "import_mode": "x07import"
   }
 }
@@ -240,7 +240,7 @@ Create `x07.json` for local tests:
 ```json
 {
   "schema_version": "x07.project@0.2.0",
-  "world": "solve-pure",
+  "world": "run-os",
   "entry": "modules/ext/hex/tests.x07.json",
   "module_roots": ["modules"],
   "lockfile": "x07.lock.json",
@@ -258,7 +258,7 @@ Create `tests/tests.json`:
   "tests": [
     {
       "id": "encode_decode_roundtrip",
-      "world": "solve-pure",
+      "world": "run-os",
       "entry": "ext.hex.tests.test_encode_decode_roundtrip",
       "expect": "pass"
     }

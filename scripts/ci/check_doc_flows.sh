@@ -88,10 +88,10 @@ mkdir -p "$min"
 (cd "$min" && "$x07_bin" init >/dev/null)
 
 (cd "$min" && "$x07_bin" fmt --input src/main.x07.json --write >/dev/null)
-(cd "$min" && "$x07_bin" lint --input src/main.x07.json --world solve-pure >/dev/null)
+(cd "$min" && "$x07_bin" lint --input src/main.x07.json >/dev/null)
 
 runner_json="$min/runner.json"
-(cd "$min" && "$x07_bin" run --profile test --report runner >"$runner_json")
+(cd "$min" && "$x07_bin" run --profile os --report runner >"$runner_json")
 "$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "doc-flow:min" --path "$runner_json" --expect "" >/dev/null
 
 (cd "$min" && "$x07_bin" test --manifest tests/tests.json >/dev/null)
@@ -110,11 +110,11 @@ mkdir -p "$cli"
 (cd "$cli" && find src -name '*.x07.json' -print0 | while IFS= read -r -d '' f; do
   "$x07_bin" fmt --input "$f" --check >/dev/null
 done)
-(cd "$cli" && "$x07_bin" lint --input src/main.x07.json --world solve-pure >/dev/null)
+(cd "$cli" && "$x07_bin" lint --input src/main.x07.json >/dev/null)
 
 mkdir -p "$cli/tmp"
 wrapped="$cli/tmp/run.wrapped.json"
-(cd "$cli" && "$x07_bin" run --profile test --report wrapped --report-out "$wrapped" -- \
+(cd "$cli" && "$x07_bin" run --profile os --report wrapped --report-out "$wrapped" -- \
   tool --url https://example.invalid/ --depth 2 --out out/results.txt >/dev/null)
 
 runner_out="$cli/tmp/runner.json"

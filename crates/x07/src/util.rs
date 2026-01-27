@@ -40,6 +40,45 @@ pub fn hex_lower(bytes: &[u8]) -> String {
     out
 }
 
+pub(crate) fn resolve_sibling_or_path(name: &str) -> PathBuf {
+    let Ok(exe) = std::env::current_exe() else {
+        return PathBuf::from(name);
+    };
+    let Some(dir) = exe.parent() else {
+        return PathBuf::from(name);
+    };
+
+    let mut candidates = Vec::new();
+
+    let mut cand = dir.join(name);
+    if cfg!(windows) {
+        cand.set_extension("exe");
+    }
+    candidates.push(cand);
+
+    if dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n == "deps")
+    {
+        if let Some(parent) = dir.parent() {
+            let mut cand = parent.join(name);
+            if cfg!(windows) {
+                cand.set_extension("exe");
+            }
+            candidates.push(cand);
+        }
+    }
+
+    for cand in candidates {
+        if cand.is_file() {
+            return cand;
+        }
+    }
+
+    PathBuf::from(name)
+}
+
 fn nybble_to_hex(n: u8) -> char {
     match n {
         0..=9 => (b'0' + n) as char,

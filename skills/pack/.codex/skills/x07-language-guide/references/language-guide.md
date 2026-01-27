@@ -87,7 +87,7 @@ Module IDs are dot-separated identifiers like `app.rle` or `std.bytes`.
 
 Module resolution is deterministic:
 
-- Built-in modules: `std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque_u32`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.rr`, `std.kv`, `std.path`
+- Built-in modules: `std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque_u32`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.path`, `std.os.env`, `std.os.fs`, `std.os.net`, `std.os.process`, `std.os.process.req_v1`, `std.os.process.caps_v1`, `std.os.process_pool`, `std.os.time`
 - Filesystem modules (standalone): `x07 run --program <prog.x07.json> --module-root <dir>` resolves `a.b` to `<dir>/a/b.x07.json`
 
 Standalone binding override:
@@ -97,7 +97,7 @@ Standalone binding override:
 
 Standalone OS builtins:
 
-- These heads are only available when compiling with `--world run-os` or `--world run-os-sandboxed`:
+- These heads are only available in OS worlds (`run-os`, `run-os-sandboxed`):
   - `os.fs.read_file(path: bytes) -> bytes`
   - `os.fs.write_file(path: bytes, data: bytes) -> i32`
   - `os.fs.read_all_v1(path: bytes, caps: bytes) -> result_bytes`
@@ -368,16 +368,20 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.world.fs.read_file","path_bytes"]` -> bytes
   - `["std.world.fs.read_file_async","path_bytes"]` -> bytes
 
-- `std.rr` (solve-rr only)
-  - `["std.rr.send_request","req_bytes"]` -> bytes
-  - `["std.rr.fetch","key_bytes"]` -> bytes
-  - `["std.rr.send","key_bytes"]` -> iface
+  - `["std.world.fs.write_file","path_bytes","data_bytes"]` -> i32
 
-- `std.kv` (solve-kv only)
-  - `["std.kv.get","key_bytes"]` -> bytes
-  - `["std.kv.get_async","key_bytes"]` -> bytes
-  - `["std.kv.set","key_bytes","val_bytes"]` -> i32
-  - `["std.kv.get_stream","key_bytes"]` -> iface
+- `std.os.env` (OS worlds)
+  - `["std.os.env.get","key_bytes"]` -> bytes
+
+- `std.os.fs` (OS worlds)
+  - `["std.os.fs.read_file","path_bytes"]` -> bytes
+  - `["std.os.fs.write_file","path_bytes","data_bytes"]` -> i32
+
+- `std.os.net` (OS worlds)
+  - `["std.os.net.http_request","req_bytes"]` -> bytes
+
+- `std.os.time` (OS worlds)
+  - `["std.os.time.now_unix_ms"]` -> i32
 
 - `std.path`
   - `["std.path.join","a","b"]` -> bytes
@@ -447,37 +451,10 @@ Views are explicit, borrowed slices used for scan/trim/split without copying.
 
 Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).
 
-## Filesystem (solve-fs only)
+## OS Worlds (run-os / run-os-sandboxed)
 
-- `["fs.read","path_bytes"]` -> bytes
-- `["fs.read_async","path_bytes"]` -> bytes
-- `["fs.open_read","path_bytes"]` -> iface
-  - Returns an `iface` reader for streaming reads.
-- `["fs.list_dir","path_bytes"]` -> bytes (newline-separated names, sorted, trailing `\n`)
-  - `path_bytes` must be a safe relative path (no absolute paths, no `..`, no empty segments).
-  - The fixture directory is the current working directory (`.`).
-
-## Request/Response (solve-rr only)
-
-- `["rr.send_request","req_bytes"]` -> bytes
-  - Fixture-backed request/response (no real network).
-  - `req_bytes` are hashed as `sha256(req_bytes)` and mapped to a response blob under `./.x07_rr/`.
-- `["rr.fetch","key_bytes"]` -> bytes
-  - Fixture-backed request/response with deterministic latency modeling.
-- `["rr.send","key_bytes"]` -> iface
-  - Returns an `iface` reader for streaming reads.
-
-## Key/Value (solve-kv only)
-
-- `["kv.get","key_bytes"]` -> bytes
-  - Returns empty bytes if missing.
-- `["kv.get_async","key_bytes"]` -> bytes
-  - Same as `kv.get` but explicitly uses the async/latency-aware path.
-- `["kv.get_stream","key_bytes"]` -> iface
-  - Returns an `iface` reader for streaming reads.
-- `["kv.set","key_bytes","val_bytes"]` -> i32
-  - Returns 1 if inserted, 0 if updated.
-  - Store is seeded per case from `./.x07_kv/seed.evkv` and reset per case.
+OS effects are accessed through `std.os.*` modules, which call `os.*` builtins (listed above).
+In sandboxed execution, these calls are gated by policy.
 
 ## Streaming I/O
 

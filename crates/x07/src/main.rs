@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -300,12 +300,6 @@ fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
 
     let mut tests = validated.tests;
     if let Some(world) = args.world {
-        if !world.is_eval_world() {
-            anyhow::bail!(
-                "x07 test supports only deterministic solve worlds, got {}",
-                world.as_str()
-            );
-        }
         tests.retain(|t| t.world == world);
     }
     if let Some(filter) = &args.filter {
@@ -562,6 +556,10 @@ fn run_one_test(
 
     let driver_src = build_test_driver_x07ast_json(test)?;
 
+    if !test.world.is_eval_world() {
+        return run_one_test_os(args, module_roots, test, &driver_src, start);
+    }
+
     let (driver_out_dir, driver_path, exe_out_path) = if args.keep_artifacts {
         let out_dir = args
             .artifact_dir
@@ -688,6 +686,268 @@ fn run_one_test(
         if args.verbose {
             eprintln!("driver: {}", driver_path.display());
         }
+    }
+
+    Ok(result)
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct OsRunnerReportRaw {
+    compile: OsRunnerCompileRaw,
+    #[serde(default)]
+    solve: Option<OsRunnerSolveRaw>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct OsRunnerCompileRaw {
+    ok: bool,
+    exit_status: i32,
+    c_source_size: u64,
+    #[serde(default)]
+    compile_error: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct OsRunnerSolveRaw {
+    ok: bool,
+    exit_status: i32,
+    solve_output_b64: String,
+    stdout_b64: String,
+    stderr_b64: String,
+    #[serde(default)]
+    fuel_used: Option<u64>,
+    #[serde(default)]
+    mem_stats: Option<x07_host_runner::MemStats>,
+    #[serde(default)]
+    sched_stats: Option<x07_host_runner::SchedStats>,
+}
+
+static X07TEST_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn create_temp_test_dir(base: &Path) -> Result<PathBuf> {
+    std::fs::create_dir_all(base)
+        .with_context(|| format!("create temp dir base: {}", base.display()))?;
+
+    let pid = std::process::id();
+    for _ in 0..10_000 {
+        let n = X07TEST_TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = base.join(format!("x07test_{pid}_{n}"));
+        if std::fs::create_dir(&path).is_ok() {
+            return Ok(path);
+        }
+    }
+
+    anyhow::bail!("failed to create temp dir under {}", base.display());
+}
+
+fn rm_rf(path: &Path) {
+    let _ = std::fs::remove_dir_all(path);
+}
+
+fn run_one_test_os(
+    args: &TestArgs,
+    module_roots: &[PathBuf],
+    test: &TestDecl,
+    driver_src: &[u8],
+    start: Instant,
+) -> Result<TestCaseResult> {
+    if args.no_run {
+        return Ok(TestCaseResult {
+            id: test.id.clone(),
+            world: test.world.as_str().to_string(),
+            expect: test.expect.as_str().to_string(),
+            status: "error".to_string(),
+            duration_ms: start.elapsed().as_millis() as u64,
+            entry: Some(test.entry.clone()),
+            fixture_root: None,
+            compile: None,
+            run: None,
+            diags: vec![Diag::new(
+                "ETEST_NO_RUN_UNSUPPORTED",
+                "--no-run is only supported for deterministic solve worlds",
+            )],
+        });
+    }
+
+    let (out_dir, cleanup_dir) = if args.keep_artifacts {
+        let out_dir = args
+            .artifact_dir
+            .join("tests")
+            .join(safe_artifact_dir_name(&test.id));
+        std::fs::create_dir_all(&out_dir)
+            .with_context(|| format!("create artifact dir: {}", out_dir.display()))?;
+        (out_dir, false)
+    } else {
+        let base = args.artifact_dir.join("tests").join("_tmp");
+        (create_temp_test_dir(&base)?, true)
+    };
+
+    let driver_path = out_dir.join("driver.x07.json");
+    std::fs::write(&driver_path, driver_src)
+        .with_context(|| format!("write driver: {}", driver_path.display()))?;
+
+    let exe_out_path = out_dir.join("solver");
+
+    let mut cmd = std::process::Command::new(crate::util::resolve_sibling_or_path("x07-os-runner"));
+    cmd.arg("--world").arg(test.world.as_str());
+    cmd.arg("--program").arg(&driver_path);
+    cmd.arg("--compiled-out").arg(&exe_out_path);
+    for root in module_roots {
+        cmd.arg("--module-root").arg(root);
+    }
+
+    let cpu_time_limit_seconds = match test.timeout_ms {
+        Some(ms) => ms_to_ceiling_seconds(ms)?,
+        None => 5,
+    };
+    cmd.arg("--cpu-time-limit-seconds")
+        .arg(cpu_time_limit_seconds.to_string());
+
+    let output = cmd.output().with_context(|| {
+        format!(
+            "exec {}",
+            crate::util::resolve_sibling_or_path("x07-os-runner").display()
+        )
+    })?;
+
+    let mut result = TestCaseResult {
+        id: test.id.clone(),
+        world: test.world.as_str().to_string(),
+        expect: test.expect.as_str().to_string(),
+        status: "error".to_string(),
+        duration_ms: 0,
+        entry: Some(test.entry.clone()),
+        fixture_root: None,
+        compile: None,
+        run: None,
+        diags: Vec::new(),
+    };
+
+    let report: OsRunnerReportRaw = match serde_json::from_slice(&output.stdout) {
+        Ok(r) => r,
+        Err(err) => {
+            result.diags.push(Diag::new(
+                "ETEST_OS_RUNNER_JSON",
+                format!("x07-os-runner did not emit valid JSON: {err}"),
+            ));
+            if !output.stderr.is_empty() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                result
+                    .diags
+                    .push(Diag::new("ETEST_OS_RUNNER_STDERR", stderr.to_string()));
+            }
+            result.duration_ms = start.elapsed().as_millis() as u64;
+            if cleanup_dir {
+                rm_rf(&out_dir);
+            }
+            return Ok(result);
+        }
+    };
+
+    result.compile = Some(CompileSection {
+        ok: report.compile.ok,
+        exit_code: Some(report.compile.exit_status),
+        compiler_diags: Vec::new(),
+        artifact_path: Some(display_path(&exe_out_path)),
+        c_bytes: Some(report.compile.c_source_size),
+    });
+
+    if !report.compile.ok {
+        if let Some(msg) = report.compile.compile_error {
+            result.diags.push(Diag::new("ETEST_COMPILE", msg));
+        } else {
+            result
+                .diags
+                .push(Diag::new("ETEST_COMPILE", "compile failed"));
+        }
+        result.duration_ms = start.elapsed().as_millis() as u64;
+        if cleanup_dir {
+            rm_rf(&out_dir);
+        }
+        return Ok(result);
+    }
+
+    let Some(solve) = report.solve else {
+        result.diags.push(Diag::new(
+            "ETEST_RUN",
+            "missing solve section in x07-os-runner report",
+        ));
+        result.duration_ms = start.elapsed().as_millis() as u64;
+        if cleanup_dir {
+            rm_rf(&out_dir);
+        }
+        return Ok(result);
+    };
+
+    result.run = Some(RunSection {
+        ok: solve.ok,
+        exit_code: solve.exit_status,
+        fuel_used: solve.fuel_used,
+        mem_stats: solve.mem_stats,
+        sched_stats: solve.sched_stats,
+        solve_output_b64: Some(solve.solve_output_b64.clone()),
+        stdout_b64: Some(solve.stdout_b64),
+        stderr_b64: Some(solve.stderr_b64),
+        failure_code_u32: None,
+    });
+
+    if !solve.ok || solve.exit_status != 0 {
+        result.diags.push(Diag::new(
+            "ETEST_RUN",
+            format!(
+                "runner failed: ok={} exit_status={}",
+                solve.ok, solve.exit_status
+            ),
+        ));
+        result.duration_ms = start.elapsed().as_millis() as u64;
+        if cleanup_dir {
+            rm_rf(&out_dir);
+        }
+        return Ok(result);
+    }
+
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let status_bytes = match b64.decode(solve.solve_output_b64.as_bytes()) {
+        Ok(b) => b,
+        Err(err) => {
+            result.diags.push(Diag::new(
+                "EBAD_STATUS",
+                format!("invalid base64 solve_output: {err}"),
+            ));
+            result.duration_ms = start.elapsed().as_millis() as u64;
+            if cleanup_dir {
+                rm_rf(&out_dir);
+            }
+            return Ok(result);
+        }
+    };
+
+    let (tag, code_u32) = match parse_evtest_status_v1(&status_bytes) {
+        Ok(x) => x,
+        Err(msg) => {
+            result.diags.push(Diag::new("EBAD_STATUS", msg.to_string()));
+            result.duration_ms = start.elapsed().as_millis() as u64;
+            if cleanup_dir {
+                rm_rf(&out_dir);
+            }
+            return Ok(result);
+        }
+    };
+
+    if let Some(run) = result.run.as_mut() {
+        run.failure_code_u32 = Some(code_u32 as u64);
+    }
+
+    result.status = compute_status(test.expect, tag);
+    result.duration_ms = start.elapsed().as_millis() as u64;
+
+    if args.verbose && args.keep_artifacts {
+        eprintln!("artifacts: {}", out_dir.display());
+        eprintln!("driver: {}", driver_path.display());
+    }
+
+    if cleanup_dir {
+        rm_rf(&out_dir);
     }
 
     Ok(result)
@@ -977,7 +1237,7 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
                 diags.push(ManifestDiag {
                     code: "ETEST_WORLD_INVALID",
                     message: format!(
-                        "invalid world: {} (allowed: solve-pure, solve-fs, solve-rr, solve-kv, solve-full)",
+                        "invalid world: {} (allowed: solve-pure, solve-fs, solve-rr, solve-kv, solve-full, run-os, run-os-sandboxed)",
                         t.world
                     ),
                     path: format!("{base}/world"),
@@ -1136,7 +1396,15 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
                 Some(abs)
             }
             WorldId::RunOs | WorldId::RunOsSandboxed => {
-                unreachable!("test manifest forbids OS worlds")
+                if t.fixture_root.is_some() {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_FIXTURE_FORBIDDEN",
+                        message: "fixture_root must not be set for OS worlds".to_string(),
+                        path: format!("{base}/fixture_root"),
+                    });
+                    continue;
+                }
+                None
             }
         };
 
@@ -1181,6 +1449,8 @@ fn parse_world(s: &str) -> Option<WorldId> {
         "solve-rr" => Some(WorldId::SolveRr),
         "solve-kv" => Some(WorldId::SolveKv),
         "solve-full" => Some(WorldId::SolveFull),
+        "run-os" => Some(WorldId::RunOs),
+        "run-os-sandboxed" => Some(WorldId::RunOsSandboxed),
         _ => None,
     }
 }

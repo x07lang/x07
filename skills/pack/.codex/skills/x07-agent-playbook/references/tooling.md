@@ -6,8 +6,7 @@ It must not rely on the toolchain source repo.
 ## Required binaries
 
 - `x07` (canonical front door: `run`, `fmt`, `lint`, `fix`, plus `pkg`, `test`, `ast`, CLI specs, `guide`)
-- `x07-host-runner` (expert backend: deterministic solve-world runner)
-- `x07-os-runner` (expert backend: run-os / run-os-sandboxed runner)
+- `x07-os-runner` (execution backend for OS worlds)
 
 ## Optional (advanced) binaries
 
@@ -32,5 +31,4 @@ It must not rely on the toolchain source repo.
 
 Expert-only:
 
-- `x07-host-runner --help`
 - `x07-os-runner --help`

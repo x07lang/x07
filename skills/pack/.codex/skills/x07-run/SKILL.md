@@ -1,6 +1,6 @@
 ---
 name: x07-run
-description: Canonical execution front door for X07 programs (solve-* and run-os*), producing pass-through runner reports.
+description: Canonical execution front door for X07 programs (run-os / run-os-sandboxed), producing runner reports.
 metadata:
   short-description: Run programs (canonical)
   version: 0.1.0
@@ -9,10 +9,7 @@ metadata:
 
 # x07-run
 
-Use this skill for normal program execution. `x07 run` dispatches to:
-
-- `x07-host-runner` for deterministic `solve-*` worlds
-- `x07-os-runner` for `run-os*` worlds
+Use this skill for normal program execution via `x07 run`.
 
 `x07 run` runs the canonical auto-repair loop by default (format → lint → quickfix, repeatable). Control it with:
 
@@ -27,15 +24,11 @@ Use this skill for normal program execution. `x07 run` dispatches to:
   - `x07 run`
 
 - Run a specific project profile:
-  - `x07 run --profile test`
   - `x07 run --profile os`
   - `x07 run --profile sandbox`
 
 - Check platform prerequisites for OS worlds (C compiler + common native deps):
   - `x07 doctor`
-
-- Run a deterministic fixture world:
-  - `x07 run --world solve-fs --fixtures fixtures`
 
 - Generate a base sandbox policy:
   - `x07 policy init --template cli`
@@ -67,15 +60,12 @@ Default is empty input bytes. Provide input via:
 
 For CLI-style programs that expect `argv_v1`, pass process args after `--` and `x07 run` will encode them into input bytes:
 
-- `x07 run --profile test -- tool --help`
-- `x07 run --profile os -- tool --url https://example.com --depth 2 --out out/results.txt`
+- `x07 run -- tool --help`
+- `x07 run --profile sandbox -- tool --url https://example.com --depth 2 --out out/results.txt`
 
 ## Output contract
 
-- Default output is a pass-through runner report JSON object on stdout:
-  - `x07-host-runner.report@...` for `solve-*`
-  - `x07-os-runner.report@...` for `run-os*`
-- Parse based on `schema_version`.
+- Default output is a runner report JSON object on stdout (parse based on `schema_version`).
 
 Optional wrapper (debuggable resolution envelope):
 

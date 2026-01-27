@@ -1,7 +1,7 @@
 {
-  "suite_id": "phaseH2-suite@0.1.0",
+  "suite_id": "stdlib-parity-suite@0.1.0",
   "world": "solve-rr",
-  "fixture_root": "ci/fixtures/bench/rr/solve-rr/phaseH2-suite-rr@0.1.0",
+  "fixture_root": "ci/fixtures/bench/rr/solve-rr/stdlib-parity-suite-rr@0.1.0",
   "rr_index": "index.json",
   "tasks": [
     {

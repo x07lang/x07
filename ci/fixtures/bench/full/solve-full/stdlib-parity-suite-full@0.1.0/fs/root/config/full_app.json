@@ -1,5 +1,5 @@
 {
-  "report": "phaseH2_full",
+  "report": "stdlib_parity_full",
   "local_scores": "data/scores.csv",
   "local_events": "data/events.jsonl",
   "user_keys": [

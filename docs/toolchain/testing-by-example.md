@@ -1,12 +1,12 @@
 # Testing by example (`x07 test` + `std.test`)
 
-This page is a hands-on tutorial for the built-in deterministic test harness.
+This page is a hands-on tutorial for the built-in test harness.
 
 `x07 test` is designed for agents:
 
 - a single canonical command
 - stable, machine-readable JSON report output (`x07.x07test@0.2.0`)
-- deterministic execution in solve worlds
+- runs inside OS worlds (`run-os` / `run-os-sandboxed`)
 
 Companion example (in the `x07` repo):
 
@@ -14,23 +14,17 @@ Companion example (in the `x07` repo):
 
 ## What `x07 test` runs (and what it does not)
 
-`x07 test` runs tests in deterministic solve worlds:
+`x07 test` runs exported X07 functions (typically returning `result_i32`) that use `std.test` assertions.
 
-- `solve-pure`
-- `solve-fs` (read-only fixture filesystem)
-- `solve-rr` (fixture request/response replay)
-- `solve-kv` (fixture key/value store)
-- `solve-full` (combined fixtures)
-
-`x07 test` does **not** run OS-world integration tests (`run-os` / `run-os-sandboxed`). For OS-world smoke tests, use `x07 run` in CI and assert on the runner report.
+It is not a general-purpose integration-test runner for external binaries. For full end-to-end checks, run your program via `x07 run` (or bundle a native binary via `x07 bundle`) in CI and assert on the runner report.
 
 ## The three artifacts of testing
 
 1. A test entry function (exported), typically returning `result_i32`.
 2. A tests manifest (`tests/tests.json`) describing which entrypoints to run.
-3. Optional fixtures (`tests/fixtures/...`) for worlds like `solve-fs` or `solve-kv`.
+3. (Optional) Test-only modules under `tests/` (kept separate from your production modules).
 
-## Example project (pure + solve-fs)
+## Example project (single smoke test)
 
 Create a project:
 
@@ -40,14 +34,12 @@ cd testing-demo
 x07 init
 ```
 
-### Step 1: add world-specific test modules
+`x07 init` creates:
 
-World-gating is enforced at compile time. If a module calls `fs.*` anywhere, it cannot be compiled in `solve-pure`.
+- `tests/smoke.x07.json` with one exported test (`smoke.pass`)
+- `tests/tests.json` listing that test in `run-os`
 
-Keep solve-world tests in separate modules based on the capabilities they use:
-
-- `tests/smoke.x07.json` (solve-pure)
-- `tests/smoke_fs.x07.json` (solve-fs)
+### Step 1: add a real assertion
 
 Replace `tests/smoke.x07.json` with:
 
@@ -74,44 +66,7 @@ Replace `tests/smoke.x07.json` with:
 }
 ```
 
-Create `tests/smoke_fs.x07.json`:
-
-```json
-{
-  "schema_version": "x07.x07ast@0.2.0",
-  "kind": "module",
-  "module_id": "smoke_fs",
-  "imports": ["std.test", "std.fs"],
-  "decls": [
-    { "kind": "export", "names": ["smoke_fs.reads_fixture"] },
-    {
-      "kind": "defn",
-      "name": "smoke_fs.reads_fixture",
-      "params": [],
-      "result": "result_i32",
-      "body": [
-        "begin",
-        ["let", "p", ["bytes.lit", "hello.txt"]],
-        ["let", "b", ["std.fs.read", ["bytes.view", "p"]]],
-        ["let", "expected", ["bytes.concat", ["bytes.lit", "Hello_fixture"], ["bytes1", 10]]],
-        ["try", ["std.test.assert_bytes_eq", "b", "expected", ["std.test.code_assert_bytes_eq"]]],
-        ["std.test.pass"]
-      ]
-    }
-  ]
-}
-```
-
-### Step 2: add fixture data
-
-Create:
-
-```bash
-mkdir -p tests/fixtures/fs_read
-printf 'Hello_fixture\n' > tests/fixtures/fs_read/hello.txt
-```
-
-### Step 3: write the tests manifest
+### Step 2: write the tests manifest
 
 Replace `tests/tests.json` with:
 
@@ -119,24 +74,14 @@ Replace `tests/tests.json` with:
 {
   "schema_version": "x07.tests_manifest@0.1.0",
   "tests": [
-    { "id": "pure_add", "world": "solve-pure", "entry": "smoke.pure_add", "expect": "pass" },
-    {
-      "id": "fs_read",
-      "world": "solve-fs",
-      "fixture_root": "fixtures/fs_read",
-      "entry": "smoke_fs.reads_fixture",
-      "expect": "pass"
-    }
+    { "id": "pure_add", "world": "run-os", "entry": "smoke.pure_add", "expect": "pass" }
   ]
 }
 ```
 
-Notes:
+If you want your unit tests to run under the sandboxed world, change `world` to `run-os-sandboxed` and keep tests pure (no filesystem/network I/O) unless you also provide a policy-driven integration harness.
 
-- `fixture_root` is resolved relative to the manifest directory (`tests/` here).
-- In the test, file paths are relative to the fixture root.
-
-### Step 4: run tests
+### Step 3: run tests
 
 ```bash
 x07 test --manifest tests/tests.json

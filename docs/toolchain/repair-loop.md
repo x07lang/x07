@@ -1,8 +1,6 @@
 # Repair loop (canonical agent workflow)
 
-X07 tooling is designed so agents can converge on a correct program by iterating over structured outputs (diagnostics, quickfixes, JSON Patch) in a deterministic world.
-
-Prefer running the repair loop in `solve-pure` (or another `solve-*` world) so failures are reproducible.
+X07 tooling is designed so agents can converge on a correct program by iterating over structured outputs (diagnostics, quickfixes, JSON Patch).
 
 ## Automatic repair (recommended)
 
@@ -28,7 +26,7 @@ x07 fmt --input src/main.x07.json --write --report-json
 ### 2) Lint (collect diagnostics)
 
 ```bash
-x07 lint --input src/main.x07.json --world solve-pure --report-json
+x07 lint --input src/main.x07.json --report-json
 ```
 
 If you want the raw diagnostics report (instead of the tool wrapper), omit `--report-json`.
@@ -36,7 +34,7 @@ If you want the raw diagnostics report (instead of the tool wrapper), omit `--re
 ### 3) Apply quickfixes (when available)
 
 ```bash
-x07 fix --input src/main.x07.json --world solve-pure --write --report-json
+x07 fix --input src/main.x07.json --write --report-json
 ```
 
 Notes:
@@ -56,14 +54,14 @@ x07 ast apply-patch --in src/main.x07.json --patch patch.json --out src/main.x07
 
 ```bash
 x07 fmt --input src/main.x07.json --write --report-json
-x07 lint --input src/main.x07.json --world solve-pure --report-json
+x07 lint --input src/main.x07.json --report-json
 ```
 
 Repeat until lint is green.
 
 ## Validate at the project level
 
-After the single-file loop is clean, run the deterministic test harness:
+After the single-file loop is clean, run the test harness:
 
 ```bash
 x07 test --manifest tests/tests.json

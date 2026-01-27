@@ -1,0 +1,13 @@
+{
+  "bundle_id": "abi-types@0.1.0",
+  "description": "ABI/types baseline suite for solve-pure.",
+  "pre_score_canaries": [
+    "labs/benchmarks/solve-pure/abi-types-smoke.json"
+  ],
+  "score_suites": [
+    "labs/benchmarks/solve-pure/abi-types-suite.json"
+  ],
+  "debug_suites": [
+    "labs/benchmarks/solve-pure/abi-types-debug-suite.json"
+  ]
+}

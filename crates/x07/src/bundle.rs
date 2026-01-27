@@ -34,7 +34,8 @@ pub struct BundleArgs {
     #[arg(long, value_name = "NAME")]
     pub profile: Option<String>,
 
-    #[arg(long, value_enum)]
+    /// Override the resolved world (advanced; prefer `--profile`).
+    #[arg(long, value_enum, hide = true)]
     pub world: Option<WorldId>,
 
     /// Output path. If a directory, the binary name defaults to `app`.
@@ -484,7 +485,7 @@ fn resolve_world(
             .with_context(|| format!("invalid project world {:?}", manifest.world))?;
         return Ok(world);
     }
-    Ok(WorldId::SolvePure)
+    Ok(WorldId::RunOs)
 }
 
 fn resolve_out_path(

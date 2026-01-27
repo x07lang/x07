@@ -150,7 +150,7 @@ fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str]
 
 fn template_default_profile(template: InitTemplate) -> &'static str {
     match template {
-        InitTemplate::Cli => "test",
+        InitTemplate::Cli => "os",
         InitTemplate::HttpClient
         | InitTemplate::WebService
         | InitTemplate::FsTool
@@ -240,10 +240,15 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
         tests_smoke: root.join("tests").join("smoke.x07.json"),
     };
 
-    let policy_path = args.template.map(|t| {
-        let pt = init_template_policy_template(t);
-        root.join(crate::policy::default_base_policy_rel_path(pt))
-    });
+    let (default_profile, policy_template) = match args.template {
+        Some(t) => (
+            template_default_profile(t),
+            init_template_policy_template(t),
+        ),
+        None => ("os", crate::policy::PolicyTemplate::Cli),
+    };
+    let should_create_policy = default_profile == "sandbox";
+    let policy_path = root.join(crate::policy::default_base_policy_rel_path(policy_template));
 
     let mut conflicts = Vec::new();
     let required_paths: [&PathBuf; 6] = [
@@ -259,10 +264,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
             conflicts.push(rel(&root, p));
         }
     }
-    if let Some(p) = &policy_path {
-        if p.exists() {
-            conflicts.push(rel(&root, p));
-        }
+    if should_create_policy && policy_path.exists() {
+        conflicts.push(rel(&root, &policy_path));
     }
     if !conflicts.is_empty() {
         let report = InitReport {
@@ -430,22 +433,20 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
         }
     }
 
-    if let Some(t) = args.template {
-        let Some(policy_path) = &policy_path else {
-            unreachable!("policy_path set when template is present");
-        };
-        let pt = init_template_policy_template(t);
-        let policy_bytes = crate::policy::render_base_policy_template_bytes(pt, None)?;
-        if let Err(err) = write_new_file(policy_path, &policy_bytes) {
+    if should_create_policy {
+        let policy_bytes = crate::policy::render_base_policy_template_bytes(policy_template, None)?;
+        if let Err(err) = write_new_file(&policy_path, &policy_bytes) {
             return print_io_error(
                 &root,
                 &created,
-                crate::policy::default_base_policy_rel_path(pt),
+                crate::policy::default_base_policy_rel_path(policy_template),
                 err,
             );
         }
-        created.push(rel(&root, policy_path));
+        created.push(rel(&root, &policy_path));
+    }
 
+    if args.template.is_some() {
         // Resolve/fetch dependencies and write an up-to-date lockfile.
         let lock_args = crate::pkg::LockArgs {
             project: paths.project.clone(),
@@ -789,7 +790,7 @@ fn write_new_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 fn project_json_bytes(template: Option<InitTemplate>, deps: &[PkgRef]) -> Result<Vec<u8>> {
     let (default_profile, policy_template) = match template {
-        None => ("test", crate::policy::PolicyTemplate::Cli),
+        None => ("os", crate::policy::PolicyTemplate::Cli),
         Some(t) => (
             template_default_profile(t),
             init_template_policy_template(t),
@@ -821,7 +822,7 @@ fn project_json_bytes(template: Option<InitTemplate>, deps: &[PkgRef]) -> Result
                 "schema_version".to_string(),
                 Value::String(PROJECT_MANIFEST_SCHEMA_VERSION.to_string()),
             ),
-            ("world".to_string(), Value::String("solve-pure".to_string())),
+            ("world".to_string(), Value::String("run-os".to_string())),
             (
                 "entry".to_string(),
                 Value::String("src/main.x07.json".to_string()),
@@ -843,14 +844,6 @@ fn project_json_bytes(template: Option<InitTemplate>, deps: &[PkgRef]) -> Result
                 "profiles".to_string(),
                 Value::Object(
                     [
-                        (
-                            "test".to_string(),
-                            Value::Object(
-                                [("world".to_string(), Value::String("solve-pure".to_string()))]
-                                    .into_iter()
-                                    .collect(),
-                            ),
-                        ),
                         (
                             "os".to_string(),
                             Value::Object(
@@ -911,7 +904,7 @@ fn package_project_json_bytes(entry_rel: &str) -> Result<Vec<u8>> {
                 "schema_version".to_string(),
                 Value::String(PROJECT_MANIFEST_SCHEMA_VERSION.to_string()),
             ),
-            ("world".to_string(), Value::String("solve-pure".to_string())),
+            ("world".to_string(), Value::String("run-os".to_string())),
             ("entry".to_string(), Value::String(entry_rel.to_string())),
             (
                 "module_roots".to_string(),
@@ -986,18 +979,10 @@ fn package_json_bytes(name: &str, ids: &PackageIds) -> Result<Vec<u8>> {
                         (
                             "worlds_allowed".to_string(),
                             Value::Array(
-                                [
-                                    "solve-pure",
-                                    "solve-fs",
-                                    "solve-rr",
-                                    "solve-kv",
-                                    "solve-full",
-                                    "run-os",
-                                    "run-os-sandboxed",
-                                ]
-                                .into_iter()
-                                .map(|s| Value::String(s.to_string()))
-                                .collect(),
+                                ["run-os", "run-os-sandboxed"]
+                                    .into_iter()
+                                    .map(|s| Value::String(s.to_string()))
+                                    .collect(),
                             ),
                         ),
                         (
@@ -1488,7 +1473,7 @@ fn package_tests_manifest_bytes(test_entry: &str) -> Result<Vec<u8>> {
                 Value::Array(vec![Value::Object(
                     [
                         ("id".to_string(), Value::String("hello_v1".to_string())),
-                        ("world".to_string(), Value::String("solve-pure".to_string())),
+                        ("world".to_string(), Value::String("run-os".to_string())),
                         ("entry".to_string(), Value::String(test_entry.to_string())),
                         ("expect".to_string(), Value::String("pass".to_string())),
                     ]
@@ -1520,7 +1505,7 @@ fn tests_manifest_bytes() -> Result<Vec<u8>> {
                 Value::Array(vec![Value::Object(
                     [
                         ("id".to_string(), Value::String("smoke/pass".to_string())),
-                        ("world".to_string(), Value::String("solve-pure".to_string())),
+                        ("world".to_string(), Value::String("run-os".to_string())),
                         ("entry".to_string(), Value::String("smoke.pass".to_string())),
                         ("expect".to_string(), Value::String("pass".to_string())),
                     ]

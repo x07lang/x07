@@ -1,7 +1,7 @@
 {
-  "suite_id": "phaseH2-collections-suite@0.1.0",
+  "suite_id": "stdlib-parity-collections-suite@0.1.0",
   "world": "solve-pure",
-  "fixture_root": "ci/fixtures/bench/pure/solve-pure/phaseH2-collections-suite-pure@0.1.0",
+  "fixture_root": "ci/fixtures/bench/pure/solve-pure/stdlib-parity-collections-suite-pure@0.1.0",
   "tasks": [
     {
       "task_id": "pure/collections_small_map_bytes_u32_smoke",

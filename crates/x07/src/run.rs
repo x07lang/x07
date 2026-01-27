@@ -49,7 +49,8 @@ pub struct RunArgs {
     #[arg(long, value_name = "PATH")]
     pub artifact: Option<PathBuf>,
 
-    #[arg(long, value_enum)]
+    /// Override the resolved world (advanced; prefer `--profile`).
+    #[arg(long, value_enum, hide = true)]
     pub world: Option<WorldId>,
 
     /// Run profile name (resolved from `x07.json.profiles`).
@@ -283,8 +284,8 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
     )?;
     let runner = resolve_runner(&args, selected_profile.as_ref(), world)?;
     let runner_bin = match runner {
-        RunnerKind::Host => resolve_sibling_or_path("x07-host-runner"),
-        RunnerKind::Os => resolve_sibling_or_path("x07-os-runner"),
+        RunnerKind::Host => crate::util::resolve_sibling_or_path("x07-host-runner"),
+        RunnerKind::Os => crate::util::resolve_sibling_or_path("x07-os-runner"),
     };
 
     let cc_profile = resolve_cc_profile(&args, selected_profile.as_ref());
@@ -873,7 +874,7 @@ fn resolve_world(
             .with_context(|| format!("invalid project world {:?}", manifest.world))?;
         return Ok(world);
     }
-    Ok(WorldId::SolvePure)
+    Ok(WorldId::RunOs)
 }
 
 fn resolve_runner(
@@ -1003,45 +1004,6 @@ pub(crate) fn discover_project_manifest(start: &Path) -> Result<Option<PathBuf>>
         dir = d.parent();
     }
     Ok(None)
-}
-
-fn resolve_sibling_or_path(name: &str) -> PathBuf {
-    let Ok(exe) = std::env::current_exe() else {
-        return PathBuf::from(name);
-    };
-    let Some(dir) = exe.parent() else {
-        return PathBuf::from(name);
-    };
-
-    let mut candidates = Vec::new();
-
-    let mut cand = dir.join(name);
-    if cfg!(windows) {
-        cand.set_extension("exe");
-    }
-    candidates.push(cand);
-
-    if dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| n == "deps")
-    {
-        if let Some(parent) = dir.parent() {
-            let mut cand = parent.join(name);
-            if cfg!(windows) {
-                cand.set_extension("exe");
-            }
-            candidates.push(cand);
-        }
-    }
-
-    for cand in candidates {
-        if cand.is_file() {
-            return cand;
-        }
-    }
-
-    PathBuf::from(name)
 }
 
 fn prepare_input_flag(

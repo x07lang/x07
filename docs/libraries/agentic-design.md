@@ -91,7 +91,7 @@ What it must not do.
 
 ## Tooling commands
 - format: `x07 fmt --input <file.x07.json> --check`
-- lint: `x07 lint --input <file.x07.json> --world solve-pure`
+- lint: `x07 lint --input <file.x07.json>`
 - test: `x07 test --manifest tests/tests.json`
 - bench (optional): `<project-specific bench command>`
 

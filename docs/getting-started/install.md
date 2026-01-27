@@ -4,8 +4,7 @@ X07 ships as a small toolchain with stable, JSON-first contracts:
 
 - `x07` — canonical CLI (init, ast, fmt/lint/fix, run, test, pkg, build)
 - `x07c` — compiler backend (advanced)
-- `x07-host-runner` — deterministic runner backend (solve-* worlds; advanced)
-- `x07-os-runner` — OS runner backend (run-os* worlds; advanced)
+- `x07-os-runner` — OS execution backend (advanced)
 
 The recommended installer is `x07up` (toolchain manager). It installs:
 
@@ -88,14 +87,14 @@ Verify:
 - `x07 ast apply-patch --help`
 - `x07 doctor` (host prerequisites for OS worlds)
 - `x07up doctor --json` (installer/toolchain + host prerequisites)
-- optional (advanced): `x07c --help`, `x07-host-runner --help`, `x07-os-runner --help`
+- optional (advanced): `x07c --help`, `x07-os-runner --help`
 
 ### Pin a toolchain per project
 
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.0.54
+x07up override set v0.0.55
 ```
 
 This makes toolchain selection deterministic for agents and CI.
@@ -108,7 +107,7 @@ If you cannot use `x07up`, download and unpack a toolchain archive and put its `
 
 If you have `cargo` installed:
 
-- `cargo build -p x07 -p x07c -p x07-host-runner -p x07-os-runner --release`
+- `cargo build -p x07 -p x07c -p x07-os-runner --release`
 - the resulting binaries will be in `target/release/`
 
 Then verify with the same commands above.
@@ -135,7 +134,7 @@ Install:
 
 ### “I can run `x07` but `x07 run` fails”
 
-`x07 run` dispatches to `x07-host-runner` / `x07-os-runner`.
+`x07 run` invokes runner backends that ship with the toolchain.
 
 - ensure the runner binaries are on your `PATH` (or installed next to `x07`)
 - ensure a working C compiler is available (override via `X07_CC`)

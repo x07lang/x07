@@ -1,5 +1,5 @@
 {
-  "suite_id": "phaseH1-suite@0.1.0",
+  "suite_id": "abi-types-suite@0.1.0",
   "world": "solve-pure",
   "tasks": [
     {

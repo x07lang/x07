@@ -75,5 +75,3 @@ Database query results are returned as **DataModel** documents, so you can:
 ## Expert appendix
 
 - Add packages manually (advanced): pick NAME@VERSION from `/agent/latest/catalog/capabilities.json` and run `x07 pkg add NAME@VERSION --sync`.
-- Debug runner behavior directly:
-  - OS worlds: `x07-os-runner --project x07.json --world run-os`

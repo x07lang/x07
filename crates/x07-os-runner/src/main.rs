@@ -291,16 +291,29 @@ fn try_main() -> Result<std::process::ExitCode> {
                 .unwrap_or_else(|| Path::new("."));
             let mut extra_cc_args = manifest.link.cc_args(base);
             let lock_path = project::default_lockfile_path(project_path, &manifest);
-            let lock_bytes = std::fs::read(&lock_path)
-                .with_context(|| format!("read lockfile: {}", lock_path.display()))?;
-            let lock: project::Lockfile = serde_json::from_slice(&lock_bytes)
-                .with_context(|| format!("parse lockfile: {}", lock_path.display()))?;
+            let lock_bytes = std::fs::read(&lock_path).with_context(|| {
+                format!(
+                    "[X07LOCK_READ] read lockfile: {} (hint: run `x07 pkg lock`)",
+                    lock_path.display()
+                )
+            })?;
+            let lock: project::Lockfile =
+                serde_json::from_slice(&lock_bytes).with_context(|| {
+                    format!(
+                        "[X07LOCK_PARSE] parse lockfile JSON: {} (hint: run `x07 pkg lock`)",
+                        lock_path.display()
+                    )
+                })?;
             project::verify_lockfile(project_path, &manifest, &lock)?;
 
             let entry_path = base.join(&manifest.entry);
 
-            let program = std::fs::read(&entry_path)
-                .with_context(|| format!("read entry: {}", entry_path.display()))?;
+            let program = std::fs::read(&entry_path).with_context(|| {
+                format!(
+                    "[X07ENTRY_READ] read entry: {} (hint: check x07.json `entry`)",
+                    entry_path.display()
+                )
+            })?;
 
             let mut module_roots = project::collect_module_roots(project_path, &manifest, &lock)?;
             let os_roots = os_paths::default_os_module_roots()?;

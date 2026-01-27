@@ -28,7 +28,8 @@ pub struct FmtArgs {
 pub struct LintArgs {
     #[arg(long)]
     pub input: PathBuf,
-    #[arg(long, value_enum, default_value_t = WorldId::SolvePure)]
+    /// Lint world gating (advanced; the public surface defaults to `run-os`).
+    #[arg(long, value_enum, default_value_t = WorldId::RunOs, hide = true)]
     pub world: WorldId,
     #[arg(long)]
     pub report_json: bool,
@@ -38,7 +39,8 @@ pub struct LintArgs {
 pub struct FixArgs {
     #[arg(long)]
     pub input: PathBuf,
-    #[arg(long, value_enum, default_value_t = WorldId::SolvePure)]
+    /// Fix world gating (advanced; the public surface defaults to `run-os`).
+    #[arg(long, value_enum, default_value_t = WorldId::RunOs, hide = true)]
     pub world: WorldId,
     #[arg(long)]
     pub write: bool,

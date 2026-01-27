@@ -215,14 +215,8 @@ pub fn load_project_manifest(path: &Path) -> Result<ProjectManifest> {
             m.schema_version
         );
     }
-    let world = crate::world_config::parse_world_id(&m.world)
+    crate::world_config::parse_world_id(&m.world)
         .with_context(|| format!("invalid project world {:?}", m.world))?;
-    if !world.is_eval_world() {
-        anyhow::bail!(
-            "project world must be a deterministic solve world, got {:?}",
-            m.world
-        );
-    }
     if m.entry.trim().is_empty() {
         anyhow::bail!("project entry must be non-empty");
     }

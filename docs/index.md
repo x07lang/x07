@@ -4,10 +4,9 @@ X07 is an **agent-first systems language**: it’s designed so autonomous coding
 
 Most languages optimize for human ergonomics (expressiveness, many equivalent ways to write the same thing). X07 optimizes for:
 
-- **Deterministic behavior** (especially in test worlds), so agents can trust feedback.
 - **Canonical representations** (bytes encodings, module layouts, request formats), so “the same intent” produces “the same shape”.
 - **LLM-oriented diagnostics** (structured, code-stable error IDs + machine-applicable fixes).
-- **Separation of concerns by world**: deterministic fixtures for testing vs OS-backed worlds for real work.
+- **World-based capability modeling** (especially for OS access), so agents can run safely with explicit intent.
 
 ## The mental model
 
@@ -38,15 +37,11 @@ Instead of 5 equivalent ways to read a file, split strings, build output, or han
 
 This reduces “LLM confusion” and makes programs and patches more uniform.
 
-### 2) Deterministic-by-default testing worlds
+### 2) Policy-gated OS execution
 
-X07’s *fixture worlds* allow repeatable tests: filesystem trees, request/response cassettes, key/value stores, virtual time, and resource budgets are stable across runs.
+When you need real OS resources (real network, real disk, real time), use `run-os` or `run-os-sandboxed`.
 
-That’s how you get:
-
-- trustworthy regressions,
-- deterministic replay,
-- cheap automated repair loops.
+`run-os-sandboxed` is governed by explicit policy files (it is not a hardened sandbox).
 
 ### 3) Production worlds are opt-in
 
@@ -66,7 +61,6 @@ When you need real OS resources (real network, real disk, real time), you switch
   - [Concurrency & multiprocessing](language/concurrency-multiprocessing.md)
 - Worlds:
   - [Worlds overview](worlds/index.md)
-  - [Deterministic fixture worlds](worlds/fixture-worlds.md)
   - [OS worlds & sandbox policy](worlds/os-worlds.md)
 - Toolchain:
   - [CLI](toolchain/cli.md)

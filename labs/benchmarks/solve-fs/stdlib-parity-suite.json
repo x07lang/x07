@@ -1,7 +1,7 @@
 {
-  "suite_id": "phaseH2-suite@0.1.0",
+  "suite_id": "stdlib-parity-suite@0.1.0",
   "world": "solve-fs",
-  "fixture_root": "ci/fixtures/bench/fs/solve-fs/phaseH2-suite-fs@0.1.0",
+  "fixture_root": "ci/fixtures/bench/fs/solve-fs/stdlib-parity-suite-fs@0.1.0",
   "fs_root": "root",
   "fs_latency_index": "latency.json",
   "tasks": [

@@ -285,7 +285,7 @@ fn try_join_and_channel_try_ops_work_in_defn() {
 
 #[test]
 fn solve_fs_read_respects_latency_index() {
-    let fixture = create_temp_dir("x07_phaseG2_fs");
+    let fixture = create_temp_dir("x07_concurrency_smoke_fs");
     std::fs::create_dir_all(fixture.join("root").join("data")).expect("mkdir data");
     std::fs::write(fixture.join("root/data/a.txt"), b"hello").expect("write a.txt");
     std::fs::write(
@@ -323,7 +323,7 @@ fn solve_fs_read_respects_latency_index() {
 
 #[test]
 fn solve_fs_open_read_and_io_read_respect_latency_index() {
-    let fixture = create_temp_dir("x07_phaseG2_fs");
+    let fixture = create_temp_dir("x07_concurrency_smoke_fs");
     std::fs::create_dir_all(fixture.join("root").join("data")).expect("mkdir data");
     std::fs::write(fixture.join("root/data/a.txt"), b"hello").expect("write a.txt");
     std::fs::write(
@@ -368,7 +368,7 @@ fn solve_fs_open_read_and_io_read_respect_latency_index() {
 
 #[test]
 fn solve_fs_concurrent_io_read_makespan_is_max_latency() {
-    let fixture = create_temp_dir("x07_phaseG2_fs");
+    let fixture = create_temp_dir("x07_concurrency_smoke_fs");
     std::fs::create_dir_all(fixture.join("root").join("data")).expect("mkdir data");
     std::fs::write(fixture.join("root/data/a.txt"), b"A").expect("write a.txt");
     std::fs::write(fixture.join("root/data/b.txt"), b"B").expect("write b.txt");
@@ -442,7 +442,7 @@ fn solve_fs_concurrent_io_read_makespan_is_max_latency() {
 
 #[test]
 fn solve_fs_bufread_fill_and_consume_work() {
-    let fixture = create_temp_dir("x07_phaseG2_fs");
+    let fixture = create_temp_dir("x07_concurrency_smoke_fs");
     std::fs::create_dir_all(fixture.join("root").join("data")).expect("mkdir data");
     std::fs::write(fixture.join("root/data/a.txt"), b"abc").expect("write a.txt");
     std::fs::write(
@@ -499,7 +499,7 @@ fn solve_fs_bufread_fill_and_consume_work() {
 
 #[test]
 fn solve_rr_send_and_io_read_respect_latency_index() {
-    let fixture = create_temp_dir("x07_phaseG2_rr");
+    let fixture = create_temp_dir("x07_concurrency_smoke_rr");
     std::fs::create_dir_all(fixture.join("bodies")).expect("mkdir bodies");
     std::fs::write(fixture.join("bodies/A.bin"), b"HELLO").expect("write A.bin");
     std::fs::write(
@@ -543,7 +543,7 @@ fn solve_rr_send_and_io_read_respect_latency_index() {
 
 #[test]
 fn solve_kv_get_and_get_stream_respect_latency_index() {
-    let fixture = create_temp_dir("x07_phaseG2_kv");
+    let fixture = create_temp_dir("x07_concurrency_smoke_kv");
     std::fs::write(
         fixture.join("seed.json"),
         br#"{"format":"x07.kv.seed@0.1.0","default_latency_ticks":0,"entries":[{"key_b64":"YQ==","value_b64":"AQIDBA==","latency_ticks":25}]}"#,

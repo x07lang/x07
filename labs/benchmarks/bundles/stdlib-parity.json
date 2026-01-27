@@ -1,0 +1,17 @@
+{
+  "bundle_id": "stdlib-parity@0.1.0",
+  "description": "Stdlib parity suite across pure and deterministic fixture worlds.",
+  "pre_score_canaries": [
+    "labs/benchmarks/solve-full/stdlib-parity-smoke.json",
+    "labs/benchmarks/solve-pure/emitters-v1-suite.json"
+  ],
+  "score_suites": [
+    "labs/benchmarks/solve-pure/stdlib-parity-suite.json",
+    "labs/benchmarks/solve-pure/stdlib-parity-collections-suite.json",
+    "labs/benchmarks/solve-fs/stdlib-parity-suite.json",
+    "labs/benchmarks/solve-rr/stdlib-parity-suite.json",
+    "labs/benchmarks/solve-kv/stdlib-parity-suite.json",
+    "labs/benchmarks/solve-full/stdlib-parity-suite.json"
+  ],
+  "debug_suites": []
+}

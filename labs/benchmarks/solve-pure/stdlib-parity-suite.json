@@ -1,7 +1,7 @@
 {
-  "suite_id": "phaseH2-suite@0.1.0",
+  "suite_id": "stdlib-parity-suite@0.1.0",
   "world": "solve-pure",
-  "fixture_root": "ci/fixtures/bench/pure/solve-pure/phaseH2-suite-pure@0.1.0",
+  "fixture_root": "ci/fixtures/bench/pure/solve-pure/stdlib-parity-suite-pure@0.1.0",
   "tasks": [
     {
       "task_id": "pure/text_word_freq_sorted",

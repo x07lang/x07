@@ -63,11 +63,8 @@ To discover available packages and versions, use the registry catalog:
    # If your project defines profiles (recommended):
    x07 run --profile os -- <your-cli-args...>
 
-   # Advanced: provide input bytes directly (for fixtures)
+   # Advanced: provide input bytes directly
    x07 run --profile os --input input.bin
-
-   # Otherwise (explicit world selection):
-   x07 run --project x07.json --world run-os -- <your-cli-args...>
    ```
 
 System prerequisites depend on platform (for example, `libcurl` + `openssl` dev packages on Linux; Homebrew `openssl@3` on macOS).
@@ -85,7 +82,7 @@ System prerequisites depend on platform (for example, `libcurl` + `openssl` dev 
 2. Run with explicit destinations (materializes a derived policy under `.x07/policies/_generated/`):
 
    ```bash
-   x07 run --world run-os-sandboxed \
+   x07 run --profile sandbox \
      --policy .x07/policies/base/http-client.sandbox.base.policy.json \
      --allow-host example.com:443 \
      -- <your-cli-args...>
@@ -93,18 +90,12 @@ System prerequisites depend on platform (for example, `libcurl` + `openssl` dev 
 
 If you edit a net-enabled base policy manually, keep `net.allow_dns: true` (required by the curl shim) and use `--allow-host` / `--deny-host` for destinations.
 
-## Deterministic tests
+## Testing
 
-Networking logic should be tested through:
+- Unit-test pure request/response transforms with `x07 test`.
+- Smoke-test networking with `x07 run --profile sandbox --allow-host ...` in CI.
 
-- fixture cassettes (request/response replay), or
-- pure request/response transforms.
+## Expert (native deps + policy details)
 
-See `examples/agent-gate/web-crawler-local` in the `x07` repo for an end-to-end sandboxed crawler that runs against a local fixture site (no public internet).
-
-## Expert appendix
-
-- Add packages manually (advanced): pick NAME@VERSION from `/agent/latest/catalog/capabilities.json` and run `x07 pkg add NAME@VERSION --sync`.
-- Debug runner behavior directly:
-  - solve worlds: `x07-host-runner --project x07.json`
-  - OS worlds: `x07-os-runner --project x07.json --world run-os`
+- If `x07 doctor` reports link errors, install the system development packages for your TLS/HTTP stack (for example, libcurl + OpenSSL headers) and re-run `x07 doctor`.
+- Keep destination control at the CLI level with `--allow-host` / `--deny-host`; treat the base policy as a deny-by-default starting point.

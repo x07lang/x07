@@ -36,44 +36,37 @@ Executables produced by the X07 runners use a simple byte framing:
 - stdout: `u32_le(len)` then `len` bytes
 - stderr: JSON stats
 
-`x07 run`, `x07-host-runner`, and `x07-os-runner` handle this framing automatically.
+`x07 run` handles this framing automatically.
 
 This “framed I/O” executable ABI is designed for machine-driven execution. If you want a normal end-user CLI binary (no framing, standard `argc/argv`, raw stdout) use `x07 bundle`.
 
-## Pick a world (deterministic vs OS)
+## Pick a profile (recommended)
 
-Worlds:
-
-- Deterministic evaluation worlds: `solve-pure`, `solve-fs`, `solve-rr`, `solve-kv`, `solve-full`
-- OS worlds: `run-os`, `run-os-sandboxed` (policy-gated; not a hardened sandbox)
-
-Recommended: define intent-driven profiles in your project (`x07.json.default_profile` + `x07.json.profiles`) and use:
+For almost all end-user usage, pick intent-driven profiles in your project (`x07.json.default_profile` + `x07.json.profiles`) and use:
 
 - `x07 run` (uses `default_profile`)
 - `x07 run --profile os`
 - `x07 run --profile sandbox`
 
+Profiles resolve to a world (`run-os` or `run-os-sandboxed`) plus optional policy and resource defaults.
+
 World resolution precedence is:
 
-1. `--world ...`
-2. `--os` / `--host` (legacy shorthand; prefer `--profile` or `--world`)
-3. `--profile ...` (or `default_profile`)
-4. project manifest `world`
-5. default: `solve-pure`
+1. `--world ...` (expert override; hidden from `x07 run --help`)
+2. `--profile ...` (or `default_profile`)
+3. project manifest `world`
+4. default: `run-os`
 
 ## Runner selection
 
 By default, `x07 run` chooses the runner from the selected world:
 
-- `solve-*` → `x07-host-runner`
 - `run-os*` → `x07-os-runner`
 
 You can override this with:
 
 - `--runner auto|host|os`
-- `--host` / `--os` (legacy shorthand; also affects world selection if `--world` is not set)
-
-The host runner is only valid for `solve-*` worlds, and the OS runner is only valid for `run-os*` worlds.
+- `--os` (legacy shorthand; also affects world selection if `--world` is not set)
 
 ## Provide input bytes
 
@@ -89,32 +82,15 @@ Input selection (highest precedence first):
 Example: pass CLI-style args via `argv_v1`:
 
 ```bash
-x07 run --profile os -- tool --help
+x07 run -- tool --help
 ```
-
-## Fixtures (solve-fs / solve-rr / solve-kv / solve-full)
-
-Fixture worlds require fixture directories. `x07 run` resolves them in this order:
-
-1. per-world flags like `--fixture-fs-dir`, `--fixture-rr-dir`, `--fixture-kv-dir`
-2. `--fixtures <dir>` (expands to `<dir>/fs`, `<dir>/rr`, `<dir>/kv` if they exist)
-3. under the project root: `.x07/fixtures/<kind>/` or `fixtures/<kind>/`
-
-Required fixture dirs:
-
-- `solve-fs` requires an `fs` fixture dir
-- `solve-rr` requires an `rr` fixture dir
-- `solve-kv` requires a `kv` fixture dir
-- `solve-full` requires all three
-
-See: [Fixture formats](../worlds/fixture-formats.md).
 
 ## Policies (run-os-sandboxed)
 
 `run-os-sandboxed` requires a base policy file:
 
 - via profile: `profiles.sandbox.policy`
-- or via CLI: `x07 run --world run-os-sandboxed --policy path/to/policy.json`
+- or via CLI: `x07 run --profile sandbox --policy path/to/policy.json`
 
 To generate a schema-valid starting policy, use `x07 policy init --template <...>` and then extend it for your app.
 
@@ -132,7 +108,6 @@ Common flags:
 - `--cc-profile default|size`
 - `--max-c-bytes <BYTES>`
 - `--compiled-out <PATH>` (write the produced runner executable; framed I/O)
-- `--compile-only` (deterministic `solve-*` worlds only; not valid with `--artifact`)
 - `--solve-fuel <N>`, `--max-memory-bytes <N>`, `--max-output-bytes <N>`, `--cpu-time-limit-seconds <N>`
 - `--auto-ffi` / `--no-auto-ffi` (OS worlds; collect/apply C FFI flags from dependencies)
 
@@ -159,7 +134,7 @@ The bundled binary encodes `argc/argv` to `argv_v1` input bytes and writes the p
 
 Report modes:
 
-- `--report runner` (default): pass through the runner JSON (`spec/x07-host-runner.report.schema.json` or `spec/x07-os-runner.report.schema.json`)
+- `--report runner` (default): pass through the runner JSON (`spec/x07-os-runner.report.schema.json`)
 - `--report wrapped`: wrap the runner JSON in `spec/x07-run.report.schema.json` (`schema_version: "x07.run.report@0.1.0"`)
 
 ### Common failure: unknown module (missing deps)

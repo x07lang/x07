@@ -14,17 +14,17 @@ These constraints are intended to keep autonomous agents convergent and reviews 
 
 ## Functional core, imperative shell
 
-- Keep deterministic logic (parsing/transform/encode) pure.
+- Keep core logic (parsing/transform/encode) pure.
 - Isolate effects (fs/net/process/time) behind world adapters, so behavior is capability-auditable.
 
 ## Ports and adapters
 
-- Use the same core logic with different adapters (fixture worlds vs OS worlds) without rewriting the core.
+- Use the same core logic with different adapters (unsandboxed vs sandboxed execution) without rewriting the core.
 
 ## Repairability
 
-- Make failures actionable: deterministic diagnostics, stable codes, and structured patches (JSON Patch) when feasible.
+- Make failures actionable: stable diagnostic codes, and structured patches (JSON Patch) when feasible.
 
-## Budgets and determinism
+## Budgets and policy
 
-- Treat fuel/memory/output budgets and determinism constraints as part of the design contract.
+- Treat fuel/memory/output budgets and sandbox policy as part of the design contract.

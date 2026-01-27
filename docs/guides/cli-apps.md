@@ -10,21 +10,21 @@ X07 is intended to make it easy for agents to build robust command-line tools.
    x07 init --template cli
    ```
 
-2. Keep business logic pure so it can be tested in deterministic worlds (`solve-*`).
+2. Keep business logic pure and isolate I/O behind adapters so it’s easy to test.
 3. Run via the single front door:
 
    ```bash
-   # Deterministic default (solve-* via x07.json profiles):
-   x07 run
-
    # OS CLI run (argv_v1 is derived from args after --):
-   x07 run --profile os -- tool --help
+   x07 run -- tool --help
+
+   # Policy-enforced run:
+   x07 run --profile sandbox -- tool --help
    ```
 
 4. Distribute a normal CLI binary (no toolchain required at runtime):
 
    ```bash
-   x07 bundle --profile os --out dist/tool
+   x07 bundle --out dist/tool
    ./dist/tool --help
    ```
 
@@ -55,18 +55,18 @@ x07 pkg add NAME@VERSION --sync
 When running under `x07 run`, you can either:
 
 - pass process args after `--` (recommended; `x07 run` encodes `argv_v1` into input bytes), or
-- provide `argv_v1` bytes directly via `--input` (advanced; useful for fixtures).
+- provide `argv_v1` bytes directly via `--input` (advanced).
 
 ### Canonical execution for CLI args: `x07 run -- <args...>`
 
 If your program expects `argv_v1`, pass process args after `--` and `x07 run` will encode them into input bytes automatically:
 
 ```bash
-x07 run --profile test -- tool --help
-x07 run --profile os -- tool --url https://example.com --depth 2 --out out/results.txt
+x07 run -- tool --help
+x07 run --profile sandbox -- tool --url https://example.com --depth 2 --out out/results.txt
 ```
 
-This eliminates the need to manually construct `--input` bytes for normal runs. `--input` remains available for fixture-based tests and advanced usage.
+This eliminates the need to manually construct `--input` bytes for normal runs. `--input` remains available for advanced usage.
 
 See also: `examples/agent-gate/cli-ext-cli` in the `x07` repo (CI-gated reference project).
 
@@ -77,19 +77,12 @@ See also: `examples/agent-gate/cli-ext-cli` in the `x07` repo (CI-gated referenc
 - `myapp.adapters` — OS I/O (fs/net/db)
 - `myapp.main` — thin wiring
 
-## Deterministic tests
+## Testing
 
-Even for CLI apps, keep tests deterministic:
+- Unit tests: `x07 test --manifest tests/tests.json`
+- Integration smoke tests: `x07 run --profile sandbox -- ...` in CI (assert on the runner report)
 
-- feed mocked input bytes
-- run in `solve-pure` or fixture worlds
-- assert exact output bytes
+## Expert (manual inputs + troubleshooting)
 
-Then separately smoke-test in OS world.
-
-## Expert appendix
-
-- Raw input bytes (fixtures): `x07 run --profile test --input input.bin`
-- Debug runner behavior directly (advanced):
-  - solve worlds: `x07-host-runner --project x07.json`
-  - OS worlds: `x07-os-runner --project x07.json --world run-os`
+- Prefer `x07 run -- <args...>` for normal runs; use `--input` only when you already have pre-encoded `argv_v1` bytes.
+- If `x07 bundle` output behaves differently than `x07 run`, check whether you’re relying on an implicit OS capability that should be expressed as an explicit policy.

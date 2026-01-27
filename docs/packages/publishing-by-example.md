@@ -136,7 +136,7 @@ non-empty `description` and `docs`.
   "modules": ["ext.acme_hello_demo", "ext.acme_hello_demo.tests"],
   "meta": {
     "determinism_tier": "pure",
-    "worlds_allowed": ["solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full", "run-os", "run-os-sandboxed"],
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
     "import_mode": "handwritten",
     "visibility": "experimental"
   }
@@ -151,7 +151,7 @@ non-empty `description` and `docs`.
 {
   "schema_version": "x07.tests_manifest@0.1.0",
   "tests": [
-    { "id": "hello_v1", "world": "solve-pure", "entry": "ext.acme_hello_demo.tests.test_hello_v1", "expect": "pass" }
+    { "id": "hello_v1", "world": "run-os", "entry": "ext.acme_hello_demo.tests.test_hello_v1", "expect": "pass" }
   ]
 }
 ```
@@ -161,7 +161,7 @@ It also generates a minimal `x07.json` so `x07 test` can automatically discover 
 ```json
 {
   "schema_version": "x07.project@0.2.0",
-  "world": "solve-pure",
+  "world": "run-os",
   "entry": "modules/ext/acme_hello_demo/tests.x07.json",
   "module_roots": ["modules"],
   "lockfile": "x07.lock.json",

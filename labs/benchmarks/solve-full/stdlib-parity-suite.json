@@ -1,11 +1,11 @@
 {
+  "suite_id": "stdlib-parity-suite@0.1.0",
   "world": "solve-full",
-  "fixture_root": "ci/fixtures/bench/full/solve-full/phaseH2-suite-full@0.1.0",
+  "fixture_root": "ci/fixtures/bench/full/solve-full/stdlib-parity-suite-full@0.1.0",
   "fs_root": "fs/root",
   "fs_latency_index": "fs/latency.json",
   "rr_index": "rr/index.json",
   "kv_seed": "kv/seed.json",
-  "suite_id": "phaseH2-smoke@0.1.0",
   "tasks": [
     {
       "task_id": "full/mini_app_report_v1",
@@ -66,6 +66,46 @@
       ]
     },
     {
+      "task_id": "full/rr_big_json_count_ok_u32le",
+      "description": "Fetch a large JSON array via RR and count objects with ok==true.\n\nInput: 1-byte RR key.\nOutput: u32 little-endian count of objects where field `ok` is true.\n\nThis is a \"views + streaming JSON\" benchmark that should avoid:\n  - copying slices per element\n  - building a full AST of the array",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 3,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-rr@0.1.1",
+          "x07:stdlib-json@0.1.1",
+          "x07:stdlib-bytes@0.1.1",
+          "x07:stdlib-io@0.1.1"
+        ],
+        "mem_stats_required": true,
+        "leak_free_required": true,
+        "capabilities_required": [
+          "rr.fetch"
+        ]
+      },
+      "cases": [
+        {
+          "name": "BIG",
+          "input_b64": "RA==",
+          "expected_b64": "VgUAAA==",
+          "assertions": {
+            "min_rr_request_calls": 1,
+            "max_rr_request_calls": 1,
+            "max_memcpy_bytes": 4096,
+            "max_realloc_calls": 2,
+            "max_peak_live_bytes": 16384
+          }
+        }
+      ]
+    },
+    {
       "task_id": "full/cache_rr_bodies_in_kv_concat",
       "description": "Cache RR bodies in KV and emit concatenation in-order.\n\nInput format: first byte `n`, then `n` RR keys (1 byte each).\nBehavior:\n  - for each key occurrence (in-order):\n      * try kv.get(key) (raw key bytes) to see if body cached\n      * if missing: rr.fetch(key) -> body, then kv.set(key, body)\n      * append body to output (in the same order as input)\nOutput: concatenation of bodies.\n\nConcurrency requirement:\n  - fetch distinct missing keys concurrently to minimize virtual time.\nDeterminism:\n  - output order is input order, regardless of completion order.",
       "assertions": {
@@ -107,6 +147,47 @@
             "min_tasks_spawned": 2,
             "max_tasks_spawned": 16,
             "max_virtual_time_ticks": 45
+          }
+        }
+      ]
+    },
+    {
+      "task_id": "full/fs_to_kv_roundtrip",
+      "description": "Roundtrip bytes from FS into KV and back.\n\nInput: UTF-8 path to a file.\nBehavior:\n  - read file bytes from FS\n  - store into KV under the same key bytes as the path string\n  - read back from KV and output the bytes\nOutput: original file bytes.",
+      "assertions": {
+        "require_lockfile": true,
+        "min_modules": 3,
+        "module_resolution": {
+          "allowed_roots": [
+            "program",
+            "deps"
+          ],
+          "forbid_ambient_fs": true
+        },
+        "required_imports": [
+          "x07:stdlib-fs@0.1.1",
+          "x07:stdlib-kv@0.1.1",
+          "x07:stdlib-io@0.1.1",
+          "x07:stdlib-text@0.1.1"
+        ],
+        "capabilities_required": [
+          "fs.read_file",
+          "kv.get",
+          "kv.set"
+        ]
+      },
+      "cases": [
+        {
+          "name": "a_txt",
+          "input_b64": "ZGF0YS9hLnR4dA==",
+          "expected_b64": "YWxwaGEKYmV0YQo=",
+          "assertions": {
+            "min_fs_read_file_calls": 1,
+            "max_fs_read_file_calls": 1,
+            "min_kv_set_calls": 1,
+            "max_kv_set_calls": 1,
+            "min_kv_get_calls": 1,
+            "max_kv_get_calls": 1
           }
         }
       ]

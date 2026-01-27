@@ -41,8 +41,8 @@ Use `x07 policy init` to generate a schema-valid starting point (then extend it 
 
 When running in `run-os-sandboxed`, `x07 run` can materialize a derived policy under `.x07/policies/_generated/`:
 
-- `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
-- `x07 run --world run-os-sandboxed --policy .x07/policies/base/http-client.sandbox.base.policy.json --deny-host example.com:*`
+- `x07 run --profile sandbox --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
+- `x07 run --profile sandbox --policy .x07/policies/base/http-client.sandbox.base.policy.json --deny-host example.com:*`
 
 Syntax:
 

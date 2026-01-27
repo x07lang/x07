@@ -7,7 +7,7 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 ### New project skeleton
 
 - `x07 init`
-  - Creates `x07.json` (with `test`/`os`/`sandbox` profiles), `x07.lock.json`, a minimal `src/` program, and a `tests/` harness (`tests/tests.json`).
+  - Creates `x07.json` (with `os`/`sandbox` profiles), `x07.lock.json`, a minimal `src/` program, and a `tests/` harness (`tests/tests.json`).
 - `x07 init --package`
   - Creates a publishable package repo: `x07-package.json`, a minimal `x07.json` + `x07.lock.json`, publishable `modules/` layout, and a CI-friendly `tests/tests.json`.
   - Not compatible with `--template` (templates are for app scaffolds).
@@ -30,9 +30,9 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 ### Linting + diagnostics (`x07diag` JSON)
 
-- `x07 lint --input <path> --world solve-pure`
+- `x07 lint --input <path>`
   - Prints an `x07diag` JSON report to stdout.
-- `x07 fix --input <path> --world solve-pure --write`
+- `x07 fix --input <path> --write`
   - Applies quickfixes (JSON Patch) and rewrites the file deterministically.
 
 ### Patching (RFC 6902 JSON Patch)
@@ -42,7 +42,7 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 ### Testing (`x07test` JSON)
 
 - `x07 test --manifest tests/tests.json`
-  - Uses deterministic worlds by default.
+  - Runs each test in its declared world.
   - Prints an `x07test` JSON report (or writes it with `--report-out`).
 
 ### Doc (module exports)
@@ -50,11 +50,6 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 doc <module-id>`
 - `x07 doc <module-id>.<exported_symbol>`
   - Prints exported symbol signatures from a module file (useful for agents exploring unfamiliar modules).
-
-### RR (record solve-rr fixtures)
-
-- `x07 rr record --out fixtures/rr <key> <url>`
-  - Records a real HTTP response body into a `solve-rr` fixture directory (see `docs/worlds/fixture-worlds.md`).
 
 ### Packages (pack/lock/publish)
 
@@ -107,7 +102,7 @@ Use `x07 run` as the canonical entry point for execution. Prefer intent-driven p
 - `x07 run --repair=memory`
 - `x07 run --repair=write` (default)
 
-For the complete guide (targets, worlds, input, fixtures, policies, reports), see [Running programs](running-programs.md).
+For the complete guide (targets, worlds, input, policies, reports), see [Running programs](running-programs.md).
 
 ## JSON outputs (agent-friendly)
 
@@ -130,7 +125,6 @@ Agents should not scrape `--help` text. Use `--cli-specrows`:
 
 - `x07 --cli-specrows`
 - `x07c --cli-specrows`
-- `x07-host-runner --cli-specrows`
 - `x07-os-runner --cli-specrows`
 
 Output is a single JSON object:

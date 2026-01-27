@@ -1,0 +1,31 @@
+{
+  "bundle_id": "regression@0.1.0",
+  "description": "Default regression bundle: ABI/types baseline + stdlib parity mini-apps, across pure and deterministic fixture worlds.",
+  "pre_score_canaries": [
+    "labs/benchmarks/solve-pure/abi-types-smoke.json",
+    "labs/benchmarks/solve-full/stdlib-parity-smoke.json",
+    "labs/benchmarks/solve-pure/emitters-v1-suite.json"
+  ],
+  "score_suites": [
+    "labs/benchmarks/solve-pure/abi-types-suite.json",
+    "labs/benchmarks/solve-pure/stdlib-parity-suite.json",
+    "labs/benchmarks/solve-pure/stdlib-parity-collections-suite.json",
+    "labs/benchmarks/solve-fs/stdlib-parity-suite.json",
+    "labs/benchmarks/solve-rr/stdlib-parity-suite.json",
+    "labs/benchmarks/solve-kv/stdlib-parity-suite.json",
+    "labs/benchmarks/solve-full/stdlib-parity-suite.json"
+  ],
+  "debug_suites": [
+    "labs/benchmarks/solve-pure/abi-types-debug-suite.json"
+  ],
+  "notes": {
+    "ordering": "Run pre_score_canaries first (fail-fast, no scoring). Then run score_suites and aggregate metrics for selection. debug_suites are optional and should run only when debug instrumentation is enabled.",
+    "expected_worlds": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full"
+    ]
+  }
+}

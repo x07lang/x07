@@ -24,8 +24,6 @@
 
 ## Worlds
 - [Worlds overview](worlds/index.md)
-- [Fixture worlds](worlds/fixture-worlds.md)
-- [Fixture formats](worlds/fixture-formats.md)
 - [OS worlds](worlds/os-worlds.md)
 - [Sandbox policy walkthrough](worlds/sandbox-policy-walkthrough.md)
 

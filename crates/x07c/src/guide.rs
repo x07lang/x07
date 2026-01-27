@@ -88,14 +88,14 @@ pub fn guide_md() -> String {
     out.push_str("Module IDs are dot-separated identifiers like `app.rle` or `std.bytes`.\n\n");
     out.push_str("Module resolution is deterministic:\n\n");
     out.push_str(
-        "- Built-in modules: `std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque_u32`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.rr`, `std.kv`, `std.path`\n",
+        "- Built-in modules: `std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque_u32`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.path`, `std.os.env`, `std.os.fs`, `std.os.net`, `std.os.process`, `std.os.process.req_v1`, `std.os.process.caps_v1`, `std.os.process_pool`, `std.os.time`\n",
     );
     out.push_str("- Filesystem modules (standalone): `x07 run --program <prog.x07.json> --module-root <dir>` resolves `a.b` to `<dir>/a/b.x07.json`\n\n");
     out.push_str("Standalone binding override:\n\n");
     out.push_str("- In standalone-only worlds (`run-os`, `run-os-sandboxed`), `std.world.*` modules are resolved from `--module-root` only (no built-in fallback).\n");
     out.push_str("- This keeps program source stable (`import std.fs`) while the target world selects the adapter implementation.\n\n");
     out.push_str("Standalone OS builtins:\n\n");
-    out.push_str("- These heads are only available when compiling with `--world run-os` or `--world run-os-sandboxed`:\n");
+    out.push_str("- These heads are only available in OS worlds (`run-os`, `run-os-sandboxed`):\n");
     out.push_str("  - `os.fs.read_file(path: bytes) -> bytes`\n");
     out.push_str("  - `os.fs.write_file(path: bytes, data: bytes) -> i32`\n");
     out.push_str("  - `os.fs.read_all_v1(path: bytes, caps: bytes) -> result_bytes`\n");
@@ -388,15 +388,16 @@ pub fn guide_md() -> String {
     out.push_str("- `std.world.fs` (adapter module; world-selected)\n");
     out.push_str("  - `[\"std.world.fs.read_file\",\"path_bytes\"]` -> bytes\n");
     out.push_str("  - `[\"std.world.fs.read_file_async\",\"path_bytes\"]` -> bytes\n\n");
-    out.push_str("- `std.rr` (solve-rr only)\n");
-    out.push_str("  - `[\"std.rr.send_request\",\"req_bytes\"]` -> bytes\n");
-    out.push_str("  - `[\"std.rr.fetch\",\"key_bytes\"]` -> bytes\n");
-    out.push_str("  - `[\"std.rr.send\",\"key_bytes\"]` -> iface\n\n");
-    out.push_str("- `std.kv` (solve-kv only)\n");
-    out.push_str("  - `[\"std.kv.get\",\"key_bytes\"]` -> bytes\n");
-    out.push_str("  - `[\"std.kv.get_async\",\"key_bytes\"]` -> bytes\n");
-    out.push_str("  - `[\"std.kv.set\",\"key_bytes\",\"val_bytes\"]` -> i32\n");
-    out.push_str("  - `[\"std.kv.get_stream\",\"key_bytes\"]` -> iface\n\n");
+    out.push_str("  - `[\"std.world.fs.write_file\",\"path_bytes\",\"data_bytes\"]` -> i32\n\n");
+    out.push_str("- `std.os.env` (OS worlds)\n");
+    out.push_str("  - `[\"std.os.env.get\",\"key_bytes\"]` -> bytes\n\n");
+    out.push_str("- `std.os.fs` (OS worlds)\n");
+    out.push_str("  - `[\"std.os.fs.read_file\",\"path_bytes\"]` -> bytes\n");
+    out.push_str("  - `[\"std.os.fs.write_file\",\"path_bytes\",\"data_bytes\"]` -> i32\n\n");
+    out.push_str("- `std.os.net` (OS worlds)\n");
+    out.push_str("  - `[\"std.os.net.http_request\",\"req_bytes\"]` -> bytes\n\n");
+    out.push_str("- `std.os.time` (OS worlds)\n");
+    out.push_str("  - `[\"std.os.time.now_unix_ms\"]` -> i32\n\n");
     out.push_str("- `std.path`\n");
     out.push_str("  - `[\"std.path.join\",\"a\",\"b\"]` -> bytes\n");
     out.push_str("  - `[\"std.path.basename\",\"p\"]` -> bytes\n");
@@ -468,36 +469,9 @@ pub fn guide_md() -> String {
 
     out.push_str("Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier owner (they cannot borrow from a temporary expression).\n\n");
 
-    out.push_str("## Filesystem (solve-fs only)\n\n");
-    out.push_str("- `[\"fs.read\",\"path_bytes\"]` -> bytes\n");
-    out.push_str("- `[\"fs.read_async\",\"path_bytes\"]` -> bytes\n");
-    out.push_str("- `[\"fs.open_read\",\"path_bytes\"]` -> iface\n");
-    out.push_str("  - Returns an `iface` reader for streaming reads.\n");
-    out.push_str(
-        "- `[\"fs.list_dir\",\"path_bytes\"]` -> bytes (newline-separated names, sorted, trailing `\\n`)\n",
-    );
-    out.push_str("  - `path_bytes` must be a safe relative path (no absolute paths, no `..`, no empty segments).\n");
-    out.push_str("  - The fixture directory is the current working directory (`.`).\n\n");
-
-    out.push_str("## Request/Response (solve-rr only)\n\n");
-    out.push_str("- `[\"rr.send_request\",\"req_bytes\"]` -> bytes\n");
-    out.push_str("  - Fixture-backed request/response (no real network).\n");
-    out.push_str("  - `req_bytes` are hashed as `sha256(req_bytes)` and mapped to a response blob under `./.x07_rr/`.\n");
-    out.push_str("- `[\"rr.fetch\",\"key_bytes\"]` -> bytes\n");
-    out.push_str("  - Fixture-backed request/response with deterministic latency modeling.\n");
-    out.push_str("- `[\"rr.send\",\"key_bytes\"]` -> iface\n");
-    out.push_str("  - Returns an `iface` reader for streaming reads.\n\n");
-
-    out.push_str("## Key/Value (solve-kv only)\n\n");
-    out.push_str("- `[\"kv.get\",\"key_bytes\"]` -> bytes\n");
-    out.push_str("  - Returns empty bytes if missing.\n");
-    out.push_str("- `[\"kv.get_async\",\"key_bytes\"]` -> bytes\n");
-    out.push_str("  - Same as `kv.get` but explicitly uses the async/latency-aware path.\n");
-    out.push_str("- `[\"kv.get_stream\",\"key_bytes\"]` -> iface\n");
-    out.push_str("  - Returns an `iface` reader for streaming reads.\n");
-    out.push_str("- `[\"kv.set\",\"key_bytes\",\"val_bytes\"]` -> i32\n");
-    out.push_str("  - Returns 1 if inserted, 0 if updated.\n");
-    out.push_str("  - Store is seeded per case from `./.x07_kv/seed.evkv` and reset per case.\n\n");
+    out.push_str("## OS Worlds (run-os / run-os-sandboxed)\n\n");
+    out.push_str("OS effects are accessed through `std.os.*` modules, which call `os.*` builtins (listed above).\n");
+    out.push_str("In sandboxed execution, these calls are gated by policy.\n\n");
 
     out.push_str("## Streaming I/O\n\n");
     out.push_str("Readers are `iface` values returned by world adapters.\n\n");

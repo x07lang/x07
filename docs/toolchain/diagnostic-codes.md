@@ -15,15 +15,12 @@ These codes appear when `tests/tests.json` (or `--manifest ...`) is invalid.
 - `ETEST_ID_EMPTY`: `tests[i].id` is empty.
 - `ETEST_ID_NON_ASCII`: `tests[i].id` is not ASCII-printable.
 - `ETEST_ID_DUPLICATE`: duplicate `tests[i].id`.
-- `ETEST_WORLD_INVALID`: invalid `tests[i].world` (only `solve-*` worlds are allowed).
+- `ETEST_WORLD_INVALID`: invalid `tests[i].world` (allowed: `run-os`, `run-os-sandboxed`).
 - `ETEST_ENTRY_INVALID`: invalid `tests[i].entry` (must be `module.symbol`).
 - `ETEST_EXPECT_INVALID`: invalid `tests[i].expect` (allowed: `pass`, `fail`, `skip`).
 - `ETEST_RETURNS_INVALID`: invalid `tests[i].returns` (allowed: `result_i32`, `bytes_status_v1`).
 - `ETEST_TIMEOUT_INVALID`: invalid `tests[i].timeout_ms` (must be `>= 1` when present).
-- `ETEST_FIXTURE_FORBIDDEN`: `fixture_root` must not be set for `solve-pure`.
-- `ETEST_FIXTURE_REQUIRED`: `fixture_root` is required for `solve-fs`, `solve-rr`, `solve-kv`, and `solve-full`.
-- `ETEST_FIXTURE_UNSAFE_PATH`: `fixture_root` is an unsafe path (absolute, contains `..`, or contains `\\`).
-- `ETEST_FIXTURE_MISSING`: `fixture_root` directory is missing, or (for `solve-full`) required subdirectories are missing.
+- `ETEST_FIXTURE_FORBIDDEN`: `fixture_root` must not be set for OS worlds.
 
 See: [Test manifest](tests-manifest.md).
 
@@ -32,6 +29,8 @@ See: [Test manifest](tests-manifest.md).
 - `ETEST_COMPILE`: compile failed for the generated test driver or test module.
 - `EDETERMINISM`: nondeterminism detected across `--repeat` runs.
 - `EBAD_STATUS`: a test returned an invalid `bytes_status_v1` payload.
+- `ETEST_NO_RUN_UNSUPPORTED`: `--no-run` is not supported for OS-world tests.
+- `ETEST_OS_RUNNER_JSON`: `x07-os-runner` did not emit a valid JSON report.
 
 ## `x07 run` common errors (stderr prefixes)
 
@@ -57,4 +56,3 @@ These codes appear as `[...]` prefixes in `x07 run` stderr output:
 - `X07PKG_LOCK_MISSING`: missing lockfile.
 - `X07PKG_LOCK_MISMATCH`: lockfile out of date.
 - `X07PKG_TRANSITIVE_MISSING`: transitive dependencies missing from `x07.json`.
-

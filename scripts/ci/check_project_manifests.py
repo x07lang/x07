@@ -146,8 +146,8 @@ def validate_project(doc: Any, rel: str) -> list[str]:
         errs.append(f"{rel}: schema_version must be 'x07.project@0.2.0'")
 
     world = doc.get("world")
-    if not isinstance(world, str) or world not in SOLVE_WORLDS:
-        errs.append(f"{rel}: world must be one of {sorted(SOLVE_WORLDS)}")
+    if not isinstance(world, str) or world not in ALL_WORLDS:
+        errs.append(f"{rel}: world must be one of {sorted(ALL_WORLDS)}")
 
     entry = doc.get("entry")
     if not isinstance(entry, str) or not entry.endswith(".x07.json") or not is_rel_path(entry):
@@ -254,4 +254,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

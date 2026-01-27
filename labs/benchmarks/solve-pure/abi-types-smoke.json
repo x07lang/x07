@@ -1,5 +1,5 @@
 {
-  "suite_id": "phaseH1-smoke@0.1.0",
+  "suite_id": "abi-types-smoke@0.1.0",
   "world": "solve-pure",
   "tasks": [
     {

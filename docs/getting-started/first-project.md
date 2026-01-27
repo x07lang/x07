@@ -14,10 +14,10 @@ x07 init
 
 This creates:
 
-- `x07.json` (with `test`, `os`, and `sandbox` profiles)
+- `x07.json` (with `os` and `sandbox` profiles)
 - `x07.lock.json`
 - `src/main.x07.json` (a minimal program)
-- `tests/tests.json` + `tests/smoke.x07.json` (a deterministic harness smoke test)
+- `tests/tests.json` + `tests/smoke.x07.json` (a harness smoke test)
 
 If you are creating a publishable package repo (for `x07 pkg publish`), use `x07 init --package` instead of `x07 init`.
 
@@ -41,12 +41,12 @@ x07 fmt --input src/main.x07.json --write
 ## Lint
 
 ```bash
-x07 lint --input src/main.x07.json --world solve-pure
+x07 lint --input src/main.x07.json
 ```
 
 `x07 lint` prints an `x07diag` JSON report to stdout.
 
-## Run (deterministic)
+## Run
 
 ```bash
 x07 run

@@ -1,5 +1,5 @@
 {
-  "report": "phaseH2_fs",
+  "report": "stdlib_parity_fs",
   "files": [
     "data/a.txt",
     "data/b.txt",

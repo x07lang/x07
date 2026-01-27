@@ -1,7 +1,7 @@
 {
-  "suite_id": "phaseH2-suite@0.1.0",
+  "suite_id": "stdlib-parity-suite@0.1.0",
   "world": "solve-kv",
-  "fixture_root": "ci/fixtures/bench/kv/solve-kv/phaseH2-suite-kv@0.1.0",
+  "fixture_root": "ci/fixtures/bench/kv/solve-kv/stdlib-parity-suite-kv@0.1.0",
   "kv_seed": "seed.json",
   "tasks": [
     {

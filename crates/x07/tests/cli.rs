@@ -341,7 +341,7 @@ fn x07_init_creates_package_skeleton() {
 
     let proj_doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
         .expect("parse x07.json");
-    assert_eq!(proj_doc["world"], "solve-pure");
+    assert_eq!(proj_doc["world"], "run-os");
     assert_eq!(
         proj_doc["entry"],
         "modules/ext/acme_hello_demo/tests.x07.json"

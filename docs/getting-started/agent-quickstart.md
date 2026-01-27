@@ -6,7 +6,7 @@ This page is a single entry point for LLM agents. Use the published agent portal
 
 - X07 source is **x07AST JSON** (`*.x07.json`), not text.
 - The toolchain is **JSON-first**: diagnostics, patches, and reports are structured.
-- Deterministic development happens in `solve-*` worlds; real OS access is `run-os*`.
+- Programs run in OS worlds: `run-os` and `run-os-sandboxed`.
 
 ## 1) Install and verify the toolchain
 
@@ -71,10 +71,10 @@ x07up agent init --project . --pin stable --with-skills project
 
 This creates:
 
-- `x07.json` (with `test`, `os`, and `sandbox` profiles)
+- `x07.json` (with `os` and `sandbox` profiles)
 - `x07.lock.json`
 - `src/` (a minimal program)
-- `tests/tests.json` + `tests/smoke.x07.json` (a deterministic harness smoke test)
+- `tests/tests.json` + `tests/smoke.x07.json` (a harness smoke test)
 
 If you are creating a publishable package repo (for `x07 pkg publish`), use `x07 init --package` instead of `x07 init`.
 
@@ -95,7 +95,7 @@ See: [Running programs](../toolchain/running-programs.md).
 If your program expects CLI arguments via `argv_v1`, pass them after `--` and `x07 run` will encode them into input bytes:
 
 ```bash
-x07 run --profile os -- tool --help
+x07 run -- tool --help
 ```
 
 Run the deterministic harness (repo-defined suites):
@@ -116,9 +116,9 @@ Note: `x07 run`, `x07 build`, and `x07 bundle` apply quickfixes automatically by
 Example loop:
 
 ```bash
-x07 lint --input src/main.x07.json --world solve-pure
-x07 fix --input src/main.x07.json --world solve-pure --write
-x07 lint --input src/main.x07.json --world solve-pure
+x07 lint --input src/main.x07.json
+x07 fix --input src/main.x07.json --write
+x07 lint --input src/main.x07.json
 ```
 
 See: [Repair loop](../toolchain/repair-loop.md).
@@ -156,17 +156,17 @@ Notes:
 
 See also: [Packages & projects](../packages/index.md).
 
-## 7) World selection (determinism vs OS)
+## 7) World selection (OS worlds)
 
-- Deterministic worlds: `solve-pure`, `solve-fs`, `solve-rr`, `solve-kv`, `solve-full`
-- OS worlds: `run-os`, `run-os-sandboxed` (policy-gated, not a hardened sandbox)
+- `run-os`: real OS adapters (disk/network/time/env/process)
+- `run-os-sandboxed`: policy-gated OS adapters (not a hardened sandbox)
 
 Prefer profiles (`x07.json.default_profile` + `x07.json.profiles`) so agents usually run:
 
 - `x07 run` (project default)
 - `x07 run --profile os` / `x07 run --profile sandbox` (explicit intent)
 
-See: [Fixture worlds](../worlds/fixture-worlds.md) and [OS worlds](../worlds/os-worlds.md).
+See: [OS worlds](../worlds/os-worlds.md).
 
 ## 8) Machine-first discovery surfaces
 

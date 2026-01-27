@@ -1,5 +1,5 @@
 {
-  "suite_id": "phaseH1-debug-suite@0.1.0",
+  "suite_id": "abi-types-debug-suite@0.1.0",
   "world": "solve-pure",
   "requires_debug_borrow_checks": true,
   "tasks": [
