@@ -1,6 +1,6 @@
 # Running programs (canonical): `x07 run`
 
-`x07 run` is the single front door for executing X07 programs. It selects the appropriate runner based on the chosen world and prints a machine-readable JSON report.
+`x07 run` is the single front door for executing X07 programs. It selects the appropriate runner based on the selected profile and prints a machine-readable JSON report.
 
 ## Choose what to run
 
@@ -50,23 +50,13 @@ For almost all end-user usage, pick intent-driven profiles in your project (`x07
 
 Profiles resolve to a world (`run-os` or `run-os-sandboxed`) plus optional policy and resource defaults.
 
-World resolution precedence is:
-
-1. `--world ...` (expert override; hidden from `x07 run --help`)
-2. `--profile ...` (or `default_profile`)
-3. project manifest `world`
-4. default: `run-os`
+If `--profile` is not provided, `x07 run` uses `default_profile` from the project manifest when present, otherwise it defaults to `os`.
 
 ## Runner selection
 
-By default, `x07 run` chooses the runner from the selected world:
+By default, `x07 run` chooses the runner from the selected profile (`x07-os-runner` for OS profiles).
 
-- `run-os*` → `x07-os-runner`
-
-You can override this with:
-
-- `--runner auto|host|os`
-- `--os` (legacy shorthand; also affects world selection if `--world` is not set)
+You can force OS runner selection with `--runner os` or `--os`.
 
 ## Provide input bytes
 
