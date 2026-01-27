@@ -9,7 +9,7 @@ metadata:
 
 # x07-os-run
 
-Prefer `x07 run --profile os` / `x07 run --profile sandbox` for normal execution. Use `x07-os-runner` directly only when you need runner-specific flags (policy debugging, auto-FFI toggles, explicit compiled artifact paths) or when you are debugging runner behavior.
+Prefer `x07 run --profile os` / `x07 run --profile sandbox` for normal execution. `x07-os-runner` is an internal component behind the `x07` facade; its CLI is not part of the supported end-user surface.
 
 Use this skill when you need real OS I/O (fs/net/process/time) via `run-os` or policy-enforced execution via `run-os-sandboxed`.
 
@@ -45,16 +45,9 @@ Use this skill when you need real OS I/O (fs/net/process/time) via `run-os` or p
 - Run a single program (when not using a project manifest):
   - `x07 run --program src/main.x07.json --module-root src`
 
-## Expert backend commands (`x07-os-runner`)
+## Expert backend (`x07-os-runner`)
 
-- Run a program (unsandboxed):
-  - `x07-os-runner --program src/main.x07.json --world run-os --module-root src`
-
-- Run a project (unsandboxed):
-  - `x07-os-runner --project x07.json --world run-os`
-
-- Run sandboxed (requires an explicit policy):
-  - `x07-os-runner --program src/main.x07.json --world run-os-sandboxed --policy run-os-policy.json --module-root src`
+`x07-os-runner` implements OS execution for `x07 run` / `x07 bundle`. Treat it as internal and prefer `x07` commands above.
 
 ## Policy
 
@@ -64,7 +57,7 @@ For net-enabled templates, keep `net.allow_hosts` empty in the base policy and u
 ## Output contract
 
 - `x07 run` in `run-os*` worlds prints an `x07-os-runner.report@...` JSON report to stdout (pass-through).
-- `x07-os-runner` prints the same report shape when invoked directly.
+- The underlying OS runner emits the same report shape.
 
 In both cases:
 - Use the process exit code for pass/fail.
