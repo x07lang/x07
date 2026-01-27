@@ -12,6 +12,7 @@ use sha2::{Digest as _, Sha256};
 
 const DEFAULT_CHANNELS_URL: &str = "https://x07lang.org/install/channels.json";
 const X07_TOOLCHAIN_TOML: &str = "x07-toolchain.toml";
+const X07_AGENT_DIR: &str = ".agent";
 
 const SHOW_SCHEMA_VERSION: &str = "x07up.show@0.1.0";
 const INSTALL_SCHEMA_VERSION: &str = "x07up.install.report@0.1.0";
@@ -568,7 +569,7 @@ fn cmd_install(
 
     match args.profile {
         InstallProfile::Full => {
-            let docs_root = final_dir.join("docs");
+            let docs_root = final_dir.join(X07_AGENT_DIR).join("docs");
             if !docs_root.is_dir()
                 && !install_component(root, &toolchain_tag, release, "docs", reporter)?
             {
@@ -591,7 +592,7 @@ fn cmd_install(
                 );
             }
 
-            let skills_root = final_dir.join(".codex/skills");
+            let skills_root = final_dir.join(X07_AGENT_DIR).join("skills");
             if !skills_root.is_dir()
                 && !install_component(root, &toolchain_tag, release, "skills", reporter)?
             {
@@ -616,11 +617,11 @@ fn cmd_install(
             }
         }
         InstallProfile::Minimal => {
-            let docs_root = final_dir.join("docs");
+            let docs_root = final_dir.join(X07_AGENT_DIR).join("docs");
             if !docs_root.is_dir() {
                 warnings.push("docs missing (profile=minimal)".to_string());
             }
-            let skills_root = final_dir.join(".codex/skills");
+            let skills_root = final_dir.join(X07_AGENT_DIR).join("skills");
             if !skills_root.is_dir() {
                 warnings.push("skills missing (profile=minimal)".to_string());
             }
@@ -936,7 +937,10 @@ fn cmd_docs(root: &Path, args: DocsArgs, reporter: &Reporter) -> Result<std::pro
             let tag = sel.resolved.ok_or_else(|| {
                 anyhow!("no active toolchain resolved; run: x07up install stable")
             })?;
-            let docs = toolchains_dir(root).join(&tag).join("docs");
+            let docs = toolchains_dir(root)
+                .join(&tag)
+                .join(X07_AGENT_DIR)
+                .join("docs");
             if reporter.json {
                 #[derive(Serialize)]
                 struct DocsPathReport {
@@ -982,16 +986,19 @@ fn cmd_skills_install(
     let tag = sel
         .resolved
         .ok_or_else(|| anyhow!("no active toolchain resolved; run: x07up install stable"))?;
-    let src = toolchains_dir(root).join(&tag).join(".codex/skills");
+    let src = toolchains_dir(root)
+        .join(&tag)
+        .join(X07_AGENT_DIR)
+        .join("skills");
     if !src.is_dir() {
         bail!("toolchain skills dir missing: {}", src.display());
     }
 
     let dst = if args.user {
-        home_dir()?.join(".codex/skills")
+        home_dir()?.join(X07_AGENT_DIR).join("skills")
     } else {
         let project = args.project.as_ref().unwrap();
-        project.join(".codex/skills")
+        project.join(X07_AGENT_DIR).join("skills")
     };
 
     reporter.progress(&format!("copy skills to {}", dst.display()));
@@ -1003,10 +1010,13 @@ fn cmd_skills_status(root: &Path, reporter: &Reporter) -> Result<std::process::E
     let cfg = Config::load(&config_path(root))?;
     let sel = select_active_toolchain(root, &cfg)?;
     let tag = sel.resolved.clone();
-    let toolchain_skills = tag
-        .as_ref()
-        .map(|t| toolchains_dir(root).join(t).join(".codex/skills"));
-    let user_skills = home_dir()?.join(".codex/skills");
+    let toolchain_skills = tag.as_ref().map(|t| {
+        toolchains_dir(root)
+            .join(t)
+            .join(X07_AGENT_DIR)
+            .join("skills")
+    });
+    let user_skills = home_dir()?.join(X07_AGENT_DIR).join("skills");
 
     #[derive(Serialize)]
     struct SkillsStatus {
@@ -1094,10 +1104,13 @@ fn cmd_agent_init(
         }
     }
 
-    let docs_root = toolchains_dir(root).join(&resolved).join("docs");
+    let docs_root = toolchains_dir(root)
+        .join(&resolved)
+        .join(X07_AGENT_DIR)
+        .join("docs");
     let skills_root = match args.with_skills {
-        AgentSkillsMode::Project => project.join(".codex/skills"),
-        AgentSkillsMode::User => home_dir()?.join(".codex/skills"),
+        AgentSkillsMode::Project => project.join(X07_AGENT_DIR).join("skills"),
+        AgentSkillsMode::User => home_dir()?.join(X07_AGENT_DIR).join("skills"),
         AgentSkillsMode::None => PathBuf::from(""),
     };
 

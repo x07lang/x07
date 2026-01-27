@@ -36,6 +36,7 @@ x07 init
 
 `x07 init` creates:
 
+- `AGENT.md` + `.agent/skills/` (agent kit)
 - `tests/smoke.x07.json` with one exported test (`smoke.pass`)
 - `tests/tests.json` listing that test in `run-os`
 

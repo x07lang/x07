@@ -1,6 +1,6 @@
 This directory contains the end-user skills pack for writing X07 programs with the released toolchain.
 
-Canonical source location (in the toolchain repo): `skills/pack/.codex/skills/`.
+Canonical source location (in the toolchain repo): `skills/pack/.agent/skills/`.
 
 Installation (for a user project):
 
@@ -8,8 +8,8 @@ Installation (for a user project):
   - user-scoped: `x07up skills install --user`
   - project-scoped: `x07up skills install --project .`
 - advanced/manual:
-  - copy these skill folders into `<project>/.codex/skills/` (project-scoped), or
-  - copy them into `~/.codex/skills/` (user-scoped).
+  - copy these skill folders into `<project>/.agent/skills/` (project-scoped), or
+  - copy them into `~/.agent/skills/` (user-scoped).
 
 Available skills:
 

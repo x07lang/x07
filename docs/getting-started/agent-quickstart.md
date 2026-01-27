@@ -56,23 +56,13 @@ cd myapp
 x07 init
 ```
 
-For agent rails (toolchain pin + skills + a self-recovery guide), run:
-
-```bash
-x07up agent init --project . --pin stable --with-skills project
-```
-
-`x07 init` vs `x07up agent init`:
-
-| Command | When to use | What it creates |
-|---|---|---|
-| `x07 init` | minimal project skeleton | `x07.json`, `x07.lock.json`, `src/`, `tests/` |
-| `x07up agent init --project . ...` | autonomous agent rails | `AGENT.md`, `x07-toolchain.toml`, optional skills install, and (if missing) the same project skeleton as `x07 init` |
-
-This creates:
+`x07 init` creates both the project skeleton and the agent kit:
 
 - `x07.json` (with `os` and `sandbox` profiles)
 - `x07.lock.json`
+- `x07-toolchain.toml` (pins `stable` and declares `docs` + `skills`)
+- `AGENT.md` (self-recovery guide + canonical commands)
+- `.agent/skills/` (project-scoped skills pack)
 - `src/` (a minimal program)
 - `tests/tests.json` + `tests/smoke.x07.json` (a harness smoke test)
 

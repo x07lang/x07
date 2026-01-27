@@ -61,8 +61,8 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $toolchainStage "bin") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $toolchainStage "deps\\x07") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $toolchainStage "stdlib\\os\\0.2.0") | Out-Null
-    New-Item -ItemType Directory -Force -Path (Join-Path $toolchainStage "docs") | Out-Null
-    New-Item -ItemType Directory -Force -Path (Join-Path $toolchainStage ".codex\\skills") | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $toolchainStage ".agent\\docs") | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $toolchainStage ".agent\\skills") | Out-Null
 
     $bins = @("x07","x07c","x07-host-runner","x07-os-runner","x07import-cli")
     foreach ($b in $bins) {
@@ -73,8 +73,8 @@ try {
     Copy-Item -Recurse -Force "stdlib/os/0.2.0/modules" (Join-Path $toolchainStage "stdlib\\os\\0.2.0")
     Copy-Item -Force "stdlib.lock" (Join-Path $toolchainStage "stdlib.lock")
     Copy-Item -Force "stdlib.os.lock" (Join-Path $toolchainStage "stdlib.os.lock")
-    Copy-Item -Recurse -Force "docs/*" (Join-Path $toolchainStage "docs")
-    Copy-Item -Recurse -Force "skills/pack/.codex/skills/*" (Join-Path $toolchainStage ".codex\\skills")
+    Copy-Item -Recurse -Force "docs/*" (Join-Path $toolchainStage ".agent\\docs")
+    Copy-Item -Recurse -Force "skills/pack/.agent/skills/*" (Join-Path $toolchainStage ".agent\\skills")
 
     $toolchainArchive = Join-Path $artifacts "x07-$tag-$target.zip"
     Compress-Archive -Path (Join-Path $toolchainStage "*") -DestinationPath $toolchainArchive -Force
@@ -199,9 +199,10 @@ try {
     throw "resolved_module_roots missing expected roots: $($missing -join ', ')"
   }
 
-  Step "smoke: agent init produces AGENT.md"
-  x07up agent init --project $proj --with-skills project | Out-Null
+  Step "smoke: init created agent kit"
   if (-not (Test-Path (Join-Path $proj "AGENT.md"))) { throw "AGENT.md not created" }
+  if (-not (Test-Path (Join-Path $proj "x07-toolchain.toml"))) { throw "x07-toolchain.toml not created" }
+  if (-not (Test-Path (Join-Path $proj ".agent\\skills\\x07-agent-playbook\\SKILL.md"))) { throw "skills not installed" }
 
   Write-Host ""
   Write-Host "ok: windows installer smoke passed"

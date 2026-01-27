@@ -48,7 +48,7 @@ struct Cli {
 
 #[derive(clap::Subcommand, Debug)]
 enum Command {
-    /// Create a new X07 project skeleton.
+    /// Create a new X07 project skeleton (and agent kit).
     Init(init::InitArgs),
     /// Run deterministic test suites.
     Test(TestArgs),

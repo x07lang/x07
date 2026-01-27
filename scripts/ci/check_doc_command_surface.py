@@ -18,9 +18,9 @@ CANONICAL_MD_DIRS = [
     "docs/recipes",
 ]
 CANONICAL_SKILLS = [
-    "skills/pack/.codex/skills/x07-run/SKILL.md",
-    "skills/pack/.codex/skills/x07-package/SKILL.md",
-    "skills/pack/.codex/skills/x07-agent-playbook/SKILL.md",
+    "skills/pack/.agent/skills/x07-run/SKILL.md",
+    "skills/pack/.agent/skills/x07-package/SKILL.md",
+    "skills/pack/.agent/skills/x07-agent-playbook/SKILL.md",
 ]
 
 # Where runner commands ARE allowed (expert tools).
@@ -28,8 +28,8 @@ EXPERT_MD_DIRS = [
     "docs/toolchain",
 ]
 EXPERT_SKILLS_DIRS = [
-    "skills/pack/.codex/skills/x07-os-run",
-    "skills/pack/.codex/skills/x07-build-run",
+    "skills/pack/.agent/skills/x07-os-run",
+    "skills/pack/.agent/skills/x07-build-run",
 ]
 
 
@@ -113,4 +113,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

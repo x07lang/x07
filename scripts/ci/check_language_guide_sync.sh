@@ -23,7 +23,7 @@ if ! diff -u "$tmp" docs/spec/language-guide.md >&2; then
   exit 1
 fi
 
-skill_copy="skills/pack/.codex/skills/x07-language-guide/references/language-guide.md"
+skill_copy="skills/pack/.agent/skills/x07-language-guide/references/language-guide.md"
 if ! diff -u "$tmp" "$skill_copy" >&2; then
   echo "ERROR: $skill_copy is out of sync with x07c guide" >&2
   echo "Regen: cargo run -q -p x07c -- guide > $skill_copy" >&2

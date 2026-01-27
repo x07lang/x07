@@ -194,6 +194,9 @@ proj="$tmp/proj"
 mkdir -p "$proj"
 cd "$proj"
 x07 init >/dev/null
+test -f "$proj/AGENT.md"
+test -f "$proj/x07-toolchain.toml"
+test -f "$proj/.agent/skills/x07-agent-playbook/SKILL.md"
 
 printf "hello" > input.bin
 x07 run --profile os --input input.bin --report wrapped --report-out .x07/run.os.json >/dev/null
@@ -240,10 +243,6 @@ if not Path(stdlib_lock).is_file():
     raise SystemExit(f"ERROR: invocation.stdlib_lock does not exist: {stdlib_lock}")
 print("ok: x07 test ok")
 PY
-
-step "smoke: agent init produces AGENT.md"
-x07up agent init --project "$proj" --with-skills project >/dev/null
-test -f "$proj/AGENT.md"
 
 echo
 echo "ok: installer smoke passed"

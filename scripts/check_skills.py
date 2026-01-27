@@ -171,14 +171,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str]) -> int:
     _args = parse_args(argv)
     root = Path(__file__).resolve().parents[1]
-    skills_root = root / "skills" / "pack" / ".codex" / "skills"
+    skills_root = root / "skills" / "pack" / ".agent" / "skills"
     if not skills_root.is_dir():
-        print("ERROR: missing skills/pack/.codex/skills/ (end-user skills pack root)", file=sys.stderr)
+        print("ERROR: missing skills/pack/.agent/skills/ (end-user skills pack root)", file=sys.stderr)
         return 2
 
     skill_dirs = iter_skill_dirs(skills_root)
     if not skill_dirs:
-        print("ERROR: no skills found under skills/pack/.codex/skills/", file=sys.stderr)
+        print("ERROR: no skills found under skills/pack/.agent/skills/", file=sys.stderr)
         return 2
 
     skills: list[Skill] = []

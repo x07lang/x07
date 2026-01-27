@@ -58,20 +58,20 @@ curl -fsSL https://x07lang.org/install.sh | sh -s -- \
 Write `x07-toolchain.toml`:
 
 ```bash
-x07up override set v0.0.57
+x07up override set v0.0.58
 ```
 
 This writes a file like:
 
 ```toml
 [toolchain]
-channel = "v0.0.57"
+channel = "v0.0.58"
 components = ["docs", "skills"]
 ```
 
 Notes:
 
-- `channel` can be `stable` or a specific tag like `v0.0.57`.
+- `channel` can be `stable` or a specific tag like `v0.0.58`.
 - `components` controls whether `x07up` installs the offline docs and skills pack.
 
 Remove it:
@@ -80,13 +80,13 @@ Remove it:
 x07up override unset
 ```
 
-## Agent kit (offline docs + skills + AGENT.md)
+## Agent kit (offline docs + skills + project rails)
 
 - Offline docs path: `x07up docs path --json`
 - Skills install:
   - user-scoped: `x07up skills install --user`
   - project-scoped: `x07up skills install --project .`
-- Project rails: `x07up agent init --project . --pin stable --with-skills project`
+- Canonical project start (creates `AGENT.md`, pins the toolchain, and installs project-scoped skills): `x07 init`
 
 See also: [Available skills](available-skills.md).
 

@@ -82,4 +82,4 @@ The default (non-freestanding) output includes a `main()` that uses the standard
 
 If you pipe raw text into the executable, it will interpret the first 4 bytes as the length prefix (which can look like an “out of memory” failure).
 
-See: [Running programs](running-programs.md#executable-i-o-framing-advanced).
+See: [Running programs](running-programs.md#executable-io-framing-advanced).

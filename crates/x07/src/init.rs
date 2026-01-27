@@ -10,6 +10,14 @@ use x07_contracts::{
     PROJECT_MANIFEST_SCHEMA_VERSION, X07AST_SCHEMA_VERSION,
 };
 
+const X07_TOOLCHAIN_TOML: &str = "x07-toolchain.toml";
+const X07_AGENT_DIR: &str = ".agent";
+
+const AGENT_TEMPLATE_MD: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../x07up/assets/AGENT.template.md"
+));
+
 #[derive(Debug, Clone, Args)]
 pub struct InitArgs {
     /// Optional scaffold template.
@@ -71,6 +79,10 @@ struct InitReport {
     command: &'static str,
     root: String,
     created: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    notes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    next_steps: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<InitError>,
 }
@@ -199,6 +211,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
                 command: "init",
                 root: ".".to_string(),
                 created: Vec::new(),
+                notes: Vec::new(),
+                next_steps: Vec::new(),
                 error: Some(InitError {
                     code: "X07INIT_CWD".to_string(),
                     message: format!("get current dir: {err}"),
@@ -216,6 +230,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
                 command: "init",
                 root: root.display().to_string(),
                 created: Vec::new(),
+                notes: Vec::new(),
+                next_steps: Vec::new(),
                 error: Some(InitError {
                     code: "X07INIT_ARGS".to_string(),
                     message: "x07 init --package does not support --template (use x07 init --template ... for app scaffolds, or x07 init --package for a publishable package scaffold)".to_string(),
@@ -239,6 +255,7 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
         tests_manifest: root.join("tests").join("tests.json"),
         tests_smoke: root.join("tests").join("smoke.x07.json"),
     };
+    let agent_paths = AgentKitPaths::new(&root);
 
     let (default_profile, policy_template) = match args.template {
         Some(t) => (
@@ -251,13 +268,16 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
     let policy_path = root.join(crate::policy::default_base_policy_rel_path(policy_template));
 
     let mut conflicts = Vec::new();
-    let required_paths: [&PathBuf; 6] = [
+    let required_paths: [&PathBuf; 9] = [
         &paths.project,
         &paths.lock,
         &paths.app,
         &paths.main,
         &paths.tests_manifest,
         &paths.tests_smoke,
+        &agent_paths.toolchain_toml,
+        &agent_paths.agent_md,
+        &agent_paths.agent_skills_dir,
     ];
     for p in required_paths {
         if p.exists() {
@@ -273,6 +293,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
             command: "init",
             root: root.display().to_string(),
             created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
             error: Some(InitError {
                 code: "X07INIT_EXISTS".to_string(),
                 message: format!(
@@ -291,6 +313,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
             command: "init",
             root: root.display().to_string(),
             created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
             error: Some(InitError {
                 code: "X07INIT_SRC".to_string(),
                 message: format!(
@@ -309,11 +333,34 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
             command: "init",
             root: root.display().to_string(),
             created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
             error: Some(InitError {
                 code: "X07INIT_TESTS".to_string(),
                 message: format!(
                     "tests exists but is not a directory: {}",
                     rel(&root, &paths.tests_dir)
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    if agent_paths.agent_dir.exists() && !agent_paths.agent_dir.is_dir() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_AGENT_DIR".to_string(),
+                message: format!(
+                    "{} exists but is not a directory: {}",
+                    X07_AGENT_DIR,
+                    rel(&root, &agent_paths.agent_dir)
                 ),
             }),
         };
@@ -329,6 +376,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
             command: "init",
             root: root.display().to_string(),
             created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
             error: Some(InitError {
                 code: "X07INIT_IO".to_string(),
                 message: format!("create src dir: {err}"),
@@ -344,6 +393,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
             command: "init",
             root: root.display().to_string(),
             created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
             error: Some(InitError {
                 code: "X07INIT_IO".to_string(),
                 message: format!("create tests dir: {err}"),
@@ -423,6 +474,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
                 command: "init",
                 root: root.display().to_string(),
                 created: created.clone(),
+                notes: Vec::new(),
+                next_steps: Vec::new(),
                 error: Some(InitError {
                     code: "X07INIT_IO".to_string(),
                     message: format!("update .gitignore: {err:#}"),
@@ -431,6 +484,23 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
             println!("{}", serde_json::to_string(&report)?);
             return Ok(std::process::ExitCode::from(20));
         }
+    }
+
+    if let Err(err) = init_agent_kit(&root, &agent_paths, &mut created) {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created,
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_AGENT".to_string(),
+                message: format!("{err:#}"),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
     }
 
     if should_create_policy {
@@ -461,6 +531,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
                 command: "init",
                 root: root.display().to_string(),
                 created,
+                notes: Vec::new(),
+                next_steps: Vec::new(),
                 error: Some(InitError {
                     code: "X07INIT_PKG_LOCK".to_string(),
                     message: msg,
@@ -476,6 +548,8 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
         command: "init",
         root: root.display().to_string(),
         created,
+        notes: init_notes(),
+        next_steps: init_next_steps(),
         error: None,
     };
     println!("{}", serde_json::to_string(&report)?);
@@ -506,6 +580,7 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
         tests_dir: root.join("tests"),
         tests_manifest: root.join("tests").join("tests.json"),
     };
+    let agent_paths = AgentKitPaths::new(root);
 
     let mut conflicts = Vec::new();
     for p in [
@@ -515,6 +590,9 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
         &paths.module_main,
         &paths.module_tests,
         &paths.tests_manifest,
+        &agent_paths.toolchain_toml,
+        &agent_paths.agent_md,
+        &agent_paths.agent_skills_dir,
     ] {
         if p.exists() {
             conflicts.push(rel(root, p));
@@ -526,6 +604,8 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
             command: "init",
             root: root.display().to_string(),
             created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
             error: Some(InitError {
                 code: "X07INIT_EXISTS".to_string(),
                 message: format!(
@@ -544,6 +624,8 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
             command: "init",
             root: root.display().to_string(),
             created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
             error: Some(InitError {
                 code: "X07INIT_MODULES".to_string(),
                 message: format!(
@@ -562,11 +644,34 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
             command: "init",
             root: root.display().to_string(),
             created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
             error: Some(InitError {
                 code: "X07INIT_TESTS".to_string(),
                 message: format!(
                     "tests exists but is not a directory: {}",
                     rel(root, &paths.tests_dir)
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    if agent_paths.agent_dir.exists() && !agent_paths.agent_dir.is_dir() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_AGENT_DIR".to_string(),
+                message: format!(
+                    "{} exists but is not a directory: {}",
+                    X07_AGENT_DIR,
+                    rel(root, &agent_paths.agent_dir)
                 ),
             }),
         };
@@ -627,6 +732,8 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
                 command: "init",
                 root: root.display().to_string(),
                 created,
+                notes: Vec::new(),
+                next_steps: Vec::new(),
                 error: Some(InitError {
                     code: "X07INIT_GITIGNORE".to_string(),
                     message: format!("ensure .gitignore: {err}"),
@@ -637,11 +744,30 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
         }
     }
 
+    if let Err(err) = init_agent_kit(root, &agent_paths, &mut created) {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created,
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_AGENT".to_string(),
+                message: format!("{err:#}"),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
     let report = InitReport {
         ok: true,
         command: "init",
         root: root.display().to_string(),
         created,
+        notes: init_notes(),
+        next_steps: init_next_steps(),
         error: None,
     };
     println!("{}", serde_json::to_string(&report)?);
@@ -672,6 +798,25 @@ struct PackageInitPaths {
     tests_manifest: PathBuf,
 }
 
+struct AgentKitPaths {
+    toolchain_toml: PathBuf,
+    agent_dir: PathBuf,
+    agent_md: PathBuf,
+    agent_skills_dir: PathBuf,
+}
+
+impl AgentKitPaths {
+    fn new(root: &Path) -> Self {
+        let agent_dir = root.join(X07_AGENT_DIR);
+        Self {
+            toolchain_toml: root.join(X07_TOOLCHAIN_TOML),
+            agent_md: root.join("AGENT.md"),
+            agent_skills_dir: agent_dir.join("skills"),
+            agent_dir,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct PackageIds {
     tail: String,
@@ -699,6 +844,8 @@ fn print_io_error(
         command: "init",
         root: root.display().to_string(),
         created: created.to_vec(),
+        notes: Vec::new(),
+        next_steps: Vec::new(),
         error: Some(InitError {
             code: "X07INIT_IO".to_string(),
             message: format!("write {path_hint}: {err}"),
@@ -706,6 +853,189 @@ fn print_io_error(
     };
     println!("{}", serde_json::to_string(&report)?);
     Ok(std::process::ExitCode::from(20))
+}
+
+fn init_notes() -> Vec<String> {
+    vec![
+        "Agent kit: AGENT.md (self-recovery + canonical commands)".to_string(),
+        format!("Toolchain pin: {X07_TOOLCHAIN_TOML} (channel=stable; components=docs+skills)"),
+        format!("Project skills: {X07_AGENT_DIR}/skills/"),
+        "Offline docs: x07up docs path --json".to_string(),
+        "Skills status: x07up skills status --json".to_string(),
+    ]
+}
+
+fn init_next_steps() -> Vec<String> {
+    vec![
+        "x07 run".to_string(),
+        "x07 test --manifest tests/tests.json".to_string(),
+    ]
+}
+
+fn init_agent_kit(root: &Path, paths: &AgentKitPaths, created: &mut Vec<String>) -> Result<()> {
+    let toolchain_root = detect_toolchain_root().context("detect active toolchain root")?;
+
+    let toolchain_toml = toolchain_toml_bytes("stable");
+    write_new_file(&paths.toolchain_toml, &toolchain_toml)
+        .with_context(|| format!("write {}", paths.toolchain_toml.display()))?;
+    created.push(rel(root, &paths.toolchain_toml));
+
+    let skills_src =
+        resolve_skills_pack_root(&toolchain_root).context("locate toolchain skills pack")?;
+    copy_dir_recursive_filtered(&skills_src, &paths.agent_skills_dir).with_context(|| {
+        format!(
+            "copy skills {} -> {}",
+            skills_src.display(),
+            paths.agent_skills_dir.display()
+        )
+    })?;
+    created.push(rel(root, &paths.agent_skills_dir));
+
+    let docs_root = toolchain_docs_root(&toolchain_root);
+    let toolchain_version = toolchain_id_for_agent_md(&toolchain_root);
+    let rendered = render_agent_md(
+        &toolchain_version,
+        "stable",
+        &docs_root.display().to_string(),
+        &paths.agent_skills_dir.display().to_string(),
+    );
+    write_new_file(&paths.agent_md, rendered.as_bytes())
+        .with_context(|| format!("write {}", paths.agent_md.display()))?;
+    created.push(rel(root, &paths.agent_md));
+
+    Ok(())
+}
+
+fn toolchain_toml_bytes(channel: &str) -> Vec<u8> {
+    format!(
+        "[toolchain]\nchannel = \"{}\"\ncomponents = [\"docs\", \"skills\"]\n",
+        channel.trim()
+    )
+    .into_bytes()
+}
+
+fn render_agent_md(
+    toolchain_version: &str,
+    channel: &str,
+    docs_root: &str,
+    skills_root: &str,
+) -> String {
+    AGENT_TEMPLATE_MD
+        .replace("{{X07_TOOLCHAIN_VERSION}}", toolchain_version)
+        .replace("{{X07_CHANNEL}}", channel)
+        .replace("{{X07_DOCS_ROOT}}", docs_root)
+        .replace("{{X07_SKILLS_ROOT}}", skills_root)
+}
+
+fn detect_toolchain_root() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    for anc in exe.ancestors() {
+        let stdlib_lock = anc.join("stdlib.lock");
+        if stdlib_lock.is_file() {
+            return Some(anc.to_path_buf());
+        }
+    }
+    None
+}
+
+fn toolchain_docs_root(toolchain_root: &Path) -> PathBuf {
+    let agent_docs = toolchain_root.join(X07_AGENT_DIR).join("docs");
+    if agent_docs.is_dir() {
+        return agent_docs;
+    }
+    let dev_docs = toolchain_root.join("docs");
+    if dev_docs.is_dir() {
+        return dev_docs;
+    }
+    agent_docs
+}
+
+fn toolchain_id_for_agent_md(toolchain_root: &Path) -> String {
+    let fallback = format!("v{}", env!("CARGO_PKG_VERSION"));
+    let Some(name) = toolchain_root.file_name().and_then(|s| s.to_str()) else {
+        return fallback;
+    };
+
+    // Installed toolchains usually look like:
+    //   stable-<target>-vX.Y.Z
+    //   vX.Y.Z
+    // In dev builds the toolchain root is often the repo root ("x07"), which we avoid leaking.
+    if (name.starts_with('v') && name[1..].chars().next().is_some_and(|c| c.is_ascii_digit()))
+        || name.contains("-v")
+    {
+        return name.to_string();
+    }
+    fallback
+}
+
+fn resolve_skills_pack_root(toolchain_root: &Path) -> Result<PathBuf> {
+    let agent_skills = toolchain_root.join(X07_AGENT_DIR).join("skills");
+    if agent_skills.is_dir() {
+        return Ok(agent_skills);
+    }
+
+    let dev_skills = toolchain_root
+        .join("skills")
+        .join("pack")
+        .join(X07_AGENT_DIR)
+        .join("skills");
+    if dev_skills.is_dir() {
+        return Ok(dev_skills);
+    }
+
+    anyhow::bail!(
+        "skills pack not found (expected either {} or {})",
+        agent_skills.display(),
+        dev_skills.display()
+    );
+}
+
+fn copy_dir_recursive_filtered(src: &Path, dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst).with_context(|| format!("create dir: {}", dst.display()))?;
+
+    let mut entries: Vec<_> = std::fs::read_dir(src)
+        .with_context(|| format!("read dir: {}", src.display()))?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .with_context(|| format!("read dir entries: {}", src.display()))?;
+    entries.sort_by_key(|e| e.file_name());
+
+    for entry in entries {
+        let src_path = entry.path();
+        let file_name = entry.file_name();
+        let name = file_name.to_string_lossy();
+        if name == ".DS_Store" || name.starts_with("._") {
+            continue;
+        }
+
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("read file type: {}", src_path.display()))?;
+        let dst_path = dst.join(&file_name);
+
+        if file_type.is_dir() {
+            copy_dir_recursive_filtered(&src_path, &dst_path)?;
+            continue;
+        }
+
+        if file_type.is_file() {
+            std::fs::copy(&src_path, &dst_path).with_context(|| {
+                format!(
+                    "copy file: {} -> {}",
+                    src_path.display(),
+                    dst_path.display()
+                )
+            })?;
+            continue;
+        }
+
+        anyhow::bail!(
+            "unsupported file type in {}: {}",
+            src.display(),
+            src_path.display()
+        );
+    }
+
+    Ok(())
 }
 
 fn sanitize_pkg_name(raw: &str) -> String {

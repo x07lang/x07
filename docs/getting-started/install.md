@@ -10,7 +10,7 @@ The recommended installer is `x07up` (toolchain manager). It installs:
 
 - the toolchain under `~/.x07/toolchains/<tag>/`
 - shims under `~/.x07/bin/` (put this on `PATH`)
-- offline docs + the Codex skills pack (default profile)
+- offline docs + the agent skills pack (default profile)
 
 Quickstart and full installer reference:
 
@@ -94,7 +94,7 @@ Verify:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.0.57
+x07up override set v0.0.58
 ```
 
 This makes toolchain selection deterministic for agents and CI.

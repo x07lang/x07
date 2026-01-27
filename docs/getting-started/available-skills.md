@@ -1,10 +1,12 @@
-# Available Codex skills (agent kit)
+# Available agent skills (agent kit)
 
-The X07 toolchain ships an optional “skills pack” for coding agents (Codex). Skills are **project playbooks**: they encode canonical workflows, command invocations, and recovery steps so agents can keep going without guessing.
+The X07 toolchain ships an optional “skills pack” for coding agents. Skills are **project playbooks**: they encode canonical workflows, command invocations, and recovery steps so agents can keep going without guessing.
 
 ## Install
 
-Install the skills pack with `x07up`:
+If you ran `x07 init`, project-scoped skills are installed automatically under `.agent/skills/`.
+
+To install the skills pack with `x07up`:
 
 - user-scoped (recommended for a workstation): `x07up skills install --user`
 - project-scoped (recommended for CI/containers): `x07up skills install --project .`
@@ -13,11 +15,9 @@ Verify installation:
 
 - `x07up skills status --json`
 
-If you used `x07up agent init --with-skills ...`, skills are installed automatically.
-
 ## Skills included
 
-All skills live under `.codex/skills/<skill-name>/SKILL.md`.
+All skills live under `.agent/skills/<skill-name>/SKILL.md`.
 
 | Skill | Purpose |
 |---|---|

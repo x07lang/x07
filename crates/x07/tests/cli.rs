@@ -252,11 +252,16 @@ fn x07_init_creates_project_skeleton() {
         "x07.lock.json",
         "src/app.x07.json",
         "src/main.x07.json",
+        "x07-toolchain.toml",
+        "AGENT.md",
+        ".agent/skills/README.md",
+        ".agent/skills/x07-agent-playbook/SKILL.md",
         ".gitignore",
     ] {
         assert!(dir.join(rel).is_file(), "missing {}", rel);
     }
     assert!(!dir.join("x07-package.json").exists());
+    assert!(!dir.join(".codex").exists(), ".codex must not be created");
 
     let out = run_x07_in_dir(&dir, &["pkg", "lock", "--project", "x07.json", "--check"]);
     assert_eq!(
@@ -302,6 +307,10 @@ fn x07_init_creates_package_skeleton() {
         "x07.json",
         "x07.lock.json",
         "x07-package.json",
+        "x07-toolchain.toml",
+        "AGENT.md",
+        ".agent/skills/README.md",
+        ".agent/skills/x07-agent-playbook/SKILL.md",
         "modules/ext/acme_hello_demo.x07.json",
         "modules/ext/acme_hello_demo/tests.x07.json",
         "tests/tests.json",

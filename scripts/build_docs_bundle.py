@@ -66,7 +66,7 @@ def write_docs_bundle(out_path: Path, docs_root: Path, tag: str) -> None:
                     if src.is_symlink():
                         raise SystemExit(f"ERROR: docs bundle does not support symlinks: {src}")
                     data = src.read_bytes()
-                    info = tarfile.TarInfo(name=f"docs/{rel_posix}")
+                    info = tarfile.TarInfo(name=f".agent/docs/{rel_posix}")
                     info.type = tarfile.REGTYPE
                     info.mode = 0o644
                     info.uid = 0
@@ -77,7 +77,7 @@ def write_docs_bundle(out_path: Path, docs_root: Path, tag: str) -> None:
                     info.size = len(data)
                     tf.addfile(info, io.BytesIO(data))
                 meta_data = docs_bundle_meta_bytes(tag)
-                meta_info = tarfile.TarInfo(name="docs/_bundle_meta.json")
+                meta_info = tarfile.TarInfo(name=".agent/docs/_bundle_meta.json")
                 meta_info.type = tarfile.REGTYPE
                 meta_info.mode = 0o644
                 meta_info.uid = 0

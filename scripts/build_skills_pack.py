@@ -79,32 +79,32 @@ def skills_pack_meta_bytes(tag: str) -> bytes:
 
 
 def build_skills_pack_bytes(root: Path, *, tag: str | None) -> bytes:
-    skills_root = root / "skills" / "pack" / ".codex" / "skills"
+    skills_root = root / "skills" / "pack" / ".agent" / "skills"
     if not skills_root.is_dir():
-        raise SystemExit("ERROR: missing skills/pack/.codex/skills/")
+        raise SystemExit("ERROR: missing skills/pack/.agent/skills/")
 
     dirs, files = iter_dirs_files(skills_root)
 
     out = io.BytesIO()
     with gzip.GzipFile(fileobj=out, mode="wb", mtime=0) as gz:
         with tarfile.open(fileobj=gz, mode="w") as tar:
-            add_dir(tar, ".codex")
-            add_dir(tar, ".codex/skills")
+            add_dir(tar, ".agent")
+            add_dir(tar, ".agent/skills")
             for d in dirs:
                 rel = d.relative_to(skills_root).as_posix()
-                add_dir(tar, f".codex/skills/{rel}")
+                add_dir(tar, f".agent/skills/{rel}")
             for f in files:
                 rel = f.relative_to(skills_root).as_posix()
-                add_file(tar, f, f".codex/skills/{rel}")
+                add_file(tar, f, f".agent/skills/{rel}")
             if tag is not None:
-                add_bytes(tar, skills_pack_meta_bytes(tag), ".codex/skills/_pack_meta.json")
+                add_bytes(tar, skills_pack_meta_bytes(tag), ".agent/skills/_pack_meta.json")
     return out.getvalue()
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="dist/x07-skills.tar.gz", help="Output path")
-    ap.add_argument("--tag", default=None, help="Release tag (for example: v0.0.57)")
+    ap.add_argument("--tag", default=None, help="Release tag (for example: v0.0.58)")
     ap.add_argument("--check", action="store_true", help="Validate determinism and (if present) output content")
     return ap.parse_args(argv)
 
