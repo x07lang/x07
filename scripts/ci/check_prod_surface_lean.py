@@ -106,7 +106,9 @@ def die(msg: str) -> None:
 def tracked_root_entries() -> list[str]:
     if (ROOT / ".git").exists():
         try:
-            out = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT)
+            out = subprocess.check_output(
+                ["git", "-c", f"safe.directory={ROOT}", "ls-files", "-z"], cwd=ROOT
+            )
             entries: set[str] = set()
             for raw in out.split(b"\0"):
                 if not raw:
@@ -121,7 +123,10 @@ def tracked_root_entries() -> list[str]:
             pass
 
     # Fallback: use filesystem entries (best-effort; includes untracked).
-    return sorted([p.name for p in ROOT.iterdir() if p.name not in {".git"}])
+    ignore = {"target", "tmp"}
+    return sorted(
+        [p.name for p in ROOT.iterdir() if p.name not in {".git"} and p.name not in ignore]
+    )
 
 
 def check_root_allowlist() -> None:
