@@ -45,7 +45,7 @@
         {
           "name": "full_app",
           "input_b64": "Y29uZmlnL2Z1bGxfYXBwLmpzb24=",
-          "expected_b64": "eyJlcnJvcnMiOjIsIm5hbWVzIjpbImFsaWNlIiwiYm9iIiwiYWxpY2UiXSwicmVwb3J0IjoicGhhc2VIMl9mdWxsIiwic2NvcmVfc3VtIjo2fQ==",
+          "expected_b64": "eyJlcnJvcnMiOjIsIm5hbWVzIjpbImFsaWNlIiwiYm9iIiwiYWxpY2UiXSwicmVwb3J0Ijoic3RkbGliX3Bhcml0eV9mdWxsIiwic2NvcmVfc3VtIjo2fQ==",
           "assertions": {
             "min_fs_read_file_calls": 3,
             "max_fs_read_file_calls": 4,

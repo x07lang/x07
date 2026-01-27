@@ -32,7 +32,7 @@
       "cases": [
         {
           "input_b64": "Y29uZmlnL2FwcC5qc29u",
-          "expected_b64": "eyJmaWxlcyI6WyJkYXRhL2EudHh0IiwiZGF0YS9iLnR4dCIsImRhdGEvYy50eHQiXSwicmVwb3J0IjoicGhhc2VIMl9mcyIsInRocmVzaG9sZCI6Mn0=",
+          "expected_b64": "eyJmaWxlcyI6WyJkYXRhL2EudHh0IiwiZGF0YS9iLnR4dCIsImRhdGEvYy50eHQiXSwicmVwb3J0Ijoic3RkbGliX3Bhcml0eV9mcyIsInRocmVzaG9sZCI6Mn0=",
           "name": "app_json",
           "assertions": {
             "min_fs_read_file_calls": 1,
