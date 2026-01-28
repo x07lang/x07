@@ -28,6 +28,8 @@ pub struct AstArgs {
 pub enum AstCommand {
     /// Emit a minimal x07AST entry/module template.
     Init(AstInitArgs),
+    /// Extract a subvalue by JSON Pointer (RFC 6901).
+    Get(AstGetArgs),
     /// Apply a JSON patch file to an x07AST JSON input.
     ApplyPatch(AstApplyPatchArgs),
     /// Validate an x07AST file (schema + optional diagnostics catalog).
@@ -107,6 +109,7 @@ pub fn cmd_ast(args: AstArgs) -> Result<std::process::ExitCode> {
 
     match cmd {
         AstCommand::Init(args) => cmd_init(args),
+        AstCommand::Get(args) => cmd_get(args),
         AstCommand::ApplyPatch(args) => cmd_apply_patch(args),
         AstCommand::Validate(args) => cmd_validate(args),
         AstCommand::Canon(args) => cmd_canon(args),
@@ -120,6 +123,31 @@ struct AstInitReport {
     schema_version: String,
     template_id: String,
     sha256: String,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AstGetArgs {
+    #[arg(long, value_name = "PATH")]
+    pub r#in: PathBuf,
+
+    #[arg(long, value_name = "JSON_POINTER")]
+    pub ptr: String,
+
+    #[arg(long, value_name = "PATH")]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Serialize)]
+struct AstGetReport {
+    ok: bool,
+    r#in: String,
+    ptr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    out: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<Value>,
 }
 
 fn cmd_init(args: AstInitArgs) -> Result<std::process::ExitCode> {
@@ -171,6 +199,92 @@ fn cmd_init(args: AstInitArgs) -> Result<std::process::ExitCode> {
         schema_version: X07AST_SCHEMA_VERSION.to_string(),
         template_id: format!("{}/{}@v1", args.world.as_str(), args.module),
         sha256: sha256_hex(&out_bytes),
+    };
+    print_json(&report)?;
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn cmd_get(args: AstGetArgs) -> Result<std::process::ExitCode> {
+    let input_bytes = match std::fs::read(&args.r#in) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            let report = AstGetReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                ptr: args.ptr.clone(),
+                out: args.out.as_ref().map(|p| p.display().to_string()),
+                error: Some(err.to_string()),
+                value: None,
+            };
+            print_json(&report)?;
+            return Ok(exit_with_error(err));
+        }
+    };
+
+    let doc: Value = match canonicalize_x07ast_bytes_to_value(&input_bytes) {
+        Ok(doc) => doc,
+        Err(_) => match serde_json::from_slice(&input_bytes) {
+            Ok(doc) => doc,
+            Err(err) => {
+                let report = AstGetReport {
+                    ok: false,
+                    r#in: args.r#in.display().to_string(),
+                    ptr: args.ptr.clone(),
+                    out: args.out.as_ref().map(|p| p.display().to_string()),
+                    error: Some(err.to_string()),
+                    value: None,
+                };
+                print_json(&report)?;
+                return Ok(exit_with_error(err));
+            }
+        },
+    };
+
+    let value = match json_pointer_get(&doc, &args.ptr) {
+        Ok(v) => v.clone(),
+        Err(msg) => {
+            let report = AstGetReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                ptr: args.ptr.clone(),
+                out: args.out.as_ref().map(|p| p.display().to_string()),
+                error: Some(msg),
+                value: None,
+            };
+            print_json(&report)?;
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    if let Some(out_path) = &args.out {
+        if out_path.as_os_str() == "-" {
+            let report = AstGetReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                ptr: args.ptr.clone(),
+                out: Some(out_path.display().to_string()),
+                error: Some(
+                    "--out '-' is not supported (stdout is reserved for the report)".to_string(),
+                ),
+                value: None,
+            };
+            print_json(&report)?;
+            return Ok(std::process::ExitCode::from(20));
+        }
+
+        let mut out_bytes = serde_json::to_string_pretty(&value)?.into_bytes();
+        out_bytes = with_trailing_newline(out_bytes);
+        write_atomic(out_path, &out_bytes)
+            .with_context(|| format!("write: {}", out_path.display()))?;
+    }
+
+    let report = AstGetReport {
+        ok: true,
+        r#in: args.r#in.display().to_string(),
+        ptr: args.ptr.clone(),
+        out: args.out.as_ref().map(|p| p.display().to_string()),
+        error: None,
+        value: Some(value),
     };
     print_json(&report)?;
     Ok(std::process::ExitCode::SUCCESS)
@@ -415,6 +529,74 @@ fn with_trailing_newline(mut bytes: Vec<u8>) -> Vec<u8> {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     util::sha256_hex(bytes)
+}
+
+fn json_pointer_get<'a>(doc: &'a Value, ptr: &str) -> Result<&'a Value, String> {
+    let ptr = ptr.trim();
+    if ptr.is_empty() {
+        return Ok(doc);
+    }
+    if !ptr.starts_with('/') {
+        return Err(format!(
+            "invalid JSON Pointer (expected leading '/'): {ptr:?}"
+        ));
+    }
+
+    let mut cur = doc;
+    for raw in ptr.split('/').skip(1) {
+        let token = unescape_json_pointer_token(raw)?;
+        match cur {
+            Value::Object(map) => {
+                cur = map
+                    .get(&token)
+                    .ok_or_else(|| format!("JSON Pointer not found at object key: {token:?}"))?;
+            }
+            Value::Array(arr) => {
+                let idx: usize = token.parse().map_err(|_| {
+                    format!("JSON Pointer array index is not an integer: {token:?}")
+                })?;
+                cur = arr
+                    .get(idx)
+                    .ok_or_else(|| format!("JSON Pointer array index out of bounds: {idx}"))?;
+            }
+            _ => {
+                return Err(format!(
+                    "JSON Pointer traversal hit non-container value at token: {token:?}"
+                ));
+            }
+        }
+    }
+    Ok(cur)
+}
+
+fn unescape_json_pointer_token(token: &str) -> Result<String, String> {
+    if !token.contains('~') {
+        return Ok(token.to_string());
+    }
+
+    let mut out = String::with_capacity(token.len());
+    let mut chars = token.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '~' {
+            out.push(ch);
+            continue;
+        }
+        match chars.next() {
+            Some('0') => out.push('~'),
+            Some('1') => out.push('/'),
+            Some(other) => {
+                return Err(format!(
+                    "invalid JSON Pointer escape sequence: ~{other} in {token:?}"
+                ))
+            }
+            None => {
+                return Err(format!(
+                    "invalid JSON Pointer escape sequence: '~' at end of {token:?}"
+                ))
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn validate_x07ast_doc(doc: &Value) -> Result<Vec<diagnostics::Diagnostic>> {

@@ -362,6 +362,12 @@ fn cmd_pkg_provides(args: ProvidesArgs) -> Result<std::process::ExitCode> {
 }
 
 fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
+    let (code, report) = pkg_add_report(&args)?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(code)
+}
+
+fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<AddResult>)> {
     let project_path = util::resolve_existing_path_upwards(&args.project);
 
     // Validate using the canonical parser for better error messages and stricter checks.
@@ -392,12 +398,12 @@ fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
                     message: format!("{err:#}"),
                 }),
             };
-            println!("{}", serde_json::to_string(&report)?);
-            return Ok(std::process::ExitCode::from(20));
+            return Ok((std::process::ExitCode::from(20), report));
         }
     };
     let dep_path = args
         .path
+        .clone()
         .unwrap_or_else(|| format!(".x07/deps/{name}/{version}"));
 
     let deps_val = obj
@@ -418,8 +424,7 @@ fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
                     message: format!("dependency already exists: {name}"),
                 }),
             };
-            println!("{}", serde_json::to_string(&report)?);
-            return Ok(std::process::ExitCode::from(20));
+            return Ok((std::process::ExitCode::from(20), report));
         }
     }
 
@@ -474,8 +479,7 @@ fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
                 result: Some(add_result),
                 error: lock_report.error,
             };
-            println!("{}", serde_json::to_string(&report)?);
-            return Ok(lock_code);
+            return Ok((lock_code, report));
         }
     }
 
@@ -485,8 +489,38 @@ fn cmd_pkg_add(args: AddArgs) -> Result<std::process::ExitCode> {
         result: Some(add_result),
         error: None,
     };
-    println!("{}", serde_json::to_string(&report)?);
-    Ok(std::process::ExitCode::SUCCESS)
+    Ok((std::process::ExitCode::SUCCESS, report))
+}
+
+pub(crate) fn pkg_add_sync_quiet(
+    project: PathBuf,
+    spec: String,
+    index: Option<String>,
+) -> Result<()> {
+    let args = AddArgs {
+        project,
+        sync: true,
+        index,
+        path: None,
+        spec,
+    };
+
+    let (_code, report) = pkg_add_report(&args)?;
+    if report.ok {
+        return Ok(());
+    }
+
+    let err_code = report.error.as_ref().map(|e| e.code.as_str()).unwrap_or("");
+    if err_code == "X07PKG_DEP_EXISTS" {
+        return Ok(());
+    }
+
+    let msg = report
+        .error
+        .as_ref()
+        .map(|e| e.message.clone())
+        .unwrap_or_else(|| "pkg.add failed".to_string());
+    anyhow::bail!("{msg}");
 }
 
 fn parse_pkg_spec(spec: &str) -> Result<(String, String)> {
@@ -1039,7 +1073,7 @@ fn requires_packages_from_manifest(dep_dir: &Path) -> Result<Vec<String>> {
     Ok(out)
 }
 
-fn official_ext_packages_dir() -> Option<PathBuf> {
+pub(crate) fn official_ext_packages_dir() -> Option<PathBuf> {
     if let Ok(v) = std::env::var("X07_REPO_ROOT") {
         let root = PathBuf::from(v);
         let cand = root.join("packages").join("ext");

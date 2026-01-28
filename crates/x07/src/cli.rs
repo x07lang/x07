@@ -1,23 +1,22 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use clap::Args;
 use jsonschema::Draft;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use x07c::project;
 
 use crate::util;
 
 const X07CLI_SPECROWS_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07cli.specrows.schema.json");
+const X07CLI_SPECROWS_CANON_ENTRY_BYTES: &[u8] =
+    include_bytes!("assets/x07cli_specrows_canon_v1.x07.json");
 const X07CLI_SPECROWS_COMPILE_ENTRY_BYTES: &[u8] =
     include_bytes!("assets/x07cli_specrows_compile_v1.x07.json");
-
-static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct X07CliDiagnostic {
@@ -123,7 +122,30 @@ struct SpecCheckReport {
 fn cmd_cli_spec_check(args: SpecCheckArgs) -> Result<std::process::ExitCode> {
     let in_path = util::resolve_existing_path_upwards(&args.r#in);
 
-    let (schema_diags, _) = validate_specrows_schema_file(&in_path)?;
+    let bytes = fs::read(&in_path).with_context(|| format!("read: {}", in_path.display()))?;
+    let doc: Value = match serde_json::from_slice(&bytes) {
+        Ok(v) => v,
+        Err(err) => {
+            let report = SpecCheckReport {
+                ok: false,
+                r#in: in_path.display().to_string(),
+                diag_out: args.diag_out.as_ref().map(|p| p.display().to_string()),
+                diagnostics_count: 1,
+                diagnostics: vec![X07CliDiagnostic {
+                    severity: "error".to_string(),
+                    code: "ECLI_JSON_PARSE".to_string(),
+                    scope: String::new(),
+                    row_index: -1,
+                    message: err.to_string(),
+                }],
+            };
+            write_diagnostics_if_requested(args.diag_out.as_ref(), &report.diagnostics)?;
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    let schema_diags = validate_specrows_schema_value(&doc)?;
     if !schema_diags.is_empty() {
         let report = SpecCheckReport {
             ok: false,
@@ -137,14 +159,27 @@ fn cmd_cli_spec_check(args: SpecCheckArgs) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::from(20));
     }
 
-    let semantic = run_semantic_check(&in_path)?;
-    let ok = !has_errors(&semantic.diagnostics);
+    let module_roots = infer_cli_module_roots_for_spec(&in_path)?;
+    let mut diagnostics: Vec<X07CliDiagnostic> = Vec::new();
+    let ok = match canon_specrows_v1(&module_roots, &bytes)? {
+        SpecrowsCanonOutput::Ok(_) => true,
+        SpecrowsCanonOutput::ErrCode(code) => {
+            diagnostics.push(X07CliDiagnostic {
+                severity: "error".to_string(),
+                code: "ECLI_SEMANTIC".to_string(),
+                scope: String::new(),
+                row_index: -1,
+                message: format!("ext.cli.specrows.compile failed (code={code})"),
+            });
+            false
+        }
+    };
     let report = SpecCheckReport {
         ok,
         r#in: in_path.display().to_string(),
         diag_out: args.diag_out.as_ref().map(|p| p.display().to_string()),
-        diagnostics_count: semantic.diagnostics.len(),
-        diagnostics: semantic.diagnostics,
+        diagnostics_count: diagnostics.len(),
+        diagnostics,
     };
     write_diagnostics_if_requested(args.diag_out.as_ref(), &report.diagnostics)?;
     println!("{}", serde_json::to_string(&report)?);
@@ -183,34 +218,68 @@ fn cmd_cli_spec_fmt(args: SpecFmtArgs) -> Result<std::process::ExitCode> {
     }
 
     let in_path = util::resolve_existing_path_upwards(&args.r#in);
-    let (schema_diags, _) = validate_specrows_schema_file(&in_path)?;
+    let bytes = fs::read(&in_path).with_context(|| format!("read: {}", in_path.display()))?;
+    let doc: Value = match serde_json::from_slice(&bytes) {
+        Ok(v) => v,
+        Err(err) => {
+            let diags = vec![X07CliDiagnostic {
+                severity: "error".to_string(),
+                code: "ECLI_JSON_PARSE".to_string(),
+                scope: String::new(),
+                row_index: -1,
+                message: err.to_string(),
+            }];
+            write_diags_stderr(&diags)?;
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+    let schema_diags = validate_specrows_schema_value(&doc)?;
     if !schema_diags.is_empty() {
         write_diags_stderr(&schema_diags)?;
         return Ok(std::process::ExitCode::from(20));
     }
 
-    let fmt = run_semantic_fmt(&in_path)?;
-    let has_errors = has_errors(&fmt.diagnostics);
-    if has_errors {
-        write_diags_stderr(&fmt.diagnostics)?;
-    }
+    let module_roots = match infer_cli_module_roots_for_spec(&in_path) {
+        Ok(r) => r,
+        Err(err) => {
+            let diags = vec![X07CliDiagnostic {
+                severity: "error".to_string(),
+                code: "ECLI_TOOL".to_string(),
+                scope: String::new(),
+                row_index: -1,
+                message: err.to_string(),
+            }];
+            write_diags_stderr(&diags)?;
+            return Ok(std::process::ExitCode::from(1));
+        }
+    };
+    let canon_json = match canon_specrows_v1(&module_roots, &bytes)? {
+        SpecrowsCanonOutput::Ok(b) => b,
+        SpecrowsCanonOutput::ErrCode(code) => {
+            let diags = vec![X07CliDiagnostic {
+                severity: "error".to_string(),
+                code: "ECLI_SEMANTIC".to_string(),
+                scope: String::new(),
+                row_index: -1,
+                message: format!("ext.cli.specrows.compile failed (code={code})"),
+            }];
+            write_diags_stderr(&diags)?;
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
 
     match (args.write, args.out.as_ref()) {
-        (true, _) => write_bytes(&in_path, &fmt.canon_json)?,
+        (true, _) => write_bytes(&in_path, &canon_json)?,
         (false, None) => {
-            std::io::stdout().write_all(&fmt.canon_json)?;
+            std::io::stdout().write_all(&canon_json)?;
         }
         (false, Some(out)) if out.as_os_str() == "-" => {
-            std::io::stdout().write_all(&fmt.canon_json)?;
+            std::io::stdout().write_all(&canon_json)?;
         }
-        (false, Some(out)) => write_bytes(out, &fmt.canon_json)?,
+        (false, Some(out)) => write_bytes(out, &canon_json)?,
     }
 
-    Ok(if has_errors {
-        std::process::ExitCode::from(20)
-    } else {
-        std::process::ExitCode::SUCCESS
-    })
+    Ok(std::process::ExitCode::SUCCESS)
 }
 
 #[derive(Debug, Serialize)]
@@ -228,7 +297,30 @@ fn cmd_cli_spec_compile(args: SpecCompileArgs) -> Result<std::process::ExitCode>
     let in_path = util::resolve_existing_path_upwards(&args.r#in);
     let out_path = args.out;
 
-    let (schema_diags, _) = validate_specrows_schema_file(&in_path)?;
+    let bytes = fs::read(&in_path).with_context(|| format!("read: {}", in_path.display()))?;
+    let doc: Value = match serde_json::from_slice(&bytes) {
+        Ok(v) => v,
+        Err(err) => {
+            let report = SpecCompileReport {
+                ok: false,
+                r#in: in_path.display().to_string(),
+                out: out_path.display().to_string(),
+                sha256: String::new(),
+                diagnostics_count: 1,
+                diagnostics: vec![X07CliDiagnostic {
+                    severity: "error".to_string(),
+                    code: "ECLI_JSON_PARSE".to_string(),
+                    scope: String::new(),
+                    row_index: -1,
+                    message: err.to_string(),
+                }],
+                tool_error: None,
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+    let schema_diags = validate_specrows_schema_value(&doc)?;
     if !schema_diags.is_empty() {
         let report = SpecCompileReport {
             ok: false,
@@ -243,22 +335,7 @@ fn cmd_cli_spec_compile(args: SpecCompileArgs) -> Result<std::process::ExitCode>
         return Ok(std::process::ExitCode::from(20));
     }
 
-    let fmt = run_semantic_fmt(&in_path)?;
-    if has_errors(&fmt.diagnostics) {
-        let report = SpecCompileReport {
-            ok: false,
-            r#in: in_path.display().to_string(),
-            out: out_path.display().to_string(),
-            sha256: String::new(),
-            diagnostics_count: fmt.diagnostics.len(),
-            diagnostics: fmt.diagnostics,
-            tool_error: None,
-        };
-        println!("{}", serde_json::to_string(&report)?);
-        return Ok(std::process::ExitCode::from(20));
-    }
-
-    let module_roots = match default_cli_module_roots() {
+    let module_roots = match infer_cli_module_roots_for_spec(&in_path) {
         Ok(r) => r,
         Err(err) => {
             let report = SpecCompileReport {
@@ -266,8 +343,8 @@ fn cmd_cli_spec_compile(args: SpecCompileArgs) -> Result<std::process::ExitCode>
                 r#in: in_path.display().to_string(),
                 out: out_path.display().to_string(),
                 sha256: String::new(),
-                diagnostics_count: fmt.diagnostics.len(),
-                diagnostics: fmt.diagnostics,
+                diagnostics_count: 0,
+                diagnostics: Vec::new(),
                 tool_error: Some(err.to_string()),
             };
             println!("{}", serde_json::to_string(&report)?);
@@ -275,17 +352,54 @@ fn cmd_cli_spec_compile(args: SpecCompileArgs) -> Result<std::process::ExitCode>
         }
     };
 
-    let compiled = match compile_specrows_v1(&module_roots, &fmt.canon_json) {
+    let canon_json = match canon_specrows_v1(&module_roots, &bytes)? {
+        SpecrowsCanonOutput::Ok(b) => b,
+        SpecrowsCanonOutput::ErrCode(code) => {
+            let diagnostics = vec![X07CliDiagnostic {
+                severity: "error".to_string(),
+                code: "ECLI_SEMANTIC".to_string(),
+                scope: String::new(),
+                row_index: -1,
+                message: format!("ext.cli.specrows.compile failed (code={code})"),
+            }];
+            let report = SpecCompileReport {
+                ok: false,
+                r#in: in_path.display().to_string(),
+                out: out_path.display().to_string(),
+                sha256: String::new(),
+                diagnostics_count: diagnostics.len(),
+                diagnostics,
+                tool_error: None,
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    if canon_json.is_empty() {
+        let report = SpecCompileReport {
+            ok: false,
+            r#in: in_path.display().to_string(),
+            out: out_path.display().to_string(),
+            sha256: String::new(),
+            diagnostics_count: 0,
+            diagnostics: Vec::new(),
+            tool_error: None,
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let compiled = match compile_specrows_v1(&module_roots, &canon_json) {
         Ok(SpecrowsCompileOutput::Ok(b)) => b,
         Ok(SpecrowsCompileOutput::ErrCode(code)) => {
-            let mut diagnostics = fmt.diagnostics;
-            diagnostics.push(X07CliDiagnostic {
+            let diagnostics = vec![X07CliDiagnostic {
                 severity: "error".to_string(),
                 code: "ECLI_COMPILE_FAILED".to_string(),
                 scope: String::new(),
                 row_index: -1,
                 message: format!("ext.cli.specrows.compile failed (code={code})"),
-            });
+            }];
             let report = SpecCompileReport {
                 ok: false,
                 r#in: in_path.display().to_string(),
@@ -308,8 +422,8 @@ fn cmd_cli_spec_compile(args: SpecCompileArgs) -> Result<std::process::ExitCode>
                 r#in: in_path.display().to_string(),
                 out: out_path.display().to_string(),
                 sha256: String::new(),
-                diagnostics_count: fmt.diagnostics.len(),
-                diagnostics: fmt.diagnostics,
+                diagnostics_count: 0,
+                diagnostics: Vec::new(),
                 tool_error: Some(err.to_string()),
             };
             println!("{}", serde_json::to_string(&report)?);
@@ -323,8 +437,8 @@ fn cmd_cli_spec_compile(args: SpecCompileArgs) -> Result<std::process::ExitCode>
         r#in: in_path.display().to_string(),
         out: out_path.display().to_string(),
         sha256: util::sha256_hex(&compiled),
-        diagnostics_count: fmt.diagnostics.len(),
-        diagnostics: fmt.diagnostics,
+        diagnostics_count: 0,
+        diagnostics: Vec::new(),
         tool_error: None,
     };
     println!("{}", serde_json::to_string(&report)?);
@@ -409,103 +523,6 @@ fn parse_compile_helper_output(output: &[u8]) -> Result<SpecrowsCompileOutput> {
     }
 }
 
-#[derive(Debug)]
-struct SemanticRun {
-    diagnostics: Vec<X07CliDiagnostic>,
-    canon_json: Vec<u8>,
-}
-
-#[derive(Debug)]
-struct SemanticCheck {
-    diagnostics: Vec<X07CliDiagnostic>,
-}
-
-fn run_semantic_check(spec_path: &Path) -> Result<SemanticCheck> {
-    let python = python_bin();
-    let script = semantic_script_path()?;
-
-    let output = Command::new(python)
-        .arg(script)
-        .arg("check")
-        .arg(spec_path)
-        .arg("--diag-out")
-        .arg("-")
-        .output()
-        .with_context(|| format!("run semantic validator: {}", spec_path.display()))?;
-
-    if !output.status.success() && output.status.code() != Some(1) {
-        anyhow::bail!(
-            "semantic validator failed unexpectedly (exit={:?})",
-            output.status.code()
-        );
-    }
-
-    let diags: X07CliDiagnosticsFile = serde_json::from_slice(&output.stdout)
-        .with_context(|| "parse semantic diagnostics JSON")?;
-    Ok(SemanticCheck {
-        diagnostics: diags.diagnostics,
-    })
-}
-
-fn run_semantic_fmt(spec_path: &Path) -> Result<SemanticRun> {
-    let python = python_bin();
-    let script = semantic_script_path()?;
-
-    let diag_path = tmp_path("x07cli_semantic", "diag.json");
-    let output = Command::new(python)
-        .arg(script)
-        .arg("fmt")
-        .arg(spec_path)
-        .arg("--diag-out")
-        .arg(&diag_path)
-        .arg("--out")
-        .arg("-")
-        .output()
-        .with_context(|| format!("run semantic formatter: {}", spec_path.display()))?;
-
-    if !output.status.success() && output.status.code() != Some(1) {
-        anyhow::bail!(
-            "semantic formatter failed unexpectedly (exit={:?})",
-            output.status.code()
-        );
-    }
-
-    let diag_bytes = fs::read(&diag_path)
-        .with_context(|| format!("read semantic diagnostics: {}", diag_path.display()))?;
-    let diags: X07CliDiagnosticsFile =
-        serde_json::from_slice(&diag_bytes).with_context(|| "parse semantic diagnostics JSON")?;
-
-    Ok(SemanticRun {
-        diagnostics: diags.diagnostics,
-        canon_json: output.stdout,
-    })
-}
-
-fn has_errors(diags: &[X07CliDiagnostic]) -> bool {
-    diags.iter().any(|d| d.severity == "error")
-}
-
-fn validate_specrows_schema_file(path: &Path) -> Result<(Vec<X07CliDiagnostic>, Value)> {
-    let bytes = fs::read(path).with_context(|| format!("read: {}", path.display()))?;
-    let doc: Value = match serde_json::from_slice(&bytes) {
-        Ok(v) => v,
-        Err(err) => {
-            return Ok((
-                vec![X07CliDiagnostic {
-                    severity: "error".to_string(),
-                    code: "ECLI_JSON_PARSE".to_string(),
-                    scope: String::new(),
-                    row_index: -1,
-                    message: err.to_string(),
-                }],
-                Value::Null,
-            ));
-        }
-    };
-    let diags = validate_specrows_schema_value(&doc)?;
-    Ok((diags, doc))
-}
-
 fn validate_specrows_schema_value(doc: &Value) -> Result<Vec<X07CliDiagnostic>> {
     let schema_json: Value =
         serde_json::from_slice(X07CLI_SPECROWS_SCHEMA_BYTES).context("parse SpecRows schema")?;
@@ -550,56 +567,203 @@ fn write_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn python_bin() -> String {
-    let configured = std::env::var("X07_PYTHON").unwrap_or_default();
-    if !configured.trim().is_empty() {
-        return configured;
-    }
-    let venv = util::resolve_existing_path_upwards(Path::new(".venv/bin/python"));
-    if venv.exists() {
-        return venv.display().to_string();
-    }
-    "python3".to_string()
-}
+fn infer_cli_module_roots_for_spec(spec_path: &Path) -> Result<Vec<PathBuf>> {
+    let toolchain_roots = toolchain_cli_spec_module_roots().ok();
+    let start_dir = spec_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let Some(project_path) = crate::run::discover_project_manifest(start_dir)? else {
+        return toolchain_roots
+            .ok_or_else(|| anyhow::anyhow!("could not find toolchain packages/ext directory"));
+    };
 
-fn semantic_script_path() -> Result<PathBuf> {
-    let path =
-        util::resolve_existing_path_upwards(Path::new("scripts/check_x07cli_specrows_semantic.py"));
-    if !path.exists() {
-        anyhow::bail!("missing semantic validator: {}", path.display());
-    }
-    Ok(path)
-}
+    let manifest =
+        project::load_project_manifest(&project_path).context("load project manifest")?;
+    let lock_path = project::default_lockfile_path(&project_path, &manifest);
 
-fn default_cli_module_roots() -> Result<Vec<PathBuf>> {
-    let candidates = [
-        PathBuf::from("stdlib/std/0.1.1/modules"),
-        PathBuf::from("packages/ext/x07-ext-cli/0.1.4/modules"),
-        PathBuf::from("packages/ext/x07-ext-data-model/0.1.3/modules"),
-        PathBuf::from("packages/ext/x07-ext-json-rs/0.1.3/modules"),
-    ];
-
-    let mut out = Vec::new();
-    for path in candidates {
-        let resolved = util::resolve_existing_path_upwards(&path);
-        if !resolved.exists() {
-            anyhow::bail!("missing module root: {}", path.display());
+    if lock_path.is_file() {
+        let lock_bytes = std::fs::read(&lock_path)
+            .with_context(|| format!("read lockfile: {}", lock_path.display()))?;
+        let lock: project::Lockfile = serde_json::from_slice(&lock_bytes)
+            .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?;
+        if project::verify_lockfile(&project_path, &manifest, &lock).is_ok() {
+            if let Ok(roots) = project::collect_module_roots(&project_path, &manifest, &lock) {
+                return Ok(merge_roots(toolchain_roots, roots));
+            }
         }
-        out.push(resolved);
     }
-    Ok(out)
+
+    let base = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+
+    let mut roots: Vec<PathBuf> = Vec::new();
+    for r in &manifest.module_roots {
+        roots.push(base.join(r));
+    }
+    for dep in &manifest.dependencies {
+        let dep_dir = base.join(&dep.path);
+        let (pkg, _, _) = project::load_package_manifest(&dep_dir).with_context(|| {
+            format!(
+                "load package manifest for {:?}@{:?} from {}",
+                dep.name,
+                dep.version,
+                dep_dir.display()
+            )
+        })?;
+        roots.push(dep_dir.join(pkg.module_root));
+    }
+
+    Ok(merge_roots(toolchain_roots, roots))
 }
 
-fn tmp_path(prefix: &str, file_name: &str) -> PathBuf {
-    let pid = std::process::id();
-    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let mut name = String::new();
-    name.push_str(prefix);
-    name.push('_');
-    name.push_str(&pid.to_string());
-    name.push('_');
-    name.push_str(&n.to_string());
-    name.push('_');
-    name.push_str(file_name);
-    std::env::temp_dir().join(name)
+fn merge_roots(toolchain: Option<Vec<PathBuf>>, project: Vec<PathBuf>) -> Vec<PathBuf> {
+    let Some(mut out) = toolchain else {
+        return project;
+    };
+    for r in project {
+        if !out.contains(&r) {
+            out.push(r);
+        }
+    }
+    out
+}
+
+fn toolchain_cli_spec_module_roots() -> Result<Vec<PathBuf>> {
+    let Some(ext_dir) = crate::pkg::official_ext_packages_dir() else {
+        anyhow::bail!("could not find toolchain packages/ext directory");
+    };
+
+    let mut roots: Vec<PathBuf> = Vec::new();
+    for name in ["ext-cli", "ext-data-model", "ext-json-rs", "ext-unicode-rs"] {
+        let versions_dir = ext_dir.join(format!("x07-{name}"));
+        let version = best_semver_version_dir(&versions_dir)
+            .with_context(|| format!("find installed {name} versions"))?;
+        let dep_dir = versions_dir.join(&version);
+        if !dep_dir.is_dir() {
+            anyhow::bail!(
+                "toolchain package is missing on disk: {name}@{version} (expected {})",
+                dep_dir.display()
+            );
+        }
+        let (pkg, _, _) = project::load_package_manifest(&dep_dir)
+            .with_context(|| format!("load package manifest: {}", dep_dir.display()))?;
+        roots.push(dep_dir.join(pkg.module_root));
+    }
+
+    roots.sort();
+    roots.dedup();
+    Ok(roots)
+}
+
+fn best_semver_version_dir(dir: &Path) -> Result<String> {
+    let mut best: Option<((u64, u64, u64), String)> = None;
+    for entry in std::fs::read_dir(dir).with_context(|| format!("read dir: {}", dir.display()))? {
+        let entry = entry.with_context(|| format!("read dir entry: {}", dir.display()))?;
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("read file type: {}", entry.path().display()))?;
+        if !file_type.is_dir() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().to_string();
+        let Some(v) = parse_semver3(&name) else {
+            continue;
+        };
+        match &best {
+            None => best = Some((v, name)),
+            Some((best_v, _)) if v > *best_v => best = Some((v, name)),
+            _ => {}
+        }
+    }
+    best.map(|(_, name)| name)
+        .ok_or_else(|| anyhow::anyhow!("no semver directories under {}", dir.display()))
+}
+
+fn parse_semver3(s: &str) -> Option<(u64, u64, u64)> {
+    let mut it = s.split('.');
+    let major = it.next()?.parse().ok()?;
+    let minor = it.next()?.parse().ok()?;
+    let patch = it.next()?.parse().ok()?;
+    if it.next().is_some() {
+        return None;
+    }
+    Some((major, minor, patch))
+}
+
+enum SpecrowsCanonOutput {
+    Ok(Vec<u8>),
+    ErrCode(i32),
+}
+
+fn canon_specrows_v1(module_roots: &[PathBuf], spec_json: &[u8]) -> Result<SpecrowsCanonOutput> {
+    let config = x07_host_runner::RunnerConfig {
+        world: x07_worlds::WorldId::SolvePure,
+        fixture_fs_dir: None,
+        fixture_fs_root: None,
+        fixture_fs_latency_index: None,
+        fixture_rr_dir: None,
+        fixture_rr_index: None,
+        fixture_kv_dir: None,
+        fixture_kv_seed: None,
+        solve_fuel: 50_000_000,
+        max_memory_bytes: 64 * 1024 * 1024,
+        max_output_bytes: 64 * 1024 * 1024,
+        cpu_time_limit_seconds: 30,
+        debug_borrow_checks: false,
+    };
+
+    let compile_options = x07_host_runner::compile_options_for_world(
+        x07_worlds::WorldId::SolvePure,
+        module_roots.to_vec(),
+    )?;
+    let result = x07_host_runner::compile_and_run_with_options(
+        X07CLI_SPECROWS_CANON_ENTRY_BYTES,
+        &config,
+        spec_json,
+        None,
+        &compile_options,
+    )?;
+
+    if !result.compile.ok {
+        let msg = result
+            .compile
+            .compile_error
+            .as_deref()
+            .unwrap_or("compile failed");
+        anyhow::bail!("{msg}");
+    }
+
+    let Some(run) = result.solve else {
+        anyhow::bail!("internal error: compile succeeded but solve did not run");
+    };
+    if !run.ok || run.exit_status != 0 {
+        anyhow::bail!(
+            "internal error: canon helper failed (ok={} exit_status={})",
+            run.ok,
+            run.exit_status
+        );
+    }
+
+    parse_canon_helper_output(&run.solve_output)
+}
+
+fn parse_canon_helper_output(output: &[u8]) -> Result<SpecrowsCanonOutput> {
+    let Some((&tag, payload)) = output.split_first() else {
+        anyhow::bail!("internal error: empty canon helper output");
+    };
+
+    match tag {
+        1 => Ok(SpecrowsCanonOutput::Ok(payload.to_vec())),
+        0 => {
+            if payload.len() < 4 {
+                anyhow::bail!("internal error: truncated canon error output");
+            }
+            let code = u32::from_le_bytes(payload[0..4].try_into().unwrap()) as i32;
+            Ok(SpecrowsCanonOutput::ErrCode(code))
+        }
+        _ => anyhow::bail!("internal error: unknown canon helper tag={tag}"),
+    }
 }

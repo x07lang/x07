@@ -1,0 +1,26 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-db-core",
+  "description": "Database interfaces, query specs, and pooling (run-os only).",
+  "docs": "Database interfaces, query specs, and pooling (run-os only).\n\nModules:\n- std.db\n- std.db.spec\n- std.db.params\n- std.db.pool\n- std.db.dm\n\nUsage:\n- Add dependency: x07 pkg add ext-db-core@0.1.5\n- Import the modules listed above.\n",
+  "version": "0.1.5",
+  "module_root": "modules",
+  "modules": [
+    "std.db",
+    "std.db.spec",
+    "std.db.params",
+    "std.db.pool",
+    "std.db.dm"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "requires_packages": [
+      "ext-data-model@0.1.4"
+    ],
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

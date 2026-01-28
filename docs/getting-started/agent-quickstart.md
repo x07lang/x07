@@ -83,7 +83,9 @@ x07 run
 
 See: [Running programs](../toolchain/running-programs.md).
 
-Diagnostics tip: many compiler errors include `ptr=/...` (a JSON Pointer into your x07AST) and sometimes `moved_ptr=/...` for ownership errors; use these to jump to the exact failing node in the `*.x07.json`.
+Diagnostics tip: many compiler errors include `ptr=/...` (a JSON Pointer into your x07AST) and sometimes `moved_ptr=/...` for ownership errors. Use `x07 ast get --in src/main.x07.json --ptr /...` to extract the failing node without manually counting indexes.
+
+Dependency tip: when compilation fails due to a missing module and prints `hint: x07 pkg add ... --sync`, `x07 run` can apply the hinted package add automatically and retry.
 
 Run report tip: in `run-os`, the `rr_*` counters in `x07 run --report ...` are record/replay adapter stats and are not a count of real OS network requests.
 

@@ -137,3 +137,94 @@ fn lint_quickfix_removes_forbidden_imports() {
     assert!(!file.imports.contains("std.fs"));
     assert!(file.imports.contains("std.bytes"));
 }
+
+#[test]
+fn lint_quickfix_copies_bytes_view_for_if_condition() {
+    let mut doc = parse_doc(
+        r#"
+        {
+          "schema_version":"x07.x07ast@0.2.0",
+          "kind":"entry",
+          "module_id":"main",
+          "imports":[],
+          "decls":[],
+          "solve":["begin",
+            ["let","resp",["bytes.alloc",0]],
+            ["if",
+              ["=",["view.len",["bytes.view","resp"]],0],
+              ["bytes.alloc",0],
+              ["view.to_bytes",["bytes.view","resp"]]
+            ]
+          ]
+        }
+        "#,
+    );
+
+    let doc_bytes = serde_json::to_vec(&doc).expect("serialize doc");
+    let mut file = x07ast::parse_x07ast_json(&doc_bytes).expect("parse x07ast");
+    x07ast::canonicalize_x07ast_file(&mut file);
+    let report = lint::lint_file(&file, lint::LintOptions::default());
+    assert!(!report.ok, "expected lint errors");
+
+    let d = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "X07-MOVE-0002")
+        .expect("expected move diagnostic");
+    let q = d.quickfix.as_ref().expect("expected quickfix");
+    assert_eq!(q.kind, QuickfixKind::JsonPatch);
+    json_patch::apply_patch(&mut doc, &q.patch).expect("apply quickfix patch");
+
+    let patched_bytes = serde_json::to_vec(&doc).expect("serialize patched");
+    let file = x07ast::parse_x07ast_json(&patched_bytes).expect("reparse patched");
+    let solve = file.solve.expect("solve present");
+    let x07c::ast::Expr::List { items, .. } = solve else {
+        panic!("solve must be a list after patch");
+    };
+    assert_eq!(items[0].as_ident(), Some("begin"));
+
+    let x07c::ast::Expr::List {
+        items: inner_items, ..
+    } = &items[2]
+    else {
+        panic!("expected nested begin at /solve/2");
+    };
+    assert_eq!(inner_items[0].as_ident(), Some("begin"));
+
+    let x07c::ast::Expr::List {
+        items: let_items, ..
+    } = &inner_items[1]
+    else {
+        panic!("expected let binding in nested begin");
+    };
+    assert_eq!(let_items[0].as_ident(), Some("let"));
+    assert_eq!(let_items[1].as_ident(), Some("_x07_tmp_copy"));
+
+    let x07c::ast::Expr::List {
+        items: if_items, ..
+    } = &inner_items[2]
+    else {
+        panic!("expected if in nested begin");
+    };
+    assert_eq!(if_items[0].as_ident(), Some("if"));
+
+    fn find_bytes_view_owner(expr: &x07c::ast::Expr) -> Option<String> {
+        match expr {
+            x07c::ast::Expr::Int { .. } | x07c::ast::Expr::Ident { .. } => None,
+            x07c::ast::Expr::List { items, .. } => {
+                if items.len() == 2 && items[0].as_ident() == Some("bytes.view") {
+                    return items[1].as_ident().map(|s| s.to_string());
+                }
+                for item in items {
+                    if let Some(v) = find_bytes_view_owner(item) {
+                        return Some(v);
+                    }
+                }
+                None
+            }
+        }
+    }
+
+    let cond_owner = find_bytes_view_owner(&if_items[1]).expect("expected bytes.view in if cond");
+    assert_eq!(cond_owner, "_x07_tmp_copy");
+}

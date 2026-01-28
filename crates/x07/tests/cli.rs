@@ -1209,3 +1209,77 @@ fn x07_cli_spec_compile_writes_bytes() {
     let sha = report["sha256"].as_str().expect("sha256");
     assert_eq!(sha.len(), 64, "expected sha256 hex");
 }
+
+#[test]
+fn x07_ast_get_extracts_json_pointer() {
+    let root = repo_root();
+    let path = root.join("target/tmp_x07_ast_get.json");
+    let doc = r#"{"a":[1,2,{"b":"c"}]}"#;
+    write_bytes(&path, doc.as_bytes());
+
+    let out = run_x07(&[
+        "ast",
+        "get",
+        "--in",
+        path.to_str().unwrap(),
+        "--ptr",
+        "/a/2/b",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["ptr"], "/a/2/b");
+    assert_eq!(v["value"], "c");
+}
+
+#[test]
+fn x07_run_auto_adds_missing_external_package() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_auto_deps");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let app = r#"{"schema_version":"x07.x07ast@0.2.0","kind":"module","module_id":"app","imports":["ext.json.data_model"],"decls":[{"kind":"export","names":["app.solve"]},{"kind":"defn","name":"app.solve","params":[],"result":"bytes","body":["begin",["let","json",["bytes.lit","{\"x\":1}"]],["ext.json.data_model.parse",["bytes.view","json"]]]}]}"#;
+    write_bytes(&dir.join("src/app.x07.json"), app.as_bytes());
+    let main = r#"{"schema_version":"x07.x07ast@0.2.0","kind":"entry","module_id":"main","imports":["app"],"decls":[],"solve":["app.solve"]}"#;
+    write_bytes(&dir.join("src/main.x07.json"), main.as_bytes());
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env_remove("X07_INTERNAL_AUTO_DEPS")
+        .args(["run", "--project", "x07.json"])
+        .output()
+        .expect("run x07");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let proj: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    let deps = proj["dependencies"].as_array().expect("dependencies[]");
+    assert!(
+        deps.iter().any(|d| d["name"] == "ext-json-rs"),
+        "expected auto-added ext-json-rs dependency"
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}

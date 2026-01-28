@@ -212,6 +212,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Ast(args)) => match &args.cmd {
                 None => vec!["ast"],
                 Some(ast::AstCommand::Init(_)) => vec!["ast", "init"],
+                Some(ast::AstCommand::Get(_)) => vec!["ast", "get"],
                 Some(ast::AstCommand::ApplyPatch(_)) => vec!["ast", "apply-patch"],
                 Some(ast::AstCommand::Validate(_)) => vec!["ast", "validate"],
                 Some(ast::AstCommand::Canon(_)) => vec!["ast", "canon"],

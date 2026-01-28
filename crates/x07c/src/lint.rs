@@ -551,6 +551,112 @@ fn lint_core_borrow_rules(
 }
 
 fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<Diagnostic>) {
+    if head == "if" && items.len() == 4 {
+        let cond = &items[1];
+        let then_branch = &items[2];
+        let else_branch = &items[3];
+
+        fn collect_bytes_view_idents(expr: &Expr, out: &mut std::collections::BTreeSet<String>) {
+            match expr {
+                Expr::Int { .. } | Expr::Ident { .. } => {}
+                Expr::List { items, .. } => {
+                    if items.len() == 2 && items[0].as_ident() == Some("bytes.view") {
+                        if let Some(name) = items[1].as_ident() {
+                            out.insert(name.to_string());
+                        }
+                    }
+                    for item in items {
+                        collect_bytes_view_idents(item, out);
+                    }
+                }
+            }
+        }
+
+        fn rewrite_bytes_view_owner(expr: &Expr, from: &str, to: &str) -> Expr {
+            match expr {
+                Expr::Int { .. } => expr.clone(),
+                Expr::Ident { name, .. } => expr_ident(name.clone()),
+                Expr::List { items, .. } => {
+                    if items.len() == 2
+                        && items[0].as_ident() == Some("bytes.view")
+                        && items[1].as_ident() == Some(from)
+                    {
+                        return expr_list(vec![
+                            expr_ident("bytes.view"),
+                            expr_ident(to.to_string()),
+                        ]);
+                    }
+                    let new_items: Vec<Expr> = items
+                        .iter()
+                        .map(|it| rewrite_bytes_view_owner(it, from, to))
+                        .collect();
+                    expr_list(new_items)
+                }
+            }
+        }
+
+        let mut cond_owners = std::collections::BTreeSet::new();
+        let mut branch_owners = std::collections::BTreeSet::new();
+        collect_bytes_view_idents(cond, &mut cond_owners);
+        collect_bytes_view_idents(then_branch, &mut branch_owners);
+        collect_bytes_view_idents(else_branch, &mut branch_owners);
+
+        let mut duplicates: Vec<String> =
+            cond_owners.intersection(&branch_owners).cloned().collect();
+        duplicates.sort();
+
+        if let Some(name) = duplicates.first() {
+            let tmp = "_x07_tmp_copy";
+            let cond_fixed = rewrite_bytes_view_owner(cond, name, tmp);
+
+            let fixed = expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(tmp.to_string()),
+                    expr_list(vec![
+                        expr_ident("view.to_bytes"),
+                        expr_ident(name.to_string()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("if"),
+                    cond_fixed,
+                    then_branch.clone(),
+                    else_branch.clone(),
+                ]),
+            ]);
+
+            diagnostics.push(Diagnostic {
+                code: "X07-MOVE-0002".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Lint,
+                message: "if uses bytes.view of the same identifier in condition and branch"
+                    .to_string(),
+                loc: Some(Location::X07Ast {
+                    ptr: ptr.to_string(),
+                }),
+                notes: vec![
+                    "bytes.view borrows from an owned bytes value and is move-sensitive. Using it in both the condition and a branch can trigger a use-after-move during compilation."
+                        .to_string(),
+                    "Suggested fix: copy the bytes for the condition (for example via view.to_bytes) and use the copy in the condition."
+                        .to_string(),
+                ],
+                related: Vec::new(),
+                data: Default::default(),
+                quickfix: Some(Quickfix {
+                    kind: QuickfixKind::JsonPatch,
+                    patch: vec![PatchOp::Replace {
+                        path: ptr.to_string(),
+                        value: x07ast::expr_to_value(&fixed),
+                    }],
+                    note: Some("Copy bytes for if condition".to_string()),
+                }),
+            });
+            return;
+        }
+    }
+
     if head != "bytes.concat" || items.len() != 3 {
         return;
     }

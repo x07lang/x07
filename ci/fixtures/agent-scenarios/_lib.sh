@@ -315,5 +315,5 @@ run_tests_report() {
 diff_snapshot() {
   local expected_dir="$1"
   local work="$2"
-  diff -ru "$expected_dir" "$work"
+  diff -ru -x .x07 "$expected_dir" "$work"
 }

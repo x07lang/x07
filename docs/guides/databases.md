@@ -66,6 +66,38 @@ Database query results are returned as **DataModel** documents, so you can:
 - Decode results into DataModel
 - Keep query-building deterministic
 
+## Parameter binding (`params_doc`)
+
+`std.db.*.exec_v1` and `std.db.*.query_v1` take `params_doc: bytes`, a **DataModel document**
+whose root is a **sequence of DataModel values** (one value per SQL placeholder like `?`).
+
+Helpers for common cases (from `std.db.params`):
+
+- No params: `std.db.params.empty_v1()`
+- 1 string param: `std.db.params.one_string_v1(bytes.lit("alice"))`
+- 1 number param (decimal ASCII): `std.db.params.one_number_dec_v1(bytes.lit("42"))`
+- 1 null param: `std.db.params.one_null_v1()`
+- 1 bool param: `std.db.params.one_bool_v1(1)` (true) / `std.db.params.one_bool_v1(0)` (false)
+
+For **multiple parameters**, build a DataModel sequence and wrap it as a doc:
+
+```json
+[
+  "begin",
+  ["let", "v_name", ["ext.data_model.value_string", ["bytes.view", ["bytes.lit", "alice"]]]],
+  ["let", "v_age", ["ext.data_model.value_number", ["bytes.view", ["bytes.lit", "42"]]]],
+  ["let", "elems", ["vec_u8.with_capacity", 0]],
+  ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", 2]]],
+  ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", ["bytes.len", "v_name"]]]],
+  ["set", "elems", ["vec_u8.extend_bytes", "elems", "v_name"]],
+  ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", ["bytes.len", "v_age"]]]],
+  ["set", "elems", ["vec_u8.extend_bytes", "elems", "v_age"]],
+  ["let", "elems_b", ["vec_u8.into_bytes", "elems"]],
+  ["let", "seq_val", ["ext.data_model.value_seq_from_elems", ["bytes.view", "elems_b"]]],
+  ["ext.data_model.doc_ok", ["bytes.view", "seq_val"]]
+]
+```
+
 ## Pools and concurrency
 
 - pools are deterministic wrappers around OS connections

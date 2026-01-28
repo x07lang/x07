@@ -1,40 +1,62 @@
 {
-  "schema_version": "x07.project@0.2.0",
-  "world": "run-os",
-  "entry": "src/main.x07.json",
-  "module_roots": [
-    "src"
-  ],
+  "default_profile": "os",
   "dependencies": [
     {
       "name": "ext-bigint-rs",
-      "version": "0.1.1",
-      "path": ".x07/deps/ext-bigint-rs/0.1.1"
+      "path": ".x07/deps/ext-bigint-rs/0.1.1",
+      "version": "0.1.1"
     },
     {
       "name": "ext-data-model",
-      "version": "0.1.3",
-      "path": ".x07/deps/ext-data-model/0.1.3"
+      "path": ".x07/deps/ext-data-model/0.1.4",
+      "version": "0.1.4"
     },
     {
       "name": "ext-decimal-rs",
-      "version": "0.1.1",
-      "path": ".x07/deps/ext-decimal-rs/0.1.1"
+      "path": ".x07/deps/ext-decimal-rs/0.1.1",
+      "version": "0.1.1"
     },
     {
       "name": "ext-error",
-      "version": "0.1.3",
-      "path": ".x07/deps/ext-error/0.1.3"
+      "path": ".x07/deps/ext-error/0.1.3",
+      "version": "0.1.3"
+    },
+    {
+      "name": "ext-json-rs",
+      "path": ".x07/deps/ext-json-rs/0.1.3",
+      "version": "0.1.3"
     },
     {
       "name": "ext-msgpack-rs",
-      "version": "0.1.1",
-      "path": ".x07/deps/ext-msgpack-rs/0.1.1"
+      "path": ".x07/deps/ext-msgpack-rs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-toml-rs",
+      "path": ".x07/deps/ext-toml-rs/0.1.3",
+      "version": "0.1.3"
+    },
+    {
+      "name": "ext-unicode-rs",
+      "path": ".x07/deps/ext-unicode-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-yaml-rs",
+      "path": ".x07/deps/ext-yaml-rs/0.1.3",
+      "version": "0.1.3"
     }
   ],
+  "entry": "src/main.x07.json",
   "lockfile": "x07.lock.json",
-  "default_profile": "os",
+  "module_roots": [
+    "src"
+  ],
   "profiles": {
-    "os": { "world": "run-os" }
-  }
+    "os": {
+      "world": "run-os"
+    }
+  },
+  "schema_version": "x07.project@0.2.0",
+  "world": "run-os"
 }

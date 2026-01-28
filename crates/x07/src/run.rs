@@ -8,6 +8,7 @@ use base64::Engine;
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
+use serde_json::Value;
 use x07_contracts::{PROJECT_LOCKFILE_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION};
 use x07_host_runner::CcProfile;
 use x07_worlds::WorldId;
@@ -19,6 +20,7 @@ static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 const DEFAULT_SOLVE_FUEL: u64 = 50_000_000;
 const DEFAULT_MAX_MEMORY_BYTES: usize = 64 * 1024 * 1024;
+const AUTO_DEPS_ENV: &str = "X07_INTERNAL_AUTO_DEPS";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab_case")]
@@ -575,15 +577,82 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
         }
     }
 
-    let output = Command::new(&runner_bin)
-        .args(&argv)
-        .stdin(Stdio::null())
-        .output()
-        .with_context(|| format!("exec {}", runner_bin.display()))?;
+    let run_runner = |set_guard: bool| -> Result<std::process::Output> {
+        let mut cmd = Command::new(&runner_bin);
+        cmd.args(&argv).stdin(Stdio::null());
+        if set_guard {
+            cmd.env(AUTO_DEPS_ENV, "1");
+        }
+        cmd.output()
+            .with_context(|| format!("exec {}", runner_bin.display()))
+    };
+
+    let can_auto_deps = target_kind == TargetKind::Project
+        && args.repair.repair != RepairMode::Off
+        && std::env::var_os(AUTO_DEPS_ENV).is_none();
+
+    let mut output = run_runner(false)?;
+    let mut exit_code = output.status.code().unwrap_or(2);
+
+    if can_auto_deps && exit_code != 0 {
+        if let Some(project_path) = project_manifest.as_ref() {
+            let mut seen_missing: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
+            for _ in 0..3 {
+                let Some(compile_error) = parse_compile_error_from_runner_stdout(&output.stdout)
+                else {
+                    break;
+                };
+                let Some(module_id) = missing_module_id_from_compile_error(&compile_error) else {
+                    break;
+                };
+                if !seen_missing.insert(module_id.clone()) {
+                    break;
+                }
+                let Some((name, version)) =
+                    x07_host_runner::best_external_package_for_module(&module_id)
+                else {
+                    break;
+                };
+
+                let spec = format!("{name}@{version}");
+                let msg = format!(
+                    "x07 run: auto-adding dependency {spec} (missing module {module_id})\n"
+                );
+                let _ = std::io::Write::write_all(&mut std::io::stderr(), msg.as_bytes());
+
+                if let Err(err) = crate::pkg::pkg_add_sync_quiet(project_path.clone(), spec, None) {
+                    let msg = format!("x07 run: auto-deps failed: {err}\n");
+                    let _ = std::io::Write::write_all(&mut std::io::stderr(), msg.as_bytes());
+                    break;
+                }
+
+                output = run_runner(true)?;
+                exit_code = output.status.code().unwrap_or(2);
+                if exit_code == 0 {
+                    break;
+                }
+            }
+        }
+    }
+
+    if exit_code != 0 {
+        if let Some(compile_error) = parse_compile_error_from_runner_stdout(&output.stdout) {
+            if let Ok(module_roots) = resolve_module_roots_for_wrapper(
+                runner,
+                target_kind,
+                &target_path,
+                project_manifest.as_deref(),
+                &args,
+                &runner_bin,
+            ) {
+                print_ptr_hints_for_compile_error(&compile_error, &module_roots);
+            }
+        }
+    }
 
     std::io::Write::write_all(&mut std::io::stderr(), &output.stderr).context("write stderr")?;
 
-    let exit_code = output.status.code().unwrap_or(2);
     let runner_stdout = output.stdout;
 
     let emitted = match args.report {
@@ -1323,4 +1392,131 @@ fn append_unique(into: &mut Vec<PathBuf>, extra: Vec<PathBuf>) {
 
 fn default_os_module_roots_best_effort(runner_bin: &Path) -> Vec<PathBuf> {
     x07_runner_common::os_paths::default_os_module_roots_best_effort_from_exe(Some(runner_bin))
+}
+
+fn parse_compile_error_from_runner_stdout(stdout: &[u8]) -> Option<String> {
+    let doc: Value = serde_json::from_slice(stdout).ok()?;
+    doc.get("compile")?
+        .get("compile_error")?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
+fn missing_module_id_from_compile_error(message: &str) -> Option<String> {
+    let idx = message.find("unknown module: ")?;
+    let rest = &message[idx + "unknown module: ".len()..];
+    let rest = rest.trim_start();
+    if !rest.starts_with('"') {
+        return None;
+    }
+    let quoted = take_rust_debug_quoted_string(rest)?;
+    serde_json::from_str::<String>(quoted).ok()
+}
+
+fn take_rust_debug_quoted_string(s: &str) -> Option<&str> {
+    let mut escaped = false;
+    let mut end = None;
+    for (i, ch) in s.char_indices().skip(1) {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '"' {
+            end = Some(i);
+            break;
+        }
+    }
+    let end = end?;
+    Some(&s[..=end])
+}
+
+fn print_ptr_hints_for_compile_error(compile_error: &str, module_roots: &[PathBuf]) {
+    let Some(fn_name) = fn_name_from_compile_error(compile_error) else {
+        return;
+    };
+    let module_id = module_id_from_fn_name(fn_name);
+    let Some(module_file) = module_file_from_roots(module_roots, module_id) else {
+        return;
+    };
+    let ptrs = pointers_from_compile_error(compile_error);
+    if ptrs.is_empty() {
+        return;
+    }
+
+    let mut stderr = std::io::stderr();
+    for ptr in ptrs.iter().take(4) {
+        let msg = format!(
+            "hint: x07 ast get --in {} --ptr {}\n",
+            module_file.display(),
+            ptr
+        );
+        let _ = std::io::Write::write_all(&mut stderr, msg.as_bytes());
+    }
+}
+
+fn fn_name_from_compile_error(message: &str) -> Option<&str> {
+    let idx = message.find("fn=")?;
+    let rest = &message[idx + "fn=".len()..];
+    let end = rest
+        .char_indices()
+        .find(|(_, ch)| ch.is_whitespace() || *ch == ')' || *ch == ',')
+        .map(|(i, _)| i)
+        .unwrap_or(rest.len());
+    if end == 0 {
+        return None;
+    }
+    Some(&rest[..end])
+}
+
+fn module_id_from_fn_name(fn_name: &str) -> &str {
+    fn_name.rsplit_once('.').map(|(m, _)| m).unwrap_or(fn_name)
+}
+
+fn module_file_from_roots(module_roots: &[PathBuf], module_id: &str) -> Option<PathBuf> {
+    let rel = format!("{}.x07.json", module_id.replace('.', "/"));
+    for root in module_roots {
+        let cand = root.join(&rel);
+        if cand.is_file() {
+            return Some(cand);
+        }
+    }
+    None
+}
+
+fn pointers_from_compile_error(message: &str) -> Vec<String> {
+    let mut raw: Vec<&str> = Vec::new();
+    collect_pointers(message, "ptr=", &mut raw);
+    collect_pointers(message, "moved_ptr=", &mut raw);
+
+    let mut out: Vec<String> = Vec::new();
+    for p in raw {
+        if !out.iter().any(|v| v == p) {
+            out.push(p.to_string());
+        }
+    }
+    out
+}
+
+fn collect_pointers<'a>(message: &'a str, key: &str, out: &mut Vec<&'a str>) {
+    let mut rest = message;
+    while let Some(idx) = rest.find(key) {
+        rest = &rest[idx + key.len()..];
+        let end = rest
+            .char_indices()
+            .find(|(_, ch)| ch.is_whitespace() || *ch == ')' || *ch == ',')
+            .map(|(i, _)| i)
+            .unwrap_or(rest.len());
+        if end == 0 {
+            break;
+        }
+        let ptr = &rest[..end];
+        if ptr.starts_with('/') {
+            out.push(ptr);
+        }
+        rest = &rest[end..];
+    }
 }

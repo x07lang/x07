@@ -14,25 +14,14 @@ rm -rf "$work"
 mkdir -p "$work"
 copy_tree "$scenario_dir/broken" "$work"
 
-set +e
-wrapped="$(run_wrapped_allow_failure "data-msgpack/missing-dep (broken)" "$work" --profile test)"
-code="$?"
-set -e
-if [[ "$code" -eq 0 ]]; then
-  die "expected broken project to fail x07 run"
-fi
-assert_wrapped_compile_error_contains "data-msgpack/missing-dep (broken)" "$wrapped" "x07 pkg add ext-msgpack-rs@0.1.1 --sync"
-
-(cd "$work" && "$X07_BIN" pkg add ext-msgpack-rs@0.1.1 --sync --project x07.json >/dev/null)
-(cd "$work" && "$X07_BIN" pkg lock --check --offline --project x07.json >/dev/null)
-
-wrapped_ok="$(run_wrapped "data-msgpack/missing-dep (fixed)" "$work" --profile test)"
+wrapped_ok="$(run_wrapped "data-msgpack/missing-dep" "$work" --profile test)"
 normalize_wrapped_report_to_golden "$wrapped_ok" "$work/tmp/run.golden.json"
-assert_json_golden_eq "data-msgpack/missing-dep (fixed)" "$work/tmp/run.golden.json" "$scenario_dir/golden.run.report.json"
+assert_json_golden_eq "data-msgpack/missing-dep" "$work/tmp/run.golden.json" "$scenario_dir/golden.run.report.json"
 
 unwrap_wrapped_report "$wrapped_ok" "$work/tmp/runner.json"
-assert_solve_output "data-msgpack/missing-dep (fixed)" "$work/tmp/runner.json" "ok"
+assert_solve_output "data-msgpack/missing-dep" "$work/tmp/runner.json" "ok"
+
+(cd "$work" && "$X07_BIN" pkg lock --check --offline --project x07.json >/dev/null)
 
 rm_ephemeral "$work"
 diff_snapshot "$scenario_dir/expected" "$work" >/dev/null
-
