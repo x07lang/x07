@@ -32,7 +32,7 @@ x07 init
 x07 pkg add NAME@VERSION --sync
 ```
 
-`x07 init` also writes the agent kit (`AGENT.md`, `x07-toolchain.toml`, `.agent/skills/`, and `.agent/docs/README.md`).
+`x07 init` also writes the agent kit (`AGENT.md`, `x07-toolchain.toml`, `.agent/skills/`, and `.agent/docs/`).
 
 If you are creating a publishable package repo, start with `x07 init --package` instead of `x07 init`
 (it creates `x07-package.json`, `modules/`, `tests/`, and the same agent kit). Follow the `next_steps` in the init JSON report

@@ -25,8 +25,8 @@ If any of the above are missing, run:
 
 - `AGENT.md`: this file.
 - `x07-toolchain.toml`: pins a channel and declares toolchain components (`docs`, `skills`).
-- `.agent/skills/`: project-scoped skills pack (if present).
-- `.agent/docs/README.md`: optional stub that points to the offline docs root.
+- `.agent/skills/`: skills pack (linked to the installed toolchain when available).
+- `.agent/docs/`: offline docs (linked to the installed toolchain when available).
 
 ## Standard recovery loop (run this, in order)
 When something fails (compile/run/test), follow this loop *without asking for help first*:

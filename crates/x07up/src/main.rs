@@ -556,13 +556,17 @@ fn cmd_install(
             .with_context(|| format!("rename {} -> {}", tmp_dir.display(), final_dir.display()))?;
     }
 
-    if let Some(channel) = channel {
-        cfg.channels.insert(channel, toolchain_tag.clone());
+    if let Some(channel) = &channel {
+        cfg.channels.insert(channel.clone(), toolchain_tag.clone());
     }
     if cfg.default_toolchain.as_deref().unwrap_or("").is_empty() {
         cfg.default_toolchain = Some(spec.clone());
     }
     cfg.save(&config_path(root))?;
+
+    if let Some(channel) = &channel {
+        ensure_toolchain_channel_link(root, channel, &toolchain_tag)?;
+    }
 
     reporter.progress("ensure x07 proxies");
     ensure_proxies(root)?;
@@ -649,15 +653,93 @@ fn cmd_install(
     }
 
     reporter.progress("");
-    reporter.progress("next: create a project");
+    reporter
+        .progress("next: create a project (includes agent kit: AGENT.md + .agent/{docs,skills})");
     reporter.progress("  mkdir myapp && cd myapp && x07 init");
     reporter.progress("  x07 run");
     reporter.progress("  x07 test --manifest tests/tests.json");
+    reporter.progress("");
+    reporter.progress("next: open offline docs / check skills");
+    reporter.progress("  x07up docs path");
+    reporter.progress("  x07up skills status --json");
     reporter.progress("");
     reporter.progress("next: create a publishable package repo");
     reporter.progress("  mkdir mypkg && cd mypkg && x07 init --package");
 
     Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn ensure_toolchain_channel_link(root: &Path, channel: &str, toolchain_tag: &str) -> Result<()> {
+    let target = toolchains_dir(root).join(toolchain_tag);
+    if !target.is_dir() {
+        bail!(
+            "toolchain dir missing while updating channel link: {}",
+            target.display()
+        );
+    }
+
+    let links_dir = toolchains_dir(root).join("_channels");
+    links_dir.mkdir_all()?;
+    let link_path = links_dir.join(channel);
+
+    if link_path.exists() {
+        remove_link_dir(&link_path)?;
+    }
+
+    create_dir_link(&target, &link_path)
+        .with_context(|| format!("link channel {channel} -> {}", target.display()))?;
+    Ok(())
+}
+
+fn remove_link_dir(path: &Path) -> Result<()> {
+    match std::fs::remove_file(path) {
+        Ok(()) => return Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(_) => {}
+    }
+
+    std::fs::remove_dir(path).with_context(|| format!("remove {}", path.display()))?;
+    Ok(())
+}
+
+fn create_dir_link(target: &Path, link: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        symlink(target, link)
+            .with_context(|| format!("symlink {} -> {}", link.display(), target.display()))?;
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::symlink_dir;
+        if symlink_dir(target, link).is_ok() {
+            return Ok(());
+        }
+
+        let status = std::process::Command::new("cmd")
+            .args([
+                "/C",
+                "mklink",
+                "/J",
+                link.to_string_lossy().as_ref(),
+                target.to_string_lossy().as_ref(),
+            ])
+            .status()
+            .context("mklink /J")?;
+        if status.success() {
+            return Ok(());
+        }
+        bail!("mklink /J failed (exit={})", status.code().unwrap_or(1));
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = target;
+        let _ = link;
+        bail!("create_dir_link: unsupported platform");
+    }
 }
 
 fn install_component(

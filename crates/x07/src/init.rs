@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+#[cfg(windows)]
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use clap::{Args, ValueEnum};
@@ -277,7 +279,7 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
         &paths.tests_manifest,
         &paths.tests_smoke,
         &agent_paths.toolchain_toml,
-        &agent_paths.agent_docs_readme,
+        &agent_paths.agent_docs_dir,
         &agent_paths.agent_md,
         &agent_paths.agent_skills_dir,
     ];
@@ -593,7 +595,7 @@ fn cmd_init_package(root: &Path) -> Result<std::process::ExitCode> {
         &paths.module_tests,
         &paths.tests_manifest,
         &agent_paths.toolchain_toml,
-        &agent_paths.agent_docs_readme,
+        &agent_paths.agent_docs_dir,
         &agent_paths.agent_md,
         &agent_paths.agent_skills_dir,
     ] {
@@ -804,7 +806,7 @@ struct PackageInitPaths {
 struct AgentKitPaths {
     toolchain_toml: PathBuf,
     agent_dir: PathBuf,
-    agent_docs_readme: PathBuf,
+    agent_docs_dir: PathBuf,
     agent_md: PathBuf,
     agent_skills_dir: PathBuf,
 }
@@ -812,12 +814,12 @@ struct AgentKitPaths {
 impl AgentKitPaths {
     fn new(root: &Path) -> Self {
         let agent_dir = root.join(X07_AGENT_DIR);
-        let agent_docs_readme = agent_dir.join("docs").join("README.md");
+        let agent_docs_dir = agent_dir.join("docs");
         Self {
             toolchain_toml: root.join(X07_TOOLCHAIN_TOML),
             agent_md: root.join("AGENT.md"),
             agent_skills_dir: agent_dir.join("skills"),
-            agent_docs_readme,
+            agent_docs_dir,
             agent_dir,
         }
     }
@@ -865,8 +867,8 @@ fn init_notes() -> Vec<String> {
     vec![
         "Agent kit: AGENT.md (self-recovery + canonical commands)".to_string(),
         format!("Toolchain pin: {X07_TOOLCHAIN_TOML} (channel=stable; components=docs+skills)"),
-        format!("Project docs: {X07_AGENT_DIR}/docs/ (README.md points to offline docs)"),
-        format!("Project skills: {X07_AGENT_DIR}/skills/"),
+        format!("Project docs: {X07_AGENT_DIR}/docs/ (linked to toolchain docs)"),
+        format!("Project skills: {X07_AGENT_DIR}/skills/ (linked to toolchain skills)"),
         "Offline docs: x07up docs path --json".to_string(),
         "Skills status: x07up skills status --json".to_string(),
     ]
@@ -906,28 +908,35 @@ fn init_agent_kit(root: &Path, paths: &AgentKitPaths, created: &mut Vec<String>)
         .with_context(|| format!("write {}", paths.toolchain_toml.display()))?;
     created.push(rel(root, &paths.toolchain_toml));
 
-    let skills_src =
-        resolve_skills_pack_root(&toolchain_root).context("locate toolchain skills pack")?;
-    copy_dir_recursive_filtered(&skills_src, &paths.agent_skills_dir).with_context(|| {
+    std::fs::create_dir_all(&paths.agent_dir)
+        .with_context(|| format!("create dir: {}", paths.agent_dir.display()))?;
+
+    let docs_src = toolchain_agent_docs_link_src(&toolchain_root, "stable");
+    link_dir_or_copy(&docs_src, &paths.agent_docs_dir).with_context(|| {
         format!(
-            "copy skills {} -> {}",
+            "install docs {} -> {}",
+            docs_src.display(),
+            paths.agent_docs_dir.display()
+        )
+    })?;
+    created.push(rel(root, &paths.agent_docs_dir));
+
+    let skills_src =
+        toolchain_agent_skills_link_src(&toolchain_root, "stable").context("locate skills pack")?;
+    link_dir_or_copy(&skills_src, &paths.agent_skills_dir).with_context(|| {
+        format!(
+            "install skills {} -> {}",
             skills_src.display(),
             paths.agent_skills_dir.display()
         )
     })?;
     created.push(rel(root, &paths.agent_skills_dir));
 
-    let agent_docs_readme = agent_docs_readme_bytes();
-    write_new_file(&paths.agent_docs_readme, &agent_docs_readme)
-        .with_context(|| format!("write {}", paths.agent_docs_readme.display()))?;
-    created.push(rel(root, &paths.agent_docs_readme));
-
-    let docs_root = toolchain_docs_root(&toolchain_root);
     let toolchain_version = toolchain_id_for_agent_md(&toolchain_root);
     let rendered = render_agent_md(
         &toolchain_version,
         "stable",
-        &docs_root.display().to_string(),
+        &paths.agent_docs_dir.display().to_string(),
         &paths.agent_skills_dir.display().to_string(),
     );
     write_new_file(&paths.agent_md, rendered.as_bytes())
@@ -999,18 +1008,79 @@ fn toolchain_id_for_agent_md(toolchain_root: &Path) -> String {
     fallback
 }
 
-fn agent_docs_readme_bytes() -> Vec<u8> {
-    let mut out = format!(
-        "This directory is part of the X07 agent kit.\n\n\
-Offline docs are installed with the toolchain (see `{X07_TOOLCHAIN_TOML}`: components = [\"docs\", \"skills\"]).\n\n\
-Find the local docs root:\n\n\
-- `x07up docs path --json`\n"
-    )
-    .into_bytes();
-    if out.last() != Some(&b'\n') {
-        out.push(b'\n');
+fn channel_toolchain_link_root(toolchain_root: &Path, channel: &str) -> Option<PathBuf> {
+    let toolchains_dir = toolchain_root.parent()?;
+    if toolchains_dir.file_name()?.to_str()? != "toolchains" {
+        return None;
     }
-    out
+    Some(toolchains_dir.join("_channels").join(channel))
+}
+
+fn toolchain_agent_docs_link_src(toolchain_root: &Path, channel: &str) -> PathBuf {
+    if let Some(root) = channel_toolchain_link_root(toolchain_root, channel) {
+        let candidate = root.join(X07_AGENT_DIR).join("docs");
+        if candidate.is_dir() {
+            return candidate;
+        }
+    }
+    toolchain_docs_root(toolchain_root)
+}
+
+fn toolchain_agent_skills_link_src(toolchain_root: &Path, channel: &str) -> Result<PathBuf> {
+    if let Some(root) = channel_toolchain_link_root(toolchain_root, channel) {
+        let candidate = root.join(X07_AGENT_DIR).join("skills");
+        if candidate.is_dir() {
+            return Ok(candidate);
+        }
+    }
+    resolve_skills_pack_root(toolchain_root)
+}
+
+fn link_dir_or_copy(src: &Path, dst: &Path) -> Result<()> {
+    if create_dir_link(src, dst).is_ok() {
+        return Ok(());
+    }
+    copy_dir_recursive_filtered(src, dst)
+}
+
+fn create_dir_link(target: &Path, link: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        symlink(target, link)
+            .with_context(|| format!("symlink {} -> {}", link.display(), target.display()))?;
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::symlink_dir;
+        if symlink_dir(target, link).is_ok() {
+            return Ok(());
+        }
+
+        let status = Command::new("cmd")
+            .args([
+                "/C",
+                "mklink",
+                "/J",
+                link.to_string_lossy().as_ref(),
+                target.to_string_lossy().as_ref(),
+            ])
+            .status()
+            .context("mklink /J")?;
+        if status.success() {
+            return Ok(());
+        }
+        anyhow::bail!("mklink /J failed (exit={})", status.code().unwrap_or(1));
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = target;
+        let _ = link;
+        anyhow::bail!("create_dir_link: unsupported platform");
+    }
 }
 
 fn resolve_skills_pack_root(toolchain_root: &Path) -> Result<PathBuf> {

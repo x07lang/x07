@@ -2,7 +2,11 @@ This directory contains the end-user skills pack for writing X07 programs with t
 
 Canonical source location (in the toolchain repo): `skills/pack/.agent/skills/`.
 
-Installation (for a user project):
+Preferred usage:
+
+- in a project repo: run `x07 init` (it creates `.agent/skills/` linked to the installed toolchain when available)
+
+Installation (copy skills explicitly):
 
 - preferred: use `x07up`:
   - user-scoped: `x07up skills install --user`

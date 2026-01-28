@@ -55,7 +55,7 @@ acme-hello-demo/
   x07-package.json
   .agent/
     docs/
-      README.md
+      ...
     skills/
       ...
   modules/
