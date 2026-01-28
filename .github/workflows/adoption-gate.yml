@@ -73,19 +73,6 @@ jobs:
         shell: bash
         run: ./scripts/ci/check_canaries.sh
 
-  windows:
-    runs-on: windows-2022
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Build (smoke)
-        run: cargo build -p x07 -p x07c -p x07-os-runner -p x07-host-runner
-      - name: Installer smoke (Windows)
-        shell: pwsh
-        run: ./scripts/ci/check_installer_smoke_windows.ps1
-
   macos:
     runs-on: macos-latest
     timeout-minutes: 60
@@ -101,7 +88,7 @@ jobs:
 
   adoption:
     runs-on: ubuntu-latest
-    needs: [linux, debian, windows, macos]
+    needs: [linux, debian, macos]
     steps:
       - name: Gate
         run: echo "adoption-gate passed"

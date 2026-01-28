@@ -514,16 +514,7 @@ fn resolve_out_path(
     dir.join(name)
 }
 
-fn normalize_exe_extension(mut out: PathBuf) -> PathBuf {
-    if cfg!(windows) {
-        let has_exe = out
-            .extension()
-            .and_then(|e| e.to_str())
-            .is_some_and(|e| e.eq_ignore_ascii_case("exe"));
-        if !has_exe {
-            out.set_extension("exe");
-        }
-    }
+fn normalize_exe_extension(out: PathBuf) -> PathBuf {
     out
 }
 

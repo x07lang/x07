@@ -1,7 +1,5 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-#[cfg(windows)]
-use std::process::Command;
 
 use anyhow::{Context, Result};
 use clap::{Args, ValueEnum};
@@ -1052,30 +1050,7 @@ fn create_dir_link(target: &Path, link: &Path) -> Result<()> {
         Ok(())
     }
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::symlink_dir;
-        if symlink_dir(target, link).is_ok() {
-            return Ok(());
-        }
-
-        let status = Command::new("cmd")
-            .args([
-                "/C",
-                "mklink",
-                "/J",
-                link.to_string_lossy().as_ref(),
-                target.to_string_lossy().as_ref(),
-            ])
-            .status()
-            .context("mklink /J")?;
-        if status.success() {
-            return Ok(());
-        }
-        anyhow::bail!("mklink /J failed (exit={})", status.code().unwrap_or(1));
-    }
-
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         let _ = target;
         let _ = link;

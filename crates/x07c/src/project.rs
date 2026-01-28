@@ -19,14 +19,8 @@ fn validate_rel_path(field: &str, raw: &str) -> Result<()> {
         anyhow::bail!("{field} must be a relative path, got {:?}", raw);
     }
     for component in path.components() {
-        match component {
-            std::path::Component::ParentDir => {
-                anyhow::bail!("{field} must not contain '..' segments: {:?}", raw)
-            }
-            std::path::Component::Prefix(_) => {
-                anyhow::bail!("{field} must not contain Windows path prefixes: {:?}", raw)
-            }
-            _ => {}
+        if component == Component::ParentDir {
+            anyhow::bail!("{field} must not contain '..' segments: {:?}", raw)
         }
     }
     Ok(())

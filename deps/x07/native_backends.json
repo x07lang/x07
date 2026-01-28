@@ -20,14 +20,6 @@
           "search_paths": [],
           "force_load": false,
           "whole_archive": false
-        },
-        "windows-msvc": {
-          "kind": "static",
-          "files": ["deps/x07/x07_ext_db_mysql.lib"],
-          "args": [],
-          "search_paths": [],
-          "force_load": false,
-          "whole_archive": false
         }
       }
     },
@@ -50,14 +42,6 @@
           "search_paths": [],
           "force_load": false,
           "whole_archive": false
-        },
-        "windows-msvc": {
-          "kind": "static",
-          "files": ["deps/x07/x07_ext_db_pg.lib"],
-          "args": [],
-          "search_paths": [],
-          "force_load": false,
-          "whole_archive": false
         }
       }
     },
@@ -76,14 +60,6 @@
         "macos": {
           "kind": "static",
           "files": ["deps/x07/libx07_ext_db_redis.a"],
-          "args": [],
-          "search_paths": [],
-          "force_load": false,
-          "whole_archive": false
-        },
-        "windows-msvc": {
-          "kind": "static",
-          "files": ["deps/x07/x07_ext_db_redis.lib"],
           "args": [],
           "search_paths": [],
           "force_load": false,
@@ -110,14 +86,6 @@
           "search_paths": [],
           "force_load": false,
           "whole_archive": false
-        },
-        "windows-msvc": {
-          "kind": "static",
-          "files": ["deps/x07/x07_ext_db_sqlite.lib"],
-          "args": [],
-          "search_paths": [],
-          "force_load": false,
-          "whole_archive": false
         }
       }
     },
@@ -140,22 +108,6 @@
           "search_paths": [],
           "force_load": false,
           "whole_archive": false
-        },
-        "windows-msvc": {
-          "kind": "static",
-          "files": ["deps/x07/x07_ext_fs.lib"],
-          "args": [],
-          "search_paths": [],
-          "force_load": false,
-          "whole_archive": false
-        },
-        "windows-gnu": {
-          "kind": "static",
-          "files": ["deps/x07/libx07_ext_fs.a"],
-          "args": ["-lws2_32", "-luserenv", "-lntdll"],
-          "search_paths": [],
-          "force_load": false,
-          "whole_archive": false
         }
       }
     },
@@ -174,14 +126,6 @@
         "macos": {
           "kind": "static",
           "files": ["deps/x07/libx07_ext_regex.a"],
-          "args": [],
-          "search_paths": [],
-          "force_load": false,
-          "whole_archive": false
-        },
-        "windows-msvc": {
-          "kind": "static",
-          "files": ["deps/x07/x07_ext_regex.lib"],
           "args": [],
           "search_paths": [],
           "force_load": false,
@@ -208,14 +152,6 @@
           "search_paths": [],
           "force_load": false,
           "whole_archive": false
-        },
-        "windows-msvc": {
-          "kind": "static",
-          "files": ["deps/x07/x07_math.lib"],
-          "args": [],
-          "search_paths": [],
-          "force_load": false,
-          "whole_archive": false
         }
       }
     },
@@ -234,14 +170,6 @@
         "macos": {
           "kind": "static",
           "files": ["deps/x07/libx07_time.a"],
-          "args": [],
-          "search_paths": [],
-          "force_load": false,
-          "whole_archive": false
-        },
-        "windows-msvc": {
-          "kind": "static",
-          "files": ["deps/x07/x07_time.lib"],
           "args": [],
           "search_paths": [],
           "force_load": false,

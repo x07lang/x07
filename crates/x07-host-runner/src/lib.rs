@@ -1,7 +1,5 @@
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
-#[cfg(windows)]
-use std::ffi::OsString;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -1003,14 +1001,12 @@ pub fn emit_native_cli_wrapper_c(opts: &NativeCliWrapperOpts) -> String {
         .map(|v| {
             format!(
                 r#"
-#ifndef _WIN32
   {{
     struct rlimit lim;
     lim.rlim_cur = (rlim_t){v}u;
     lim.rlim_max = (rlim_t){v}u;
     (void)setrlimit(RLIMIT_CPU, &lim);
   }}
-#endif
 "#
             )
         })
@@ -1026,20 +1022,10 @@ pub fn emit_native_cli_wrapper_c(opts: &NativeCliWrapperOpts) -> String {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#else
 #include <sys/resource.h>
-#endif
 
 static void x07_setenv(const char* k, const char* v) {{
-#ifdef _WIN32
-  _putenv_s(k, v);
-#else
   setenv(k, v, 1);
-#endif
 }}
 
 static void x07_u32le_write(uint8_t* dst, uint32_t v) {{
@@ -1050,10 +1036,6 @@ static void x07_u32le_write(uint8_t* dst, uint32_t v) {{
 }}
 
 int main(int argc, char** argv) {{
-#ifdef _WIN32
-  _setmode(1, _O_BINARY);
-#endif
-
 {cpu_limit_setup}
 
 {env_lines}
@@ -1385,13 +1367,7 @@ pub fn compile_c_to_exe_with_config(
     std::fs::create_dir_all(&dir)
         .with_context(|| format!("create cache dir: {}", dir.display()))?;
 
-    let exe_path = {
-        let mut p = dir.join("solver");
-        if cfg!(windows) {
-            p.set_extension("exe");
-        }
-        p
-    };
+    let exe_path = dir.join("solver");
     let keep_c_path = dir.join("solver.c");
 
     if exe_path.exists() {
@@ -1420,13 +1396,7 @@ pub fn compile_c_to_exe_with_config(
     let pid = std::process::id();
     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     let tmp_src_path = dir.join(format!("solver_{pid}_{n}.c"));
-    let tmp_exe_path = {
-        let mut p = dir.join(format!("solver_{pid}_{n}"));
-        if cfg!(windows) {
-            p.set_extension("exe");
-        }
-        p
-    };
+    let tmp_exe_path = dir.join(format!("solver_{pid}_{n}"));
 
     std::fs::write(&tmp_src_path, c_source.as_bytes())
         .with_context(|| format!("write C source: {}", tmp_src_path.display()))?;
@@ -1467,20 +1437,10 @@ pub fn compile_c_to_exe_with_config(
         }
     }
     for a in &config.extra_cc_args {
-        #[cfg(windows)]
-        {
-            let arg = strip_windows_verbatim_path_prefix(a);
-            cmd.arg(arg.as_ref());
-        }
-        #[cfg(not(windows))]
-        {
-            cmd.arg(a);
-        }
+        cmd.arg(a);
     }
 
-    let cmd_program = cmd.get_program().to_os_string();
-    #[cfg(windows)]
-    let cmd_args: Vec<OsString> = cmd.get_args().map(|a| a.to_os_string()).collect();
+    let cmd_program = cmd.get_program().to_string_lossy().to_string();
 
     let out = cmd
         .output()
@@ -1490,20 +1450,9 @@ pub fn compile_c_to_exe_with_config(
 
     let mut stderr = out.stderr;
     if !ok {
-        fn tail_truncate(b: &[u8], limit: usize) -> Vec<u8> {
-            if b.len() <= limit {
-                return b.to_vec();
-            }
-            let start = b.len() - limit;
-            let mut out = Vec::new();
-            out.extend_from_slice(b"...<truncated>...\n");
-            out.extend_from_slice(&b[start..]);
-            out
-        }
-
         let mut diag = Vec::new();
         diag.extend_from_slice(b"--- x07 cc invocation ---\n");
-        diag.extend_from_slice(format!("cc: {}\n", cmd_program.to_string_lossy()).as_bytes());
+        diag.extend_from_slice(format!("cc: {cmd_program}\n").as_bytes());
         if !cc_args.trim().is_empty() {
             diag.extend_from_slice(b"\n--- X07_CC_ARGS ---\n");
             diag.extend_from_slice(cc_args.trim().as_bytes());
@@ -1514,105 +1463,6 @@ pub fn compile_c_to_exe_with_config(
         diag.extend_from_slice(format!("exe: {}\n", tmp_exe_path.display()).as_bytes());
         if keep_c {
             diag.extend_from_slice(format!("keep_c: {}\n", keep_c_path.display()).as_bytes());
-        }
-
-        #[cfg(windows)]
-        let mut diag_cc_out = Vec::new();
-        #[cfg(not(windows))]
-        let diag_cc_out = Vec::new();
-        #[cfg(windows)]
-        {
-            let mut ld_path = Vec::new();
-            if let Ok(out) = Command::new(&cc).arg("-print-prog-name=ld").output() {
-                ld_path.extend_from_slice(&out.stdout);
-                ld_path.extend_from_slice(&out.stderr);
-            }
-            if !ld_path.is_empty() {
-                diag.extend_from_slice(b"\n--- cc -print-prog-name=ld ---\n");
-                diag.extend_from_slice(&tail_truncate(&ld_path, 400));
-                if !diag.ends_with(b"\n") {
-                    diag.extend_from_slice(b"\n");
-                }
-            }
-
-            let mut search_dirs = Vec::new();
-            if let Ok(out) = Command::new(&cc).arg("-print-search-dirs").output() {
-                search_dirs.extend_from_slice(&out.stdout);
-                search_dirs.extend_from_slice(&out.stderr);
-            }
-            if !search_dirs.is_empty() {
-                diag.extend_from_slice(b"\n--- cc -print-search-dirs (tail) ---\n");
-                diag.extend_from_slice(&tail_truncate(&search_dirs, 600));
-                if !diag.ends_with(b"\n") {
-                    diag.extend_from_slice(b"\n");
-                }
-            }
-
-            diag.extend_from_slice(b"\n--- cc -print-file-name ---\n");
-            for lib in [
-                "libssl.dll.a",
-                "libssl.a",
-                "libssl-3.dll.a",
-                "libcrypto.dll.a",
-                "libcrypto.a",
-                "libcrypto-3.dll.a",
-            ] {
-                let mut resolved = Vec::new();
-                if let Ok(out) = Command::new(&cc)
-                    .arg(format!("-print-file-name={lib}"))
-                    .output()
-                {
-                    resolved.extend_from_slice(&out.stdout);
-                    resolved.extend_from_slice(&out.stderr);
-                }
-                let path = String::from_utf8_lossy(&resolved);
-                let path = path.trim();
-                let exists = Path::new(path).is_file();
-                let exists = if exists { " (found)" } else { " (missing)" };
-                diag.extend_from_slice(format!("{lib}: {path}{exists}\n").as_bytes());
-            }
-
-            let mut dry_run = Vec::new();
-            let mut dry_cmd = Command::new(&cc);
-            dry_cmd.arg("-###");
-            dry_cmd.args(&cmd_args);
-            if let Ok(out) = dry_cmd.output() {
-                dry_run.extend_from_slice(&out.stdout);
-                dry_run.extend_from_slice(&out.stderr);
-            }
-            if !dry_run.is_empty() {
-                diag.extend_from_slice(b"\n--- cc -### (tail) ---\n");
-                diag.extend_from_slice(&tail_truncate(&dry_run, 1800));
-                if !diag.ends_with(b"\n") {
-                    diag.extend_from_slice(b"\n");
-                }
-            }
-
-            let mut diag_cmd = Command::new(&cc);
-            diag_cmd.args(&cmd_args);
-            diag_cmd.arg("-Wl,-t");
-            if let Ok(out) = diag_cmd.output() {
-                diag_cc_out.extend_from_slice(&out.stdout);
-                diag_cc_out.extend_from_slice(&out.stderr);
-            }
-        }
-        if !diag_cc_out.is_empty() {
-            diag.extend_from_slice(b"\n--- cc -Wl,-t output (tail) ---\n");
-            diag.extend_from_slice(&tail_truncate(&diag_cc_out, 2400));
-            if !diag.ends_with(b"\n") {
-                diag.extend_from_slice(b"\n");
-            }
-            #[cfg(windows)]
-            {
-                let filtered = filter_windows_link_errors(&diag_cc_out);
-                if !filtered.is_empty() {
-                    diag.extend_from_slice(b"\n--- cc -Wl,-t output (errors) ---\n");
-                    diag.extend_from_slice(&filtered);
-                    if !diag.ends_with(b"\n") {
-                        diag.extend_from_slice(b"\n");
-                    }
-                }
-            }
         }
 
         let mut combined = diag;
@@ -1664,56 +1514,6 @@ pub fn compile_c_to_exe_with_config(
         stderr,
         exe_path: ok.then_some(final_exe_path),
     })
-}
-
-#[cfg(windows)]
-fn strip_windows_verbatim_path_prefix(arg: &str) -> std::borrow::Cow<'_, str> {
-    if !(arg.contains(r"\\?\") || arg.contains(r"//?/")) {
-        return std::borrow::Cow::Borrowed(arg);
-    }
-
-    // Rust's canonicalize() can produce verbatim paths like:
-    // - \\?\C:\path\to\file
-    // - \\?\UNC\server\share\path
-    //
-    // Some C toolchains (notably mingw gcc) fail to resolve these paths.
-    let mut s = arg.replace(r"\\?\UNC\", r"\\");
-    s = s.replace(r"\\?\", "");
-    s = s.replace(r"//?/UNC/", r"//");
-    s = s.replace(r"//?/", "");
-    s = s.replace('\\', "/");
-    std::borrow::Cow::Owned(s)
-}
-
-#[cfg(windows)]
-fn filter_windows_link_errors(out: &[u8]) -> Vec<u8> {
-    let text = String::from_utf8_lossy(out);
-    let needles = [
-        "error:",
-        "undefined reference",
-        "cannot find",
-        "file format",
-        "not recognized",
-        "ld:",
-        "collect2.exe:",
-    ];
-
-    let mut matched: Vec<&str> = Vec::new();
-    for line in text.lines() {
-        let lc = line.to_ascii_lowercase();
-        if needles.iter().any(|n| lc.contains(n)) {
-            matched.push(line);
-        }
-    }
-
-    let keep = 80usize;
-    let start = matched.len().saturating_sub(keep);
-    let mut out = Vec::new();
-    for line in &matched[start..] {
-        out.extend_from_slice(line.as_bytes());
-        out.extend_from_slice(b"\n");
-    }
-    out
 }
 
 #[cfg(test)]

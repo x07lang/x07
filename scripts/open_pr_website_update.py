@@ -106,10 +106,6 @@ def main(argv: list[str]) -> int:
             src=toolchain_repo / "dist" / "install" / "install.sh",
             dst=website_root / "site" / "static" / "install.sh",
         )
-        sync_file(
-            src=toolchain_repo / "dist" / "install" / "install.ps1",
-            dst=website_root / "site" / "static" / "install.ps1",
-        )
 
         channels_path = args.channels_json
         if channels_path is None:

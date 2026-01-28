@@ -75,8 +75,9 @@ step "OS-world external packages smoke"
 step "bundle smoke (native executable, no toolchain)"
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
-    # Prefer the native Windows gate to avoid MSYS text-mode quirks.
-    pwsh ./scripts/ci/check_bundle_smoke_windows.ps1
+    echo "ERROR: native Windows is not supported (WSL2 only)." >&2
+    echo "hint: run this gate inside WSL2 (Ubuntu recommended): ./scripts/ci/check_all.sh" >&2
+    exit 2
     ;;
   *)
     # On Linux CI, prefer the stronger "no toolchain installed" check via docker.

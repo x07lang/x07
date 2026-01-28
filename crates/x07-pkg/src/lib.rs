@@ -319,7 +319,7 @@ fn validate_archive_rel_path(path: &Path) -> Result<()> {
     for component in path.components() {
         match component {
             std::path::Component::Prefix(_) => {
-                anyhow::bail!("windows prefix archive paths are not allowed: {:?}", path);
+                anyhow::bail!("archive paths must not contain path prefixes: {:?}", path);
             }
             std::path::Component::ParentDir => {
                 anyhow::bail!("archive paths must not contain '..': {:?}", path);

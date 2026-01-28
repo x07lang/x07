@@ -2,7 +2,7 @@
 
 X07’s canonical installer is `x07up` (toolchain manager).
 
-The bootstrap scripts (`install.sh` / `install.ps1`) install `x07up`, then `x07up` installs the selected toolchain and sets up `~/.x07/bin/` shims.
+The bootstrap script (`install.sh`) installs `x07up`, then `x07up` installs the selected toolchain and sets up `~/.x07/bin/` shims. On Windows, run the bootstrap inside WSL2.
 
 Quickstart: see [Install](install.md).
 
@@ -26,11 +26,9 @@ Then (in the same shell session):
 export PATH="$HOME/.x07/bin:$PATH"
 ```
 
-Windows:
+Windows (WSL2):
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://x07lang.org/install.ps1 -OutFile install.ps1; .\\install.ps1 -Yes -Channel stable"
-```
+X07 does not currently publish native Windows toolchains. Install and run X07 inside WSL2 (Ubuntu recommended) and use the macOS / Linux installer command above.
 
 ## CI / agent mode (deterministic + machine-clean)
 
@@ -58,20 +56,20 @@ curl -fsSL https://x07lang.org/install.sh | sh -s -- \
 Write `x07-toolchain.toml`:
 
 ```bash
-x07up override set v0.0.63
+x07up override set v0.0.64
 ```
 
 This writes a file like:
 
 ```toml
 [toolchain]
-channel = "v0.0.63"
+channel = "v0.0.64"
 components = ["docs", "skills"]
 ```
 
 Notes:
 
-- `channel` can be `stable` or a specific tag like `v0.0.63`.
+- `channel` can be `stable` or a specific tag like `v0.0.64`.
 - `components` controls whether `x07up` installs the offline docs and skills pack.
 
 Remove it:

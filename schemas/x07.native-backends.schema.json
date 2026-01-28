@@ -112,12 +112,10 @@
         "link": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["linux", "macos", "windows-msvc"],
+          "required": ["linux", "macos"],
           "properties": {
             "linux": { "$ref": "#/$defs/LinkSpec" },
-            "macos": { "$ref": "#/$defs/LinkSpec" },
-            "windows-msvc": { "$ref": "#/$defs/LinkSpec" },
-            "windows-gnu": { "$ref": "#/$defs/LinkSpec" }
+            "macos": { "$ref": "#/$defs/LinkSpec" }
           }
         }
       }

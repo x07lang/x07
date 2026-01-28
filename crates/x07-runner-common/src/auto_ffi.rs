@@ -59,7 +59,6 @@ pub fn collect_auto_ffi_cc_args(module_roots: &[PathBuf]) -> Result<Vec<String>>
     let mut seen_libs: HashSet<String> = HashSet::new();
 
     let mut need_openssl_prefix = false;
-    let mut need_winsock = false;
 
     for module_root in module_roots {
         let Some(manifest_path) = find_package_manifest_for_module_root(module_root) else {
@@ -97,9 +96,6 @@ pub fn collect_auto_ffi_cc_args(module_roots: &[PathBuf]) -> Result<Vec<String>>
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        if cfg!(windows) && (name == "ext-sockets-c" || name == "ext-curl-c") {
-            need_winsock = true;
-        }
 
         let mut ffi_libs: Vec<String> = Vec::new();
         if let Some(libs) = doc
@@ -179,13 +175,6 @@ pub fn collect_auto_ffi_cc_args(module_roots: &[PathBuf]) -> Result<Vec<String>>
             if seen_lib_search.insert(r.clone()) {
                 lib_search_args.push(r);
             }
-        }
-    }
-
-    if need_winsock {
-        let arg = "-lws2_32".to_string();
-        if seen_libs.insert(arg.clone()) {
-            lib_args.push(arg);
         }
     }
 

@@ -21,7 +21,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path
 Set-Location $root
 
 if (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
-  Write-Error "bash not found; on Windows run from MSYS2 UCRT64 or WSL2 (then execute ./scripts/ci/check_all.sh)."
+  Write-Error "bash not found; on Windows run from WSL2 (then execute ./scripts/ci/check_all.sh)."
 }
 
 Exec "bash" @("-lc", "./scripts/ci/check_all.sh")

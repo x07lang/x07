@@ -27,10 +27,6 @@ pub struct NativeBackend {
 pub struct LinkByPlatform {
     pub linux: LinkSpec,
     pub macos: LinkSpec,
-    #[serde(rename = "windows-msvc")]
-    pub windows_msvc: LinkSpec,
-    #[serde(rename = "windows-gnu", default)]
-    pub windows_gnu: Option<LinkSpec>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -51,8 +47,6 @@ pub struct LinkSpec {
 enum HostPlatform {
     Linux,
     MacOS,
-    WindowsMsvc,
-    WindowsGnu,
 }
 
 pub fn plan_native_link_argv(
@@ -93,7 +87,6 @@ pub fn plan_native_link_argv(
     reqs.dedup_by(|a, b| a.backend_id == b.backend_id);
 
     let mut out: Vec<String> = Vec::new();
-    let mut post_out: Vec<String> = Vec::new();
     let mut seen_args: BTreeSet<String> = BTreeSet::new();
     let mut libs: Vec<String> = Vec::new();
     let mut seen_libs: BTreeSet<String> = BTreeSet::new();
@@ -121,10 +114,6 @@ pub fn plan_native_link_argv(
         let spec = match platform {
             HostPlatform::Linux => &backend.link.linux,
             HostPlatform::MacOS => &backend.link.macos,
-            HostPlatform::WindowsMsvc => &backend.link.windows_msvc,
-            HostPlatform::WindowsGnu => backend.link.windows_gnu.as_ref().with_context(|| {
-                format!("backend {} missing link.windows-gnu", backend.backend_id)
-            })?,
         };
 
         match spec.kind.as_str() {
@@ -140,8 +129,6 @@ pub fn plan_native_link_argv(
             let full = join_rel(toolchain_root, rel)?;
             let flag = match platform {
                 HostPlatform::Linux | HostPlatform::MacOS => format!("-L{}", full.display()),
-                HostPlatform::WindowsMsvc => format!("/LIBPATH:{}", full.display()),
-                HostPlatform::WindowsGnu => format!("-L{}", full.display()),
             };
             if seen_args.insert(flag.clone()) {
                 out.push(flag);
@@ -150,11 +137,7 @@ pub fn plan_native_link_argv(
 
         for arg in &spec.args {
             if seen_args.insert(arg.clone()) {
-                if matches!(platform, HostPlatform::WindowsGnu) {
-                    post_out.push(arg.clone());
-                } else {
-                    out.push(arg.clone());
-                }
+                out.push(arg.clone());
             }
         }
 
@@ -195,13 +178,9 @@ pub fn plan_native_link_argv(
                 out.push("-Wl,--end-group".to_string());
             }
         }
-        HostPlatform::MacOS | HostPlatform::WindowsMsvc | HostPlatform::WindowsGnu => {
+        HostPlatform::MacOS => {
             out.extend(libs);
         }
-    }
-
-    if matches!(platform, HostPlatform::WindowsGnu) {
-        out.extend(post_out);
     }
 
     Ok(out)
@@ -214,35 +193,7 @@ fn host_platform() -> Result<HostPlatform> {
     if cfg!(target_os = "macos") {
         return Ok(HostPlatform::MacOS);
     }
-    if cfg!(windows) {
-        if let Some(p) = windows_link_platform_from_env() {
-            return Ok(p);
-        }
-        if cfg!(target_env = "msvc") {
-            return Ok(HostPlatform::WindowsMsvc);
-        }
-        return Ok(HostPlatform::WindowsGnu);
-    }
     anyhow::bail!("unsupported host platform");
-}
-
-fn windows_link_platform_from_env() -> Option<HostPlatform> {
-    if !cfg!(windows) {
-        return None;
-    }
-
-    let cc = std::env::var("X07_CC").ok()?;
-    let cc = cc.trim();
-    if cc.is_empty() {
-        return None;
-    }
-
-    let cc_lc = cc.to_ascii_lowercase();
-    if cc_lc.contains("clang-cl") || cc_lc.ends_with("cl.exe") || cc_lc == "cl" {
-        Some(HostPlatform::WindowsMsvc)
-    } else {
-        Some(HostPlatform::WindowsGnu)
-    }
 }
 
 fn join_rel(root: &Path, rel: &str) -> Result<PathBuf> {

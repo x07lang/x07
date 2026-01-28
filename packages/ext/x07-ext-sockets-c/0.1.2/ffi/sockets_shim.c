@@ -4,15 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#  include <winsock2.h>
-#  include <ws2tcpip.h>
-typedef SOCKET x07_sock_t;
-#  define X07_SOCK_INVALID INVALID_SOCKET
-#  define x07_sock_close closesocket
-#  define x07_sock_errno() ((int)WSAGetLastError())
-typedef int x07_socklen_t;
-#else
 #  include <arpa/inet.h>
 #  include <errno.h>
 #  include <fcntl.h>
@@ -27,7 +18,6 @@ typedef int x07_sock_t;
 #  define x07_sock_close close
 #  define x07_sock_errno() (errno)
 typedef socklen_t x07_socklen_t;
-#endif
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -660,21 +650,6 @@ static uint32_t x07_ext_sockets_tcp_stream_read_into(
       return 0;
     }
 
-#if defined(_WIN32)
-    int got = recv(e->fd, (char*)dst, (int)max_bytes, 0);
-    if (got == 0) {
-      x07_ext_sockets_sock_close_in_place(e);
-      return 0;
-    }
-    if (got == SOCKET_ERROR) {
-      int err = x07_sock_errno();
-      if (err == WSAEINTR) continue;
-      if (err == WSAEWOULDBLOCK) continue;
-      x07_ext_sockets_sock_close_in_place(e);
-      return 0;
-    }
-    return (got > 0) ? (uint32_t)got : 0u;
-#else
     ssize_t got = recv(e->fd, dst, (size_t)max_bytes, 0);
     if (got == 0) {
       x07_ext_sockets_sock_close_in_place(e);
@@ -688,7 +663,6 @@ static uint32_t x07_ext_sockets_tcp_stream_read_into(
       return 0;
     }
     return (got > 0) ? (uint32_t)got : 0u;
-#endif
   }
 }
 
@@ -783,17 +757,6 @@ static uint32_t x07_ext_sockets_udp_recv_doc_into(
     memset(&ss, 0, sizeof(ss));
     x07_socklen_t ss_len = (x07_socklen_t)sizeof(ss);
 
-#if defined(_WIN32)
-    int got = recvfrom(e->fd, (char*)(dst + hdr_max), (int)payload_cap, 0, (struct sockaddr*)&ss, &ss_len);
-    if (got == SOCKET_ERROR) {
-      int err = x07_sock_errno();
-      if (err == WSAEINTR) continue;
-      if (err == WSAEWOULDBLOCK) return x07_ext_sockets_write_err_doc_v1(X07_NET_ERR_TIMEOUT, dst, cap);
-      if (err == WSAEMSGSIZE) return x07_ext_sockets_write_err_doc_v1(X07_NET_ERR_TOO_LARGE, dst, cap);
-      return x07_ext_sockets_write_err_doc_v1(X07_NET_ERR_CONNECT, dst, cap);
-    }
-    uint32_t payload_len = (got > 0) ? (uint32_t)got : 0u;
-#else
     ssize_t got = recvfrom(e->fd, dst + hdr_max, (size_t)payload_cap, 0, (struct sockaddr*)&ss, &ss_len);
     if (got < 0) {
       int err = x07_sock_errno();
@@ -802,7 +765,6 @@ static uint32_t x07_ext_sockets_udp_recv_doc_into(
       return x07_ext_sockets_write_err_doc_v1(X07_NET_ERR_CONNECT, dst, cap);
     }
     uint32_t payload_len = (got > 0) ? (uint32_t)got : 0u;
-#endif
 
     uint32_t addr_len = x07_ext_sockaddr_to_netaddr_v1_in_place((const struct sockaddr*)&ss, dst + 8, 28u);
     if (addr_len == 0) return x07_ext_sockets_write_err_doc_v1(X07_NET_ERR_INTERNAL, dst, cap);
@@ -1010,43 +972,17 @@ static void x07_ext_build_netaddr_ipv6(uint8_t* out, const uint8_t ip[16], uint3
   memcpy(out + 12, ip, 16);
 }
 
-#if defined(_WIN32)
-static int x07_ext_wsa_ready(void) {
-  static int ready = 0;
-  if (ready) return 1;
-  WSADATA wsa;
-  if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return 0;
-  ready = 1;
-  return 1;
-}
-#else
 static int x07_ext_wsa_ready(void) { return 1; }
-#endif
 
 static int x07_ext_sock_set_nonblocking(x07_sock_t fd) {
-#if defined(_WIN32)
-  u_long mode = 1;
-  return ioctlsocket(fd, FIONBIO, &mode) == 0;
-#else
   int flags = fcntl(fd, F_GETFL, 0);
   if (flags < 0) return 0;
   if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) != 0) return 0;
   return 1;
-#endif
 }
 
 static int x07_ext_poll_one(x07_sock_t fd, int events, int timeout_ms, int* out_revents) {
   if (out_revents) *out_revents = 0;
-#if defined(_WIN32)
-  WSAPOLLFD pfd;
-  memset(&pfd, 0, sizeof(pfd));
-  pfd.fd = fd;
-  pfd.events = (SHORT)events;
-  int rc = WSAPoll(&pfd, 1, timeout_ms);
-  if (rc <= 0) return rc;
-  if (out_revents) *out_revents = (int)pfd.revents;
-  return rc;
-#else
   struct pollfd pfd;
   memset(&pfd, 0, sizeof(pfd));
   pfd.fd = fd;
@@ -1055,24 +991,15 @@ static int x07_ext_poll_one(x07_sock_t fd, int events, int timeout_ms, int* out_
   if (rc <= 0) return rc;
   if (out_revents) *out_revents = (int)pfd.revents;
   return rc;
-#endif
 }
 
 static int x07_ext_sock_get_so_error(x07_sock_t fd, int* out_err) {
   if (out_err) *out_err = 0;
-#if defined(_WIN32)
-  int so_error = 0;
-  int len = (int)sizeof(so_error);
-  if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&so_error, &len) != 0) return 0;
-  if (out_err) *out_err = so_error;
-  return 1;
-#else
   int so_error = 0;
   x07_socklen_t len = (x07_socklen_t)sizeof(so_error);
   if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &so_error, &len) != 0) return 0;
   if (out_err) *out_err = so_error;
   return 1;
-#endif
 }
 
 static uint32_t x07_ext_tcp_connect_addr(const struct sockaddr* sa, x07_socklen_t sa_len, uint32_t timeout_ms, x07_sock_t* out_fd) {
@@ -1087,15 +1014,6 @@ static uint32_t x07_ext_tcp_connect_addr(const struct sockaddr* sa, x07_socklen_
   }
 
   int rc = connect(fd, sa, (x07_socklen_t)sa_len);
-#if defined(_WIN32)
-  if (rc != 0) {
-    int err = x07_sock_errno();
-    if (err != WSAEWOULDBLOCK && err != WSAEINPROGRESS) {
-      (void)x07_sock_close(fd);
-      return X07_NET_ERR_CONNECT;
-    }
-  }
-#else
   if (rc != 0) {
     int err = x07_sock_errno();
     if (err != EINPROGRESS) {
@@ -1103,7 +1021,6 @@ static uint32_t x07_ext_tcp_connect_addr(const struct sockaddr* sa, x07_socklen_
       return X07_NET_ERR_CONNECT;
     }
   }
-#endif
 
   int revents = 0;
   int prc = x07_ext_poll_one(fd, POLLOUT, (int)timeout_ms, &revents);
@@ -1241,11 +1158,7 @@ static uint32_t x07_ext_tcp_connect_fd_v1(const x07NetAddrV1* a, const x07NetCap
 }
 
 static const char* x07_ext_inet_ntop(int family, const void* addr, char* out, size_t out_sz) {
-#if defined(_WIN32)
-  return inet_ntop(family, addr, out, out_sz);
-#else
   return inet_ntop(family, addr, out, (socklen_t)out_sz);
-#endif
 }
 
 static uint32_t x07_ext_tls_client_handshake(
@@ -1342,19 +1255,11 @@ static uint32_t x07_ext_tls_client_handshake(
     }
   }
 
-#if defined(_WIN32)
-  if (SSL_set_fd(ssl, (int)fd) != 1) {
-    SSL_free(ssl);
-    SSL_CTX_free(ctx);
-    return X07_NET_ERR_TLS;
-  }
-#else
   if (SSL_set_fd(ssl, fd) != 1) {
     SSL_free(ssl);
     SSL_CTX_free(ctx);
     return X07_NET_ERR_TLS;
   }
-#endif
 
   for (;;) {
     ERR_clear_error();
@@ -1843,11 +1748,7 @@ int32_t x07_ext_sockets_tcp_listen_alloc(
   if (fd == X07_SOCK_INVALID) return x07_ext_return_err(X07_NET_ERR_CONNECT, out_handle);
 
   int opt = 1;
-#if defined(_WIN32)
-  (void)setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, (int)sizeof(opt));
-#else
   (void)setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, (x07_socklen_t)sizeof(opt));
-#endif
 
   if (bind(fd, (struct sockaddr*)&ss, (x07_socklen_t)ss_len) != 0) {
     (void)x07_sock_close(fd);
@@ -2025,16 +1926,6 @@ int32_t x07_ext_sockets_tcp_stream_read_alloc(
     if (!tmp) return x07_ext_return_err(X07_NET_ERR_INTERNAL, out_handle);
   }
 
-#if defined(_WIN32)
-  int got = recv(e->fd, (char*)tmp, (int)max_bytes, 0);
-  if (got == SOCKET_ERROR) {
-    int err = x07_sock_errno();
-    free(tmp);
-    if (err == WSAEWOULDBLOCK) return x07_ext_return_err(X07_NET_ERR_TIMEOUT, out_handle);
-    return x07_ext_return_err(X07_NET_ERR_CONNECT, out_handle);
-  }
-  uint32_t payload_len = (got > 0) ? (uint32_t)got : 0u;
-#else
   ssize_t got = recv(e->fd, tmp, (size_t)max_bytes, 0);
   if (got < 0) {
     int err = x07_sock_errno();
@@ -2043,7 +1934,6 @@ int32_t x07_ext_sockets_tcp_stream_read_alloc(
     return x07_ext_return_err(X07_NET_ERR_CONNECT, out_handle);
   }
   uint32_t payload_len = (got > 0) ? (uint32_t)got : 0u;
-#endif
 
   uint32_t doc_len = 0;
   uint8_t* doc = x07_ext_make_ok_read_doc(tmp, payload_len, &doc_len);
@@ -2086,15 +1976,6 @@ int32_t x07_ext_sockets_tcp_stream_write_alloc(
 
   uint32_t wrote = 0;
   if (data_len != 0) {
-#if defined(_WIN32)
-    int n = send(e->fd, (const char*)data, (int)data_len, 0);
-    if (n == SOCKET_ERROR) {
-      int err = x07_sock_errno();
-      if (err == WSAEWOULDBLOCK) return x07_ext_return_err(X07_NET_ERR_TIMEOUT, out_handle);
-      return x07_ext_return_err(X07_NET_ERR_CONNECT, out_handle);
-    }
-    if (n > 0) wrote = (uint32_t)n;
-#else
     ssize_t n = send(e->fd, data, (size_t)data_len, 0);
     if (n < 0) {
       int err = x07_sock_errno();
@@ -2102,7 +1983,6 @@ int32_t x07_ext_sockets_tcp_stream_write_alloc(
       return x07_ext_return_err(X07_NET_ERR_CONNECT, out_handle);
     }
     if (n > 0) wrote = (uint32_t)n;
-#endif
   }
 
   uint32_t doc_len = 0;
@@ -2364,21 +2244,12 @@ int32_t x07_ext_sockets_tcp_stream_shutdown_v1(int32_t stream_handle, int32_t ho
   x07SockEntry* e = x07_ext_sockets_sock_ptr((uint32_t)stream_handle);
   if (!e || e->kind != X07_SOCK_KIND_TCP_STREAM || e->closed) return 0;
 
-#if defined(_WIN32)
-  int sd = SD_BOTH;
-  if (how == 0) sd = SD_RECEIVE;
-  else if (how == 1) sd = SD_SEND;
-  else if (how == 2) sd = SD_BOTH;
-  else return 0;
-  return shutdown(e->fd, sd) == 0 ? 1 : 0;
-#else
   int sh = SHUT_RDWR;
   if (how == 0) sh = SHUT_RD;
   else if (how == 1) sh = SHUT_WR;
   else if (how == 2) sh = SHUT_RDWR;
   else return 0;
   return shutdown(e->fd, sh) == 0 ? 1 : 0;
-#endif
 }
 
 int32_t x07_ext_sockets_tcp_stream_close_v1(int32_t stream_handle) {
@@ -2611,19 +2482,6 @@ int32_t x07_ext_sockets_udp_sendto_alloc(
       memcpy(&ss, it->ai_addr, it->ai_addrlen);
       ss_len = (x07_socklen_t)it->ai_addrlen;
 
-#if defined(_WIN32)
-      int sent = sendto(e->fd, (const char*)payload, (int)payload_len, 0, (struct sockaddr*)&ss, (int)ss_len);
-      if (sent == SOCKET_ERROR) {
-        int err = x07_sock_errno();
-        if (err == WSAEWOULDBLOCK) {
-          saw_timeout = 1;
-          break;
-        }
-        saw_connect_err = 1;
-        continue;
-      }
-      uint32_t wrote = (sent > 0) ? (uint32_t)sent : 0u;
-#else
       ssize_t sent = sendto(e->fd, payload, (size_t)payload_len, 0, (struct sockaddr*)&ss, (x07_socklen_t)ss_len);
       if (sent < 0) {
         int err = x07_sock_errno();
@@ -2635,7 +2493,6 @@ int32_t x07_ext_sockets_udp_sendto_alloc(
         continue;
       }
       uint32_t wrote = (sent > 0) ? (uint32_t)sent : 0u;
-#endif
 
       freeaddrinfo(res);
       uint32_t doc_len = 0;
@@ -2677,15 +2534,6 @@ int32_t x07_ext_sockets_udp_sendto_alloc(
   if (prc == 0) return x07_ext_return_err(X07_NET_ERR_TIMEOUT, out_handle);
   if (prc < 0) return x07_ext_return_err(X07_NET_ERR_INTERNAL, out_handle);
 
-#if defined(_WIN32)
-  int sent = sendto(e->fd, (const char*)payload, (int)payload_len, 0, (struct sockaddr*)&ss, (int)ss_len);
-  if (sent == SOCKET_ERROR) {
-    int err = x07_sock_errno();
-    if (err == WSAEWOULDBLOCK) return x07_ext_return_err(X07_NET_ERR_TIMEOUT, out_handle);
-    return x07_ext_return_err(X07_NET_ERR_CONNECT, out_handle);
-  }
-  uint32_t wrote = (sent > 0) ? (uint32_t)sent : 0u;
-#else
   ssize_t sent = sendto(e->fd, payload, (size_t)payload_len, 0, (struct sockaddr*)&ss, (x07_socklen_t)ss_len);
   if (sent < 0) {
     int err = x07_sock_errno();
@@ -2693,7 +2541,6 @@ int32_t x07_ext_sockets_udp_sendto_alloc(
     return x07_ext_return_err(X07_NET_ERR_CONNECT, out_handle);
   }
   uint32_t wrote = (sent > 0) ? (uint32_t)sent : 0u;
-#endif
 
   uint32_t doc_len = 0;
   uint8_t* doc = x07_ext_make_ok_write_doc(wrote, &doc_len);
@@ -2737,16 +2584,6 @@ int32_t x07_ext_sockets_udp_recvfrom_alloc(
   x07_socklen_t peer_len = (x07_socklen_t)sizeof(peer);
   memset(&peer, 0, sizeof(peer));
 
-#if defined(_WIN32)
-  int got = recvfrom(e->fd, (char*)tmp, (int)max_bytes, 0, (struct sockaddr*)&peer, (int*)&peer_len);
-  if (got == SOCKET_ERROR) {
-    int err = x07_sock_errno();
-    free(tmp);
-    if (err == WSAEWOULDBLOCK) return x07_ext_return_err(X07_NET_ERR_TIMEOUT, out_handle);
-    return x07_ext_return_err(X07_NET_ERR_CONNECT, out_handle);
-  }
-  uint32_t payload_len = (got > 0) ? (uint32_t)got : 0u;
-#else
   ssize_t got = recvfrom(e->fd, tmp, (size_t)max_bytes, 0, (struct sockaddr*)&peer, &peer_len);
   if (got < 0) {
     int err = x07_sock_errno();
@@ -2755,7 +2592,6 @@ int32_t x07_ext_sockets_udp_recvfrom_alloc(
     return x07_ext_return_err(X07_NET_ERR_CONNECT, out_handle);
   }
   uint32_t payload_len = (got > 0) ? (uint32_t)got : 0u;
-#endif
 
   uint8_t* from_addr = NULL;
   uint32_t from_addr_len = 0;

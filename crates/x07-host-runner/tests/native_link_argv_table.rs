@@ -1,15 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-#[cfg(windows)]
-use std::sync::Mutex;
 
 use x07_contracts::{NATIVE_BACKENDS_SCHEMA_VERSION, NATIVE_REQUIRES_SCHEMA_VERSION};
 use x07_host_runner::plan_native_link_argv;
 use x07c::native::{NativeBackendReq, NativeRequires};
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
-#[cfg(windows)]
-static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 fn temp_dir(prefix: &str) -> PathBuf {
     let base = std::env::temp_dir();
@@ -34,9 +30,7 @@ const MANIFEST_JSON: &str = r#"
       "abi_major": 1,
       "link": {
         "linux": { "kind": "static", "files": ["deps/x07/libx07_ext_net.a"], "args": ["-pthread"], "search_paths": [], "force_load": false, "whole_archive": false },
-        "macos": { "kind": "static", "files": ["deps/x07/libx07_ext_net.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "windows-msvc": { "kind": "static", "files": ["deps/x07/x07_ext_net.lib"], "args": ["Ws2_32.lib"], "search_paths": [], "force_load": false, "whole_archive": false },
-        "windows-gnu": { "kind": "static", "files": ["deps/x07/libx07_ext_net.a"], "args": ["-lws2_32"], "search_paths": [], "force_load": false, "whole_archive": false }
+        "macos": { "kind": "static", "files": ["deps/x07/libx07_ext_net.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false }
       }
     },
     {
@@ -44,9 +38,7 @@ const MANIFEST_JSON: &str = r#"
       "abi_major": 1,
       "link": {
         "linux": { "kind": "static", "files": ["deps/x07/libx07_ext_regex.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "macos": { "kind": "static", "files": ["deps/x07/libx07_ext_regex.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "windows-msvc": { "kind": "static", "files": ["deps/x07/x07_ext_regex.lib"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "windows-gnu": { "kind": "static", "files": ["deps/x07/libx07_ext_regex.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false }
+        "macos": { "kind": "static", "files": ["deps/x07/libx07_ext_regex.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false }
       }
     },
     {
@@ -54,9 +46,7 @@ const MANIFEST_JSON: &str = r#"
       "abi_major": 1,
       "link": {
         "linux": { "kind": "static", "files": ["deps/x07/libx07_ext_sqlite3.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "macos": { "kind": "static", "files": ["deps/x07/libx07_ext_sqlite3.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "windows-msvc": { "kind": "static", "files": ["deps/x07/x07_ext_sqlite3.lib"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false },
-        "windows-gnu": { "kind": "static", "files": ["deps/x07/libx07_ext_sqlite3.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false }
+        "macos": { "kind": "static", "files": ["deps/x07/libx07_ext_sqlite3.a"], "args": [], "search_paths": [], "force_load": false, "whole_archive": false }
       }
     }
   ]
@@ -73,9 +63,6 @@ fn write_fixture_toolchain_root(root: &Path) {
         "deps/x07/libx07_ext_net.a",
         "deps/x07/libx07_ext_regex.a",
         "deps/x07/libx07_ext_sqlite3.a",
-        "deps/x07/x07_ext_net.lib",
-        "deps/x07/x07_ext_regex.lib",
-        "deps/x07/x07_ext_sqlite3.lib",
     ] {
         write_bytes(&root.join(rel), b"dummy");
     }
@@ -162,86 +149,4 @@ fn native_link_argv_macos_exact() {
     assert_eq!(argv, expected);
 
     let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-#[cfg(windows)]
-fn native_link_argv_windows_msvc_exact() {
-    let _lock = ENV_LOCK.lock().expect("lock env");
-    let prev_cc = std::env::var_os("X07_CC");
-    std::env::set_var("X07_CC", "cl.exe");
-
-    let dir = temp_dir("x07_native_link_windows");
-    write_fixture_toolchain_root(&dir);
-
-    let argv = plan_native_link_argv(&dir, &requires_doc()).expect("plan argv");
-
-    let expected = vec![
-        "Ws2_32.lib".to_string(),
-        dir.join("deps")
-            .join("x07")
-            .join("x07_ext_net.lib")
-            .to_string_lossy()
-            .to_string(),
-        dir.join("deps")
-            .join("x07")
-            .join("x07_ext_regex.lib")
-            .to_string_lossy()
-            .to_string(),
-        dir.join("deps")
-            .join("x07")
-            .join("x07_ext_sqlite3.lib")
-            .to_string_lossy()
-            .to_string(),
-    ];
-
-    assert_eq!(argv, expected);
-
-    let _ = std::fs::remove_dir_all(&dir);
-
-    match prev_cc {
-        Some(v) => std::env::set_var("X07_CC", v),
-        None => std::env::remove_var("X07_CC"),
-    }
-}
-
-#[test]
-#[cfg(windows)]
-fn native_link_argv_windows_gnu_exact() {
-    let _lock = ENV_LOCK.lock().expect("lock env");
-    let prev_cc = std::env::var_os("X07_CC");
-    std::env::set_var("X07_CC", "gcc");
-
-    let dir = temp_dir("x07_native_link_windows_gnu");
-    write_fixture_toolchain_root(&dir);
-
-    let argv = plan_native_link_argv(&dir, &requires_doc()).expect("plan argv");
-
-    let expected = vec![
-        dir.join("deps")
-            .join("x07")
-            .join("libx07_ext_net.a")
-            .to_string_lossy()
-            .to_string(),
-        dir.join("deps")
-            .join("x07")
-            .join("libx07_ext_regex.a")
-            .to_string_lossy()
-            .to_string(),
-        dir.join("deps")
-            .join("x07")
-            .join("libx07_ext_sqlite3.a")
-            .to_string_lossy()
-            .to_string(),
-        "-lws2_32".to_string(),
-    ];
-
-    assert_eq!(argv, expected);
-
-    let _ = std::fs::remove_dir_all(&dir);
-
-    match prev_cc {
-        Some(v) => std::env::set_var("X07_CC", v),
-        None => std::env::remove_var("X07_CC"),
-    }
 }

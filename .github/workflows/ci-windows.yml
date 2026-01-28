@@ -1,4 +1,4 @@
-name: CI (Windows)
+name: CI (WSL2)
 
 on:
   workflow_dispatch:
@@ -9,72 +9,6 @@ permissions:
   contents: read
 
 jobs:
-  windows:
-    name: windows-2022
-    runs-on: windows-2022
-    timeout-minutes: 60
-    if: github.event_name != 'schedule'
-    env:
-      X07_PYTHON: python
-      X07_CC: gcc
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up MSYS2 (UCRT64, C toolchain + libs)
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-lld
-            mingw-w64-ucrt-x86_64-openssl
-            mingw-w64-ucrt-x86_64-curl
-            mingw-w64-ucrt-x86_64-sqlite3
-            mingw-w64-ucrt-x86_64-zlib
-            mingw-w64-ucrt-x86_64-pkgconf
-
-      - name: Add MSYS2 UCRT64 to PATH
-        shell: bash
-        run: echo "${RUNNER_TEMP}\\\\msys64\\\\ucrt64\\\\bin" >> "$GITHUB_PATH"
-
-      - name: Select MSYS2 gcc for builds
-        shell: bash
-        run: |
-          set -euo pipefail
-          runner_temp_posix="${RUNNER_TEMP//\\//}"
-          gcc_path="${runner_temp_posix}/msys64/ucrt64/bin/gcc.exe"
-          if [[ ! -x "$gcc_path" ]]; then
-            echo "ERROR: expected MSYS2 gcc at: $gcc_path" >&2
-            exit 2
-          fi
-          echo "X07_CC=$gcc_path" >> "$GITHUB_ENV"
-          echo "X07_CC_ARGS=-fuse-ld=lld" >> "$GITHUB_ENV"
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Set up Rust (stable)
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: CI gate
-        shell: bash
-        run: ./scripts/ci/check_all.sh
-
-      - name: Installer smoke (local channels)
-        shell: pwsh
-        env:
-          X07_INSTALL_SMOKE_MODE: local
-        run: ./scripts/ci/check_installer_smoke_windows.ps1
-
   wsl2:
     name: wsl2-ubuntu
     runs-on: windows-2022

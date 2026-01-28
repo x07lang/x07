@@ -50,11 +50,7 @@ pub(crate) fn resolve_sibling_or_path(name: &str) -> PathBuf {
 
     let mut candidates = Vec::new();
 
-    let mut cand = dir.join(name);
-    if cfg!(windows) {
-        cand.set_extension("exe");
-    }
-    candidates.push(cand);
+    candidates.push(dir.join(name));
 
     if dir
         .file_name()
@@ -62,11 +58,7 @@ pub(crate) fn resolve_sibling_or_path(name: &str) -> PathBuf {
         .is_some_and(|n| n == "deps")
     {
         if let Some(parent) = dir.parent() {
-            let mut cand = parent.join(name);
-            if cfg!(windows) {
-                cand.set_extension("exe");
-            }
-            candidates.push(cand);
+            candidates.push(parent.join(name));
         }
     }
 

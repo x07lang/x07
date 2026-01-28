@@ -3,9 +3,9 @@
   "dependencies": [
     {
       "name": "ext-curl-c",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-curl-c/0.1.4",
-      "package_manifest_sha256": "fd4d16bc79b2a3175be44d3fcb8a8a76eb8436b80bc16a058a6ed93f1a3d30b2",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-curl-c/0.1.5",
+      "package_manifest_sha256": "e89a5ed6478c1f5e7d05eb19bd091606ab9b43b7854aa718508968132b030616",
       "module_root": "modules",
       "modules_sha256": {
         "ext.curl._ffi": "d0f6a102b0e5693b0c08fe3183a0cedad0b905220d341896acec256f3e06df30",
@@ -36,9 +36,9 @@
     },
     {
       "name": "ext-net",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-net/0.1.4",
-      "package_manifest_sha256": "3803695f8b6a0fdf8b4566877d57aacf3e812e7196585f5285dcfe87a7486b24",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-net/0.1.5",
+      "package_manifest_sha256": "eb71c646b2c55182359c4f9a45c5848967211c7f00228fb4cae745e8a2b6fa37",
       "module_root": "modules",
       "modules_sha256": {
         "std.net.codec": "cf0a9ec8e6a60ba101fc536a0c27de1fe68e851b23f6f0221e6b35ef6e1fe6e8",
@@ -56,9 +56,9 @@
     },
     {
       "name": "ext-sockets-c",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-sockets-c/0.1.4",
-      "package_manifest_sha256": "98d6483584b636bedd68d534690404759a734ba3fedefbb1cacd2aabb4f255bd",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-sockets-c/0.1.5",
+      "package_manifest_sha256": "ee55e57989b4e62feb93ea9ae09dca6042b7bf729d00111a9f585fb61ddc3534",
       "module_root": "modules",
       "modules_sha256": {
         "ext.sockets._ffi": "9752f467c1b46fbd6d60e0d50a3e55f15fdcac109348d586c7bcc4e24f31864b",

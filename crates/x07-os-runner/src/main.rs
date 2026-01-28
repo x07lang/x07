@@ -79,9 +79,9 @@ struct Cli {
 }
 
 fn main() -> std::process::ExitCode {
-    // Windows defaults to a 1MiB stack, which is not enough for our current compiler recursion
-    // depth (for example, larger template and example projects). Run the real entrypoint on a
-    // larger-stack thread to keep behavior consistent across platforms.
+    // Some platforms default to a small stack, which is not enough for our current compiler
+    // recursion depth (for example, larger template and example projects). Run the real entrypoint
+    // on a larger-stack thread to keep behavior consistent.
     let handle = std::thread::Builder::new()
         .name("x07-os-runner".to_string())
         .stack_size(8 * 1024 * 1024)

@@ -58,11 +58,9 @@ macOS / Linux:
 curl -fsSL https://x07lang.org/install.sh | sh -s -- --yes --channel stable
 ```
 
-Windows:
+Windows (WSL2):
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://x07lang.org/install.ps1 -OutFile install.ps1; .\\install.ps1 -Yes -Channel stable"
-```
+X07 is supported on Windows via WSL2 (Ubuntu recommended). In your WSL2 shell, run the macOS / Linux install command above.
 
 Docs: https://x07lang.org/docs/getting-started/installer/
 

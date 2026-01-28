@@ -22,7 +22,7 @@ def iso_utc_now() -> str:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tag", required=True, help="Release tag (for example: v0.0.63)")
+    ap.add_argument("--tag", required=True, help="Release tag (for example: v0.0.64)")
     ap.add_argument("--dist", type=Path, default=Path("dist"), help="Artifacts directory (default: dist)")
     ap.add_argument(
         "--base-url",
@@ -64,7 +64,6 @@ def main(argv: list[str]) -> int:
         ("aarch64-unknown-linux-gnu", "tar.gz"),
         ("x86_64-apple-darwin", "tar.gz"),
         ("aarch64-apple-darwin", "tar.gz"),
-        ("x86_64-pc-windows-msvc", "zip"),
     ]
 
     toolchain_assets: dict[str, dict] = {}

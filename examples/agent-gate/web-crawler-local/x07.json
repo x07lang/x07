@@ -8,8 +8,8 @@
   "dependencies": [
     {
       "name": "ext-curl-c",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-curl-c/0.1.4"
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-curl-c/0.1.5"
     },
     {
       "name": "ext-fs",
@@ -23,13 +23,13 @@
     },
     {
       "name": "ext-net",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-net/0.1.4"
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-net/0.1.5"
     },
     {
       "name": "ext-sockets-c",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-sockets-c/0.1.4"
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-sockets-c/0.1.5"
     },
     {
       "name": "ext-url-rs",

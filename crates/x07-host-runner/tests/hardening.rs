@@ -40,10 +40,7 @@ fn cc_command() -> (OsString, Vec<String>) {
 fn compile_c_artifact(source: &str) -> (PathBuf, PathBuf) {
     let dir = create_temp_dir("x07_test_c");
     let src_path = dir.join("prog.c");
-    let mut exe_path = dir.join("prog");
-    if cfg!(windows) {
-        exe_path.set_extension("exe");
-    }
+    let exe_path = dir.join("prog");
     std::fs::write(&src_path, source).expect("write C source");
 
     let (cc, cc_args) = cc_command();

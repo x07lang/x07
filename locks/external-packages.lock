@@ -529,8 +529,8 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.0/modules/ext/cli/complete.x07.json",
-          "sha256": "04effd7ecf4f93fdb8c5623ecf68d841769dd8fb746eaef52705a92faa07296e",
-          "size_bytes": 603
+          "sha256": "467823121af4eac3f98098e62c167979b288724ece138e434b93f287d335a9d8",
+          "size_bytes": 545
         },
         {
           "module_id": "ext.cli.help",
@@ -569,8 +569,8 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.1/modules/ext/cli/complete.x07.json",
-          "sha256": "04effd7ecf4f93fdb8c5623ecf68d841769dd8fb746eaef52705a92faa07296e",
-          "size_bytes": 603
+          "sha256": "467823121af4eac3f98098e62c167979b288724ece138e434b93f287d335a9d8",
+          "size_bytes": 545
         },
         {
           "module_id": "ext.cli.help",
@@ -609,8 +609,8 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.2/modules/ext/cli/complete.x07.json",
-          "sha256": "03914419076424f2238f1617c31718ca49d9a25050c9cd6b5a84522a23634c3a",
-          "size_bytes": 616
+          "sha256": "a0d3aaeb9db285c6d762b020a8dbfc4269a9bb4549a4e3d1b49e44f7c685268f",
+          "size_bytes": 558
         },
         {
           "module_id": "ext.cli.help",
@@ -649,8 +649,8 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.3/modules/ext/cli/complete.x07.json",
-          "sha256": "03914419076424f2238f1617c31718ca49d9a25050c9cd6b5a84522a23634c3a",
-          "size_bytes": 616
+          "sha256": "a0d3aaeb9db285c6d762b020a8dbfc4269a9bb4549a4e3d1b49e44f7c685268f",
+          "size_bytes": 558
         },
         {
           "module_id": "ext.cli.help",
@@ -689,8 +689,8 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.4/modules/ext/cli/complete.x07.json",
-          "sha256": "03914419076424f2238f1617c31718ca49d9a25050c9cd6b5a84522a23634c3a",
-          "size_bytes": 616
+          "sha256": "a0d3aaeb9db285c6d762b020a8dbfc4269a9bb4549a4e3d1b49e44f7c685268f",
+          "size_bytes": 558
         },
         {
           "module_id": "ext.cli.help",
@@ -729,8 +729,8 @@
         {
           "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.5/modules/ext/cli/complete.x07.json",
-          "sha256": "03914419076424f2238f1617c31718ca49d9a25050c9cd6b5a84522a23634c3a",
-          "size_bytes": 616
+          "sha256": "a0d3aaeb9db285c6d762b020a8dbfc4269a9bb4549a4e3d1b49e44f7c685268f",
+          "size_bytes": 558
         },
         {
           "module_id": "ext.cli.help",
@@ -761,6 +761,46 @@
       "package_manifest_sha256": "80bdfc18999f1c2d24f84b06bc89b2a67e245043bc26407529e83a8ae308ec9a",
       "path": "packages/ext/x07-ext-cli/0.1.5",
       "version": "0.1.5"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.cli.complete",
+          "path": "packages/ext/x07-ext-cli/0.1.6/modules/ext/cli/complete.x07.json",
+          "sha256": "a0d3aaeb9db285c6d762b020a8dbfc4269a9bb4549a4e3d1b49e44f7c685268f",
+          "size_bytes": 558
+        },
+        {
+          "module_id": "ext.cli.help",
+          "path": "packages/ext/x07-ext-cli/0.1.6/modules/ext/cli/help.x07.json",
+          "sha256": "04ba3a0130789c3476e17383876033181fa4098df208f66bc45521fd2cb93aeb",
+          "size_bytes": 3394
+        },
+        {
+          "module_id": "ext.cli.specrows",
+          "path": "packages/ext/x07-ext-cli/0.1.6/modules/ext/cli/specrows.x07.json",
+          "sha256": "16e7624d3519287881f2f5591c0bf64c3104ac1d6040cdf8248b7503ffb3ab9a",
+          "size_bytes": 11029
+        },
+        {
+          "module_id": "ext.cli.tests",
+          "path": "packages/ext/x07-ext-cli/0.1.6/modules/ext/cli/tests.x07.json",
+          "sha256": "6bc6042a841977da90d5e8760eda6174ccb36295712b6dd6405606831c35250a",
+          "size_bytes": 11234
+        },
+        {
+          "module_id": "ext.cli",
+          "path": "packages/ext/x07-ext-cli/0.1.6/modules/ext/cli.x07.json",
+          "sha256": "f70ed5d407c0562897da77801a732b3d31d4f0777e7b24803e726210c5ba05a7",
+          "size_bytes": 42108
+        }
+      ],
+      "name": "ext-cli",
+      "package_manifest_sha256": "06a4e0dc470613ba7696b32903300d30f57f0fedeea8e2aa44b0920da9090944",
+      "path": "packages/ext/x07-ext-cli/0.1.6",
+      "version": "0.1.6"
     },
     {
       "determinism_tier": "pure",
@@ -1319,6 +1359,31 @@
       "package_manifest_sha256": "fd4d16bc79b2a3175be44d3fcb8a8a76eb8436b80bc16a058a6ed93f1a3d30b2",
       "path": "packages/ext/x07-ext-curl-c/0.1.4",
       "version": "0.1.4"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "ffi_libs": [
+        "curl"
+      ],
+      "import_mode": "ffi",
+      "modules": [
+        {
+          "module_id": "ext.curl._ffi",
+          "path": "packages/ext/x07-ext-curl-c/0.1.5/modules/ext/curl/_ffi.x07.json",
+          "sha256": "d0f6a102b0e5693b0c08fe3183a0cedad0b905220d341896acec256f3e06df30",
+          "size_bytes": 3889
+        },
+        {
+          "module_id": "ext.curl.http",
+          "path": "packages/ext/x07-ext-curl-c/0.1.5/modules/ext/curl/http.x07.json",
+          "sha256": "cd61c70c190555c34d89efe96b1fede41db2b878325f4f765d57a3418bf0eca0",
+          "size_bytes": 23355
+        }
+      ],
+      "name": "ext-curl-c",
+      "package_manifest_sha256": "e89a5ed6478c1f5e7d05eb19bd091606ab9b43b7854aa718508968132b030616",
+      "path": "packages/ext/x07-ext-curl-c/0.1.5",
+      "version": "0.1.5"
     },
     {
       "determinism_tier": "pure",
@@ -4010,6 +4075,82 @@
     },
     {
       "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.net.codec",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/codec.x07.json",
+          "sha256": "cf0a9ec8e6a60ba101fc536a0c27de1fe68e851b23f6f0221e6b35ef6e1fe6e8",
+          "size_bytes": 8632
+        },
+        {
+          "module_id": "std.net.dns",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/dns.x07.json",
+          "sha256": "867c1a219895eb406f6cfd81ae288ce885c4f503ee9132a4fe9064923ebf337d",
+          "size_bytes": 1837
+        },
+        {
+          "module_id": "std.net.err",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/err.x07.json",
+          "sha256": "fe7332e87ae4ba0606018cf42685662ee9e8225efd0a5042c486c8ef56892b0b",
+          "size_bytes": 2036
+        },
+        {
+          "module_id": "std.net.http.client",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/http/client.x07.json",
+          "sha256": "7a5b0045d1aec39e63b6d79912468e39a436d12741e4e14ccdd51df91b2f0d34",
+          "size_bytes": 10653
+        },
+        {
+          "module_id": "std.net.http.server",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/http/server.x07.json",
+          "sha256": "4d0b7adff387bda76b4425691367be15dd72333935fcb6b2b420196340a5e16e",
+          "size_bytes": 12267
+        },
+        {
+          "module_id": "std.net.http.spec",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/http/spec.x07.json",
+          "sha256": "21c66733fdab3a5561d0295a514d6c0f875aba9d8b428e23563a7132856844ee",
+          "size_bytes": 26091
+        },
+        {
+          "module_id": "std.net.http",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/http.x07.json",
+          "sha256": "6dafbe8454be0042b1e28d1517254e2c2ff9e3ea91d213f3ee5a39add567fa57",
+          "size_bytes": 3672
+        },
+        {
+          "module_id": "std.net.io",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/io.x07.json",
+          "sha256": "f8af5435e10ca4053326e6bacf570968182922868b6dccec70676cfaee3bea46",
+          "size_bytes": 1654
+        },
+        {
+          "module_id": "std.net.tcp",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/tcp.x07.json",
+          "sha256": "d22507235437cc2898b7e6613dfc35d4f26725026cc78d592835dc4835e49117",
+          "size_bytes": 7576
+        },
+        {
+          "module_id": "std.net.tls",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/tls.x07.json",
+          "sha256": "cf5c730a0627fe82dda1f794e3c8e31b04d8cdf0fe32270d8b3496155e96feee",
+          "size_bytes": 2702
+        },
+        {
+          "module_id": "std.net.udp",
+          "path": "packages/ext/x07-ext-net/0.1.5/modules/std/net/udp.x07.json",
+          "sha256": "e1353807a38186230ceadca1baab0b2ee3d12d1a683b3cacbbe34d9e1008588d",
+          "size_bytes": 4822
+        }
+      ],
+      "name": "ext-net",
+      "package_manifest_sha256": "eb71c646b2c55182359c4f9a45c5848967211c7f00228fb4cae745e8a2b6fa37",
+      "path": "packages/ext/x07-ext-net/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "determinism_tier": "os-world-only",
       "ffi_libs": [
         "ssl",
         "crypto"
@@ -4817,6 +4958,32 @@
       "package_manifest_sha256": "98d6483584b636bedd68d534690404759a734ba3fedefbb1cacd2aabb4f255bd",
       "path": "packages/ext/x07-ext-sockets-c/0.1.4",
       "version": "0.1.4"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "ffi_libs": [
+        "ssl",
+        "crypto"
+      ],
+      "import_mode": "ffi",
+      "modules": [
+        {
+          "module_id": "ext.sockets._ffi",
+          "path": "packages/ext/x07-ext-sockets-c/0.1.5/modules/ext/sockets/_ffi.x07.json",
+          "sha256": "9752f467c1b46fbd6d60e0d50a3e55f15fdcac109348d586c7bcc4e24f31864b",
+          "size_bytes": 7045
+        },
+        {
+          "module_id": "ext.sockets.net",
+          "path": "packages/ext/x07-ext-sockets-c/0.1.5/modules/ext/sockets/net.x07.json",
+          "sha256": "17265e8474646fd2866aa950bbb435da6ae3f410ddece65a62b09c0880b5b157",
+          "size_bytes": 10712
+        }
+      ],
+      "name": "ext-sockets-c",
+      "package_manifest_sha256": "ee55e57989b4e62feb93ea9ae09dca6042b7bf729d00111a9f585fb61ddc3534",
+      "path": "packages/ext/x07-ext-sockets-c/0.1.5",
+      "version": "0.1.5"
     },
     {
       "determinism_tier": "pure",
@@ -6565,6 +6732,6 @@
       "version": "0.1.4"
     }
   ],
-  "packages_hash": "e6ae9593d01a74ec4ded36e042f120617e55190f116c21c1030d97e0411db787",
+  "packages_hash": "6f6fb3000b3c762ff069e4713d6f5a0c9642377d7a93e6f90c0ae9010012af16",
   "packages_root": "packages/ext"
 }

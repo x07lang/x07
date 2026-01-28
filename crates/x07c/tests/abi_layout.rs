@@ -10,7 +10,7 @@ fn abi_layout_c_static_asserts_compile() {
     let rel = "crates/x07c/tests/abi_layout.c";
     let c_path = repo_root.join(rel);
     let cc = std::env::var_os("X07_CC").unwrap_or_else(|| OsStr::new("cc").to_os_string());
-    let null_out = if cfg!(windows) { "NUL" } else { "/dev/null" };
+    let null_out = "/dev/null";
 
     let out = Command::new(cc)
         .args([

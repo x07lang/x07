@@ -66,7 +66,8 @@ X07 should treat these as Tier-1 OS platforms:
 
 - Linux
 - macOS
-- Windows
+
+On Windows, OS-world support is via WSL2 (run X07 inside a Linux distro such as Ubuntu).
 
 And Tier-2:
 

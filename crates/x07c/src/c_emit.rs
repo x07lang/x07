@@ -17630,27 +17630,12 @@ const RUNTIME_C_PREAMBLE: &str = r#"
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-
-#ifndef _WIN32
 #include <poll.h>
 #include <spawn.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
-#endif
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <io.h>
-#include <windows.h>
-#ifndef SIGKILL
-#define SIGKILL 9
-#endif
-#endif
-
-#ifndef _WIN32
 #ifndef MAP_ANON
 #define MAP_ANON MAP_ANONYMOUS
-#endif
 #endif
 #else
 #include <stddef.h>
@@ -22520,10 +22505,6 @@ static uint32_t rt_os_time_sleep_ms_v1(ctx_t* ctx, int32_t ms) {
   }
 
   uint32_t ms_u = (uint32_t)ms;
-#if defined(_WIN32)
-  Sleep(ms_u);
-  return UINT32_C(1);
-#else
   struct timespec req;
   req.tv_sec = (time_t)(ms_u / UINT32_C(1000));
   req.tv_nsec = (long)((ms_u % UINT32_C(1000)) * UINT32_C(1000000));
@@ -22533,7 +22514,6 @@ static uint32_t rt_os_time_sleep_ms_v1(ctx_t* ctx, int32_t ms) {
     if (errno == EINTR) continue;
     return UINT32_C(0);
   }
-#endif
 }
 
 static bytes_t rt_os_time_local_tzid_v1(ctx_t* ctx) {
@@ -22567,25 +22547,17 @@ static void rt_os_close_fd(int fd) {
 }
 
 static int rt_os_set_nonblock(int fd) {
-#ifdef _WIN32
-  (void)fd; return 0;
-#else
   int flags = fcntl(fd, F_GETFL, 0);
   if (flags < 0) return -1;
   if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) return -1;
   return 0;
-#endif
 }
 
 static int rt_os_set_cloexec(int fd) {
-#ifdef _WIN32
-  (void)fd; return 0;
-#else
   int flags = fcntl(fd, F_GETFD, 0);
   if (flags < 0) return -1;
   if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) < 0) return -1;
   return 0;
-#endif
 }
 
 #define RT_OS_PROC_CODE_POLICY_DENIED UINT32_C(1)
@@ -22611,24 +22583,11 @@ struct rt_os_proc_s {
   uint16_t gen;
   uint16_t _pad;
 
-#if defined(_WIN32)
-  HANDLE win_proc;
-  HANDLE win_job;
-  HANDLE win_stdin;
-  HANDLE win_stdout;
-  HANDLE win_stderr;
-  HANDLE win_thread_stdin;
-  HANDLE win_thread_stdout;
-  HANDLE win_thread_stderr;
-  HANDLE win_stdin_event;
-  volatile LONG win_lock;
-#else
   pid_t pid;
   pid_t pgid;
   int stdin_fd;
   int stdout_fd;
   int stderr_fd;
-#endif
 
   uint32_t stdin_closed;
   uint32_t stdin_close_requested;
@@ -22670,21 +22629,6 @@ struct rt_os_proc_s {
 };
 
 static void rt_os_procs_ensure_cap(ctx_t* ctx, uint32_t need) {
-#if defined(_WIN32)
-  if (need <= ctx->os_procs_cap) return;
-  if (ctx->os_procs_cap != 0) rt_trap("os.process out of proc slots");
-  uint32_t new_cap = UINT32_C(1024);
-  if (new_cap < need) new_cap = need;
-  rt_os_proc_t* items = (rt_os_proc_t*)rt_alloc(
-    ctx,
-    new_cap * (uint32_t)sizeof(rt_os_proc_t),
-    (uint32_t)_Alignof(rt_os_proc_t)
-  );
-  memset(items, 0, new_cap * (uint32_t)sizeof(rt_os_proc_t));
-  ctx->os_procs = items;
-  ctx->os_procs_cap = new_cap;
-  return;
-#else
   if (need <= ctx->os_procs_cap) return;
   rt_os_proc_t* old_items = ctx->os_procs;
   uint32_t old_cap = ctx->os_procs_cap;
@@ -22714,7 +22658,6 @@ static void rt_os_procs_ensure_cap(ctx_t* ctx, uint32_t need) {
   }
   ctx->os_procs = items;
   ctx->os_procs_cap = new_cap;
-#endif
 }
 
 static uint16_t rt_os_proc_next_gen(uint16_t gen) {
@@ -22747,31 +22690,16 @@ static void rt_os_proc_init_entry(ctx_t* ctx, rt_os_proc_t* p, uint16_t gen) {
   memset(p, 0, sizeof(*p));
   p->state = RT_OS_PROC_STATE_EMPTY;
   p->gen = gen ? gen : 1;
-#if !defined(_WIN32)
   p->pid = (pid_t)-1;
   p->pgid = (pid_t)-1;
   p->stdin_fd = -1;
   p->stdout_fd = -1;
   p->stderr_fd = -1;
-#endif
   p->stdin_buf = rt_bytes_empty(ctx);
   p->stdout_buf = rt_bytes_empty(ctx);
   p->stderr_buf = rt_bytes_empty(ctx);
   p->result = rt_bytes_empty(ctx);
 }
-
-#if defined(_WIN32)
-static void rt_os_proc_lock(rt_os_proc_t* p) {
-  for (;;) {
-    if (InterlockedCompareExchange(&p->win_lock, 1, 0) == 0) return;
-    Sleep(0);
-  }
-}
-
-static void rt_os_proc_unlock(rt_os_proc_t* p) {
-  InterlockedExchange(&p->win_lock, 0);
-}
-#endif
 
 static uint32_t rt_os_proc_find_free_slot(ctx_t* ctx) {
   for (uint32_t i = 0; i < ctx->os_procs_len; i++) {
@@ -22811,28 +22739,6 @@ static rt_os_proc_t* rt_os_proc_from_handle(ctx_t* ctx, int32_t handle, uint32_t
 }
 
 static void rt_os_proc_close_fds(rt_os_proc_t* p) {
-#if defined(_WIN32)
-  rt_os_proc_lock(p);
-  if (p->win_stdin) {
-    (void)CloseHandle(p->win_stdin);
-    p->win_stdin = NULL;
-  }
-  if (p->win_stdout) {
-    (void)CloseHandle(p->win_stdout);
-    p->win_stdout = NULL;
-  }
-  if (p->win_stderr) {
-    (void)CloseHandle(p->win_stderr);
-    p->win_stderr = NULL;
-  }
-  if (p->win_stdin_event) {
-    (void)SetEvent(p->win_stdin_event);
-  }
-  p->stdin_closed = 1;
-  p->stdout_closed = 1;
-  p->stderr_closed = 1;
-  rt_os_proc_unlock(p);
-#else
   rt_os_close_fd(p->stdin_fd);
   rt_os_close_fd(p->stdout_fd);
   rt_os_close_fd(p->stderr_fd);
@@ -22842,7 +22748,6 @@ static void rt_os_proc_close_fds(rt_os_proc_t* p) {
   p->stdin_closed = 1;
   p->stdout_closed = 1;
   p->stderr_closed = 1;
-#endif
 }
 
 static void rt_os_proc_drop_buffers(ctx_t* ctx, rt_os_proc_t* p) {
@@ -22915,9 +22820,6 @@ static bytes_t rt_os_proc_make_err(ctx_t* ctx, uint32_t code) {
 }
 
 static uint32_t rt_os_proc_exit_code_from_status(int status) {
-#if defined(_WIN32)
-  return (uint32_t)status;
-#else
   uint32_t exit_code = UINT32_C(1);
   if (WIFEXITED(status)) {
     exit_code = (uint32_t)WEXITSTATUS(status);
@@ -22925,7 +22827,6 @@ static uint32_t rt_os_proc_exit_code_from_status(int status) {
     exit_code = UINT32_C(128) + (uint32_t)WTERMSIG(status);
   }
   return exit_code;
-#endif
 }
 
 static bytes_t rt_os_proc_build_ok_doc(
@@ -22962,17 +22863,6 @@ static bytes_t rt_os_proc_build_ok_doc(
 }
 
 static void rt_os_proc_try_wait(rt_os_proc_t* p) {
-#if defined(_WIN32)
-  if (!p->win_proc) return;
-  if (p->exited) return;
-  DWORD r = WaitForSingleObject(p->win_proc, 0);
-  if (r == WAIT_OBJECT_0) {
-    DWORD code = 0;
-    if (!GetExitCodeProcess(p->win_proc, &code)) code = 0;
-    p->exited = 1;
-    p->status = (int)code;
-  }
-#else
   if (p->pid == (pid_t)-1) return;
   if (p->exited) return;
   for (;;) {
@@ -22991,10 +22881,8 @@ static void rt_os_proc_try_wait(rt_os_proc_t* p) {
       return;
     }
   }
-#endif
 }
 
-#if !defined(_WIN32)
 static pid_t rt_os_proc_kill_target(rt_os_proc_t* p) {
   if (p->pid == (pid_t)-1) return (pid_t)-1;
   if (rt_os_proc_kill_tree && p->pgid > (pid_t)1) {
@@ -23002,27 +22890,14 @@ static pid_t rt_os_proc_kill_target(rt_os_proc_t* p) {
   }
   return p->pid;
 }
-#endif
 
 static void rt_os_proc_send_kill(rt_os_proc_t* p, int32_t sig) {
-#if defined(_WIN32)
-  (void)sig;
-  if (!p->win_proc) return;
-  if (p->kill_sent) return;
-  if (rt_os_proc_kill_tree && p->win_job) {
-    (void)TerminateJobObject(p->win_job, 1);
-  } else {
-    (void)TerminateProcess(p->win_proc, 1);
-  }
-  p->kill_sent = 1;
-#else
   if (p->pid == (pid_t)-1) return;
   if (p->kill_sent) return;
   pid_t target = rt_os_proc_kill_target(p);
   if (target == (pid_t)-1 || target == (pid_t)0) return;
   (void)kill(target, sig);
   p->kill_sent = 1;
-#endif
 }
 
 static void rt_os_proc_mark_done(ctx_t* ctx, rt_os_proc_t* p, uint32_t idx, bytes_t result) {
@@ -23075,19 +22950,6 @@ static void rt_os_proc_finish_piped(ctx_t* ctx, rt_os_proc_t* p) {
 }
 
 static void rt_os_proc_kill_and_reap(rt_os_proc_t* p) {
-#if defined(_WIN32)
-  if (!p->win_proc) return;
-  if (rt_os_proc_kill_tree && p->win_job) {
-    (void)TerminateJobObject(p->win_job, 1);
-  } else {
-    (void)TerminateProcess(p->win_proc, 1);
-  }
-  (void)WaitForSingleObject(p->win_proc, INFINITE);
-  DWORD code = 0;
-  if (!GetExitCodeProcess(p->win_proc, &code)) code = 0;
-  p->exited = 1;
-  p->status = (int)code;
-#else
   if (p->pid == (pid_t)-1) return;
   pid_t target = rt_os_proc_kill_target(p);
   if (target == (pid_t)-1 || target == (pid_t)0) return;
@@ -23099,7 +22961,6 @@ static void rt_os_proc_kill_and_reap(rt_os_proc_t* p) {
     if (r < 0 && errno == EINTR) continue;
     break;
   }
-#endif
 }
 
 static void rt_os_spawn_free_argv_env(
@@ -23132,415 +22993,6 @@ static void rt_os_spawn_free_argv_env(
   }
 }
 
-#if defined(_WIN32)
-static void rt_os_win_close_handle(HANDLE* h) {
-  if (!h || !*h) return;
-  (void)CloseHandle(*h);
-  *h = NULL;
-}
-
-static uint32_t rt_os_win_wcs_len(const wchar_t* s) {
-  uint32_t n = 0;
-  while (s && s[n]) n += 1;
-  return n;
-}
-
-static wchar_t* rt_os_win_utf8_to_wide_alloc(
-    ctx_t* ctx,
-    const char* s,
-    uint32_t s_len,
-    const char* what,
-    uint32_t* out_bytes
-) {
-  if (s_len > (uint32_t)INT32_MAX) rt_trap(what);
-  int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, (int)s_len, NULL, 0);
-  if (wlen <= 0) rt_trap(what);
-  uint64_t bytes64 = ((uint64_t)(wlen + 1)) * (uint64_t)sizeof(wchar_t);
-  if (bytes64 > (uint64_t)UINT32_MAX) rt_trap(what);
-  uint32_t bytes = (uint32_t)bytes64;
-  wchar_t* out = (wchar_t*)rt_alloc(ctx, bytes, (uint32_t)_Alignof(wchar_t));
-  int wlen2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, (int)s_len, out, wlen);
-  if (wlen2 != wlen) rt_trap(what);
-  out[wlen] = 0;
-  if (out_bytes) *out_bytes = bytes;
-  return out;
-}
-
-static uint32_t rt_os_win_arg_needs_quotes(const wchar_t* s) {
-  if (!s || !*s) return 1;
-  for (uint32_t i = 0; s[i]; i++) {
-    wchar_t c = s[i];
-    if (c == L' ' || c == L'\t' || c == L'"') return 1;
-  }
-  return 0;
-}
-
-static void rt_os_win_cmdline_append_wchar(wchar_t* out, uint32_t cap, uint32_t* at, wchar_t c) {
-  if (!out || !at) rt_trap("os.process windows cmdline internal error");
-  if (*at >= cap) rt_trap("os.process windows cmdline overflow");
-  out[*at] = c;
-  *at += 1;
-}
-
-static void rt_os_win_cmdline_append_str(wchar_t* out, uint32_t cap, uint32_t* at, const wchar_t* s) {
-  uint32_t n = rt_os_win_wcs_len(s);
-  for (uint32_t i = 0; i < n; i++) {
-    rt_os_win_cmdline_append_wchar(out, cap, at, s[i]);
-  }
-}
-
-static void rt_os_win_cmdline_append_arg(wchar_t* out, uint32_t cap, uint32_t* at, const wchar_t* arg) {
-  uint32_t needs = rt_os_win_arg_needs_quotes(arg);
-  if (!needs) {
-    rt_os_win_cmdline_append_str(out, cap, at, arg);
-    return;
-  }
-
-  rt_os_win_cmdline_append_wchar(out, cap, at, L'"');
-
-  uint32_t i = 0;
-  while (arg && arg[i]) {
-    uint32_t bs = 0;
-    while (arg[i] == L'\\') {
-      bs += 1;
-      i += 1;
-    }
-
-    if (arg[i] == 0) {
-      for (uint32_t j = 0; j < bs * 2; j++) rt_os_win_cmdline_append_wchar(out, cap, at, L'\\');
-      break;
-    }
-
-    if (arg[i] == L'"') {
-      for (uint32_t j = 0; j < bs * 2 + 1; j++) rt_os_win_cmdline_append_wchar(out, cap, at, L'\\');
-      rt_os_win_cmdline_append_wchar(out, cap, at, L'"');
-      i += 1;
-      continue;
-    }
-
-    for (uint32_t j = 0; j < bs; j++) rt_os_win_cmdline_append_wchar(out, cap, at, L'\\');
-    rt_os_win_cmdline_append_wchar(out, cap, at, arg[i]);
-    i += 1;
-  }
-
-  rt_os_win_cmdline_append_wchar(out, cap, at, L'"');
-}
-
-static wchar_t* rt_os_win_build_cmdline(
-    ctx_t* ctx,
-    char** argv,
-    uint32_t* argv_sizes,
-    uint32_t argv_count,
-    uint32_t* out_bytes
-) {
-  uint64_t cap64 = 16;
-  for (uint32_t i = 0; i < argv_count; i++) {
-    uint32_t n = argv_sizes ? argv_sizes[i] : 0;
-    if (n > 0) n -= 1;
-    cap64 += (uint64_t)(n * 2) + 4;
-  }
-  if (cap64 > (uint64_t)UINT32_MAX) rt_trap("os.process windows cmdline too long");
-  uint32_t cap = (uint32_t)cap64;
-
-  uint64_t bytes64 = ((uint64_t)(cap + 1)) * (uint64_t)sizeof(wchar_t);
-  if (bytes64 > (uint64_t)UINT32_MAX) rt_trap("os.process windows cmdline too long");
-  uint32_t bytes = (uint32_t)bytes64;
-
-  wchar_t* out = (wchar_t*)rt_alloc(ctx, bytes, (uint32_t)_Alignof(wchar_t));
-  uint32_t at = 0;
-
-  for (uint32_t i = 0; i < argv_count; i++) {
-    if (i != 0) rt_os_win_cmdline_append_wchar(out, cap, &at, L' ');
-    uint32_t n = argv_sizes ? argv_sizes[i] : 0;
-    if (n > 0) n -= 1;
-    uint32_t wbytes = 0;
-    wchar_t* argw = rt_os_win_utf8_to_wide_alloc(
-      ctx,
-      argv[i],
-      n,
-      "os.process argv must be valid utf8 on windows",
-      &wbytes
-    );
-    rt_os_win_cmdline_append_arg(out, cap, &at, argw);
-    rt_free(ctx, argw, wbytes, (uint32_t)_Alignof(wchar_t));
-  }
-
-  if (at > cap) rt_trap("os.process windows cmdline overflow");
-  out[at] = 0;
-  if (out_bytes) *out_bytes = bytes;
-  return out;
-}
-
-static wchar_t* rt_os_win_build_env_block(
-    ctx_t* ctx,
-    char** envp,
-    uint32_t* env_sizes,
-    uint32_t env_count,
-    uint32_t* out_bytes
-) {
-  if (env_count == 0) {
-    uint32_t bytes = (uint32_t)(2u * (uint32_t)sizeof(wchar_t));
-    wchar_t* block = (wchar_t*)rt_alloc(ctx, bytes, (uint32_t)_Alignof(wchar_t));
-    block[0] = 0;
-    block[1] = 0;
-    if (out_bytes) *out_bytes = bytes;
-    return block;
-  }
-
-  uint64_t cap64 = 8;
-  for (uint32_t i = 0; i < env_count; i++) {
-    uint32_t n = env_sizes ? env_sizes[i] : 0;
-    if (n > 0) n -= 1;
-    cap64 += (uint64_t)(n * 2) + 2;
-  }
-  if (cap64 > (uint64_t)UINT32_MAX) rt_trap("os.process windows env block too long");
-  uint32_t cap = (uint32_t)cap64;
-
-  uint64_t bytes64 = ((uint64_t)(cap + 1)) * (uint64_t)sizeof(wchar_t);
-  if (bytes64 > (uint64_t)UINT32_MAX) rt_trap("os.process windows env block too long");
-  uint32_t bytes = (uint32_t)bytes64;
-
-  wchar_t* block = (wchar_t*)rt_alloc(ctx, bytes, (uint32_t)_Alignof(wchar_t));
-  uint32_t at = 0;
-
-  for (uint32_t i = 0; i < env_count; i++) {
-    uint32_t n = env_sizes ? env_sizes[i] : 0;
-    if (n > 0) n -= 1;
-    uint32_t wbytes = 0;
-    wchar_t* w = rt_os_win_utf8_to_wide_alloc(
-      ctx,
-      envp[i],
-      n,
-      "os.process env must be valid utf8 on windows",
-      &wbytes
-    );
-    uint32_t wlen = rt_os_win_wcs_len(w);
-    if (at + wlen + 2 > cap) rt_trap("os.process windows env block overflow");
-    for (uint32_t j = 0; j < wlen; j++) block[at++] = w[j];
-    block[at++] = 0;
-    rt_free(ctx, w, wbytes, (uint32_t)_Alignof(wchar_t));
-  }
-
-  block[at++] = 0;
-  if (out_bytes) *out_bytes = bytes;
-  return block;
-}
-
-static DWORD WINAPI rt_os_win_stdout_thread(LPVOID arg) {
-  rt_os_proc_t* p = (rt_os_proc_t*)arg;
-  uint8_t buf[4096];
-
-  for (;;) {
-    HANDLE h = NULL;
-    rt_os_proc_lock(p);
-    h = p->win_stdout;
-    rt_os_proc_unlock(p);
-    if (!h) break;
-
-    DWORD got = 0;
-    BOOL ok = ReadFile(h, buf, (DWORD)sizeof(buf), &got, NULL);
-    if (!ok || got == 0) break;
-
-    rt_os_proc_lock(p);
-    if (p->stdout_closed || p->fail_code != 0) {
-      rt_os_proc_unlock(p);
-      break;
-    }
-
-    uint32_t total_len = p->stdout_len + p->stderr_len;
-    uint32_t total_rem = (total_len < p->max_total) ? (p->max_total - total_len) : 0;
-    uint32_t rem_total = (p->stdout_len < p->max_stdout) ? (p->max_stdout - p->stdout_len) : 0;
-    if (rem_total > total_rem) rem_total = total_rem;
-    if (rem_total == 0) {
-      p->fail_code = RT_OS_PROC_CODE_OUTPUT_LIMIT;
-      rt_os_proc_unlock(p);
-      break;
-    }
-
-    if (p->stdout_off != 0 && p->stdout_off + p->stdout_len == p->max_stdout) {
-      memmove(p->stdout_buf.ptr, p->stdout_buf.ptr + p->stdout_off, p->stdout_len);
-      p->stdout_off = 0;
-    }
-
-    uint32_t cont_rem = p->max_stdout - (p->stdout_off + p->stdout_len);
-    uint32_t rem = rem_total;
-    if (rem > cont_rem) rem = cont_rem;
-
-    uint32_t n = (uint32_t)got;
-    if (n > rem) n = rem;
-    if (n != 0) {
-      memcpy(p->stdout_buf.ptr + p->stdout_off + p->stdout_len, buf, n);
-      p->stdout_len += n;
-    }
-    if ((uint32_t)got > n) {
-      p->fail_code = RT_OS_PROC_CODE_OUTPUT_LIMIT;
-    }
-    rt_os_proc_unlock(p);
-  }
-
-  rt_os_proc_lock(p);
-  rt_os_win_close_handle(&p->win_stdout);
-  p->stdout_closed = 1;
-  rt_os_proc_unlock(p);
-  return 0;
-}
-
-static DWORD WINAPI rt_os_win_stderr_thread(LPVOID arg) {
-  rt_os_proc_t* p = (rt_os_proc_t*)arg;
-  uint8_t buf[4096];
-
-  for (;;) {
-    HANDLE h = NULL;
-    rt_os_proc_lock(p);
-    h = p->win_stderr;
-    rt_os_proc_unlock(p);
-    if (!h) break;
-
-    DWORD got = 0;
-    BOOL ok = ReadFile(h, buf, (DWORD)sizeof(buf), &got, NULL);
-    if (!ok || got == 0) break;
-
-    rt_os_proc_lock(p);
-    if (p->stderr_closed || p->fail_code != 0) {
-      rt_os_proc_unlock(p);
-      break;
-    }
-
-    uint32_t total_len = p->stdout_len + p->stderr_len;
-    uint32_t total_rem = (total_len < p->max_total) ? (p->max_total - total_len) : 0;
-    uint32_t rem_total = (p->stderr_len < p->max_stderr) ? (p->max_stderr - p->stderr_len) : 0;
-    if (rem_total > total_rem) rem_total = total_rem;
-    if (rem_total == 0) {
-      p->fail_code = RT_OS_PROC_CODE_OUTPUT_LIMIT;
-      rt_os_proc_unlock(p);
-      break;
-    }
-
-    if (p->stderr_off != 0 && p->stderr_off + p->stderr_len == p->max_stderr) {
-      memmove(p->stderr_buf.ptr, p->stderr_buf.ptr + p->stderr_off, p->stderr_len);
-      p->stderr_off = 0;
-    }
-
-    uint32_t cont_rem = p->max_stderr - (p->stderr_off + p->stderr_len);
-    uint32_t rem = rem_total;
-    if (rem > cont_rem) rem = cont_rem;
-
-    uint32_t n = (uint32_t)got;
-    if (n > rem) n = rem;
-    if (n != 0) {
-      memcpy(p->stderr_buf.ptr + p->stderr_off + p->stderr_len, buf, n);
-      p->stderr_len += n;
-    }
-    if ((uint32_t)got > n) {
-      p->fail_code = RT_OS_PROC_CODE_OUTPUT_LIMIT;
-    }
-    rt_os_proc_unlock(p);
-  }
-
-  rt_os_proc_lock(p);
-  rt_os_win_close_handle(&p->win_stderr);
-  p->stderr_closed = 1;
-  rt_os_proc_unlock(p);
-  return 0;
-}
-
-static DWORD WINAPI rt_os_win_stdin_thread(LPVOID arg) {
-  rt_os_proc_t* p = (rt_os_proc_t*)arg;
-  uint8_t buf[4096];
-
-  for (;;) {
-    HANDLE ev = NULL;
-    rt_os_proc_lock(p);
-    ev = p->win_stdin_event;
-    rt_os_proc_unlock(p);
-    if (!ev) break;
-
-    DWORD wr = WaitForSingleObject(ev, INFINITE);
-    if (wr != WAIT_OBJECT_0) return 0;
-
-    for (;;) {
-      HANDLE h = NULL;
-      uint32_t n = 0;
-
-      rt_os_proc_lock(p);
-      if (p->stdin_closed) {
-        rt_os_proc_unlock(p);
-        return 0;
-      }
-      h = p->win_stdin;
-      if (!h) {
-        p->stdin_closed = 1;
-        rt_os_proc_unlock(p);
-        return 0;
-      }
-
-      uint32_t pending = 0;
-      if (p->stdin_off < p->stdin_buf.len) pending = p->stdin_buf.len - p->stdin_off;
-      if (pending == 0) {
-        if (p->mode == RT_OS_PROC_MODE_CAPTURE || p->stdin_close_requested) {
-          rt_os_win_close_handle(&p->win_stdin);
-          p->stdin_closed = 1;
-          rt_os_proc_unlock(p);
-          return 0;
-        }
-        rt_os_proc_unlock(p);
-        break;
-      }
-
-      uint32_t off0 = p->stdin_off;
-      n = pending;
-      if (n > (uint32_t)sizeof(buf)) n = (uint32_t)sizeof(buf);
-      memcpy(buf, p->stdin_buf.ptr + off0, n);
-      rt_os_proc_unlock(p);
-
-      DWORD wrote = 0;
-      BOOL ok = WriteFile(h, buf, (DWORD)n, &wrote, NULL);
-      if (!ok) {
-        rt_os_proc_lock(p);
-        rt_os_win_close_handle(&p->win_stdin);
-        p->stdin_closed = 1;
-        rt_os_proc_unlock(p);
-        return 0;
-      }
-      if (wrote == 0) {
-        rt_os_proc_lock(p);
-        rt_os_win_close_handle(&p->win_stdin);
-        p->stdin_closed = 1;
-        rt_os_proc_unlock(p);
-        return 0;
-      }
-
-      rt_os_proc_lock(p);
-      if (!p->stdin_closed) {
-        uint64_t next64 = (uint64_t)p->stdin_off + (uint64_t)wrote;
-        p->stdin_off = (next64 > (uint64_t)p->stdin_buf.len) ? p->stdin_buf.len : (uint32_t)next64;
-      }
-      rt_os_proc_unlock(p);
-
-      if ((uint32_t)wrote < n) {
-        break;
-      }
-    }
-  }
-
-  return 0;
-}
-
-static void rt_os_win_proc_join_threads(rt_os_proc_t* p) {
-  HANDLE th[3];
-  th[0] = p->win_thread_stdout;
-  th[1] = p->win_thread_stderr;
-  th[2] = p->win_thread_stdin;
-  for (uint32_t i = 0; i < 3; i++) {
-    if (!th[i]) continue;
-    (void)WaitForSingleObject(th[i], INFINITE);
-    rt_os_win_close_handle(&th[i]);
-  }
-  p->win_thread_stdout = NULL;
-  p->win_thread_stderr = NULL;
-  p->win_thread_stdin = NULL;
-}
-#endif
 
 static int32_t rt_os_process_spawn_impl(ctx_t* ctx, bytes_t req, bytes_t caps, uint32_t mode) {
   rt_os_policy_init(ctx);
@@ -23576,28 +23028,6 @@ static int32_t rt_os_process_spawn_impl(ctx_t* ctx, bytes_t req, bytes_t caps, u
   char** envp = NULL;
   uint32_t* env_sizes = NULL;
 
-#if defined(_WIN32)
-  HANDLE win_stdin_read = NULL;
-  HANDLE win_stdin_write = NULL;
-  HANDLE win_stdout_read = NULL;
-  HANDLE win_stdout_write = NULL;
-  HANDLE win_stderr_read = NULL;
-  HANDLE win_stderr_write = NULL;
-
-  PROCESS_INFORMATION win_pi = (PROCESS_INFORMATION){0};
-
-  HANDLE win_job = NULL;
-  HANDLE win_stdin_event = NULL;
-
-  wchar_t* win_exe = NULL;
-  uint32_t win_exe_bytes = 0;
-  wchar_t* win_cmdline = NULL;
-  uint32_t win_cmdline_bytes = 0;
-  wchar_t* win_env_block = NULL;
-  uint32_t win_env_block_bytes = 0;
-  wchar_t* win_cwd = NULL;
-  uint32_t win_cwd_bytes = 0;
-#else
   int stdin_pipe[2] = {-1, -1};
   int stdout_pipe[2] = {-1, -1};
   int stderr_pipe[2] = {-1, -1};
@@ -23610,7 +23040,6 @@ static int32_t rt_os_process_spawn_impl(ctx_t* ctx, bytes_t req, bytes_t caps, u
   pid_t pid = (pid_t)-1;
   pid_t pgid = (pid_t)-1;
   int status = 0;
-#endif
 
   bytes_t stdin_copy = rt_bytes_empty(ctx);
   bytes_t stdout_buf = rt_bytes_empty(ctx);
@@ -23945,283 +23374,6 @@ static int32_t rt_os_process_spawn_impl(ctx_t* ctx, bytes_t req, bytes_t caps, u
     rt_mem_on_memcpy(ctx, stdin_len);
   }
 
-#if defined(_WIN32)
-  SECURITY_ATTRIBUTES sa = (SECURITY_ATTRIBUTES){0};
-  sa.nLength = (DWORD)sizeof(sa);
-  sa.lpSecurityDescriptor = NULL;
-  sa.bInheritHandle = TRUE;
-
-  if (!CreatePipe(&win_stdin_read, &win_stdin_write, &sa, 0)) {
-    err = RT_OS_PROC_CODE_SPAWN_FAILED;
-    goto cleanup;
-  }
-  if (!SetHandleInformation(win_stdin_write, HANDLE_FLAG_INHERIT, 0)) {
-    err = RT_OS_PROC_CODE_SPAWN_FAILED;
-    goto cleanup;
-  }
-
-  if (!CreatePipe(&win_stdout_read, &win_stdout_write, &sa, 0)) {
-    err = RT_OS_PROC_CODE_SPAWN_FAILED;
-    goto cleanup;
-  }
-  if (!SetHandleInformation(win_stdout_read, HANDLE_FLAG_INHERIT, 0)) {
-    err = RT_OS_PROC_CODE_SPAWN_FAILED;
-    goto cleanup;
-  }
-
-  if (!CreatePipe(&win_stderr_read, &win_stderr_write, &sa, 0)) {
-    err = RT_OS_PROC_CODE_SPAWN_FAILED;
-    goto cleanup;
-  }
-  if (!SetHandleInformation(win_stderr_read, HANDLE_FLAG_INHERIT, 0)) {
-    err = RT_OS_PROC_CODE_SPAWN_FAILED;
-    goto cleanup;
-  }
-
-  if (rt_os_proc_kill_tree) {
-    win_job = CreateJobObjectW(NULL, NULL);
-    if (!win_job) {
-      err = RT_OS_PROC_CODE_SPAWN_FAILED;
-      goto cleanup;
-    }
-    (void)SetHandleInformation(win_job, HANDLE_FLAG_INHERIT, 0);
-
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = (JOBOBJECT_EXTENDED_LIMIT_INFORMATION){0};
-    jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    if (!SetInformationJobObject(
-            win_job,
-            JobObjectExtendedLimitInformation,
-            &jeli,
-            (DWORD)sizeof(jeli))) {
-      err = RT_OS_PROC_CODE_SPAWN_FAILED;
-      goto cleanup;
-    }
-  }
-
-  uint32_t argv0_len = argv_sizes ? argv_sizes[0] : 0;
-  if (argv0_len > 0) argv0_len -= 1;
-  win_exe = rt_os_win_utf8_to_wide_alloc(
-    ctx,
-    argv[0],
-    argv0_len,
-    "os.process argv must be valid utf8 on windows",
-    &win_exe_bytes
-  );
-  for (uint32_t i = 0; win_exe[i]; i++) {
-    if (win_exe[i] == L'/') win_exe[i] = L'\\';
-  }
-
-  win_cmdline = rt_os_win_build_cmdline(ctx, argv, argv_sizes, argv_count, &win_cmdline_bytes);
-  win_env_block = rt_os_win_build_env_block(ctx, envp, env_sizes, env_count, &win_env_block_bytes);
-
-  if (cwd_len != 0) {
-    if (rt_os_sandboxed) {
-      uint32_t ok = 0;
-      const char* cur = rt_os_proc_allow_cwd_roots;
-      const char* root = NULL;
-      size_t root_len = 0;
-      while (rt_os_split_next(&cur, &root, &root_len)) {
-        char* p = rt_os_join_root_and_rel(ctx, root, root_len, cwd_view);
-        uint32_t pn = (uint32_t)strlen(p);
-        uint32_t wbytes = 0;
-        wchar_t* w = rt_os_win_utf8_to_wide_alloc(
-          ctx,
-          p,
-          pn,
-          "os.process cwd must be valid utf8 on windows",
-          &wbytes
-        );
-        for (uint32_t j = 0; w[j]; j++) {
-          if (w[j] == L'/') w[j] = L'\\';
-        }
-        DWORD attrs = GetFileAttributesW(w);
-        if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY)) {
-          ok = 1;
-          win_cwd = w;
-          win_cwd_bytes = wbytes;
-          rt_free(ctx, p, pn + 1, 1);
-          break;
-        }
-        rt_free(ctx, p, pn + 1, 1);
-        rt_free(ctx, w, wbytes, (uint32_t)_Alignof(wchar_t));
-      }
-      if (!ok) {
-        err = RT_OS_PROC_CODE_SPAWN_FAILED;
-        goto cleanup;
-      }
-    } else {
-      uint32_t n = cwd_cstr_size ? (cwd_cstr_size - 1) : 0;
-      win_cwd = rt_os_win_utf8_to_wide_alloc(
-        ctx,
-        cwd_cstr,
-        n,
-        "os.process cwd must be valid utf8 on windows",
-        &win_cwd_bytes
-      );
-      for (uint32_t j = 0; win_cwd[j]; j++) {
-        if (win_cwd[j] == L'/') win_cwd[j] = L'\\';
-      }
-    }
-  }
-
-  uint32_t need_stdin_thread = (mode == RT_OS_PROC_MODE_PIPED || stdin_len != 0) ? UINT32_C(1) : UINT32_C(0);
-  if (need_stdin_thread) {
-    win_stdin_event = CreateEventW(NULL, FALSE, FALSE, NULL);
-    if (!win_stdin_event) {
-      err = RT_OS_PROC_CODE_SPAWN_FAILED;
-      goto cleanup;
-    }
-    (void)SetHandleInformation(win_stdin_event, HANDLE_FLAG_INHERIT, 0);
-  }
-
-  DWORD flags = CREATE_UNICODE_ENVIRONMENT;
-  if (rt_os_proc_kill_tree) flags |= CREATE_SUSPENDED;
-
-  STARTUPINFOW si = (STARTUPINFOW){0};
-  si.cb = (DWORD)sizeof(si);
-  si.dwFlags = STARTF_USESTDHANDLES;
-  si.hStdInput = win_stdin_read;
-  si.hStdOutput = win_stdout_write;
-  si.hStdError = win_stderr_write;
-
-  if (!CreateProcessW(
-        win_exe,
-        win_cmdline,
-        NULL,
-        NULL,
-        TRUE,
-        flags,
-        (LPVOID)win_env_block,
-        win_cwd,
-        &si,
-        &win_pi)) {
-    err = RT_OS_PROC_CODE_SPAWN_FAILED;
-    goto cleanup;
-  }
-
-  if (win_job) {
-    if (!AssignProcessToJobObject(win_job, win_pi.hProcess)) {
-      err = RT_OS_PROC_CODE_SPAWN_FAILED;
-      goto cleanup;
-    }
-  }
-
-  if (flags & CREATE_SUSPENDED) {
-    DWORD r = ResumeThread(win_pi.hThread);
-    if (r == (DWORD)-1) {
-      err = RT_OS_PROC_CODE_SPAWN_FAILED;
-      goto cleanup;
-    }
-  }
-
-  rt_os_win_close_handle(&win_pi.hThread);
-  rt_os_win_close_handle(&win_stdin_read);
-  rt_os_win_close_handle(&win_stdout_write);
-  rt_os_win_close_handle(&win_stderr_write);
-
-  stdout_buf = rt_bytes_alloc(ctx, max_stdout);
-  stderr_buf = rt_bytes_alloc(ctx, max_stderr);
-
-  proc->mode = mode;
-  proc->win_proc = win_pi.hProcess;
-  win_pi.hProcess = NULL;
-  proc->win_job = win_job;
-  win_job = NULL;
-  proc->win_stdin = win_stdin_write;
-  win_stdin_write = NULL;
-  proc->win_stdout = win_stdout_read;
-  win_stdout_read = NULL;
-  proc->win_stderr = win_stderr_read;
-  win_stderr_read = NULL;
-
-  proc->stdin_closed = 0;
-  proc->stdout_closed = 0;
-  proc->stderr_closed = 0;
-
-  proc->exited = 0;
-  proc->status = 0;
-
-  proc->fail_code = 0;
-  proc->kill_sent = 0;
-
-  proc->max_stdout = max_stdout;
-  proc->max_stderr = max_stderr;
-  proc->max_total = max_total;
-  proc->timeout_ms = timeout_ms;
-  proc->start_ms = rt_os_now_ms();
-
-  proc->stdin_buf = stdin_copy;
-  proc->stdin_off = 0;
-  proc->stdout_buf = stdout_buf;
-  proc->stdout_len = 0;
-  proc->stderr_buf = stderr_buf;
-  proc->stderr_len = 0;
-
-  stdin_copy = rt_bytes_empty(ctx);
-  stdout_buf = rt_bytes_empty(ctx);
-  stderr_buf = rt_bytes_empty(ctx);
-
-  proc->win_thread_stdout = CreateThread(NULL, 0, rt_os_win_stdout_thread, proc, 0, NULL);
-  if (!proc->win_thread_stdout) {
-    err = RT_OS_PROC_CODE_SPAWN_FAILED;
-    goto cleanup;
-  }
-  proc->win_thread_stderr = CreateThread(NULL, 0, rt_os_win_stderr_thread, proc, 0, NULL);
-  if (!proc->win_thread_stderr) {
-    err = RT_OS_PROC_CODE_SPAWN_FAILED;
-    goto cleanup;
-  }
-
-  if (mode == RT_OS_PROC_MODE_CAPTURE && proc->stdin_buf.len == 0) {
-    rt_os_win_close_handle(&proc->win_stdin);
-    proc->stdin_closed = 1;
-  } else {
-    proc->win_stdin_event = win_stdin_event;
-    win_stdin_event = NULL;
-    proc->win_thread_stdin = CreateThread(NULL, 0, rt_os_win_stdin_thread, proc, 0, NULL);
-    if (!proc->win_thread_stdin) {
-      err = RT_OS_PROC_CODE_SPAWN_FAILED;
-      goto cleanup;
-    }
-    if (proc->win_stdin_event) (void)SetEvent(proc->win_stdin_event);
-  }
-
-  proc->state = RT_OS_PROC_STATE_RUNNING;
-
-  rt_os_spawn_free_argv_env(ctx, argv, argv_sizes, argv_count, envp, env_sizes, env_count);
-  argv = NULL;
-  argv_sizes = NULL;
-  envp = NULL;
-  env_sizes = NULL;
-  if (cwd_cstr) {
-    rt_free(ctx, cwd_cstr, cwd_cstr_size, 1);
-    cwd_cstr = NULL;
-    cwd_cstr_size = 0;
-  }
-  if (win_exe) {
-    rt_free(ctx, win_exe, win_exe_bytes, (uint32_t)_Alignof(wchar_t));
-    win_exe = NULL;
-    win_exe_bytes = 0;
-  }
-  if (win_cmdline) {
-    rt_free(ctx, win_cmdline, win_cmdline_bytes, (uint32_t)_Alignof(wchar_t));
-    win_cmdline = NULL;
-    win_cmdline_bytes = 0;
-  }
-  if (win_env_block) {
-    rt_free(ctx, win_env_block, win_env_block_bytes, (uint32_t)_Alignof(wchar_t));
-    win_env_block = NULL;
-    win_env_block_bytes = 0;
-  }
-  if (win_cwd) {
-    rt_free(ctx, win_cwd, win_cwd_bytes, (uint32_t)_Alignof(wchar_t));
-    win_cwd = NULL;
-    win_cwd_bytes = 0;
-  }
-
-  ctx->os_procs_live += 1;
-  return rt_os_proc_handle_i32(idx, gen);
-#else
   if (pipe(stdin_pipe) != 0) {
     err = RT_OS_PROC_CODE_SPAWN_FAILED;
     goto cleanup;
@@ -24414,41 +23566,8 @@ static int32_t rt_os_process_spawn_impl(ctx_t* ctx, bytes_t req, bytes_t caps, u
   ctx->os_procs_live += 1;
   return rt_os_proc_handle_i32(idx, gen);
 
-#endif
 
 cleanup:
-#if defined(_WIN32)
-  if (win_pi.hProcess) {
-    if (rt_os_proc_kill_tree && win_job) (void)TerminateJobObject(win_job, 1);
-    (void)TerminateProcess(win_pi.hProcess, 1);
-    (void)WaitForSingleObject(win_pi.hProcess, INFINITE);
-  }
-
-  rt_os_proc_kill_and_reap(proc);
-  rt_os_proc_close_fds(proc);
-  rt_os_win_proc_join_threads(proc);
-  rt_os_proc_drop_buffers(ctx, proc);
-  rt_os_proc_drop_result(ctx, proc);
-  rt_os_win_close_handle(&proc->win_proc);
-  rt_os_win_close_handle(&proc->win_job);
-  rt_os_win_close_handle(&proc->win_stdin_event);
-
-  rt_os_win_close_handle(&win_pi.hThread);
-  rt_os_win_close_handle(&win_pi.hProcess);
-  rt_os_win_close_handle(&win_stdin_read);
-  rt_os_win_close_handle(&win_stdin_write);
-  rt_os_win_close_handle(&win_stdout_read);
-  rt_os_win_close_handle(&win_stdout_write);
-  rt_os_win_close_handle(&win_stderr_read);
-  rt_os_win_close_handle(&win_stderr_write);
-  rt_os_win_close_handle(&win_stdin_event);
-  rt_os_win_close_handle(&win_job);
-
-  if (win_exe) rt_free(ctx, win_exe, win_exe_bytes, (uint32_t)_Alignof(wchar_t));
-  if (win_cmdline) rt_free(ctx, win_cmdline, win_cmdline_bytes, (uint32_t)_Alignof(wchar_t));
-  if (win_env_block) rt_free(ctx, win_env_block, win_env_block_bytes, (uint32_t)_Alignof(wchar_t));
-  if (win_cwd) rt_free(ctx, win_cwd, win_cwd_bytes, (uint32_t)_Alignof(wchar_t));
-#else
   rt_os_close_fd(stdin_fd);
   rt_os_close_fd(stdout_fd);
   rt_os_close_fd(stderr_fd);
@@ -24465,7 +23584,6 @@ cleanup:
     (void)kill(pid, SIGKILL);
     (void)waitpid(pid, &status, 0);
   }
-#endif
 
   rt_os_spawn_free_argv_env(ctx, argv, argv_sizes, argv_count, envp, env_sizes, env_count);
   if (cwd_cstr) rt_free(ctx, cwd_cstr, cwd_cstr_size, 1);
@@ -24609,15 +23727,9 @@ static bytes_t rt_os_process_stdout_read_v1(ctx_t* ctx, int32_t handle, int32_t 
   if (p->mode != RT_OS_PROC_MODE_PIPED) rt_trap("os.process.stdout_read_v1 invalid proc mode");
 
 
-#if defined(_WIN32)
-  rt_os_proc_lock(p);
-#endif
 
   uint32_t avail = p->stdout_len;
   if (avail == 0) {
-#if defined(_WIN32)
-    rt_os_proc_unlock(p);
-#endif
     return rt_bytes_empty(ctx);
   }
 
@@ -24632,9 +23744,6 @@ static bytes_t rt_os_process_stdout_read_v1(ctx_t* ctx, int32_t handle, int32_t 
   p->stdout_len -= n;
   if (p->stdout_len == 0) p->stdout_off = 0;
 
-#if defined(_WIN32)
-  rt_os_proc_unlock(p);
-#endif
   return out;
 }
 
@@ -24651,15 +23760,9 @@ static bytes_t rt_os_process_stderr_read_v1(ctx_t* ctx, int32_t handle, int32_t 
 
   if (p->mode != RT_OS_PROC_MODE_PIPED) rt_trap("os.process.stderr_read_v1 invalid proc mode");
 
-#if defined(_WIN32)
-  rt_os_proc_lock(p);
-#endif
 
   uint32_t avail = p->stderr_len;
   if (avail == 0) {
-#if defined(_WIN32)
-    rt_os_proc_unlock(p);
-#endif
     return rt_bytes_empty(ctx);
   }
 
@@ -24674,9 +23777,6 @@ static bytes_t rt_os_process_stderr_read_v1(ctx_t* ctx, int32_t handle, int32_t 
   p->stderr_len -= n;
   if (p->stderr_len == 0) p->stderr_off = 0;
 
-#if defined(_WIN32)
-  rt_os_proc_unlock(p);
-#endif
   return out;
 }
 
@@ -24718,49 +23818,23 @@ static int32_t rt_os_process_stdin_write_v1(ctx_t* ctx, int32_t handle, bytes_t 
 
   if (rt_os_sandboxed && rt_os_proc_max_stdin_bytes != 0) {
     uint64_t total64 = 0;
-#if defined(_WIN32)
-    rt_os_proc_lock(p);
-    if (p->stdin_closed || p->stdin_close_requested || !p->win_stdin) {
-      rt_os_proc_unlock(p);
-      return 0;
-    }
-    uint32_t pending = 0;
-    if (p->stdin_off < p->stdin_buf.len) pending = p->stdin_buf.len - p->stdin_off;
-    total64 = (uint64_t)pending + (uint64_t)chunk.len;
-    rt_os_proc_unlock(p);
-#else
     (void)rt_os_process_poll_all(ctx, 0);
     if (p->stdin_fd < 0 || p->stdin_closed) return 0;
 
     uint32_t pending = 0;
     if (p->stdin_off < p->stdin_buf.len) pending = p->stdin_buf.len - p->stdin_off;
-#endif
     total64 = (uint64_t)pending + (uint64_t)chunk.len;
     if (total64 > (uint64_t)rt_os_proc_max_stdin_bytes) {
       rt_trap("os.process.stdin_write_v1 pending exceeds policy max_stdin_bytes");
     }
   }
 
-#if defined(_WIN32)
-  rt_os_proc_lock(p);
-  uint32_t is_closed = p->stdin_closed || p->stdin_close_requested || !p->win_stdin;
-  rt_os_proc_unlock(p);
-  if (is_closed) return 0;
-
-  rt_os_proc_lock(p);
-  rt_os_proc_stdin_append(ctx, p, chunk);
-  HANDLE ev = p->win_stdin_event;
-  rt_os_proc_unlock(p);
-  if (ev) (void)SetEvent(ev);
-  return 1;
-#else
   (void)rt_os_process_poll_all(ctx, 0);
   if (p->stdin_fd < 0 || p->stdin_closed) return 0;
 
   rt_os_proc_stdin_append(ctx, p, chunk);
   (void)rt_os_process_poll_all(ctx, 0);
   return (p->stdin_fd < 0 || p->stdin_closed) ? 0 : 1;
-#endif
 }
 
 static int32_t rt_os_process_stdin_close_v1(ctx_t* ctx, int32_t handle) {
@@ -24772,20 +23846,6 @@ static int32_t rt_os_process_stdin_close_v1(ctx_t* ctx, int32_t handle) {
   (void)idx;
 
   if (p->mode != RT_OS_PROC_MODE_PIPED) rt_trap("os.process.stdin_close_v1 invalid proc mode");
-#if defined(_WIN32)
-  rt_os_proc_lock(p);
-  if (!p->win_stdin || p->stdin_closed || p->stdin_close_requested) {
-    rt_os_proc_unlock(p);
-    return 0;
-  }
-
-  p->stdin_close_requested = 1;
-  HANDLE ev = p->win_stdin_event;
-  rt_os_proc_unlock(p);
-
-  if (ev) (void)SetEvent(ev);
-  return 1;
-#else
   if (p->stdin_fd < 0 || p->stdin_closed) return 0;
 
   rt_os_close_fd(p->stdin_fd);
@@ -24795,7 +23855,6 @@ static int32_t rt_os_process_stdin_close_v1(ctx_t* ctx, int32_t handle) {
   p->stdin_buf = rt_bytes_empty(ctx);
   p->stdin_off = 0;
   return 1;
-#endif
 }
 
 static int32_t rt_os_process_try_wait_v1(ctx_t* ctx, int32_t handle) {
@@ -24821,11 +23880,7 @@ static uint32_t rt_os_process_join_exit_poll(ctx_t* ctx, int32_t handle, int32_t
   rt_os_proc_t* p = rt_os_proc_from_handle(ctx, handle, &idx);
   (void)idx;
 
-#if defined(_WIN32)
-  if (p->state != RT_OS_PROC_STATE_RUNNING || (p->exited && p->stdout_closed && p->stderr_closed)) {
-#else
   if (p->state != RT_OS_PROC_STATE_RUNNING || p->exited) {
-#endif
     if (out) *out = 1;
     return UINT32_C(1);
   }
@@ -24858,11 +23913,7 @@ static int32_t rt_os_process_join_exit_v1(ctx_t* ctx, int32_t handle) {
     rt_os_proc_t* p = rt_os_proc_from_handle(ctx, handle, &idx);
     (void)idx;
 
-#if defined(_WIN32)
-    if (p->state != RT_OS_PROC_STATE_RUNNING || (p->exited && p->stdout_closed && p->stderr_closed)) return 1;
-#else
     if (p->state != RT_OS_PROC_STATE_RUNNING || p->exited) return 1;
-#endif
 
     if (!rt_sched_step(ctx)) rt_sched_deadlock();
   }
@@ -24907,16 +23958,11 @@ static int32_t rt_os_process_kill_v1(ctx_t* ctx, int32_t handle, int32_t sig) {
   (void)idx;
 
   if (p->state != RT_OS_PROC_STATE_RUNNING) return 0;
-#if defined(_WIN32)
-  rt_os_proc_send_kill(p, sig);
-  return 1;
-#else
   if (p->pid == (pid_t)-1) return 0;
   pid_t target = rt_os_proc_kill_target(p);
   if (target == (pid_t)-1 || target == (pid_t)0) return 0;
   if (kill(target, (int)sig) != 0) return 0;
   return 1;
-#endif
 }
 
 static int32_t rt_os_process_drop_v1(ctx_t* ctx, int32_t handle) {
@@ -24935,18 +23981,6 @@ static int32_t rt_os_process_drop_v1(ctx_t* ctx, int32_t handle) {
     ctx->os_procs_live -= 1;
   }
 
-#if defined(_WIN32)
-  rt_os_proc_close_fds(p);
-  rt_os_win_proc_join_threads(p);
-  rt_os_proc_drop_buffers(ctx, p);
-  rt_os_proc_drop_result(ctx, p);
-  if (was_running) {
-    rt_os_proc_kill_and_reap(p);
-  }
-  rt_os_win_close_handle(&p->win_proc);
-  rt_os_win_close_handle(&p->win_job);
-  rt_os_win_close_handle(&p->win_stdin_event);
-#else
   if (was_running) {
     rt_os_proc_close_fds(p);
     rt_os_proc_drop_buffers(ctx, p);
@@ -24957,7 +23991,6 @@ static int32_t rt_os_process_drop_v1(ctx_t* ctx, int32_t handle) {
     rt_os_proc_drop_buffers(ctx, p);
     rt_os_proc_drop_result(ctx, p);
   }
-#endif
 
   uint16_t next_gen = rt_os_proc_next_gen(p->gen);
   rt_os_proc_init_entry(ctx, p, next_gen);
@@ -24968,72 +24001,12 @@ static uint32_t rt_os_process_poll_all(ctx_t* ctx, int poll_timeout_ms) {
   rt_os_policy_init(ctx);
   uint32_t had_live = ctx->os_procs_live ? UINT32_C(1) : UINT32_C(0);
   if (!had_live) {
-#if defined(_WIN32)
-    if (poll_timeout_ms > 0) Sleep((DWORD)poll_timeout_ms);
-#else
     if (poll_timeout_ms > 0) (void)poll(NULL, 0, poll_timeout_ms);
-#endif
     return UINT32_C(0);
   }
 
   if (poll_timeout_ms < 0) poll_timeout_ms = 0;
 
-#if defined(_WIN32)
-  if (poll_timeout_ms > 0) Sleep((DWORD)poll_timeout_ms);
-
-  // Update exit status and enforce timeouts.
-  for (uint32_t i = 0; i < ctx->os_procs_len; i++) {
-    rt_os_proc_t* p = &ctx->os_procs[i];
-    if (p->state != RT_OS_PROC_STATE_RUNNING) continue;
-    rt_os_proc_try_wait(p);
-    if (p->exited && p->stdout_closed && p->stderr_closed) {
-      uint32_t reason_id = rt_os_proc_handle_u32(i, p->gen);
-      rt_os_proc_wake_exit_waiters(ctx, p, reason_id);
-    }
-
-    if (p->fail_code == 0 && p->timeout_ms != 0) {
-      uint64_t now_ms = rt_os_now_ms();
-      if (now_ms >= p->start_ms && now_ms - p->start_ms > (uint64_t)p->timeout_ms) {
-        p->fail_code = RT_OS_PROC_CODE_TIMEOUT;
-        rt_os_proc_send_kill(p, SIGKILL);
-        rt_os_proc_close_fds(p);
-        rt_os_proc_drop_buffers(ctx, p);
-      }
-    }
-  }
-
-  // Finalize completed processes.
-  for (uint32_t i = 0; i < ctx->os_procs_len; i++) {
-    rt_os_proc_t* p = &ctx->os_procs[i];
-    if (p->state != RT_OS_PROC_STATE_RUNNING) continue;
-
-    rt_os_proc_try_wait(p);
-    if (p->exited && p->stdout_closed && p->stderr_closed) {
-      uint32_t reason_id = rt_os_proc_handle_u32(i, p->gen);
-      rt_os_proc_wake_exit_waiters(ctx, p, reason_id);
-    }
-
-    if (p->fail_code != 0) {
-      rt_os_proc_send_kill(p, SIGKILL);
-      if (p->exited) {
-        rt_os_proc_close_fds(p);
-        rt_os_proc_finish_err(ctx, p, i, p->fail_code);
-      }
-      continue;
-    }
-
-    if (p->exited && p->stdin_closed && p->stdout_closed && p->stderr_closed) {
-      rt_os_proc_close_fds(p);
-      if (p->mode == RT_OS_PROC_MODE_CAPTURE) {
-        rt_os_proc_finish_ok(ctx, p, i);
-      } else {
-        rt_os_proc_finish_piped(ctx, p);
-      }
-    }
-  }
-
-  return UINT32_C(1);
-#else
   // Update exit status and enforce timeouts.
   for (uint32_t i = 0; i < ctx->os_procs_len; i++) {
     rt_os_proc_t* p = &ctx->os_procs[i];
@@ -25288,7 +24261,6 @@ static uint32_t rt_os_process_poll_all(ctx_t* ctx, int poll_timeout_ms) {
   if (tags) rt_free(ctx, tags, nfds * (uint32_t)sizeof(uint32_t), (uint32_t)_Alignof(uint32_t));
 
   return UINT32_C(1);
-#endif
 }
 
 static void rt_os_process_cleanup(ctx_t* ctx) {
@@ -25305,19 +24277,6 @@ static void rt_os_process_cleanup(ctx_t* ctx) {
     rt_os_proc_t* p = &ctx->os_procs[i];
     if (p->state == RT_OS_PROC_STATE_EMPTY) continue;
 
-#if defined(_WIN32)
-    uint32_t was_running = (p->state == RT_OS_PROC_STATE_RUNNING) ? 1 : 0;
-    rt_os_proc_close_fds(p);
-    rt_os_win_proc_join_threads(p);
-    rt_os_proc_drop_buffers(ctx, p);
-    rt_os_proc_drop_result(ctx, p);
-    if (was_running) {
-      rt_os_proc_kill_and_reap(p);
-    }
-    rt_os_win_close_handle(&p->win_proc);
-    rt_os_win_close_handle(&p->win_job);
-    rt_os_win_close_handle(&p->win_stdin_event);
-#else
     if (p->state == RT_OS_PROC_STATE_RUNNING) {
       rt_os_proc_close_fds(p);
       rt_os_proc_drop_buffers(ctx, p);
@@ -25328,7 +24287,6 @@ static void rt_os_process_cleanup(ctx_t* ctx) {
       rt_os_proc_drop_buffers(ctx, p);
       rt_os_proc_drop_result(ctx, p);
     }
-#endif
 
     uint16_t next_gen = rt_os_proc_next_gen(p->gen);
     rt_os_proc_init_entry(ctx, p, next_gen);
@@ -25408,13 +24366,9 @@ static int rt_write_exact(int fd, const uint8_t* src, uint32_t len) {
 }
 
 int main(void) {
-#ifdef _WIN32
-  _setmode(0, _O_BINARY); _setmode(1, _O_BINARY);
-#endif
   const uint32_t mem_cap = (uint32_t)(X07_MEM_CAP);
   int mem_is_mmap = 0;
   uint8_t* mem = NULL;
-#ifndef _WIN32
   mem = (uint8_t*)mmap(
     NULL,
     (size_t)mem_cap,
@@ -25429,10 +24383,6 @@ int main(void) {
     mem = (uint8_t*)calloc(1, (size_t)mem_cap);
     if (!mem) rt_trap("calloc failed");
   }
-#else
-  mem = (uint8_t*)calloc(1, (size_t)mem_cap);
-  if (!mem) rt_trap("calloc failed");
-#endif
 
   ctx_t ctx;
   memset(&ctx, 0, sizeof(ctx));
@@ -25606,15 +24556,11 @@ int main(void) {
   );
 #endif
   fflush(stderr);
-#ifndef _WIN32
   if (mem_is_mmap) {
     (void)munmap(mem, (size_t)mem_cap);
   } else {
     free(mem);
   }
-#else
-  free(mem);
-#endif
   return 0;
 }
 "#;

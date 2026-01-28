@@ -6,7 +6,7 @@
       "summary": "Parse CLI argv (argv_v1) and define CLI interfaces.",
       "canonical": {
         "name": "ext-cli",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "status": "stable"
     },
@@ -28,12 +28,12 @@
       "summary": "HTTP client for OS worlds (GET/POST, headers, body).",
       "canonical": {
         "name": "ext-net",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "alternatives": [
         {
           "name": "ext-curl-c",
-          "version": "0.1.4"
+          "version": "0.1.5"
         }
       ],
       "worlds": [
@@ -48,7 +48,7 @@
       "summary": "libcurl bindings (advanced; required by ext-net HTTP client backend).",
       "canonical": {
         "name": "ext-curl-c",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "worlds": [
         "run-os",
@@ -62,7 +62,7 @@
       "summary": "Low-level sockets for OS worlds.",
       "canonical": {
         "name": "ext-sockets-c",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "worlds": [
         "run-os",

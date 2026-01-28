@@ -603,17 +603,6 @@ fn write_atomic_best_effort(path: &Path, data: &[u8], overwrite: bool) -> ev_res
         }
     };
 
-    #[cfg(windows)]
-    {
-        if overwrite && path.exists() {
-            // Best-effort: Windows rename does not replace existing files atomically.
-            if let Err(e) = std::fs::remove_file(path) {
-                let _ = std::fs::remove_file(&tmp_path);
-                return err_i32(map_io_err(&e));
-            }
-        }
-    }
-
     if let Err(e) = std::fs::rename(&tmp_path, path) {
         let _ = std::fs::remove_file(&tmp_path);
         return err_i32(map_io_err(&e));

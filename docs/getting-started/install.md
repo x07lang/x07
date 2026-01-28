@@ -19,7 +19,7 @@ Quickstart and full installer reference:
 ## Prerequisites
 
 - macOS / Linux bootstrap installer (`install.sh`): `python3` (3.10+)
-- A C compiler toolchain (`clang`/`gcc` on macOS/Linux; MSVC or clang-cl on Windows)
+- A C compiler toolchain (`clang`/`gcc` on macOS/Linux)
 - Linux: libcurl development headers for packages that link libcurl (for example `ext-curl-c`)
 
 After installing, run `x07 doctor` for a machine-readable environment report and install suggestions.
@@ -30,7 +30,8 @@ Prebuilt toolchains (via `x07up`) are currently published for:
 
 - macOS (Apple Silicon + Intel)
 - Linux (x86_64 glibc + ARM64 glibc)
-- Windows (x86_64)
+
+On Windows, X07 is supported via WSL2 (run X07 inside a Linux distro such as Ubuntu and follow the Linux instructions below). Native Windows toolchains are not currently published.
 
 Other targets (for example Linux musl/Alpine) currently require building from source.
 
@@ -64,17 +65,12 @@ curl -fsSL https://x07lang.org/install.sh | sh -s -- \
   --json
 ```
 
-### Windows
+### Windows (WSL2)
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://x07lang.org/install.ps1 -OutFile install.ps1; .\\install.ps1 -Yes -Channel stable"
-```
+X07 does not currently publish native Windows toolchains. On Windows, install and run X07 inside WSL2:
 
-CI / agent-friendly:
-
-```powershell
-.\install.ps1 -Yes -Channel stable -NoModifyPath -Json
-```
+1. Install WSL2 (Ubuntu recommended).
+2. In your WSL2 shell, follow the macOS / Linux install instructions above.
 
 ### Verify
 
@@ -94,7 +90,7 @@ Verify:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.0.63
+x07up override set v0.0.64
 ```
 
 This makes toolchain selection deterministic for agents and CI.
@@ -130,7 +126,7 @@ Install:
 
 - macOS: Xcode Command Line Tools
 - Linux: `clang` or `gcc`
-- Windows: MSVC Build Tools or clang-cl
+- Windows (WSL2): install a Linux toolchain in your distro (for example Ubuntu: `sudo apt-get install -y clang build-essential`)
 
 ### “I can run `x07` but `x07 run` fails”
 

@@ -20,7 +20,6 @@ jobs:
           - ubuntu-22.04
           - macos-15-intel
           - macos-14
-          - windows-2022
     env:
       X07_PYTHON: python
     steps:
@@ -55,40 +54,6 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install openssl@3 pkg-config
-
-      - name: Set up MSYS2 (UCRT64, C toolchain + libs)
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-lld
-            mingw-w64-ucrt-x86_64-openssl
-            mingw-w64-ucrt-x86_64-curl
-            mingw-w64-ucrt-x86_64-sqlite3
-            mingw-w64-ucrt-x86_64-zlib
-            mingw-w64-ucrt-x86_64-pkgconf
-
-      - name: Add MSYS2 UCRT64 to PATH
-        if: runner.os == 'Windows'
-        shell: bash
-        run: echo "${RUNNER_TEMP}\\\\msys64\\\\ucrt64\\\\bin" >> "$GITHUB_PATH"
-
-      - name: Select MSYS2 gcc for builds
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          set -euo pipefail
-          runner_temp_posix="${RUNNER_TEMP//\\//}"
-          gcc_path="${runner_temp_posix}/msys64/ucrt64/bin/gcc.exe"
-          if [[ ! -x "$gcc_path" ]]; then
-            echo "ERROR: expected MSYS2 gcc at: $gcc_path" >&2
-            exit 2
-          fi
-          echo "X07_CC=$gcc_path" >> "$GITHUB_ENV"
-          echo "X07_CC_ARGS=-fuse-ld=lld" >> "$GITHUB_ENV"
 
       - name: CI gate
         shell: bash
@@ -128,16 +93,10 @@ jobs:
           JSON
           printf 'hi' >"${tmp}/input.bin"
 
-          exe="target/release/x07-host-runner"
-          if [ "${RUNNER_OS}" = "Windows" ]; then
-            exe="${exe}.exe"
-          fi
-
-          "${exe}" --program "${tmp}/program.x07.json" --world solve-pure --input "${tmp}/input.bin" \
+          target/release/x07-host-runner --program "${tmp}/program.x07.json" --world solve-pure --input "${tmp}/input.bin" \
             | python -c 'import base64,json,sys; report=json.load(sys.stdin); expected=base64.b64encode(b"hi").decode("ascii"); exit_code=report.get("exit_code"); out=(report.get("solve") or {}).get("solve_output_b64"); assert exit_code==0, report; assert out==expected, (out, expected); print("ok: relocated host-runner smoke passed")'
 
-      - name: Build and stage native backends (Unix)
-        if: runner.os != 'Windows'
+      - name: Build and stage native backends
         shell: bash
         run: |
           set -euo pipefail
@@ -150,8 +109,7 @@ jobs:
           ./scripts/build_ext_db_mysql.sh
           ./scripts/build_ext_db_redis.sh
 
-      - name: Package binaries (Unix)
-        if: runner.os != 'Windows'
+      - name: Package toolchain
         shell: bash
         run: |
           set -euo pipefail
@@ -161,8 +119,7 @@ jobs:
           mkdir -p dist
           scripts/build_toolchain_tarball.sh --tag "$tag" --platform "${{ runner.os }}" --out "$out"
 
-      - name: Package x07up (Unix)
-        if: runner.os != 'Windows'
+      - name: Package x07up
         shell: bash
         run: |
           set -euo pipefail
@@ -176,57 +133,13 @@ jobs:
           chmod 0755 "$stage/x07up"
           tar -czf "$out" -C "$stage" x07up
 
-      - name: Package toolchain (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $tag = $env:GITHUB_REF_NAME
-          New-Item -ItemType Directory -Force dist | Out-Null
-          $target = $env:X07_TARGET
-          $stage = "dist/.tmp_toolchain_${tag}_Windows"
-          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force "$stage/bin" | Out-Null
-          New-Item -ItemType Directory -Force "$stage/deps/x07" | Out-Null
-          New-Item -ItemType Directory -Force "$stage/stdlib/os/0.2.0" | Out-Null
-          New-Item -ItemType Directory -Force "$stage/.agent/docs" | Out-Null
-          New-Item -ItemType Directory -Force "$stage/.agent/skills" | Out-Null
-
-          $bins = @("x07","x07c","x07-host-runner","x07-os-runner","x07import-cli")
-          foreach ($b in $bins) {
-            Copy-Item -Force "target/release/$b.exe" "$stage/bin/$b.exe"
-          }
-
-          Copy-Item -Force "deps/x07/native_backends.json" "$stage/deps/x07/native_backends.json"
-          Copy-Item -Recurse -Force "stdlib/os/0.2.0/modules" "$stage/stdlib/os/0.2.0"
-          Copy-Item -Recurse -Force "docs/*" "$stage/.agent/docs"
-          Copy-Item -Recurse -Force "skills/pack/.agent/skills/*" "$stage/.agent/skills"
-
-          $out = "dist/x07-$tag-$target.zip"
-          Compress-Archive -Path "$stage/*" -DestinationPath $out -Force
-
-      - name: Package x07up (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $tag = $env:GITHUB_REF_NAME
-          $target = $env:X07_TARGET
-          New-Item -ItemType Directory -Force dist | Out-Null
-          $stage = "dist/.tmp_x07up_${tag}_Windows"
-          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force $stage | Out-Null
-          Copy-Item -Force "target/release/x07up.exe" "$stage/x07up.exe"
-          $out = "dist/x07up-$tag-$target.zip"
-          Compress-Archive -Path "$stage/*" -DestinationPath $out -Force
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: x07-${{ github.ref_name }}-${{ matrix.os }}
           path: |
             dist/x07-${{ github.ref_name }}-*.tar.gz
-            dist/x07-${{ github.ref_name }}-*.zip
             dist/x07up-${{ github.ref_name }}-*.tar.gz
-            dist/x07up-${{ github.ref_name }}-*.zip
 
   build-linux-aarch64:
     name: release / build-linux-aarch64
@@ -313,7 +226,7 @@ jobs:
           files=()
           while IFS= read -r -d '' f; do
             files+=("$f")
-          done < <(find dist -type f \( -name 'x07-*.tar.gz' -o -name 'x07-*.zip' -o -name 'x07up-*.tar.gz' -o -name 'x07up-*.zip' \) -print0)
+          done < <(find dist -type f \( -name 'x07-*.tar.gz' -o -name 'x07up-*.tar.gz' \) -print0)
 
           for f in "${files[@]}"; do
             base="$(basename "$f")"
@@ -348,7 +261,7 @@ jobs:
           files=()
           while IFS= read -r -d '' f; do
             files+=("$f")
-          done < <(find dist -maxdepth 1 -type f \( -name 'x07-*.tar.gz' -o -name 'x07-*.zip' -o -name 'x07up-*.tar.gz' -o -name 'x07up-*.zip' -o -name 'release-manifest.json' -o -name 'channels.json' \) -print0)
+          done < <(find dist -maxdepth 1 -type f \( -name 'x07-*.tar.gz' -o -name 'x07up-*.tar.gz' -o -name 'release-manifest.json' -o -name 'channels.json' \) -print0)
 
           if (( ${#files[@]} == 0 )); then
             echo "ERROR: no release assets found under dist/" >&2

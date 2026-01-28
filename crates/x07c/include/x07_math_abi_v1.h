@@ -8,7 +8,7 @@
 //  - the native math backend library implementation (libx07_math.a)
 //
 // Design goals:
-//  - Stable C ABI across platforms (Linux/macOS/Windows)
+//  - Stable C ABI across platforms (Linux/macOS)
 //  - Minimal surface: only what the math builtins need
 //  - No dependency on Rust layout defaults (everything is explicit)
 

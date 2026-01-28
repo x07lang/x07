@@ -180,12 +180,6 @@ fn find_in_path(prog: &str) -> Option<PathBuf> {
         if cand.is_file() && is_executable(&cand) {
             return Some(cand);
         }
-        if cfg!(windows) {
-            let cand = dir.join(format!("{prog}.exe"));
-            if cand.is_file() && is_executable(&cand) {
-                return Some(cand);
-            }
-        }
     }
     None
 }

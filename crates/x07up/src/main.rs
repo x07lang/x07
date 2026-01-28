@@ -431,8 +431,6 @@ fn detect_target_key() -> Result<String> {
         ("linux", "aarch64") => "aarch64-unknown-linux-gnu",
         ("macos", "x86_64") => "x86_64-apple-darwin",
         ("macos", "aarch64") => "aarch64-apple-darwin",
-        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
-        ("windows", "aarch64") => "aarch64-pc-windows-msvc",
         _ => "unknown",
     };
     if key == "unknown" {
@@ -711,30 +709,7 @@ fn create_dir_link(target: &Path, link: &Path) -> Result<()> {
         Ok(())
     }
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::symlink_dir;
-        if symlink_dir(target, link).is_ok() {
-            return Ok(());
-        }
-
-        let status = std::process::Command::new("cmd")
-            .args([
-                "/C",
-                "mklink",
-                "/J",
-                link.to_string_lossy().as_ref(),
-                target.to_string_lossy().as_ref(),
-            ])
-            .status()
-            .context("mklink /J")?;
-        if status.success() {
-            return Ok(());
-        }
-        bail!("mklink /J failed (exit={})", status.code().unwrap_or(1));
-    }
-
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         let _ = target;
         let _ = link;
@@ -1578,12 +1553,10 @@ fn parse_toolchain_toml(contents: &str) -> Result<String> {
 
 fn tool_path(root: &Path, toolchain_tag: &str, tool: &str) -> Result<PathBuf> {
     validate_toolchain_id(toolchain_tag)?;
-    let mut p = toolchains_dir(root).join(toolchain_tag).join("bin");
-    if cfg!(windows) {
-        p = p.join(format!("{tool}.exe"));
-    } else {
-        p = p.join(tool);
-    }
+    let p = toolchains_dir(root)
+        .join(toolchain_tag)
+        .join("bin")
+        .join(tool);
     Ok(p)
 }
 
@@ -1746,12 +1719,6 @@ fn rename_overwrite_file(src: &Path, dst: &Path) -> Result<()> {
     if dst.exists() && dst.is_dir() {
         bail!("refusing to overwrite directory: {}", dst.display());
     }
-    #[cfg(windows)]
-    {
-        if dst.exists() {
-            std::fs::remove_file(dst).with_context(|| format!("remove {}", dst.display()))?;
-        }
-    }
     std::fs::rename(src, dst)
         .with_context(|| format!("rename {} -> {}", src.display(), dst.display()))?;
     Ok(())
@@ -1771,11 +1738,7 @@ fn ensure_proxies(root: &Path) -> Result<()> {
         "x07up",
     ];
     for tool in tools {
-        let dst = if cfg!(windows) {
-            dir.join(format!("{tool}.exe"))
-        } else {
-            dir.join(tool)
-        };
+        let dst = dir.join(tool);
         install_proxy_binary(&src, &dst)?;
     }
     Ok(())
@@ -1823,22 +1786,9 @@ fn proxy_dispatch(invoked: &str) -> Result<std::process::ExitCode> {
     cmd.stdout(std::process::Stdio::inherit());
     cmd.stderr(std::process::Stdio::inherit());
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt as _;
-        let err = cmd.exec();
-        bail!("exec failed: {err}");
-    }
-    #[cfg(not(unix))]
-    {
-        let status = cmd.status().context("spawn tool")?;
-        if let Some(code) = status.code() {
-            return Ok(std::process::ExitCode::from(
-                u8::try_from(code).unwrap_or(1),
-            ));
-        }
-        Ok(std::process::ExitCode::from(1))
-    }
+    use std::os::unix::process::CommandExt as _;
+    let err = cmd.exec();
+    bail!("exec failed: {err}");
 }
 
 fn copy_tree_skip_existing(src: &Path, dst: &Path) -> Result<()> {
