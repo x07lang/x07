@@ -3,6 +3,20 @@ use std::collections::{BTreeSet, HashMap};
 use crate::ast::Expr;
 use crate::fingerprint::stable_fingerprint;
 
+fn expr_ident(name: impl Into<String>) -> Expr {
+    Expr::Ident {
+        name: name.into(),
+        ptr: String::new(),
+    }
+}
+
+fn expr_list(items: Vec<Expr>) -> Expr {
+    Expr::List {
+        items,
+        ptr: String::new(),
+    }
+}
+
 pub fn optimize_expr(expr: Expr) -> Expr {
     let expr = const_fold(expr);
     let expr = cse_pure_subexpressions(expr);
@@ -11,11 +25,11 @@ pub fn optimize_expr(expr: Expr) -> Expr {
 
 fn const_fold(expr: Expr) -> Expr {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => expr,
-        Expr::List(items) => {
+        Expr::Int { .. } | Expr::Ident { .. } => expr,
+        Expr::List { items, ptr } => {
             let mut items: Vec<Expr> = items.into_iter().map(const_fold).collect();
             let Some(head) = items.first().and_then(Expr::as_ident) else {
-                return Expr::List(items);
+                return Expr::List { items, ptr };
             };
 
             match head {
@@ -23,14 +37,14 @@ fn const_fold(expr: Expr) -> Expr {
                     if items.len() == 2 {
                         return items.remove(1);
                     }
-                    Expr::List(items)
+                    Expr::List { items, ptr }
                 }
                 "if" if items.len() == 4 => {
                     let cond = items[1].clone();
                     let then_ = items[2].clone();
                     let else_ = items[3].clone();
                     match cond {
-                        Expr::Int(i) => {
+                        Expr::Int { value: i, .. } => {
                             if i == 0 {
                                 else_
                             } else {
@@ -41,7 +55,7 @@ fn const_fold(expr: Expr) -> Expr {
                             if then_ == else_ {
                                 then_
                             } else {
-                                Expr::List(items)
+                                Expr::List { items, ptr }
                             }
                         }
                     }
@@ -50,7 +64,7 @@ fn const_fold(expr: Expr) -> Expr {
                     let a = items[1].clone();
                     let b = items[2].clone();
                     match (a, b) {
-                        (Expr::Int(x), Expr::Int(y)) => {
+                        (Expr::Int { value: x, .. }, Expr::Int { value: y, .. }) => {
                             let v = match head {
                                 "+" => x.wrapping_add(y),
                                 "-" => x.wrapping_sub(y),
@@ -74,12 +88,12 @@ fn const_fold(expr: Expr) -> Expr {
                                 ">=u" => ((x as u32) >= (y as u32)) as i32,
                                 _ => unreachable!(),
                             };
-                            Expr::Int(v)
+                            Expr::Int { value: v, ptr }
                         }
-                        _ => Expr::List(items),
+                        _ => Expr::List { items, ptr },
                     }
                 }
-                _ => Expr::List(items),
+                _ => Expr::List { items, ptr },
             }
         }
     }
@@ -87,10 +101,13 @@ fn const_fold(expr: Expr) -> Expr {
 
 fn licm_bytes_len(expr: Expr) -> Expr {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => expr,
-        Expr::List(items) => {
+        Expr::Int { .. } | Expr::Ident { .. } => expr,
+        Expr::List { items, ptr } => {
             let Some(head) = items.first().and_then(Expr::as_ident) else {
-                return Expr::List(items.into_iter().map(licm_bytes_len).collect());
+                return Expr::List {
+                    items: items.into_iter().map(licm_bytes_len).collect(),
+                    ptr,
+                };
             };
 
             if head == "for" && items.len() == 5 {
@@ -114,17 +131,26 @@ fn licm_bytes_len(expr: Expr) -> Expr {
                 hoists.sort();
 
                 if hoists.is_empty() {
-                    return Expr::List(vec![
-                        Expr::Ident("for".to_string()),
-                        Expr::Ident(var_name),
-                        start,
-                        end,
-                        licm_bytes_len(body),
-                    ]);
+                    return Expr::List {
+                        items: vec![
+                            expr_ident("for"),
+                            expr_ident(var_name),
+                            start,
+                            end,
+                            licm_bytes_len(body),
+                        ],
+                        ptr,
+                    };
                 }
 
                 let mut used = BTreeSet::new();
-                collect_idents(&Expr::List(items.clone()), &mut used);
+                collect_idents(
+                    &Expr::List {
+                        items: items.clone(),
+                        ptr: String::new(),
+                    },
+                    &mut used,
+                );
 
                 let mut bindings: Vec<(String, String)> = Vec::with_capacity(hoists.len());
                 for name in hoists {
@@ -138,33 +164,36 @@ fn licm_bytes_len(expr: Expr) -> Expr {
                 }
 
                 let mut out = Vec::with_capacity(2 + bindings.len());
-                out.push(Expr::Ident("begin".to_string()));
+                out.push(expr_ident("begin"));
                 for (src, dst) in bindings {
-                    out.push(Expr::List(vec![
-                        Expr::Ident("let".to_string()),
-                        Expr::Ident(dst),
-                        Expr::List(vec![Expr::Ident("bytes.len".to_string()), Expr::Ident(src)]),
+                    out.push(expr_list(vec![
+                        expr_ident("let"),
+                        expr_ident(dst),
+                        expr_list(vec![expr_ident("bytes.len"), expr_ident(src)]),
                     ]));
                 }
-                out.push(Expr::List(vec![
-                    Expr::Ident("for".to_string()),
-                    Expr::Ident(var_name),
+                out.push(expr_list(vec![
+                    expr_ident("for"),
+                    expr_ident(var_name),
                     start,
                     end,
                     new_body,
                 ]));
-                return Expr::List(out);
+                return Expr::List { items: out, ptr };
             }
 
-            Expr::List(items.into_iter().map(licm_bytes_len).collect())
+            Expr::List {
+                items: items.into_iter().map(licm_bytes_len).collect(),
+                ptr,
+            }
         }
     }
 }
 
 fn collect_assigned_vars(expr: &Expr, out: &mut BTreeSet<String>) {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => {}
-        Expr::List(items) => {
+        Expr::Int { .. } | Expr::Ident { .. } => {}
+        Expr::List { items, .. } => {
             if items.first().and_then(Expr::as_ident) == Some("set") && items.len() >= 2 {
                 if let Some(name) = items[1].as_ident() {
                     out.insert(name.to_string());
@@ -185,8 +214,8 @@ fn collect_bytes_len_idents(
     counts: &mut HashMap<String, usize>,
 ) {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => {}
-        Expr::List(items) => {
+        Expr::Int { .. } | Expr::Ident { .. } => {}
+        Expr::List { items, .. } => {
             if items.first().and_then(Expr::as_ident) == Some("bytes.len") && items.len() == 2 {
                 if let Some(name) = items[1].as_ident() {
                     if name != loop_var && !assigned.contains(name) && !bound.contains(name) {
@@ -203,8 +232,8 @@ fn collect_bytes_len_idents(
 
 fn collect_let_bound_vars(expr: &Expr, out: &mut BTreeSet<String>) {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => {}
-        Expr::List(items) => {
+        Expr::Int { .. } | Expr::Ident { .. } => {}
+        Expr::List { items, .. } => {
             if items.first().and_then(Expr::as_ident) == Some("let") && items.len() >= 2 {
                 if let Some(name) = items[1].as_ident() {
                     out.insert(name.to_string());
@@ -224,20 +253,24 @@ fn collect_let_bound_vars(expr: &Expr, out: &mut BTreeSet<String>) {
 
 fn replace_bytes_len_ident(expr: Expr, src: &str, dst: &str) -> Expr {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => expr,
-        Expr::List(items) => {
+        Expr::Int { .. } | Expr::Ident { .. } => expr,
+        Expr::List { items, ptr } => {
             if items.first().and_then(Expr::as_ident) == Some("bytes.len")
                 && items.len() == 2
                 && items[1].as_ident() == Some(src)
             {
-                return Expr::Ident(dst.to_string());
+                return Expr::Ident {
+                    name: dst.to_string(),
+                    ptr,
+                };
             }
-            Expr::List(
-                items
+            Expr::List {
+                items: items
                     .into_iter()
                     .map(|e| replace_bytes_len_ident(e, src, dst))
                     .collect(),
-            )
+                ptr,
+            }
         }
     }
 }
@@ -247,12 +280,16 @@ fn cse_pure_subexpressions(expr: Expr) -> Expr {
         return cse_in_pure(expr);
     }
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => expr,
-        Expr::List(items) => Expr::List(items.into_iter().map(cse_pure_subexpressions).collect()),
+        Expr::Int { .. } | Expr::Ident { .. } => expr,
+        Expr::List { items, ptr } => Expr::List {
+            items: items.into_iter().map(cse_pure_subexpressions).collect(),
+            ptr,
+        },
     }
 }
 
 fn cse_in_pure(expr: Expr) -> Expr {
+    let root_ptr = expr.ptr().to_string();
     let mut counts: HashMap<u128, (usize, Expr)> = HashMap::new();
     collect_pure_counts(&expr, &mut counts);
     let mut candidates: Vec<(usize, usize, u128, Expr)> = Vec::new();
@@ -260,7 +297,7 @@ fn cse_in_pure(expr: Expr) -> Expr {
         if count < 2 {
             continue;
         }
-        if matches!(sample, Expr::Int(_) | Expr::Ident(_)) {
+        if matches!(sample, Expr::Int { .. } | Expr::Ident { .. }) {
             continue;
         }
         let size = sample.node_count();
@@ -297,21 +334,24 @@ fn cse_in_pure(expr: Expr) -> Expr {
     }
 
     let mut out = Vec::with_capacity(2 + bindings.len());
-    out.push(Expr::Ident("begin".to_string()));
+    out.push(expr_ident("begin"));
 
     let mut cur_mapping: HashMap<u128, String> = HashMap::new();
     for (fp, name, sample) in &bindings {
         let rhs = replace_pure_with_mapping(sample.clone(), &cur_mapping);
-        out.push(Expr::List(vec![
-            Expr::Ident("let".to_string()),
-            Expr::Ident(name.clone()),
+        out.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(name.clone()),
             rhs,
         ]));
         cur_mapping.insert(*fp, name.clone());
     }
 
     out.push(replace_pure_with_mapping(expr, &cur_mapping));
-    Expr::List(out)
+    Expr::List {
+        items: out,
+        ptr: root_ptr,
+    }
 }
 
 fn collect_pure_counts(expr: &Expr, counts: &mut HashMap<u128, (usize, Expr)>) {
@@ -320,7 +360,7 @@ fn collect_pure_counts(expr: &Expr, counts: &mut HashMap<u128, (usize, Expr)>) {
         let e = counts.entry(fp).or_insert((0, expr.clone()));
         e.0 += 1;
     }
-    if let Expr::List(items) = expr {
+    if let Expr::List { items, .. } = expr {
         for item in items {
             collect_pure_counts(item, counts);
         }
@@ -329,26 +369,31 @@ fn collect_pure_counts(expr: &Expr, counts: &mut HashMap<u128, (usize, Expr)>) {
 
 fn replace_pure_with_mapping(expr: Expr, mapping: &HashMap<u128, String>) -> Expr {
     if is_pure(&expr) {
+        let expr_ptr = expr.ptr().to_string();
         let fp = stable_fingerprint(&expr);
         if let Some(name) = mapping.get(&fp) {
-            return Expr::Ident(name.clone());
+            return Expr::Ident {
+                name: name.clone(),
+                ptr: expr_ptr,
+            };
         }
     }
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => expr,
-        Expr::List(items) => Expr::List(
-            items
+        Expr::Int { .. } | Expr::Ident { .. } => expr,
+        Expr::List { items, ptr } => Expr::List {
+            items: items
                 .into_iter()
                 .map(|e| replace_pure_with_mapping(e, mapping))
                 .collect(),
-        ),
+            ptr,
+        },
     }
 }
 
 fn is_pure(expr: &Expr) -> bool {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => true,
-        Expr::List(items) => {
+        Expr::Int { .. } | Expr::Ident { .. } => true,
+        Expr::List { items, .. } => {
             let Some(head) = items.first().and_then(Expr::as_ident) else {
                 return false;
             };
@@ -364,11 +409,11 @@ fn is_pure(expr: &Expr) -> bool {
 
 fn collect_idents(expr: &Expr, out: &mut BTreeSet<String>) {
     match expr {
-        Expr::Int(_) => {}
-        Expr::Ident(s) => {
+        Expr::Int { .. } => {}
+        Expr::Ident { name: s, .. } => {
             out.insert(s.clone());
         }
-        Expr::List(items) => {
+        Expr::List { items, .. } => {
             for item in items {
                 collect_idents(item, out);
             }

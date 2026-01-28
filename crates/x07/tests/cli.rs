@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use serde_json::Value;
 use x07_contracts::{
     X07TEST_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
-    X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
+    X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION,
 };
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -135,6 +135,35 @@ fn x07_test_smoke_suite() {
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+#[test]
+fn x07_run_project_accepts_dir_path() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_project_dir");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07_in_dir(&dir, &["run", "--project", ".", "--report", "wrapped"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07_RUN_REPORT_SCHEMA_VERSION);
 }
 
 #[test]

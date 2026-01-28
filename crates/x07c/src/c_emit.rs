@@ -13,6 +13,7 @@ struct VarRef {
     ty: Ty,
     c_name: String,
     moved: bool,
+    moved_ptr: Option<String>,
     borrow_count: u32,
     // For `bytes_view` values that borrow from an owned buffer, this is the C local name of the
     // owner (`bytes_t` or `vec_u8_t`) whose backing allocation must outlive the view.
@@ -26,6 +27,7 @@ struct AsyncVarRef {
     ty: Ty,
     c_name: String,
     moved: bool,
+    moved_ptr: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,9 +145,9 @@ fn is_owned_ty(ty: Ty) -> bool {
 
 fn expr_uses_head(expr: &Expr, head: &str) -> bool {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => false,
-        Expr::List(items) => {
-            if let Some(Expr::Ident(h)) = items.first() {
+        Expr::Int { .. } | Expr::Ident { .. } => false,
+        Expr::List { items, .. } => {
+            if let Some(Expr::Ident { name: h, .. }) = items.first() {
                 if h == head {
                     return true;
                 }
@@ -222,7 +224,16 @@ pub fn emit_c_program_with_native_requires(
     emitter.emit_program().map_err(|mut e| {
         if let Some(name) = &emitter.current_fn_name {
             if !e.message.contains("(fn=") {
-                e.message = format!("{} (fn={name})", e.message);
+                if let Some(ptr) = emitter.current_ptr.as_deref().filter(|p| !p.is_empty()) {
+                    e.message = format!("{} (fn={name} ptr={ptr})", e.message);
+                } else {
+                    e.message = format!("{} (fn={name})", e.message);
+                }
+            }
+        }
+        if !e.message.contains("ptr=") {
+            if let Some(ptr) = emitter.current_ptr.as_deref().filter(|p| !p.is_empty()) {
+                e.message = format!("{} (ptr={ptr})", e.message);
             }
         }
         e
@@ -237,7 +248,16 @@ pub fn check_c_program(program: &Program, options: &CompileOptions) -> Result<()
     emitter.check_program().map_err(|mut e| {
         if let Some(name) = &emitter.current_fn_name {
             if !e.message.contains("(fn=") {
-                e.message = format!("{} (fn={name})", e.message);
+                if let Some(ptr) = emitter.current_ptr.as_deref().filter(|p| !p.is_empty()) {
+                    e.message = format!("{} (fn={name} ptr={ptr})", e.message);
+                } else {
+                    e.message = format!("{} (fn={name})", e.message);
+                }
+            }
+        }
+        if !e.message.contains("ptr=") {
+            if let Some(ptr) = emitter.current_ptr.as_deref().filter(|p| !p.is_empty()) {
+                e.message = format!("{} (ptr={ptr})", e.message);
             }
         }
         e
@@ -271,6 +291,7 @@ struct Emitter<'a> {
     allow_async_ops: bool,
     unsafe_depth: usize,
     current_fn_name: Option<String>,
+    current_ptr: Option<String>,
     native_requires: BTreeMap<String, NativeReqAcc>,
 }
 
@@ -312,6 +333,7 @@ impl<'a> Emitter<'a> {
             allow_async_ops: false,
             unsafe_depth: 0,
             current_fn_name: None,
+            current_ptr: None,
             native_requires: BTreeMap::new(),
         }
     }
@@ -379,6 +401,7 @@ impl<'a> Emitter<'a> {
             ty,
             c_name,
             moved: false,
+            moved_ptr: None,
             borrow_count: 0,
             borrow_of: None,
             is_temp,
@@ -386,9 +409,14 @@ impl<'a> Emitter<'a> {
     }
 
     fn err(&self, kind: CompileErrorKind, message: String) -> CompilerError {
-        match &self.current_fn_name {
-            Some(name) => CompilerError::new(kind, format!("{message} (fn={name})")),
-            None => CompilerError::new(kind, message),
+        let ptr = self.current_ptr.as_deref().filter(|p| !p.is_empty());
+        match (&self.current_fn_name, ptr) {
+            (Some(name), Some(ptr)) => {
+                CompilerError::new(kind, format!("{message} (fn={name} ptr={ptr})"))
+            }
+            (Some(name), None) => CompilerError::new(kind, format!("{message} (fn={name})")),
+            (None, Some(ptr)) => CompilerError::new(kind, format!("{message} (ptr={ptr})")),
+            (None, None) => CompilerError::new(kind, message),
         }
     }
 
@@ -472,7 +500,7 @@ impl<'a> Emitter<'a> {
 
     fn borrow_of_view_expr(&self, expr: &Expr) -> Result<Option<String>, CompilerError> {
         match expr {
-            Expr::Ident(name) => {
+            Expr::Ident { name, .. } => {
                 if name == "input" {
                     return Ok(None);
                 }
@@ -490,7 +518,7 @@ impl<'a> Emitter<'a> {
                 }
                 Ok(v.borrow_of.clone())
             }
-            Expr::List(items) => {
+            Expr::List { items, .. } => {
                 let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
                     CompilerError::new(
                         CompileErrorKind::Parse,
@@ -536,7 +564,9 @@ impl<'a> Emitter<'a> {
                         let Some(owner_name) = args.first().and_then(Expr::as_ident) else {
                             return Err(self.err(
                                 CompileErrorKind::Typing,
-                                format!("{head} requires an identifier owner"),
+                                format!(
+                                    "{head} requires an identifier owner (bind the value to a local with let first)"
+                                ),
                             ));
                         };
                         let Some(owner) = self.lookup(owner_name) else {
@@ -557,7 +587,8 @@ impl<'a> Emitter<'a> {
                         let Some(owner_name) = args.first().and_then(Expr::as_ident) else {
                             return Err(self.err(
                                 CompileErrorKind::Typing,
-                                "vec_u8.as_view requires an identifier owner".to_string(),
+                                "vec_u8.as_view requires an identifier owner (bind the value to a local with let first)"
+                                    .to_string(),
                             ));
                         };
                         let Some(owner) = self.lookup(owner_name) else {
@@ -624,7 +655,7 @@ impl<'a> Emitter<'a> {
 
     fn borrow_of_as_bytes_view(&self, expr: &Expr) -> Result<Option<String>, CompilerError> {
         match expr {
-            Expr::Ident(name) => {
+            Expr::Ident { name, .. } => {
                 if name == "input" {
                     return Ok(None);
                 }
@@ -770,7 +801,7 @@ impl<'a> Emitter<'a> {
         }
 
         match expr {
-            Expr::Ident(name) if name != "input" => {
+            Expr::Ident { name, .. } if name != "input" => {
                 Ok(ViewBorrowFrom::LocalOwned(name.to_string()))
             }
             _ => Err(CompilerError::new(
@@ -790,14 +821,14 @@ impl<'a> Emitter<'a> {
         collector: &mut ViewBorrowCollector,
     ) -> Result<Option<ViewBorrowFrom>, CompilerError> {
         match expr {
-            Expr::Int(_) => Ok(None),
-            Expr::Ident(name) => {
+            Expr::Int { .. } => Ok(None),
+            Expr::Ident { name, .. } => {
                 if name == "input" {
                     return Ok(Some(ViewBorrowFrom::Runtime));
                 }
                 Ok(env.lookup(name))
             }
-            Expr::List(items) => {
+            Expr::List { items, ptr } => {
                 let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
                     CompilerError::new(
                         CompileErrorKind::Parse,
@@ -905,9 +936,12 @@ impl<'a> Emitter<'a> {
                     }
                     "bytes.view" | "bytes.subview" | "vec_u8.as_view" => {
                         let Some(owner_name) = args.first().and_then(Expr::as_ident) else {
+                            let ptr = ptr.as_str();
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                format!("{head} requires an identifier owner"),
+                                format!(
+                                    "{head} requires an identifier owner (bind the value to a local with let first) (ptr={ptr})"
+                                ),
                             ));
                         };
                         Ok(Some(ViewBorrowFrom::LocalOwned(owner_name.to_string())))
@@ -1376,6 +1410,7 @@ impl<'a> Emitter<'a> {
                     ty,
                     c_name: format!("f->{name}"),
                     moved: false,
+                    moved_ptr: None,
                 })
             }
 
@@ -1408,10 +1443,10 @@ impl<'a> Emitter<'a> {
                 cont: usize,
             ) -> Result<(), CompilerError> {
                 match expr {
-                    Expr::Int(_) | Expr::Ident(_) | Expr::List(_) => {}
+                    Expr::Int { .. } | Expr::Ident { .. } | Expr::List { .. } => {}
                 }
                 match expr {
-                    Expr::Int(i) => {
+                    Expr::Int { value: i, .. } => {
                         self.line(state, "rt_fuel(ctx, 1);");
                         if dest.ty != Ty::I32 {
                             return Err(CompilerError::new(
@@ -1424,7 +1459,7 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         Ok(())
                     }
-                    Expr::Ident(name) => {
+                    Expr::Ident { name, ptr: use_ptr } => {
                         self.line(state, "rt_fuel(ctx, 1);");
                         if name == "input" {
                             if dest.ty != Ty::BytesView {
@@ -1444,9 +1479,16 @@ impl<'a> Emitter<'a> {
                             ));
                         };
                         if is_owned_ty(v.ty) && v.moved {
+                            let moved_ptr = v
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                format!("use after move: {name:?}"),
+                                format!(
+                                    "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                ),
                             ));
                         }
                         let wrote = match (dest.ty, v.ty) {
@@ -1484,6 +1526,7 @@ impl<'a> Emitter<'a> {
                             if is_owned_ty(dest.ty) {
                                 if let Some(v) = self.lookup_mut(name) {
                                     v.moved = true;
+                                    v.moved_ptr = Some(use_ptr.clone());
                                 }
                                 self.line(state, format!("{} = {};", v.c_name, c_empty(dest.ty)));
                             }
@@ -1491,7 +1534,7 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         Ok(())
                     }
-                    Expr::List(items) => self.emit_list_entry(state, items, dest, cont),
+                    Expr::List { items, .. } => self.emit_list_entry(state, items, dest, cont),
                 }
             }
 
@@ -1571,7 +1614,10 @@ impl<'a> Emitter<'a> {
                     return self.emit_addr_of_form(state, args, dest, cont, true);
                 }
 
-                let call_ty = self.infer_expr(&Expr::List(items.to_vec()))?;
+                let call_ty = self.infer_expr(&Expr::List {
+                    items: items.to_vec(),
+                    ptr: String::new(),
+                })?;
                 if call_ty != dest.ty && call_ty != Ty::Never {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
@@ -5475,6 +5521,7 @@ impl<'a> Emitter<'a> {
                         ty: expr_ty,
                         c_name: binding.c_name.clone(),
                         moved: false,
+                        moved_ptr: None,
                     },
                 );
 
@@ -5570,6 +5617,7 @@ impl<'a> Emitter<'a> {
                 }
                 if let Some(v) = self.lookup_mut(name) {
                     v.moved = false;
+                    v.moved_ptr = None;
                 }
                 if var.c_name != dest.c_name && var.ty != Ty::Never {
                     if is_owned_ty(var.ty) {
@@ -5682,6 +5730,7 @@ impl<'a> Emitter<'a> {
                         ty: Ty::I32,
                         c_name: var.clone(),
                         moved: false,
+                        moved_ptr: None,
                     },
                     end_state,
                 )?;
@@ -5741,6 +5790,7 @@ impl<'a> Emitter<'a> {
                         ty: Ty::Bytes,
                         c_name: "f->ret".to_string(),
                         moved: false,
+                        moved_ptr: None,
                     },
                     self.ret_state,
                 )?;
@@ -5771,6 +5821,7 @@ impl<'a> Emitter<'a> {
                     ty: p.ty,
                     c_name: format!("f->p{i}"),
                     moved: false,
+                    moved_ptr: None,
                 },
             );
         }
@@ -5786,6 +5837,7 @@ impl<'a> Emitter<'a> {
                 ty: Ty::Bytes,
                 c_name: "f->ret".to_string(),
                 moved: false,
+                moved_ptr: None,
             },
             ret_state,
         )?;
@@ -6141,160 +6193,181 @@ impl<'a> Emitter<'a> {
     }
 
     fn emit_expr(&mut self, expr: &Expr) -> Result<VarRef, CompilerError> {
-        let ty = self.infer_expr_in_new_scope(expr)?;
-        let (storage_ty, name) = match ty {
-            Ty::I32 => (Ty::I32, self.alloc_local("t_i32_")?),
-            Ty::Bytes => (Ty::Bytes, self.alloc_local("t_bytes_")?),
-            Ty::BytesView => (Ty::BytesView, self.alloc_local("t_view_")?),
-            Ty::VecU8 => (Ty::VecU8, self.alloc_local("t_vec_u8_")?),
-            Ty::OptionI32 => (Ty::OptionI32, self.alloc_local("t_opt_i32_")?),
-            Ty::OptionBytes => (Ty::OptionBytes, self.alloc_local("t_opt_bytes_")?),
-            Ty::ResultI32 => (Ty::ResultI32, self.alloc_local("t_res_i32_")?),
-            Ty::ResultBytes => (Ty::ResultBytes, self.alloc_local("t_res_bytes_")?),
-            Ty::Iface => (Ty::Iface, self.alloc_local("t_iface_")?),
-            Ty::PtrConstU8 => (Ty::PtrConstU8, self.alloc_local("t_ptr_")?),
-            Ty::PtrMutU8 => (Ty::PtrMutU8, self.alloc_local("t_ptr_")?),
-            Ty::PtrConstVoid => (Ty::PtrConstVoid, self.alloc_local("t_ptr_")?),
-            Ty::PtrMutVoid => (Ty::PtrMutVoid, self.alloc_local("t_ptr_")?),
-            Ty::PtrConstI32 => (Ty::PtrConstI32, self.alloc_local("t_ptr_")?),
-            Ty::PtrMutI32 => (Ty::PtrMutI32, self.alloc_local("t_ptr_")?),
-            Ty::Never => (Ty::I32, self.alloc_local("t_never_")?),
-        };
-        self.decl_local(storage_ty, &name);
-        self.emit_expr_to(expr, storage_ty, &name)?;
+        let prev_ptr = self.current_ptr.replace(expr.ptr().to_string());
+        let out = (|| {
+            let ty = self.infer_expr_in_new_scope(expr)?;
+            let (storage_ty, name) = match ty {
+                Ty::I32 => (Ty::I32, self.alloc_local("t_i32_")?),
+                Ty::Bytes => (Ty::Bytes, self.alloc_local("t_bytes_")?),
+                Ty::BytesView => (Ty::BytesView, self.alloc_local("t_view_")?),
+                Ty::VecU8 => (Ty::VecU8, self.alloc_local("t_vec_u8_")?),
+                Ty::OptionI32 => (Ty::OptionI32, self.alloc_local("t_opt_i32_")?),
+                Ty::OptionBytes => (Ty::OptionBytes, self.alloc_local("t_opt_bytes_")?),
+                Ty::ResultI32 => (Ty::ResultI32, self.alloc_local("t_res_i32_")?),
+                Ty::ResultBytes => (Ty::ResultBytes, self.alloc_local("t_res_bytes_")?),
+                Ty::Iface => (Ty::Iface, self.alloc_local("t_iface_")?),
+                Ty::PtrConstU8 => (Ty::PtrConstU8, self.alloc_local("t_ptr_")?),
+                Ty::PtrMutU8 => (Ty::PtrMutU8, self.alloc_local("t_ptr_")?),
+                Ty::PtrConstVoid => (Ty::PtrConstVoid, self.alloc_local("t_ptr_")?),
+                Ty::PtrMutVoid => (Ty::PtrMutVoid, self.alloc_local("t_ptr_")?),
+                Ty::PtrConstI32 => (Ty::PtrConstI32, self.alloc_local("t_ptr_")?),
+                Ty::PtrMutI32 => (Ty::PtrMutI32, self.alloc_local("t_ptr_")?),
+                Ty::Never => (Ty::I32, self.alloc_local("t_never_")?),
+            };
+            self.decl_local(storage_ty, &name);
+            self.emit_expr_to(expr, storage_ty, &name)?;
 
-        let mut v = self.make_var_ref(ty, name.clone(), true);
-        if ty == Ty::BytesView {
-            let borrow_of = self.borrow_of_view_expr(expr)?;
-            if let Some(owner) = &borrow_of {
-                self.inc_borrow_count(owner)?;
+            let mut v = self.make_var_ref(ty, name.clone(), true);
+            if ty == Ty::BytesView {
+                let borrow_of = self.borrow_of_view_expr(expr)?;
+                if let Some(owner) = &borrow_of {
+                    self.inc_borrow_count(owner)?;
+                }
+                v.borrow_of = borrow_of;
             }
-            v.borrow_of = borrow_of;
-        }
 
-        if is_owned_ty(ty) || ty == Ty::BytesView {
-            self.bind(format!("#tmp:{name}"), v.clone());
-        }
+            if is_owned_ty(ty) || ty == Ty::BytesView {
+                self.bind(format!("#tmp:{name}"), v.clone());
+            }
 
-        Ok(v)
+            Ok(v)
+        })();
+        self.current_ptr = prev_ptr;
+        out
     }
 
     fn emit_expr_as_bytes_view(&mut self, expr: &Expr) -> Result<VarRef, CompilerError> {
-        let ty = self.infer_expr_in_new_scope(expr)?;
-        match ty {
-            Ty::BytesView => self.emit_expr(expr),
-            Ty::Bytes => match expr {
-                Expr::Ident(name) if name != "input" => {
-                    let Some(owner) = self.lookup(name).cloned() else {
-                        return Err(self.err(
-                            CompileErrorKind::Typing,
-                            format!("unknown identifier: {name:?}"),
-                        ));
-                    };
-                    if owner.moved {
-                        return Err(self.err(
-                            CompileErrorKind::Typing,
-                            format!("use after move: {name:?}"),
-                        ));
-                    }
-                    if owner.ty != Ty::Bytes {
-                        return Err(CompilerError::new(
-                            CompileErrorKind::Typing,
-                            format!("type mismatch for identifier {name:?}"),
-                        ));
-                    }
+        let prev_ptr = self.current_ptr.replace(expr.ptr().to_string());
+        let out = (|| {
+            let ty = self.infer_expr_in_new_scope(expr)?;
+            match ty {
+                Ty::BytesView => self.emit_expr(expr),
+                Ty::Bytes => match expr {
+                    Expr::Ident { name, .. } if name != "input" => {
+                        let Some(owner) = self.lookup(name).cloned() else {
+                            return Err(self.err(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {name:?}"),
+                            ));
+                        };
+                        if owner.moved {
+                            let moved_ptr = owner
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
+                            return Err(self.err(
+                                CompileErrorKind::Typing,
+                                format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                            ));
+                        }
+                        if owner.ty != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("type mismatch for identifier {name:?}"),
+                            ));
+                        }
 
-                    let tmp = self.alloc_local("t_view_")?;
-                    self.decl_local(Ty::BytesView, &tmp);
-                    self.line(&format!("{tmp} = rt_bytes_view(ctx, {});", owner.c_name));
-                    self.inc_borrow_count(&owner.c_name)?;
-                    let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
-                    view.borrow_of = Some(owner.c_name);
-                    self.bind(format!("#tmp:{tmp}"), view.clone());
-                    Ok(view)
-                }
-                _ => {
-                    let owner = self.emit_expr(expr)?;
-                    if owner.ty != Ty::Bytes {
-                        return Err(CompilerError::new(
-                            CompileErrorKind::Typing,
-                            format!("expected bytes, got {:?}", owner.ty),
-                        ));
+                        let tmp = self.alloc_local("t_view_")?;
+                        self.decl_local(Ty::BytesView, &tmp);
+                        self.line(&format!("{tmp} = rt_bytes_view(ctx, {});", owner.c_name));
+                        self.inc_borrow_count(&owner.c_name)?;
+                        let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
+                        view.borrow_of = Some(owner.c_name);
+                        self.bind(format!("#tmp:{tmp}"), view.clone());
+                        Ok(view)
                     }
-                    let tmp = self.alloc_local("t_view_")?;
-                    self.decl_local(Ty::BytesView, &tmp);
-                    self.line(&format!("{tmp} = rt_bytes_view(ctx, {});", owner.c_name));
-                    self.inc_borrow_count(&owner.c_name)?;
-                    let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
-                    view.borrow_of = Some(owner.c_name);
-                    self.bind(format!("#tmp:{tmp}"), view.clone());
-                    Ok(view)
-                }
-            },
-            Ty::VecU8 => match expr {
-                Expr::Ident(name) => {
-                    let Some(owner) = self.lookup(name).cloned() else {
-                        return Err(CompilerError::new(
-                            CompileErrorKind::Typing,
-                            format!("unknown identifier: {name:?}"),
-                        ));
-                    };
-                    if owner.moved {
-                        return Err(CompilerError::new(
-                            CompileErrorKind::Typing,
-                            format!("use after move: {name:?}"),
-                        ));
+                    _ => {
+                        let owner = self.emit_expr(expr)?;
+                        if owner.ty != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("expected bytes, got {:?}", owner.ty),
+                            ));
+                        }
+                        let tmp = self.alloc_local("t_view_")?;
+                        self.decl_local(Ty::BytesView, &tmp);
+                        self.line(&format!("{tmp} = rt_bytes_view(ctx, {});", owner.c_name));
+                        self.inc_borrow_count(&owner.c_name)?;
+                        let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
+                        view.borrow_of = Some(owner.c_name);
+                        self.bind(format!("#tmp:{tmp}"), view.clone());
+                        Ok(view)
                     }
-                    if owner.ty != Ty::VecU8 {
-                        return Err(CompilerError::new(
-                            CompileErrorKind::Typing,
-                            format!("type mismatch for identifier {name:?}"),
-                        ));
-                    }
+                },
+                Ty::VecU8 => match expr {
+                    Expr::Ident { name, .. } => {
+                        let Some(owner) = self.lookup(name).cloned() else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {name:?}"),
+                            ));
+                        };
+                        if owner.moved {
+                            let moved_ptr = owner
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                            ));
+                        }
+                        if owner.ty != Ty::VecU8 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("type mismatch for identifier {name:?}"),
+                            ));
+                        }
 
-                    let tmp = self.alloc_local("t_view_")?;
-                    self.decl_local(Ty::BytesView, &tmp);
-                    self.line(&format!(
-                        "{tmp} = rt_vec_u8_as_view(ctx, {});",
-                        owner.c_name
-                    ));
-                    self.inc_borrow_count(&owner.c_name)?;
-                    let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
-                    view.borrow_of = Some(owner.c_name);
-                    self.bind(format!("#tmp:{tmp}"), view.clone());
-                    Ok(view)
-                }
-                _ => {
-                    let owner = self.emit_expr(expr)?;
-                    if owner.ty != Ty::VecU8 {
-                        return Err(CompilerError::new(
-                            CompileErrorKind::Typing,
-                            format!("expected vec_u8, got {:?}", owner.ty),
+                        let tmp = self.alloc_local("t_view_")?;
+                        self.decl_local(Ty::BytesView, &tmp);
+                        self.line(&format!(
+                            "{tmp} = rt_vec_u8_as_view(ctx, {});",
+                            owner.c_name
                         ));
+                        self.inc_borrow_count(&owner.c_name)?;
+                        let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
+                        view.borrow_of = Some(owner.c_name);
+                        self.bind(format!("#tmp:{tmp}"), view.clone());
+                        Ok(view)
                     }
-                    let tmp = self.alloc_local("t_view_")?;
-                    self.decl_local(Ty::BytesView, &tmp);
-                    self.line(&format!(
-                        "{tmp} = rt_vec_u8_as_view(ctx, {});",
-                        owner.c_name
-                    ));
-                    self.inc_borrow_count(&owner.c_name)?;
-                    let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
-                    view.borrow_of = Some(owner.c_name);
-                    self.bind(format!("#tmp:{tmp}"), view.clone());
-                    Ok(view)
-                }
-            },
-            other => Err(CompilerError::new(
-                CompileErrorKind::Typing,
-                format!("expected bytes/bytes_view/vec_u8, got {other:?}"),
-            )),
-        }
+                    _ => {
+                        let owner = self.emit_expr(expr)?;
+                        if owner.ty != Ty::VecU8 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("expected vec_u8, got {:?}", owner.ty),
+                            ));
+                        }
+                        let tmp = self.alloc_local("t_view_")?;
+                        self.decl_local(Ty::BytesView, &tmp);
+                        self.line(&format!(
+                            "{tmp} = rt_vec_u8_as_view(ctx, {});",
+                            owner.c_name
+                        ));
+                        self.inc_borrow_count(&owner.c_name)?;
+                        let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
+                        view.borrow_of = Some(owner.c_name);
+                        self.bind(format!("#tmp:{tmp}"), view.clone());
+                        Ok(view)
+                    }
+                },
+                other => Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("expected bytes/bytes_view/vec_u8, got {other:?}"),
+                )),
+            }
+        })();
+        self.current_ptr = prev_ptr;
+        out
     }
 
     fn emit_stmt(&mut self, expr: &Expr) -> Result<(), CompilerError> {
-        match expr {
-            Expr::List(items) => {
+        let prev_ptr = self.current_ptr.replace(expr.ptr().to_string());
+        let out = (|| match expr {
+            Expr::List { items, .. } => {
                 let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
                     CompilerError::new(
                         CompileErrorKind::Parse,
@@ -6388,7 +6461,9 @@ impl<'a> Emitter<'a> {
                 let _ = self.emit_expr(expr)?;
                 Ok(())
             }
-        }
+        })();
+        self.current_ptr = prev_ptr;
+        out
     }
 
     fn emit_let_stmt(&mut self, args: &[Expr]) -> Result<(), CompilerError> {
@@ -6419,7 +6494,10 @@ impl<'a> Emitter<'a> {
         let mut var = self.make_var_ref(expr_ty, c_name.clone(), false);
         if is_owned_ty(expr_ty) {
             match &args[1] {
-                Expr::Ident(src_name) if src_name != "input" => {
+                Expr::Ident {
+                    name: src_name,
+                    ptr: src_ptr,
+                } if src_name != "input" => {
                     let Some(src) = self.lookup(src_name).cloned() else {
                         return Err(CompilerError::new(
                             CompileErrorKind::Typing,
@@ -6433,9 +6511,14 @@ impl<'a> Emitter<'a> {
                         ));
                     }
                     if src.moved {
+                        let moved_ptr = src
+                            .moved_ptr
+                            .as_deref()
+                            .filter(|p| !p.is_empty())
+                            .unwrap_or("<unknown>");
                         return Err(CompilerError::new(
                             CompileErrorKind::Typing,
-                            format!("use after move: {src_name:?}"),
+                            format!("use after move: {src_name:?} moved_ptr={moved_ptr}"),
                         ));
                     }
                     if src.borrow_count != 0 {
@@ -6448,6 +6531,7 @@ impl<'a> Emitter<'a> {
                     self.line(&format!("{} = {};", src.c_name, c_empty(expr_ty)));
                     if let Some(src_mut) = self.lookup_mut(src_name) {
                         src_mut.moved = true;
+                        src_mut.moved_ptr = Some(src_ptr.clone());
                     }
                 }
                 _ => {
@@ -6512,6 +6596,7 @@ impl<'a> Emitter<'a> {
 
             if let Some(v) = self.lookup_mut(name) {
                 v.moved = false;
+                v.moved_ptr = None;
             }
         } else if dst.ty == Ty::BytesView {
             let tmp = self.alloc_local("t_view_")?;
@@ -6538,22 +6623,27 @@ impl<'a> Emitter<'a> {
     }
 
     fn emit_expr_to(&mut self, expr: &Expr, dest_ty: Ty, dest: &str) -> Result<(), CompilerError> {
-        self.line("rt_fuel(ctx, 1);");
-        match expr {
-            Expr::Int(i) => {
-                if dest_ty != Ty::I32 {
-                    return Err(CompilerError::new(
-                        CompileErrorKind::Typing,
-                        "int literal used where bytes expected".to_string(),
-                    ));
+        let prev_ptr = self.current_ptr.replace(expr.ptr().to_string());
+        let out = (|| {
+            self.line("rt_fuel(ctx, 1);");
+            match expr {
+                Expr::Int { value: i, .. } => {
+                    if dest_ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "int literal used where bytes expected".to_string(),
+                        ));
+                    }
+                    let v = *i as u32;
+                    self.line(&format!("{dest} = UINT32_C({v});"));
+                    Ok(())
                 }
-                let v = *i as u32;
-                self.line(&format!("{dest} = UINT32_C({v});"));
-                Ok(())
+                Expr::Ident { name, .. } => self.emit_ident_to(name, dest_ty, dest),
+                Expr::List { items, .. } => self.emit_list_to(items, dest_ty, dest),
             }
-            Expr::Ident(name) => self.emit_ident_to(name, dest_ty, dest),
-            Expr::List(items) => self.emit_list_to(items, dest_ty, dest),
-        }
+        })();
+        self.current_ptr = prev_ptr;
+        out
     }
 
     fn emit_ident_to(&mut self, name: &str, dest_ty: Ty, dest: &str) -> Result<(), CompilerError> {
@@ -6575,9 +6665,14 @@ impl<'a> Emitter<'a> {
             ));
         };
         if var.moved {
+            let moved_ptr = var
+                .moved_ptr
+                .as_deref()
+                .filter(|p| !p.is_empty())
+                .unwrap_or("<unknown>");
             return Err(self.err(
                 CompileErrorKind::Typing,
-                format!("use after move: {name:?}"),
+                format!("use after move: {name:?} moved_ptr={moved_ptr}"),
             ));
         }
         if var.ty != dest_ty {
@@ -6595,8 +6690,10 @@ impl<'a> Emitter<'a> {
             }
             self.line(&format!("{dest} = {};", var.c_name));
             self.line(&format!("{} = {};", var.c_name, c_empty(dest_ty)));
+            let moved_ptr = self.current_ptr.clone();
             if let Some(v) = self.lookup_mut(name) {
                 v.moved = true;
+                v.moved_ptr = moved_ptr;
             }
         } else {
             self.line(&format!("{dest} = {};", var.c_name));
@@ -7258,7 +7355,9 @@ impl<'a> Emitter<'a> {
                 format!("{head} returns i32"),
             ));
         }
-        if (head == "<u" || head == ">=u") && matches!(args.get(1), Some(Expr::Int(0))) {
+        if (head == "<u" || head == ">=u")
+            && matches!(args.get(1), Some(Expr::Int { value: 0, .. }))
+        {
             let msg = match head {
                 "<u" => {
                     "semantic error: `(<u x 0)` is always false (unsigned comparison). \
@@ -7614,7 +7713,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "bytes.set_u8 returns bytes".to_string(),
             ));
         }
-        if let Expr::Ident(name) = &args[0] {
+        if let Expr::Ident { name, .. } = &args[0] {
             let Some(var) = self.lookup(name).cloned() else {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -7622,9 +7721,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             if var.borrow_count != 0 {
@@ -7655,8 +7759,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             if dest != var_c_name.as_str() {
                 self.line(&format!("{dest} = {var_c_name};"));
                 self.line(&format!("{var_c_name} = {};", c_empty(Ty::Bytes)));
+                let moved_ptr = self.current_ptr.clone();
                 if let Some(v) = self.lookup_mut(name) {
                     v.moved = true;
+                    v.moved_ptr = moved_ptr;
                 }
             }
             return Ok(());
@@ -8260,7 +8366,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let Some(b_name) = args[0].as_ident() else {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "bytes.view requires an identifier owner (bind the bytes to a variable first)"
+                "bytes.view requires an identifier owner (bind the value to a local with let first)"
                     .to_string(),
             ));
         };
@@ -8271,9 +8377,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         };
         if b.moved {
+            let moved_ptr = b
+                .moved_ptr
+                .as_deref()
+                .filter(|p| !p.is_empty())
+                .unwrap_or("<unknown>");
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                format!("use after move: {b_name:?}"),
+                format!("use after move: {b_name:?} moved_ptr={moved_ptr}"),
             ));
         }
         if b.ty != Ty::Bytes {
@@ -8307,7 +8418,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let Some(b_name) = args[0].as_ident() else {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "bytes.subview requires an identifier owner (bind the bytes to a variable first)"
+                "bytes.subview requires an identifier owner (bind the value to a local with let first)"
                     .to_string(),
             ));
         };
@@ -8318,9 +8429,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         };
         if b.moved {
+            let moved_ptr = b
+                .moved_ptr
+                .as_deref()
+                .filter(|p| !p.is_empty())
+                .unwrap_or("<unknown>");
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                format!("use after move: {b_name:?}"),
+                format!("use after move: {b_name:?} moved_ptr={moved_ptr}"),
             ));
         }
         let start = self.emit_expr(&args[1])?;
@@ -11625,9 +11741,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             if var.ty != Ty::VecU8 {
@@ -11677,9 +11798,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             let idx = self.emit_expr(&args[1])?;
@@ -11730,7 +11856,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
 
-        if let Expr::Ident(name) = &args[0] {
+        if let Expr::Ident { name, .. } = &args[0] {
             let Some(var) = self.lookup(name).cloned() else {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -11738,9 +11864,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             if var.borrow_count != 0 {
@@ -11771,8 +11902,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             if dest != var_c_name.as_str() {
                 self.line(&format!("{dest} = {var_c_name};"));
                 self.line(&format!("{var_c_name} = {};", c_empty(Ty::VecU8)));
+                let moved_ptr = self.current_ptr.clone();
                 if let Some(v) = self.lookup_mut(name) {
                     v.moved = true;
+                    v.moved_ptr = moved_ptr;
                 }
             }
             return Ok(());
@@ -11815,7 +11948,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "vec_u8.push returns vec_u8".to_string(),
             ));
         }
-        if let Expr::Ident(name) = &args[0] {
+        if let Expr::Ident { name, .. } = &args[0] {
             let Some(var) = self.lookup(name).cloned() else {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -11823,9 +11956,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             if var.borrow_count != 0 {
@@ -11855,8 +11993,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             if dest != var_c_name.as_str() {
                 self.line(&format!("{dest} = {var_c_name};"));
                 self.line(&format!("{var_c_name} = {};", c_empty(Ty::VecU8)));
+                let moved_ptr = self.current_ptr.clone();
                 if let Some(v) = self.lookup_mut(name) {
                     v.moved = true;
+                    v.moved_ptr = moved_ptr;
                 }
             }
             return Ok(());
@@ -11904,7 +12044,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "vec_u8.reserve_exact returns vec_u8".to_string(),
             ));
         }
-        if let Expr::Ident(name) = &args[0] {
+        if let Expr::Ident { name, .. } = &args[0] {
             let Some(var) = self.lookup(name).cloned() else {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -11912,9 +12052,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             if var.borrow_count != 0 {
@@ -11944,8 +12089,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             if dest != var_c_name.as_str() {
                 self.line(&format!("{dest} = {var_c_name};"));
                 self.line(&format!("{var_c_name} = {};", c_empty(Ty::VecU8)));
+                let moved_ptr = self.current_ptr.clone();
                 if let Some(v) = self.lookup_mut(name) {
                     v.moved = true;
+                    v.moved_ptr = moved_ptr;
                 }
             }
             return Ok(());
@@ -11993,7 +12140,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "vec_u8.extend_zeroes returns vec_u8".to_string(),
             ));
         }
-        if let Expr::Ident(name) = &args[0] {
+        if let Expr::Ident { name, .. } = &args[0] {
             let Some(var) = self.lookup(name).cloned() else {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -12001,9 +12148,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             if var.borrow_count != 0 {
@@ -12033,8 +12185,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             if dest != var_c_name.as_str() {
                 self.line(&format!("{dest} = {var_c_name};"));
                 self.line(&format!("{var_c_name} = {};", c_empty(Ty::VecU8)));
+                let moved_ptr = self.current_ptr.clone();
                 if let Some(v) = self.lookup_mut(name) {
                     v.moved = true;
+                    v.moved_ptr = moved_ptr;
                 }
             }
             return Ok(());
@@ -12076,7 +12230,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "vec_u8.extend_bytes returns vec_u8".to_string(),
             ));
         }
-        if let Expr::Ident(name) = &args[0] {
+        if let Expr::Ident { name, .. } = &args[0] {
             let Some(var) = self.lookup(name).cloned() else {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -12084,9 +12238,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             if var.borrow_count != 0 {
@@ -12116,8 +12275,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             if dest != var_c_name.as_str() {
                 self.line(&format!("{dest} = {var_c_name};"));
                 self.line(&format!("{var_c_name} = {};", c_empty(Ty::VecU8)));
+                let moved_ptr = self.current_ptr.clone();
                 if let Some(v) = self.lookup_mut(name) {
                     v.moved = true;
+                    v.moved_ptr = moved_ptr;
                 }
             }
             self.release_temp_view_borrow(&b)?;
@@ -12167,7 +12328,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "vec_u8.extend_bytes_range returns vec_u8".to_string(),
             ));
         }
-        if let Expr::Ident(name) = &args[0] {
+        if let Expr::Ident { name, .. } = &args[0] {
             let Some(var) = self.lookup(name).cloned() else {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -12175,9 +12336,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             if var.borrow_count != 0 {
@@ -12211,8 +12377,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             if dest != var_c_name.as_str() {
                 self.line(&format!("{dest} = {var_c_name};"));
                 self.line(&format!("{var_c_name} = {};", c_empty(Ty::VecU8)));
+                let moved_ptr = self.current_ptr.clone();
                 if let Some(v) = self.lookup_mut(name) {
                     v.moved = true;
+                    v.moved_ptr = moved_ptr;
                 }
             }
             self.release_temp_view_borrow(&b)?;
@@ -12267,7 +12435,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         match &args[0] {
-            Expr::Ident(name) => {
+            Expr::Ident { name, .. } => {
                 let Some(var) = self.lookup(name).cloned() else {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
@@ -12275,9 +12443,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                     ));
                 };
                 if var.moved {
+                    let moved_ptr = var
+                        .moved_ptr
+                        .as_deref()
+                        .filter(|p| !p.is_empty())
+                        .unwrap_or("<unknown>");
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
-                        format!("use after move: {name:?}"),
+                        format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                     ));
                 }
                 if var.borrow_count != 0 {
@@ -12296,8 +12469,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                     "{dest} = rt_vec_u8_into_bytes(ctx, &{});",
                     var.c_name
                 ));
+                let moved_ptr = self.current_ptr.clone();
                 if let Some(v) = self.lookup_mut(name) {
                     v.moved = true;
+                    v.moved_ptr = moved_ptr;
                 }
                 Ok(())
             }
@@ -12339,7 +12514,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let Some(h_name) = args[0].as_ident() else {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "vec_u8.as_view requires an identifier owner (bind the vec_u8 to a variable first)"
+                "vec_u8.as_view requires an identifier owner (bind the value to a local with let first)"
                     .to_string(),
             ));
         };
@@ -12350,9 +12525,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         };
         if h.moved {
+            let moved_ptr = h
+                .moved_ptr
+                .as_deref()
+                .filter(|p| !p.is_empty())
+                .unwrap_or("<unknown>");
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                format!("use after move: {h_name:?}"),
+                format!("use after move: {h_name:?} moved_ptr={moved_ptr}"),
             ));
         }
         if h.ty != Ty::VecU8 {
@@ -12576,9 +12756,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             };
             if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("use after move: {name:?}"),
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
                 ));
             }
             var.c_name
@@ -13942,8 +14127,8 @@ impl InferCtx {
 
     fn infer(&mut self, expr: &Expr) -> Result<Ty, CompilerError> {
         match expr {
-            Expr::Int(_) => Ok(Ty::I32),
-            Expr::Ident(name) => {
+            Expr::Int { .. } => Ok(Ty::I32),
+            Expr::Ident { name, .. } => {
                 if name == "input" {
                     return Ok(Ty::BytesView);
                 }
@@ -13954,7 +14139,7 @@ impl InferCtx {
                     )
                 })
             }
-            Expr::List(items) => {
+            Expr::List { items, .. } => {
                 let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
                     CompilerError::new(
                         CompileErrorKind::Parse,
@@ -17168,7 +17353,7 @@ impl InferCtx {
 
     fn infer_stmt(&mut self, expr: &Expr) -> Result<Ty, CompilerError> {
         let ty = match expr {
-            Expr::List(items) => {
+            Expr::List { items, .. } => {
                 let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
                     CompilerError::new(
                         CompileErrorKind::Parse,

@@ -37,7 +37,7 @@ pub enum RunnerMode {
 
 #[derive(Debug, Clone, Args)]
 pub struct RunArgs {
-    /// Run a project (manifest + lockfile).
+    /// Run a project (`x07.json` path, or a directory containing `x07.json`).
     #[arg(long, value_name = "PATH")]
     pub project: Option<PathBuf>,
 
@@ -686,11 +686,11 @@ fn resolve_target(cwd: &Path, args: &RunArgs) -> Result<(TargetKind, PathBuf, Op
     }
 
     if let Some(path) = &args.project {
-        return Ok((
-            TargetKind::Project,
-            path.to_path_buf(),
-            Some(path.to_path_buf()),
-        ));
+        let path = match std::fs::metadata(path) {
+            Ok(meta) if meta.is_dir() => path.join("x07.json"),
+            _ => path.to_path_buf(),
+        };
+        return Ok((TargetKind::Project, path.clone(), Some(path)));
     }
     if let Some(path) = &args.program {
         let base = path

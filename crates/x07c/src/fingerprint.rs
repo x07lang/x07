@@ -15,19 +15,19 @@ pub(crate) fn stable_fingerprint(expr: &Expr) -> u128 {
 
     fn go(mut h: u128, e: &Expr) -> u128 {
         match e {
-            Expr::Int(i) => {
+            Expr::Int { value: i, .. } => {
                 h = write_bytes(h, &[0x01]);
                 h = write_bytes(h, &i.to_le_bytes());
                 h
             }
-            Expr::Ident(s) => {
+            Expr::Ident { name: s, .. } => {
                 h = write_bytes(h, &[0x02]);
                 let len: u32 = s.len() as u32;
                 h = write_bytes(h, &len.to_le_bytes());
                 h = write_bytes(h, s.as_bytes());
                 h
             }
-            Expr::List(items) => {
+            Expr::List { items, .. } => {
                 h = write_bytes(h, &[0x03]);
                 let len: u32 = items.len() as u32;
                 h = write_bytes(h, &len.to_le_bytes());

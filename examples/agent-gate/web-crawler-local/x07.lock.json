@@ -36,9 +36,9 @@
     },
     {
       "name": "ext-net",
-      "version": "0.1.3",
-      "path": ".x07/deps/ext-net/0.1.3",
-      "package_manifest_sha256": "1be4f620e540e7b486db17af594f2919fff4dd6d797c29c2fad2e503233d182b",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-net/0.1.4",
+      "package_manifest_sha256": "3803695f8b6a0fdf8b4566877d57aacf3e812e7196585f5285dcfe87a7486b24",
       "module_root": "modules",
       "modules_sha256": {
         "std.net.codec": "cf0a9ec8e6a60ba101fc536a0c27de1fe68e851b23f6f0221e6b35ef6e1fe6e8",

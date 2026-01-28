@@ -1649,6 +1649,46 @@
       "import_mode": "handwritten",
       "modules": [
         {
+          "module_id": "std.db.dm",
+          "path": "packages/ext/x07-ext-db-core/0.1.4/modules/std/db/dm.x07.json",
+          "sha256": "6c4ee76423e82e44bd75f167ff094d2c0d340685e9fa9012fd01bd0406f51fe2",
+          "size_bytes": 2643
+        },
+        {
+          "module_id": "std.db.params",
+          "path": "packages/ext/x07-ext-db-core/0.1.4/modules/std/db/params.x07.json",
+          "sha256": "3d970ea94e07b459117f5709ad84cb2d16db1ff211a394fa0acdc9eae0105416",
+          "size_bytes": 4111
+        },
+        {
+          "module_id": "std.db.pool",
+          "path": "packages/ext/x07-ext-db-core/0.1.4/modules/std/db/pool.x07.json",
+          "sha256": "9efde2ab062124fe5f8e5e17c362fdec80dddf1c87f7148732c63d4fb4851183",
+          "size_bytes": 2660
+        },
+        {
+          "module_id": "std.db.spec",
+          "path": "packages/ext/x07-ext-db-core/0.1.4/modules/std/db/spec.x07.json",
+          "sha256": "f512ff48d770ba75e35a83f9f2314df1d6ae342d543121f01fdfdb0ace77eeb1",
+          "size_bytes": 9470
+        },
+        {
+          "module_id": "std.db",
+          "path": "packages/ext/x07-ext-db-core/0.1.4/modules/std/db.x07.json",
+          "sha256": "2cefc8bf968c6043ebd79068e82bae4c0ad688ccabb7990a9a059268d448d863",
+          "size_bytes": 4949
+        }
+      ],
+      "name": "ext-db-core",
+      "package_manifest_sha256": "b5764ecc74c3de05c82d7e3e0615f6b69796a12c36dcc9fe54f3ed5deb297d2f",
+      "path": "packages/ext/x07-ext-db-core/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
           "module_id": "std.db.mysql.pool",
           "path": "packages/ext/x07-ext-db-mysql/0.1.0/modules/std/db/mysql/pool.x07.json",
           "sha256": "892f499a4d79d4b86a3d3122c883da7849d30e3f2a4326b5e41cae6845b3d955",
@@ -2091,6 +2131,34 @@
       "package_manifest_sha256": "5ce2206f18877990cf813818defa45950302d06f2f474f86171a0d3130ad6f2e",
       "path": "packages/ext/x07-ext-db-sqlite/0.1.3",
       "version": "0.1.3"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.db.sqlite.pool",
+          "path": "packages/ext/x07-ext-db-sqlite/0.1.4/modules/std/db/sqlite/pool.x07.json",
+          "sha256": "a821a446185c97ccffaed02496f358e85a695a7b8334d23ebcc684597490a05e",
+          "size_bytes": 3458
+        },
+        {
+          "module_id": "std.db.sqlite.spec",
+          "path": "packages/ext/x07-ext-db-sqlite/0.1.4/modules/std/db/sqlite/spec.x07.json",
+          "sha256": "564e69341cafff595c6378fffa1f2b152188f5a73243143c32cf84ba2b2c896e",
+          "size_bytes": 5593
+        },
+        {
+          "module_id": "std.db.sqlite",
+          "path": "packages/ext/x07-ext-db-sqlite/0.1.4/modules/std/db/sqlite.x07.json",
+          "sha256": "1c6f188949a1e562b464dcece8303b38050dd799805bae4a338745e6147836ff",
+          "size_bytes": 2655
+        }
+      ],
+      "name": "ext-db-sqlite",
+      "package_manifest_sha256": "d22a6e5873a33cf4e1637bddf6e996a280b3fe223c5652c2f1d1e47407be1ff4",
+      "path": "packages/ext/x07-ext-db-sqlite/0.1.4",
+      "version": "0.1.4"
     },
     {
       "determinism_tier": "pure",
@@ -3641,6 +3709,82 @@
       "package_manifest_sha256": "1be4f620e540e7b486db17af594f2919fff4dd6d797c29c2fad2e503233d182b",
       "path": "packages/ext/x07-ext-net/0.1.3",
       "version": "0.1.3"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.net.codec",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/codec.x07.json",
+          "sha256": "cf0a9ec8e6a60ba101fc536a0c27de1fe68e851b23f6f0221e6b35ef6e1fe6e8",
+          "size_bytes": 8632
+        },
+        {
+          "module_id": "std.net.dns",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/dns.x07.json",
+          "sha256": "867c1a219895eb406f6cfd81ae288ce885c4f503ee9132a4fe9064923ebf337d",
+          "size_bytes": 1837
+        },
+        {
+          "module_id": "std.net.err",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/err.x07.json",
+          "sha256": "fe7332e87ae4ba0606018cf42685662ee9e8225efd0a5042c486c8ef56892b0b",
+          "size_bytes": 2036
+        },
+        {
+          "module_id": "std.net.http.client",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/http/client.x07.json",
+          "sha256": "7a5b0045d1aec39e63b6d79912468e39a436d12741e4e14ccdd51df91b2f0d34",
+          "size_bytes": 10653
+        },
+        {
+          "module_id": "std.net.http.server",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/http/server.x07.json",
+          "sha256": "4d0b7adff387bda76b4425691367be15dd72333935fcb6b2b420196340a5e16e",
+          "size_bytes": 12267
+        },
+        {
+          "module_id": "std.net.http.spec",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/http/spec.x07.json",
+          "sha256": "21c66733fdab3a5561d0295a514d6c0f875aba9d8b428e23563a7132856844ee",
+          "size_bytes": 26091
+        },
+        {
+          "module_id": "std.net.http",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/http.x07.json",
+          "sha256": "6dafbe8454be0042b1e28d1517254e2c2ff9e3ea91d213f3ee5a39add567fa57",
+          "size_bytes": 3672
+        },
+        {
+          "module_id": "std.net.io",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/io.x07.json",
+          "sha256": "f8af5435e10ca4053326e6bacf570968182922868b6dccec70676cfaee3bea46",
+          "size_bytes": 1654
+        },
+        {
+          "module_id": "std.net.tcp",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/tcp.x07.json",
+          "sha256": "d22507235437cc2898b7e6613dfc35d4f26725026cc78d592835dc4835e49117",
+          "size_bytes": 7576
+        },
+        {
+          "module_id": "std.net.tls",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/tls.x07.json",
+          "sha256": "cf5c730a0627fe82dda1f794e3c8e31b04d8cdf0fe32270d8b3496155e96feee",
+          "size_bytes": 2702
+        },
+        {
+          "module_id": "std.net.udp",
+          "path": "packages/ext/x07-ext-net/0.1.4/modules/std/net/udp.x07.json",
+          "sha256": "e1353807a38186230ceadca1baab0b2ee3d12d1a683b3cacbbe34d9e1008588d",
+          "size_bytes": 4822
+        }
+      ],
+      "name": "ext-net",
+      "package_manifest_sha256": "3803695f8b6a0fdf8b4566877d57aacf3e812e7196585f5285dcfe87a7486b24",
+      "path": "packages/ext/x07-ext-net/0.1.4",
+      "version": "0.1.4"
     },
     {
       "determinism_tier": "os-world-only",
@@ -6199,6 +6343,6 @@
       "version": "0.1.4"
     }
   ],
-  "packages_hash": "4ffc0f74e5f0bcc4027a06ebbd257d04d2fb57e8bb9112a450b95bd9d5bf069b",
+  "packages_hash": "7e2355a1a732dac6e8a740aac9fca7d986f9c346fc529a70539d18007d0a1a7a",
   "packages_root": "packages/ext"
 }

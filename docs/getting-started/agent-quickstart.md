@@ -83,6 +83,10 @@ x07 run
 
 See: [Running programs](../toolchain/running-programs.md).
 
+Diagnostics tip: many compiler errors include `ptr=/...` (a JSON Pointer into your x07AST) and sometimes `moved_ptr=/...` for ownership errors; use these to jump to the exact failing node in the `*.x07.json`.
+
+Run report tip: in `run-os`, the `rr_*` counters in `x07 run --report ...` are record/replay adapter stats and are not a count of real OS network requests.
+
 If your program expects CLI arguments via `argv_v1`, pass them after `--` and `x07 run` will encode them into input bytes:
 
 ```bash
@@ -144,6 +148,7 @@ Notes:
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
+- Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).
 
 See also: [Packages & projects](../packages/index.md).
 

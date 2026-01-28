@@ -502,7 +502,10 @@ fn expr_from_json_sexpr(v: &Value, ptr: &str) -> Result<Expr, X07AstError> {
                 message: format!("number out of i32 range: {i}"),
                 ptr: ptr.to_string(),
             })?;
-            Ok(Expr::Int(i32_))
+            Ok(Expr::Int {
+                value: i32_,
+                ptr: ptr.to_string(),
+            })
         }
         Value::String(s) => {
             if s.chars().any(|c| c.is_whitespace()) {
@@ -511,7 +514,10 @@ fn expr_from_json_sexpr(v: &Value, ptr: &str) -> Result<Expr, X07AstError> {
                     ptr: ptr.to_string(),
                 });
             }
-            Ok(Expr::Ident(s.to_string()))
+            Ok(Expr::Ident {
+                name: s.to_string(),
+                ptr: ptr.to_string(),
+            })
         }
         Value::Array(items) => {
             if items.is_empty() {
@@ -531,18 +537,27 @@ fn expr_from_json_sexpr(v: &Value, ptr: &str) -> Result<Expr, X07AstError> {
                 });
             }
             let mut out = Vec::with_capacity(items.len());
-            out.push(Expr::Ident(head.to_string()));
+            out.push(Expr::Ident {
+                name: head.to_string(),
+                ptr: format!("{ptr}/0"),
+            });
             for (idx, item) in items.iter().enumerate().skip(1) {
                 let item_ptr = format!("{ptr}/{idx}");
                 if head == "bytes.lit" && idx == 1 {
                     if let Value::String(s) = item {
-                        out.push(Expr::Ident(s.to_string()));
+                        out.push(Expr::Ident {
+                            name: s.to_string(),
+                            ptr: item_ptr,
+                        });
                         continue;
                     }
                 }
                 out.push(expr_from_json_sexpr(item, &item_ptr)?);
             }
-            Ok(Expr::List(out))
+            Ok(Expr::List {
+                items: out,
+                ptr: ptr.to_string(),
+            })
         }
         _ => Err(X07AstError {
             message: format!("unsupported JSON value in expr: {v:?}"),
@@ -722,9 +737,9 @@ fn ty_to_name(ty: Ty) -> &'static str {
 
 pub fn expr_to_value(e: &Expr) -> Value {
     match e {
-        Expr::Int(i) => Value::Number((*i).into()),
-        Expr::Ident(s) => Value::String(s.clone()),
-        Expr::List(items) => Value::Array(items.iter().map(expr_to_value).collect()),
+        Expr::Int { value, .. } => Value::Number((*value).into()),
+        Expr::Ident { name, .. } => Value::String(name.clone()),
+        Expr::List { items, .. } => Value::Array(items.iter().map(expr_to_value).collect()),
     }
 }
 

@@ -1,24 +1,33 @@
 use x07c::ast::Expr;
 
 fn ident(s: &str) -> Expr {
-    Expr::Ident(s.to_string())
+    Expr::Ident {
+        name: s.to_string(),
+        ptr: String::new(),
+    }
 }
 
 fn list(items: Vec<Expr>) -> Expr {
-    Expr::List(items)
+    Expr::List {
+        items,
+        ptr: String::new(),
+    }
 }
 
 fn has_len_hoist_from_out_of_scope_var(expr: &Expr, var: &str) -> bool {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => false,
-        Expr::List(items) => {
+        Expr::Int { .. } | Expr::Ident { .. } => false,
+        Expr::List { items, .. } => {
             if items.len() == 3
                 && items[0].as_ident() == Some("let")
                 && items[1]
                     .as_ident()
                     .is_some_and(|name| name.starts_with("__x07_len"))
             {
-                if let Expr::List(rhs_items) = &items[2] {
+                if let Expr::List {
+                    items: rhs_items, ..
+                } = &items[2]
+                {
                     if rhs_items.len() == 2
                         && rhs_items[0].as_ident() == Some("bytes.len")
                         && rhs_items[1].as_ident() == Some(var)
@@ -47,22 +56,45 @@ fn licm_bytes_len_does_not_hoist_let_bound_names() {
             list(vec![
                 ident("view.slice"),
                 ident("b"),
-                Expr::Int(0),
-                Expr::Int(0),
+                Expr::Int {
+                    value: 0,
+                    ptr: String::new(),
+                },
+                Expr::Int {
+                    value: 0,
+                    ptr: String::new(),
+                },
             ]),
         ]),
         list(vec![ident("bytes.len"), ident("pkg_view")]),
         list(vec![ident("bytes.len"), ident("pkg_view")]),
-        Expr::Int(0),
+        Expr::Int {
+            value: 0,
+            ptr: String::new(),
+        },
     ]);
 
-    let body = list(vec![ident("begin"), inner.clone(), inner, Expr::Int(0)]);
+    let body = list(vec![
+        ident("begin"),
+        inner.clone(),
+        inner,
+        Expr::Int {
+            value: 0,
+            ptr: String::new(),
+        },
+    ]);
 
     let expr = list(vec![
         ident("for"),
         ident("i"),
-        Expr::Int(0),
-        Expr::Int(10),
+        Expr::Int {
+            value: 0,
+            ptr: String::new(),
+        },
+        Expr::Int {
+            value: 10,
+            ptr: String::new(),
+        },
         body,
     ]);
 

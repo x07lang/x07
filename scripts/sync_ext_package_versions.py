@@ -254,9 +254,9 @@ def _seed_project_deps(*, root: Path, project_dir: Path, project_manifest: Path)
 
 
 def _clean_project_state(project_dir: Path) -> None:
-    x07_dir = project_dir / ".x07"
-    if x07_dir.exists():
-        shutil.rmtree(x07_dir)
+    deps_dir = project_dir / ".x07" / "deps"
+    if deps_dir.exists():
+        shutil.rmtree(deps_dir)
 
 
 def main(argv: list[str]) -> int:

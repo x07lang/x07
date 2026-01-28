@@ -4,6 +4,20 @@ use crate::diagnostics::{
 };
 use crate::x07ast::{self, X07AstFile, X07AstKind};
 
+fn expr_ident(name: impl Into<String>) -> Expr {
+    Expr::Ident {
+        name: name.into(),
+        ptr: String::new(),
+    }
+}
+
+fn expr_list(items: Vec<Expr>) -> Expr {
+    Expr::List {
+        items,
+        ptr: String::new(),
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LintOptions {
     pub world: x07_worlds::WorldId,
@@ -269,8 +283,8 @@ fn lint_world_imports(file: &X07AstFile, options: LintOptions, diagnostics: &mut
 
 fn lint_expr(expr: &Expr, ptr: &str, options: LintOptions, diagnostics: &mut Vec<Diagnostic>) {
     match expr {
-        Expr::Int(_) | Expr::Ident(_) => {}
-        Expr::List(items) => {
+        Expr::Int { .. } | Expr::Ident { .. } => {}
+        Expr::List { items, .. } => {
             if items.is_empty() {
                 diagnostics.push(Diagnostic {
                     code: "X07-ARITY-0000".to_string(),
@@ -339,14 +353,14 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
                     new_items.extend(items[0..4].iter().cloned());
                     let mut begin_items: Vec<Expr> =
                         Vec::with_capacity(items.len().saturating_sub(3));
-                    begin_items.push(Expr::Ident("begin".to_string()));
+                    begin_items.push(expr_ident("begin"));
                     begin_items.extend(items[4..].iter().cloned());
-                    new_items.push(Expr::List(begin_items));
+                    new_items.push(expr_list(begin_items));
                     diag.quickfix = Some(Quickfix {
                         kind: QuickfixKind::JsonPatch,
                         patch: vec![PatchOp::Replace {
                             path: ptr.to_string(),
-                            value: x07ast::expr_to_value(&Expr::List(new_items)),
+                            value: x07ast::expr_to_value(&expr_list(new_items)),
                         }],
                         note: Some("Wrap extra for body expressions in begin".to_string()),
                     });
@@ -425,14 +439,14 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
 
                 if items.len() > 3 {
                     let mut begin_items: Vec<Expr> = Vec::with_capacity(items.len());
-                    begin_items.push(Expr::Ident("begin".to_string()));
-                    begin_items.push(Expr::List(items[0..3].to_vec()));
+                    begin_items.push(expr_ident("begin"));
+                    begin_items.push(expr_list(items[0..3].to_vec()));
                     begin_items.extend(items[3..].iter().cloned());
                     diag.quickfix = Some(Quickfix {
                         kind: QuickfixKind::JsonPatch,
                         patch: vec![PatchOp::Replace {
                             path: ptr.to_string(),
-                            value: x07ast::expr_to_value(&Expr::List(begin_items)),
+                            value: x07ast::expr_to_value(&expr_list(begin_items)),
                         }],
                         note: Some(format!("Rewrite {head} with body into begin")),
                     });
@@ -482,7 +496,7 @@ fn lint_core_borrow_rules(
     let Some(owner) = items.get(1) else {
         return;
     };
-    if matches!(owner, Expr::Ident(_)) {
+    if matches!(owner, Expr::Ident { .. }) {
         return;
     }
 
@@ -502,18 +516,18 @@ fn lint_core_borrow_rules(
 
     let tmp = "_x07_tmp";
     let mut call_items: Vec<Expr> = Vec::with_capacity(items.len());
-    call_items.push(Expr::Ident(head.to_string()));
-    call_items.push(Expr::Ident(tmp.to_string()));
+    call_items.push(expr_ident(head.to_string()));
+    call_items.push(expr_ident(tmp.to_string()));
     call_items.extend(items.iter().skip(2).cloned());
 
-    let fixed = Expr::List(vec![
-        Expr::Ident("begin".to_string()),
-        Expr::List(vec![
-            Expr::Ident("let".to_string()),
-            Expr::Ident(tmp.to_string()),
+    let fixed = expr_list(vec![
+        expr_ident("begin"),
+        expr_list(vec![
+            expr_ident("let"),
+            expr_ident(tmp.to_string()),
             owner.clone(),
         ]),
-        Expr::List(call_items),
+        expr_list(call_items),
     ]);
 
     diagnostics.push(Diagnostic {
@@ -558,16 +572,13 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
             .to_string(),
     ];
 
-    let fixed = Expr::List(vec![
-        Expr::Ident("bytes.concat".to_string()),
-        Expr::List(vec![
-            Expr::Ident("view.to_bytes".to_string()),
-            Expr::List(vec![
-                Expr::Ident("bytes.view".to_string()),
-                Expr::Ident(a.to_string()),
-            ]),
+    let fixed = expr_list(vec![
+        expr_ident("bytes.concat"),
+        expr_list(vec![
+            expr_ident("view.to_bytes"),
+            expr_list(vec![expr_ident("bytes.view"), expr_ident(a.to_string())]),
         ]),
-        Expr::Ident(a.to_string()),
+        expr_ident(a.to_string()),
     ]);
 
     diagnostics.push(Diagnostic {

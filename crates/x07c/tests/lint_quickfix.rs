@@ -39,12 +39,15 @@ fn lint_quickfix_wraps_for_varargs_body_in_begin() {
     let patched_bytes = serde_json::to_vec(&doc).expect("serialize patched");
     let file = x07ast::parse_x07ast_json(&patched_bytes).expect("reparse patched");
     let solve = file.solve.expect("solve present");
-    let x07c::ast::Expr::List(items) = solve else {
+    let x07c::ast::Expr::List { items, .. } = solve else {
         panic!("solve must be a list after patch");
     };
     assert_eq!(items[0].as_ident(), Some("for"));
     assert_eq!(items.len(), 5, "for list must have 5 elements total");
-    let x07c::ast::Expr::List(body_items) = &items[4] else {
+    let x07c::ast::Expr::List {
+        items: body_items, ..
+    } = &items[4]
+    else {
         panic!("for body must be a list");
     };
     assert_eq!(body_items[0].as_ident(), Some("begin"));
@@ -84,7 +87,7 @@ fn lint_quickfix_rewrites_let_with_body_into_begin() {
     let patched_bytes = serde_json::to_vec(&doc).expect("serialize patched");
     let file = x07ast::parse_x07ast_json(&patched_bytes).expect("reparse patched");
     let solve = file.solve.expect("solve present");
-    let x07c::ast::Expr::List(items) = solve else {
+    let x07c::ast::Expr::List { items, .. } = solve else {
         panic!("solve must be a list after patch");
     };
     assert_eq!(items[0].as_ident(), Some("begin"));

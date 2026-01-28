@@ -17,7 +17,7 @@
     {
       "id": "net.http",
       "summary": "HTTP client for OS worlds (GET/POST, headers, body).",
-      "canonical": { "name": "ext-net", "version": "0.1.3" },
+      "canonical": { "name": "ext-net", "version": "0.1.4" },
       "alternatives": [{ "name": "ext-curl-c", "version": "0.1.4" }],
       "worlds": ["run-os", "run-os-sandboxed"],
       "status": "stable",
@@ -177,14 +177,14 @@
     {
       "id": "db.core",
       "summary": "Database core interfaces and pooling for OS worlds.",
-      "canonical": { "name": "ext-db-core", "version": "0.1.3" },
+      "canonical": { "name": "ext-db-core", "version": "0.1.4" },
       "worlds": ["run-os", "run-os-sandboxed"],
       "status": "experimental"
     },
     {
       "id": "db.sqlite",
       "summary": "SQLite client for OS worlds.",
-      "canonical": { "name": "ext-db-sqlite", "version": "0.1.3" },
+      "canonical": { "name": "ext-db-sqlite", "version": "0.1.4" },
       "worlds": ["run-os", "run-os-sandboxed"],
       "status": "experimental"
     },

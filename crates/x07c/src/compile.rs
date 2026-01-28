@@ -316,8 +316,8 @@ const INTERNAL_ONLY_HEADS: &[&str] = &["set_u32.dump_u32le", "map_u32.dump_kv_u3
 
 fn find_internal_only_head(expr: &crate::ast::Expr) -> Option<&'static str> {
     match expr {
-        crate::ast::Expr::Int(_) | crate::ast::Expr::Ident(_) => None,
-        crate::ast::Expr::List(items) => {
+        crate::ast::Expr::Int { .. } | crate::ast::Expr::Ident { .. } => None,
+        crate::ast::Expr::List { items, .. } => {
             let head = items.first().and_then(crate::ast::Expr::as_ident);
             if let Some(head) = head {
                 for &forbidden in INTERNAL_ONLY_HEADS {
@@ -793,9 +793,9 @@ fn validate_program_world_caps(
 ) -> Result<(), CompilerError> {
     fn expr_uses_head(expr: &crate::ast::Expr, head: &str) -> bool {
         match expr {
-            crate::ast::Expr::Int(_) | crate::ast::Expr::Ident(_) => false,
-            crate::ast::Expr::List(items) => {
-                if let Some(crate::ast::Expr::Ident(h)) = items.first() {
+            crate::ast::Expr::Int { .. } | crate::ast::Expr::Ident { .. } => false,
+            crate::ast::Expr::List { items, .. } => {
+                if let Some(crate::ast::Expr::Ident { name: h, .. }) = items.first() {
                     if h == head {
                         return true;
                     }
@@ -940,8 +940,8 @@ fn dead_code_eliminate(program: &mut Program) {
 
 fn collect_call_heads(expr: &crate::ast::Expr, out: &mut Vec<String>) {
     match expr {
-        crate::ast::Expr::Int(_) | crate::ast::Expr::Ident(_) => {}
-        crate::ast::Expr::List(items) => {
+        crate::ast::Expr::Int { .. } | crate::ast::Expr::Ident { .. } => {}
+        crate::ast::Expr::List { items, .. } => {
             if let Some(head) = items.first().and_then(crate::ast::Expr::as_ident) {
                 out.push(head.to_string());
             }
@@ -996,8 +996,8 @@ fn validate_expr_visibility(
     module_infos: &BTreeMap<String, ModuleInfo>,
 ) -> Result<(), CompilerError> {
     match expr {
-        crate::ast::Expr::Int(_) | crate::ast::Expr::Ident(_) => Ok(()),
-        crate::ast::Expr::List(items) => {
+        crate::ast::Expr::Int { .. } | crate::ast::Expr::Ident { .. } => Ok(()),
+        crate::ast::Expr::List { items, .. } => {
             if let Some(head) = items.first().and_then(crate::ast::Expr::as_ident) {
                 if let Some(callee_module) = fn_module.get(head) {
                     if callee_module != caller_module {
