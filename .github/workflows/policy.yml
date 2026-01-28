@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   governance:
     name: policy / governance-files-present
@@ -35,4 +38,3 @@ jobs:
           test -f docs/releases.md
           test -f docs/versioning.md
           test -f docs/stability.md
-

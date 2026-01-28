@@ -45,6 +45,8 @@ def run_server(host: str, port: int, timeout_s: int) -> int:
         cert_path, key_path = generate_test_cert_and_key(tmp_path)
 
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        if hasattr(ssl, "TLSVersion"):
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         ctx.load_cert_chain(certfile=str(cert_path), keyfile=str(key_path))
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
