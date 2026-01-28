@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Args;
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::run;
@@ -67,6 +68,12 @@ pub fn cmd_doc(args: DocArgs) -> Result<std::process::ExitCode> {
         }
     }
 
+    if let Some(project_path) = project_path.as_deref() {
+        if try_print_package_docs(query, project_path)? {
+            return Ok(std::process::ExitCode::SUCCESS);
+        }
+    }
+
     anyhow::bail!("module/symbol not found: {query}");
 }
 
@@ -94,6 +101,86 @@ fn resolve_project_module_roots(project_path: &Path) -> Result<Vec<PathBuf>> {
         roots.push(dep_dir.join(pkg.module_root));
     }
     Ok(roots)
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+struct PackageDocManifest {
+    name: String,
+    version: String,
+    description: String,
+    docs: String,
+    module_root: String,
+    modules: Vec<String>,
+}
+
+fn try_print_package_docs(query: &str, project_path: &Path) -> Result<bool> {
+    let (pkg, _pkg_dir) = match resolve_project_package_by_query(project_path, query)? {
+        Some(v) => v,
+        None => return Ok(false),
+    };
+
+    let name = pkg.name.trim();
+    let version = pkg.version.trim();
+    if name.is_empty() || version.is_empty() {
+        return Ok(false);
+    }
+
+    println!("package: {name}@{version}");
+    if !pkg.description.trim().is_empty() {
+        println!("description: {}", pkg.description.trim());
+    }
+    if !pkg.modules.is_empty() {
+        println!("modules:");
+        for module_id in &pkg.modules {
+            println!("  - {module_id}");
+        }
+        if let Some(first) = pkg.modules.first() {
+            println!("hint: x07 doc {first}");
+        }
+        return Ok(true);
+    }
+    if !pkg.docs.trim().is_empty() {
+        println!("docs:\n{}", pkg.docs.trim_end());
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+fn resolve_project_package_by_query(
+    project_path: &Path,
+    query: &str,
+) -> Result<Option<(PackageDocManifest, PathBuf)>> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Ok(None);
+    }
+    let want = query.split('@').next().unwrap_or(query).trim();
+    if want.is_empty() {
+        return Ok(None);
+    }
+
+    let manifest = x07c::project::load_project_manifest(project_path).context("load project")?;
+    let base = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+
+    let dep = manifest.dependencies.iter().find(|d| d.name == want);
+    let Some(dep) = dep else {
+        return Ok(None);
+    };
+    let dep_dir = base.join(&dep.path);
+    let pkg_path = dep_dir.join("x07-package.json");
+    if !pkg_path.is_file() {
+        return Ok(None);
+    }
+    let bytes = std::fs::read(&pkg_path)
+        .with_context(|| format!("read package: {}", pkg_path.display()))?;
+    let pkg: PackageDocManifest = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse JSON: {}", pkg_path.display()))?;
+    Ok(Some((pkg, dep_dir)))
 }
 
 #[derive(Debug, Clone)]
@@ -277,5 +364,72 @@ fn print_symbol(symbol: &str, sig: &ExportSig) {
     }
     if sig.kind != "defn" {
         println!("kind: {}", sig.kind);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_temp_dir(prefix: &str) -> PathBuf {
+        let base = std::env::temp_dir();
+        let pid = std::process::id();
+        for n in 0..10_000u32 {
+            let p = base.join(format!("x07-doc-{prefix}-{pid}-{n}"));
+            if std::fs::create_dir(&p).is_ok() {
+                return p;
+            }
+        }
+        panic!("failed to create temp dir under {}", base.display());
+    }
+
+    #[test]
+    fn resolves_package_manifest_from_project_deps() {
+        let root = make_temp_dir("resolve_pkg");
+        let project_path = root.join("x07.json");
+
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::create_dir_all(root.join("deps/ext-net/0.1.4")).unwrap();
+        std::fs::write(
+            &project_path,
+            r#"{
+  "schema_version": "x07.project@0.2.0",
+  "world": "run-os",
+  "entry": "src/main.x07.json",
+  "module_roots": ["src"],
+  "dependencies": [{"name":"ext-net","version":"0.1.4","path":"deps/ext-net/0.1.4"}],
+  "lockfile": "x07.lock.json"
+}
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("deps/ext-net/0.1.4/x07-package.json"),
+            r#"{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-net",
+  "version": "0.1.4",
+  "description": "Networking APIs",
+  "docs": "Use ext-net",
+  "module_root": "modules",
+  "modules": ["std.net.http.client"]
+}
+"#,
+        )
+        .unwrap();
+
+        let (pkg, _dir) = resolve_project_package_by_query(&project_path, "ext-net")
+            .unwrap()
+            .unwrap();
+        assert_eq!(pkg.name, "ext-net");
+        assert_eq!(pkg.version, "0.1.4");
+        assert_eq!(pkg.modules, vec!["std.net.http.client"]);
+
+        let (pkg2, _dir2) = resolve_project_package_by_query(&project_path, "ext-net@0.1.4")
+            .unwrap()
+            .unwrap();
+        assert_eq!(pkg2.name, "ext-net");
+
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }

@@ -148,6 +148,7 @@ Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
+- If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 - Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).
@@ -172,7 +173,8 @@ See: [OS worlds](../worlds/os-worlds.md).
 - Schemas: `spec/*.schema.json` (and the synced copies on x07lang.org under `/agent/.../schemas/`)
 - External packages index: `GET /agent/latest/packages/index.json` on x07lang.org
 - Offline docs: `x07up docs path --json`
-- Local module inspection: `x07 doc <module-or-symbol>`
+- Local module inspection: `x07 doc <module-or-symbol>` (example: `x07 doc std.net.http.client`)
+- Local package inspection (project deps): `x07 doc <package-name>` (example: `x07 doc ext-net`)
 - Built-in reference guide: `x07 guide`
 
 ## 9) Known-good reference projects (copy/paste)

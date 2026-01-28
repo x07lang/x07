@@ -18,6 +18,8 @@ use x07_contracts::NATIVE_REQUIRES_SCHEMA_VERSION;
 use x07_worlds::WorldId;
 use x07c::compile;
 use x07c::language;
+#[cfg(target_os = "linux")]
+use x07c::native::BACKEND_ID_EXT_DB_SQLITE;
 
 mod native_backends;
 pub use native_backends::plan_native_link_argv;
@@ -344,6 +346,7 @@ pub fn compile_program_with_options(
             });
         }
     }
+    maybe_add_linux_libm_for_sqlite(&native_requires, &mut cc_args);
 
     let tool = compile_c_to_exe(&c_source, config, compile_options, &cc_args)?;
     if !tool.ok {
@@ -408,6 +411,30 @@ pub fn compile_program_with_options(
         fuel_used: Some(compile_stats.fuel_used),
         trap: None,
     })
+}
+
+fn maybe_add_linux_libm_for_sqlite(
+    native_requires: &x07c::native::NativeRequires,
+    cc_args: &mut Vec<String>,
+) {
+    #[cfg(target_os = "linux")]
+    {
+        let needs_libm = native_requires
+            .requires
+            .iter()
+            .any(|r| r.backend_id == BACKEND_ID_EXT_DB_SQLITE);
+        if !needs_libm {
+            return;
+        }
+        if cc_args.iter().any(|a| a == "-lm") {
+            return;
+        }
+        cc_args.push("-lm".to_string());
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (native_requires, cc_args);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1193,6 +1220,7 @@ pub fn compile_bundle_exe(
             });
         }
     }
+    maybe_add_linux_libm_for_sqlite(&native_requires, &mut cc_args);
 
     let wrapper_c = emit_native_cli_wrapper_c(wrapper);
     let combined_c = format!("{freestanding_c}\n\n{wrapper_c}");
@@ -1720,6 +1748,23 @@ mod tests {
         assert_eq!(found, root);
 
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn adds_lm_when_sqlite_is_required() {
+        let native_requires = x07c::native::NativeRequires {
+            schema_version: "test".to_string(),
+            world: None,
+            requires: vec![x07c::native::NativeBackendReq {
+                backend_id: BACKEND_ID_EXT_DB_SQLITE.to_string(),
+                abi_major: 1,
+                features: Vec::new(),
+            }],
+        };
+        let mut cc_args = vec!["-O2".to_string()];
+        maybe_add_linux_libm_for_sqlite(&native_requires, &mut cc_args);
+        assert!(cc_args.last().is_some_and(|a| a == "-lm"));
     }
 }
 
