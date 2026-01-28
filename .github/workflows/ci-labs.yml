@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: "0 6 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   labs:
     name: ci / labs
@@ -37,4 +40,3 @@ jobs:
       - name: Labs perf baseline
         shell: bash
         run: ./labs/scripts/ci/check_perf_baseline.sh
-

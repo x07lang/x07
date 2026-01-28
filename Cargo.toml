@@ -48,3 +48,6 @@ default-members = [
   "crates/x07-proc-echo",
   "crates/x07-proc-worker-frame-echo",
 ]
+
+[patch.crates-io]
+mysql_async = { git = "https://github.com/blackbeam/mysql_async", rev = "e13fe9606dc819cfbf222d2b6189611a9863f2fe" }
