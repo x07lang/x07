@@ -128,6 +128,12 @@ Install:
 - Linux: `clang` or `gcc`
 - Windows (WSL2): install a Linux toolchain in your distro (for example Ubuntu: `sudo apt-get install -y clang build-essential`)
 
+### “clang: error: no such file or directory: 'SystemConfiguration'” (macOS)
+
+This can happen if the toolchain emits malformed macOS framework link flags.
+
+Upgrade to the latest stable toolchain (for example: `x07up update stable`), then re-run. If it still fails on the latest toolchain, file a bug with the full `stderr_b64` decoded output from the run report.
+
 ### “I can run `x07` but `x07 run` fails”
 
 `x07 run` invokes runner backends that ship with the toolchain.
