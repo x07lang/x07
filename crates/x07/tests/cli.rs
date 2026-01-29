@@ -217,6 +217,53 @@ fn x07_cli_specrows_includes_nested_subcommands() {
 }
 
 #[test]
+fn x07_fix_applies_multiple_borrow_quickfixes() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_fix_borrow_quickfixes");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program = serde_json::to_vec(&serde_json::json!({
+        "schema_version": "x07.x07ast@0.2.0",
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": ["begin",
+            ["let", "x", ["+",
+                ["bytes.len", ["bytes.view", ["bytes.lit", "a"]]],
+                ["bytes.len", ["bytes.view", ["bytes.lit", "b"]]]
+            ]],
+            ["let", "y", ["view.to_bytes", ["bytes.view", ["bytes.lit", "c"]]]],
+            "y"
+        ]
+    }))
+    .expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program);
+
+    let out = run_x07(&[
+        "fix",
+        "--input",
+        program_path.to_str().unwrap(),
+        "--write",
+        "--report-json",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["command"], "fix");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["diagnostics_count"], 0);
+}
+
+#[test]
 fn x07_test_finds_stdlib_lock_from_exe_when_missing() {
     let root = repo_root();
     let dir = fresh_os_tmp_dir("tmp_x07_test_stdlib_lock");

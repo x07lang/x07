@@ -18,6 +18,28 @@ fn expr_list(items: Vec<Expr>) -> Expr {
     }
 }
 
+#[derive(Debug, Clone)]
+struct BeginStmtCtx {
+    begin_ptr: String,
+    stmt_index: usize,
+    stmt_root_ptr: String,
+}
+
+#[derive(Debug, Clone)]
+struct LintCtx {
+    begin_stmt: Option<BeginStmtCtx>,
+    hoist_safe: bool,
+}
+
+impl Default for LintCtx {
+    fn default() -> Self {
+        Self {
+            begin_stmt: None,
+            hoist_safe: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LintOptions {
     pub world: x07_worlds::WorldId,
@@ -68,7 +90,13 @@ pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
     lint_world_decls(file, options, &mut diagnostics);
 
     if let Some(solve) = &file.solve {
-        lint_expr(solve, "/solve", options, &mut diagnostics);
+        lint_expr(
+            solve,
+            "/solve",
+            options,
+            &LintCtx::default(),
+            &mut diagnostics,
+        );
     }
 
     let export_slots = if file.kind == X07AstKind::Module && !file.exports.is_empty() {
@@ -81,11 +109,23 @@ pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
 
     for (idx, f) in file.functions.iter().enumerate() {
         let ptr = format!("/decls/{}/body", defn_base + idx);
-        lint_expr(&f.body, &ptr, options, &mut diagnostics);
+        lint_expr(
+            &f.body,
+            &ptr,
+            options,
+            &LintCtx::default(),
+            &mut diagnostics,
+        );
     }
     for (idx, f) in file.async_functions.iter().enumerate() {
         let ptr = format!("/decls/{}/body", defn_base + file.functions.len() + idx);
-        lint_expr(&f.body, &ptr, options, &mut diagnostics);
+        lint_expr(
+            &f.body,
+            &ptr,
+            options,
+            &LintCtx::default(),
+            &mut diagnostics,
+        );
     }
 
     Report::ok().with_diagnostics(diagnostics)
@@ -281,7 +321,13 @@ fn lint_world_imports(file: &X07AstFile, options: LintOptions, diagnostics: &mut
     });
 }
 
-fn lint_expr(expr: &Expr, ptr: &str, options: LintOptions, diagnostics: &mut Vec<Diagnostic>) {
+fn lint_expr(
+    expr: &Expr,
+    ptr: &str,
+    options: LintOptions,
+    ctx: &LintCtx,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     match expr {
         Expr::Int { .. } | Expr::Ident { .. } => {}
         Expr::List { items, .. } => {
@@ -303,12 +349,44 @@ fn lint_expr(expr: &Expr, ptr: &str, options: LintOptions, diagnostics: &mut Vec
             }
             let head = items[0].as_ident().unwrap_or("");
             lint_core_arity(head, items, ptr, diagnostics);
-            lint_core_borrow_rules(head, items, ptr, diagnostics);
+            lint_core_borrow_rules(head, items, ptr, ctx, diagnostics);
             lint_core_move_rules(head, items, ptr, diagnostics);
             lint_world_heads(head, ptr, options, diagnostics);
 
             for (idx, item) in items.iter().enumerate() {
-                lint_expr(item, &format!("{ptr}/{idx}"), options, diagnostics);
+                let child_ptr = format!("{ptr}/{idx}");
+
+                let mut child_ctx = ctx.clone();
+                match head {
+                    "if" => {
+                        if idx == 2 || idx == 3 {
+                            child_ctx.hoist_safe = false;
+                        }
+                    }
+                    "for" => {
+                        if idx == 4 {
+                            child_ctx.hoist_safe = false;
+                        }
+                    }
+                    _ => {}
+                }
+
+                let stmt_root_is_here = child_ctx
+                    .begin_stmt
+                    .as_ref()
+                    .map(|s| s.stmt_root_ptr == ptr)
+                    .unwrap_or(false);
+                let statement_block_root = matches!(head, "begin" | "unsafe")
+                    && (child_ctx.begin_stmt.is_none() || stmt_root_is_here);
+                if statement_block_root && idx >= 1 {
+                    child_ctx.begin_stmt = Some(BeginStmtCtx {
+                        begin_ptr: ptr.to_string(),
+                        stmt_index: idx,
+                        stmt_root_ptr: child_ptr.clone(),
+                    });
+                }
+
+                lint_expr(item, &child_ptr, options, &child_ctx, diagnostics);
             }
         }
     }
@@ -479,10 +557,23 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
     }
 }
 
+fn borrow_tmp_name(ptr: &str) -> String {
+    let mut out = String::with_capacity(ptr.len() + 32);
+    out.push_str("_x07_tmp_borrow");
+    for ch in ptr.chars() {
+        match ch {
+            'a'..='z' | 'A'..='Z' | '0'..='9' => out.push(ch),
+            _ => out.push('_'),
+        }
+    }
+    out
+}
+
 fn lint_core_borrow_rules(
     head: &str,
     items: &[Expr],
     ptr: &str,
+    ctx: &LintCtx,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let Some(owner_ptr) = (match head {
@@ -514,21 +605,55 @@ fn lint_core_borrow_rules(
         );
     }
 
-    let tmp = "_x07_tmp";
+    let tmp = borrow_tmp_name(ptr);
     let mut call_items: Vec<Expr> = Vec::with_capacity(items.len());
     call_items.push(expr_ident(head.to_string()));
     call_items.push(expr_ident(tmp.to_string()));
     call_items.extend(items.iter().skip(2).cloned());
 
-    let fixed = expr_list(vec![
-        expr_ident("begin"),
-        expr_list(vec![
-            expr_ident("let"),
-            expr_ident(tmp.to_string()),
-            owner.clone(),
-        ]),
-        expr_list(call_items),
-    ]);
+    let fixed_call = expr_list(call_items);
+
+    let quickfix = if !ctx.hoist_safe {
+        None
+    } else if let Some(b) = ctx.begin_stmt.as_ref() {
+        Some(Quickfix {
+            kind: QuickfixKind::JsonPatch,
+            patch: vec![
+                PatchOp::Replace {
+                    path: ptr.to_string(),
+                    value: x07ast::expr_to_value(&fixed_call),
+                },
+                PatchOp::Add {
+                    path: format!("{}/{}", b.begin_ptr, b.stmt_index),
+                    value: x07ast::expr_to_value(&expr_list(vec![
+                        expr_ident("let"),
+                        expr_ident(tmp.to_string()),
+                        owner.clone(),
+                    ])),
+                },
+            ],
+            note: Some(format!("Introduce let binding for {head} owner")),
+        })
+    } else if ptr == "/solve" || ptr.ends_with("/body") {
+        Some(Quickfix {
+            kind: QuickfixKind::JsonPatch,
+            patch: vec![PatchOp::Replace {
+                path: ptr.to_string(),
+                value: x07ast::expr_to_value(&expr_list(vec![
+                    expr_ident("begin"),
+                    expr_list(vec![
+                        expr_ident("let"),
+                        expr_ident(tmp.to_string()),
+                        owner.clone(),
+                    ]),
+                    fixed_call,
+                ])),
+            }],
+            note: Some(format!("Introduce let binding for {head} owner")),
+        })
+    } else {
+        None
+    };
 
     diagnostics.push(Diagnostic {
         code: "X07-BORROW-0001".to_string(),
@@ -539,14 +664,7 @@ fn lint_core_borrow_rules(
         notes,
         related: Vec::new(),
         data: Default::default(),
-        quickfix: Some(Quickfix {
-            kind: QuickfixKind::JsonPatch,
-            patch: vec![PatchOp::Replace {
-                path: ptr.to_string(),
-                value: x07ast::expr_to_value(&fixed),
-            }],
-            note: Some(format!("Introduce let binding for {head} owner")),
-        }),
+        quickfix,
     });
 }
 

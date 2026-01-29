@@ -8,6 +8,45 @@ use x07_worlds::WorldId;
 
 use x07c::{diagnostics, lint, world_config, x07ast};
 
+fn patch_op_path(op: &diagnostics::PatchOp) -> &str {
+    match op {
+        diagnostics::PatchOp::Add { path, .. } => path,
+        diagnostics::PatchOp::Remove { path } => path,
+        diagnostics::PatchOp::Replace { path, .. } => path,
+        diagnostics::PatchOp::Move { path, .. } => path,
+        diagnostics::PatchOp::Copy { path, .. } => path,
+        diagnostics::PatchOp::Test { path, .. } => path,
+    }
+}
+
+fn json_ptr_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let mut a_it = a.trim_start_matches('/').split('/');
+    let mut b_it = b.trim_start_matches('/').split('/');
+    loop {
+        match (a_it.next(), b_it.next()) {
+            (None, None) => return std::cmp::Ordering::Equal,
+            (None, Some(_)) => return std::cmp::Ordering::Less,
+            (Some(_), None) => return std::cmp::Ordering::Greater,
+            (Some(ax), Some(bx)) => {
+                let ax_is_idx = !ax.is_empty() && ax.as_bytes().iter().all(|c| c.is_ascii_digit());
+                let bx_is_idx = !bx.is_empty() && bx.as_bytes().iter().all(|c| c.is_ascii_digit());
+
+                let ord = if ax_is_idx && bx_is_idx {
+                    let ai = ax.parse::<u64>().unwrap_or(u64::MAX);
+                    let bi = bx.parse::<u64>().unwrap_or(u64::MAX);
+                    ai.cmp(&bi)
+                } else {
+                    ax.cmp(bx)
+                };
+
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize)]
 #[clap(rename_all = "kebab_case")]
 #[serde(rename_all = "kebab-case")]
@@ -68,19 +107,70 @@ pub fn repair_x07ast_file_doc(
         }
 
         let mut any_applied = false;
+        let mut tests: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+        let mut replaces: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+        let mut removes: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+        let mut adds: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+        let mut others: Vec<(usize, diagnostics::PatchOp)> = Vec::new();
+
+        let mut op_idx: usize = 0;
         for d in &report.diagnostics {
             let Some(q) = &d.quickfix else { continue };
             if q.kind != diagnostics::QuickfixKind::JsonPatch {
                 continue;
             }
-            applied_ops_count = applied_ops_count.saturating_add(q.patch.len());
-            x07c::json_patch::apply_patch(doc, &q.patch)
-                .map_err(|e| anyhow::anyhow!("apply patch failed: {e}"))?;
             any_applied = true;
+            applied_ops_count = applied_ops_count.saturating_add(q.patch.len());
+            for op in &q.patch {
+                match op {
+                    diagnostics::PatchOp::Test { .. } => tests.push((op_idx, op.clone())),
+                    diagnostics::PatchOp::Replace { .. } => replaces.push((op_idx, op.clone())),
+                    diagnostics::PatchOp::Remove { .. } => removes.push((op_idx, op.clone())),
+                    diagnostics::PatchOp::Add { .. } => adds.push((op_idx, op.clone())),
+                    diagnostics::PatchOp::Move { .. } | diagnostics::PatchOp::Copy { .. } => {
+                        others.push((op_idx, op.clone()));
+                    }
+                }
+                op_idx = op_idx.saturating_add(1);
+            }
         }
         if !any_applied {
             break;
         }
+
+        tests.sort_by(|(ia, a), (ib, b)| {
+            ia.cmp(ib)
+                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+        });
+        replaces.sort_by(|(ia, a), (ib, b)| {
+            json_ptr_cmp(patch_op_path(b), patch_op_path(a))
+                .then_with(|| ia.cmp(ib))
+                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+        });
+        removes.sort_by(|(ia, a), (ib, b)| {
+            json_ptr_cmp(patch_op_path(b), patch_op_path(a))
+                .then_with(|| ib.cmp(ia))
+                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+        });
+        adds.sort_by(|(ia, a), (ib, b)| {
+            json_ptr_cmp(patch_op_path(b), patch_op_path(a))
+                .then_with(|| ib.cmp(ia))
+                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+        });
+        others.sort_by(|(ia, a), (ib, b)| {
+            ia.cmp(ib)
+                .then_with(|| patch_op_path(a).cmp(patch_op_path(b)))
+        });
+
+        let mut patch: Vec<diagnostics::PatchOp> = Vec::new();
+        patch.extend(tests.into_iter().map(|(_, op)| op));
+        patch.extend(replaces.into_iter().map(|(_, op)| op));
+        patch.extend(others.into_iter().map(|(_, op)| op));
+        patch.extend(removes.into_iter().map(|(_, op)| op));
+        patch.extend(adds.into_iter().map(|(_, op)| op));
+
+        x07c::json_patch::apply_patch(doc, &patch)
+            .map_err(|e| anyhow::anyhow!("apply patch failed: {e}"))?;
     }
 
     let doc_bytes = serde_json::to_vec(doc)?;
