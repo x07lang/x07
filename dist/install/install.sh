@@ -67,15 +67,15 @@ download_to_file() {
 sha256_file() {
   path="$1"
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$path" | awk '{print $1}'
+    sha256sum "$path" | { read -r hash _; printf '%s\n' "$hash"; }
     return 0
   fi
   if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$path" | awk '{print $1}'
+    shasum -a 256 "$path" | { read -r hash _; printf '%s\n' "$hash"; }
     return 0
   fi
   if command -v openssl >/dev/null 2>&1; then
-    openssl dgst -sha256 "$path" | awk '{print $NF}'
+    openssl dgst -sha256 "$path" | { read -r _ hash; printf '%s\n' "$hash"; }
     return 0
   fi
   die "missing sha256 tool (need sha256sum, shasum, or openssl)"
@@ -100,30 +100,108 @@ json_get_channel_field() {
   file="$1"
   channel="$2"
   field="$3"
-  awk -v ch="$channel" -v field="$field" '
-    BEGIN { in_channels=0; in_entry=0 }
-    /"channels"[[:space:]]*:/ { in_channels=1; next }
-    in_channels && in_entry==0 && $0 ~ "\"" ch "\"[[:space:]]*:" { in_entry=1; next }
-    in_entry==1 {
-      if (match($0, "\"" field "\"[[:space:]]*:[[:space:]]*\"([^\"]+)\"", m)) { print m[1]; exit }
-      if ($0 ~ /}/) { in_entry=0 }
-    }
-  ' "$file"
+
+  in_channels=0
+  in_entry=0
+
+  while IFS= read -r line; do
+    case "$line" in
+      '  "channels": {'*)
+        in_channels=1
+        in_entry=0
+        continue
+        ;;
+    esac
+
+    if [ "$in_channels" -eq 0 ]; then
+      continue
+    fi
+
+    case "$line" in
+      "    \"$channel\": {"*)
+        in_entry=1
+        continue
+        ;;
+    esac
+
+    if [ "$in_entry" -eq 0 ]; then
+      continue
+    fi
+
+    prefix="      \"$field\": \""
+    case "$line" in
+      "$prefix"*)
+        value="${line#"$prefix"}"
+        value="${value%%\"*}"
+        printf '%s' "$value"
+        return 0
+        ;;
+      '    }'*)
+        return 0
+        ;;
+    esac
+  done <"$file"
+
+  return 0
 }
 
 json_get_toolchain_min_required_x07up() {
   file="$1"
   toolchain_tag="$2"
-  awk -v tag="$toolchain_tag" '
-    BEGIN { in_toolchains=0; in_release=0; in_min=0 }
-    /"toolchains"[[:space:]]*:/ { in_toolchains=1; next }
-    in_toolchains && in_release==0 && $0 ~ "\"" tag "\"[[:space:]]*:" { in_release=1; next }
-    in_release==1 && /"min_required"[[:space:]]*:/ { in_min=1; next }
-    in_min==1 {
-      if (match($0, "\"x07up\"[[:space:]]*:[[:space:]]*\"([^\"]+)\"", m)) { print m[1]; exit }
-      if ($0 ~ /}/) { exit }
-    }
-  ' "$file"
+
+  in_toolchains=0
+  in_release=0
+  in_min=0
+
+  while IFS= read -r line; do
+    case "$line" in
+      '  "toolchains": {'*)
+        in_toolchains=1
+        continue
+        ;;
+    esac
+
+    if [ "$in_toolchains" -eq 0 ]; then
+      continue
+    fi
+
+    case "$line" in
+      "    \"$toolchain_tag\": {"*)
+        in_release=1
+        continue
+        ;;
+    esac
+
+    if [ "$in_release" -eq 0 ]; then
+      continue
+    fi
+
+    case "$line" in
+      '      "min_required": {'*)
+        in_min=1
+        continue
+        ;;
+    esac
+
+    if [ "$in_min" -eq 0 ]; then
+      continue
+    fi
+
+    prefix='        "x07up": "'
+    case "$line" in
+      "$prefix"*)
+        value="${line#"$prefix"}"
+        value="${value%%\"*}"
+        printf '%s' "$value"
+        return 0
+        ;;
+      '      }'*)
+        return 0
+        ;;
+    esac
+  done <"$file"
+
+  return 0
 }
 
 json_get_x07up_asset_field() {
@@ -131,16 +209,72 @@ json_get_x07up_asset_field() {
   x07up_tag="$2"
   target="$3"
   field="$4"
-  awk -v tag="$x07up_tag" -v target="$target" -v field="$field" '
-    BEGIN { in_x07up=0; in_release=0; in_assets=0; in_target=0 }
-    /"x07up"[[:space:]]*:/ { in_x07up=1; next }
-    in_x07up && in_release==0 && $0 ~ "\"" tag "\"[[:space:]]*:" { in_release=1; next }
-    in_release==1 && /"assets"[[:space:]]*:/ { in_assets=1; next }
-    in_assets==1 && in_target==0 && $0 ~ "\"" target "\"[[:space:]]*:" { in_target=1; next }
-    in_target==1 {
-      if (match($0, "\"" field "\"[[:space:]]*:[[:space:]]*\"([^\"]+)\"", m)) { print m[1]; exit }
-    }
-  ' "$file"
+
+  in_x07up=0
+  in_release=0
+  in_assets=0
+  in_target=0
+
+  while IFS= read -r line; do
+    case "$line" in
+      '  "x07up": {'*)
+        in_x07up=1
+        continue
+        ;;
+    esac
+
+    if [ "$in_x07up" -eq 0 ]; then
+      continue
+    fi
+
+    case "$line" in
+      "    \"$x07up_tag\": {"*)
+        in_release=1
+        continue
+        ;;
+    esac
+
+    if [ "$in_release" -eq 0 ]; then
+      continue
+    fi
+
+    case "$line" in
+      '      "assets": {'*)
+        in_assets=1
+        continue
+        ;;
+    esac
+
+    if [ "$in_assets" -eq 0 ]; then
+      continue
+    fi
+
+    case "$line" in
+      "        \"$target\": {"*)
+        in_target=1
+        continue
+        ;;
+    esac
+
+    if [ "$in_target" -eq 0 ]; then
+      continue
+    fi
+
+    prefix="          \"$field\": \""
+    case "$line" in
+      "$prefix"*)
+        value="${line#"$prefix"}"
+        value="${value%%\"*}"
+        printf '%s' "$value"
+        return 0
+        ;;
+      '        }'*)
+        return 0
+        ;;
+    esac
+  done <"$file"
+
+  return 0
 }
 
 detect_profile_path() {
@@ -298,7 +432,14 @@ X07UP_EXTRACT_DIR="${TMP_DIR}/x07up"
 mkdir -p "${X07UP_EXTRACT_DIR}"
 tar -xzf "${X07UP_ARCHIVE}" -C "${X07UP_EXTRACT_DIR}"
 
-X07UP_FOUND="$(find "${X07UP_EXTRACT_DIR}" -type f -name x07up -print | head -n 1 || true)"
+X07UP_FOUND=""
+if [ -f "${X07UP_EXTRACT_DIR}/x07up" ]; then
+  X07UP_FOUND="${X07UP_EXTRACT_DIR}/x07up"
+elif [ -f "${X07UP_EXTRACT_DIR}/bin/x07up" ]; then
+  X07UP_FOUND="${X07UP_EXTRACT_DIR}/bin/x07up"
+elif command -v find >/dev/null 2>&1; then
+  X07UP_FOUND="$(find "${X07UP_EXTRACT_DIR}" -type f -name x07up -print | head -n 1 || true)"
+fi
 [ -n "${X07UP_FOUND}" ] || die "x07up binary not found in archive"
 
 mkdir -p "${ROOT}/bin"
