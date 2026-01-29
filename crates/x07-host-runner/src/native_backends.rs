@@ -49,6 +49,38 @@ enum HostPlatform {
     MacOS,
 }
 
+fn push_link_args(
+    out: &mut Vec<String>,
+    seen_args: &mut BTreeSet<String>,
+    args: &[String],
+    backend_id: &str,
+) -> Result<()> {
+    let mut i: usize = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "-framework" || arg == "-weak_framework" {
+            let Some(name) = args.get(i + 1) else {
+                anyhow::bail!(
+                    "native backend {backend_id} has dangling {arg} in args (expected framework name)"
+                );
+            };
+            let key = format!("{arg} {name}");
+            if seen_args.insert(key) {
+                out.push(arg.clone());
+                out.push(name.clone());
+            }
+            i = i.saturating_add(2);
+            continue;
+        }
+
+        if seen_args.insert(arg.clone()) {
+            out.push(arg.clone());
+        }
+        i = i.saturating_add(1);
+    }
+    Ok(())
+}
+
 pub fn plan_native_link_argv(
     toolchain_root: &Path,
     requires: &NativeRequires,
@@ -135,11 +167,7 @@ pub fn plan_native_link_argv(
             }
         }
 
-        for arg in &spec.args {
-            if seen_args.insert(arg.clone()) {
-                out.push(arg.clone());
-            }
-        }
+        push_link_args(&mut out, &mut seen_args, &spec.args, &backend.backend_id)?;
 
         if spec.force_load {
             anyhow::bail!(
@@ -218,4 +246,55 @@ fn join_rel(root: &Path, rel: &str) -> Result<PathBuf> {
         out.push(part);
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::push_link_args;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn framework_args_are_deduped_by_pair_not_token() {
+        let args = vec![
+            "-framework".to_string(),
+            "CoreFoundation".to_string(),
+            "-framework".to_string(),
+            "SystemConfiguration".to_string(),
+        ];
+        let mut out = Vec::new();
+        let mut seen = BTreeSet::new();
+        push_link_args(&mut out, &mut seen, &args, "x07.test").expect("push args");
+        assert_eq!(out, args);
+    }
+
+    #[test]
+    fn duplicate_framework_pairs_are_deduped() {
+        let args = vec![
+            "-framework".to_string(),
+            "CoreFoundation".to_string(),
+            "-framework".to_string(),
+            "CoreFoundation".to_string(),
+        ];
+        let mut out = Vec::new();
+        let mut seen = BTreeSet::new();
+        push_link_args(&mut out, &mut seen, &args, "x07.test").expect("push args");
+        assert_eq!(
+            out,
+            vec!["-framework".to_string(), "CoreFoundation".to_string()]
+        );
+    }
+
+    #[test]
+    fn weak_framework_pairs_are_preserved() {
+        let args = vec![
+            "-weak_framework".to_string(),
+            "CoreFoundation".to_string(),
+            "-weak_framework".to_string(),
+            "SystemConfiguration".to_string(),
+        ];
+        let mut out = Vec::new();
+        let mut seen = BTreeSet::new();
+        push_link_args(&mut out, &mut seen, &args, "x07.test").expect("push args");
+        assert_eq!(out, args);
+    }
 }

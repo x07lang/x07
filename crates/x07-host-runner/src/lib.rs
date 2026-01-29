@@ -1453,6 +1453,11 @@ pub fn compile_c_to_exe_with_config(
         let mut diag = Vec::new();
         diag.extend_from_slice(b"--- x07 cc invocation ---\n");
         diag.extend_from_slice(format!("cc: {cmd_program}\n").as_bytes());
+        diag.extend_from_slice(b"\n--- cc argv ---\n");
+        for a in std::iter::once(cmd.get_program()).chain(cmd.get_args()) {
+            diag.extend_from_slice(a.to_string_lossy().as_bytes());
+            diag.extend_from_slice(b"\n");
+        }
         if !cc_args.trim().is_empty() {
             diag.extend_from_slice(b"\n--- X07_CC_ARGS ---\n");
             diag.extend_from_slice(cc_args.trim().as_bytes());
