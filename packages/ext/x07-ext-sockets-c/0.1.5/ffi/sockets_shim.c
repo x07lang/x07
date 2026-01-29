@@ -23,7 +23,7 @@ typedef socklen_t x07_socklen_t;
 #include <openssl/ssl.h>
 #include <openssl/x509v3.h>
 
-// Net error codes (pinned in dev-docs/x07-internal-docs/net/errors-v1.md).
+// Net error codes (pinned in docs/net/errors-v1.md).
 enum {
   X07_NET_ERR_POLICY_DENIED = 1,
   X07_NET_ERR_INVALID_REQ = 2,
@@ -35,7 +35,7 @@ enum {
   X07_NET_ERR_INTERNAL = 8,
 };
 
-// V1 NetAddr tags (pinned in dev-docs/x07-internal-docs/net/net-v1.md).
+// V1 NetAddr tags (pinned in docs/net/net-v1.md).
 enum {
   X07_NET_ADDR_TAG_IPV4 = 1,
   X07_NET_ADDR_TAG_IPV6 = 2,

@@ -29,7 +29,7 @@ Core interfaces (required):
 Drivers (pick the ones you need):
 
 - `ext-db-sqlite` (`std.db.sqlite`, `std.db.sqlite.pool`)
-- `ext-db-postgres` (`std.db.postgres`, `std.db.postgres.pool`)
+- `ext-db-postgres` (`std.db.pg`, `std.db.pg.pool`)
 - `ext-db-mysql` (`std.db.mysql`, `std.db.mysql.pool`)
 - `ext-db-redis` (`std.db.redis`, `std.db.redis.pool`)
 
@@ -107,3 +107,8 @@ For **multiple parameters**, build a DataModel sequence and wrap it as a doc:
 ## Expert appendix
 
 - Add packages manually (advanced): pick NAME@VERSION from `/agent/latest/catalog/capabilities.json` and run `x07 pkg add NAME@VERSION --sync`.
+
+## Reference contracts
+
+- [DB v1 envelope + caps](../db/db-v1.md)
+- Driver request formats: [SQLite](../db/sqlite-v1.md), [Postgres](../db/postgres-v1.md), [MySQL](../db/mysql-v1.md), [Redis](../db/redis-v1.md)

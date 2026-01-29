@@ -53,6 +53,37 @@
 - [External packages](libraries/external.md)
 - [Agentic design](libraries/agentic-design.md)
 
+## Contracts
+- Networking
+  - [Networking bytes ABIs v1](net/net-v1.md)
+  - [Networking error docs v1](net/errors-v1.md)
+- Databases
+  - [DB v1](db/db-v1.md)
+  - [SQLite v1](db/sqlite-v1.md)
+  - [Postgres v1](db/postgres-v1.md)
+  - [MySQL v1](db/mysql-v1.md)
+  - [Redis v1](db/redis-v1.md)
+  - [Pool v1](db/pool-v1.md)
+- Filesystem
+  - [FS v1](fs/fs-v1.md)
+- Time
+  - [Time v1](time/time-v1.md)
+  - [Duration v1](time/duration-v1.md)
+  - [RFC3339 v1](time/rfc3339-v1.md)
+  - [Civil v1](time/civil-v1.md)
+  - [TZDB v1](time/tzdb-v1.md)
+  - [OS time v1](time/os-time-v1.md)
+- Math
+  - [Math v1](math/math-v1.md)
+  - [Vendor v1](math/vendor-v1.md)
+  - [Native backend](math/native-backend-v1.md)
+  - [Smoke suites](math/smoke-suites-v1.md)
+- Text
+  - [Regex v1](text/regex-v1.md)
+  - [X7SL v1](text/x7sl-v1.md)
+- OS
+  - [Process ABI v1](os/process-abi-v1.md)
+
 - [FAQ](faq.md)
 - [Versioning policy](versioning-policy.md)
 - [References](references.md)
