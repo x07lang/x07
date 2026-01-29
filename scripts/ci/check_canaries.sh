@@ -56,6 +56,10 @@ run_quiet "check_build_auto_repair" ./scripts/ci/check_build_auto_repair.sh
 # Milestone 2: whitespace-capable literals / authoring ergonomics.
 run_quiet "check_text_literals_smoke" ./scripts/ci/check_text_literals_smoke.sh
 
+# Milestone 2.1: data interchange codecs (ext packages).
+run_quiet "check_ext_toml_data_model_parse_smoke" ./scripts/ci/check_ext_toml_data_model_parse_smoke.sh
+run_quiet "check_ext_pb_data_model_emit_smoke" ./scripts/ci/check_ext_pb_data_model_emit_smoke.sh
+
 # Milestone 3: actionable diagnostics (ptr + suggested fix + quickfix).
 run_quiet "check_diagnostics_actionable" "$python_bin" scripts/ci/check_diagnostics_actionable.py
 

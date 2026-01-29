@@ -1,0 +1,35 @@
+{
+  "schema_version": "x07.x07ast@0.2.0",
+  "kind": "module",
+  "module_id": "ext.msgpack",
+  "imports": [
+    "ext.msgpack.data_model"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.msgpack.encode_data_model_v1",
+        "ext.msgpack.decode_data_model_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.encode_data_model_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["ext.msgpack.data_model.emit_v1", "doc"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.msgpack.decode_data_model_v1",
+      "params": [{ "name": "msgpack", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["ext.msgpack.data_model.parse_v1", "msgpack"]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-msgpack-rs@0.1.0"
+  }
+}
