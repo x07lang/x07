@@ -335,6 +335,32 @@
       "status": "experimental"
     },
     {
+      "id": "db.mysql",
+      "summary": "MySQL client for OS worlds.",
+      "canonical": {
+        "name": "ext-db-mysql",
+        "version": "0.1.3"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental"
+    },
+    {
+      "id": "db.redis",
+      "summary": "Redis client for OS worlds.",
+      "canonical": {
+        "name": "ext-db-redis",
+        "version": "0.1.3"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental"
+    },
+    {
       "id": "fs.glob",
       "summary": "Glob-like wildcard matching for ASCII paths/tokens.",
       "canonical": {
