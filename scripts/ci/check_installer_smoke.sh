@@ -78,7 +78,13 @@ if [[ "$target" == "unknown" || "$platform" == "unknown" ]]; then
 fi
 
 tmp="$(mktemp -d)"
-cleanup() { rm -rf "$tmp"; }
+server_pid=""
+cleanup() {
+  if [[ -n "$server_pid" ]]; then
+    kill "$server_pid" >/dev/null 2>&1 || true
+  fi
+  rm -rf "$tmp"
+}
 trap cleanup EXIT
 
 mode="${X07_INSTALL_SMOKE_MODE:-local}"
@@ -110,16 +116,40 @@ if [[ "$mode" == "local" ]]; then
 
   step "start local artifacts server"
   server_json="$tmp/server.json"
-  "$python_bin" scripts/ci/local_http_server.py --root "$artifacts" --ready-json "$server_json" --quiet &
+  server_log="$tmp/server.log"
+  "$python_bin" scripts/ci/local_http_server.py \
+    --root "$artifacts" \
+    --ready-json "$server_json" \
+    --quiet \
+    >"$server_log" 2>&1 &
   server_pid="$!"
-  trap 'kill "$server_pid" >/dev/null 2>&1 || true' EXIT
 
-  for _ in $(seq 1 50); do
+  for _ in $(seq 1 200); do
     [[ -f "$server_json" ]] && break
+    if ! kill -0 "$server_pid" >/dev/null 2>&1; then
+      break
+    fi
     sleep 0.05
   done
   if [[ ! -f "$server_json" ]]; then
     echo "ERROR: local server did not publish ready json" >&2
+    if [[ -f "$server_log" ]]; then
+      echo "--- local_http_server.py log ---" >&2
+      tail -n 200 "$server_log" >&2 || true
+    fi
+    if ! kill -0 "$server_pid" >/dev/null 2>&1; then
+      server_exit=0
+      wait "$server_pid" || server_exit="$?"
+      echo "ERROR: local server exited (status=$server_exit)" >&2
+    fi
+    exit 2
+  fi
+  if ! kill -0 "$server_pid" >/dev/null 2>&1; then
+    echo "ERROR: local server exited early after publishing ready json" >&2
+    if [[ -f "$server_log" ]]; then
+      echo "--- local_http_server.py log ---" >&2
+      tail -n 200 "$server_log" >&2 || true
+    fi
     exit 2
   fi
   base_url="$("$python_bin" - "$server_json" <<'PY'
