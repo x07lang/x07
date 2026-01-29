@@ -14,8 +14,9 @@ This page is a single entry point for LLM agents. Use the published agent portal
 
 Prerequisites (macOS / Linux):
 
-- `python3` (3.10+)
-- optional: `curl` (used for downloads when available)
+- `sh` + `tar`
+- `curl` or `wget` (used for downloads)
+- a sha256 tool (`sha256sum`, `shasum`, or `openssl`) for installer verification
 - for OS worlds / native deps (for example `ext-curl-c`): a C toolchain and libcurl headers (`x07 doctor` reports missing deps)
 
 macOS / Linux (CI-safe, no profile edits, JSON report):

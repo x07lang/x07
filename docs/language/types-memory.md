@@ -21,9 +21,11 @@ Performance rule:
 
 Use `vec_u8` for output building:
 
-- `vec_u8.with_capacity(n)` to preallocate
-- `vec_u8.extend_bytes(...)` to append chunks
-- `vec_u8.as_bytes` to produce final bytes (often as a view)
+- `std.vec.with_capacity(n)` to preallocate
+- `std.vec.extend_bytes(v, b)` to append chunks
+- `std.vec.as_bytes(v)` to produce final bytes (often without copying)
+
+Note: there are also lower-level `vec_u8.*` builtins; prefer `std.vec.*` in application code.
 
 This reduces:
 - `realloc_calls`

@@ -1220,6 +1220,40 @@ fn x07_cli_spec_check_schema_error_is_reported() {
 }
 
 #[test]
+fn x07_cli_spec_check_schema_error_includes_row_index_and_scope() {
+    let root = repo_root();
+    let spec_path = root.join("target/tmp_cli_specrows_schema_err_row_index.json");
+    let spec_json = r#"{"schema_version":"x07cli.specrows@0.1.0","app":{"name":"mytool","version":"0.1.0"},"rows":[["root","opt","-o","--output","output","PATH"]]}"#;
+    write_bytes(&spec_path, spec_json.as_bytes());
+
+    let out = run_x07(&["cli", "spec", "check", "--in", spec_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    let row_diag = diags
+        .iter()
+        .find(|d| d.get("code").and_then(Value::as_str) == Some("ECLI_SCHEMA_INVALID"))
+        .expect("ECLI_SCHEMA_INVALID diag");
+    assert_eq!(row_diag["row_index"], 0);
+    assert_eq!(row_diag["scope"], "root");
+    let msg = row_diag["message"].as_str().expect("message string");
+    assert!(
+        msg.contains("expected"),
+        "expected helpful row length hint, got: {msg}"
+    );
+    assert!(
+        msg.contains("Shape:"),
+        "expected expected-shape hint, got: {msg}"
+    );
+}
+
+#[test]
 fn x07_cli_spec_compile_writes_bytes() {
     let root = repo_root();
     let spec_path = root.join("target/tmp_cli_specrows_compile_ok.json");

@@ -523,6 +523,39 @@ fn parse_compile_helper_output(output: &[u8]) -> Result<SpecrowsCompileOutput> {
     }
 }
 
+fn specrows_row_index_from_instance_path(path: &str) -> Option<usize> {
+    let s = path.strip_prefix("/rows/")?;
+    let (idx, _) = s.split_once('/').unwrap_or((s, ""));
+    idx.parse().ok()
+}
+
+fn specrows_expected_shape(kind: &str) -> Option<(usize, usize, &'static str, &'static str)> {
+    match kind {
+        "about" => Some((3, 3, r#"[scope,"about",text]"#, "")),
+        "help" => Some((5, 5, r#"[scope,"help","-h","--help",text]"#, "")),
+        "version" => Some((5, 5, r#"[scope,"version","-V","--version",text]"#, "")),
+        "flag" => Some((
+            6,
+            7,
+            r#"[scope,"flag","-v","--verbose",key,text,{...}]"#,
+            "Note: the last meta object is optional. ",
+        )),
+        "opt" => Some((
+            7,
+            8,
+            r#"[scope,"opt","-o","--output",key,kind,text,{...}]"#,
+            "Note: the last meta object is optional. ",
+        )),
+        "arg" => Some((
+            5,
+            6,
+            r#"[scope,"arg","INPUT",key,text,{...}]"#,
+            "Note: the last meta object is optional. ",
+        )),
+        _ => None,
+    }
+}
+
 fn validate_specrows_schema_value(doc: &Value) -> Result<Vec<X07CliDiagnostic>> {
     let schema_json: Value =
         serde_json::from_slice(X07CLI_SPECROWS_SCHEMA_BYTES).context("parse SpecRows schema")?;
@@ -533,17 +566,68 @@ fn validate_specrows_schema_value(doc: &Value) -> Result<Vec<X07CliDiagnostic>> 
 
     let mut out = Vec::new();
     for error in validator.iter_errors(doc) {
+        let instance_path = error.instance_path().as_str();
+        let mut row_index: i32 = -1;
+        let mut scope = String::new();
+        let mut message = format!("{} ({instance_path})", error);
+
+        if let Some(idx) = specrows_row_index_from_instance_path(instance_path) {
+            row_index = idx.try_into().unwrap_or(-1);
+            if let Some(row) = doc.get("rows").and_then(|rows| rows.get(idx)) {
+                let kind = row.get(1).and_then(Value::as_str).unwrap_or("");
+                if let Some(s) = row.get(0).and_then(Value::as_str) {
+                    scope = s.to_string();
+                }
+
+                if let Some(arr) = row.as_array() {
+                    let got = arr.len();
+                    if let Some((min, max, shape, shape_hint)) = specrows_expected_shape(kind) {
+                        let in_range = got >= min && got <= max;
+                        let expected = if min == max {
+                            min.to_string()
+                        } else {
+                            format!("{min}..={max}")
+                        };
+                        message = if in_range {
+                            format!(
+                                "invalid row at rows[{idx}] (scope={scope} kind={kind}): {error} ({instance_path})"
+                            )
+                        } else {
+                            format!(
+                                "invalid row at rows[{idx}] (scope={scope} kind={kind}): expected {expected} elements, got {got}. {shape_hint}Shape: {shape}"
+                            )
+                        };
+                    } else {
+                        message = format!(
+                            "invalid row at rows[{idx}] (scope={scope}): {error} ({instance_path})"
+                        );
+                    }
+                }
+            }
+        }
+
         out.push(X07CliDiagnostic {
             severity: "error".to_string(),
             code: "ECLI_SCHEMA_INVALID".to_string(),
-            scope: String::new(),
-            row_index: -1,
-            message: format!("{} ({})", error, error.instance_path()),
+            scope,
+            row_index,
+            message,
         });
     }
 
     out.sort_by(|a, b| {
-        (a.code.as_str(), a.message.as_str()).cmp(&(b.code.as_str(), b.message.as_str()))
+        (
+            a.row_index,
+            a.code.as_str(),
+            a.scope.as_str(),
+            a.message.as_str(),
+        )
+            .cmp(&(
+                b.row_index,
+                b.code.as_str(),
+                b.scope.as_str(),
+                b.message.as_str(),
+            ))
     });
     Ok(out)
 }

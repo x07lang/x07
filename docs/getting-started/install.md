@@ -18,7 +18,7 @@ Quickstart and full installer reference:
 
 ## Prerequisites
 
-- macOS / Linux bootstrap installer (`install.sh`): `python3` (3.10+)
+- macOS / Linux bootstrap installer (`install.sh`): `sh`, `tar`, and either `curl` or `wget` (plus a sha256 tool: `sha256sum`, `shasum`, or `openssl`)
 - A C compiler toolchain (`clang`/`gcc` on macOS/Linux)
 - Linux: libcurl development headers for packages that link libcurl (for example `ext-curl-c`)
 
@@ -90,7 +90,7 @@ Verify:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.0.65
+x07up override set v0.0.66
 ```
 
 This makes toolchain selection deterministic for agents and CI.

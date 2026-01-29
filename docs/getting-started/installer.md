@@ -8,7 +8,7 @@ Quickstart: see [Install](install.md).
 
 ## Prerequisites
 
-- macOS / Linux: `python3` (3.10+) for `install.sh` (optional: `curl`)
+- macOS / Linux: `sh`, `tar`, and either `curl` or `wget` (plus a sha256 tool: `sha256sum`, `shasum`, or `openssl`)
 - For compiling/running X07 programs: a C toolchain (`x07up doctor --json` reports missing deps)
 - Linux: libcurl development headers for packages that link libcurl (for example `ext-curl-c`)
 
@@ -56,20 +56,20 @@ curl -fsSL https://x07lang.org/install.sh | sh -s -- \
 Write `x07-toolchain.toml`:
 
 ```bash
-x07up override set v0.0.65
+x07up override set v0.0.66
 ```
 
 This writes a file like:
 
 ```toml
 [toolchain]
-channel = "v0.0.65"
+channel = "v0.0.66"
 components = ["docs", "skills"]
 ```
 
 Notes:
 
-- `channel` can be `stable` or a specific tag like `v0.0.65`.
+- `channel` can be `stable` or a specific tag like `v0.0.66`.
 - `components` controls whether `x07up` installs the offline docs and skills pack.
 
 Remove it:
