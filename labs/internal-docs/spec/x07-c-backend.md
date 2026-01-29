@@ -25,7 +25,7 @@ Notes:
 - The compiled program sees `input` as a `bytes_view` (borrowed) and must return owned `bytes`.
 - `mem_stats` are reset after reading the input payload, so input bytes are excluded from memory gates/scoring.
 - In debug-borrow builds, `debug_stats.borrow_violations` is emitted and can be gated by benchmark suites.
-- ABI v2 (C-facing value layouts) is specified under `internal-docs/spec/abi/` and `crates/x07c/include/x07_abi_v2.h`.
+- ABI v2 (C-facing value layouts) is specified under `labs/internal-docs/spec/abi/` and `crates/x07c/include/x07_abi_v2.h`.
 
 ## Worlds (capability profiles)
 

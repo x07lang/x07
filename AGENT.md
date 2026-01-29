@@ -12,11 +12,17 @@
   - fast: `./scripts/ci/check_canaries.sh`
   - full: `./scripts/ci/check_all.sh`
 
+## Docs layout
+
+- `docs/`: published end-user docs (bundled into releases and synced to x07lang.org)
+  - external package contracts: `docs/{db,fs,math,net,os,text,time}/`
+- `labs/internal-docs/`: toolchain/language development notes (not published)
+
 ## Repo layout
 
 - `crates/`: Rust workspace crates (CLI + compiler + runners + shipped native extensions)
 - `docs/`: end-user documentation (published)
-- `internal-docs/`: internal specs + design notes (not published)
+- `labs/internal-docs/`: internal specs + design notes (not published)
 - `examples/`: public examples
 - `ci/`: release-blocking fixtures and suites
 - `skills/`: released agent skills pack (installed via `x07up`)

@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // ABI v1 value layouts for the X07 C backend.
-// Normative spec: internal-docs/spec/abi/abi-v1.md
+// Normative spec: labs/internal-docs/spec/abi/abi-v1.md
 
 typedef struct {
   uint8_t* ptr;

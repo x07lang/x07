@@ -54,7 +54,7 @@ The Unix seconds represent the corresponding absolute instant.
 
 - `code_invalid_doc = 1` — input doc malformed (wrong tag/length)
 - `code_invalid_param = 2` — inputs out of range (month/day/hms/nanos/offset)
-- `code_out_of_range = 3` — unix seconds outside supported range (currently year >= 1970 and <= 9999)
+- `code_out_of_range = 3` — unix seconds outside supported range (currently `year >= 1970 and year <= 9999`)
 - `code_before_epoch = 4` — conversion would require dates before 1970-01-01 (not supported in v1)
 
 ## API (v1)

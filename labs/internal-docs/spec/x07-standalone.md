@@ -11,7 +11,7 @@ X07 can be used “standalone” by using the compiler + runners directly, pinni
    - Deterministic evaluation worlds: `x07-host-runner`
    - Standalone OS worlds: `x07-os-runner`
 
-See `internal-docs/spec/x07-c-backend.md` for the solver ABI and execution details.
+See `labs/internal-docs/spec/x07-c-backend.md` for the solver ABI and execution details.
 
 ## Tooling loop (recommended)
 
@@ -30,7 +30,7 @@ For multi-module programs and pinned dependencies, use the Phase E project workf
 - `cargo run -p x07c -- build --project <project/x07.json> --out <out.c>`
 - `cargo run -p x07-host-runner -- --project <project/x07.json> --world solve-pure --input <case.bin>`
 
-Details: `internal-docs/spec/modules-packages.md`.
+Details: `labs/internal-docs/spec/modules-packages.md`.
 
 ## Standalone OS worlds (Phase H3)
 

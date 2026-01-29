@@ -33,7 +33,7 @@ To keep fitness stable and evaluation safe:
 - Capability access is deny-by-default and world-scoped (`solve-pure`, `solve-fs`, `solve-rr`, `solve-kv`, `solve-full`).
 - Solver artifacts run with a fixed environment (no inherited args/env) and Unix resource limits as kill-switches.
 
-Implementation details: `internal-docs/spec/x07-c-backend.md`.
+Implementation details: `labs/internal-docs/spec/x07-c-backend.md`.
 
 ## Regression suites
 
