@@ -28,7 +28,7 @@
       "summary": "HTTP client for OS worlds (GET/POST, headers, body).",
       "canonical": {
         "name": "ext-net",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "alternatives": [
         {

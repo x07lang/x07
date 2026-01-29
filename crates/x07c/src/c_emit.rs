@@ -130,10 +130,33 @@ fn c_escape_string(bytes: &[u8]) -> String {
             b'\r' => out.push_str("\\r"),
             b'\t' => out.push_str("\\t"),
             0x20..=0x7E => out.push(b as char),
-            _ => out.push_str(&format!("\\x{:02x}", b)),
+            _ => {
+                use std::fmt::Write as _;
+                let _ = write!(out, "\\{:03o}", b);
+            }
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::c_escape_string;
+
+    #[test]
+    fn escapes_do_not_greedily_consume_following_hex_digits() {
+        let bytes = [0xEF, 0xBC, 0xAF, b'1', b'2', b'3'];
+        let escaped = c_escape_string(&bytes);
+        assert!(!escaped.contains("\\x"));
+        assert!(escaped.starts_with("\\357\\274\\257123"));
+    }
+
+    #[test]
+    fn escapes_basic_controls() {
+        let bytes = [b'\n', b'\r', b'\t', b'\\', b'"'];
+        let escaped = c_escape_string(&bytes);
+        assert_eq!(escaped, "\\n\\r\\t\\\\\\\"");
+    }
 }
 
 fn is_owned_ty(ty: Ty) -> bool {
@@ -1392,13 +1415,13 @@ impl<'a> Emitter<'a> {
             }
 
             fn alloc_local(&mut self, prefix: &str, ty: Ty) -> Result<AsyncVarRef, CompilerError> {
-                if self.local_count >= language::limits::MAX_LOCALS {
+                let max_locals = language::limits::max_locals();
+                if self.local_count >= max_locals {
                     return Err(CompilerError::new(
                         CompileErrorKind::Budget,
                         format!(
-                            "max locals exceeded: {} (fn={})",
-                            language::limits::MAX_LOCALS,
-                            self.fn_name
+                            "max locals exceeded: {} (fn={}) (hint: split this function body (extract helper defn/defasync) or raise X07_MAX_LOCALS)",
+                            max_locals, self.fn_name
                         ),
                     ));
                 }
@@ -6130,14 +6153,17 @@ impl<'a> Emitter<'a> {
     }
 
     fn alloc_local(&mut self, prefix: &str) -> Result<String, CompilerError> {
-        if self.local_count >= language::limits::MAX_LOCALS {
+        let max_locals = language::limits::max_locals();
+        if self.local_count >= max_locals {
             let msg = match &self.current_fn_name {
                 Some(name) => format!(
-                    "max locals exceeded: {} (fn={})",
-                    language::limits::MAX_LOCALS,
-                    name
+                    "max locals exceeded: {} (fn={}) (hint: split this function body (extract helper defn/defasync) or raise X07_MAX_LOCALS)",
+                    max_locals, name
                 ),
-                None => format!("max locals exceeded: {}", language::limits::MAX_LOCALS),
+                None => format!(
+                    "max locals exceeded: {} (hint: split this function body (extract helper defn/defasync) or raise X07_MAX_LOCALS)",
+                    max_locals
+                ),
             };
             return Err(CompilerError::new(CompileErrorKind::Budget, msg));
         }
@@ -19462,7 +19488,14 @@ static uint32_t rt_sched_step(ctx_t* ctx) {
     }
 
     if (!t->in_ready && t->wait_kind == RT_WAIT_NONE) {
-      rt_trap("task pending without block");
+      char msg[96];
+      (void)snprintf(
+        msg,
+        sizeof(msg),
+        "task pending without block (task_id=%" PRIu32 ")",
+        task_id
+      );
+      rt_trap(msg);
     }
     (void)rt_os_process_poll_all(ctx, 0);
     return UINT32_C(1);

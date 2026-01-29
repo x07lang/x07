@@ -426,6 +426,15 @@ run_one_multi_bg_with_http_client "ext-net http server (loopback allow)" \
   "$(x07_ext_pkg_modules x07-ext-sockets-c)" \
   "$(x07_ext_pkg_modules x07-ext-url-rs)"
 
+run_one_multi_sandboxed "ext-net http task wrappers" \
+  "tests/external_os/net_http_task_wrappers_smoke/src/main.x07.json" \
+  "tests/external_os/net/run-os-policy.file-etc-allow-ffi.json" \
+  "$(x07_ext_pkg_manifest x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_ffi x07-ext-sockets-c sockets_shim.c)" \
+  "$(x07_ext_pkg_modules x07-ext-net)" \
+  "$(x07_ext_pkg_modules x07-ext-sockets-c)" \
+  "$(x07_ext_pkg_modules x07-ext-url-rs)"
+
 with_tls_echo_server "127.0.0.1" "30030" \
   run_one_multi "ext-net tls" \
     "tests/external_os/net_tls/src/main.x07.json" \

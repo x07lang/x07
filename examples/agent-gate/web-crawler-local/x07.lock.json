@@ -36,20 +36,20 @@
     },
     {
       "name": "ext-net",
-      "version": "0.1.5",
-      "path": ".x07/deps/ext-net/0.1.5",
-      "package_manifest_sha256": "eb71c646b2c55182359c4f9a45c5848967211c7f00228fb4cae745e8a2b6fa37",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-net/0.1.6",
+      "package_manifest_sha256": "0c86cf9f379dfecdc6df963d68248fef3374ff8bfe18cccf7c92a446847dc8e5",
       "module_root": "modules",
       "modules_sha256": {
-        "std.net.codec": "cf0a9ec8e6a60ba101fc536a0c27de1fe68e851b23f6f0221e6b35ef6e1fe6e8",
+        "std.net.codec": "e2fdadac2f15faeb4d7e955f1a82a74496a35be0337a7cfc885b01be189023bc",
         "std.net.dns": "867c1a219895eb406f6cfd81ae288ce885c4f503ee9132a4fe9064923ebf337d",
         "std.net.err": "fe7332e87ae4ba0606018cf42685662ee9e8225efd0a5042c486c8ef56892b0b",
         "std.net.http": "6dafbe8454be0042b1e28d1517254e2c2ff9e3ea91d213f3ee5a39add567fa57",
         "std.net.http.client": "7a5b0045d1aec39e63b6d79912468e39a436d12741e4e14ccdd51df91b2f0d34",
-        "std.net.http.server": "4d0b7adff387bda76b4425691367be15dd72333935fcb6b2b420196340a5e16e",
+        "std.net.http.server": "79907480efc0e073b4bf9c66962ba8a156d88ed1f8a479bb2d0a27faa1d99c38",
         "std.net.http.spec": "21c66733fdab3a5561d0295a514d6c0f875aba9d8b428e23563a7132856844ee",
-        "std.net.io": "f8af5435e10ca4053326e6bacf570968182922868b6dccec70676cfaee3bea46",
-        "std.net.tcp": "d22507235437cc2898b7e6613dfc35d4f26725026cc78d592835dc4835e49117",
+        "std.net.io": "53223f5bc2310784c298f1130e65df97fbe95a126d779b79458f22c508f1ef39",
+        "std.net.tcp": "8cbcc318b945d08c2e0b79f740ca54ab4a8b0dc5ddf74fedb8448754002e1655",
         "std.net.tls": "cf5c730a0627fe82dda1f794e3c8e31b04d8cdf0fe32270d8b3496155e96feee",
         "std.net.udp": "e1353807a38186230ceadca1baab0b2ee3d12d1a683b3cacbbe34d9e1008588d"
       }

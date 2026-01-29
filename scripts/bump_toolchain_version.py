@@ -127,6 +127,19 @@ def replace_versioned_examples(*, rel_path: str, src: str, new_tag: str) -> str:
     raise ValueError(f"unsupported versioned literal file: {rel_path}")
 
 
+def replace_x07_registry_git_tag_dependency(src: str, *, dep: str, new_tag: str) -> tuple[str, bool]:
+    pattern = re.compile(
+        rf'(^\s*{re.escape(dep)}\s*=\s*\{{[^\n}}]*\bgit\s*=\s*"https://github\.com/x07lang/x07"[^\n}}]*\btag\s*=\s*")'
+        rf"{SEMVER_TAG_IN_TEXT_RE.pattern}"
+        rf'(")',
+        flags=re.MULTILINE,
+    )
+    out, n = pattern.subn(lambda m: f"{m.group(1)}{new_tag}{m.group(2)}", src)
+    if n == 0:
+        raise ValueError(f"missing expected {dep} git dependency tagged from https://github.com/x07lang/x07")
+    return out, out != src
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", required=True, help="New release tag (for example: v0.0.21)")
@@ -185,6 +198,28 @@ def main(argv: list[str]) -> int:
                 continue
             write_text(path, out)
             changed.append(rel)
+
+    registry_repo_root = repo_root.parent / "x07-registry"
+    registry_cargo = registry_repo_root / "Cargo.toml"
+    if registry_cargo.is_file():
+        rel = str(registry_cargo.relative_to(repo_root.parent))
+        src = read_text(registry_cargo)
+        try:
+            out = src
+            out, _ = replace_x07_registry_git_tag_dependency(out, dep="x07-worlds", new_tag=new_tag)
+            out, _ = replace_x07_registry_git_tag_dependency(out, dep="x07c", new_tag=new_tag)
+        except ValueError:
+            if args.check:
+                changed.append(rel)
+                out = src
+            else:
+                raise
+        if out != src:
+            if args.check:
+                changed.append(rel)
+            else:
+                write_text(registry_cargo, out)
+                changed.append(rel)
 
     if changed:
         changed = sorted(set(changed))

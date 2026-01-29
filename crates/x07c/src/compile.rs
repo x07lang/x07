@@ -255,13 +255,13 @@ pub fn compile_program_to_c_with_meta(
             .iter()
             .map(|f| f.body.node_count())
             .sum::<usize>();
-    if total_nodes > language::limits::MAX_AST_NODES {
+    let max_ast_nodes = language::limits::max_ast_nodes();
+    if total_nodes > max_ast_nodes {
         return Err(CompilerError::new(
             CompileErrorKind::Budget,
             format!(
-                "AST too large: max_ast_nodes={} got {}",
-                language::limits::MAX_AST_NODES,
-                total_nodes
+                "AST too large: max_ast_nodes={} got {} (set X07_MAX_AST_NODES=<n>)",
+                max_ast_nodes, total_nodes
             ),
         ));
     }
