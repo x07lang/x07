@@ -721,9 +721,11 @@ fn ty_to_name(ty: Ty) -> &'static str {
         Ty::BytesView => "bytes_view",
         Ty::VecU8 => "vec_u8",
         Ty::OptionI32 => "option_i32",
+        Ty::OptionTaskSelectEvtV1 => "option_i32",
         Ty::OptionBytes => "option_bytes",
         Ty::ResultI32 => "result_i32",
         Ty::ResultBytes => "result_bytes",
+        Ty::ResultResultBytes => "result_result_bytes",
         Ty::Iface => "iface",
         Ty::PtrConstU8 => "ptr_const_u8",
         Ty::PtrMutU8 => "ptr_mut_u8",
@@ -731,6 +733,11 @@ fn ty_to_name(ty: Ty) -> &'static str {
         Ty::PtrMutVoid => "ptr_mut_void",
         Ty::PtrConstI32 => "ptr_const_i32",
         Ty::PtrMutI32 => "ptr_mut_i32",
+        Ty::TaskScopeV1 => "i32",
+        Ty::TaskHandleBytesV1
+        | Ty::TaskHandleResultBytesV1
+        | Ty::TaskSlotV1
+        | Ty::TaskSelectEvtV1 => "i32",
         Ty::Never => "never",
     }
 }

@@ -39,6 +39,12 @@ For deterministic, budgeted streaming pipelines (source → transforms → sink)
 
 See [Streaming pipes](stream-pipes.md).
 
+## Concurrency
+
+X07 provides deterministic async concurrency for fixture worlds and structured concurrency via `task.scope_v1`.
+
+See [Concurrency & multiprocessing](concurrency-multiprocessing.md).
+
 ## “Single canonical way”
 
 Where many languages offer multiple competing patterns, X07 standardizes:

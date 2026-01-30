@@ -154,3 +154,23 @@ fn compile_accepts_borrow_then_move_in_defasync() {
     compile_program_to_c(program.as_slice(), &CompileOptions::default())
         .expect("program must compile");
 }
+
+#[test]
+fn compile_accepts_task_scope_cancel_all_in_defasync() {
+    let program = x07_program::entry(
+        &[],
+        vec![x07_program::defasync(
+            "main.f",
+            &[],
+            "bytes",
+            json!([
+                "task.scope_v1",
+                ["task.scope.cfg_v1"],
+                ["begin", ["task.scope.cancel_all_v1"], ["bytes.alloc", 0]]
+            ]),
+        )],
+        json!(["bytes.alloc", 0]),
+    );
+    compile_program_to_c(program.as_slice(), &CompileOptions::default())
+        .expect("program must compile");
+}

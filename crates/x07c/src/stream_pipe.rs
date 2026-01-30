@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use crate::ast::Expr;
 use crate::compile::{CompileErrorKind, CompileOptions, CompilerError};
-use crate::program::{FunctionDef, FunctionParam, Program};
+use crate::program::{AsyncFunctionDef, FunctionDef, FunctionParam, Program};
 use crate::types::Ty;
 use crate::x07ast;
 
@@ -28,41 +28,68 @@ pub fn elaborate_stream_pipes(
         existing_names,
         helpers: BTreeMap::new(),
         new_helpers: Vec::new(),
+        new_async_helpers: Vec::new(),
     };
 
-    program.solve = elab.rewrite_expr(program.solve.clone(), "main")?;
+    program.solve = elab.rewrite_expr(program.solve.clone(), "main", RewriteCtx::Solve)?;
     for f in &mut program.functions {
         let module_id = function_module_id(&f.name)?;
-        f.body = elab.rewrite_expr(f.body.clone(), module_id)?;
+        f.body = elab.rewrite_expr(f.body.clone(), module_id, RewriteCtx::Defn)?;
     }
     for f in &mut program.async_functions {
         let module_id = function_module_id(&f.name)?;
-        f.body = elab.rewrite_expr(f.body.clone(), module_id)?;
+        f.body = elab.rewrite_expr(f.body.clone(), module_id, RewriteCtx::Defasync)?;
     }
 
     program.functions.extend(elab.new_helpers);
+    program.async_functions.extend(elab.new_async_helpers);
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RewriteCtx {
+    Solve,
+    Defn,
+    Defasync,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PipeHelperKind {
+    Defn,
+    Defasync,
+}
+
+#[derive(Debug, Clone)]
+struct PipeHelperInfo {
+    name: String,
+    kind: PipeHelperKind,
 }
 
 struct Elaborator<'a> {
     options: &'a CompileOptions,
     existing_names: BTreeSet<String>,
-    helpers: BTreeMap<(String, String), String>,
+    helpers: BTreeMap<(String, String), PipeHelperInfo>,
     new_helpers: Vec<FunctionDef>,
+    new_async_helpers: Vec<AsyncFunctionDef>,
 }
 
 impl Elaborator<'_> {
-    fn rewrite_expr(&mut self, expr: Expr, module_id: &str) -> Result<Expr, CompilerError> {
+    fn rewrite_expr(
+        &mut self,
+        expr: Expr,
+        module_id: &str,
+        ctx: RewriteCtx,
+    ) -> Result<Expr, CompilerError> {
         match expr {
             Expr::Int { .. } | Expr::Ident { .. } => Ok(expr),
             Expr::List { items, ptr } => {
                 if items.first().and_then(Expr::as_ident) == Some("std.stream.pipe_v1") {
-                    return self.rewrite_pipe(Expr::List { items, ptr }, module_id);
+                    return self.rewrite_pipe(Expr::List { items, ptr }, module_id, ctx);
                 }
 
                 let mut new_items = Vec::with_capacity(items.len());
                 for item in items {
-                    new_items.push(self.rewrite_expr(item, module_id)?);
+                    new_items.push(self.rewrite_expr(item, module_id, ctx)?);
                 }
                 Ok(Expr::List {
                     items: new_items,
@@ -72,15 +99,24 @@ impl Elaborator<'_> {
         }
     }
 
-    fn rewrite_pipe(&mut self, expr: Expr, module_id: &str) -> Result<Expr, CompilerError> {
+    fn rewrite_pipe(
+        &mut self,
+        expr: Expr,
+        module_id: &str,
+        ctx: RewriteCtx,
+    ) -> Result<Expr, CompilerError> {
         let h8 = hash_pipe_without_expr_bodies(&expr)?;
         let parsed = parse_pipe_v1(&expr)?;
+        let needs_async = parsed
+            .chain
+            .iter()
+            .any(|xf| matches!(xf, PipeXfV1::ParMapStreamV1 { .. }));
 
         let helper_full = format!("{module_id}.__std_stream_pipe_v1_{h8}");
         let helper_key = (module_id.to_string(), h8.clone());
 
-        let helper_name = if let Some(name) = self.helpers.get(&helper_key) {
-            name.clone()
+        let helper = if let Some(info) = self.helpers.get(&helper_key) {
+            info.clone()
         } else {
             if self.existing_names.contains(&helper_full) {
                 return Err(CompilerError::new(
@@ -90,31 +126,67 @@ impl Elaborator<'_> {
             }
             validate_pipe_world_caps(&parsed, self.options)?;
             let body = gen_pipe_helper_body(&parsed, self.options)?;
-            let helper = FunctionDef {
+            let kind = if needs_async {
+                PipeHelperKind::Defasync
+            } else {
+                PipeHelperKind::Defn
+            };
+            match kind {
+                PipeHelperKind::Defn => {
+                    self.new_helpers.push(FunctionDef {
+                        name: helper_full.clone(),
+                        params: parsed
+                            .params
+                            .iter()
+                            .enumerate()
+                            .map(|(idx, p)| FunctionParam {
+                                name: format!("p{idx}"),
+                                ty: p.ty,
+                            })
+                            .collect(),
+                        ret_ty: Ty::Bytes,
+                        body,
+                    });
+                }
+                PipeHelperKind::Defasync => {
+                    self.new_async_helpers.push(AsyncFunctionDef {
+                        name: helper_full.clone(),
+                        params: parsed
+                            .params
+                            .iter()
+                            .enumerate()
+                            .map(|(idx, p)| FunctionParam {
+                                name: format!("p{idx}"),
+                                ty: p.ty,
+                            })
+                            .collect(),
+                        ret_ty: Ty::Bytes,
+                        body,
+                    });
+                }
+            }
+            let helper = PipeHelperInfo {
                 name: helper_full.clone(),
-                params: parsed
-                    .params
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, p)| FunctionParam {
-                        name: format!("p{idx}"),
-                        ty: p.ty,
-                    })
-                    .collect(),
-                ret_ty: Ty::Bytes,
-                body,
+                kind,
             };
             self.existing_names.insert(helper_full.clone());
-            self.helpers.insert(helper_key, helper_full.clone());
-            self.new_helpers.push(helper);
-            helper_full
+            self.helpers.insert(helper_key, helper.clone());
+            helper
         };
+
+        if helper.kind == PipeHelperKind::Defasync && ctx == RewriteCtx::Defn {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.stream.pipe_v1 with concurrency stages is only allowed in solve or defasync"
+                    .to_string(),
+            ));
+        }
 
         let mut begin_items: Vec<Expr> = vec![expr_ident("begin")];
         let mut arg_names: Vec<String> = Vec::with_capacity(parsed.params.len());
         for (idx, param) in parsed.params.iter().enumerate() {
             let arg_name = format!("__std_stream_pipe_v1_{h8}_arg{idx}");
-            let arg_expr = self.rewrite_expr(param.expr.clone(), module_id)?;
+            let arg_expr = self.rewrite_expr(param.expr.clone(), module_id, ctx)?;
             begin_items.push(expr_list(vec![
                 expr_ident("let"),
                 expr_ident(arg_name.clone()),
@@ -124,11 +196,15 @@ impl Elaborator<'_> {
         }
 
         let mut call_items: Vec<Expr> = Vec::with_capacity(1 + arg_names.len());
-        call_items.push(expr_ident(helper_name));
+        call_items.push(expr_ident(helper.name));
         for name in arg_names {
             call_items.push(expr_ident(name));
         }
-        begin_items.push(expr_list(call_items));
+        let call_expr = expr_list(call_items);
+        begin_items.push(match helper.kind {
+            PipeHelperKind::Defn => call_expr,
+            PipeHelperKind::Defasync => expr_list(vec![expr_ident("await"), call_expr]),
+        });
         Ok(expr_list(begin_items))
     }
 }
@@ -230,6 +306,7 @@ struct PipeCfgV1 {
     max_steps: Option<i32>,
     emit_payload: Option<i32>,
     emit_stats: Option<i32>,
+    allow_nondet_v1: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -308,6 +385,22 @@ enum PipeXfV1 {
     DeframeU32LeV1 {
         cfg: DeframeU32LeCfgV1,
     },
+    ParMapStreamV1 {
+        cfg: ParMapStreamCfgV1,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct ParMapStreamCfgV1 {
+    max_inflight: i32,
+    max_item_bytes: i32,
+    max_inflight_in_bytes: i32,
+    max_out_item_bytes: i32,
+    ctx_param: Option<usize>,
+    mapper_defasync: String,
+    scope_cfg: Expr,
+    unordered: bool,
+    result_bytes: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -413,6 +506,7 @@ fn parse_cfg_v1(expr: &Expr) -> Result<PipeCfgV1, CompilerError> {
     let mut max_steps = None;
     let mut emit_payload = None;
     let mut emit_stats = None;
+    let mut allow_nondet_v1 = None;
 
     for field in items.iter().skip(1) {
         let Expr::List { items: kv, .. } = field else {
@@ -443,6 +537,15 @@ fn parse_cfg_v1(expr: &Expr) -> Result<PipeCfgV1, CompilerError> {
             "max_steps" => max_steps = Some(value),
             "emit_payload" => emit_payload = Some(value),
             "emit_stats" => emit_stats = Some(value),
+            "allow_nondet_v1" => {
+                if value != 0 && value != 1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "allow_nondet_v1 must be 0 or 1".to_string(),
+                    ));
+                }
+                allow_nondet_v1 = Some(value);
+            }
             _ => {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -486,6 +589,7 @@ fn parse_cfg_v1(expr: &Expr) -> Result<PipeCfgV1, CompilerError> {
         max_steps,
         emit_payload,
         emit_stats,
+        allow_nondet_v1: allow_nondet_v1.unwrap_or(0),
     })
 }
 
@@ -987,6 +1091,143 @@ fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfV1, Com
                     max_frames,
                     allow_empty,
                     on_truncated,
+                },
+            })
+        }
+        "std.stream.xf.par_map_stream_v1"
+        | "std.stream.xf.par_map_stream_result_bytes_v1"
+        | "std.stream.xf.par_map_stream_unordered_v1"
+        | "std.stream.xf.par_map_stream_unordered_result_bytes_v1" => {
+            let fields = parse_kv_fields(head, &items[1..])?;
+            for k in fields.keys() {
+                match k.as_str() {
+                    "max_inflight"
+                    | "max_item_bytes"
+                    | "max_inflight_in_bytes"
+                    | "max_out_item_bytes"
+                    | "ctx"
+                    | "mapper_defasync"
+                    | "scope_cfg" => {}
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} unknown field: {k}"),
+                        ));
+                    }
+                }
+            }
+
+            let max_inflight = fields
+                .get("max_inflight")
+                .ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} missing max_inflight"),
+                    )
+                })
+                .and_then(|v| expect_i32(v, "max_inflight must be an integer"))?;
+            if max_inflight <= 0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} max_inflight must be >= 1"),
+                ));
+            }
+
+            let max_item_bytes = fields
+                .get("max_item_bytes")
+                .ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} missing max_item_bytes"),
+                    )
+                })
+                .and_then(|v| expect_i32(v, "max_item_bytes must be an integer"))?;
+            if max_item_bytes <= 0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} max_item_bytes must be >= 1"),
+                ));
+            }
+
+            let max_inflight_in_bytes = fields
+                .get("max_inflight_in_bytes")
+                .map(|v| expect_i32(v, "max_inflight_in_bytes must be an integer"))
+                .transpose()?
+                .unwrap_or(0);
+            if max_inflight_in_bytes < 0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} max_inflight_in_bytes must be >= 0"),
+                ));
+            }
+
+            let max_out_item_bytes = fields
+                .get("max_out_item_bytes")
+                .map(|v| expect_i32(v, "max_out_item_bytes must be an integer"))
+                .transpose()?
+                .unwrap_or(0);
+            if max_out_item_bytes < 0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} max_out_item_bytes must be >= 0"),
+                ));
+            }
+
+            let ctx_param = match fields.get("ctx") {
+                None => None,
+                Some(v) => Some(parse_expr_v1(params, Ty::Bytes, v)?),
+            };
+
+            let mapper_defasync = fields
+                .get("mapper_defasync")
+                .ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} missing mapper_defasync"),
+                    )
+                })
+                .and_then(|v| match v {
+                    Expr::Ident { name, .. } => Ok(name.clone()),
+                    Expr::List { .. } => parse_fn_v1(v),
+                    _ => Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} mapper_defasync must be an identifier or std.stream.fn_v1"),
+                    )),
+                })?;
+
+            let scope_cfg = match fields.get("scope_cfg") {
+                None => expr_list(vec![expr_ident("task.scope.cfg_v1".to_string())]),
+                Some(v) => {
+                    let Expr::List {
+                        items: cfg_items, ..
+                    } = v
+                    else {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} scope_cfg must be task.scope.cfg_v1"),
+                        ));
+                    };
+                    if cfg_items.first().and_then(Expr::as_ident) != Some("task.scope.cfg_v1") {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} scope_cfg must be task.scope.cfg_v1"),
+                        ));
+                    }
+                    v.clone()
+                }
+            };
+
+            Ok(PipeXfV1::ParMapStreamV1 {
+                cfg: ParMapStreamCfgV1 {
+                    max_inflight,
+                    max_item_bytes,
+                    max_inflight_in_bytes,
+                    max_out_item_bytes,
+                    ctx_param,
+                    mapper_defasync,
+                    scope_cfg,
+                    unordered: head.contains("_unordered_"),
+                    result_bytes: head.contains("_result_bytes_"),
                 },
             })
         }
@@ -1582,6 +1823,7 @@ fn gen_pipe_helper_body(
     let mut split_states: Vec<SplitLinesState> = Vec::new();
     let mut deframe_states: Vec<DeframeState> = Vec::new();
     let mut json_canon_states: Vec<JsonCanonState> = Vec::new();
+    let mut par_map_states: Vec<ParMapState> = Vec::new();
     for (idx, xf) in pipe.chain.iter().enumerate() {
         match xf {
             PipeXfV1::Take { n_param } => {
@@ -1628,6 +1870,24 @@ fn gen_pipe_helper_body(
                 });
             }
             PipeXfV1::MapBytes { .. } | PipeXfV1::Filter { .. } | PipeXfV1::FrameU32Le => {}
+            PipeXfV1::ParMapStreamV1 { cfg: pcfg } => {
+                par_map_states.push(ParMapState {
+                    stage_idx: idx,
+                    cfg: pcfg.clone(),
+                    ctx_b_var: format!("par_map_ctx_b_{idx}"),
+                    ctx_v_var: format!("par_map_ctx_v_{idx}"),
+                    slots_var: format!("par_map_slots_{idx}"),
+                    lens_var: (pcfg.max_inflight_in_bytes > 0)
+                        .then(|| format!("par_map_lens_{idx}")),
+                    idxs_var: (pcfg.unordered && pcfg.result_bytes)
+                        .then(|| format!("par_map_idxs_{idx}")),
+                    head_var: (!pcfg.unordered).then(|| format!("par_map_head_{idx}")),
+                    len_var: format!("par_map_len_{idx}"),
+                    inflight_bytes_var: (pcfg.max_inflight_in_bytes > 0)
+                        .then(|| format!("par_map_inflight_bytes_{idx}")),
+                    next_index_var: format!("par_map_next_index_{idx}"),
+                });
+            }
             PipeXfV1::JsonCanonStreamV1 { cfg: jcfg } => {
                 let max_depth = if jcfg.max_depth > 0 {
                     jcfg.max_depth
@@ -1682,7 +1942,23 @@ fn gen_pipe_helper_body(
         }
     }
 
+    if par_map_states.len() > 1 {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "std.stream.pipe_v1 supports at most one par_map stream stage".to_string(),
+        ));
+    }
+    if cfg.allow_nondet_v1 == 0 && par_map_states.iter().any(|s| s.cfg.unordered) {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "X07E_PIPE_NDET_NOT_ALLOWED: unordered par_map stages require allow_nondet_v1=1"
+                .to_string(),
+        ));
+    }
+
     let has_take = !take_states.is_empty();
+
+    let par_map_scope_cfg = par_map_states.first().map(|s| s.cfg.scope_cfg.clone());
 
     let sink_vec_var = match sink_shape.base {
         SinkBaseV1::CollectBytes | SinkBaseV1::WorldFsWriteFile { .. } => {
@@ -1723,6 +1999,7 @@ fn gen_pipe_helper_body(
         split_states,
         deframe_states,
         json_canon_states,
+        par_map_states,
         sink_vec_var,
         hash_var,
     };
@@ -1857,6 +2134,117 @@ fn gen_pipe_helper_body(
             expr_ident(j.buf_var.clone()),
             expr_list(vec![expr_ident("vec_u8.with_capacity"), expr_int(cap)]),
         ]));
+    }
+
+    // Init par_map_stream state.
+    for p in &cg.par_map_states {
+        let ctx_expr = match p.cfg.ctx_param {
+            Some(param) => param_ident(param),
+            None => expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
+        };
+        items.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(p.ctx_b_var.clone()),
+            ctx_expr,
+        ]));
+        items.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(p.ctx_v_var.clone()),
+            expr_list(vec![
+                expr_ident("bytes.view"),
+                expr_ident(p.ctx_b_var.clone()),
+            ]),
+        ]));
+
+        let cap_bytes = p.cfg.max_inflight.checked_mul(4).ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "par_map_stream cap overflow".to_string(),
+            )
+        })?;
+        items.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(p.slots_var.clone()),
+            expr_list(vec![
+                expr_ident("vec_u8.with_capacity"),
+                expr_int(cap_bytes),
+            ]),
+        ]));
+        items.push(expr_list(vec![
+            expr_ident("set"),
+            expr_ident(p.slots_var.clone()),
+            expr_list(vec![
+                expr_ident("vec_u8.extend_zeroes"),
+                expr_ident(p.slots_var.clone()),
+                expr_int(cap_bytes),
+            ]),
+        ]));
+
+        if p.cfg.unordered {
+            let init_i = format!("pm_init_{stage_idx}", stage_idx = p.stage_idx);
+            items.push(expr_list(vec![
+                expr_ident("for"),
+                expr_ident(init_i.clone()),
+                expr_int(0),
+                expr_int(p.cfg.max_inflight),
+                expr_list(vec![
+                    expr_ident("begin"),
+                    vec_u8_set_u32_le(
+                        &p.slots_var,
+                        expr_list(vec![expr_ident("*"), expr_ident(init_i), expr_int(4)]),
+                        expr_int(-1),
+                    ),
+                    expr_int(0),
+                ]),
+            ]));
+        }
+
+        if let Some(lens) = &p.lens_var {
+            items.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(lens.clone()),
+                expr_list(vec![
+                    expr_ident("vec_u8.with_capacity"),
+                    expr_int(cap_bytes),
+                ]),
+            ]));
+            items.push(expr_list(vec![
+                expr_ident("set"),
+                expr_ident(lens.clone()),
+                expr_list(vec![
+                    expr_ident("vec_u8.extend_zeroes"),
+                    expr_ident(lens.clone()),
+                    expr_int(cap_bytes),
+                ]),
+            ]));
+            if let Some(inflight) = &p.inflight_bytes_var {
+                items.push(let_i32(inflight, 0));
+            }
+        }
+        if let Some(idxs) = &p.idxs_var {
+            items.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(idxs.clone()),
+                expr_list(vec![
+                    expr_ident("vec_u8.with_capacity"),
+                    expr_int(cap_bytes),
+                ]),
+            ]));
+            items.push(expr_list(vec![
+                expr_ident("set"),
+                expr_ident(idxs.clone()),
+                expr_list(vec![
+                    expr_ident("vec_u8.extend_zeroes"),
+                    expr_ident(idxs.clone()),
+                    expr_int(cap_bytes),
+                ]),
+            ]));
+        }
+        items.push(let_i32(&p.len_var, 0));
+        if let Some(head) = &p.head_var {
+            items.push(let_i32(head, 0));
+        }
+        items.push(let_i32(&p.next_index_var, 0));
     }
 
     // Init sink state.
@@ -2125,7 +2513,12 @@ fn gen_pipe_helper_body(
     };
     items.push(main);
 
-    Ok(expr_list(items))
+    let body = expr_list(items);
+    if let Some(cfg_expr) = par_map_scope_cfg {
+        Ok(expr_list(vec![expr_ident("task.scope_v1"), cfg_expr, body]))
+    } else {
+        Ok(body)
+    }
 }
 
 const E_CFG_INVALID: i32 = 1;
@@ -2137,6 +2530,11 @@ const E_DB_QUERY_FAILED: i32 = 7;
 const E_SCRATCH_OVERFLOW: i32 = 8;
 const E_STAGE_FAILED: i32 = 9;
 const E_FRAME_TOO_LARGE: i32 = 10;
+
+const E_PARMAP_ITEM_TOO_LARGE: i32 = 100;
+const E_PARMAP_OUT_TOO_LARGE: i32 = 101;
+const E_PARMAP_CHILD_ERR: i32 = 102;
+const E_PARMAP_CHILD_CANCELED: i32 = 103;
 
 const E_JSON_SYNTAX: i32 = 20;
 const E_JSON_NOT_IJSON: i32 = 21;
@@ -2207,6 +2605,21 @@ struct JsonCanonState {
     stage_idx: usize,
     cfg: JsonCanonStreamCfgV1,
     buf_var: String,
+}
+
+#[derive(Clone)]
+struct ParMapState {
+    stage_idx: usize,
+    cfg: ParMapStreamCfgV1,
+    ctx_b_var: String,
+    ctx_v_var: String,
+    slots_var: String,
+    lens_var: Option<String>,
+    idxs_var: Option<String>,
+    head_var: Option<String>,
+    len_var: String,
+    inflight_bytes_var: Option<String>,
+    next_index_var: String,
 }
 
 #[derive(Clone)]
@@ -2348,6 +2761,7 @@ struct PipeCodegen<'a> {
     split_states: Vec<SplitLinesState>,
     deframe_states: Vec<DeframeState>,
     json_canon_states: Vec<JsonCanonState>,
+    par_map_states: Vec<ParMapState>,
 
     sink_vec_var: Option<String>,
     hash_var: Option<String>,
@@ -2358,24 +2772,34 @@ impl PipeCodegen<'_> {
         !self.split_states.is_empty()
             || !self.deframe_states.is_empty()
             || !self.json_canon_states.is_empty()
+            || !self.par_map_states.is_empty()
     }
 
     fn gen_run_bytes_source(&self, bytes_param: usize) -> Result<Expr, CompilerError> {
         let item_b = param_ident(bytes_param);
-        let item_v = expr_list(vec![expr_ident("bytes.view"), item_b.clone()]);
 
-        let mut stmts = vec![expr_list(vec![
-            expr_ident("let"),
-            expr_ident("item_len".to_string()),
-            expr_list(vec![expr_ident("view.len"), item_v.clone()]),
-        ])];
+        let mut stmts = vec![
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident("item_v".to_string()),
+                expr_list(vec![expr_ident("bytes.view"), item_b]),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident("item_len".to_string()),
+                expr_list(vec![
+                    expr_ident("view.len"),
+                    expr_ident("item_v".to_string()),
+                ]),
+            ]),
+        ];
         stmts.push(set_add_i32(
             &self.bytes_in_var,
             expr_ident("item_len".to_string()),
         ));
         stmts.push(set_add_i32(&self.items_in_var, expr_int(1)));
         stmts.push(self.budget_check_in()?);
-        stmts.push(self.gen_process_from(0, item_v)?);
+        stmts.push(self.gen_process_from(0, expr_ident("item_v".to_string()))?);
 
         if let Some(stop) = &self.stop_var {
             stmts.push(expr_list(vec![
@@ -3426,6 +3850,7 @@ impl PipeCodegen<'_> {
             PipeXfV1::JsonCanonStreamV1 { .. } => {
                 self.gen_json_canon_stream_process(stage_idx, item)
             }
+            PipeXfV1::ParMapStreamV1 { .. } => self.gen_par_map_stream_process(stage_idx, item),
         }
     }
 
@@ -4373,12 +4798,1116 @@ impl PipeCodegen<'_> {
         ))
     }
 
+    fn par_map_state(&self, stage_idx: usize) -> Result<&ParMapState, CompilerError> {
+        self.par_map_states
+            .iter()
+            .find(|s| s.stage_idx == stage_idx)
+            .ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Internal,
+                    "internal error: missing par_map_stream state".to_string(),
+                )
+            })
+    }
+
+    fn gen_par_map_ordered_emit_one(
+        &self,
+        stage_idx: usize,
+        p: &ParMapState,
+    ) -> Result<Expr, CompilerError> {
+        let head_var = p.head_var.as_ref().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Internal,
+                "internal error: ordered par_map missing head var".to_string(),
+            )
+        })?;
+
+        let slot_id_var = format!("pm_slot_id_{stage_idx}");
+        let off_var = format!("pm_off_{stage_idx}");
+        let bad_idx_var = format!("pm_idx_{stage_idx}");
+        let out_b_var = format!("pm_out_b_{stage_idx}");
+        let out_v_var = format!("pm_out_v_{stage_idx}");
+
+        let mut stmts = Vec::new();
+
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(bad_idx_var.clone()),
+            expr_list(vec![
+                expr_ident("-"),
+                expr_ident(p.next_index_var.clone()),
+                expr_ident(p.len_var.clone()),
+            ]),
+        ]));
+
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(off_var.clone()),
+            expr_list(vec![
+                expr_ident("*"),
+                expr_ident(head_var.clone()),
+                expr_int(4),
+            ]),
+        ]));
+
+        if let Some(inflight_bytes) = &p.inflight_bytes_var {
+            let lens = p.lens_var.as_ref().expect("lens var for inflight bytes");
+            let in_len_var = format!("pm_in_len_{stage_idx}");
+            stmts.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(in_len_var.clone()),
+                vec_u8_read_u32_le(lens, expr_ident(off_var.clone())),
+            ]));
+            stmts.push(expr_list(vec![
+                expr_ident("set"),
+                expr_ident(inflight_bytes.clone()),
+                expr_list(vec![
+                    expr_ident("-"),
+                    expr_ident(inflight_bytes.clone()),
+                    expr_ident(in_len_var),
+                ]),
+            ]));
+        }
+
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(slot_id_var.clone()),
+            expr_list(vec![
+                expr_ident("task.scope.slot_from_i32_v1"),
+                vec_u8_read_u32_le(&p.slots_var, expr_ident(off_var.clone())),
+            ]),
+        ]));
+
+        if p.cfg.result_bytes {
+            let rb_var = format!("pm_rb_{stage_idx}");
+            let ec_var = format!("pm_ec_{stage_idx}");
+            stmts.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(rb_var.clone()),
+                expr_list(vec![
+                    expr_ident("task.scope.await_slot_result_bytes_v1"),
+                    expr_ident(slot_id_var.clone()),
+                ]),
+            ]));
+            stmts.push(expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_list(vec![
+                        expr_ident("result_bytes.is_ok"),
+                        expr_ident(rb_var.clone()),
+                    ]),
+                    expr_int(1),
+                ]),
+                expr_list(vec![
+                    expr_ident("begin"),
+                    expr_list(vec![
+                        expr_ident("let"),
+                        expr_ident(out_b_var.clone()),
+                        expr_list(vec![
+                            expr_ident("result_bytes.unwrap_or"),
+                            expr_ident(rb_var.clone()),
+                            expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
+                        ]),
+                    ]),
+                    self.par_map_emit_one_downstream(stage_idx, p, &out_b_var, &out_v_var)?,
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("begin"),
+                    expr_list(vec![
+                        expr_ident("let"),
+                        expr_ident(ec_var.clone()),
+                        expr_list(vec![
+                            expr_ident("result_bytes.err_code"),
+                            expr_ident(rb_var),
+                        ]),
+                    ]),
+                    expr_list(vec![expr_ident("task.scope.cancel_all_v1")]),
+                    expr_list(vec![
+                        expr_ident("return"),
+                        err_doc_with_payload(
+                            expr_list(vec![
+                                expr_ident("if"),
+                                expr_list(vec![
+                                    expr_ident("="),
+                                    expr_ident(ec_var.clone()),
+                                    expr_int(2),
+                                ]),
+                                expr_int(E_PARMAP_CHILD_CANCELED),
+                                expr_int(E_PARMAP_CHILD_ERR),
+                            ]),
+                            "stream:par_map_child_err",
+                            expr_list(vec![
+                                expr_ident("begin"),
+                                expr_list(vec![
+                                    expr_ident("let"),
+                                    expr_ident("pl".to_string()),
+                                    expr_list(vec![
+                                        expr_ident("vec_u8.with_capacity"),
+                                        expr_int(8),
+                                    ]),
+                                ]),
+                                extend_u32("pl", expr_ident(ec_var)),
+                                extend_u32("pl", expr_ident(bad_idx_var)),
+                                expr_list(vec![
+                                    expr_ident("vec_u8.into_bytes"),
+                                    expr_ident("pl".to_string()),
+                                ]),
+                            ]),
+                        ),
+                    ]),
+                ]),
+            ]));
+        } else {
+            stmts.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(out_b_var.clone()),
+                expr_list(vec![
+                    expr_ident("task.scope.await_slot_bytes_v1"),
+                    expr_ident(slot_id_var.clone()),
+                ]),
+            ]));
+            stmts.push(self.par_map_emit_one_downstream(stage_idx, p, &out_b_var, &out_v_var)?);
+        }
+
+        stmts.push(expr_list(vec![
+            expr_ident("set"),
+            expr_ident(head_var.clone()),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_list(vec![
+                        expr_ident("+"),
+                        expr_ident(head_var.clone()),
+                        expr_int(1),
+                    ]),
+                    expr_int(p.cfg.max_inflight),
+                ]),
+                expr_int(0),
+                expr_list(vec![
+                    expr_ident("+"),
+                    expr_ident(head_var.clone()),
+                    expr_int(1),
+                ]),
+            ]),
+        ]));
+        stmts.push(expr_list(vec![
+            expr_ident("set"),
+            expr_ident(p.len_var.clone()),
+            expr_list(vec![
+                expr_ident("-"),
+                expr_ident(p.len_var.clone()),
+                expr_int(1),
+            ]),
+        ]));
+        stmts.push(expr_int(0));
+
+        Ok(expr_list(
+            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
+        ))
+    }
+
+    fn gen_par_map_unordered_emit_one(
+        &self,
+        stage_idx: usize,
+        p: &ParMapState,
+    ) -> Result<Expr, CompilerError> {
+        let found_var = format!("pm_found_{stage_idx}");
+        let poll_var = format!("pm_poll_{stage_idx}");
+        let scan_i = format!("pm_scan_{stage_idx}");
+        let old_len_var = format!("pm_old_len_{stage_idx}");
+        let slot_off_var = format!("pm_slot_off_{stage_idx}");
+        let slot_id_var = format!("pm_slot_id_{stage_idx}");
+        let last_idx_var = format!("pm_last_idx_{stage_idx}");
+        let last_off_var = format!("pm_last_off_{stage_idx}");
+        let sel_len_var = format!("pm_sel_len_{stage_idx}");
+        let out_b_var = format!("pm_out_b_{stage_idx}");
+        let out_v_var = format!("pm_out_v_{stage_idx}");
+
+        let poll_end = i32::MAX;
+        let sentinel = expr_int(-1);
+
+        let cancel_and_return = |doc: Expr| {
+            expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![expr_ident("task.scope.cancel_all_v1")]),
+                expr_list(vec![expr_ident("return"), doc]),
+            ])
+        };
+
+        let mut scan_body: Vec<Expr> = Vec::new();
+        scan_body.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(slot_off_var.clone()),
+            expr_list(vec![
+                expr_ident("*"),
+                expr_ident(scan_i.clone()),
+                expr_int(4),
+            ]),
+        ]));
+        scan_body.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(slot_id_var.clone()),
+            expr_list(vec![
+                expr_ident("task.scope.slot_from_i32_v1"),
+                vec_u8_read_u32_le(&p.slots_var, expr_ident(slot_off_var.clone())),
+            ]),
+        ]));
+
+        let remove_slot = {
+            let mut r: Vec<Expr> = Vec::new();
+            r.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(last_idx_var.clone()),
+                expr_list(vec![
+                    expr_ident("-"),
+                    expr_ident(old_len_var.clone()),
+                    expr_int(1),
+                ]),
+            ]));
+
+            if let Some(inflight) = &p.inflight_bytes_var {
+                let lens = p.lens_var.as_ref().expect("lens var");
+                r.push(expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(sel_len_var.clone()),
+                    vec_u8_read_u32_le(lens, expr_ident(slot_off_var.clone())),
+                ]));
+                r.push(expr_list(vec![
+                    expr_ident("set"),
+                    expr_ident(inflight.clone()),
+                    expr_list(vec![
+                        expr_ident("-"),
+                        expr_ident(inflight.clone()),
+                        expr_ident(sel_len_var.clone()),
+                    ]),
+                ]));
+            }
+
+            let mut remove_last = Vec::new();
+            remove_last.push(vec_u8_set_u32_le(
+                &p.slots_var,
+                expr_ident(slot_off_var.clone()),
+                sentinel.clone(),
+            ));
+            if let Some(lens) = &p.lens_var {
+                remove_last.push(vec_u8_set_u32_le(
+                    lens,
+                    expr_ident(slot_off_var.clone()),
+                    expr_int(0),
+                ));
+            }
+            if let Some(idxs) = &p.idxs_var {
+                remove_last.push(vec_u8_set_u32_le(
+                    idxs,
+                    expr_ident(slot_off_var.clone()),
+                    expr_int(0),
+                ));
+            }
+            remove_last.push(expr_list(vec![
+                expr_ident("set"),
+                expr_ident(p.len_var.clone()),
+                expr_ident(last_idx_var.clone()),
+            ]));
+            remove_last.push(expr_int(0));
+
+            let mut remove_swap = vec![expr_list(vec![
+                expr_ident("let"),
+                expr_ident(last_off_var.clone()),
+                expr_list(vec![
+                    expr_ident("*"),
+                    expr_ident(last_idx_var.clone()),
+                    expr_int(4),
+                ]),
+            ])];
+            remove_swap.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident("pm_last_slot".to_string()),
+                vec_u8_read_u32_le(&p.slots_var, expr_ident(last_off_var.clone())),
+            ]));
+            remove_swap.push(vec_u8_set_u32_le(
+                &p.slots_var,
+                expr_ident(slot_off_var.clone()),
+                expr_ident("pm_last_slot".to_string()),
+            ));
+            remove_swap.push(vec_u8_set_u32_le(
+                &p.slots_var,
+                expr_ident(last_off_var.clone()),
+                sentinel.clone(),
+            ));
+            if let Some(lens) = &p.lens_var {
+                remove_swap.push(expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident("pm_last_len".to_string()),
+                    vec_u8_read_u32_le(lens, expr_ident(last_off_var.clone())),
+                ]));
+                remove_swap.push(vec_u8_set_u32_le(
+                    lens,
+                    expr_ident(slot_off_var.clone()),
+                    expr_ident("pm_last_len".to_string()),
+                ));
+                remove_swap.push(vec_u8_set_u32_le(
+                    lens,
+                    expr_ident(last_off_var.clone()),
+                    expr_int(0),
+                ));
+            }
+            if let Some(idxs) = &p.idxs_var {
+                remove_swap.push(expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident("pm_last_idx".to_string()),
+                    vec_u8_read_u32_le(idxs, expr_ident(last_off_var.clone())),
+                ]));
+                remove_swap.push(vec_u8_set_u32_le(
+                    idxs,
+                    expr_ident(slot_off_var.clone()),
+                    expr_ident("pm_last_idx".to_string()),
+                ));
+                remove_swap.push(vec_u8_set_u32_le(
+                    idxs,
+                    expr_ident(last_off_var),
+                    expr_int(0),
+                ));
+            }
+            remove_swap.push(expr_list(vec![
+                expr_ident("set"),
+                expr_ident(p.len_var.clone()),
+                expr_ident(last_idx_var.clone()),
+            ]));
+            remove_swap.push(expr_int(0));
+
+            r.push(expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_ident(scan_i.clone()),
+                    expr_ident(last_idx_var.clone()),
+                ]),
+                expr_list(
+                    vec![expr_ident("begin")]
+                        .into_iter()
+                        .chain(remove_last)
+                        .collect(),
+                ),
+                expr_list(
+                    vec![expr_ident("begin")]
+                        .into_iter()
+                        .chain(remove_swap)
+                        .collect(),
+                ),
+            ]));
+            r.push(expr_int(0));
+
+            expr_list(vec![expr_ident("begin")].into_iter().chain(r).collect())
+        };
+
+        let take_and_emit = if p.cfg.result_bytes {
+            let idxs = p.idxs_var.as_ref().expect("idxs var");
+            let r_var = format!("pm_try_r_{stage_idx}");
+            let inner_var = format!("pm_inner_{stage_idx}");
+            let idx_val_var = format!("pm_idx_val_{stage_idx}");
+            let ec_var = format!("pm_ec_{stage_idx}");
+
+            expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(r_var.clone()),
+                    expr_list(vec![
+                        expr_ident("task.scope.try_await_slot.result_bytes_v1"),
+                        expr_ident(slot_id_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("="),
+                        expr_list(vec![
+                            expr_ident("result_result_bytes.is_ok"),
+                            expr_ident(r_var.clone()),
+                        ]),
+                        expr_int(1),
+                    ]),
+                    expr_list(vec![
+                        expr_ident("begin"),
+                        expr_list(vec![
+                            expr_ident("let"),
+                            expr_ident(inner_var.clone()),
+                            expr_list(vec![
+                                expr_ident("result_result_bytes.unwrap_or"),
+                                expr_ident(r_var.clone()),
+                                expr_list(vec![expr_ident("result_bytes.err"), expr_int(0)]),
+                            ]),
+                        ]),
+                        expr_list(vec![
+                            expr_ident("let"),
+                            expr_ident(idx_val_var.clone()),
+                            vec_u8_read_u32_le(idxs, expr_ident(slot_off_var.clone())),
+                        ]),
+                        expr_list(vec![
+                            expr_ident("if"),
+                            expr_list(vec![
+                                expr_ident("="),
+                                expr_list(vec![
+                                    expr_ident("result_bytes.is_ok"),
+                                    expr_ident(inner_var.clone()),
+                                ]),
+                                expr_int(1),
+                            ]),
+                            expr_list(vec![
+                                expr_ident("begin"),
+                                expr_list(vec![
+                                    expr_ident("let"),
+                                    expr_ident(out_b_var.clone()),
+                                    expr_list(vec![
+                                        expr_ident("result_bytes.unwrap_or"),
+                                        expr_ident(inner_var.clone()),
+                                        expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
+                                    ]),
+                                ]),
+                                remove_slot,
+                                self.par_map_emit_one_downstream(
+                                    stage_idx, p, &out_b_var, &out_v_var,
+                                )?,
+                                expr_list(vec![
+                                    expr_ident("set"),
+                                    expr_ident(found_var.clone()),
+                                    expr_int(1),
+                                ]),
+                                expr_list(vec![
+                                    expr_ident("set"),
+                                    expr_ident(scan_i.clone()),
+                                    expr_ident(old_len_var.clone()),
+                                ]),
+                                expr_list(vec![
+                                    expr_ident("set"),
+                                    expr_ident(poll_var.clone()),
+                                    expr_int(poll_end),
+                                ]),
+                                expr_int(0),
+                            ]),
+                            expr_list(vec![
+                                expr_ident("begin"),
+                                expr_list(vec![
+                                    expr_ident("let"),
+                                    expr_ident(ec_var.clone()),
+                                    expr_list(vec![
+                                        expr_ident("result_bytes.err_code"),
+                                        expr_ident(inner_var),
+                                    ]),
+                                ]),
+                                expr_list(vec![expr_ident("task.scope.cancel_all_v1")]),
+                                expr_list(vec![
+                                    expr_ident("return"),
+                                    err_doc_with_payload(
+                                        expr_list(vec![
+                                            expr_ident("if"),
+                                            expr_list(vec![
+                                                expr_ident("="),
+                                                expr_ident(ec_var.clone()),
+                                                expr_int(2),
+                                            ]),
+                                            expr_int(E_PARMAP_CHILD_CANCELED),
+                                            expr_int(E_PARMAP_CHILD_ERR),
+                                        ]),
+                                        "stream:par_map_child_err",
+                                        expr_list(vec![
+                                            expr_ident("begin"),
+                                            expr_list(vec![
+                                                expr_ident("let"),
+                                                expr_ident("pl".to_string()),
+                                                expr_list(vec![
+                                                    expr_ident("vec_u8.with_capacity"),
+                                                    expr_int(8),
+                                                ]),
+                                            ]),
+                                            extend_u32("pl", expr_ident(ec_var.clone())),
+                                            extend_u32("pl", expr_ident(idx_val_var.clone())),
+                                            expr_list(vec![
+                                                expr_ident("vec_u8.into_bytes"),
+                                                expr_ident("pl".to_string()),
+                                            ]),
+                                        ]),
+                                    ),
+                                ]),
+                            ]),
+                        ]),
+                    ]),
+                    expr_list(vec![
+                        expr_ident("begin"),
+                        expr_list(vec![
+                            expr_ident("let"),
+                            expr_ident(ec_var.clone()),
+                            expr_list(vec![
+                                expr_ident("result_result_bytes.err_code"),
+                                expr_ident(r_var),
+                            ]),
+                        ]),
+                        expr_list(vec![
+                            expr_ident("if"),
+                            expr_list(vec![
+                                expr_ident("="),
+                                expr_ident(ec_var.clone()),
+                                expr_int(2),
+                            ]),
+                            expr_list(vec![
+                                expr_ident("begin"),
+                                expr_list(vec![
+                                    expr_ident("let"),
+                                    expr_ident(idx_val_var.clone()),
+                                    vec_u8_read_u32_le(idxs, expr_ident(slot_off_var.clone())),
+                                ]),
+                                expr_list(vec![expr_ident("task.scope.cancel_all_v1")]),
+                                expr_list(vec![
+                                    expr_ident("return"),
+                                    err_doc_with_payload(
+                                        expr_int(E_PARMAP_CHILD_CANCELED),
+                                        "stream:par_map_child_canceled",
+                                        expr_list(vec![
+                                            expr_ident("begin"),
+                                            expr_list(vec![
+                                                expr_ident("let"),
+                                                expr_ident("pl".to_string()),
+                                                expr_list(vec![
+                                                    expr_ident("vec_u8.with_capacity"),
+                                                    expr_int(8),
+                                                ]),
+                                            ]),
+                                            extend_u32("pl", expr_int(2)),
+                                            extend_u32("pl", expr_ident(idx_val_var)),
+                                            expr_list(vec![
+                                                expr_ident("vec_u8.into_bytes"),
+                                                expr_ident("pl".to_string()),
+                                            ]),
+                                        ]),
+                                    ),
+                                ]),
+                            ]),
+                            expr_int(0),
+                        ]),
+                        expr_int(0),
+                    ]),
+                ]),
+                expr_int(0),
+            ])
+        } else {
+            let r_var = format!("pm_try_r_{stage_idx}");
+            let ec_var = format!("pm_ec_{stage_idx}");
+            expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(r_var.clone()),
+                    expr_list(vec![
+                        expr_ident("task.scope.try_await_slot.bytes_v1"),
+                        expr_ident(slot_id_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("="),
+                        expr_list(vec![
+                            expr_ident("result_bytes.is_ok"),
+                            expr_ident(r_var.clone()),
+                        ]),
+                        expr_int(1),
+                    ]),
+                    expr_list(vec![
+                        expr_ident("begin"),
+                        expr_list(vec![
+                            expr_ident("let"),
+                            expr_ident(out_b_var.clone()),
+                            expr_list(vec![
+                                expr_ident("result_bytes.unwrap_or"),
+                                expr_ident(r_var.clone()),
+                                expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
+                            ]),
+                        ]),
+                        remove_slot,
+                        self.par_map_emit_one_downstream(stage_idx, p, &out_b_var, &out_v_var)?,
+                        expr_list(vec![
+                            expr_ident("set"),
+                            expr_ident(found_var.clone()),
+                            expr_int(1),
+                        ]),
+                        expr_list(vec![
+                            expr_ident("set"),
+                            expr_ident(scan_i.clone()),
+                            expr_ident(old_len_var.clone()),
+                        ]),
+                        expr_list(vec![
+                            expr_ident("set"),
+                            expr_ident(poll_var.clone()),
+                            expr_int(poll_end),
+                        ]),
+                        expr_int(0),
+                    ]),
+                    expr_list(vec![
+                        expr_ident("begin"),
+                        expr_list(vec![
+                            expr_ident("let"),
+                            expr_ident(ec_var.clone()),
+                            expr_list(vec![expr_ident("result_bytes.err_code"), expr_ident(r_var)]),
+                        ]),
+                        expr_list(vec![
+                            expr_ident("if"),
+                            expr_list(vec![expr_ident("="), expr_ident(ec_var), expr_int(2)]),
+                            cancel_and_return(err_doc_const(
+                                E_PARMAP_CHILD_CANCELED,
+                                "stream:par_map_child_canceled",
+                            )),
+                            expr_int(0),
+                        ]),
+                        expr_int(0),
+                    ]),
+                ]),
+                expr_int(0),
+            ])
+        };
+
+        scan_body.push(take_and_emit);
+        scan_body.push(expr_int(0));
+
+        let poll_body = vec![
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(old_len_var.clone()),
+                expr_ident(p.len_var.clone()),
+            ]),
+            expr_list(vec![
+                expr_ident("for"),
+                expr_ident(scan_i.clone()),
+                expr_int(0),
+                expr_ident(old_len_var.clone()),
+                expr_list(vec![
+                    expr_ident("begin"),
+                    expr_list(vec![
+                        expr_ident("if"),
+                        expr_list(vec![
+                            expr_ident("="),
+                            expr_ident(found_var.clone()),
+                            expr_int(0),
+                        ]),
+                        expr_list(
+                            vec![expr_ident("begin")]
+                                .into_iter()
+                                .chain(scan_body)
+                                .collect(),
+                        ),
+                        expr_int(0),
+                    ]),
+                    expr_int(0),
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_ident(found_var.clone()),
+                    expr_int(0),
+                ]),
+                expr_list(vec![expr_ident("task.sleep"), expr_int(1)]),
+                expr_int(0),
+            ]),
+            expr_int(0),
+        ];
+
+        Ok(expr_list(vec![
+            expr_ident("begin"),
+            let_i32(&found_var, 0),
+            expr_list(vec![
+                expr_ident("for"),
+                expr_ident(poll_var.clone()),
+                expr_int(0),
+                expr_int(poll_end),
+                expr_list(
+                    vec![expr_ident("begin")]
+                        .into_iter()
+                        .chain(poll_body)
+                        .collect(),
+                ),
+            ]),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_ident(found_var.clone()),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("return"),
+                    err_doc_const(E_CFG_INVALID, "stream:max_steps_exceeded"),
+                ]),
+                expr_int(0),
+            ]),
+            expr_int(0),
+        ]))
+    }
+
+    fn par_map_emit_one_downstream(
+        &self,
+        stage_idx: usize,
+        p: &ParMapState,
+        out_b_var: &str,
+        out_v_var: &str,
+    ) -> Result<Expr, CompilerError> {
+        let mut stmts = Vec::new();
+        if p.cfg.max_out_item_bytes > 0 {
+            let out_n = format!("pm_out_n_{stage_idx}");
+            stmts.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(out_n.clone()),
+                expr_list(vec![
+                    expr_ident("bytes.len"),
+                    expr_ident(out_b_var.to_string()),
+                ]),
+            ]));
+            stmts.push(expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("<"),
+                    expr_ident(out_n.clone()),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("begin"),
+                    expr_list(vec![expr_ident("task.scope.cancel_all_v1")]),
+                    expr_list(vec![
+                        expr_ident("return"),
+                        err_doc_const(E_PARMAP_OUT_TOO_LARGE, "stream:par_map_out_too_large"),
+                    ]),
+                ]),
+                expr_int(0),
+            ]));
+            stmts.push(expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident(">u"),
+                    expr_ident(out_n),
+                    expr_int(p.cfg.max_out_item_bytes),
+                ]),
+                expr_list(vec![
+                    expr_ident("begin"),
+                    expr_list(vec![expr_ident("task.scope.cancel_all_v1")]),
+                    expr_list(vec![
+                        expr_ident("return"),
+                        err_doc_const(E_PARMAP_OUT_TOO_LARGE, "stream:par_map_out_too_large"),
+                    ]),
+                ]),
+                expr_int(0),
+            ]));
+        }
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(out_v_var.to_string()),
+            expr_list(vec![
+                expr_ident("bytes.view"),
+                expr_ident(out_b_var.to_string()),
+            ]),
+        ]));
+        stmts.push(self.gen_process_from(stage_idx + 1, expr_ident(out_v_var.to_string()))?);
+        stmts.push(expr_int(0));
+
+        Ok(expr_list(
+            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
+        ))
+    }
+
+    fn gen_par_map_stream_process(
+        &self,
+        stage_idx: usize,
+        item: Expr,
+    ) -> Result<Expr, CompilerError> {
+        let p = self.par_map_state(stage_idx)?;
+
+        let item_n_var = format!("pm_item_n_{stage_idx}");
+        let item_b_var = format!("pm_item_b_{stage_idx}");
+
+        let cancel_and_return = |doc: Expr| {
+            expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![expr_ident("task.scope.cancel_all_v1")]),
+                expr_list(vec![expr_ident("return"), doc]),
+            ])
+        };
+
+        let mut stmts = Vec::new();
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(item_n_var.clone()),
+            expr_list(vec![expr_ident("view.len"), item.clone()]),
+        ]));
+        stmts.push(expr_list(vec![
+            expr_ident("if"),
+            expr_list(vec![
+                expr_ident("<"),
+                expr_ident(item_n_var.clone()),
+                expr_int(0),
+            ]),
+            cancel_and_return(err_doc_const(
+                E_PARMAP_ITEM_TOO_LARGE,
+                "stream:par_map_item_too_large",
+            )),
+            expr_int(0),
+        ]));
+        stmts.push(expr_list(vec![
+            expr_ident("if"),
+            expr_list(vec![
+                expr_ident(">u"),
+                expr_ident(item_n_var.clone()),
+                expr_int(p.cfg.max_item_bytes),
+            ]),
+            cancel_and_return(err_doc_const(
+                E_PARMAP_ITEM_TOO_LARGE,
+                "stream:par_map_item_too_large",
+            )),
+            expr_int(0),
+        ]));
+        if p.cfg.max_inflight_in_bytes > 0 {
+            stmts.push(expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident(">u"),
+                    expr_ident(item_n_var.clone()),
+                    expr_int(p.cfg.max_inflight_in_bytes),
+                ]),
+                cancel_and_return(err_doc_const(
+                    E_PARMAP_ITEM_TOO_LARGE,
+                    "stream:par_map_item_too_large",
+                )),
+                expr_int(0),
+            ]));
+        }
+
+        let drain_one = if p.cfg.unordered {
+            self.gen_par_map_unordered_emit_one(stage_idx, p)?
+        } else {
+            self.gen_par_map_ordered_emit_one(stage_idx, p)?
+        };
+
+        let drain_i = format!("pm_drain_{stage_idx}");
+        let bytes_backpressure = if p.cfg.max_inflight_in_bytes > 0 {
+            let inflight_bytes = p.inflight_bytes_var.as_ref().expect("inflight bytes var");
+            expr_list(vec![
+                expr_ident(">u"),
+                expr_list(vec![
+                    expr_ident("+"),
+                    expr_ident(inflight_bytes.clone()),
+                    expr_ident(item_n_var.clone()),
+                ]),
+                expr_int(p.cfg.max_inflight_in_bytes),
+            ])
+        } else {
+            expr_int(0)
+        };
+
+        let drain_cond = expr_list(vec![
+            expr_ident("if"),
+            expr_list(vec![
+                expr_ident("="),
+                expr_ident(p.len_var.clone()),
+                expr_int(p.cfg.max_inflight),
+            ]),
+            expr_int(1),
+            bytes_backpressure,
+        ]);
+
+        stmts.push(expr_list(vec![
+            expr_ident("for"),
+            expr_ident(drain_i),
+            expr_int(0),
+            expr_int(p.cfg.max_inflight),
+            expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![expr_ident("if"), drain_cond, drain_one, expr_int(0)]),
+                expr_int(0),
+            ]),
+        ]));
+
+        if p.cfg.max_inflight_in_bytes > 0 {
+            let inflight_bytes = p.inflight_bytes_var.as_ref().expect("inflight bytes var");
+            stmts.push(expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident(">u"),
+                    expr_list(vec![
+                        expr_ident("+"),
+                        expr_ident(inflight_bytes.clone()),
+                        expr_ident(item_n_var.clone()),
+                    ]),
+                    expr_int(p.cfg.max_inflight_in_bytes),
+                ]),
+                cancel_and_return(err_doc_const(
+                    E_PARMAP_ITEM_TOO_LARGE,
+                    "stream:par_map_item_too_large",
+                )),
+                expr_int(0),
+            ]));
+        }
+
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(item_b_var.clone()),
+            expr_list(vec![expr_ident("view.to_bytes"), item]),
+        ]));
+
+        let slot_var = format!("pm_slot_{stage_idx}");
+        let async_let_head = if p.cfg.result_bytes {
+            "task.scope.async_let_result_bytes_v1"
+        } else {
+            "task.scope.async_let_bytes_v1"
+        };
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(slot_var.clone()),
+            expr_list(vec![
+                expr_ident(async_let_head.to_string()),
+                expr_list(vec![
+                    expr_ident(p.cfg.mapper_defasync.clone()),
+                    expr_ident(p.ctx_v_var.clone()),
+                    expr_ident(item_b_var.clone()),
+                ]),
+            ]),
+        ]));
+
+        let slot_off_var = format!("pm_slot_off_{stage_idx}");
+        if p.cfg.unordered {
+            stmts.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(slot_off_var.clone()),
+                expr_list(vec![
+                    expr_ident("*"),
+                    expr_ident(p.len_var.clone()),
+                    expr_int(4),
+                ]),
+            ]));
+        } else {
+            let head_var = p.head_var.as_ref().expect("head for ordered par_map");
+            let sum_var = format!("pm_sum_{stage_idx}");
+            let tail_var = format!("pm_tail_{stage_idx}");
+            stmts.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(sum_var.clone()),
+                expr_list(vec![
+                    expr_ident("+"),
+                    expr_ident(head_var.clone()),
+                    expr_ident(p.len_var.clone()),
+                ]),
+            ]));
+            stmts.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(tail_var.clone()),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("<u"),
+                        expr_ident(sum_var.clone()),
+                        expr_int(p.cfg.max_inflight),
+                    ]),
+                    expr_ident(sum_var.clone()),
+                    expr_list(vec![
+                        expr_ident("-"),
+                        expr_ident(sum_var),
+                        expr_int(p.cfg.max_inflight),
+                    ]),
+                ]),
+            ]));
+            stmts.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(slot_off_var.clone()),
+                expr_list(vec![expr_ident("*"), expr_ident(tail_var), expr_int(4)]),
+            ]));
+        }
+
+        stmts.push(vec_u8_set_u32_le(
+            &p.slots_var,
+            expr_ident(slot_off_var.clone()),
+            expr_list(vec![
+                expr_ident("task.scope.slot_to_i32_v1"),
+                expr_ident(slot_var),
+            ]),
+        ));
+        if let Some(lens) = &p.lens_var {
+            let inflight_bytes = p.inflight_bytes_var.as_ref().expect("inflight bytes var");
+            stmts.push(vec_u8_set_u32_le(
+                lens,
+                expr_ident(slot_off_var.clone()),
+                expr_ident(item_n_var.clone()),
+            ));
+            stmts.push(expr_list(vec![
+                expr_ident("set"),
+                expr_ident(inflight_bytes.clone()),
+                expr_list(vec![
+                    expr_ident("+"),
+                    expr_ident(inflight_bytes.clone()),
+                    expr_ident(item_n_var.clone()),
+                ]),
+            ]));
+        }
+        if let Some(idxs) = &p.idxs_var {
+            stmts.push(vec_u8_set_u32_le(
+                idxs,
+                expr_ident(slot_off_var.clone()),
+                expr_ident(p.next_index_var.clone()),
+            ));
+        }
+
+        stmts.push(set_add_i32(&p.len_var, expr_int(1)));
+        stmts.push(set_add_i32(&p.next_index_var, expr_int(1)));
+        stmts.push(expr_int(0));
+
+        Ok(expr_list(
+            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
+        ))
+    }
+
+    fn gen_par_map_stream_flush(&self, stage_idx: usize) -> Result<Expr, CompilerError> {
+        let p = self.par_map_state(stage_idx)?;
+
+        let drain_one = if p.cfg.unordered {
+            self.gen_par_map_unordered_emit_one(stage_idx, p)?
+        } else {
+            self.gen_par_map_ordered_emit_one(stage_idx, p)?
+        };
+
+        let drain_i = format!("pm_flush_{stage_idx}");
+        let mut stmts = vec![expr_list(vec![
+            expr_ident("for"),
+            expr_ident(drain_i),
+            expr_int(0),
+            expr_int(p.cfg.max_inflight),
+            expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident(">u"),
+                        expr_ident(p.len_var.clone()),
+                        expr_int(0),
+                    ]),
+                    drain_one.clone(),
+                    expr_int(0),
+                ]),
+                expr_int(0),
+            ]),
+        ])];
+        stmts.push(self.gen_flush_from(stage_idx + 1)?);
+        stmts.push(expr_int(0));
+        Ok(expr_list(
+            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
+        ))
+    }
+
     fn gen_flush_from(&self, stage_idx: usize) -> Result<Expr, CompilerError> {
         if stage_idx >= self.chain.len() {
             return Ok(expr_int(0));
         }
         match &self.chain[stage_idx] {
             PipeXfV1::JsonCanonStreamV1 { .. } => self.gen_json_canon_stream_flush(stage_idx),
+            PipeXfV1::ParMapStreamV1 { .. } => self.gen_par_map_stream_flush(stage_idx),
             PipeXfV1::SplitLines { .. } => {
                 let s = self
                     .split_states
@@ -5809,7 +7338,7 @@ fn ok_doc(cg: &PipeCodegen<'_>, payload: Expr) -> Expr {
             expr_list(vec![
                 expr_ident("vec_u8.extend_bytes"),
                 expr_ident("out".to_string()),
-                expr_ident("plb".to_string()),
+                expr_ident("plv".to_string()),
             ]),
         ]),
         expr_list(vec![
@@ -5907,7 +7436,7 @@ fn err_doc_with_payload(code: Expr, msg: &str, payload: Expr) -> Expr {
             expr_list(vec![
                 expr_ident("vec_u8.extend_bytes"),
                 expr_ident("out".to_string()),
-                expr_ident("msg".to_string()),
+                expr_ident("msgv".to_string()),
             ]),
         ]),
         extend_u32("out", expr_ident("pl_len".to_string())),
@@ -5917,7 +7446,7 @@ fn err_doc_with_payload(code: Expr, msg: &str, payload: Expr) -> Expr {
             expr_list(vec![
                 expr_ident("vec_u8.extend_bytes"),
                 expr_ident("out".to_string()),
-                expr_ident("plb".to_string()),
+                expr_ident("plv".to_string()),
             ]),
         ]),
         expr_list(vec![
@@ -5936,6 +7465,102 @@ fn extend_u32(out: &str, x: Expr) -> Expr {
             expr_ident(out.to_string()),
             expr_list(vec![expr_ident("codec.write_u32_le"), x]),
         ]),
+    ])
+}
+
+fn vec_u8_read_u32_le(vec_name: &str, off: Expr) -> Expr {
+    expr_list(vec![
+        expr_ident("codec.read_u32_le"),
+        expr_list(vec![
+            expr_ident("vec_u8.as_view"),
+            expr_ident(vec_name.to_string()),
+        ]),
+        off,
+    ])
+}
+
+fn vec_u8_set_u32_le(vec_name: &str, off: Expr, value: Expr) -> Expr {
+    expr_list(vec![
+        expr_ident("begin"),
+        expr_list(vec![
+            expr_ident("let"),
+            expr_ident("u32le_off".to_string()),
+            off,
+        ]),
+        expr_list(vec![
+            expr_ident("let"),
+            expr_ident("u32le".to_string()),
+            expr_list(vec![expr_ident("codec.write_u32_le"), value]),
+        ]),
+        expr_list(vec![
+            expr_ident("set"),
+            expr_ident(vec_name.to_string()),
+            expr_list(vec![
+                expr_ident("vec_u8.set"),
+                expr_ident(vec_name.to_string()),
+                expr_ident("u32le_off".to_string()),
+                expr_list(vec![
+                    expr_ident("bytes.get_u8"),
+                    expr_ident("u32le".to_string()),
+                    expr_int(0),
+                ]),
+            ]),
+        ]),
+        expr_list(vec![
+            expr_ident("set"),
+            expr_ident(vec_name.to_string()),
+            expr_list(vec![
+                expr_ident("vec_u8.set"),
+                expr_ident(vec_name.to_string()),
+                expr_list(vec![
+                    expr_ident("+"),
+                    expr_ident("u32le_off".to_string()),
+                    expr_int(1),
+                ]),
+                expr_list(vec![
+                    expr_ident("bytes.get_u8"),
+                    expr_ident("u32le".to_string()),
+                    expr_int(1),
+                ]),
+            ]),
+        ]),
+        expr_list(vec![
+            expr_ident("set"),
+            expr_ident(vec_name.to_string()),
+            expr_list(vec![
+                expr_ident("vec_u8.set"),
+                expr_ident(vec_name.to_string()),
+                expr_list(vec![
+                    expr_ident("+"),
+                    expr_ident("u32le_off".to_string()),
+                    expr_int(2),
+                ]),
+                expr_list(vec![
+                    expr_ident("bytes.get_u8"),
+                    expr_ident("u32le".to_string()),
+                    expr_int(2),
+                ]),
+            ]),
+        ]),
+        expr_list(vec![
+            expr_ident("set"),
+            expr_ident(vec_name.to_string()),
+            expr_list(vec![
+                expr_ident("vec_u8.set"),
+                expr_ident(vec_name.to_string()),
+                expr_list(vec![
+                    expr_ident("+"),
+                    expr_ident("u32le_off".to_string()),
+                    expr_int(3),
+                ]),
+                expr_list(vec![
+                    expr_ident("bytes.get_u8"),
+                    expr_ident("u32le".to_string()),
+                    expr_int(3),
+                ]),
+            ]),
+        ]),
+        expr_int(0),
     ])
 }
 
@@ -6229,12 +7854,17 @@ fn canon_stream_descriptor_pairs(v: &mut Value) {
             if let Some(head) = items.first().and_then(Value::as_str) {
                 match head {
                     "std.stream.cfg_v1"
+                    | "task.scope.cfg_v1"
                     | "std.stream.sink.net_tcp_connect_write_v1"
                     | "std.stream.sink.net_tcp_write_u32frames_v1"
                     | "std.stream.sink.net_tcp_write_stream_handle_v1"
                     | "std.stream.src.net_tcp_read_stream_handle_v1"
                     | "std.stream.xf.deframe_u32le_v1"
-                    | "std.stream.xf.json_canon_stream_v1" => {
+                    | "std.stream.xf.json_canon_stream_v1"
+                    | "std.stream.xf.par_map_stream_v1"
+                    | "std.stream.xf.par_map_stream_result_bytes_v1"
+                    | "std.stream.xf.par_map_stream_unordered_v1"
+                    | "std.stream.xf.par_map_stream_unordered_result_bytes_v1" => {
                         canon_pair_tail(items, 1);
                     }
                     "std.stream.xf.map_in_place_buf_v1" => canon_map_in_place_buf(items),

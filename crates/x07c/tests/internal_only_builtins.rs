@@ -90,3 +90,70 @@ fn compile_rejects_internal_only_builtins_in_decl_body() {
         err.message
     );
 }
+
+#[test]
+fn compile_rejects_reserved_stream_pipe_helper_names() {
+    let program = x07_program::entry(
+        &[],
+        vec![x07_program::defn(
+            "main.__std_stream_pipe_v1_bad",
+            &[],
+            "bytes",
+            json!(["bytes.alloc", 0]),
+        )],
+        json!(["bytes.alloc", 0]),
+    );
+    let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
+        .expect_err("must reject reserved helper function name");
+    assert_eq!(err.kind, CompileErrorKind::Parse);
+    assert!(
+        err.message.contains("reserved function name"),
+        "unexpected error message: {}",
+        err.message
+    );
+}
+
+#[test]
+fn compile_accepts_stream_pipe_helpers_that_use_internal_only_builtins() {
+    let program = x07_program::entry(
+        &[],
+        vec![x07_program::defasync(
+            "main.mapper",
+            &[("ctx", "bytes_view"), ("item", "bytes")],
+            "bytes",
+            json!(["begin", "ctx", "item"]),
+        )],
+        json!([
+            "std.stream.pipe_v1",
+            [
+                "std.stream.cfg_v1",
+                ["chunk_max_bytes", 64],
+                ["bufread_cap_bytes", 64],
+                ["max_in_bytes", 1024],
+                ["max_out_bytes", 1024],
+                ["max_items", 100]
+            ],
+            [
+                "std.stream.src.bytes_v1",
+                ["std.stream.expr_v1", ["bytes.lit", "a\nb\nc\n"]]
+            ],
+            [
+                "std.stream.chain_v1",
+                [
+                    "std.stream.xf.split_lines_v1",
+                    ["std.stream.expr_v1", 10],
+                    ["std.stream.expr_v1", 128]
+                ],
+                [
+                    "std.stream.xf.par_map_stream_v1",
+                    ["max_inflight", 2],
+                    ["max_item_bytes", 64],
+                    ["mapper_defasync", ["std.stream.fn_v1", "main.mapper"]]
+                ]
+            ],
+            ["std.stream.sink.collect_bytes_v1"]
+        ]),
+    );
+    compile_program_to_c(program.as_slice(), &CompileOptions::default())
+        .expect("program must compile");
+}

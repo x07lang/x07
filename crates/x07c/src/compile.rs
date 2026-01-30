@@ -215,6 +215,7 @@ pub fn compile_program_to_c_with_meta(
             .extend(m.extern_functions.clone());
     }
 
+    forbid_reserved_helper_function_names(&parsed_program)?;
     stream_pipe::elaborate_stream_pipes(&mut parsed_program, options)?;
     parsed_program.functions.sort_by(|a, b| a.name.cmp(&b.name));
     parsed_program
@@ -295,6 +296,28 @@ pub fn compile_program_to_c_with_meta(
     })
 }
 
+fn forbid_reserved_helper_function_names(program: &Program) -> Result<(), CompilerError> {
+    const RESERVED: &str = ".__std_stream_pipe_v1_";
+
+    for f in &program.functions {
+        if f.name.contains(RESERVED) {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("reserved function name: {:?}", f.name),
+            ));
+        }
+    }
+    for f in &program.async_functions {
+        if f.name.contains(RESERVED) {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("reserved function name: {:?}", f.name),
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 struct ModuleInfo {
     imports: BTreeSet<String>,
@@ -315,7 +338,12 @@ struct ParsedMain {
     program: Program,
 }
 
-const INTERNAL_ONLY_HEADS: &[&str] = &["set_u32.dump_u32le", "map_u32.dump_kv_u32le_u32le"];
+const INTERNAL_ONLY_HEADS: &[&str] = &[
+    "set_u32.dump_u32le",
+    "map_u32.dump_kv_u32le_u32le",
+    "task.scope.slot_to_i32_v1",
+    "task.scope.slot_from_i32_v1",
+];
 
 fn find_internal_only_head(expr: &crate::ast::Expr) -> Option<&'static str> {
     match expr {
@@ -424,6 +452,9 @@ fn forbid_internal_only_heads_in_non_builtin_code(
         if info.is_builtin {
             continue;
         }
+        if f.name.contains(".__std_stream_pipe_v1_") {
+            continue;
+        }
         if let Some(head) = find_internal_only_head(&f.body) {
             return Err(CompilerError::new(
                 CompileErrorKind::Unsupported,
@@ -455,6 +486,9 @@ fn forbid_internal_only_heads_in_non_builtin_code(
             )
         })?;
         if info.is_builtin {
+            continue;
+        }
+        if f.name.contains(".__std_stream_pipe_v1_") {
             continue;
         }
         if let Some(head) = find_internal_only_head(&f.body) {

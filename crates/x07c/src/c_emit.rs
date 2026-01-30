@@ -162,8 +162,41 @@ mod tests {
 fn is_owned_ty(ty: Ty) -> bool {
     matches!(
         ty,
-        Ty::Bytes | Ty::VecU8 | Ty::OptionBytes | Ty::ResultBytes
+        Ty::Bytes
+            | Ty::VecU8
+            | Ty::OptionBytes
+            | Ty::ResultBytes
+            | Ty::ResultResultBytes
+            | Ty::TaskScopeV1
+            | Ty::TaskSelectEvtV1
+            | Ty::OptionTaskSelectEvtV1
     )
+}
+
+fn is_task_handle_ty(ty: Ty) -> bool {
+    matches!(ty, Ty::TaskHandleBytesV1 | Ty::TaskHandleResultBytesV1)
+}
+
+fn ty_compat_task_handle_as_i32(got: Ty, want: Ty) -> bool {
+    got == want || (want == Ty::I32 && is_task_handle_ty(got))
+}
+
+fn ty_compat_call_arg(got: Ty, want: Ty) -> bool {
+    ty_compat_task_handle_as_i32(got, want)
+        || matches!(
+            (got, want),
+            (Ty::Bytes, Ty::BytesView) | (Ty::VecU8, Ty::BytesView)
+        )
+}
+
+fn ty_compat_call_arg_extern(got: Ty, want: Ty) -> bool {
+    ty_compat_call_arg(got, want)
+        || matches!(
+            (got, want),
+            (Ty::PtrMutU8, Ty::PtrConstU8)
+                | (Ty::PtrMutVoid, Ty::PtrConstVoid)
+                | (Ty::PtrMutI32, Ty::PtrConstI32)
+        )
 }
 
 fn expr_uses_head(expr: &Expr, head: &str) -> bool {
@@ -306,6 +339,7 @@ struct Emitter<'a> {
     tmp_counter: u32,
     local_count: usize,
     scopes: Vec<BTreeMap<String, VarRef>>,
+    task_scopes: Vec<String>,
     fn_c_names: BTreeMap<String, String>,
     async_fn_new_names: BTreeMap<String, String>,
     extern_functions: BTreeMap<String, ExternFunctionDecl>,
@@ -348,6 +382,7 @@ impl<'a> Emitter<'a> {
             tmp_counter: 0,
             local_count: 0,
             scopes: vec![BTreeMap::new()],
+            task_scopes: Vec::new(),
             fn_c_names,
             async_fn_new_names,
             extern_functions,
@@ -516,6 +551,41 @@ impl<'a> Emitter<'a> {
                 self.line("}");
                 self.line(&format!("{c_name}.tag = UINT32_C(0);"));
                 self.line(&format!("{c_name}.payload.err = UINT32_C(0);"));
+            }
+            Ty::ResultResultBytes => {
+                self.line(&format!("if ({c_name}.tag) {{"));
+                self.indent += 1;
+                self.line(&format!("if ({c_name}.payload.ok.tag) {{"));
+                self.indent += 1;
+                self.line(&format!(
+                    "rt_bytes_drop(ctx, &{c_name}.payload.ok.payload.ok);"
+                ));
+                self.indent -= 1;
+                self.line("}");
+                self.line(&format!("{c_name}.payload.ok.tag = UINT32_C(0);"));
+                self.line(&format!("{c_name}.payload.ok.payload.err = UINT32_C(0);"));
+                self.indent -= 1;
+                self.line("}");
+                self.line(&format!("{c_name}.tag = UINT32_C(0);"));
+                self.line(&format!("{c_name}.payload.err = UINT32_C(0);"));
+            }
+            Ty::TaskScopeV1 => {
+                self.line(&format!("rt_scope_dispose_on_drop(ctx, &{c_name});"));
+            }
+            Ty::TaskSelectEvtV1 => {
+                self.line(&format!(
+                    "if ({c_name} != 0) rt_select_evt_drop(ctx, {c_name});"
+                ));
+                self.line(&format!("{c_name} = UINT32_C(0);"));
+            }
+            Ty::OptionTaskSelectEvtV1 => {
+                self.line(&format!("if ({c_name}.tag) {{"));
+                self.indent += 1;
+                self.line(&format!("rt_select_evt_drop(ctx, {c_name}.payload);"));
+                self.indent -= 1;
+                self.line("}");
+                self.line(&format!("{c_name}.tag = UINT32_C(0);"));
+                self.line(&format!("{c_name}.payload = UINT32_C(0);"));
             }
             _ => {}
         }
@@ -1271,7 +1341,7 @@ impl<'a> Emitter<'a> {
     fn emit_async_function_prototypes(&mut self) {
         for f in &self.program.async_functions {
             self.line(&format!(
-                "static uint32_t {}(ctx_t* ctx, void* fut, bytes_t* out);",
+                "static uint32_t {}(ctx_t* ctx, void* fut, rt_task_out_t* out);",
                 c_async_poll_name(&f.name)
             ));
             self.line(&format!(
@@ -1322,10 +1392,10 @@ impl<'a> Emitter<'a> {
         self.allow_async_ops = true;
         self.emit_source_line_for_symbol(&f.name);
 
-        if f.ret_ty != Ty::Bytes {
+        if f.ret_ty != Ty::Bytes && f.ret_ty != Ty::ResultBytes {
             return Err(CompilerError::new(
                 CompileErrorKind::Unsupported,
-                format!("defasync {:?} must return bytes", f.name),
+                format!("defasync {:?} must return bytes or result_bytes", f.name),
             ));
         }
 
@@ -1337,7 +1407,7 @@ impl<'a> Emitter<'a> {
         let mut fields: Vec<(String, Ty)> = vec![
             ("state".to_string(), Ty::I32),
             ("input".to_string(), Ty::BytesView),
-            ("ret".to_string(), Ty::Bytes),
+            ("ret".to_string(), f.ret_ty),
         ];
         for (i, p) in f.params.iter().enumerate() {
             fields.push((format!("p{i}"), p.ty));
@@ -1355,9 +1425,25 @@ impl<'a> Emitter<'a> {
                 );
             }
             for fun in &self.program.async_functions {
+                let call_ret_ty = match fun.ret_ty {
+                    Ty::Bytes => Ty::TaskHandleBytesV1,
+                    Ty::ResultBytes => Ty::TaskHandleResultBytesV1,
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Internal,
+                            format!(
+                                "internal error: invalid defasync return type: {:?}",
+                                fun.ret_ty
+                            ),
+                        ));
+                    }
+                };
                 functions.insert(
                     fun.name.clone(),
-                    (Ty::I32, fun.params.iter().map(|p| p.ty).collect::<Vec<_>>()),
+                    (
+                        call_ret_ty,
+                        fun.params.iter().map(|p| p.ty).collect::<Vec<_>>(),
+                    ),
                 );
             }
             functions
@@ -1374,12 +1460,21 @@ impl<'a> Emitter<'a> {
             local_count: usize,
             unsafe_depth: usize,
             scopes: Vec<BTreeMap<String, AsyncVarRef>>,
+            task_scopes: Vec<AsyncVarRef>,
             states: Vec<Vec<String>>,
             ret_state: usize,
             fn_name: String,
+            fn_ret_ty: Ty,
         }
 
         impl Machine {
+            fn storage_ty_for(ty: Ty) -> Ty {
+                match ty {
+                    Ty::Never => Ty::I32,
+                    _ => ty,
+                }
+            }
+
             fn new_state(&mut self) -> usize {
                 let id = self.states.len();
                 self.states.push(Vec::new());
@@ -1448,9 +1543,10 @@ impl<'a> Emitter<'a> {
             fn infer_expr(&self, expr: &Expr) -> Result<Ty, CompilerError> {
                 let mut infer = InferCtx {
                     options: self.options.clone(),
-                    fn_ret_ty: Ty::Bytes,
+                    fn_ret_ty: self.fn_ret_ty,
                     allow_async_ops: true,
                     unsafe_depth: self.unsafe_depth,
+                    task_scope_depth: self.task_scopes.len(),
                     scopes: self
                         .scopes
                         .iter()
@@ -1547,7 +1643,7 @@ impl<'a> Emitter<'a> {
                             _ => false,
                         };
                         if !wrote {
-                            if v.ty != dest.ty {
+                            if v.ty != dest.ty && !ty_compat_task_handle_as_i32(v.ty, dest.ty) {
                                 return Err(CompilerError::new(
                                     CompileErrorKind::Typing,
                                     format!("type mismatch for identifier {name:?}"),
@@ -1591,8 +1687,322 @@ impl<'a> Emitter<'a> {
                     "set" => return self.emit_set(state, args, dest, cont),
                     "if" => return self.emit_if(state, args, dest, cont),
                     "for" => return self.emit_for(state, args, dest, cont),
+                    "task.scope_v1" => return self.emit_task_scope_v1(state, args, dest, cont),
+                    "task.scope.wait_all_v1" => {
+                        return self.emit_task_scope_wait_all_v1(state, args, dest, cont)
+                    }
+                    "task.scope.select_v1" | "task.scope.select_try_v1" => {
+                        return self.emit_task_scope_select_v1(state, head, args, dest, cont)
+                    }
                     "return" => return self.emit_return(state, args),
                     _ => {}
+                }
+
+                if head == "vec_u8.len" {
+                    if args.len() != 1 || dest.ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "vec_u8.len expects vec_u8 and returns i32".to_string(),
+                        ));
+                    }
+                    if let Expr::Ident { name, ptr: use_ptr } = &args[0] {
+                        self.line(state, "rt_fuel(ctx, 1);");
+                        let Some(v) = self.lookup(name) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {name:?}"),
+                            ));
+                        };
+                        if v.moved {
+                            let moved_ptr = v
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                ),
+                            ));
+                        }
+                        if v.ty != Ty::VecU8 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("type mismatch for identifier {name:?}"),
+                            ));
+                        }
+                        self.line(state, format!("{} = {}.len;", dest.c_name, v.c_name));
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                }
+
+                if head == "bytes.len" {
+                    if args.len() != 1 || dest.ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.len expects bytes_view and returns i32".to_string(),
+                        ));
+                    }
+                    if let Expr::Ident { name, ptr: use_ptr } = &args[0] {
+                        self.line(state, "rt_fuel(ctx, 1);");
+                        let Some(v) = self.lookup(name) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {name:?}"),
+                            ));
+                        };
+                        if is_owned_ty(v.ty) && v.moved {
+                            let moved_ptr = v
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                ),
+                            ));
+                        }
+                        if v.ty != Ty::Bytes && v.ty != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("type mismatch for identifier {name:?}"),
+                            ));
+                        }
+                        self.line(state, format!("{} = {}.len;", dest.c_name, v.c_name));
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                }
+
+                if head == "bytes.get_u8" {
+                    if args.len() != 2 || dest.ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.get_u8 expects (bytes_view, i32) and returns i32".to_string(),
+                        ));
+                    }
+                    if let Expr::Ident { name, ptr: use_ptr } = &args[0] {
+                        let Some(v) = self.lookup(name) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {name:?}"),
+                            ));
+                        };
+                        if is_owned_ty(v.ty) && v.moved {
+                            let moved_ptr = v
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                ),
+                            ));
+                        }
+                        if v.ty != Ty::Bytes && v.ty != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "bytes.get_u8 expects bytes_view".to_string(),
+                            ));
+                        }
+                        if self.infer_expr(&args[1])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "bytes.get_u8 expects (bytes_view, i32)".to_string(),
+                            ));
+                        }
+                        self.line(state, "rt_fuel(ctx, 1);");
+                        let idx_tmp = self.alloc_local("t_get_u8_idx_", Ty::I32)?;
+                        let idx_state = self.new_state();
+                        let apply_state = self.new_state();
+                        self.line(state, format!("goto st_{idx_state};"));
+                        self.emit_expr_entry(idx_state, &args[1], idx_tmp.clone(), apply_state)?;
+                        let view = if v.ty == Ty::Bytes {
+                            format!("rt_bytes_view(ctx, {})", v.c_name)
+                        } else {
+                            v.c_name.clone()
+                        };
+                        self.line(
+                            apply_state,
+                            format!(
+                                "{} = rt_view_get_u8(ctx, {}, {});",
+                                dest.c_name, view, idx_tmp.c_name
+                            ),
+                        );
+                        self.line(apply_state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                }
+
+                if head == "bytes.view" {
+                    if args.len() != 1 || dest.ty != Ty::BytesView {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.view expects bytes and returns bytes_view".to_string(),
+                        ));
+                    }
+                    let Expr::Ident { name, ptr: use_ptr } = &args[0] else {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.view requires an identifier owner (bind the value to a local with let first)"
+                                .to_string(),
+                        ));
+                    };
+                    self.line(state, "rt_fuel(ctx, 1);");
+                    let Some(v) = self.lookup(name) else {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("unknown identifier: {name:?}"),
+                        ));
+                    };
+                    if v.moved {
+                        let moved_ptr = v
+                            .moved_ptr
+                            .as_deref()
+                            .filter(|p| !p.is_empty())
+                            .unwrap_or("<unknown>");
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"),
+                        ));
+                    }
+                    if v.ty != Ty::Bytes {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.view expects bytes owner".to_string(),
+                        ));
+                    }
+                    self.line(
+                        state,
+                        format!("{} = rt_bytes_view(ctx, {});", dest.c_name, v.c_name),
+                    );
+                    self.line(state, format!("goto st_{cont};"));
+                    return Ok(());
+                }
+
+                if head == "bytes.subview" {
+                    if args.len() != 3 || dest.ty != Ty::BytesView {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.subview expects (bytes, i32, i32) and returns bytes_view"
+                                .to_string(),
+                        ));
+                    }
+                    let Expr::Ident {
+                        name: owner_name,
+                        ptr: use_ptr,
+                    } = &args[0]
+                    else {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.subview requires an identifier owner (bind the value to a local with let first)"
+                                .to_string(),
+                        ));
+                    };
+                    let Some(owner) = self.lookup(owner_name) else {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("unknown identifier: {owner_name:?}"),
+                        ));
+                    };
+                    if owner.moved {
+                        let moved_ptr = owner
+                            .moved_ptr
+                            .as_deref()
+                            .filter(|p| !p.is_empty())
+                            .unwrap_or("<unknown>");
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!(
+                                "use after move: {owner_name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                            ),
+                        ));
+                    }
+                    if owner.ty != Ty::Bytes {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.subview expects bytes owner".to_string(),
+                        ));
+                    }
+                    if self.infer_expr(&args[1])? != Ty::I32
+                        || self.infer_expr(&args[2])? != Ty::I32
+                    {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.subview expects (bytes, i32, i32)".to_string(),
+                        ));
+                    }
+
+                    self.line(state, "rt_fuel(ctx, 1);");
+                    let start_tmp = self.alloc_local("t_subview_start_", Ty::I32)?;
+                    let len_tmp = self.alloc_local("t_subview_len_", Ty::I32)?;
+                    let start_state = self.new_state();
+                    let len_state = self.new_state();
+                    let apply_state = self.new_state();
+                    self.line(state, format!("goto st_{start_state};"));
+                    self.emit_expr_entry(start_state, &args[1], start_tmp.clone(), len_state)?;
+                    self.emit_expr_entry(len_state, &args[2], len_tmp.clone(), apply_state)?;
+                    self.line(
+                        apply_state,
+                        format!(
+                            "{} = rt_bytes_subview(ctx, {}, {}, {});",
+                            dest.c_name, owner.c_name, start_tmp.c_name, len_tmp.c_name
+                        ),
+                    );
+                    self.line(apply_state, format!("goto st_{cont};"));
+                    return Ok(());
+                }
+
+                if head == "vec_u8.as_view" {
+                    if args.len() != 1 || dest.ty != Ty::BytesView {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "vec_u8.as_view expects vec_u8 and returns bytes_view".to_string(),
+                        ));
+                    }
+                    let Expr::Ident { name, ptr: use_ptr } = &args[0] else {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "vec_u8.as_view requires an identifier owner (bind the value to a local with let first)"
+                                .to_string(),
+                        ));
+                    };
+                    self.line(state, "rt_fuel(ctx, 1);");
+                    let Some(v) = self.lookup(name) else {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("unknown identifier: {name:?}"),
+                        ));
+                    };
+                    if v.moved {
+                        let moved_ptr = v
+                            .moved_ptr
+                            .as_deref()
+                            .filter(|p| !p.is_empty())
+                            .unwrap_or("<unknown>");
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"),
+                        ));
+                    }
+                    if v.ty != Ty::VecU8 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "vec_u8.as_view expects vec_u8 owner".to_string(),
+                        ));
+                    }
+                    self.line(
+                        state,
+                        format!("{} = rt_vec_u8_as_view(ctx, {});", dest.c_name, v.c_name),
+                    );
+                    self.line(state, format!("goto st_{cont};"));
+                    return Ok(());
                 }
 
                 if head == "bytes.lit" {
@@ -1649,7 +2059,10 @@ impl<'a> Emitter<'a> {
                     items: items.to_vec(),
                     ptr: String::new(),
                 })?;
-                if call_ty != dest.ty && call_ty != Ty::Never {
+                if call_ty != dest.ty
+                    && call_ty != Ty::Never
+                    && !ty_compat_task_handle_as_i32(call_ty, dest.ty)
+                {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
                         format!("call must evaluate to {:?}, got {:?}", dest.ty, call_ty),
@@ -2566,10 +2979,13 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "await" | "task.join.bytes" => {
-                        if args.len() != 1 || dest.ty != Ty::Bytes || args[0].ty != Ty::I32 {
+                        if args.len() != 1
+                            || dest.ty != Ty::Bytes
+                            || (args[0].ty != Ty::TaskHandleBytesV1 && args[0].ty != Ty::I32)
+                        {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                format!("{head} expects i32 and returns bytes"),
+                                format!("{head} expects bytes task handle and returns bytes"),
                             ));
                         }
                         let resume = state;
@@ -2584,11 +3000,82 @@ impl<'a> Emitter<'a> {
                         self.line(state, "return UINT32_C(0);");
                         return Ok(());
                     }
-                    "task.spawn" => {
-                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                    "task.join.result_bytes" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::ResultBytes
+                            || (args[0].ty != Ty::TaskHandleResultBytesV1 && args[0].ty != Ty::I32)
+                        {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                "task.spawn expects i32 and returns i32".to_string(),
+                                "task.join.result_bytes expects result_bytes task handle and returns result_bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        let resume = state;
+                        self.line(
+                            state,
+                            format!(
+                                "if (rt_task_join_result_bytes_poll(ctx, {}, &{})) goto st_{cont};",
+                                args[0].c_name, dest.c_name
+                            ),
+                        );
+                        self.line(state, format!("f->state = UINT32_C({resume});"));
+                        self.line(state, "return UINT32_C(0);");
+                        return Ok(());
+                    }
+                    "task.try_join.bytes" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::ResultBytes
+                            || (args[0].ty != Ty::TaskHandleBytesV1 && args[0].ty != Ty::I32)
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.try_join.bytes expects bytes task handle and returns result_bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_task_try_join_bytes(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.try_join.result_bytes" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::ResultResultBytes
+                            || (args[0].ty != Ty::TaskHandleResultBytesV1 && args[0].ty != Ty::I32)
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.try_join.result_bytes expects result_bytes task handle and returns result_result_bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_task_try_join_result_bytes(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.spawn" => {
+                        if args.len() != 1
+                            || !ty_compat_task_handle_as_i32(args[0].ty, dest.ty)
+                            || (args[0].ty != Ty::TaskHandleBytesV1
+                                && args[0].ty != Ty::TaskHandleResultBytesV1
+                                && args[0].ty != Ty::I32)
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.spawn expects task handle and returns task handle"
+                                    .to_string(),
                             ));
                         }
                         self.line(
@@ -2625,16 +3112,413 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "task.cancel" => {
-                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                        if args.len() != 1
+                            || dest.ty != Ty::I32
+                            || (args[0].ty != Ty::TaskHandleBytesV1
+                                && args[0].ty != Ty::TaskHandleResultBytesV1
+                                && args[0].ty != Ty::I32)
+                        {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                "task.cancel expects i32".to_string(),
+                                "task.cancel expects task handle".to_string(),
                             ));
                         }
                         self.line(
                             state,
                             format!("{} = rt_task_cancel(ctx, {});", dest.c_name, args[0].c_name),
                         );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.scope.start_soon_v1" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::I32
+                            || (args[0].ty != Ty::TaskHandleBytesV1
+                                && args[0].ty != Ty::TaskHandleResultBytesV1)
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.start_soon_v1 expects task handle and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        let scope = self
+                            .task_scopes
+                            .last()
+                            .cloned()
+                            .ok_or_else(|| {
+                                CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "X07E_SCOPE_001: task.scope.start_soon_v1 used outside task.scope_v1"
+                                        .to_string(),
+                                )
+                            })?;
+                        let kind = match args[0].ty {
+                            Ty::TaskHandleBytesV1 => "RT_TASK_OUT_KIND_BYTES",
+                            Ty::TaskHandleResultBytesV1 => "RT_TASK_OUT_KIND_RESULT_BYTES",
+                            _ => unreachable!(),
+                        };
+                        self.line(state, format!("rt_task_spawn(ctx, {});", args[0].c_name));
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scope_start_soon(ctx, &{}, {}, {});",
+                                dest.c_name, scope.c_name, args[0].c_name, kind
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.scope.cancel_all_v1" => {
+                        if !args.is_empty() || dest.ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.cancel_all_v1 expects 0 args and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        let scope = self
+                            .task_scopes
+                            .last()
+                            .cloned()
+                            .ok_or_else(|| {
+                                CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "X07E_SCOPE_001: task.scope.cancel_all_v1 used outside task.scope_v1"
+                                        .to_string(),
+                                )
+                            })?;
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scope_cancel_all(ctx, &{});",
+                                dest.c_name, scope.c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.scope.async_let_bytes_v1" | "task.scope.async_let_result_bytes_v1" => {
+                        if args.len() != 1 || dest.ty != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects 1 arg and returns task_slot_v1"),
+                            ));
+                        }
+                        let scope = self.task_scopes.last().cloned().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("X07E_SCOPE_SLOT_001: {head} used outside task.scope_v1"),
+                            )
+                        })?;
+                        let (want, kind) = match head {
+                            "task.scope.async_let_bytes_v1" => {
+                                (Ty::TaskHandleBytesV1, "RT_TASK_OUT_KIND_BYTES")
+                            }
+                            "task.scope.async_let_result_bytes_v1" => {
+                                (Ty::TaskHandleResultBytesV1, "RT_TASK_OUT_KIND_RESULT_BYTES")
+                            }
+                            _ => unreachable!(),
+                        };
+                        if args[0].ty != want {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects {want:?}"),
+                            ));
+                        }
+                        self.line(state, format!("rt_task_spawn(ctx, {});", args[0].c_name));
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scope_async_let(ctx, &{}, {}, {});",
+                                dest.c_name, scope.c_name, args[0].c_name, kind
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.scope.await_slot_bytes_v1" => {
+                        if args.len() != 1 || dest.ty != Ty::Bytes || args[0].ty != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.await_slot_bytes_v1 expects task_slot_v1 and returns bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        let scope = self
+                            .task_scopes
+                            .last()
+                            .cloned()
+                            .ok_or_else(|| {
+                                CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "X07E_SCOPE_SLOT_002: task.scope.await_slot_bytes_v1 used outside task.scope_v1"
+                                        .to_string(),
+                                )
+                            })?;
+                        let resume = state;
+                        self.line(
+                            state,
+                            format!(
+                                "if (rt_scope_await_slot_bytes_poll(ctx, &{}, {}, &{})) goto st_{cont};",
+                                scope.c_name, args[0].c_name, dest.c_name
+                            ),
+                        );
+                        self.line(state, format!("f->state = UINT32_C({resume});"));
+                        self.line(state, "return UINT32_C(0);");
+                        return Ok(());
+                    }
+                    "task.scope.await_slot_result_bytes_v1" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::ResultBytes
+                            || args[0].ty != Ty::TaskSlotV1
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.await_slot_result_bytes_v1 expects task_slot_v1 and returns result_bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        let scope = self
+                            .task_scopes
+                            .last()
+                            .cloned()
+                            .ok_or_else(|| {
+                                CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "X07E_SCOPE_SLOT_002: task.scope.await_slot_result_bytes_v1 used outside task.scope_v1"
+                                        .to_string(),
+                                )
+                            })?;
+                        let resume = state;
+                        self.line(
+                            state,
+                            format!(
+                                "if (rt_scope_await_slot_result_bytes_poll(ctx, &{}, {}, &{})) goto st_{cont};",
+                                scope.c_name, args[0].c_name, dest.c_name
+                            ),
+                        );
+                        self.line(state, format!("f->state = UINT32_C({resume});"));
+                        self.line(state, "return UINT32_C(0);");
+                        return Ok(());
+                    }
+                    "task.scope.try_await_slot.bytes_v1" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::ResultBytes
+                            || args[0].ty != Ty::TaskSlotV1
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.try_await_slot.bytes_v1 expects task_slot_v1 and returns result_bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        let scope = self
+                            .task_scopes
+                            .last()
+                            .cloned()
+                            .ok_or_else(|| {
+                                CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "X07E_SCOPE_SLOT_002: task.scope.try_await_slot.bytes_v1 used outside task.scope_v1"
+                                        .to_string(),
+                                )
+                            })?;
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scope_try_await_slot_bytes(ctx, &{}, {});",
+                                dest.c_name, scope.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.scope.try_await_slot.result_bytes_v1" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::ResultResultBytes
+                            || args[0].ty != Ty::TaskSlotV1
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.try_await_slot.result_bytes_v1 expects task_slot_v1 and returns result_result_bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        let scope = self
+                            .task_scopes
+                            .last()
+                            .cloned()
+                            .ok_or_else(|| {
+                                CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "X07E_SCOPE_SLOT_002: task.scope.try_await_slot.result_bytes_v1 used outside task.scope_v1"
+                                        .to_string(),
+                                )
+                            })?;
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scope_try_await_slot_result_bytes(ctx, &{}, {});",
+                                dest.c_name, scope.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.scope.slot_is_finished_v1" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.slot_is_finished_v1 expects task_slot_v1 and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        let scope = self
+                            .task_scopes
+                            .last()
+                            .cloned()
+                            .ok_or_else(|| {
+                                CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "X07E_SCOPE_SLOT_002: task.scope.slot_is_finished_v1 used outside task.scope_v1"
+                                        .to_string(),
+                                )
+                            })?;
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scope_slot_is_finished(ctx, &{}, {});",
+                                dest.c_name, scope.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.scope.slot_to_i32_v1" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.slot_to_i32_v1 expects task_slot_v1 and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(state, format!("{} = {};", dest.c_name, args[0].c_name));
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.scope.slot_from_i32_v1" => {
+                        if args.len() != 1 || dest.ty != Ty::TaskSlotV1 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.slot_from_i32_v1 expects i32 and returns task_slot_v1"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(state, format!("{} = {};", dest.c_name, args[0].c_name));
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.select_evt.tag_v1" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::TaskSelectEvtV1
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.select_evt.tag_v1 expects task_select_evt_v1 and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_select_evt_tag(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.select_evt.case_index_v1" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::TaskSelectEvtV1
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.select_evt.case_index_v1 expects task_select_evt_v1 and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_select_evt_case_index(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.select_evt.src_id_v1" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::TaskSelectEvtV1
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.select_evt.src_id_v1 expects task_select_evt_v1 and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_select_evt_src_id(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.select_evt.take_bytes_v1" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::Bytes
+                            || args[0].ty != Ty::TaskSelectEvtV1
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.select_evt.take_bytes_v1 expects task_select_evt_v1 and returns bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_select_evt_take_bytes(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "task.select_evt.drop_v1" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::TaskSelectEvtV1
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.select_evt.drop_v1 expects task_select_evt_v1 and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("rt_select_evt_drop(ctx, {});", args[0].c_name),
+                        );
+                        self.line(state, format!("{} = UINT32_C(1);", dest.c_name));
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -5736,23 +6620,7 @@ impl<'a> Emitter<'a> {
                         self.emit_expr_entry(s, e, dest.clone(), next)?;
                     } else {
                         let ty = self.infer_expr(e)?;
-                        let storage_ty = match ty {
-                            Ty::I32 | Ty::Never => Ty::I32,
-                            Ty::Bytes => Ty::Bytes,
-                            Ty::BytesView => Ty::BytesView,
-                            Ty::VecU8 => Ty::VecU8,
-                            Ty::OptionI32 => Ty::OptionI32,
-                            Ty::OptionBytes => Ty::OptionBytes,
-                            Ty::ResultI32 => Ty::ResultI32,
-                            Ty::ResultBytes => Ty::ResultBytes,
-                            Ty::Iface => Ty::Iface,
-                            Ty::PtrConstU8 => Ty::PtrConstU8,
-                            Ty::PtrMutU8 => Ty::PtrMutU8,
-                            Ty::PtrConstVoid => Ty::PtrConstVoid,
-                            Ty::PtrMutVoid => Ty::PtrMutVoid,
-                            Ty::PtrConstI32 => Ty::PtrConstI32,
-                            Ty::PtrMutI32 => Ty::PtrMutI32,
-                        };
+                        let storage_ty = Self::storage_ty_for(ty);
                         let tmp = self.alloc_local("t_begin_", storage_ty)?;
                         self.emit_expr_entry(s, e, tmp, next)?;
                     }
@@ -5790,23 +6658,7 @@ impl<'a> Emitter<'a> {
                 }
 
                 self.line(state, "rt_fuel(ctx, 1);");
-                let storage_ty = match expr_ty {
-                    Ty::I32 | Ty::Never => Ty::I32,
-                    Ty::Bytes => Ty::Bytes,
-                    Ty::BytesView => Ty::BytesView,
-                    Ty::VecU8 => Ty::VecU8,
-                    Ty::OptionI32 => Ty::OptionI32,
-                    Ty::OptionBytes => Ty::OptionBytes,
-                    Ty::ResultI32 => Ty::ResultI32,
-                    Ty::ResultBytes => Ty::ResultBytes,
-                    Ty::Iface => Ty::Iface,
-                    Ty::PtrConstU8 => Ty::PtrConstU8,
-                    Ty::PtrMutU8 => Ty::PtrMutU8,
-                    Ty::PtrConstVoid => Ty::PtrConstVoid,
-                    Ty::PtrMutVoid => Ty::PtrMutVoid,
-                    Ty::PtrConstI32 => Ty::PtrConstI32,
-                    Ty::PtrMutI32 => Ty::PtrMutI32,
-                };
+                let storage_ty = Self::storage_ty_for(expr_ty);
                 let binding = self.alloc_local("v_", storage_ty)?;
 
                 let expr_state = self.new_state();
@@ -6049,9 +6901,11 @@ impl<'a> Emitter<'a> {
                     Ty::BytesView => Ty::BytesView,
                     Ty::VecU8 => Ty::VecU8,
                     Ty::OptionI32 => Ty::OptionI32,
+                    Ty::OptionTaskSelectEvtV1 => Ty::OptionTaskSelectEvtV1,
                     Ty::OptionBytes => Ty::OptionBytes,
                     Ty::ResultI32 => Ty::ResultI32,
                     Ty::ResultBytes => Ty::ResultBytes,
+                    Ty::ResultResultBytes => Ty::ResultResultBytes,
                     Ty::Iface => Ty::Iface,
                     Ty::PtrConstU8 => Ty::PtrConstU8,
                     Ty::PtrMutU8 => Ty::PtrMutU8,
@@ -6059,6 +6913,11 @@ impl<'a> Emitter<'a> {
                     Ty::PtrMutVoid => Ty::PtrMutVoid,
                     Ty::PtrConstI32 => Ty::PtrConstI32,
                     Ty::PtrMutI32 => Ty::PtrMutI32,
+                    Ty::TaskScopeV1 => Ty::TaskScopeV1,
+                    Ty::TaskHandleBytesV1 => Ty::TaskHandleBytesV1,
+                    Ty::TaskHandleResultBytesV1 => Ty::TaskHandleResultBytesV1,
+                    Ty::TaskSlotV1 => Ty::TaskSlotV1,
+                    Ty::TaskSelectEvtV1 => Ty::TaskSelectEvtV1,
                 };
                 let body_tmp = self.alloc_local("t_for_body_", body_storage)?;
                 self.emit_expr_entry(body_state, &args[3], body_tmp, inc_state)?;
@@ -6072,6 +6931,580 @@ impl<'a> Emitter<'a> {
                 Ok(())
             }
 
+            fn emit_task_scope_v1(
+                &mut self,
+                state: usize,
+                args: &[Expr],
+                dest: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                if args.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "task.scope_v1 expects 2 args".to_string(),
+                    ));
+                }
+                let cfg = parse_task_scope_cfg_v1(&args[0])?;
+
+                self.line(state, "rt_fuel(ctx, 1);");
+                let scope = self.alloc_local("t_scope_", Ty::TaskScopeV1)?;
+                self.line(
+                    state,
+                    format!(
+                        "rt_scope_init(ctx, &{}, UINT32_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT32_C({}));",
+                        scope.c_name,
+                        cfg.max_children,
+                        cfg.max_ticks,
+                        cfg.max_blocked_waits,
+                        cfg.max_join_polls,
+                        cfg.max_slot_result_bytes
+                    ),
+                );
+
+                let body_state = self.new_state();
+                let exit_state = self.new_state();
+                self.line(state, format!("goto st_{body_state};"));
+
+                self.task_scopes.push(scope.clone());
+                self.emit_expr_entry(body_state, &args[1], dest, exit_state)?;
+                let popped = self.task_scopes.pop();
+                debug_assert_eq!(popped.as_ref().map(|v| &v.c_name), Some(&scope.c_name));
+
+                let resume = exit_state;
+                self.line(exit_state, "rt_fuel(ctx, 1);");
+                self.line(
+                    exit_state,
+                    format!(
+                        "if (rt_scope_exit_poll(ctx, &{})) goto st_{cont};",
+                        scope.c_name
+                    ),
+                );
+                self.line(exit_state, format!("f->state = UINT32_C({resume});"));
+                self.line(exit_state, "return UINT32_C(0);");
+                Ok(())
+            }
+
+            fn emit_task_scope_wait_all_v1(
+                &mut self,
+                state: usize,
+                args: &[Expr],
+                dest: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                let scope = self.task_scopes.last().cloned().ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "X07E_SCOPE_001: task.scope.wait_all_v1 used outside task.scope_v1"
+                            .to_string(),
+                    )
+                })?;
+                if !args.is_empty() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "task.scope.wait_all_v1 expects 0 args".to_string(),
+                    ));
+                }
+                if dest.ty != Ty::I32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.wait_all_v1 returns i32".to_string(),
+                    ));
+                }
+
+                self.line(state, "rt_fuel(ctx, 1);");
+                self.line(
+                    state,
+                    format!(
+                        "{} = rt_scope_wait_all_count(&{});",
+                        dest.c_name, scope.c_name
+                    ),
+                );
+                let join_state = self.new_state();
+                self.line(state, format!("goto st_{join_state};"));
+
+                let resume = join_state;
+                self.line(join_state, "rt_fuel(ctx, 1);");
+                self.line(
+                    join_state,
+                    format!(
+                        "if (rt_scope_join_drop_remaining_poll(ctx, &{})) {{ rt_scope_reset_active(&{}); goto st_{cont}; }}",
+                        scope.c_name, scope.c_name
+                    ),
+                );
+                self.line(join_state, format!("f->state = UINT32_C({resume});"));
+                self.line(join_state, "return UINT32_C(0);");
+                Ok(())
+            }
+
+            fn emit_task_scope_select_v1(
+                &mut self,
+                state: usize,
+                head: &str,
+                args: &[Expr],
+                dest: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                let scope = self.task_scopes.last().cloned().ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "X07E_SELECT_OUTSIDE_SCOPE: task.scope.select used outside task.scope_v1"
+                            .to_string(),
+                    )
+                })?;
+                if args.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        format!("{head} expects 2 args"),
+                    ));
+                }
+                let cfg = parse_task_select_cfg_v1(&args[0])?;
+                let cases = parse_task_select_cases_v1(&args[1])?;
+                if cases.len() > cfg.max_cases as usize {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "X07E_SELECT_TOO_MANY_CASES: too many cases".to_string(),
+                    ));
+                }
+
+                let is_try = head == "task.scope.select_try_v1";
+                if is_try && dest.ty != Ty::OptionTaskSelectEvtV1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.select_try_v1 returns option_i32".to_string(),
+                    ));
+                }
+                if !is_try && dest.ty != Ty::TaskSelectEvtV1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.select_v1 returns task_select_evt_v1".to_string(),
+                    ));
+                }
+
+                self.line(state, "rt_fuel(ctx, 1);");
+                let slot_tmp = self.alloc_local("t_select_slot_", Ty::TaskSlotV1)?;
+                let chan_tmp = self.alloc_local("t_select_chan_", Ty::I32)?;
+                let rr_start_tmp = if cfg.policy == TaskSelectPolicyV1::RrV1 {
+                    Some(self.alloc_local("t_select_rr_", Ty::I32)?)
+                } else {
+                    None
+                };
+                let poll_tmp = if is_try {
+                    None
+                } else {
+                    Some(self.alloc_local("t_select_polls_", Ty::I32)?)
+                };
+                let slept_tmp = if is_try || cfg.timeout_ticks == 0 {
+                    None
+                } else {
+                    Some(self.alloc_local("t_select_slept_", Ty::I32)?)
+                };
+
+                if let Some(polls) = &poll_tmp {
+                    self.line(state, format!("{} = UINT32_C(0);", polls.c_name));
+                }
+                if let Some(slept) = &slept_tmp {
+                    self.line(state, format!("{} = UINT32_C(0);", slept.c_name));
+                }
+
+                let scan_state = self.new_state();
+                let no_ready_state = self.new_state();
+                self.line(state, format!("goto st_{scan_state};"));
+
+                self.line(scan_state, "rt_fuel(ctx, 1);");
+                if let Some(rr_start) = &rr_start_tmp {
+                    let n_cases = cases.len();
+                    self.line(
+                        scan_state,
+                        format!("{} = {}.select_rr_cursor;", rr_start.c_name, scope.c_name),
+                    );
+                    if n_cases != 0 {
+                        self.line(
+                            scan_state,
+                            format!(
+                                "if ({} >= UINT32_C({})) {} = UINT32_C(0);",
+                                rr_start.c_name, n_cases, rr_start.c_name
+                            ),
+                        );
+                    }
+                }
+
+                let mut first_pass_states: Vec<(usize, usize, Option<usize>)> = Vec::new();
+                let mut second_pass_states: Vec<(usize, usize, Option<usize>)> = Vec::new();
+
+                fn pass_skip_cond(
+                    idx: usize,
+                    rr_start: Option<&AsyncVarRef>,
+                    first_pass: bool,
+                ) -> Option<String> {
+                    let rr_start = rr_start?;
+                    if first_pass {
+                        Some(format!(
+                            "if (UINT32_C({idx}) < {}) goto {{NEXT}};",
+                            rr_start.c_name
+                        ))
+                    } else {
+                        Some(format!(
+                            "if (UINT32_C({idx}) >= {}) goto {{NEXT}};",
+                            rr_start.c_name
+                        ))
+                    }
+                }
+
+                for (idx, case) in cases.iter().enumerate() {
+                    let eval_state = self.new_state();
+                    let check_state = self.new_state();
+                    let skip = pass_skip_cond(idx, rr_start_tmp.as_ref(), true);
+                    first_pass_states.push((eval_state, check_state, skip.map(|_| 0)));
+
+                    let eval_state2 = self.new_state();
+                    let check_state2 = self.new_state();
+                    let skip2 = pass_skip_cond(idx, rr_start_tmp.as_ref(), false);
+                    second_pass_states.push((eval_state2, check_state2, skip2.map(|_| 0)));
+
+                    // Silence unused warnings for `case`.
+                    let _ = case;
+                }
+
+                // Wire scan start to first-pass first eval.
+                if !first_pass_states.is_empty() {
+                    self.line(scan_state, format!("goto st_{};", first_pass_states[0].0));
+                } else {
+                    self.line(scan_state, format!("goto st_{no_ready_state};"));
+                }
+
+                // Helper to emit a single case evaluation + check.
+                let emit_case = |this: &mut Machine,
+                                 eval_state: usize,
+                                 check_state: usize,
+                                 next_state: usize,
+                                 rr_skip: Option<&str>,
+                                 case_idx: usize,
+                                 case: &TaskSelectCaseV1,
+                                 scope: &AsyncVarRef,
+                                 slot_tmp: &AsyncVarRef,
+                                 chan_tmp: &AsyncVarRef,
+                                 dest: &AsyncVarRef,
+                                 cont: usize,
+                                 cases_len: usize,
+                                 policy: TaskSelectPolicyV1|
+                 -> Result<(), CompilerError> {
+                    if let Some(skip) = rr_skip {
+                        this.line(
+                            eval_state,
+                            skip.replace("{NEXT}", &format!("st_{next_state}")),
+                        );
+                    }
+                    match case {
+                        TaskSelectCaseV1::SlotBytes { slot } => {
+                            this.emit_expr_entry(eval_state, slot, slot_tmp.clone(), check_state)?;
+
+                            // Sentinel-based disabling:
+                            // - slot cases: UINT32_MAX disables the case
+                            this.line(
+                                check_state,
+                                format!(
+                                    "if ({} == UINT32_MAX) goto st_{next_state};",
+                                    slot_tmp.c_name
+                                ),
+                            );
+                            this.line(
+                                check_state,
+                                format!(
+                                    "result_bytes_t r = rt_scope_try_await_slot_bytes(ctx, &{}, {});",
+                                    scope.c_name, slot_tmp.c_name
+                                ),
+                            );
+                            this.line(check_state, "if (r.tag) {");
+                            this.line(
+                                check_state,
+                                if dest.ty == Ty::OptionTaskSelectEvtV1 {
+                                    format!(
+                                        "  {}.tag = UINT32_C(1); {}.payload = rt_select_evt_new(ctx, {}.key, UINT32_C(1), UINT32_C({}), {}, r.payload.ok);",
+                                        dest.c_name,
+                                        dest.c_name,
+                                        scope.c_name,
+                                        case_idx,
+                                        slot_tmp.c_name
+                                    )
+                                } else {
+                                    format!(
+                                        "  {} = rt_select_evt_new(ctx, {}.key, UINT32_C(1), UINT32_C({}), {}, r.payload.ok);",
+                                        dest.c_name,
+                                        scope.c_name,
+                                        case_idx,
+                                        slot_tmp.c_name
+                                    )
+                                },
+                            );
+                            if policy == TaskSelectPolicyV1::RrV1 && cases_len != 0 {
+                                let next = (case_idx + 1) % cases_len;
+                                this.line(
+                                    check_state,
+                                    format!(
+                                        "  {}.select_rr_cursor = UINT32_C({next});",
+                                        scope.c_name
+                                    ),
+                                );
+                            }
+                            this.line(check_state, format!("  goto st_{cont};"));
+                            this.line(check_state, "}");
+                            this.line(check_state, "if (r.payload.err == UINT32_C(2)) {");
+                            this.line(
+                                check_state,
+                                if dest.ty == Ty::OptionTaskSelectEvtV1 {
+                                    format!(
+                                        "  {}.tag = UINT32_C(1); {}.payload = rt_select_evt_new(ctx, {}.key, UINT32_C(2), UINT32_C({}), {}, rt_bytes_empty(ctx));",
+                                        dest.c_name,
+                                        dest.c_name,
+                                        scope.c_name,
+                                        case_idx,
+                                        slot_tmp.c_name
+                                    )
+                                } else {
+                                    format!(
+                                        "  {} = rt_select_evt_new(ctx, {}.key, UINT32_C(2), UINT32_C({}), {}, rt_bytes_empty(ctx));",
+                                        dest.c_name,
+                                        scope.c_name,
+                                        case_idx,
+                                        slot_tmp.c_name
+                                    )
+                                },
+                            );
+                            if policy == TaskSelectPolicyV1::RrV1 && cases_len != 0 {
+                                let next = (case_idx + 1) % cases_len;
+                                this.line(
+                                    check_state,
+                                    format!(
+                                        "  {}.select_rr_cursor = UINT32_C({next});",
+                                        scope.c_name
+                                    ),
+                                );
+                            }
+                            this.line(check_state, format!("  goto st_{cont};"));
+                            this.line(check_state, "}");
+                            this.line(check_state, format!("goto st_{next_state};"));
+                        }
+                        TaskSelectCaseV1::ChanRecvBytes { chan } => {
+                            this.emit_expr_entry(eval_state, chan, chan_tmp.clone(), check_state)?;
+
+                            // Sentinel-based disabling:
+                            // - chan cases: 0 disables the case (chan ids are 1-based)
+                            this.line(
+                                check_state,
+                                format!(
+                                    "if ({} == UINT32_C(0)) goto st_{next_state};",
+                                    chan_tmp.c_name
+                                ),
+                            );
+                            this.line(
+                                check_state,
+                                format!(
+                                    "result_bytes_t r = rt_chan_bytes_try_recv(ctx, {});",
+                                    chan_tmp.c_name
+                                ),
+                            );
+                            this.line(check_state, "if (r.tag) {");
+                            this.line(
+                                check_state,
+                                if dest.ty == Ty::OptionTaskSelectEvtV1 {
+                                    format!(
+                                        "  {}.tag = UINT32_C(1); {}.payload = rt_select_evt_new(ctx, {}.key, UINT32_C(3), UINT32_C({}), {}, r.payload.ok);",
+                                        dest.c_name,
+                                        dest.c_name,
+                                        scope.c_name,
+                                        case_idx,
+                                        chan_tmp.c_name
+                                    )
+                                } else {
+                                    format!(
+                                        "  {} = rt_select_evt_new(ctx, {}.key, UINT32_C(3), UINT32_C({}), {}, r.payload.ok);",
+                                        dest.c_name,
+                                        scope.c_name,
+                                        case_idx,
+                                        chan_tmp.c_name
+                                    )
+                                },
+                            );
+                            if policy == TaskSelectPolicyV1::RrV1 && cases_len != 0 {
+                                let next = (case_idx + 1) % cases_len;
+                                this.line(
+                                    check_state,
+                                    format!(
+                                        "  {}.select_rr_cursor = UINT32_C({next});",
+                                        scope.c_name
+                                    ),
+                                );
+                            }
+                            this.line(check_state, format!("  goto st_{cont};"));
+                            this.line(check_state, "}");
+                            this.line(check_state, "if (r.payload.err == UINT32_C(2)) {");
+                            this.line(
+                                check_state,
+                                if dest.ty == Ty::OptionTaskSelectEvtV1 {
+                                    format!(
+                                        "  {}.tag = UINT32_C(1); {}.payload = rt_select_evt_new(ctx, {}.key, UINT32_C(4), UINT32_C({}), {}, rt_bytes_empty(ctx));",
+                                        dest.c_name,
+                                        dest.c_name,
+                                        scope.c_name,
+                                        case_idx,
+                                        chan_tmp.c_name
+                                    )
+                                } else {
+                                    format!(
+                                        "  {} = rt_select_evt_new(ctx, {}.key, UINT32_C(4), UINT32_C({}), {}, rt_bytes_empty(ctx));",
+                                        dest.c_name,
+                                        scope.c_name,
+                                        case_idx,
+                                        chan_tmp.c_name
+                                    )
+                                },
+                            );
+                            if policy == TaskSelectPolicyV1::RrV1 && cases_len != 0 {
+                                let next = (case_idx + 1) % cases_len;
+                                this.line(
+                                    check_state,
+                                    format!(
+                                        "  {}.select_rr_cursor = UINT32_C({next});",
+                                        scope.c_name
+                                    ),
+                                );
+                            }
+                            this.line(check_state, format!("  goto st_{cont};"));
+                            this.line(check_state, "}");
+                            this.line(check_state, format!("goto st_{next_state};"));
+                        }
+                    }
+                    Ok(())
+                };
+
+                // Emit first pass cases.
+                for (idx, (eval_state, check_state, _)) in first_pass_states.iter().enumerate() {
+                    let next = if idx + 1 < first_pass_states.len() {
+                        first_pass_states[idx + 1].0
+                    } else if cfg.policy == TaskSelectPolicyV1::RrV1 {
+                        // Second pass starts.
+                        second_pass_states
+                            .first()
+                            .map(|s| s.0)
+                            .unwrap_or(no_ready_state)
+                    } else {
+                        no_ready_state
+                    };
+                    let rr_skip = pass_skip_cond(idx, rr_start_tmp.as_ref(), true);
+                    emit_case(
+                        self,
+                        *eval_state,
+                        *check_state,
+                        next,
+                        rr_skip.as_deref(),
+                        idx,
+                        &cases[idx],
+                        &scope,
+                        &slot_tmp,
+                        &chan_tmp,
+                        &dest,
+                        cont,
+                        cases.len(),
+                        cfg.policy,
+                    )?;
+                }
+
+                // Emit second pass cases for rr.
+                if cfg.policy == TaskSelectPolicyV1::RrV1 {
+                    for (idx, (eval_state, check_state, _)) in second_pass_states.iter().enumerate()
+                    {
+                        let next = if idx + 1 < second_pass_states.len() {
+                            second_pass_states[idx + 1].0
+                        } else {
+                            no_ready_state
+                        };
+                        let rr_skip = pass_skip_cond(idx, rr_start_tmp.as_ref(), false);
+                        emit_case(
+                            self,
+                            *eval_state,
+                            *check_state,
+                            next,
+                            rr_skip.as_deref(),
+                            idx,
+                            &cases[idx],
+                            &scope,
+                            &slot_tmp,
+                            &chan_tmp,
+                            &dest,
+                            cont,
+                            cases.len(),
+                            cfg.policy,
+                        )?;
+                    }
+                }
+
+                // No ready handling.
+                if is_try {
+                    self.line(
+                        no_ready_state,
+                        format!("{}.tag = UINT32_C(0);", dest.c_name),
+                    );
+                    self.line(
+                        no_ready_state,
+                        format!("{}.payload = UINT32_C(0);", dest.c_name),
+                    );
+                    self.line(no_ready_state, format!("goto st_{cont};"));
+                    return Ok(());
+                }
+
+                let polls = poll_tmp.expect("blocking select has polls");
+                self.line(
+                    no_ready_state,
+                    format!("{} = {} + UINT32_C(1);", polls.c_name, polls.c_name),
+                );
+                if cfg.max_polls != 0 {
+                    self.line(
+                        no_ready_state,
+                        format!(
+                            "if ({} > UINT32_C({})) rt_trap(\"X07T_SELECT_MAX_POLLS\");",
+                            polls.c_name, cfg.max_polls
+                        ),
+                    );
+                }
+                if cfg.timeout_ticks != 0 {
+                    let slept = slept_tmp.as_ref().expect("timeout has slept");
+                    self.line(
+                        no_ready_state,
+                        format!(
+                            "if ({} >= UINT32_C({})) {{ {} = rt_select_evt_new(ctx, {}.key, UINT32_C(5), UINT32_C(0), UINT32_C(0), rt_bytes_empty(ctx)); goto st_{cont}; }}",
+                            slept.c_name,
+                            cfg.timeout_ticks,
+                            dest.c_name,
+                            scope.c_name
+                        ),
+                    );
+                }
+                if cfg.poll_sleep_ticks != 0 {
+                    self.line(
+                        no_ready_state,
+                        format!("rt_task_sleep(ctx, UINT32_C({}));", cfg.poll_sleep_ticks),
+                    );
+                    if let Some(slept) = &slept_tmp {
+                        self.line(
+                            no_ready_state,
+                            format!(
+                                "{} = {} + UINT32_C({});",
+                                slept.c_name, slept.c_name, cfg.poll_sleep_ticks
+                            ),
+                        );
+                    }
+                } else {
+                    self.line(no_ready_state, "rt_task_yield(ctx);");
+                }
+                self.line(
+                    no_ready_state,
+                    format!("f->state = UINT32_C({scan_state});"),
+                );
+                self.line(no_ready_state, "return UINT32_C(0);");
+
+                Ok(())
+            }
+
             fn emit_return(&mut self, state: usize, args: &[Expr]) -> Result<(), CompilerError> {
                 if args.len() != 1 {
                     return Err(CompilerError::new(
@@ -6079,20 +7512,48 @@ impl<'a> Emitter<'a> {
                         "return form: (return <expr>)".to_string(),
                     ));
                 }
+                let scopes_snapshot = self.scopes.clone();
+                let task_scopes_snapshot = self.task_scopes.clone();
+
                 self.line(state, "rt_fuel(ctx, 1);");
                 let expr_state = self.new_state();
                 self.line(state, format!("goto st_{expr_state};"));
+
+                let cleanup_start = self.new_state();
                 self.emit_expr_entry(
                     expr_state,
                     &args[0],
                     AsyncVarRef {
-                        ty: Ty::Bytes,
+                        ty: self.fn_ret_ty,
                         c_name: "f->ret".to_string(),
                         moved: false,
                         moved_ptr: None,
                     },
-                    self.ret_state,
+                    cleanup_start,
                 )?;
+
+                // Unwind any active task scopes (inner-to-outer) before returning.
+                let mut next = self.ret_state;
+                for scope in task_scopes_snapshot.iter() {
+                    let st = self.new_state();
+                    let resume = st;
+                    self.line(
+                        st,
+                        format!(
+                            "if (rt_scope_exit_poll(ctx, &{})) goto st_{next};",
+                            scope.c_name
+                        ),
+                    );
+                    self.line(st, format!("f->state = UINT32_C({resume});"));
+                    self.line(st, "return UINT32_C(0);");
+                    next = st;
+                }
+                self.line(cleanup_start, format!("goto st_{next};"));
+
+                // `return` terminates control flow. Moves/sets performed while evaluating the return
+                // expression must not affect the remaining compilation state.
+                self.scopes = scopes_snapshot;
+                self.task_scopes = task_scopes_snapshot;
                 Ok(())
             }
         }
@@ -6108,9 +7569,11 @@ impl<'a> Emitter<'a> {
             local_count: 0,
             unsafe_depth: 0,
             scopes: vec![BTreeMap::new()],
+            task_scopes: Vec::new(),
             states: Vec::new(),
             ret_state: 0,
             fn_name: f.name.clone(),
+            fn_ret_ty: f.ret_ty,
         };
 
         for (i, p) in f.params.iter().enumerate() {
@@ -6133,7 +7596,7 @@ impl<'a> Emitter<'a> {
             start,
             &f.body,
             AsyncVarRef {
-                ty: Ty::Bytes,
+                ty: f.ret_ty,
                 c_name: "f->ret".to_string(),
                 moved: false,
                 moved_ptr: None,
@@ -6141,8 +7604,28 @@ impl<'a> Emitter<'a> {
             ret_state,
         )?;
 
-        machine.line(ret_state, "*out = f->ret;");
-        machine.line(ret_state, "f->ret = rt_bytes_empty(ctx);");
+        match f.ret_ty {
+            Ty::Bytes => {
+                machine.line(ret_state, "out->kind = RT_TASK_OUT_KIND_BYTES;");
+                machine.line(ret_state, "out->payload.bytes = f->ret;");
+                machine.line(ret_state, "f->ret = rt_bytes_empty(ctx);");
+            }
+            Ty::ResultBytes => {
+                machine.line(ret_state, "out->kind = RT_TASK_OUT_KIND_RESULT_BYTES;");
+                machine.line(ret_state, "out->payload.result_bytes = f->ret;");
+                machine.line(ret_state, "f->ret.tag = UINT32_C(0);");
+                machine.line(ret_state, "f->ret.payload.err = UINT32_C(0);");
+            }
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Internal,
+                    format!(
+                        "internal error: unsupported defasync return type: {:?}",
+                        f.ret_ty
+                    ),
+                ));
+            }
+        }
         machine.line(ret_state, "return UINT32_C(1);");
 
         self.line("typedef struct {");
@@ -6155,7 +7638,7 @@ impl<'a> Emitter<'a> {
         self.push_char('\n');
 
         self.line(&format!(
-            "static uint32_t {poll_name}(ctx_t* ctx, void* fut, bytes_t* out) {{"
+            "static uint32_t {poll_name}(ctx_t* ctx, void* fut, rt_task_out_t* out) {{"
         ));
         self.indent += 1;
         self.line(&format!("{fut_type}* f = ({fut_type}*)fut;"));
@@ -6188,28 +7671,7 @@ impl<'a> Emitter<'a> {
                 continue;
             }
             let field = format!("f->{name}");
-            match *ty {
-                Ty::Bytes => self.line(&format!("rt_bytes_drop(ctx, &{field});")),
-                Ty::VecU8 => self.line(&format!("rt_vec_u8_drop(ctx, &{field});")),
-                Ty::OptionBytes => {
-                    self.line(&format!("if ({field}.tag) {{"));
-                    self.indent += 1;
-                    self.line(&format!("rt_bytes_drop(ctx, &{field}.payload);"));
-                    self.indent -= 1;
-                    self.line("}");
-                    self.line(&format!("{field}.tag = UINT32_C(0);"));
-                }
-                Ty::ResultBytes => {
-                    self.line(&format!("if ({field}.tag) {{"));
-                    self.indent += 1;
-                    self.line(&format!("rt_bytes_drop(ctx, &{field}.payload.ok);"));
-                    self.indent -= 1;
-                    self.line("}");
-                    self.line(&format!("{field}.tag = UINT32_C(0);"));
-                    self.line(&format!("{field}.payload.err = UINT32_C(0);"));
-                }
-                _ => {}
-            }
+            self.emit_drop_var(*ty, &field);
         }
         self.line(&format!(
             "rt_free(ctx, f, (uint32_t)sizeof({fut_type}), (uint32_t)_Alignof({fut_type}));"
@@ -6279,7 +7741,10 @@ impl<'a> Emitter<'a> {
         }
 
         let result_ty = self.infer_expr_in_new_scope(&f.body)?;
-        if result_ty != f.ret_ty && result_ty != Ty::Never {
+        if result_ty != f.ret_ty
+            && result_ty != Ty::Never
+            && !ty_compat_task_handle_as_i32(result_ty, f.ret_ty)
+        {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
                 format!(
@@ -6339,6 +7804,7 @@ impl<'a> Emitter<'a> {
         self.local_count = 0;
         self.scopes.clear();
         self.scopes.push(BTreeMap::new());
+        self.task_scopes.clear();
         self.allow_async_ops = false;
         self.unsafe_depth = 0;
         self.current_fn_name = None;
@@ -6450,11 +7916,19 @@ impl<'a> Emitter<'a> {
 
     fn decl_local(&mut self, ty: Ty, name: &str) {
         match ty {
-            Ty::I32 => self.line(&format!("uint32_t {name} = UINT32_C(0);")),
+            Ty::I32
+            | Ty::TaskHandleBytesV1
+            | Ty::TaskHandleResultBytesV1
+            | Ty::TaskSlotV1
+            | Ty::TaskSelectEvtV1
+            | Ty::Never => self.line(&format!("uint32_t {name} = UINT32_C(0);")),
+            Ty::TaskScopeV1 => self.line(&format!("rt_scope_t {name} = (rt_scope_t){{0}};")),
             Ty::Bytes => self.line(&format!("bytes_t {name} = rt_bytes_empty(ctx);")),
             Ty::BytesView => self.line(&format!("bytes_view_t {name} = rt_view_empty(ctx);")),
             Ty::VecU8 => self.line(&format!("vec_u8_t {name} = (vec_u8_t){{0}};")),
-            Ty::OptionI32 => self.line(&format!("option_i32_t {name} = (option_i32_t){{0}};")),
+            Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => {
+                self.line(&format!("option_i32_t {name} = (option_i32_t){{0}};"))
+            }
             Ty::OptionBytes => {
                 self.line(&format!("option_bytes_t {name} = (option_bytes_t){{0}};"))
             }
@@ -6462,6 +7936,9 @@ impl<'a> Emitter<'a> {
             Ty::ResultBytes => {
                 self.line(&format!("result_bytes_t {name} = (result_bytes_t){{0}};"))
             }
+            Ty::ResultResultBytes => self.line(&format!(
+                "result_result_bytes_t {name} = (result_result_bytes_t){{0}};"
+            )),
             Ty::Iface => self.line(&format!("iface_t {name} = (iface_t){{0}};")),
             Ty::PtrConstU8 => self.line(&format!("const uint8_t* {name} = NULL;")),
             Ty::PtrMutU8 => self.line(&format!("uint8_t* {name} = NULL;")),
@@ -6469,7 +7946,6 @@ impl<'a> Emitter<'a> {
             Ty::PtrMutVoid => self.line(&format!("void* {name} = NULL;")),
             Ty::PtrConstI32 => self.line(&format!("const uint32_t* {name} = NULL;")),
             Ty::PtrMutI32 => self.line(&format!("uint32_t* {name} = NULL;")),
-            Ty::Never => self.line(&format!("uint32_t {name} = UINT32_C(0);")),
         }
     }
 
@@ -6499,14 +7975,22 @@ impl<'a> Emitter<'a> {
         let out = (|| {
             let ty = self.infer_expr_in_new_scope(expr)?;
             let (storage_ty, name) = match ty {
-                Ty::I32 => (Ty::I32, self.alloc_local("t_i32_")?),
+                Ty::I32
+                | Ty::TaskHandleBytesV1
+                | Ty::TaskHandleResultBytesV1
+                | Ty::TaskSlotV1
+                | Ty::TaskSelectEvtV1 => (ty, self.alloc_local("t_i32_")?),
+                Ty::TaskScopeV1 => (Ty::TaskScopeV1, self.alloc_local("t_scope_")?),
                 Ty::Bytes => (Ty::Bytes, self.alloc_local("t_bytes_")?),
                 Ty::BytesView => (Ty::BytesView, self.alloc_local("t_view_")?),
                 Ty::VecU8 => (Ty::VecU8, self.alloc_local("t_vec_u8_")?),
-                Ty::OptionI32 => (Ty::OptionI32, self.alloc_local("t_opt_i32_")?),
+                Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => (ty, self.alloc_local("t_opt_i32_")?),
                 Ty::OptionBytes => (Ty::OptionBytes, self.alloc_local("t_opt_bytes_")?),
                 Ty::ResultI32 => (Ty::ResultI32, self.alloc_local("t_res_i32_")?),
                 Ty::ResultBytes => (Ty::ResultBytes, self.alloc_local("t_res_bytes_")?),
+                Ty::ResultResultBytes => {
+                    (Ty::ResultResultBytes, self.alloc_local("t_res_res_bytes_")?)
+                }
                 Ty::Iface => (Ty::Iface, self.alloc_local("t_iface_")?),
                 Ty::PtrConstU8 => (Ty::PtrConstU8, self.alloc_local("t_ptr_")?),
                 Ty::PtrMutU8 => (Ty::PtrMutU8, self.alloc_local("t_ptr_")?),
@@ -6977,7 +8461,7 @@ impl<'a> Emitter<'a> {
                 format!("use after move: {name:?} moved_ptr={moved_ptr}"),
             ));
         }
-        if var.ty != dest_ty {
+        if var.ty != dest_ty && !ty_compat_task_handle_as_i32(var.ty, dest_ty) {
             return Err(self.err(
                 CompileErrorKind::Typing,
                 format!("type mismatch for identifier {name:?}"),
@@ -7024,6 +8508,27 @@ impl<'a> Emitter<'a> {
             "set" => self.emit_set_to(args, dest_ty, dest),
             "if" => self.emit_if_to(args, dest_ty, dest),
             "for" => self.emit_for_to(args, dest_ty, dest),
+            "task.scope_v1" => self.emit_task_scope_v1_to(args, dest_ty, dest),
+            "task.scope.slot_to_i32_v1" => {
+                self.emit_task_scope_slot_to_i32_v1_to(args, dest_ty, dest)
+            }
+            "task.scope.slot_from_i32_v1" => {
+                self.emit_task_scope_slot_from_i32_v1_to(args, dest_ty, dest)
+            }
+            "task.scope.select_v1" | "task.scope.select_try_v1" => {
+                self.emit_task_scope_select_v1_to(head, args, dest_ty, dest)
+            }
+            "task.select_evt.tag_v1" => self.emit_task_select_evt_tag_v1_to(args, dest_ty, dest),
+            "task.select_evt.case_index_v1" => {
+                self.emit_task_select_evt_case_index_v1_to(args, dest_ty, dest)
+            }
+            "task.select_evt.src_id_v1" => {
+                self.emit_task_select_evt_src_id_v1_to(args, dest_ty, dest)
+            }
+            "task.select_evt.take_bytes_v1" => {
+                self.emit_task_select_evt_take_bytes_v1_to(args, dest_ty, dest)
+            }
+            "task.select_evt.drop_v1" => self.emit_task_select_evt_drop_v1_to(args, dest_ty, dest),
             "return" => self.emit_return(args),
 
             "+" | "-" | "*" | "/" | "%" | "&" | "|" | "^" | "<<u" | ">>u" | "=" | "!=" | "<"
@@ -7159,10 +8664,53 @@ impl<'a> Emitter<'a> {
             "task.spawn" => self.emit_task_spawn_to(args, dest_ty, dest),
             "task.is_finished" => self.emit_task_is_finished_to(args, dest_ty, dest),
             "task.try_join.bytes" => self.emit_task_try_join_bytes_to(args, dest_ty, dest),
+            "task.try_join.result_bytes" => {
+                self.emit_task_try_join_result_bytes_to(args, dest_ty, dest)
+            }
             "task.join.bytes" => self.emit_task_join_bytes_to(args, dest_ty, dest),
+            "task.join.result_bytes" => self.emit_task_join_result_bytes_to(args, dest_ty, dest),
             "task.yield" => self.emit_task_yield_to(args, dest_ty, dest),
             "task.sleep" => self.emit_task_sleep_to(args, dest_ty, dest),
             "task.cancel" => self.emit_task_cancel_to(args, dest_ty, dest),
+
+            "task.scope.start_soon_v1" => {
+                self.emit_task_scope_start_soon_v1_to(args, dest_ty, dest)
+            }
+            "task.scope.cancel_all_v1" => {
+                self.emit_task_scope_cancel_all_v1_to(args, dest_ty, dest)
+            }
+            "task.scope.wait_all_v1" => self.emit_task_scope_wait_all_v1_to(args, dest_ty, dest),
+            "task.scope.async_let_bytes_v1" => self.emit_task_scope_async_let_v1_to(
+                head,
+                args,
+                dest_ty,
+                dest,
+                Ty::TaskHandleBytesV1,
+                "RT_TASK_OUT_KIND_BYTES",
+            ),
+            "task.scope.async_let_result_bytes_v1" => self.emit_task_scope_async_let_v1_to(
+                head,
+                args,
+                dest_ty,
+                dest,
+                Ty::TaskHandleResultBytesV1,
+                "RT_TASK_OUT_KIND_RESULT_BYTES",
+            ),
+            "task.scope.await_slot_bytes_v1" => {
+                self.emit_task_scope_await_slot_bytes_v1_to(args, dest_ty, dest)
+            }
+            "task.scope.await_slot_result_bytes_v1" => {
+                self.emit_task_scope_await_slot_result_bytes_v1_to(args, dest_ty, dest)
+            }
+            "task.scope.try_await_slot.bytes_v1" => {
+                self.emit_task_scope_try_await_slot_bytes_v1_to(args, dest_ty, dest)
+            }
+            "task.scope.try_await_slot.result_bytes_v1" => {
+                self.emit_task_scope_try_await_slot_result_bytes_v1_to(args, dest_ty, dest)
+            }
+            "task.scope.slot_is_finished_v1" => {
+                self.emit_task_scope_slot_is_finished_v1_to(args, dest_ty, dest)
+            }
 
             "chan.bytes.new" => self.emit_chan_bytes_new_to(args, dest_ty, dest),
             "chan.bytes.try_send" => self.emit_chan_bytes_try_send_to(args, dest_ty, dest),
@@ -7336,6 +8884,16 @@ impl<'a> Emitter<'a> {
             "result_bytes.is_ok" => self.emit_result_bytes_is_ok_to(args, dest_ty, dest),
             "result_bytes.err_code" => self.emit_result_bytes_err_code_to(args, dest_ty, dest),
             "result_bytes.unwrap_or" => self.emit_result_bytes_unwrap_or_to(args, dest_ty, dest),
+
+            "result_result_bytes.is_ok" => {
+                self.emit_result_result_bytes_is_ok_to(args, dest_ty, dest)
+            }
+            "result_result_bytes.err_code" => {
+                self.emit_result_result_bytes_err_code_to(args, dest_ty, dest)
+            }
+            "result_result_bytes.unwrap_or" => {
+                self.emit_result_result_bytes_unwrap_or_to(args, dest_ty, dest)
+            }
 
             "try" => self.emit_try_to(args, dest_ty, dest),
 
@@ -7642,14 +9200,19 @@ impl<'a> Emitter<'a> {
             ));
         }
         let scopes_snapshot = self.scopes.clone();
+        let task_scopes_snapshot = self.task_scopes.clone();
         let v = self.emit_expr(&args[0])?;
-        if v.ty != self.fn_ret_ty {
+        if v.ty != self.fn_ret_ty && !ty_compat_task_handle_as_i32(v.ty, self.fn_ret_ty) {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
                 format!("return expression must evaluate to {:?}", self.fn_ret_ty),
             ));
         }
 
+        let task_scopes = self.task_scopes.clone();
+        for scope_name in task_scopes.iter().rev() {
+            self.line(&format!("rt_scope_exit_block(ctx, &{scope_name});"));
+        }
         for (ty, c_name) in self.live_owned_drop_list(Some(&v.c_name)) {
             self.emit_drop_var(ty, &c_name);
         }
@@ -7657,6 +9220,7 @@ impl<'a> Emitter<'a> {
         // `return` terminates control flow. Moves/sets performed while evaluating the return
         // expression must not affect the remaining compilation state.
         self.scopes = scopes_snapshot;
+        self.task_scopes = task_scopes_snapshot;
         Ok(())
     }
 
@@ -7795,7 +9359,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 Ty::BytesView => self.emit_expr_as_bytes_view(arg_expr)?,
                 _ => self.emit_expr(arg_expr)?,
             };
-            if v.ty != param.ty {
+            if v.ty != param.ty && !ty_compat_task_handle_as_i32(v.ty, param.ty) {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
                     format!("call {:?} arg {} expects {:?}", head, i, param.ty),
@@ -7853,13 +9417,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         for (i, (arg_expr, param)) in args.iter().zip(f.params.iter()).enumerate() {
             let v = self.emit_expr(arg_expr)?;
             let want = param.ty;
-            let ok = v.ty == want
-                || matches!(
-                    (v.ty, want),
-                    (Ty::PtrMutU8, Ty::PtrConstU8)
-                        | (Ty::PtrMutVoid, Ty::PtrConstVoid)
-                        | (Ty::PtrMutI32, Ty::PtrConstI32)
-                );
+            let ok = ty_compat_call_arg_extern(v.ty, want);
             if !ok {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -7904,10 +9462,23 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 format!("call {:?} expects {} args", head, f.params.len()),
             ));
         }
-        if dest_ty != Ty::I32 {
+        let expected_dest_ty = match f.ret_ty {
+            Ty::Bytes => Ty::TaskHandleBytesV1,
+            Ty::ResultBytes => Ty::TaskHandleResultBytesV1,
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Internal,
+                    format!(
+                        "internal error: invalid defasync return type: {:?}",
+                        f.ret_ty
+                    ),
+                ));
+            }
+        };
+        if dest_ty != expected_dest_ty {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                format!("async call {:?} returns i32 task handle", head),
+                format!("async call {:?} returns {:?}", head, expected_dest_ty),
             ));
         }
 
@@ -7915,7 +9486,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let mut arg_vals = Vec::with_capacity(args.len());
         for (i, (arg_expr, param)) in args.iter().zip(f.params.iter()).enumerate() {
             let v = self.emit_expr(arg_expr)?;
-            if v.ty != param.ty {
+            if v.ty != param.ty && !ty_compat_task_handle_as_i32(v.ty, param.ty) {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
                     format!("call {:?} arg {} expects {:?}", head, i, param.ty),
@@ -9088,10 +10659,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         let tid = self.emit_expr(&args[0])?;
-        if tid.ty != Ty::I32 {
+        if tid.ty != Ty::TaskHandleBytesV1 && tid.ty != Ty::I32 {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "await expects i32 task handle".to_string(),
+                "await expects bytes task handle".to_string(),
             ));
         }
         self.line(&format!(
@@ -9113,17 +10684,20 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "task.spawn expects 1 arg".to_string(),
             ));
         }
-        if dest_ty != Ty::I32 {
+        let tid = self.emit_expr(&args[0])?;
+        if tid.ty != Ty::TaskHandleBytesV1
+            && tid.ty != Ty::TaskHandleResultBytesV1
+            && tid.ty != Ty::I32
+        {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "task.spawn returns i32".to_string(),
+                "task.spawn expects task handle".to_string(),
             ));
         }
-        let tid = self.emit_expr(&args[0])?;
-        if tid.ty != Ty::I32 {
+        if dest_ty != tid.ty && !ty_compat_task_handle_as_i32(tid.ty, dest_ty) {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "task.spawn expects i32 task handle".to_string(),
+                "task.spawn returns task handle".to_string(),
             ));
         }
         self.line(&format!("{dest} = rt_task_spawn(ctx, {});", tid.c_name));
@@ -9149,10 +10723,13 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         let tid = self.emit_expr(&args[0])?;
-        if tid.ty != Ty::I32 {
+        if tid.ty != Ty::TaskHandleBytesV1
+            && tid.ty != Ty::TaskHandleResultBytesV1
+            && tid.ty != Ty::I32
+        {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "task.is_finished expects i32 task handle".to_string(),
+                "task.is_finished expects task handle".to_string(),
             ));
         }
         self.line(&format!(
@@ -9181,14 +10758,46 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         let tid = self.emit_expr(&args[0])?;
-        if tid.ty != Ty::I32 {
+        if tid.ty != Ty::TaskHandleBytesV1 && tid.ty != Ty::I32 {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "task.try_join.bytes expects i32 task handle".to_string(),
+                "task.try_join.bytes expects bytes task handle".to_string(),
             ));
         }
         self.line(&format!(
             "{dest} = rt_task_try_join_bytes(ctx, {});",
+            tid.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_try_join_result_bytes_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.try_join.result_bytes expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.try_join.result_bytes returns result_result_bytes".to_string(),
+            ));
+        }
+        let tid = self.emit_expr(&args[0])?;
+        if tid.ty != Ty::TaskHandleResultBytesV1 && tid.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.try_join.result_bytes expects result_bytes task handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_task_try_join_result_bytes(ctx, {});",
             tid.c_name
         ));
         Ok(())
@@ -9213,14 +10822,46 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         let tid = self.emit_expr(&args[0])?;
-        if tid.ty != Ty::I32 {
+        if tid.ty != Ty::TaskHandleBytesV1 && tid.ty != Ty::I32 {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "task.join.bytes expects i32 task handle".to_string(),
+                "task.join.bytes expects bytes task handle".to_string(),
             ));
         }
         self.line(&format!(
             "{dest} = rt_task_join_bytes_block(ctx, {});",
+            tid.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_join_result_bytes_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.join.result_bytes expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.join.result_bytes returns result_bytes".to_string(),
+            ));
+        }
+        let tid = self.emit_expr(&args[0])?;
+        if tid.ty != Ty::TaskHandleResultBytesV1 && tid.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.join.result_bytes expects result_bytes task handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_task_join_result_bytes_block(ctx, {});",
             tid.c_name
         ));
         Ok(())
@@ -9299,13 +10940,1058 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         let tid = self.emit_expr(&args[0])?;
-        if tid.ty != Ty::I32 {
+        if tid.ty != Ty::TaskHandleBytesV1
+            && tid.ty != Ty::TaskHandleResultBytesV1
+            && tid.ty != Ty::I32
+        {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "task.cancel expects i32 task handle".to_string(),
+                "task.cancel expects task handle".to_string(),
             ));
         }
         self.line(&format!("{dest} = rt_task_cancel(ctx, {});", tid.c_name));
+        Ok(())
+    }
+
+    fn emit_task_scope_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "task.scope_v1 is only allowed in solve or defasync".to_string(),
+            ));
+        }
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope_v1 expects 2 args".to_string(),
+            ));
+        }
+        let cfg = parse_task_scope_cfg_v1(&args[0])?;
+
+        let body_ty = self.infer_expr_in_new_scope(&args[1])?;
+        if body_ty != dest_ty && body_ty != Ty::Never {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("task.scope_v1 body must evaluate to {dest_ty:?} (or return)"),
+            ));
+        }
+
+        let scope_name = self.alloc_local("t_scope_")?;
+        self.decl_local(Ty::TaskScopeV1, &scope_name);
+        self.line(&format!(
+            "rt_scope_init(ctx, &{scope_name}, UINT32_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT32_C({}));",
+            cfg.max_children,
+            cfg.max_ticks,
+            cfg.max_blocked_waits,
+            cfg.max_join_polls,
+            cfg.max_slot_result_bytes
+        ));
+
+        self.task_scopes.push(scope_name.clone());
+        self.emit_expr_to(&args[1], dest_ty, dest)?;
+        let popped = self.task_scopes.pop();
+        debug_assert_eq!(popped.as_deref(), Some(scope_name.as_str()));
+
+        self.line(&format!("rt_scope_exit_block(ctx, &{scope_name});"));
+        Ok(())
+    }
+
+    fn emit_task_scope_start_soon_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "task.scope.start_soon_v1 is only allowed in solve or defasync".to_string(),
+            ));
+        }
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_001: task.scope.start_soon_v1 used outside task.scope_v1".to_string(),
+            )
+        })?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.start_soon_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.start_soon_v1 returns i32".to_string(),
+            ));
+        }
+
+        let Expr::List { items: call, .. } = &args[0] else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_002: task.scope.start_soon_v1 expects an immediate defasync call expression"
+                    .to_string(),
+            ));
+        };
+        let head = call.first().and_then(Expr::as_ident).ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_002: task.scope.start_soon_v1 expects an immediate defasync call expression"
+                    .to_string(),
+            )
+        })?;
+        let call_args = &call[1..];
+        let async_f = self.program.async_functions.iter().find(|f| f.name == head).ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_002: task.scope.start_soon_v1 expects an immediate defasync call expression"
+                    .to_string(),
+            )
+        })?;
+
+        let handle_ty = match async_f.ret_ty {
+            Ty::Bytes => Ty::TaskHandleBytesV1,
+            Ty::ResultBytes => Ty::TaskHandleResultBytesV1,
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Internal,
+                    format!(
+                        "internal error: unsupported defasync return type: {:?}",
+                        async_f.ret_ty
+                    ),
+                ));
+            }
+        };
+        let kind = match handle_ty {
+            Ty::TaskHandleBytesV1 => "RT_TASK_OUT_KIND_BYTES",
+            Ty::TaskHandleResultBytesV1 => "RT_TASK_OUT_KIND_RESULT_BYTES",
+            _ => unreachable!(),
+        };
+
+        let task_id = self.alloc_local("t_task_")?;
+        self.decl_local(handle_ty, &task_id);
+        self.emit_async_call_to(head, call_args, handle_ty, &task_id)?;
+        self.line(&format!("(void)rt_task_spawn(ctx, {task_id});"));
+        self.line(&format!(
+            "{dest} = rt_scope_start_soon(ctx, &{scope_name}, {task_id}, {kind});"
+        ));
+        Ok(())
+    }
+
+    fn emit_task_scope_cancel_all_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "task.scope.cancel_all_v1 is only allowed in solve or defasync".to_string(),
+            ));
+        }
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_001: task.scope.cancel_all_v1 used outside task.scope_v1".to_string(),
+            )
+        })?;
+        if !args.is_empty() {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.cancel_all_v1 expects 0 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.cancel_all_v1 returns i32".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scope_cancel_all(ctx, &{scope_name});"
+        ));
+        Ok(())
+    }
+
+    fn emit_task_scope_wait_all_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "task.scope.wait_all_v1 is only allowed in solve or defasync".to_string(),
+            ));
+        }
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_001: task.scope.wait_all_v1 used outside task.scope_v1".to_string(),
+            )
+        })?;
+        if !args.is_empty() {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.wait_all_v1 expects 0 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.wait_all_v1 returns i32".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_scope_wait_all_count(&{scope_name});"));
+        self.line(&format!(
+            "rt_scope_join_drop_remaining_block(ctx, &{scope_name});"
+        ));
+        self.line(&format!("rt_scope_reset_active(&{scope_name});"));
+        Ok(())
+    }
+
+    fn emit_task_scope_async_let_v1_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+        expect_handle_ty: Ty,
+        kind: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("{head} is only allowed in solve or defasync"),
+            ));
+        }
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("X07E_SCOPE_SLOT_001: {head} used outside task.scope_v1"),
+            )
+        })?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 1 arg"),
+            ));
+        }
+        if dest_ty != Ty::TaskSlotV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns task_slot_v1"),
+            ));
+        }
+
+        let Expr::List { items: call, .. } = &args[0] else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!(
+                    "X07E_SCOPE_SLOT_003: {head} expects an immediate defasync call expression"
+                ),
+            ));
+        };
+        let callee = call.first().and_then(Expr::as_ident).ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                format!(
+                    "X07E_SCOPE_SLOT_003: {head} expects an immediate defasync call expression"
+                ),
+            )
+        })?;
+        let call_args = &call[1..];
+        let async_f = self
+            .program
+            .async_functions
+            .iter()
+            .find(|f| f.name == callee)
+            .ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "X07E_SCOPE_SLOT_003: {head} expects an immediate defasync call expression"
+                    ),
+                )
+            })?;
+        let got_handle_ty = match async_f.ret_ty {
+            Ty::Bytes => Ty::TaskHandleBytesV1,
+            Ty::ResultBytes => Ty::TaskHandleResultBytesV1,
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Internal,
+                    format!(
+                        "internal error: unsupported defasync return type: {:?}",
+                        async_f.ret_ty
+                    ),
+                ));
+            }
+        };
+        if got_handle_ty != expect_handle_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} defasync return type mismatch"),
+            ));
+        }
+
+        let task_id = self.alloc_local("t_task_")?;
+        self.decl_local(expect_handle_ty, &task_id);
+        self.emit_async_call_to(callee, call_args, expect_handle_ty, &task_id)?;
+        self.line(&format!("(void)rt_task_spawn(ctx, {task_id});"));
+        self.line(&format!(
+            "{dest} = rt_scope_async_let(ctx, &{scope_name}, {task_id}, {kind});"
+        ));
+        Ok(())
+    }
+
+    fn emit_task_scope_await_slot_bytes_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "task.scope.await_slot_bytes_v1 is only allowed in solve or defasync".to_string(),
+            ));
+        }
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_SLOT_002: task.scope.await_slot_bytes_v1 used outside task.scope_v1"
+                    .to_string(),
+            )
+        })?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.await_slot_bytes_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.await_slot_bytes_v1 returns bytes".to_string(),
+            ));
+        }
+        let slot_id = self.emit_expr(&args[0])?;
+        if slot_id.ty != Ty::TaskSlotV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.await_slot_bytes_v1 expects task_slot_v1".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scope_await_slot_bytes_block(ctx, &{scope_name}, {});",
+            slot_id.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_scope_await_slot_result_bytes_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "task.scope.await_slot_result_bytes_v1 is only allowed in solve or defasync"
+                    .to_string(),
+            ));
+        }
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_SLOT_002: task.scope.await_slot_result_bytes_v1 used outside task.scope_v1".to_string(),
+            )
+        })?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.await_slot_result_bytes_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.await_slot_result_bytes_v1 returns result_bytes".to_string(),
+            ));
+        }
+        let slot_id = self.emit_expr(&args[0])?;
+        if slot_id.ty != Ty::TaskSlotV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.await_slot_result_bytes_v1 expects task_slot_v1".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scope_await_slot_result_bytes_block(ctx, &{scope_name}, {});",
+            slot_id.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_scope_try_await_slot_bytes_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_SLOT_002: task.scope.try_await_slot.bytes_v1 used outside task.scope_v1"
+                    .to_string(),
+            )
+        })?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.try_await_slot.bytes_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.try_await_slot.bytes_v1 returns result_bytes".to_string(),
+            ));
+        }
+        let slot_id = self.emit_expr(&args[0])?;
+        if slot_id.ty != Ty::TaskSlotV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.try_await_slot.bytes_v1 expects task_slot_v1".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scope_try_await_slot_bytes(ctx, &{scope_name}, {});",
+            slot_id.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_scope_try_await_slot_result_bytes_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_SLOT_002: task.scope.try_await_slot.result_bytes_v1 used outside task.scope_v1"
+                    .to_string(),
+            )
+        })?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.try_await_slot.result_bytes_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.try_await_slot.result_bytes_v1 returns result_result_bytes".to_string(),
+            ));
+        }
+        let slot_id = self.emit_expr(&args[0])?;
+        if slot_id.ty != Ty::TaskSlotV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.try_await_slot.result_bytes_v1 expects task_slot_v1".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scope_try_await_slot_result_bytes(ctx, &{scope_name}, {});",
+            slot_id.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_scope_slot_is_finished_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_SLOT_002: task.scope.slot_is_finished_v1 used outside task.scope_v1"
+                    .to_string(),
+            )
+        })?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.slot_is_finished_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.slot_is_finished_v1 returns i32".to_string(),
+            ));
+        }
+        let slot_id = self.emit_expr(&args[0])?;
+        if slot_id.ty != Ty::TaskSlotV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.slot_is_finished_v1 expects task_slot_v1".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scope_slot_is_finished(ctx, &{scope_name}, {});",
+            slot_id.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_scope_slot_to_i32_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let _scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.slot_to_i32_v1 used outside task.scope_v1".to_string(),
+            )
+        })?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.slot_to_i32_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.slot_to_i32_v1 returns i32".to_string(),
+            ));
+        }
+        let slot = self.emit_expr(&args[0])?;
+        if slot.ty != Ty::TaskSlotV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.slot_to_i32_v1 expects task_slot_v1".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = {};", slot.c_name));
+        Ok(())
+    }
+
+    fn emit_task_scope_slot_from_i32_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let _scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.slot_from_i32_v1 used outside task.scope_v1".to_string(),
+            )
+        })?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.scope.slot_from_i32_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::TaskSlotV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.slot_from_i32_v1 returns task_slot_v1".to_string(),
+            ));
+        }
+        let slot = self.emit_expr(&args[0])?;
+        if slot.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.slot_from_i32_v1 expects i32".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = {};", slot.c_name));
+        Ok(())
+    }
+
+    fn emit_task_scope_select_v1_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("{head} is only allowed in solve or defasync"),
+            ));
+        }
+        let scope_name = self.task_scopes.last().cloned().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SELECT_OUTSIDE_SCOPE: task.scope.select used outside task.scope_v1"
+                    .to_string(),
+            )
+        })?;
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 2 args"),
+            ));
+        }
+        let cfg = parse_task_select_cfg_v1(&args[0])?;
+        let cases = parse_task_select_cases_v1(&args[1])?;
+        if cases.len() > cfg.max_cases as usize {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SELECT_TOO_MANY_CASES: too many cases".to_string(),
+            ));
+        }
+
+        let is_try = head == "task.scope.select_try_v1";
+        match (is_try, dest_ty) {
+            (false, Ty::TaskSelectEvtV1) => {}
+            (true, Ty::OptionTaskSelectEvtV1) => {}
+            (false, _) => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "task.scope.select_v1 returns task_select_evt_v1".to_string(),
+                ));
+            }
+            (true, _) => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "task.scope.select_try_v1 returns option_i32".to_string(),
+                ));
+            }
+        }
+
+        let res_var = self.alloc_local("t_select_res_")?;
+        self.decl_local(Ty::ResultBytes, &res_var);
+
+        let polls_var = if is_try {
+            None
+        } else {
+            let v = self.alloc_local("t_select_polls_")?;
+            self.decl_local(Ty::I32, &v);
+            Some(v)
+        };
+        let slept_var = if is_try || cfg.timeout_ticks == 0 {
+            None
+        } else {
+            let v = self.alloc_local("t_select_slept_")?;
+            self.decl_local(Ty::I32, &v);
+            Some(v)
+        };
+
+        let rr_start_var = if cfg.policy == TaskSelectPolicyV1::RrV1 {
+            let v = self.alloc_local("t_select_rr_")?;
+            self.decl_local(Ty::I32, &v);
+            Some(v)
+        } else {
+            None
+        };
+
+        let done_label = self.alloc_local("lbl_select_done_")?;
+        let loop_label = self.alloc_local("lbl_select_loop_")?;
+
+        // Initialize per-call state.
+        if let Some(polls) = &polls_var {
+            self.line(&format!("{polls} = UINT32_C(0);"));
+        }
+        if let Some(slept) = &slept_var {
+            self.line(&format!("{slept} = UINT32_C(0);"));
+        }
+
+        self.line(&format!("{loop_label}: ;"));
+        if let Some(rr) = &rr_start_var {
+            self.line(&format!("{rr} = {scope_name}.select_rr_cursor;"));
+            if !cases.is_empty() {
+                self.line(&format!(
+                    "if ({rr} >= UINT32_C({})) {rr} = UINT32_C(0);",
+                    cases.len()
+                ));
+            }
+        }
+
+        let emit_case_check = |this: &mut Self,
+                               idx: usize,
+                               case: &TaskSelectCaseV1|
+         -> Result<(), CompilerError> {
+            match case {
+                TaskSelectCaseV1::SlotBytes { slot } => {
+                    let slot_id = this.emit_expr(slot)?;
+                    if slot_id.ty != Ty::TaskSlotV1 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "task.scope.select slot case expects task_slot_v1".to_string(),
+                        ));
+                    }
+                    this.line(&format!("if ({} != UINT32_MAX) {{", slot_id.c_name));
+                    this.indent += 1;
+                    this.line(&format!(
+                        "{res_var} = rt_scope_try_await_slot_bytes(ctx, &{scope_name}, {});",
+                        slot_id.c_name
+                    ));
+                    this.line(&format!("if ({res_var}.tag) {{"));
+                    this.indent += 1;
+                    if !is_try {
+                        this.line(&format!(
+                            "{dest} = rt_select_evt_new(ctx, {scope_name}.key, UINT32_C(1), UINT32_C({idx}), {}, {res_var}.payload.ok);",
+                            slot_id.c_name
+                        ));
+                    } else {
+                        this.line(&format!("{dest}.tag = UINT32_C(1);"));
+                        this.line(&format!(
+                            "{dest}.payload = rt_select_evt_new(ctx, {scope_name}.key, UINT32_C(1), UINT32_C({idx}), {}, {res_var}.payload.ok);",
+                            slot_id.c_name
+                        ));
+                    }
+                    // Prevent double-free of payload moved into the select event.
+                    this.line(&format!("{res_var}.tag = UINT32_C(0);"));
+                    this.line(&format!("{res_var}.payload.err = UINT32_C(0);"));
+                    if cfg.policy == TaskSelectPolicyV1::RrV1 && !cases.is_empty() {
+                        let next = (idx + 1) % cases.len();
+                        this.line(&format!(
+                            "{scope_name}.select_rr_cursor = UINT32_C({next});"
+                        ));
+                    }
+                    this.line(&format!("goto {done_label};"));
+                    this.indent -= 1;
+                    this.line("}");
+                    this.line(&format!("if ({res_var}.payload.err == UINT32_C(2)) {{"));
+                    this.indent += 1;
+                    if !is_try {
+                        this.line(&format!(
+                            "{dest} = rt_select_evt_new(ctx, {scope_name}.key, UINT32_C(2), UINT32_C({idx}), {}, rt_bytes_empty(ctx));",
+                            slot_id.c_name
+                        ));
+                    } else {
+                        this.line(&format!("{dest}.tag = UINT32_C(1);"));
+                        this.line(&format!(
+                            "{dest}.payload = rt_select_evt_new(ctx, {scope_name}.key, UINT32_C(2), UINT32_C({idx}), {}, rt_bytes_empty(ctx));",
+                            slot_id.c_name
+                        ));
+                    }
+                    if cfg.policy == TaskSelectPolicyV1::RrV1 && !cases.is_empty() {
+                        let next = (idx + 1) % cases.len();
+                        this.line(&format!(
+                            "{scope_name}.select_rr_cursor = UINT32_C({next});"
+                        ));
+                    }
+                    this.line(&format!("goto {done_label};"));
+                    this.indent -= 1;
+                    this.line("}");
+                    this.indent -= 1;
+                    this.line("}");
+                }
+                TaskSelectCaseV1::ChanRecvBytes { chan } => {
+                    let chan_id = this.emit_expr(chan)?;
+                    if chan_id.ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "task.scope.select chan.recv case expects i32 chan handle".to_string(),
+                        ));
+                    }
+                    this.line(&format!("if ({} != UINT32_C(0)) {{", chan_id.c_name));
+                    this.indent += 1;
+                    this.line(&format!(
+                        "{res_var} = rt_chan_bytes_try_recv(ctx, {});",
+                        chan_id.c_name
+                    ));
+                    this.line(&format!("if ({res_var}.tag) {{"));
+                    this.indent += 1;
+                    if !is_try {
+                        this.line(&format!(
+                            "{dest} = rt_select_evt_new(ctx, {scope_name}.key, UINT32_C(3), UINT32_C({idx}), {}, {res_var}.payload.ok);",
+                            chan_id.c_name
+                        ));
+                    } else {
+                        this.line(&format!("{dest}.tag = UINT32_C(1);"));
+                        this.line(&format!(
+                            "{dest}.payload = rt_select_evt_new(ctx, {scope_name}.key, UINT32_C(3), UINT32_C({idx}), {}, {res_var}.payload.ok);",
+                            chan_id.c_name
+                        ));
+                    }
+                    this.line(&format!("{res_var}.tag = UINT32_C(0);"));
+                    this.line(&format!("{res_var}.payload.err = UINT32_C(0);"));
+                    if cfg.policy == TaskSelectPolicyV1::RrV1 && !cases.is_empty() {
+                        let next = (idx + 1) % cases.len();
+                        this.line(&format!(
+                            "{scope_name}.select_rr_cursor = UINT32_C({next});"
+                        ));
+                    }
+                    this.line(&format!("goto {done_label};"));
+                    this.indent -= 1;
+                    this.line("}");
+                    this.line(&format!("if ({res_var}.payload.err == UINT32_C(2)) {{"));
+                    this.indent += 1;
+                    if !is_try {
+                        this.line(&format!(
+                            "{dest} = rt_select_evt_new(ctx, {scope_name}.key, UINT32_C(4), UINT32_C({idx}), {}, rt_bytes_empty(ctx));",
+                            chan_id.c_name
+                        ));
+                    } else {
+                        this.line(&format!("{dest}.tag = UINT32_C(1);"));
+                        this.line(&format!(
+                            "{dest}.payload = rt_select_evt_new(ctx, {scope_name}.key, UINT32_C(4), UINT32_C({idx}), {}, rt_bytes_empty(ctx));",
+                            chan_id.c_name
+                        ));
+                    }
+                    if cfg.policy == TaskSelectPolicyV1::RrV1 && !cases.is_empty() {
+                        let next = (idx + 1) % cases.len();
+                        this.line(&format!(
+                            "{scope_name}.select_rr_cursor = UINT32_C({next});"
+                        ));
+                    }
+                    this.line(&format!("goto {done_label};"));
+                    this.indent -= 1;
+                    this.line("}");
+                    this.indent -= 1;
+                    this.line("}");
+                }
+            }
+            Ok(())
+        };
+
+        let rr_start = rr_start_var.as_deref();
+
+        // First pass (rr: indices >= rr_start; priority: all).
+        for (idx, case) in cases.iter().enumerate() {
+            if let Some(rr) = rr_start {
+                self.line(&format!("if (UINT32_C({idx}) >= {rr}) {{"));
+                self.indent += 1;
+                emit_case_check(self, idx, case)?;
+                self.indent -= 1;
+                self.line("}");
+            } else {
+                emit_case_check(self, idx, case)?;
+            }
+        }
+        // Second pass for rr (indices < rr_start).
+        if let Some(rr) = rr_start {
+            for (idx, case) in cases.iter().enumerate() {
+                self.line(&format!("if (UINT32_C({idx}) < {rr}) {{"));
+                self.indent += 1;
+                emit_case_check(self, idx, case)?;
+                self.indent -= 1;
+                self.line("}");
+            }
+        }
+
+        if is_try {
+            self.line(&format!("{dest}.tag = UINT32_C(0);"));
+            self.line(&format!("{dest}.payload = UINT32_C(0);"));
+            self.line(&format!("goto {done_label};"));
+            self.line(&format!("{done_label}: ;"));
+            return Ok(());
+        }
+
+        // Nothing ready: apply blocking policy and retry.
+        if let Some(polls) = &polls_var {
+            self.line(&format!("{polls} = {polls} + UINT32_C(1);"));
+            if cfg.max_polls != 0 {
+                self.line(&format!(
+                    "if ({polls} > UINT32_C({})) rt_trap(\"X07T_SELECT_MAX_POLLS\");",
+                    cfg.max_polls
+                ));
+            }
+        }
+        if cfg.timeout_ticks != 0 {
+            let slept = slept_var.as_deref().unwrap();
+            self.line(&format!(
+                "if ({slept} >= UINT32_C({})) {{ {dest} = rt_select_evt_new(ctx, {scope_name}.key, UINT32_C(5), UINT32_C(0), UINT32_C(0), rt_bytes_empty(ctx)); goto {done_label}; }}",
+                cfg.timeout_ticks
+            ));
+        }
+        if cfg.poll_sleep_ticks != 0 {
+            self.line(&format!(
+                "(void)rt_task_sleep_block(ctx, UINT32_C({}));",
+                cfg.poll_sleep_ticks
+            ));
+            if let Some(slept) = slept_var.as_deref() {
+                self.line(&format!(
+                    "{slept} = {slept} + UINT32_C({});",
+                    cfg.poll_sleep_ticks
+                ));
+            }
+        } else {
+            self.line("(void)rt_task_yield_block(ctx);");
+        }
+        self.line(&format!("goto {loop_label};"));
+
+        self.line(&format!("{done_label}: ;"));
+        Ok(())
+    }
+
+    fn emit_task_select_evt_tag_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.select_evt.tag_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.tag_v1 returns i32".to_string(),
+            ));
+        }
+        let evt = self.emit_expr(&args[0])?;
+        if evt.ty != Ty::TaskSelectEvtV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.tag_v1 expects task_select_evt_v1".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_select_evt_tag(ctx, {});", evt.c_name));
+        Ok(())
+    }
+
+    fn emit_task_select_evt_case_index_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.select_evt.case_index_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.case_index_v1 returns i32".to_string(),
+            ));
+        }
+        let evt = self.emit_expr(&args[0])?;
+        if evt.ty != Ty::TaskSelectEvtV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.case_index_v1 expects task_select_evt_v1".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_select_evt_case_index(ctx, {});",
+            evt.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_select_evt_src_id_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.select_evt.src_id_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.src_id_v1 returns i32".to_string(),
+            ));
+        }
+        let evt = self.emit_expr(&args[0])?;
+        if evt.ty != Ty::TaskSelectEvtV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.src_id_v1 expects task_select_evt_v1".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_select_evt_src_id(ctx, {});",
+            evt.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_select_evt_take_bytes_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.select_evt.take_bytes_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.take_bytes_v1 returns bytes".to_string(),
+            ));
+        }
+        let evt = self.emit_expr(&args[0])?;
+        if evt.ty != Ty::TaskSelectEvtV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.take_bytes_v1 expects task_select_evt_v1".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_select_evt_take_bytes(ctx, {});",
+            evt.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_task_select_evt_drop_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "task.select_evt.drop_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.drop_v1 returns i32".to_string(),
+            ));
+        }
+        let evt = self.emit_expr(&args[0])?;
+        if evt.ty != Ty::TaskSelectEvtV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.select_evt.drop_v1 expects task_select_evt_v1".to_string(),
+            ));
+        }
+        self.line(&format!("rt_select_evt_drop(ctx, {});", evt.c_name));
+        self.line(&format!("{dest} = UINT32_C(1);"));
         Ok(())
     }
 
@@ -14632,6 +17318,119 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         Ok(())
     }
 
+    fn emit_result_result_bytes_is_ok_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "result_result_bytes.is_ok expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_result_bytes.is_ok returns i32".to_string(),
+            ));
+        }
+        let res = self.emit_expr(&args[0])?;
+        if res.ty != Ty::ResultResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_result_bytes.is_ok expects result_result_bytes".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", res.c_name));
+        Ok(())
+    }
+
+    fn emit_result_result_bytes_err_code_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "result_result_bytes.err_code expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_result_bytes.err_code returns i32".to_string(),
+            ));
+        }
+        let res = self.emit_expr(&args[0])?;
+        if res.ty != Ty::ResultResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_result_bytes.err_code expects result_result_bytes".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = ({}.tag == UINT32_C(0)) ? {}.payload.err : UINT32_C(0);",
+            res.c_name, res.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_result_result_bytes_unwrap_or_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "result_result_bytes.unwrap_or expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_result_bytes.unwrap_or returns result_bytes".to_string(),
+            ));
+        }
+        let res = self.emit_expr(&args[0])?;
+        let default = self.emit_expr(&args[1])?;
+        if res.ty != Ty::ResultResultBytes || default.ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_result_bytes.unwrap_or expects (result_result_bytes, result_bytes default)"
+                    .to_string(),
+            ));
+        }
+
+        self.line(&format!("if ({}.tag == UINT32_C(1)) {{", res.c_name));
+        self.indent += 1;
+        self.line(&format!("{dest} = {}.payload.ok;", res.c_name));
+        self.line(&format!(
+            "{}.payload.ok = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = UINT32_C(0) }};",
+            res.c_name
+        ));
+        self.line(&format!("{}.tag = UINT32_C(0);", res.c_name));
+        self.line(&format!("{}.payload.err = UINT32_C(0);", res.c_name));
+        self.indent -= 1;
+        self.line("} else {");
+        self.indent += 1;
+        self.line(&format!("{dest} = {};", default.c_name));
+        self.line(&format!(
+            "{}.payload.ok = rt_bytes_empty(ctx);",
+            default.c_name
+        ));
+        self.line(&format!("{}.tag = UINT32_C(0);", default.c_name));
+        self.line(&format!("{}.payload.err = UINT32_C(0);", default.c_name));
+        self.indent -= 1;
+        self.line("}");
+        Ok(())
+    }
+
     fn emit_try_to(&mut self, args: &[Expr], dest_ty: Ty, dest: &str) -> Result<(), CompilerError> {
         if args.len() != 1 {
             return Err(CompilerError::new(
@@ -15012,9 +17811,25 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             );
         }
         for f in &self.program.async_functions {
+            let call_ret_ty = match f.ret_ty {
+                Ty::Bytes => Ty::TaskHandleBytesV1,
+                Ty::ResultBytes => Ty::TaskHandleResultBytesV1,
+                _ => {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Internal,
+                        format!(
+                            "internal error: invalid defasync return type: {:?}",
+                            f.ret_ty
+                        ),
+                    ));
+                }
+            };
             functions.insert(
                 f.name.clone(),
-                (Ty::I32, f.params.iter().map(|p| p.ty).collect::<Vec<_>>()),
+                (
+                    call_ret_ty,
+                    f.params.iter().map(|p| p.ty).collect::<Vec<_>>(),
+                ),
             );
         }
 
@@ -15023,6 +17838,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             fn_ret_ty: self.fn_ret_ty,
             allow_async_ops: self.allow_async_ops,
             unsafe_depth: self.unsafe_depth,
+            task_scope_depth: 0,
             scopes: self
                 .scopes
                 .iter()
@@ -15051,11 +17867,369 @@ fn c_escape_c_string(s: &str) -> String {
     out
 }
 
+#[derive(Debug, Clone, Copy)]
+struct TaskScopeCfgV1 {
+    max_children: u32,
+    max_ticks: u64,
+    max_blocked_waits: u64,
+    max_join_polls: u64,
+    max_slot_result_bytes: u32,
+}
+
+fn parse_task_scope_cfg_v1(expr: &Expr) -> Result<TaskScopeCfgV1, CompilerError> {
+    let Expr::List { items, .. } = expr else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "task.scope.cfg_v1 must be a list".to_string(),
+        ));
+    };
+    if items.first().and_then(Expr::as_ident) != Some("task.scope.cfg_v1") {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "task.scope cfg must be task.scope.cfg_v1".to_string(),
+        ));
+    }
+
+    let mut max_children: Option<u32> = None;
+    let mut max_ticks: Option<u64> = None;
+    let mut max_blocked_waits: Option<u64> = None;
+    let mut max_join_polls: Option<u64> = None;
+    let mut max_slot_result_bytes: Option<u32> = None;
+
+    for field in items.iter().skip(1) {
+        let Expr::List { items: kv, .. } = field else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.cfg_v1 field must be a pair".to_string(),
+            ));
+        };
+        if kv.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.cfg_v1 field must be a pair".to_string(),
+            ));
+        }
+        let Some(key) = kv[0].as_ident() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.cfg_v1 key must be an identifier".to_string(),
+            ));
+        };
+        let Expr::Int { value, .. } = kv[1] else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.cfg_v1 value must be an integer".to_string(),
+            ));
+        };
+
+        if value < 0 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("task.scope.cfg_v1 {key} must be >= 0"),
+            ));
+        }
+
+        match key {
+            "max_children" => {
+                if max_children.replace(value as u32).is_some() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.cfg_v1 has duplicate max_children".to_string(),
+                    ));
+                }
+            }
+            "max_ticks" => {
+                if max_ticks.replace(value as u64).is_some() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.cfg_v1 has duplicate max_ticks".to_string(),
+                    ));
+                }
+            }
+            "max_blocked_waits" => {
+                if max_blocked_waits.replace(value as u64).is_some() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.cfg_v1 has duplicate max_blocked_waits".to_string(),
+                    ));
+                }
+            }
+            "max_join_polls" => {
+                if max_join_polls.replace(value as u64).is_some() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.cfg_v1 has duplicate max_join_polls".to_string(),
+                    ));
+                }
+            }
+            "max_slot_result_bytes" => {
+                if max_slot_result_bytes.replace(value as u32).is_some() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.cfg_v1 has duplicate max_slot_result_bytes".to_string(),
+                    ));
+                }
+            }
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("task.scope.cfg_v1 unknown field: {key}"),
+                ));
+            }
+        }
+    }
+
+    Ok(TaskScopeCfgV1 {
+        max_children: max_children.unwrap_or(1024),
+        max_ticks: max_ticks.unwrap_or(0),
+        max_blocked_waits: max_blocked_waits.unwrap_or(0),
+        max_join_polls: max_join_polls.unwrap_or(0),
+        max_slot_result_bytes: max_slot_result_bytes.unwrap_or(0),
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TaskSelectPolicyV1 {
+    PriorityV1,
+    RrV1,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TaskSelectCfgV1 {
+    max_cases: u32,
+    poll_sleep_ticks: u32,
+    max_polls: u32,
+    policy: TaskSelectPolicyV1,
+    timeout_ticks: u32,
+}
+
+fn parse_task_select_cfg_v1(expr: &Expr) -> Result<TaskSelectCfgV1, CompilerError> {
+    let Expr::List { items, .. } = expr else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "task.scope.select.cfg_v1 must be a list".to_string(),
+        ));
+    };
+    if items.first().and_then(Expr::as_ident) != Some("task.scope.select.cfg_v1") {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "task.scope.select cfg must be task.scope.select.cfg_v1".to_string(),
+        ));
+    }
+
+    let mut max_cases: Option<u32> = None;
+    let mut poll_sleep_ticks: Option<u32> = None;
+    let mut max_polls: Option<u32> = None;
+    let mut policy: Option<TaskSelectPolicyV1> = None;
+    let mut timeout_ticks: Option<u32> = None;
+
+    for field in items.iter().skip(1) {
+        let Expr::List { items: kv, .. } = field else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.select.cfg_v1 field must be a pair".to_string(),
+            ));
+        };
+        if kv.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.select.cfg_v1 field must be a pair".to_string(),
+            ));
+        }
+        let Some(key) = kv[0].as_ident() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.select.cfg_v1 key must be an identifier".to_string(),
+            ));
+        };
+
+        match key {
+            "policy" => {
+                let Some(p) = kv[1].as_ident() else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.select.cfg_v1 policy must be an identifier".to_string(),
+                    ));
+                };
+                let p = match p {
+                    "priority_v1" => TaskSelectPolicyV1::PriorityV1,
+                    "rr_v1" => TaskSelectPolicyV1::RrV1,
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "task.scope.select.cfg_v1 policy must be \"priority_v1\" or \"rr_v1\""
+                                .to_string(),
+                        ));
+                    }
+                };
+                if policy.replace(p).is_some() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.select.cfg_v1 has duplicate policy".to_string(),
+                    ));
+                }
+            }
+            "max_cases" | "poll_sleep_ticks" | "max_polls" | "timeout_ticks" => {
+                let Expr::Int { value, .. } = kv[1] else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.select.cfg_v1 value must be an integer".to_string(),
+                    ));
+                };
+                if value < 0 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("task.scope.select.cfg_v1 {key} must be >= 0"),
+                    ));
+                }
+                let x = value as u32;
+                match key {
+                    "max_cases" => {
+                        if max_cases.replace(x).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.select.cfg_v1 has duplicate max_cases".to_string(),
+                            ));
+                        }
+                    }
+                    "poll_sleep_ticks" => {
+                        if poll_sleep_ticks.replace(x).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.select.cfg_v1 has duplicate poll_sleep_ticks"
+                                    .to_string(),
+                            ));
+                        }
+                    }
+                    "max_polls" => {
+                        if max_polls.replace(x).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.select.cfg_v1 has duplicate max_polls".to_string(),
+                            ));
+                        }
+                    }
+                    "timeout_ticks" => {
+                        if timeout_ticks.replace(x).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.select.cfg_v1 has duplicate timeout_ticks".to_string(),
+                            ));
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("task.scope.select.cfg_v1 unknown field: {key}"),
+                ));
+            }
+        }
+    }
+
+    let max_cases = max_cases.ok_or_else(|| {
+        CompilerError::new(
+            CompileErrorKind::Typing,
+            "task.scope.select.cfg_v1 missing max_cases".to_string(),
+        )
+    })?;
+    if max_cases == 0 {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "task.scope.select.cfg_v1 max_cases must be >= 1".to_string(),
+        ));
+    }
+
+    Ok(TaskSelectCfgV1 {
+        max_cases,
+        poll_sleep_ticks: poll_sleep_ticks.unwrap_or(1),
+        max_polls: max_polls.unwrap_or(0),
+        policy: policy.unwrap_or(TaskSelectPolicyV1::PriorityV1),
+        timeout_ticks: timeout_ticks.unwrap_or(0),
+    })
+}
+
+#[derive(Debug, Clone)]
+enum TaskSelectCaseV1 {
+    SlotBytes { slot: Expr },
+    ChanRecvBytes { chan: Expr },
+}
+
+fn parse_task_select_cases_v1(expr: &Expr) -> Result<Vec<TaskSelectCaseV1>, CompilerError> {
+    let Expr::List { items, .. } = expr else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "task.scope.select.cases_v1 must be a list".to_string(),
+        ));
+    };
+    if items.first().and_then(Expr::as_ident) != Some("task.scope.select.cases_v1") {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "task.scope.select cases must be task.scope.select.cases_v1".to_string(),
+        ));
+    }
+    if items.len() < 2 {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "task.scope.select.cases_v1 must have at least one case".to_string(),
+        ));
+    }
+    let mut out = Vec::with_capacity(items.len() - 1);
+    for case in items.iter().skip(1) {
+        let Expr::List { items: inner, .. } = case else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.select.cases_v1 case must be a list".to_string(),
+            ));
+        };
+        let Some(head) = inner.first().and_then(Expr::as_ident) else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "task.scope.select.cases_v1 case must start with an identifier".to_string(),
+            ));
+        };
+        match head {
+            "task.scope.select.case_slot_bytes_v1" => {
+                if inner.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects 1 argument"),
+                    ));
+                }
+                out.push(TaskSelectCaseV1::SlotBytes {
+                    slot: inner[1].clone(),
+                });
+            }
+            "task.scope.select.case_chan_recv_bytes_v1" => {
+                if inner.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects 1 argument"),
+                    ));
+                }
+                out.push(TaskSelectCaseV1::ChanRecvBytes {
+                    chan: inner[1].clone(),
+                });
+            }
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("task.scope.select.cases_v1 unknown case: {head}"),
+                ));
+            }
+        }
+    }
+    Ok(out)
+}
+
 struct InferCtx {
     options: CompileOptions,
     fn_ret_ty: Ty,
     allow_async_ops: bool,
     unsafe_depth: usize,
+    task_scope_depth: usize,
     scopes: Vec<BTreeMap<String, Ty>>,
     functions: BTreeMap<String, (Ty, Vec<Ty>)>,
     extern_functions: BTreeMap<String, ExternFunctionDecl>,
@@ -15133,6 +18307,52 @@ impl InferCtx {
         None
     }
 
+    fn infer_immediate_defasync_call_expr(&mut self, expr: &Expr) -> Result<Ty, CompilerError> {
+        let Expr::List { items, .. } = expr else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_002: expected an immediate defasync call expression".to_string(),
+            ));
+        };
+        let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_002: expected an immediate defasync call expression".to_string(),
+            )
+        })?;
+        let args = &items[1..];
+
+        let Some((ret_ty, params)) = self.functions.get(head).cloned() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("unknown identifier: {head:?}"),
+            ));
+        };
+        if ret_ty != Ty::TaskHandleBytesV1 && ret_ty != Ty::TaskHandleResultBytesV1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "X07E_SCOPE_002: expected an immediate defasync call expression".to_string(),
+            ));
+        }
+        if args.len() != params.len() {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("call {head:?} expects {} args", params.len()),
+            ));
+        }
+        for (i, (arg, want_ty)) in args.iter().zip(params.iter()).enumerate() {
+            let got = self.infer(arg)?;
+            let ok = ty_compat_call_arg(got, *want_ty);
+            if !ok {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("call {head:?} arg {i} expects {want_ty:?}"),
+                ));
+            }
+        }
+        Ok(ret_ty)
+    }
+
     fn infer(&mut self, expr: &Expr) -> Result<Ty, CompilerError> {
         match expr {
             Expr::Int { .. } => Ok(Ty::I32),
@@ -15203,6 +18423,24 @@ impl InferCtx {
                                 "let name must be an identifier".to_string(),
                             )
                         })?;
+                        if self.task_scope_depth != 0 {
+                            if let Expr::List { items: call_items, .. } = &args[1] {
+                                if let Some(call_head) =
+                                    call_items.first().and_then(Expr::as_ident)
+                                {
+                                    if matches!(
+                                        self.functions.get(call_head).map(|(ret_ty, _)| *ret_ty),
+                                        Some(Ty::TaskHandleBytesV1 | Ty::TaskHandleResultBytesV1)
+                                    ) {
+                                        return Err(CompilerError::new(
+                                            CompileErrorKind::Typing,
+                                            "X07E_SCOPE_003: illegal spawn pattern inside task.scope_v1 (use task.scope.start_soon_v1 or task.scope.async_let_*_v1)"
+                                                .to_string(),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
                         let ty = self.infer(&args[1])?;
                         self.bind(name.to_string(), ty);
                         Ok(ty)
@@ -17399,6 +20637,385 @@ impl InferCtx {
                         }
                         Ok(Ty::ResultI32)
                     }
+                    "task.scope.cfg_v1" => Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.cfg_v1 is a descriptor; use it only as the first argument to task.scope_v1".to_string(),
+                    )),
+                    "task.scope_v1" => {
+                        if !self.allow_async_ops {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "task.scope_v1 is only allowed in solve or defasync".to_string(),
+                            ));
+                        }
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        let _cfg = parse_task_scope_cfg_v1(&args[0])?;
+                        self.task_scope_depth = self.task_scope_depth.saturating_add(1);
+                        let body_ty = self.infer(&args[1])?;
+                        self.task_scope_depth = self.task_scope_depth.saturating_sub(1);
+                        if body_ty == Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_SLOT_004: task_slot_v1 must not escape task.scope_v1"
+                                    .to_string(),
+                            ));
+                        }
+                        if body_ty == Ty::TaskSelectEvtV1 || body_ty == Ty::OptionTaskSelectEvtV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SELECT_EVT_ESCAPES_SCOPE: task_select_evt_v1 must not escape task.scope_v1".to_string(),
+                            ));
+                        }
+                        Ok(body_ty)
+                    }
+                    "task.scope.start_soon_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_001: task.scope.start_soon_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.start_soon_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let _call_ret = self.infer_immediate_defasync_call_expr(&args[0])?;
+                        Ok(Ty::I32)
+                    }
+                    "task.scope.cancel_all_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_001: task.scope.cancel_all_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if !args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.cancel_all_v1 expects 0 args".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "task.scope.wait_all_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_001: task.scope.wait_all_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if !args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.wait_all_v1 expects 0 args".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "task.scope.async_let_bytes_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_SLOT_001: task.scope.async_let_bytes_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.async_let_bytes_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let call_ret = self.infer_immediate_defasync_call_expr(&args[0])?;
+                        if call_ret != Ty::TaskHandleBytesV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.async_let_bytes_v1 expects a defasync that returns bytes".to_string(),
+                            ));
+                        }
+                        Ok(Ty::TaskSlotV1)
+                    }
+                    "task.scope.async_let_result_bytes_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_SLOT_001: task.scope.async_let_result_bytes_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.async_let_result_bytes_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let call_ret = self.infer_immediate_defasync_call_expr(&args[0])?;
+                        if call_ret != Ty::TaskHandleResultBytesV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.async_let_result_bytes_v1 expects a defasync that returns result_bytes".to_string(),
+                            ));
+                        }
+                        Ok(Ty::TaskSlotV1)
+                    }
+                    "task.scope.await_slot_bytes_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_SLOT_002: task.scope.await_slot_bytes_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.await_slot_bytes_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.await_slot_bytes_v1 expects task_slot_v1".to_string(),
+                            ));
+                        }
+                        Ok(Ty::Bytes)
+                    }
+                    "task.scope.await_slot_result_bytes_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_SLOT_002: task.scope.await_slot_result_bytes_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.await_slot_result_bytes_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.await_slot_result_bytes_v1 expects task_slot_v1".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes)
+                    }
+                    "task.scope.try_await_slot.bytes_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_SLOT_002: task.scope.try_await_slot.bytes_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.try_await_slot.bytes_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.try_await_slot.bytes_v1 expects task_slot_v1".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes)
+                    }
+                    "task.scope.try_await_slot.result_bytes_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_SLOT_002: task.scope.try_await_slot.result_bytes_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.try_await_slot.result_bytes_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.try_await_slot.result_bytes_v1 expects task_slot_v1".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultResultBytes)
+                    }
+                    "task.scope.slot_is_finished_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SCOPE_SLOT_002: task.scope.slot_is_finished_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.slot_is_finished_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.slot_is_finished_v1 expects task_slot_v1".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "task.scope.slot_to_i32_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.slot_to_i32_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.slot_to_i32_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::TaskSlotV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.slot_to_i32_v1 expects task_slot_v1".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "task.scope.slot_from_i32_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.slot_from_i32_v1 used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.scope.slot_from_i32_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.scope.slot_from_i32_v1 expects i32".to_string(),
+                            ));
+                        }
+                        Ok(Ty::TaskSlotV1)
+                    }
+                    "task.scope.select.cfg_v1" => Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "task.scope.select.cfg_v1 is a descriptor; use it only as the first argument to task.scope.select_*_v1".to_string(),
+                    )),
+                    "task.scope.select.cases_v1"
+                    | "task.scope.select.case_slot_bytes_v1"
+                    | "task.scope.select.case_chan_recv_bytes_v1" => Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} is a descriptor; use it only as an argument to task.scope.select_*_v1"),
+                    )),
+                    "task.scope.select_v1" | "task.scope.select_try_v1" => {
+                        if self.task_scope_depth == 0 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SELECT_OUTSIDE_SCOPE: task.scope.select used outside task.scope_v1".to_string(),
+                            ));
+                        }
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 2 args"),
+                            ));
+                        }
+                        let cfg = parse_task_select_cfg_v1(&args[0])?;
+                        let cases = parse_task_select_cases_v1(&args[1])?;
+                        if cases.len() > cfg.max_cases as usize {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "X07E_SELECT_TOO_MANY_CASES: too many select cases".to_string(),
+                            ));
+                        }
+                        for case in &cases {
+                            match case {
+                                TaskSelectCaseV1::SlotBytes { slot } => {
+                                    if self.infer(slot)? != Ty::TaskSlotV1 {
+                                        return Err(CompilerError::new(
+                                            CompileErrorKind::Typing,
+                                            "task.scope.select slot case expects task_slot_v1"
+                                                .to_string(),
+                                        ));
+                                    }
+                                }
+                                TaskSelectCaseV1::ChanRecvBytes { chan } => {
+                                    if self.infer(chan)? != Ty::I32 {
+                                        return Err(CompilerError::new(
+                                            CompileErrorKind::Typing,
+                                            "task.scope.select chan.recv case expects i32 chan handle"
+                                                .to_string(),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        Ok(if head == "task.scope.select_v1" {
+                            Ty::TaskSelectEvtV1
+                        } else {
+                            Ty::OptionTaskSelectEvtV1
+                        })
+                    }
+                    "task.select_evt.tag_v1"
+                    | "task.select_evt.case_index_v1"
+                    | "task.select_evt.src_id_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 1 arg"),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::TaskSelectEvtV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects task_select_evt_v1"),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "task.select_evt.take_bytes_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.select_evt.take_bytes_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::TaskSelectEvtV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.select_evt.take_bytes_v1 expects task_select_evt_v1".to_string(),
+                            ));
+                        }
+                        Ok(Ty::Bytes)
+                    }
+                    "task.select_evt.drop_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.select_evt.drop_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::TaskSelectEvtV1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.select_evt.drop_v1 expects task_select_evt_v1".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
                     "await" | "task.spawn" => {
                         if head == "await" && !self.allow_async_ops {
                             return Err(CompilerError::new(
@@ -17412,15 +21029,28 @@ impl InferCtx {
                                 format!("{head} expects 1 arg"),
                             ));
                         }
-                        if self.infer(&args[0])? != Ty::I32 {
-                            return Err(CompilerError::new(
-                                CompileErrorKind::Typing,
-                                format!("{head} expects i32 task handle"),
-                            ));
-                        }
+                        let hty = self.infer(&args[0])?;
                         match head {
-                            "await" => Ok(Ty::Bytes),
-                            "task.spawn" => Ok(Ty::I32),
+                            "await" => {
+                                if hty != Ty::TaskHandleBytesV1 && hty != Ty::I32 {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "await expects bytes task handle".to_string(),
+                                    ));
+                                }
+                                Ok(Ty::Bytes)
+                            }
+                            "task.spawn" => {
+                                if hty != Ty::TaskHandleBytesV1 && hty != Ty::TaskHandleResultBytesV1
+                                    && hty != Ty::I32
+                                {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "task.spawn expects task handle".to_string(),
+                                    ));
+                                }
+                                Ok(hty)
+                            }
                             _ => unreachable!(),
                         }
                     }
@@ -17431,10 +21061,14 @@ impl InferCtx {
                                 "task.is_finished expects 1 arg".to_string(),
                             ));
                         }
-                        if self.infer(&args[0])? != Ty::I32 {
+                        let hty = self.infer(&args[0])?;
+                        if hty != Ty::TaskHandleBytesV1
+                            && hty != Ty::TaskHandleResultBytesV1
+                            && hty != Ty::I32
+                        {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                "task.is_finished expects i32 task handle".to_string(),
+                                "task.is_finished expects task handle".to_string(),
                             ));
                         }
                         Ok(Ty::I32)
@@ -17446,19 +21080,39 @@ impl InferCtx {
                                 "task.try_join.bytes expects 1 arg".to_string(),
                             ));
                         }
-                        if self.infer(&args[0])? != Ty::I32 {
+                        let hty = self.infer(&args[0])?;
+                        if hty != Ty::TaskHandleBytesV1 && hty != Ty::I32 {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                "task.try_join.bytes expects i32 task handle".to_string(),
+                                "task.try_join.bytes expects bytes task handle".to_string(),
                             ));
                         }
                         Ok(Ty::ResultBytes)
                     }
-                    "task.join.bytes" | "task.cancel" => {
-                        if head == "task.join.bytes" && !self.allow_async_ops {
+                    "task.try_join.result_bytes" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "task.try_join.result_bytes expects 1 arg".to_string(),
+                            ));
+                        }
+                        let hty = self.infer(&args[0])?;
+                        if hty != Ty::TaskHandleResultBytesV1 && hty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "task.try_join.result_bytes expects result_bytes task handle"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultResultBytes)
+                    }
+                    "task.join.bytes" | "task.join.result_bytes" | "task.cancel" => {
+                        if (head == "task.join.bytes" || head == "task.join.result_bytes")
+                            && !self.allow_async_ops
+                        {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
-                                "task.join.bytes is only allowed in solve or defasync".to_string(),
+                                format!("{head} is only allowed in solve or defasync"),
                             ));
                         }
                         if args.len() != 1 {
@@ -17467,15 +21121,39 @@ impl InferCtx {
                                 format!("{head} expects 1 arg"),
                             ));
                         }
-                        if self.infer(&args[0])? != Ty::I32 {
-                            return Err(CompilerError::new(
-                                CompileErrorKind::Typing,
-                                format!("{head} expects i32 task handle"),
-                            ));
-                        }
+                        let hty = self.infer(&args[0])?;
                         match head {
-                            "task.join.bytes" => Ok(Ty::Bytes),
-                            "task.cancel" => Ok(Ty::I32),
+                            "task.join.bytes" => {
+                                if hty != Ty::TaskHandleBytesV1 && hty != Ty::I32 {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "task.join.bytes expects bytes task handle".to_string(),
+                                    ));
+                                }
+                                Ok(Ty::Bytes)
+                            }
+                            "task.join.result_bytes" => {
+                                if hty != Ty::TaskHandleResultBytesV1 && hty != Ty::I32 {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "task.join.result_bytes expects result_bytes task handle"
+                                            .to_string(),
+                                    ));
+                                }
+                                Ok(Ty::ResultBytes)
+                            }
+                            "task.cancel" => {
+                                if hty != Ty::TaskHandleBytesV1
+                                    && hty != Ty::TaskHandleResultBytesV1
+                                    && hty != Ty::I32
+                                {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "task.cancel expects task handle".to_string(),
+                                    ));
+                                }
+                                Ok(Ty::I32)
+                            }
                             _ => unreachable!(),
                         }
                     }
@@ -18335,6 +22013,54 @@ impl InferCtx {
                         }
                         Ok(Ty::Bytes)
                     }
+                    "result_result_bytes.is_ok" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_result_bytes.is_ok expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::ResultResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_result_bytes.is_ok expects result_result_bytes".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "result_result_bytes.err_code" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_result_bytes.err_code expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::ResultResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_result_bytes.err_code expects result_result_bytes".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "result_result_bytes.unwrap_or" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_result_bytes.unwrap_or expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::ResultResultBytes
+                            || self.infer(&args[1])? != Ty::ResultBytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_result_bytes.unwrap_or expects (result_result_bytes, result_bytes default)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes)
+                    }
                     "try" => {
                         if args.len() != 1 {
                             return Err(CompilerError::new(
@@ -18493,15 +22219,7 @@ impl InferCtx {
                             for (i, (arg, p)) in args.iter().zip(f.params.iter()).enumerate() {
                                 let got = self.infer(arg)?;
                                 let want = p.ty;
-                                let ok = got == want
-                                    || matches!(
-                                        (got, want),
-                                        (Ty::Bytes, Ty::BytesView)
-                                            | (Ty::VecU8, Ty::BytesView)
-                                            | (Ty::PtrMutU8, Ty::PtrConstU8)
-                                            | (Ty::PtrMutVoid, Ty::PtrConstVoid)
-                                            | (Ty::PtrMutI32, Ty::PtrConstI32)
-                                    );
+                                let ok = ty_compat_call_arg_extern(got, want);
                                 if !ok {
                                     return Err(CompilerError::new(
                                         CompileErrorKind::Typing,
@@ -18523,12 +22241,7 @@ impl InferCtx {
                                         args.iter().zip(params.iter()).enumerate()
                                     {
                                         let got = self.infer(arg)?;
-                                        let ok = got == *want_ty
-                                            || matches!(
-                                                (got, *want_ty),
-                                                (Ty::Bytes, Ty::BytesView)
-                                                    | (Ty::VecU8, Ty::BytesView)
-                                            );
+                                        let ok = ty_compat_call_arg(got, *want_ty);
                                         if !ok {
                                             return Err(CompilerError::new(
                                                 CompileErrorKind::Typing,
@@ -18692,14 +22405,21 @@ fn c_async_fut_type_name(name: &str) -> String {
 
 fn c_ret_ty(ty: Ty) -> &'static str {
     match ty {
-        Ty::I32 | Ty::Never => "uint32_t",
+        Ty::I32
+        | Ty::TaskHandleBytesV1
+        | Ty::TaskHandleResultBytesV1
+        | Ty::TaskSlotV1
+        | Ty::TaskSelectEvtV1
+        | Ty::Never => "uint32_t",
+        Ty::TaskScopeV1 => "rt_scope_t",
         Ty::Bytes => "bytes_t",
         Ty::BytesView => "bytes_view_t",
         Ty::VecU8 => "vec_u8_t",
-        Ty::OptionI32 => "option_i32_t",
+        Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => "option_i32_t",
         Ty::OptionBytes => "option_bytes_t",
         Ty::ResultI32 => "result_i32_t",
         Ty::ResultBytes => "result_bytes_t",
+        Ty::ResultResultBytes => "result_result_bytes_t",
         Ty::Iface => "iface_t",
         Ty::PtrConstU8 => "const uint8_t*",
         Ty::PtrMutU8 => "uint8_t*",
@@ -18712,14 +22432,21 @@ fn c_ret_ty(ty: Ty) -> &'static str {
 
 fn c_zero(ty: Ty) -> &'static str {
     match ty {
-        Ty::I32 | Ty::Never => "UINT32_C(0)",
+        Ty::I32
+        | Ty::TaskHandleBytesV1
+        | Ty::TaskHandleResultBytesV1
+        | Ty::TaskSlotV1
+        | Ty::TaskSelectEvtV1
+        | Ty::Never => "UINT32_C(0)",
+        Ty::TaskScopeV1 => "(rt_scope_t){0}",
         Ty::Bytes => "rt_bytes_empty(ctx)",
         Ty::BytesView => "rt_view_empty(ctx)",
         Ty::VecU8 => "(vec_u8_t){0}",
-        Ty::OptionI32 => "(option_i32_t){0}",
+        Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => "(option_i32_t){0}",
         Ty::OptionBytes => "(option_bytes_t){0}",
         Ty::ResultI32 => "(result_i32_t){0}",
         Ty::ResultBytes => "(result_bytes_t){0}",
+        Ty::ResultResultBytes => "(result_result_bytes_t){0}",
         Ty::Iface => "(iface_t){0}",
         Ty::PtrConstU8
         | Ty::PtrMutU8
@@ -18742,14 +22469,21 @@ fn c_param_list_value(params: &[FunctionParam]) -> String {
     for (i, p) in params.iter().enumerate() {
         out.push_str(", ");
         out.push_str(match p.ty {
-            Ty::I32 | Ty::Never => "uint32_t",
+            Ty::I32
+            | Ty::TaskHandleBytesV1
+            | Ty::TaskHandleResultBytesV1
+            | Ty::TaskSlotV1
+            | Ty::TaskSelectEvtV1
+            | Ty::Never => "uint32_t",
+            Ty::TaskScopeV1 => "rt_scope_t",
             Ty::Bytes => "bytes_t",
             Ty::BytesView => "bytes_view_t",
             Ty::VecU8 => "vec_u8_t",
-            Ty::OptionI32 => "option_i32_t",
+            Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => "option_i32_t",
             Ty::OptionBytes => "option_bytes_t",
             Ty::ResultI32 => "result_i32_t",
             Ty::ResultBytes => "result_bytes_t",
+            Ty::ResultResultBytes => "result_result_bytes_t",
             Ty::Iface => "iface_t",
             Ty::PtrConstU8 => "const uint8_t*",
             Ty::PtrMutU8 => "uint8_t*",
@@ -18772,14 +22506,21 @@ fn c_param_list_user(params: &[FunctionParam]) -> String {
     for (i, p) in params.iter().enumerate() {
         out.push_str(", ");
         out.push_str(match p.ty {
-            Ty::I32 | Ty::Never => "uint32_t",
+            Ty::I32
+            | Ty::TaskHandleBytesV1
+            | Ty::TaskHandleResultBytesV1
+            | Ty::TaskSlotV1
+            | Ty::TaskSelectEvtV1
+            | Ty::Never => "uint32_t",
+            Ty::TaskScopeV1 => "rt_scope_t",
             Ty::Bytes => "bytes_t",
             Ty::BytesView => "bytes_view_t",
             Ty::VecU8 => "vec_u8_t",
-            Ty::OptionI32 => "option_i32_t",
+            Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => "option_i32_t",
             Ty::OptionBytes => "option_bytes_t",
             Ty::ResultI32 => "result_i32_t",
             Ty::ResultBytes => "result_bytes_t",
+            Ty::ResultResultBytes => "result_result_bytes_t",
             Ty::Iface => "iface_t",
             Ty::PtrConstU8 => "const uint8_t*",
             Ty::PtrMutU8 => "uint8_t*",
@@ -18925,6 +22666,25 @@ typedef struct {
     uint32_t err;
   } payload;
 } result_bytes_t;
+
+typedef struct {
+  uint32_t tag;
+  union {
+    result_bytes_t ok;
+    uint32_t err;
+  } payload;
+} result_result_bytes_t;
+
+#define RT_TASK_OUT_KIND_BYTES UINT32_C(1)
+#define RT_TASK_OUT_KIND_RESULT_BYTES UINT32_C(2)
+
+typedef struct {
+  uint32_t kind;
+  union {
+    bytes_t bytes;
+    result_bytes_t result_bytes;
+  } payload;
+} rt_task_out_t;
 
 typedef struct {
   uint32_t data;
@@ -19103,6 +22863,7 @@ typedef struct {
 typedef struct rt_task_s rt_task_t;
 typedef struct rt_timer_ev_s rt_timer_ev_t;
 typedef struct rt_chan_bytes_s rt_chan_bytes_t;
+typedef struct rt_select_evt_s rt_select_evt_t;
 typedef struct rt_io_reader_s rt_io_reader_t;
 typedef struct rt_bufread_s rt_bufread_t;
 typedef struct rt_scratch_u8_fixed_s rt_scratch_u8_fixed_t;
@@ -19190,6 +22951,10 @@ typedef struct {
   rt_chan_bytes_t* sched_chans;
   uint32_t sched_chans_len;
   uint32_t sched_chans_cap;
+
+  rt_select_evt_t* sched_select_evts;
+  uint32_t sched_select_evts_len;
+  uint32_t sched_select_evts_cap;
 
   // Phase G2 streaming I/O (deterministic, fixture-backed).
   rt_io_reader_t* io_readers;
@@ -19892,6 +23657,13 @@ static inline bytes_view_t rt_view_empty(ctx_t* ctx) {
   return out;
 }
 
+static inline rt_task_out_t rt_task_out_empty(ctx_t* ctx) {
+  rt_task_out_t out;
+  out.kind = RT_TASK_OUT_KIND_BYTES;
+  out.payload.bytes = rt_bytes_empty(ctx);
+  return out;
+}
+
 static bytes_t rt_bytes_alloc(ctx_t* ctx, uint32_t len) {
   if (len == 0) return rt_bytes_empty(ctx);
   bytes_t out;
@@ -19954,6 +23726,27 @@ static void rt_bytes_drop(ctx_t* ctx, bytes_t* b) {
   rt_free(ctx, b->ptr, size, 1);
   b->ptr = ctx->heap.mem;
   b->len = UINT32_C(0);
+}
+
+static void rt_task_out_drop(ctx_t* ctx, rt_task_out_t* out) {
+  if (!out) return;
+  if (out->kind == RT_TASK_OUT_KIND_BYTES) {
+    rt_bytes_drop(ctx, &out->payload.bytes);
+    out->payload.bytes = rt_bytes_empty(ctx);
+    out->kind = RT_TASK_OUT_KIND_BYTES;
+    return;
+  }
+  if (out->kind == RT_TASK_OUT_KIND_RESULT_BYTES) {
+    if (out->payload.result_bytes.tag) {
+      rt_bytes_drop(ctx, &out->payload.result_bytes.payload.ok);
+    }
+    out->payload.result_bytes.tag = UINT32_C(0);
+    out->payload.result_bytes.payload.err = UINT32_C(0);
+    out->kind = RT_TASK_OUT_KIND_BYTES;
+    out->payload.bytes = rt_bytes_empty(ctx);
+    return;
+  }
+  rt_trap("task.out.drop invalid kind");
 }
 
 static bytes_t rt_view_to_bytes(ctx_t* ctx, bytes_view_t v) {
@@ -20239,10 +24032,10 @@ struct rt_task_s {
   uint32_t join_wait_head;
   uint32_t join_wait_tail;
 
-  uint32_t (*poll)(ctx_t* ctx, void* fut, bytes_t* out);
+  uint32_t (*poll)(ctx_t* ctx, void* fut, rt_task_out_t* out);
   void (*drop)(ctx_t* ctx, void* fut);
   void* fut;
-  bytes_t out;
+  rt_task_out_t out;
   uint32_t out_taken;
 };
 
@@ -20266,6 +24059,19 @@ struct rt_chan_bytes_s {
   uint32_t send_wait_tail;
   uint32_t recv_wait_head;
   uint32_t recv_wait_tail;
+};
+
+struct rt_select_evt_s {
+  uint32_t alive;
+  uint32_t taken;
+
+  uint64_t scope_key;
+
+  uint32_t tag;
+  uint32_t case_index;
+  uint32_t src_id;
+
+  bytes_t payload;
 };
 
 // Phase G2: deterministic streaming I/O reader handles + BufRead-like buffering.
@@ -20327,6 +24133,13 @@ static rt_chan_bytes_t* rt_chan_bytes_ptr(ctx_t* ctx, uint32_t chan_id) {
   rt_chan_bytes_t* c = &ctx->sched_chans[chan_id - 1];
   if (!c->alive) rt_trap("chan invalid handle");
   return c;
+}
+
+static rt_select_evt_t* rt_select_evt_ptr(ctx_t* ctx, uint32_t evt_id) {
+  if (evt_id == 0 || evt_id > ctx->sched_select_evts_len) rt_trap("X07T_SELECT_EVT_INVALID");
+  rt_select_evt_t* e = &ctx->sched_select_evts[evt_id - 1];
+  if (!e->alive) rt_trap("X07T_SELECT_EVT_INVALID");
+  return e;
 }
 
 static rt_io_reader_t* rt_io_reader_ptr(ctx_t* ctx, uint32_t reader_id) {
@@ -20405,6 +24218,38 @@ static void rt_sched_chans_ensure_cap(ctx_t* ctx, uint32_t need) {
   }
   ctx->sched_chans = items;
   ctx->sched_chans_cap = new_cap;
+}
+
+static void rt_sched_select_evts_ensure_cap(ctx_t* ctx, uint32_t need) {
+  if (need <= ctx->sched_select_evts_cap) return;
+  rt_select_evt_t* old_items = ctx->sched_select_evts;
+  uint32_t old_cap = ctx->sched_select_evts_cap;
+  uint32_t old_bytes_total = old_cap * (uint32_t)sizeof(rt_select_evt_t);
+  uint32_t new_cap = ctx->sched_select_evts_cap ? ctx->sched_select_evts_cap : 8;
+  while (new_cap < need) {
+    if (new_cap > UINT32_MAX / 2) {
+      new_cap = need;
+      break;
+    }
+    new_cap *= 2;
+  }
+  rt_select_evt_t* items = (rt_select_evt_t*)rt_alloc_realloc(
+    ctx,
+    old_items,
+    old_bytes_total,
+    new_cap * (uint32_t)sizeof(rt_select_evt_t),
+    (uint32_t)_Alignof(rt_select_evt_t)
+  );
+  if (old_items && ctx->sched_select_evts_len) {
+    uint32_t bytes = ctx->sched_select_evts_len * (uint32_t)sizeof(rt_select_evt_t);
+    memcpy(items, old_items, bytes);
+    rt_mem_on_memcpy(ctx, bytes);
+  }
+  if (old_items && old_bytes_total) {
+    rt_free(ctx, old_items, old_bytes_total, (uint32_t)_Alignof(rt_select_evt_t));
+  }
+  ctx->sched_select_evts = items;
+  ctx->sched_select_evts_cap = new_cap;
 }
 
 static void rt_sched_timers_ensure_cap(ctx_t* ctx, uint32_t need) {
@@ -20641,7 +24486,7 @@ static uint32_t rt_sched_step(ctx_t* ctx) {
     uint32_t prev = ctx->sched_current_task;
     ctx->sched_current_task = task_id;
 
-    bytes_t out = rt_bytes_empty(ctx);
+    rt_task_out_t out = rt_task_out_empty(ctx);
     uint32_t done = t->poll(ctx, t->fut, &out);
 
     ctx->sched_current_task = prev;
@@ -20707,7 +24552,7 @@ static __attribute__((noreturn)) void rt_sched_deadlock(void) {
 
 static uint32_t rt_task_create(
     ctx_t* ctx,
-    uint32_t (*poll)(ctx_t* ctx, void* fut, bytes_t* out),
+    uint32_t (*poll)(ctx_t* ctx, void* fut, rt_task_out_t* out),
     void (*drop)(ctx_t* ctx, void* fut),
     void* fut
 ) {
@@ -20719,7 +24564,7 @@ static uint32_t rt_task_create(
   t->poll = poll;
   t->drop = drop;
   t->fut = fut;
-  t->out = rt_bytes_empty(ctx);
+  t->out = rt_task_out_empty(ctx);
   t->out_taken = 0;
   ctx->sched_tasks_len += 1;
 
@@ -20744,8 +24589,8 @@ static uint32_t rt_task_cancel(ctx_t* ctx, uint32_t task_id) {
   }
   t->drop = NULL;
   t->fut = NULL;
-  rt_bytes_drop(ctx, &t->out);
-  t->out = rt_bytes_empty(ctx);
+  rt_task_out_drop(ctx, &t->out);
+  t->out = rt_task_out_empty(ctx);
   t->out_taken = 0;
   rt_sched_trace_event(ctx, RT_TRACE_COMPLETE, (uint64_t)task_id, ctx->sched_now_ticks);
 
@@ -20770,14 +24615,16 @@ static uint32_t rt_task_join_bytes_poll(ctx_t* ctx, uint32_t task_id, bytes_t* o
     t->out_taken = 1;
     if (t->canceled) {
       if (out) *out = rt_bytes_empty(ctx);
+      t->out = rt_task_out_empty(ctx);
       return UINT32_C(1);
     }
+    if (t->out.kind != RT_TASK_OUT_KIND_BYTES) rt_trap("task.join.bytes kind mismatch");
     if (out) {
-      *out = t->out;
+      *out = t->out.payload.bytes;
     } else {
-      rt_bytes_drop(ctx, &t->out);
+      rt_bytes_drop(ctx, &t->out.payload.bytes);
     }
-    t->out = rt_bytes_empty(ctx);
+    t->out = rt_task_out_empty(ctx);
     return UINT32_C(1);
   }
 
@@ -20809,9 +24656,10 @@ static bytes_t rt_task_join_bytes_block(ctx_t* ctx, uint32_t task_id) {
   if (t->out_taken) rt_trap("join already taken");
   t->out_taken = 1;
   if (t->canceled) return rt_bytes_empty(ctx);
-  bytes_t out = t->out;
-  t->out = rt_bytes_empty(ctx);
-  return out;
+  if (t->out.kind != RT_TASK_OUT_KIND_BYTES) rt_trap("task.join.bytes kind mismatch");
+  bytes_t out_b = t->out.payload.bytes;
+  t->out = rt_task_out_empty(ctx);
+  return out_b;
 }
 
 static uint32_t rt_task_is_finished(ctx_t* ctx, uint32_t task_id) {
@@ -20830,9 +24678,84 @@ static result_bytes_t rt_task_try_join_bytes(ctx_t* ctx, uint32_t task_id) {
   if (t->canceled) {
     return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = UINT32_C(2) };
   }
-  bytes_t out = t->out;
-  t->out = rt_bytes_empty(ctx);
-  return (result_bytes_t){ .tag = UINT32_C(1), .payload.ok = out };
+  if (t->out.kind != RT_TASK_OUT_KIND_BYTES) rt_trap("task.try_join.bytes kind mismatch");
+  bytes_t out_b = t->out.payload.bytes;
+  t->out = rt_task_out_empty(ctx);
+  return (result_bytes_t){ .tag = UINT32_C(1), .payload.ok = out_b };
+}
+
+static uint32_t rt_task_join_result_bytes_poll(ctx_t* ctx, uint32_t task_id, result_bytes_t* out) {
+  ctx->sched_stats.join_calls += 1;
+  rt_task_t* t = rt_task_ptr(ctx, task_id);
+  if (t->done) {
+    if (t->out_taken) rt_trap("join already taken");
+    t->out_taken = 1;
+    if (t->canceled) {
+      if (out) *out = (result_bytes_t){ .tag = UINT32_C(0), .payload.err = UINT32_C(2) };
+      t->out = rt_task_out_empty(ctx);
+      return UINT32_C(1);
+    }
+    if (t->out.kind != RT_TASK_OUT_KIND_RESULT_BYTES) rt_trap("task.join.result_bytes kind mismatch");
+    if (out) {
+      *out = t->out.payload.result_bytes;
+    } else {
+      if (t->out.payload.result_bytes.tag) {
+        rt_bytes_drop(ctx, &t->out.payload.result_bytes.payload.ok);
+      }
+    }
+    t->out = rt_task_out_empty(ctx);
+    return UINT32_C(1);
+  }
+
+  uint32_t cur = ctx->sched_current_task;
+  if (cur == 0) rt_trap("join.poll from main");
+  if (cur == task_id) rt_trap("join self");
+
+  rt_task_t* me = rt_task_ptr(ctx, cur);
+  if (me->wait_kind == RT_WAIT_JOIN && me->wait_id == task_id) {
+    return UINT32_C(0);
+  }
+  if (me->wait_kind != RT_WAIT_NONE) rt_trap("join while already waiting");
+
+  me->wait_kind = RT_WAIT_JOIN;
+  me->wait_id = task_id;
+  ctx->sched_stats.blocked_waits += 1;
+  rt_sched_trace_event(ctx, RT_TRACE_BLOCK, (uint64_t)cur, ((uint64_t)RT_WAIT_JOIN << 32) | task_id);
+  rt_wait_list_push(ctx, &t->join_wait_head, &t->join_wait_tail, cur);
+  return UINT32_C(0);
+}
+
+static result_bytes_t rt_task_join_result_bytes_block(ctx_t* ctx, uint32_t task_id) {
+  ctx->sched_stats.join_calls += 1;
+  rt_task_t* t = rt_task_ptr(ctx, task_id);
+  while (!t->done) {
+    if (!rt_sched_step(ctx)) rt_sched_deadlock();
+    t = rt_task_ptr(ctx, task_id);
+  }
+  if (t->out_taken) rt_trap("join already taken");
+  t->out_taken = 1;
+  if (t->canceled) return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = UINT32_C(2) };
+  if (t->out.kind != RT_TASK_OUT_KIND_RESULT_BYTES) rt_trap("task.join.result_bytes kind mismatch");
+  result_bytes_t out_rb = t->out.payload.result_bytes;
+  t->out = rt_task_out_empty(ctx);
+  return out_rb;
+}
+
+static result_result_bytes_t rt_task_try_join_result_bytes(ctx_t* ctx, uint32_t task_id) {
+  ctx->sched_stats.join_calls += 1;
+  rt_task_t* t = rt_task_ptr(ctx, task_id);
+  if (!t->done) {
+    return (result_result_bytes_t){ .tag = UINT32_C(0), .payload.err = UINT32_C(1) };
+  }
+  if (t->out_taken) rt_trap("join already taken");
+  t->out_taken = 1;
+  if (t->canceled) {
+    return (result_result_bytes_t){ .tag = UINT32_C(0), .payload.err = UINT32_C(2) };
+  }
+  if (t->out.kind != RT_TASK_OUT_KIND_RESULT_BYTES) rt_trap("task.try_join.result_bytes kind mismatch");
+  result_bytes_t out_rb = t->out.payload.result_bytes;
+  t->out = rt_task_out_empty(ctx);
+  return (result_result_bytes_t){ .tag = UINT32_C(1), .payload.ok = out_rb };
 }
 
 static void rt_task_yield(ctx_t* ctx) {
@@ -20888,6 +24811,615 @@ static uint32_t rt_task_sleep_block(ctx_t* ctx, uint32_t ticks) {
     if (!rt_sched_step(ctx)) rt_sched_deadlock();
   }
   return UINT32_C(0);
+}
+
+typedef struct {
+  uint32_t task_id;
+  uint32_t kind;
+  uint32_t state;
+  uint32_t gen;
+} rt_scope_slot_t;
+
+typedef struct {
+  uint32_t max_children;
+  uint64_t max_ticks;
+  uint64_t max_blocked_waits;
+  uint64_t max_join_polls;
+  uint32_t max_slot_result_bytes;
+
+  uint64_t key;
+
+  uint8_t cancel_requested;
+
+  uint64_t snap_ticks;
+  uint64_t snap_blocked_waits;
+  uint64_t snap_join_polls;
+  uint64_t snap_tasks_spawned;
+
+  uint32_t child_cap;
+  uint32_t child_len;
+  uint32_t* child_task_ids;
+  uint32_t* child_task_kinds;
+
+  uint32_t reg_cap;
+  uint32_t reg_len;
+  uint32_t* reg_task_ids;
+
+  uint32_t slot_cap;
+  uint32_t slot_len;
+  rt_scope_slot_t* slots;
+
+  uint32_t join_phase;
+  uint32_t join_slot_i;
+  uint32_t join_child_i;
+
+  uint32_t select_rr_cursor;
+} rt_scope_t;
+
+#define RT_SCOPE_SLOT_EMPTY UINT32_C(0)
+#define RT_SCOPE_SLOT_PENDING UINT32_C(1)
+#define RT_SCOPE_SLOT_TAKEN UINT32_C(2)
+#define RT_SCOPE_SLOT_CONSUMED UINT32_C(3)
+
+static void rt_scope_init(
+  ctx_t* ctx,
+  rt_scope_t* s,
+  uint32_t max_children,
+  uint64_t max_ticks,
+  uint64_t max_blocked_waits,
+  uint64_t max_join_polls,
+  uint32_t max_slot_result_bytes
+) {
+  memset(s, 0, sizeof(*s));
+  s->max_children = max_children;
+  s->max_ticks = max_ticks;
+  s->max_blocked_waits = max_blocked_waits;
+  s->max_join_polls = max_join_polls;
+  s->max_slot_result_bytes = max_slot_result_bytes;
+  s->key = (uint64_t)(uintptr_t)s;
+
+  s->child_cap = max_children;
+  s->reg_cap = max_children;
+  s->slot_cap = max_children;
+  s->slot_len = max_children;
+
+  if (max_children != 0) {
+    s->child_task_ids = (uint32_t*)rt_alloc(
+      ctx,
+      max_children * (uint32_t)sizeof(uint32_t),
+      (uint32_t)_Alignof(uint32_t)
+    );
+    s->child_task_kinds = (uint32_t*)rt_alloc(
+      ctx,
+      max_children * (uint32_t)sizeof(uint32_t),
+      (uint32_t)_Alignof(uint32_t)
+    );
+    s->reg_task_ids = (uint32_t*)rt_alloc(
+      ctx,
+      max_children * (uint32_t)sizeof(uint32_t),
+      (uint32_t)_Alignof(uint32_t)
+    );
+    s->slots = (rt_scope_slot_t*)rt_alloc(
+      ctx,
+      max_children * (uint32_t)sizeof(rt_scope_slot_t),
+      (uint32_t)_Alignof(rt_scope_slot_t)
+    );
+    memset(s->slots, 0, max_children * (uint32_t)sizeof(rt_scope_slot_t));
+  }
+
+  s->snap_ticks = ctx->sched_now_ticks;
+  s->snap_blocked_waits = ctx->sched_stats.blocked_waits;
+  s->snap_join_polls = ctx->sched_stats.join_calls;
+  s->snap_tasks_spawned = ctx->sched_stats.tasks_spawned;
+}
+
+static void rt_scope_drop(ctx_t* ctx, rt_scope_t* s) {
+  if (s->key != 0 && ctx->sched_select_evts_len != 0) {
+    for (uint32_t i = 0; i < ctx->sched_select_evts_len; i++) {
+      rt_select_evt_t* e = &ctx->sched_select_evts[i];
+      if (!e->alive) continue;
+      if (e->scope_key != s->key) continue;
+      rt_bytes_drop(ctx, &e->payload);
+      e->payload = rt_bytes_empty(ctx);
+      e->taken = 1;
+      e->alive = 0;
+    }
+  }
+  if (s->child_cap && s->child_task_ids) {
+    rt_free(
+      ctx,
+      s->child_task_ids,
+      s->child_cap * (uint32_t)sizeof(uint32_t),
+      (uint32_t)_Alignof(uint32_t)
+    );
+  }
+  if (s->child_cap && s->child_task_kinds) {
+    rt_free(
+      ctx,
+      s->child_task_kinds,
+      s->child_cap * (uint32_t)sizeof(uint32_t),
+      (uint32_t)_Alignof(uint32_t)
+    );
+  }
+  if (s->reg_cap && s->reg_task_ids) {
+    rt_free(
+      ctx,
+      s->reg_task_ids,
+      s->reg_cap * (uint32_t)sizeof(uint32_t),
+      (uint32_t)_Alignof(uint32_t)
+    );
+  }
+  if (s->slot_cap && s->slots) {
+    rt_free(
+      ctx,
+      s->slots,
+      s->slot_cap * (uint32_t)sizeof(rt_scope_slot_t),
+      (uint32_t)_Alignof(rt_scope_slot_t)
+    );
+  }
+  memset(s, 0, sizeof(*s));
+}
+
+static void rt_scope_register_task(rt_scope_t* s, uint32_t task_id) {
+  if (s->reg_len >= s->reg_cap) rt_trap("X07T_SCOPE_BUDGET_CHILDREN_EXCEEDED");
+  s->reg_task_ids[s->reg_len] = task_id;
+  s->reg_len += 1;
+}
+
+static void rt_scope_unregister_task(rt_scope_t* s, uint32_t task_id) {
+  for (uint32_t i = 0; i < s->reg_len; i++) {
+    if (s->reg_task_ids[i] != task_id) continue;
+    for (uint32_t j = i + 1; j < s->reg_len; j++) {
+      s->reg_task_ids[j - 1] = s->reg_task_ids[j];
+    }
+    s->reg_len -= 1;
+    if (s->reg_len < s->reg_cap) s->reg_task_ids[s->reg_len] = 0;
+    return;
+  }
+}
+
+static uint32_t rt_scope_start_soon(ctx_t* ctx, rt_scope_t* s, uint32_t task_id, uint32_t kind) {
+  (void)ctx;
+  if (s->cancel_requested) rt_trap("X07T_SCOPE_START_AFTER_CANCEL");
+  rt_scope_register_task(s, task_id);
+  if (s->child_len >= s->child_cap) rt_trap("X07T_SCOPE_BUDGET_CHILDREN_EXCEEDED");
+  s->child_task_ids[s->child_len] = task_id;
+  s->child_task_kinds[s->child_len] = kind;
+  s->child_len += 1;
+  return UINT32_C(1);
+}
+
+static uint32_t rt_scope_async_let(ctx_t* ctx, rt_scope_t* s, uint32_t task_id, uint32_t kind) {
+  (void)ctx;
+  if (s->cancel_requested) rt_trap("X07T_SCOPE_START_AFTER_CANCEL");
+  rt_scope_register_task(s, task_id);
+  for (uint32_t i = 0; i < s->slot_len; i++) {
+    rt_scope_slot_t* slot = &s->slots[i];
+    if (slot->state != RT_SCOPE_SLOT_EMPTY && slot->state != RT_SCOPE_SLOT_CONSUMED) continue;
+    slot->gen += 1;
+    slot->task_id = task_id;
+    slot->kind = kind;
+    slot->state = RT_SCOPE_SLOT_PENDING;
+    uint32_t handle = (slot->gen << 16) | i;
+    return handle;
+  }
+  rt_trap("X07T_SCOPE_BUDGET_CHILDREN_EXCEEDED");
+}
+
+static uint32_t rt_scope_slot_is_finished(ctx_t* ctx, rt_scope_t* s, uint32_t slot_id) {
+  uint32_t slot_idx = slot_id & UINT32_C(0xffff);
+  uint32_t slot_gen = slot_id >> 16;
+  if (slot_idx >= s->slot_len) rt_trap("X07T_SCOPE_SLOT_OOB");
+  rt_scope_slot_t* slot = &s->slots[slot_idx];
+  if (slot->gen != slot_gen) rt_trap("X07T_SCOPE_SLOT_INVALID");
+  if (slot->state == RT_SCOPE_SLOT_PENDING || slot->state == RT_SCOPE_SLOT_TAKEN) {
+    return rt_task_is_finished(ctx, slot->task_id);
+  }
+  if (slot->state == RT_SCOPE_SLOT_CONSUMED) return UINT32_C(1);
+  rt_trap("X07T_SCOPE_SLOT_INVALID");
+}
+
+static uint32_t rt_scope_slot_task_for_await(
+  rt_scope_t* s,
+  uint32_t slot_id,
+  uint32_t expected_kind
+) {
+  uint32_t slot_idx = slot_id & UINT32_C(0xffff);
+  uint32_t slot_gen = slot_id >> 16;
+  if (slot_idx >= s->slot_len) rt_trap("X07T_SCOPE_SLOT_OOB");
+  rt_scope_slot_t* slot = &s->slots[slot_idx];
+  if (slot->gen != slot_gen) rt_trap("X07T_SCOPE_SLOT_INVALID");
+  if (slot->state == RT_SCOPE_SLOT_PENDING) {
+    slot->state = RT_SCOPE_SLOT_TAKEN;
+  } else if (slot->state != RT_SCOPE_SLOT_TAKEN) {
+    rt_trap("X07T_SCOPE_SLOT_ALREADY_CONSUMED");
+  }
+  if (slot->kind != expected_kind) rt_trap("X07T_SCOPE_SLOT_KIND_MISMATCH");
+  if (slot->task_id == 0) rt_trap("X07T_SCOPE_SLOT_INVALID");
+  return slot->task_id;
+}
+
+static void rt_scope_check_slot_result_size(rt_scope_t* s, bytes_t out) {
+  if (s->max_slot_result_bytes != 0 && out.len > s->max_slot_result_bytes) {
+    rt_trap("X07T_SCOPE_SLOT_RESULT_TOO_LARGE");
+  }
+}
+
+static uint32_t rt_scope_await_slot_bytes_poll(ctx_t* ctx, rt_scope_t* s, uint32_t slot_id, bytes_t* out) {
+  uint32_t task_id = rt_scope_slot_task_for_await(s, slot_id, RT_TASK_OUT_KIND_BYTES);
+  uint32_t done = rt_task_join_bytes_poll(ctx, task_id, out);
+  if (!done) return UINT32_C(0);
+  rt_scope_check_slot_result_size(s, *out);
+  uint32_t slot_idx = slot_id & UINT32_C(0xffff);
+  rt_scope_slot_t* slot = &s->slots[slot_idx];
+  slot->state = RT_SCOPE_SLOT_CONSUMED;
+  slot->task_id = 0;
+  rt_scope_unregister_task(s, task_id);
+  return UINT32_C(1);
+}
+
+static bytes_t rt_scope_await_slot_bytes_block(ctx_t* ctx, rt_scope_t* s, uint32_t slot_id) {
+  uint32_t slot_idx = slot_id & UINT32_C(0xffff);
+  uint32_t slot_gen = slot_id >> 16;
+  if (slot_idx >= s->slot_len) rt_trap("X07T_SCOPE_SLOT_OOB");
+  rt_scope_slot_t* slot = &s->slots[slot_idx];
+  if (slot->gen != slot_gen) rt_trap("X07T_SCOPE_SLOT_INVALID");
+  if (slot->state != RT_SCOPE_SLOT_PENDING) rt_trap("X07T_SCOPE_SLOT_ALREADY_CONSUMED");
+  if (slot->kind != RT_TASK_OUT_KIND_BYTES) rt_trap("X07T_SCOPE_SLOT_KIND_MISMATCH");
+  slot->state = RT_SCOPE_SLOT_TAKEN;
+  uint32_t task_id = slot->task_id;
+  bytes_t out = rt_task_join_bytes_block(ctx, task_id);
+  rt_scope_check_slot_result_size(s, out);
+  slot->state = RT_SCOPE_SLOT_CONSUMED;
+  slot->task_id = 0;
+  rt_scope_unregister_task(s, task_id);
+  return out;
+}
+
+static uint32_t rt_scope_await_slot_result_bytes_poll(
+  ctx_t* ctx,
+  rt_scope_t* s,
+  uint32_t slot_id,
+  result_bytes_t* out
+) {
+  uint32_t task_id = rt_scope_slot_task_for_await(s, slot_id, RT_TASK_OUT_KIND_RESULT_BYTES);
+  uint32_t done = rt_task_join_result_bytes_poll(ctx, task_id, out);
+  if (!done) return UINT32_C(0);
+  if (out->tag) rt_scope_check_slot_result_size(s, out->payload.ok);
+  uint32_t slot_idx = slot_id & UINT32_C(0xffff);
+  rt_scope_slot_t* slot = &s->slots[slot_idx];
+  slot->state = RT_SCOPE_SLOT_CONSUMED;
+  slot->task_id = 0;
+  rt_scope_unregister_task(s, task_id);
+  return UINT32_C(1);
+}
+
+static result_bytes_t rt_scope_await_slot_result_bytes_block(ctx_t* ctx, rt_scope_t* s, uint32_t slot_id) {
+  uint32_t slot_idx = slot_id & UINT32_C(0xffff);
+  uint32_t slot_gen = slot_id >> 16;
+  if (slot_idx >= s->slot_len) rt_trap("X07T_SCOPE_SLOT_OOB");
+  rt_scope_slot_t* slot = &s->slots[slot_idx];
+  if (slot->gen != slot_gen) rt_trap("X07T_SCOPE_SLOT_INVALID");
+  if (slot->state != RT_SCOPE_SLOT_PENDING) rt_trap("X07T_SCOPE_SLOT_ALREADY_CONSUMED");
+  if (slot->kind != RT_TASK_OUT_KIND_RESULT_BYTES) rt_trap("X07T_SCOPE_SLOT_KIND_MISMATCH");
+  slot->state = RT_SCOPE_SLOT_TAKEN;
+  uint32_t task_id = slot->task_id;
+  result_bytes_t out = rt_task_join_result_bytes_block(ctx, task_id);
+  if (out.tag) rt_scope_check_slot_result_size(s, out.payload.ok);
+  slot->state = RT_SCOPE_SLOT_CONSUMED;
+  slot->task_id = 0;
+  rt_scope_unregister_task(s, task_id);
+  return out;
+}
+
+static result_bytes_t rt_scope_try_await_slot_bytes(ctx_t* ctx, rt_scope_t* s, uint32_t slot_id) {
+  uint32_t slot_idx = slot_id & UINT32_C(0xffff);
+  uint32_t slot_gen = slot_id >> 16;
+  if (slot_idx >= s->slot_len) rt_trap("X07T_SCOPE_SLOT_OOB");
+  rt_scope_slot_t* slot = &s->slots[slot_idx];
+  if (slot->gen != slot_gen) rt_trap("X07T_SCOPE_SLOT_INVALID");
+  if (slot->state != RT_SCOPE_SLOT_PENDING) rt_trap("X07T_SCOPE_SLOT_ALREADY_CONSUMED");
+  if (slot->kind != RT_TASK_OUT_KIND_BYTES) rt_trap("X07T_SCOPE_SLOT_KIND_MISMATCH");
+  uint32_t task_id = slot->task_id;
+  result_bytes_t r = rt_task_try_join_bytes(ctx, task_id);
+  if (r.tag) {
+    rt_scope_check_slot_result_size(s, r.payload.ok);
+    slot->state = RT_SCOPE_SLOT_CONSUMED;
+    slot->task_id = 0;
+    rt_scope_unregister_task(s, task_id);
+    return r;
+  }
+  if (r.payload.err == UINT32_C(2)) {
+    slot->state = RT_SCOPE_SLOT_CONSUMED;
+    slot->task_id = 0;
+    rt_scope_unregister_task(s, task_id);
+  }
+  return r;
+}
+
+static result_result_bytes_t rt_scope_try_await_slot_result_bytes(ctx_t* ctx, rt_scope_t* s, uint32_t slot_id) {
+  uint32_t slot_idx = slot_id & UINT32_C(0xffff);
+  uint32_t slot_gen = slot_id >> 16;
+  if (slot_idx >= s->slot_len) rt_trap("X07T_SCOPE_SLOT_OOB");
+  rt_scope_slot_t* slot = &s->slots[slot_idx];
+  if (slot->gen != slot_gen) rt_trap("X07T_SCOPE_SLOT_INVALID");
+  if (slot->state != RT_SCOPE_SLOT_PENDING) rt_trap("X07T_SCOPE_SLOT_ALREADY_CONSUMED");
+  if (slot->kind != RT_TASK_OUT_KIND_RESULT_BYTES) rt_trap("X07T_SCOPE_SLOT_KIND_MISMATCH");
+  uint32_t task_id = slot->task_id;
+  result_result_bytes_t r = rt_task_try_join_result_bytes(ctx, task_id);
+  if (r.tag) {
+    if (r.payload.ok.tag) rt_scope_check_slot_result_size(s, r.payload.ok.payload.ok);
+    slot->state = RT_SCOPE_SLOT_CONSUMED;
+    slot->task_id = 0;
+    rt_scope_unregister_task(s, task_id);
+    return r;
+  }
+  if (r.payload.err == UINT32_C(2)) {
+    slot->state = RT_SCOPE_SLOT_CONSUMED;
+    slot->task_id = 0;
+    rt_scope_unregister_task(s, task_id);
+  }
+  return r;
+}
+
+static uint32_t rt_scope_wait_all_count(rt_scope_t* s) {
+  uint32_t slots_pending = 0;
+  for (uint32_t i = 0; i < s->slot_len; i++) {
+    if (s->slots[i].state == RT_SCOPE_SLOT_PENDING) slots_pending += 1;
+  }
+  return s->child_len + slots_pending;
+}
+
+static void rt_scope_reset_active(rt_scope_t* s) {
+  s->child_len = 0;
+  s->reg_len = 0;
+  s->cancel_requested = 0;
+}
+
+static uint32_t rt_scope_cancel_all(ctx_t* ctx, rt_scope_t* s) {
+  uint32_t canceled = 0;
+  for (uint32_t i = s->reg_len; i > 0; i--) {
+    canceled += rt_task_cancel(ctx, s->reg_task_ids[i - 1]);
+  }
+  s->cancel_requested = 1;
+  return canceled;
+}
+
+static uint32_t rt_scope_join_drop_remaining_poll(ctx_t* ctx, rt_scope_t* s) {
+  if (s->join_phase == 0) {
+    s->join_phase = 1;
+    s->join_slot_i = 0;
+    s->join_child_i = 0;
+  }
+
+  if (s->join_phase == 1) {
+    while (s->join_slot_i < s->slot_len) {
+      uint32_t slot_id = s->join_slot_i;
+      rt_scope_slot_t* slot = &s->slots[slot_id];
+      if (slot->state != RT_SCOPE_SLOT_PENDING) {
+        s->join_slot_i += 1;
+        continue;
+      }
+
+      if (slot->kind == RT_TASK_OUT_KIND_BYTES) {
+        bytes_t out = rt_bytes_empty(ctx);
+        uint32_t task_id = slot->task_id;
+        uint32_t done = rt_task_join_bytes_poll(ctx, task_id, &out);
+        if (!done) return UINT32_C(0);
+        rt_scope_check_slot_result_size(s, out);
+        rt_bytes_drop(ctx, &out);
+        rt_scope_unregister_task(s, task_id);
+      } else if (slot->kind == RT_TASK_OUT_KIND_RESULT_BYTES) {
+        result_bytes_t out = (result_bytes_t){0};
+        uint32_t task_id = slot->task_id;
+        uint32_t done = rt_task_join_result_bytes_poll(ctx, task_id, &out);
+        if (!done) return UINT32_C(0);
+        if (out.tag) {
+          rt_scope_check_slot_result_size(s, out.payload.ok);
+          rt_bytes_drop(ctx, &out.payload.ok);
+        }
+        rt_scope_unregister_task(s, task_id);
+      } else {
+        rt_trap("scope slot kind invalid");
+      }
+
+      slot->state = RT_SCOPE_SLOT_CONSUMED;
+      slot->task_id = 0;
+      s->join_slot_i += 1;
+    }
+    s->join_phase = 2;
+  }
+
+  if (s->join_phase == 2) {
+    while (s->join_child_i < s->child_len) {
+      uint32_t task_id = s->child_task_ids[s->join_child_i];
+      uint32_t kind = s->child_task_kinds[s->join_child_i];
+      if (kind == RT_TASK_OUT_KIND_BYTES) {
+        uint32_t done = rt_task_join_bytes_poll(ctx, task_id, NULL);
+        if (!done) return UINT32_C(0);
+      } else if (kind == RT_TASK_OUT_KIND_RESULT_BYTES) {
+        uint32_t done = rt_task_join_result_bytes_poll(ctx, task_id, NULL);
+        if (!done) return UINT32_C(0);
+      } else {
+        rt_trap("scope child kind invalid");
+      }
+      s->join_child_i += 1;
+    }
+    s->join_phase = 0;
+    s->join_slot_i = 0;
+    s->join_child_i = 0;
+    return UINT32_C(1);
+  }
+
+  rt_trap("scope join invalid state");
+}
+
+static void rt_scope_join_drop_remaining_block(ctx_t* ctx, rt_scope_t* s) {
+  for (uint32_t slot_id = 0; slot_id < s->slot_len; slot_id++) {
+    rt_scope_slot_t* slot = &s->slots[slot_id];
+    if (slot->state != RT_SCOPE_SLOT_PENDING) continue;
+    if (slot->kind == RT_TASK_OUT_KIND_BYTES) {
+      uint32_t task_id = slot->task_id;
+      bytes_t out = rt_task_join_bytes_block(ctx, task_id);
+      rt_scope_check_slot_result_size(s, out);
+      rt_bytes_drop(ctx, &out);
+      rt_scope_unregister_task(s, task_id);
+    } else if (slot->kind == RT_TASK_OUT_KIND_RESULT_BYTES) {
+      uint32_t task_id = slot->task_id;
+      result_bytes_t out = rt_task_join_result_bytes_block(ctx, task_id);
+      if (out.tag) {
+        rt_scope_check_slot_result_size(s, out.payload.ok);
+        rt_bytes_drop(ctx, &out.payload.ok);
+      }
+      rt_scope_unregister_task(s, task_id);
+    } else {
+      rt_trap("scope slot kind invalid");
+    }
+    slot->state = RT_SCOPE_SLOT_CONSUMED;
+    slot->task_id = 0;
+  }
+
+  for (uint32_t i = 0; i < s->child_len; i++) {
+    uint32_t task_id = s->child_task_ids[i];
+    uint32_t kind = s->child_task_kinds[i];
+    if (kind == RT_TASK_OUT_KIND_BYTES) {
+      bytes_t out = rt_task_join_bytes_block(ctx, task_id);
+      rt_bytes_drop(ctx, &out);
+    } else if (kind == RT_TASK_OUT_KIND_RESULT_BYTES) {
+      result_bytes_t out = rt_task_join_result_bytes_block(ctx, task_id);
+      if (out.tag) {
+        rt_bytes_drop(ctx, &out.payload.ok);
+      }
+    } else {
+      rt_trap("scope child kind invalid");
+    }
+  }
+}
+
+static void rt_scope_budget_check_exit(ctx_t* ctx, rt_scope_t* s) {
+  uint64_t ticks = ctx->sched_now_ticks - s->snap_ticks;
+  if (s->max_ticks != 0 && ticks > s->max_ticks) rt_trap("X07T_SCOPE_BUDGET_TICKS_EXCEEDED");
+
+  uint64_t blocked = ctx->sched_stats.blocked_waits - s->snap_blocked_waits;
+  if (s->max_blocked_waits != 0 && blocked > s->max_blocked_waits) {
+    rt_trap("X07T_SCOPE_BUDGET_BLOCKED_WAITS_EXCEEDED");
+  }
+
+  uint64_t joins = ctx->sched_stats.join_calls - s->snap_join_polls;
+  if (s->max_join_polls != 0 && joins > s->max_join_polls) rt_trap("X07T_SCOPE_BUDGET_JOIN_POLLS_EXCEEDED");
+}
+
+static uint32_t rt_scope_exit_poll(ctx_t* ctx, rt_scope_t* s) {
+  uint32_t done = rt_scope_join_drop_remaining_poll(ctx, s);
+  if (!done) return UINT32_C(0);
+  rt_scope_budget_check_exit(ctx, s);
+  rt_scope_drop(ctx, s);
+  return UINT32_C(1);
+}
+
+static void rt_scope_exit_block(ctx_t* ctx, rt_scope_t* s) {
+  rt_scope_join_drop_remaining_block(ctx, s);
+  rt_scope_budget_check_exit(ctx, s);
+  rt_scope_drop(ctx, s);
+}
+
+static void rt_scope_dispose_on_drop(ctx_t* ctx, rt_scope_t* s) {
+  // Best-effort scope cleanup used by async task drop (task cancel / task complete):
+  // - cancel unfinished children in deterministic order (reverse registration)
+  // - drop any finished but unconsumed outputs (without blocking)
+  // - free scope buffers
+  if (s->reg_len != 0) {
+    for (uint32_t i = s->reg_len; i > 0; i--) {
+      uint32_t task_id = s->reg_task_ids[i - 1];
+      if (task_id == 0) continue;
+      rt_task_t* t = rt_task_ptr(ctx, task_id);
+      if (!t->done) {
+        (void)rt_task_cancel(ctx, task_id);
+        continue;
+      }
+      if (t->out_taken || t->canceled) continue;
+      if (t->out.kind == RT_TASK_OUT_KIND_BYTES) {
+        (void)rt_task_join_bytes_poll(ctx, task_id, NULL);
+      } else if (t->out.kind == RT_TASK_OUT_KIND_RESULT_BYTES) {
+        (void)rt_task_join_result_bytes_poll(ctx, task_id, NULL);
+      } else {
+        rt_trap("scope.drop invalid out kind");
+      }
+    }
+  }
+  rt_scope_drop(ctx, s);
+}
+
+static uint32_t rt_select_evt_new(
+  ctx_t* ctx,
+  uint64_t scope_key,
+  uint32_t tag,
+  uint32_t case_index,
+  uint32_t src_id,
+  bytes_t payload
+) {
+  // Reuse a free slot if possible.
+  for (uint32_t i = 0; i < ctx->sched_select_evts_len; i++) {
+    rt_select_evt_t* e = &ctx->sched_select_evts[i];
+    if (e->alive) continue;
+    memset(e, 0, sizeof(*e));
+    e->alive = 1;
+    e->tag = tag;
+    e->case_index = case_index;
+    e->src_id = src_id;
+    e->scope_key = scope_key;
+    e->payload = payload;
+    return i + 1;
+  }
+
+  if (ctx->sched_select_evts_len == UINT32_MAX) rt_trap("select.evt.new overflow");
+  uint32_t need = ctx->sched_select_evts_len + 1;
+  rt_sched_select_evts_ensure_cap(ctx, need);
+  uint32_t evt_id = need;
+  rt_select_evt_t* e = &ctx->sched_select_evts[evt_id - 1];
+  memset(e, 0, sizeof(*e));
+  e->alive = 1;
+  e->tag = tag;
+  e->case_index = case_index;
+  e->src_id = src_id;
+  e->scope_key = scope_key;
+  e->payload = payload;
+  ctx->sched_select_evts_len = need;
+  return evt_id;
+}
+
+static uint32_t rt_select_evt_tag(ctx_t* ctx, uint32_t evt_id) {
+  rt_select_evt_t* e = rt_select_evt_ptr(ctx, evt_id);
+  return e->tag;
+}
+
+static uint32_t rt_select_evt_case_index(ctx_t* ctx, uint32_t evt_id) {
+  rt_select_evt_t* e = rt_select_evt_ptr(ctx, evt_id);
+  return e->case_index;
+}
+
+static uint32_t rt_select_evt_src_id(ctx_t* ctx, uint32_t evt_id) {
+  rt_select_evt_t* e = rt_select_evt_ptr(ctx, evt_id);
+  return e->src_id;
+}
+
+static bytes_t rt_select_evt_take_bytes(ctx_t* ctx, uint32_t evt_id) {
+  rt_select_evt_t* e = rt_select_evt_ptr(ctx, evt_id);
+  if (e->taken) rt_trap("X07T_SELECT_EVT_ALREADY_TAKEN");
+  e->taken = 1;
+  bytes_t out = e->payload;
+  e->payload = rt_bytes_empty(ctx);
+  e->alive = 0;
+  return out;
+}
+
+static void rt_select_evt_drop(ctx_t* ctx, uint32_t evt_id) {
+  rt_select_evt_t* e = rt_select_evt_ptr(ctx, evt_id);
+  if (e->taken) rt_trap("X07T_SELECT_EVT_ALREADY_TAKEN");
+  rt_bytes_drop(ctx, &e->payload);
+  e->payload = rt_bytes_empty(ctx);
+  e->taken = 1;
+  e->alive = 0;
 }
 
 static uint32_t rt_chan_bytes_new(ctx_t* ctx, uint32_t cap) {
@@ -24159,6 +28691,26 @@ static void rt_ctx_cleanup(ctx_t* ctx) {
   ctx->sched_chans_len = 0;
   ctx->sched_chans_cap = 0;
 
+  for (uint32_t i = 0; i < ctx->sched_select_evts_len; i++) {
+    rt_select_evt_t* e = &ctx->sched_select_evts[i];
+    if (!e->alive) continue;
+    rt_bytes_drop(ctx, &e->payload);
+    e->payload = rt_bytes_empty(ctx);
+    e->alive = 0;
+    e->taken = 0;
+  }
+  if (ctx->sched_select_evts && ctx->sched_select_evts_cap) {
+    rt_free(
+      ctx,
+      ctx->sched_select_evts,
+      ctx->sched_select_evts_cap * (uint32_t)sizeof(rt_select_evt_t),
+      (uint32_t)_Alignof(rt_select_evt_t)
+    );
+  }
+  ctx->sched_select_evts = NULL;
+  ctx->sched_select_evts_len = 0;
+  ctx->sched_select_evts_cap = 0;
+
   if (ctx->sched_timers && ctx->sched_timers_cap) {
     rt_free(
       ctx,
@@ -24181,8 +28733,8 @@ static void rt_ctx_cleanup(ctx_t* ctx) {
     }
     t->drop = NULL;
     t->fut = NULL;
-    rt_bytes_drop(ctx, &t->out);
-    t->out = rt_bytes_empty(ctx);
+    rt_task_out_drop(ctx, &t->out);
+    t->out = rt_task_out_empty(ctx);
     t->out_taken = 0;
     t->alive = 0;
   }

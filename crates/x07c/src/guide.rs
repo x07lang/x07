@@ -35,13 +35,13 @@ pub fn guide_md() -> String {
     out.push_str("- `vec_u8` for mutable byte vectors (move-only; capacity-planned builders)\n");
     out.push_str("- `option_i32`, `option_bytes` for typed optional values\n");
     out.push_str(
-        "- `result_i32`, `result_bytes` for typed results with deterministic error codes\n",
+        "- `result_i32`, `result_bytes`, `result_result_bytes` for typed results with deterministic error codes\n",
     );
     out.push_str("- `iface` for interface records (used for streaming readers)\n");
     out.push_str("- Raw pointer types (standalone-only; require unsafe capability): `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`\n\n");
     out.push_str("Move rules (critical):\n");
     out.push_str("- Passing `bytes` / `vec_u8` to a function that expects `bytes` / `vec_u8` **moves** (consumes) the value.\n");
-    out.push_str("- `result_i32` / `result_bytes` values are also move-only; consume them once (use `*_err_code`, `*_unwrap_or`, or `try`).\n");
+    out.push_str("- `result_i32` / `result_bytes` / `result_result_bytes` values are also move-only; consume them once (use `*_err_code`, `*_unwrap_or`, or `try`).\n");
     out.push_str("- Mutating APIs return the updated value; always bind it with `let`/`set` (example: `[\"set\",\"b\",[\"bytes.set_u8\",\"b\",0,65]]`).\n\n");
 
     out.push_str("## Builtins\n\n");
@@ -141,7 +141,7 @@ pub fn guide_md() -> String {
     out.push_str("## Functions\n\n");
     out.push_str("- Define with a `decls[]` entry of kind `defn`.\n");
     out.push_str("  - `body` is a single expression; wrap multi-step bodies in `begin`.\n");
-    out.push_str("  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `result_i32`, `result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.\n");
+    out.push_str("  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `result_i32`, `result_bytes`, `result_result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.\n");
     out.push_str("  - Function names must be namespaced and start with the current module ID.\n");
     out.push_str("    - In the entry file, use module `main` (example: `main.helper`).\n");
     out.push_str("  - `input` (bytes_view) is available in all function bodies.\n");
@@ -149,25 +149,64 @@ pub fn guide_md() -> String {
 
     out.push_str("## Concurrency\n\n");
     out.push_str("Async functions are defined with `defasync`.\n");
-    out.push_str("Calling an async function returns an opaque `i32` task handle.\n");
+    out.push_str("Calling an async function returns an opaque task handle (`i32` in x07AST; type-checked by the compiler).\n");
     out.push_str(
         "To get concurrency, create multiple tasks before waiting on them (and avoid blocking operations outside tasks).\n\n",
     );
     out.push_str("- Define with a `decls[]` entry of kind `defasync`.\n");
     out.push_str("  - `body` is a single expression; wrap multi-step bodies in `begin`.\n");
-    out.push_str("  - `bytes` is the awaited return type (currently only `bytes` is supported).\n");
-    out.push_str("- Call: `[\"name\", arg1, arg2, ...]` -> `i32` (task handle)\n");
-    out.push_str("- `[\"await\", task_handle]` -> `bytes` (alias of `task.join.bytes`)\n");
-    out.push_str("- `[\"task.spawn\", task_handle]` -> `i32`\n");
+    out.push_str("  - Awaited return types:\n");
+    out.push_str("    - `bytes`\n");
+    out.push_str("    - `result_bytes`\n\n");
+    out.push_str("Task ops:\n\n");
+    out.push_str("- Call: `[\"name\", arg1, arg2, ...]` -> `i32` task handle\n");
+    out.push_str("- `[\"await\", <bytes task handle>]` -> `bytes` (alias of `task.join.bytes`)\n");
+    out.push_str(
+        "- `[\"task.spawn\", task_handle]` -> `i32` (stats/registration; optional for most code)\n",
+    );
     out.push_str("- `[\"task.is_finished\", task_handle]` -> `i32` (0/1)\n");
-    out.push_str("- `[\"task.try_join.bytes\", task_handle]` -> `result_bytes` (err=1 not finished; err=2 canceled)\n");
-    out.push_str("- `[\"task.join.bytes\", task_handle]` -> `bytes`\n");
+    out.push_str("- `[\"task.try_join.bytes\", <bytes task handle>]` -> `result_bytes` (err=1 not finished; err=2 canceled)\n");
+    out.push_str("- `[\"task.join.bytes\", <bytes task handle>]` -> `bytes`\n");
+    out.push_str("- `[\"task.try_join.result_bytes\", <result_bytes task handle>]` -> `result_result_bytes` (err=1 not finished; err=2 canceled)\n");
+    out.push_str(
+        "- `[\"task.join.result_bytes\", <result_bytes task handle>]` -> `result_bytes`\n",
+    );
     out.push_str("- `[\"task.yield\"]` -> `i32`\n");
     out.push_str("- `[\"task.sleep\", ticks_i32]` -> `i32` (virtual time ticks)\n");
     out.push_str("- `[\"task.cancel\", task_handle]` -> `i32`\n\n");
     out.push_str(
         "Note: `await` / `task.join.bytes` are only allowed in `solve` expressions and inside `defasync` bodies (not inside `defn`).\n\n",
     );
+    out.push_str("Structured concurrency (`task.scope_v1`):\n\n");
+    out.push_str("- `[\"task.scope_v1\", [\"task.scope.cfg_v1\", ...], <body>]` evaluates `<body>` and then joins+drops all children started in the scope.\n");
+    out.push_str("- `[\"task.scope.start_soon_v1\", <immediate defasync call expr>] -> i32` registers a child task in the current scope.\n");
+    out.push_str("- `[\"task.scope.cancel_all_v1\"] -> i32` cancels all registered children.\n");
+    out.push_str(
+        "- `[\"task.scope.wait_all_v1\"] -> i32` joins+drops all registered children so far.\n\n",
+    );
+    out.push_str("Scope cfg (`task.scope.cfg_v1`) fields (all optional):\n\n");
+    out.push_str("- `[\"max_children\", <u32>]`\n");
+    out.push_str("- `[\"max_ticks\", <u64>]`\n");
+    out.push_str("- `[\"max_blocked_waits\", <u64>]`\n");
+    out.push_str("- `[\"max_join_polls\", <u64>]`\n");
+    out.push_str("- `[\"max_slot_result_bytes\", <u32>]`\n\n");
+    out.push_str("Scoped slots (`async_let`):\n\n");
+    out.push_str("- `[\"task.scope.async_let_bytes_v1\", <immediate defasync call expr>] -> i32` (slot id)\n");
+    out.push_str("- `[\"task.scope.async_let_result_bytes_v1\", <immediate defasync call expr>] -> i32` (slot id)\n");
+    out.push_str("- `[\"task.scope.await_slot_bytes_v1\", slot_id] -> bytes`\n");
+    out.push_str("- `[\"task.scope.await_slot_result_bytes_v1\", slot_id] -> result_bytes`\n");
+    out.push_str("- `[\"task.scope.try_await_slot.bytes_v1\", slot_id] -> result_bytes` (err=1 not ready; err=2 canceled)\n");
+    out.push_str("- `[\"task.scope.try_await_slot.result_bytes_v1\", slot_id] -> result_result_bytes` (err=1 not ready; err=2 canceled)\n");
+    out.push_str("- `[\"task.scope.slot_is_finished_v1\", slot_id] -> i32` (0/1)\n\n");
+    out.push_str("Scoped select:\n\n");
+    out.push_str("- `[\"task.scope.select_v1\", [\"task.scope.select.cfg_v1\", ...], [\"task.scope.select.cases_v1\", ...]] -> i32` (select evt id)\n");
+    out.push_str("- `[\"task.scope.select_try_v1\", [\"task.scope.select.cfg_v1\", ...], [\"task.scope.select.cases_v1\", ...]] -> option_i32` (optional select evt id)\n\n");
+    out.push_str("Select event helpers:\n\n");
+    out.push_str("- `[\"task.select_evt.tag_v1\", evt_id] -> i32`\n");
+    out.push_str("- `[\"task.select_evt.case_index_v1\", evt_id] -> i32`\n");
+    out.push_str("- `[\"task.select_evt.src_id_v1\", evt_id] -> i32`\n");
+    out.push_str("- `[\"task.select_evt.take_bytes_v1\", evt_id] -> bytes`\n");
+    out.push_str("- `[\"task.select_evt.drop_v1\", evt_id] -> i32`\n\n");
     out.push_str("Channels (bytes payloads):\n\n");
     out.push_str("- `[\"chan.bytes.new\", cap_i32]` -> `i32`\n");
     out.push_str("- `[\"chan.bytes.try_send\", chan_handle, bytes_view]` -> `i32` (0 full; 1 sent; 2 closed)\n");

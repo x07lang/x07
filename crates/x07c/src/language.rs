@@ -3,7 +3,7 @@ pub const LANG_ID: &str = "x07-core@0.2.0";
 pub mod limits {
     pub const MAX_SOURCE_BYTES: usize = 65_536;
     pub const MAX_AST_NODES: usize = 200_000;
-    pub const MAX_LOCALS: usize = 1024;
+    pub const MAX_LOCALS: usize = 2048;
     pub const MAX_C_BYTES: usize = 5 * 1024 * 1024;
 
     pub fn max_ast_nodes() -> usize {

@@ -4,12 +4,12 @@ IMPORTANT:
 - Output ONLY one JSON object (no preamble).
 - Do NOT use Markdown code fences.
 - Do NOT output extra prose.
-- Must satisfy x07AST schema_version `x07.x07ast@0.1.0`.
+- Must satisfy x07AST schema_version `x07.x07ast@0.2.0`.
 
 Program encoding: UTF-8 JSON text.
 
 Entry program object fields:
-- `schema_version`: `x07.x07ast@0.1.0`
+- `schema_version`: `x07.x07ast@0.2.0`
 - `kind`: `entry`
 - `module_id`: `main`
 - `imports`: array of module IDs (e.g. `std.bytes`)
@@ -29,7 +29,7 @@ Entry program object fields:
 - `bytes_view` for borrowed byte views (zero-copy scanning/slicing)
 - `vec_u8` for mutable byte vectors (move-only; capacity-planned builders)
 - `option_i32`, `option_bytes` for typed optional values
-- `result_i32`, `result_bytes` for typed results with deterministic error codes
+- `result_i32`, `result_bytes`, `result_result_bytes` for typed results with deterministic error codes
 - `iface` for interface records (used for streaming readers)
 - Raw pointer types (standalone-only; require unsafe capability): `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`
 
@@ -141,7 +141,7 @@ Standalone unsafe + FFI:
 
 - Define with a `decls[]` entry of kind `defn`.
   - `body` is a single expression; wrap multi-step bodies in `begin`.
-  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `result_i32`, `result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.
+  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `result_i32`, `result_bytes`, `result_result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.
   - Function names must be namespaced and start with the current module ID.
     - In the entry file, use module `main` (example: `main.helper`).
   - `input` (bytes_view) is available in all function bodies.
@@ -150,21 +150,68 @@ Standalone unsafe + FFI:
 ## Concurrency
 
 Async functions are defined with `defasync`.
-Calling an async function returns an opaque `i32` task handle.
+Calling an async function returns an opaque task handle (`i32` in x07AST; type-checked by the compiler).
 To get concurrency, create multiple tasks before waiting on them (and avoid blocking operations outside tasks).
 
 - Define with a `decls[]` entry of kind `defasync`.
   - `body` is a single expression; wrap multi-step bodies in `begin`.
-  - `bytes` is the awaited return type (currently only `bytes` is supported).
-- Call: `["name", arg1, arg2, ...]` -> `i32` (task handle)
-- `["await", task_handle]` -> `bytes` (alias of `task.join.bytes`)
-- `["task.spawn", task_handle]` -> `i32`
+  - Awaited return types:
+    - `bytes`
+    - `result_bytes`
+
+Task ops:
+
+- Call: `["name", arg1, arg2, ...]` -> `i32` task handle
+- `["await", <bytes task handle>]` -> `bytes` (alias of `task.join.bytes`)
+- `["task.spawn", task_handle]` -> `i32` (stats/registration; optional for most code)
 - `["task.is_finished", task_handle]` -> `i32` (0/1)
-- `["task.try_join.bytes", task_handle]` -> `result_bytes` (err=1 not finished; err=2 canceled)
-- `["task.join.bytes", task_handle]` -> `bytes`
+- `["task.try_join.bytes", <bytes task handle>]` -> `result_bytes` (err=1 not finished; err=2 canceled)
+- `["task.join.bytes", <bytes task handle>]` -> `bytes`
+- `["task.try_join.result_bytes", <result_bytes task handle>]` -> `result_result_bytes` (err=1 not finished; err=2 canceled)
+- `["task.join.result_bytes", <result_bytes task handle>]` -> `result_bytes`
 - `["task.yield"]` -> `i32`
 - `["task.sleep", ticks_i32]` -> `i32` (virtual time ticks)
 - `["task.cancel", task_handle]` -> `i32`
+
+Note: `await` / `task.join.bytes` are only allowed in `solve` expressions and inside `defasync` bodies (not inside `defn`).
+
+Structured concurrency (`task.scope_v1`):
+
+- `["task.scope_v1", ["task.scope.cfg_v1", ...], <body>]` evaluates `<body>` and then joins+drops all children started in the scope.
+- `["task.scope.start_soon_v1", <immediate defasync call expr>] -> i32` registers a child task in the current scope.
+- `["task.scope.cancel_all_v1"] -> i32` cancels all registered children.
+- `["task.scope.wait_all_v1"] -> i32` joins+drops all registered children so far.
+
+Scope cfg (`task.scope.cfg_v1`) fields (all optional):
+
+- `["max_children", <u32>]`
+- `["max_ticks", <u64>]`
+- `["max_blocked_waits", <u64>]`
+- `["max_join_polls", <u64>]`
+- `["max_slot_result_bytes", <u32>]`
+
+Scoped slots (`async_let`):
+
+- `["task.scope.async_let_bytes_v1", <immediate defasync call expr>] -> i32` (slot id)
+- `["task.scope.async_let_result_bytes_v1", <immediate defasync call expr>] -> i32` (slot id)
+- `["task.scope.await_slot_bytes_v1", slot_id] -> bytes`
+- `["task.scope.await_slot_result_bytes_v1", slot_id] -> result_bytes`
+- `["task.scope.try_await_slot.bytes_v1", slot_id] -> result_bytes` (err=1 not ready; err=2 canceled)
+- `["task.scope.try_await_slot.result_bytes_v1", slot_id] -> result_result_bytes` (err=1 not ready; err=2 canceled)
+- `["task.scope.slot_is_finished_v1", slot_id] -> i32` (0/1)
+
+Scoped select:
+
+- `["task.scope.select_v1", ["task.scope.select.cfg_v1", ...], ["task.scope.select.cases_v1", ...]] -> i32` (select evt id)
+- `["task.scope.select_try_v1", ["task.scope.select.cfg_v1", ...], ["task.scope.select.cases_v1", ...]] -> option_i32` (optional select evt id)
+
+Select event helpers:
+
+- `["task.select_evt.tag_v1", evt_id] -> i32`
+- `["task.select_evt.case_index_v1", evt_id] -> i32`
+- `["task.select_evt.src_id_v1", evt_id] -> i32`
+- `["task.select_evt.take_bytes_v1", evt_id] -> bytes`
+- `["task.select_evt.drop_v1", evt_id] -> i32`
 
 Channels (bytes payloads):
 
@@ -592,5 +639,3 @@ Many tasks use `input[0..k]` as parameters and the remaining bytes as data.
 Example (k=1):
 
 - `["begin",["let","x",["std.bytes.get_u8","input",0]],["let","n",["std.bytes.len","input"]],["let","v",["std.vec.with_capacity",["-","n",1]]],["for","i",1,"n",["std.vec.push","v",["std.bytes.get_u8","input","i"]]],["std.vec.as_bytes","v"]]`
-
-

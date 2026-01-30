@@ -8,6 +8,7 @@ pub enum Ty {
     OptionBytes,
     ResultI32,
     ResultBytes,
+    ResultResultBytes,
     Iface,
     PtrConstU8,
     PtrMutU8,
@@ -15,6 +16,12 @@ pub enum Ty {
     PtrMutVoid,
     PtrConstI32,
     PtrMutI32,
+    TaskScopeV1,
+    TaskHandleBytesV1,
+    TaskHandleResultBytesV1,
+    TaskSlotV1,
+    TaskSelectEvtV1,
+    OptionTaskSelectEvtV1,
     Never,
 }
 
@@ -29,6 +36,7 @@ impl Ty {
             "option_bytes" => Some(Ty::OptionBytes),
             "result_i32" => Some(Ty::ResultI32),
             "result_bytes" => Some(Ty::ResultBytes),
+            "result_result_bytes" => Some(Ty::ResultResultBytes),
             "iface" => Some(Ty::Iface),
             "ptr_const_u8" => Some(Ty::PtrConstU8),
             "ptr_mut_u8" => Some(Ty::PtrMutU8),
