@@ -31,6 +31,14 @@ X07 uses a small core type system optimized for agents:
 
 See [Types & memory model](types-memory.md).
 
+## Streaming pipes
+
+For deterministic, budgeted streaming pipelines (source → transforms → sink), X07 provides a compiler special form:
+
+- `std.stream.pipe_v1`
+
+See [Streaming pipes](stream-pipes.md).
+
 ## “Single canonical way”
 
 Where many languages offer multiple competing patterns, X07 standardizes:

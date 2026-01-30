@@ -5,6 +5,7 @@ use globset::{Glob, GlobMatcher};
 use once_cell::sync::OnceCell;
 use std::io::{self, Read as _, Write as _};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
@@ -58,6 +59,7 @@ const FS_ERR_POLICY_DENY: i32 = 60001;
 const FS_ERR_DISABLED: i32 = 60002;
 const FS_ERR_BAD_PATH: i32 = 60003;
 const FS_ERR_BAD_CAPS: i32 = 60004;
+const FS_ERR_BAD_HANDLE: i32 = 60005;
 
 const FS_ERR_NOT_FOUND: i32 = 60010;
 const FS_ERR_ALREADY_EXISTS: i32 = 60011;
@@ -133,6 +135,92 @@ fn effective_max(policy_max: u32, caps_max: u32) -> u32 {
         policy_max
     } else {
         policy_max.min(caps_max)
+    }
+}
+
+// -------------------------
+// Streaming write handles (FS v1)
+// -------------------------
+
+#[derive(Debug)]
+struct WriterHandleV1 {
+    file: Option<std::fs::File>,
+    final_path: PathBuf,
+    tmp_path: Option<PathBuf>,
+    max_write_bytes: u32,
+    written: u32,
+}
+
+static WRITERS: OnceCell<Mutex<Vec<Option<WriterHandleV1>>>> = OnceCell::new();
+
+fn writers() -> &'static Mutex<Vec<Option<WriterHandleV1>>> {
+    WRITERS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn writer_idx(handle: i32) -> Option<usize> {
+    if handle <= 0 {
+        None
+    } else {
+        Some((handle as usize).saturating_sub(1))
+    }
+}
+
+fn writer_insert(table: &mut Vec<Option<WriterHandleV1>>, w: WriterHandleV1) -> Result<i32, i32> {
+    for (idx, slot) in table.iter_mut().enumerate() {
+        if slot.is_none() {
+            *slot = Some(w);
+            let h = idx + 1;
+            if h > (i32::MAX as usize) {
+                *slot = None;
+                return Err(FS_ERR_UNSUPPORTED);
+            }
+            return Ok(h as i32);
+        }
+    }
+    table.push(Some(w));
+    let h = table.len();
+    if h > (i32::MAX as usize) {
+        table.pop();
+        return Err(FS_ERR_UNSUPPORTED);
+    }
+    Ok(h as i32)
+}
+
+fn open_atomic_tmp_best_effort(
+    path: &Path,
+    overwrite: bool,
+) -> Result<(std::fs::File, PathBuf), i32> {
+    let Some(parent) = path.parent() else {
+        return Err(FS_ERR_BAD_PATH);
+    };
+    let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+        return Err(FS_ERR_BAD_PATH);
+    };
+
+    if path.exists() {
+        match std::fs::metadata(path) {
+            Ok(m) if m.is_dir() => return Err(FS_ERR_IS_DIR),
+            Ok(_) if !overwrite => return Err(FS_ERR_ALREADY_EXISTS),
+            Ok(_) => {}
+            Err(e) => return Err(map_io_err(&e)),
+        }
+    }
+
+    let mut counter: u32 = 0;
+    loop {
+        let candidate = parent.join(format!("{name}.x07_tmp_{counter}"));
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(f) => return Ok((f, candidate)),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                counter = counter.wrapping_add(1);
+                continue;
+            }
+            Err(e) => return Err(map_io_err(&e)),
+        }
     }
 }
 
@@ -567,6 +655,222 @@ pub extern "C" fn x07_ext_fs_write_all_v1(
     .unwrap_or_else(|_| err_i32(FS_ERR_IO))
 }
 
+#[no_mangle]
+pub extern "C" fn x07_ext_fs_stream_open_write_v1(path: ev_bytes, caps: ev_bytes) -> ev_result_i32 {
+    std::panic::catch_unwind(|| unsafe {
+        let caps = match parse_caps_v1(bytes_as_slice(caps)) {
+            Ok(caps) => caps,
+            Err(code) => return err_i32(code),
+        };
+
+        let pol = policy();
+        if cap_allow_symlinks(caps) && !pol.allow_symlinks {
+            return err_i32(FS_ERR_SYMLINK_DENIED);
+        }
+
+        if cap_create_parents(caps) && !pol.allow_mkdir {
+            return err_i32(FS_ERR_POLICY_DENY);
+        }
+        if cap_atomic_write(caps) && !pol.allow_rename {
+            return err_i32(FS_ERR_POLICY_DENY);
+        }
+
+        let path_bytes = bytes_as_slice(path);
+        let pb = match enforce_write_path(caps, path_bytes) {
+            Ok(p) => p,
+            Err(code) => return err_i32(code),
+        };
+
+        let max_write = effective_max(pol.max_write_bytes, caps.max_write_bytes);
+
+        if cap_create_parents(caps) {
+            if let Some(parent) = pb.parent() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    return err_i32(map_io_err(&e));
+                }
+            }
+        }
+
+        let overwrite = cap_overwrite(caps);
+
+        if cap_atomic_write(caps) {
+            let (f, tmp) = match open_atomic_tmp_best_effort(&pb, overwrite) {
+                Ok(v) => v,
+                Err(code) => return err_i32(code),
+            };
+
+            let handle = match writers().lock() {
+                Ok(mut table) => writer_insert(
+                    &mut table,
+                    WriterHandleV1 {
+                        file: Some(f),
+                        final_path: pb,
+                        tmp_path: Some(tmp),
+                        max_write_bytes: max_write,
+                        written: 0,
+                    },
+                ),
+                Err(_) => Err(FS_ERR_IO),
+            };
+
+            return match handle {
+                Ok(h) => ok_i32(h),
+                Err(code) => err_i32(code),
+            };
+        }
+
+        if overwrite {
+            match std::fs::metadata(&pb) {
+                Ok(m) if m.is_dir() => return err_i32(FS_ERR_IS_DIR),
+                Ok(_) => {}
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return err_i32(map_io_err(&e)),
+            }
+        } else {
+            match std::fs::metadata(&pb) {
+                Ok(m) => {
+                    if m.is_dir() {
+                        return err_i32(FS_ERR_IS_DIR);
+                    }
+                    return err_i32(FS_ERR_ALREADY_EXISTS);
+                }
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return err_i32(map_io_err(&e)),
+            }
+        }
+
+        let open = if overwrite {
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&pb)
+        } else {
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&pb)
+        };
+
+        let f = match open {
+            Ok(f) => f,
+            Err(e) => return err_i32(map_io_err(&e)),
+        };
+
+        let handle = match writers().lock() {
+            Ok(mut table) => writer_insert(
+                &mut table,
+                WriterHandleV1 {
+                    file: Some(f),
+                    final_path: pb,
+                    tmp_path: None,
+                    max_write_bytes: max_write,
+                    written: 0,
+                },
+            ),
+            Err(_) => Err(FS_ERR_IO),
+        };
+
+        match handle {
+            Ok(h) => ok_i32(h),
+            Err(code) => err_i32(code),
+        }
+    })
+    .unwrap_or_else(|_| err_i32(FS_ERR_IO))
+}
+
+#[no_mangle]
+pub extern "C" fn x07_ext_fs_stream_write_all_v1(
+    writer_handle: i32,
+    data: ev_bytes,
+) -> ev_result_i32 {
+    std::panic::catch_unwind(|| unsafe {
+        let Ok(mut table) = writers().lock() else {
+            return err_i32(FS_ERR_IO);
+        };
+        let Some(idx) = writer_idx(writer_handle) else {
+            return err_i32(FS_ERR_BAD_HANDLE);
+        };
+        let Some(w) = table.get_mut(idx).and_then(|v| v.as_mut()) else {
+            return err_i32(FS_ERR_BAD_HANDLE);
+        };
+        let Some(f) = w.file.as_mut() else {
+            return err_i32(FS_ERR_BAD_HANDLE);
+        };
+
+        let data_bytes = bytes_as_slice(data);
+        let Some(rem) = w.max_write_bytes.checked_sub(w.written) else {
+            return err_i32(FS_ERR_TOO_LARGE);
+        };
+        if data_bytes.len() > (rem as usize) {
+            return err_i32(FS_ERR_TOO_LARGE);
+        }
+
+        if let Err(e) = f.write_all(data_bytes) {
+            return err_i32(map_io_err(&e));
+        }
+        w.written = w.written.saturating_add(data_bytes.len() as u32);
+
+        ok_i32(data_bytes.len() as i32)
+    })
+    .unwrap_or_else(|_| err_i32(FS_ERR_IO))
+}
+
+#[no_mangle]
+pub extern "C" fn x07_ext_fs_stream_close_v1(writer_handle: i32) -> ev_result_i32 {
+    std::panic::catch_unwind(|| {
+        let Ok(mut table) = writers().lock() else {
+            return err_i32(FS_ERR_IO);
+        };
+        let Some(idx) = writer_idx(writer_handle) else {
+            return err_i32(FS_ERR_BAD_HANDLE);
+        };
+        let Some(w) = table.get_mut(idx).and_then(|v| v.as_mut()) else {
+            return err_i32(FS_ERR_BAD_HANDLE);
+        };
+
+        // Idempotent close.
+        let Some(f) = w.file.take() else {
+            return ok_i32(1);
+        };
+        drop(f);
+
+        if let Some(tmp) = w.tmp_path.take() {
+            if let Err(e) = std::fs::rename(&tmp, &w.final_path) {
+                let _ = std::fs::remove_file(&tmp);
+                w.tmp_path = Some(tmp);
+                return err_i32(map_io_err(&e));
+            }
+        }
+
+        ok_i32(1)
+    })
+    .unwrap_or_else(|_| err_i32(FS_ERR_IO))
+}
+
+#[no_mangle]
+pub extern "C" fn x07_ext_fs_stream_drop_v1(writer_handle: i32) -> i32 {
+    std::panic::catch_unwind(|| {
+        let Ok(mut table) = writers().lock() else {
+            return 1;
+        };
+        let Some(idx) = writer_idx(writer_handle) else {
+            return 1;
+        };
+        let Some(w) = table.get_mut(idx).and_then(|v| v.take()) else {
+            return 1;
+        };
+
+        drop(w.file);
+        if let Some(tmp) = w.tmp_path {
+            let _ = std::fs::remove_file(&tmp);
+        }
+
+        1
+    })
+    .unwrap_or(1)
+}
+
 fn write_atomic_best_effort(path: &Path, data: &[u8], overwrite: bool) -> ev_result_i32 {
     let Some(parent) = path.parent() else {
         return err_i32(FS_ERR_BAD_PATH);
@@ -975,4 +1279,141 @@ pub extern "C" fn x07_ext_fs_stat_v1(path: ev_bytes, caps: ev_bytes) -> ev_resul
         ok_bytes_vec(stat)
     })
     .unwrap_or_else(|_| err_bytes(FS_ERR_IO))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[no_mangle]
+    extern "C" fn ev_bytes_alloc(len: u32) -> ev_bytes {
+        let mut v = vec![0u8; len as usize];
+        let ptr = v.as_mut_ptr();
+        std::mem::forget(v);
+        ev_bytes { ptr, len }
+    }
+
+    #[no_mangle]
+    extern "C" fn ev_trap(code: i32) -> ! {
+        panic!("ev_trap({code})")
+    }
+
+    fn caps_v1(max_write_bytes: u32, flags: u32) -> Vec<u8> {
+        let mut out = Vec::with_capacity(24);
+        out.extend_from_slice(&1u32.to_le_bytes());
+        out.extend_from_slice(&0u32.to_le_bytes()); // max_read_bytes
+        out.extend_from_slice(&max_write_bytes.to_le_bytes());
+        out.extend_from_slice(&0u32.to_le_bytes()); // max_entries
+        out.extend_from_slice(&0u32.to_le_bytes()); // max_depth
+        out.extend_from_slice(&flags.to_le_bytes());
+        out
+    }
+
+    fn to_ev_bytes(b: &[u8]) -> ev_bytes {
+        ev_bytes {
+            ptr: b.as_ptr() as *mut u8,
+            len: b.len() as u32,
+        }
+    }
+
+    fn ok_i32(res: ev_result_i32) -> i32 {
+        assert_eq!(res.tag, 1, "expected ok, got err={}", unsafe {
+            res.payload.err
+        });
+        unsafe { res.payload.ok as i32 }
+    }
+
+    fn err_i32(res: ev_result_i32) -> i32 {
+        assert_eq!(res.tag, 0, "expected err");
+        unsafe { res.payload.err as i32 }
+    }
+
+    #[test]
+    fn fs_stream_writer_handle_v1_smoke() {
+        std::env::set_var("X07_OS_SANDBOXED", "0");
+        std::env::set_var("X07_OS_FS", "1");
+        std::env::set_var("X07_OS_FS_ALLOW_MKDIR", "1");
+        std::env::set_var("X07_OS_FS_ALLOW_RENAME", "1");
+        std::env::set_var("X07_OS_FS_MAX_WRITE_BYTES", "1000000");
+
+        let root = format!("target/x07_ext_fs_stream_test_{}", std::process::id());
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("create test dir");
+
+        // Non-atomic writer, max_write_bytes enforced cumulatively.
+        let out_path = format!("{root}/out.txt");
+        let caps = caps_v1(8, CAP_CREATE_PARENTS | CAP_OVERWRITE);
+        let h = ok_i32(x07_ext_fs_stream_open_write_v1(
+            to_ev_bytes(out_path.as_bytes()),
+            to_ev_bytes(&caps),
+        ));
+        assert!(h > 0);
+        assert_eq!(
+            ok_i32(x07_ext_fs_stream_write_all_v1(h, to_ev_bytes(b"abc"))),
+            3
+        );
+        assert_eq!(
+            ok_i32(x07_ext_fs_stream_write_all_v1(h, to_ev_bytes(b"def"))),
+            3
+        );
+        assert_eq!(
+            ok_i32(x07_ext_fs_stream_write_all_v1(h, to_ev_bytes(b"gh"))),
+            2
+        );
+        assert_eq!(
+            err_i32(x07_ext_fs_stream_write_all_v1(h, to_ev_bytes(b"i"))),
+            FS_ERR_TOO_LARGE
+        );
+        assert_eq!(ok_i32(x07_ext_fs_stream_close_v1(h)), 1);
+        assert_eq!(x07_ext_fs_stream_drop_v1(h), 1);
+
+        let got = std::fs::read(&out_path).expect("read out.txt");
+        assert_eq!(got, b"abcdefgh");
+
+        // Atomic writer commits on close.
+        let atomic_path = format!("{root}/atomic.txt");
+        let caps_atomic = caps_v1(1024, CAP_CREATE_PARENTS | CAP_OVERWRITE | CAP_ATOMIC_WRITE);
+        let h2 = ok_i32(x07_ext_fs_stream_open_write_v1(
+            to_ev_bytes(atomic_path.as_bytes()),
+            to_ev_bytes(&caps_atomic),
+        ));
+        assert_eq!(
+            ok_i32(x07_ext_fs_stream_write_all_v1(h2, to_ev_bytes(b"hi"))),
+            2
+        );
+        assert_eq!(ok_i32(x07_ext_fs_stream_close_v1(h2)), 1);
+        assert_eq!(x07_ext_fs_stream_drop_v1(h2), 1);
+        let got2 = std::fs::read(&atomic_path).expect("read atomic.txt");
+        assert_eq!(got2, b"hi");
+
+        // Dropping without close should clean up the tmp file and not create the final path.
+        let atomic_drop_path = format!("{root}/atomic_drop.txt");
+        let h3 = ok_i32(x07_ext_fs_stream_open_write_v1(
+            to_ev_bytes(atomic_drop_path.as_bytes()),
+            to_ev_bytes(&caps_atomic),
+        ));
+        assert_eq!(
+            ok_i32(x07_ext_fs_stream_write_all_v1(h3, to_ev_bytes(b"x"))),
+            1
+        );
+        assert_eq!(x07_ext_fs_stream_drop_v1(h3), 1);
+        assert_eq!(err_i32(x07_ext_fs_stream_close_v1(h3)), FS_ERR_BAD_HANDLE);
+        assert!(!Path::new(&atomic_drop_path).exists());
+        let leftovers: Vec<_> = std::fs::read_dir(&root)
+            .expect("read_dir")
+            .filter_map(|e| e.ok())
+            .filter_map(|e| e.file_name().into_string().ok())
+            .filter(|name| name.starts_with("atomic_drop.txt.x07_tmp_"))
+            .collect();
+        assert_eq!(leftovers, Vec::<String>::new());
+
+        // Invalid handle errors.
+        assert_eq!(
+            err_i32(x07_ext_fs_stream_write_all_v1(123, to_ev_bytes(b"z"))),
+            FS_ERR_BAD_HANDLE
+        );
+        assert_eq!(err_i32(x07_ext_fs_stream_close_v1(123)), FS_ERR_BAD_HANDLE);
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

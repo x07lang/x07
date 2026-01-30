@@ -12,6 +12,7 @@ pub mod native;
 pub mod optimize;
 pub mod program;
 pub mod project;
+pub mod stream_pipe;
 pub mod types;
 pub mod validate;
 pub mod world_config;

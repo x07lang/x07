@@ -7,6 +7,7 @@ use crate::language;
 use crate::native::NativeRequires;
 use crate::optimize;
 use crate::program::{AsyncFunctionDef, FunctionDef, Program};
+use crate::stream_pipe;
 use crate::types::Ty;
 use crate::validate;
 use crate::x07ast;
@@ -213,6 +214,8 @@ pub fn compile_program_to_c_with_meta(
             .extern_functions
             .extend(m.extern_functions.clone());
     }
+
+    stream_pipe::elaborate_stream_pipes(&mut parsed_program, options)?;
     parsed_program.functions.sort_by(|a, b| a.name.cmp(&b.name));
     parsed_program
         .async_functions

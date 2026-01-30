@@ -639,6 +639,7 @@ impl<'a> Emitter<'a> {
                     }
                     // Views that borrow from runtime state (not from a user-owned buffer).
                     "bufread.fill" => Ok(None),
+                    "scratch_u8_fixed_v1.as_view" => Ok(None),
                     _ if self.fn_view_return_arg.contains_key(head) => {
                         let Some(spec) = self.fn_view_return_arg.get(head) else {
                             return Err(CompilerError::new(
@@ -1173,6 +1174,11 @@ impl<'a> Emitter<'a> {
     }
 
     fn emit_runtime_preamble(&mut self) -> Result<(), CompilerError> {
+        const JSON_JCS_START: &str = "\n// --- X07_JSON_JCS_START";
+        const JSON_JCS_END: &str = "\n// --- X07_JSON_JCS_END";
+
+        let uses_json_jcs = program_uses_head(self.program, "json.jcs.canon_doc_v1");
+
         if self.options.enable_fs || self.options.enable_rr || self.options.enable_kv {
             const FS_START: &str = "\n#if X07_ENABLE_FS\nstatic bytes_t rt_fs_read";
             const SHA256_START: &str = "\nstatic uint32_t rt_sha256_rotr";
@@ -1189,11 +1195,6 @@ impl<'a> Emitter<'a> {
                 || program_uses_head(self.program, "fs.list_dir");
             let uses_rr_send_request = program_uses_head(self.program, "rr.send_request");
             let uses_rr_send = program_uses_head(self.program, "rr.send");
-
-            if uses_fs && uses_rr_send_request {
-                self.push_str(RUNTIME_C_PREAMBLE);
-                return Ok(());
-            }
 
             let mut preamble = RUNTIME_C_PREAMBLE.to_string();
 
@@ -1212,6 +1213,10 @@ impl<'a> Emitter<'a> {
             if !uses_rr_send {
                 preamble = trim_preamble_section(&preamble, RR_SEND_START, RR_SEND_END, "rr.send")?;
             }
+            if !uses_json_jcs {
+                preamble =
+                    trim_preamble_section(&preamble, JSON_JCS_START, JSON_JCS_END, "json.jcs")?;
+            }
 
             self.push_str(&preamble);
             return Ok(());
@@ -1220,14 +1225,17 @@ impl<'a> Emitter<'a> {
         const FIXTURE_START: &str = "\n#if X07_ENABLE_FS\nstatic bytes_t rt_fs_read";
         const FIXTURE_END: &str = "\nstatic uint32_t rt_codec_read_u32_le";
 
-        let (head, rest) = RUNTIME_C_PREAMBLE
-            .split_once(FIXTURE_START)
-            .ok_or_else(|| {
-                CompilerError::new(
-                    CompileErrorKind::Internal,
-                    "internal error: runtime preamble missing fixture start marker".to_string(),
-                )
-            })?;
+        let mut preamble = RUNTIME_C_PREAMBLE.to_string();
+        if !uses_json_jcs {
+            preamble = trim_preamble_section(&preamble, JSON_JCS_START, JSON_JCS_END, "json.jcs")?;
+        }
+
+        let (head, rest) = preamble.split_once(FIXTURE_START).ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Internal,
+                "internal error: runtime preamble missing fixture start marker".to_string(),
+            )
+        })?;
         let (_, tail) = rest.split_once(FIXTURE_END).ok_or_else(|| {
             CompilerError::new(
                 CompileErrorKind::Internal,
@@ -2961,6 +2969,108 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
+                    "os.fs.stream_open_write_v1" => {
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.fs.stream_open_write_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 2
+                            || dest.ty != Ty::ResultI32
+                            || args[0].ty != Ty::Bytes
+                            || args[1].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_open_write_v1 expects (bytes path, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_fs_stream_open_write_v1({}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.fs.stream_write_all_v1" => {
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.fs.stream_write_all_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 2
+                            || dest.ty != Ty::ResultI32
+                            || args[0].ty != Ty::I32
+                            || args[1].ty != Ty::BytesView
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_write_all_v1 expects (i32 writer_handle, bytes_view data)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_fs_stream_write_all_v1((int32_t){}, (bytes_t){{ .ptr = {}.ptr, .len = {}.len }});",
+                                dest.c_name, args[0].c_name, args[1].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.fs.stream_close_v1" => {
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.fs.stream_close_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 || dest.ty != Ty::ResultI32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_close_v1 expects i32 writer_handle".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_fs_stream_close_v1((int32_t){});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.fs.stream_drop_v1" => {
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.fs.stream_drop_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_drop_v1 expects i32 writer_handle".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_fs_stream_drop_v1((int32_t){});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
                     "os.fs.mkdirs_v1" => {
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
@@ -4520,6 +4630,135 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
+                    "scratch_u8_fixed_v1.new" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.new expects i32".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scratch_u8_fixed_new(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "scratch_u8_fixed_v1.clear" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.clear expects i32".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scratch_u8_fixed_clear(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "scratch_u8_fixed_v1.len" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.len expects i32".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scratch_u8_fixed_len(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "scratch_u8_fixed_v1.cap" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.cap expects i32".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scratch_u8_fixed_cap(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "scratch_u8_fixed_v1.as_view" => {
+                        if args.len() != 1 || dest.ty != Ty::BytesView || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.as_view expects i32".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scratch_u8_fixed_as_view(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "scratch_u8_fixed_v1.try_write" => {
+                        if args.len() != 2
+                            || dest.ty != Ty::ResultI32
+                            || args[0].ty != Ty::I32
+                            || (args[1].ty != Ty::Bytes && args[1].ty != Ty::BytesView)
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.try_write expects (i32, bytes_view)"
+                                    .to_string(),
+                            ));
+                        }
+                        let b = if args[1].ty == Ty::Bytes {
+                            format!("rt_bytes_view(ctx, {})", args[1].c_name)
+                        } else {
+                            args[1].c_name.clone()
+                        };
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scratch_u8_fixed_try_write(ctx, {}, {});",
+                                dest.c_name, args[0].c_name, b
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "scratch_u8_fixed_v1.drop" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.drop expects i32".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_scratch_u8_fixed_drop(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
                     "codec.read_u32_le" => {
                         if args.len() != 2
                             || dest.ty != Ty::I32
@@ -4677,6 +4916,43 @@ impl<'a> Emitter<'a> {
                             state,
                             format!("{} = rt_vec_u8_len(ctx, {});", dest.c_name, args[0].c_name),
                         );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "vec_u8.cap" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::VecU8 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_u8.cap expects vec_u8".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("{} = rt_vec_u8_cap(ctx, {});", dest.c_name, args[0].c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "vec_u8.clear" => {
+                        if args.len() != 1 || dest.ty != Ty::VecU8 || args[0].ty != Ty::VecU8 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_u8.clear expects vec_u8".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_vec_u8_clear(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        if dest.c_name != args[0].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[0].c_name, c_empty(Ty::VecU8)),
+                            );
+                        }
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -6838,6 +7114,7 @@ impl<'a> Emitter<'a> {
                 dest_ty,
                 dest,
             ),
+            "json.jcs.canon_doc_v1" => self.emit_json_jcs_canon_doc_v1_to(args, dest_ty, dest),
 
             "regex.compile_opts_v1" => self.emit_regex_compile_opts_v1_to(args, dest_ty, dest),
             "regex.exec_from_v1" => self.emit_regex_exec_from_v1_to(args, dest_ty, dest),
@@ -6903,6 +7180,14 @@ impl<'a> Emitter<'a> {
             "os.fs.write_file" => self.emit_os_fs_write_file_to(args, dest_ty, dest),
             "os.fs.read_all_v1" => self.emit_os_fs_read_all_v1_to(args, dest_ty, dest),
             "os.fs.write_all_v1" => self.emit_os_fs_write_all_v1_to(args, dest_ty, dest),
+            "os.fs.stream_open_write_v1" => {
+                self.emit_os_fs_stream_open_write_v1_to(args, dest_ty, dest)
+            }
+            "os.fs.stream_write_all_v1" => {
+                self.emit_os_fs_stream_write_all_v1_to(args, dest_ty, dest)
+            }
+            "os.fs.stream_close_v1" => self.emit_os_fs_stream_close_v1_to(args, dest_ty, dest),
+            "os.fs.stream_drop_v1" => self.emit_os_fs_stream_drop_v1_to(args, dest_ty, dest),
             "os.fs.mkdirs_v1" => self.emit_os_fs_mkdirs_v1_to(args, dest_ty, dest),
             "os.fs.remove_file_v1" => self.emit_os_fs_remove_file_v1_to(args, dest_ty, dest),
             "os.fs.remove_dir_all_v1" => self.emit_os_fs_remove_dir_all_v1_to(args, dest_ty, dest),
@@ -6994,6 +7279,17 @@ impl<'a> Emitter<'a> {
             "bufread.new" => self.emit_bufread_new_to(args, dest_ty, dest),
             "bufread.fill" => self.emit_bufread_fill_to(args, dest_ty, dest),
             "bufread.consume" => self.emit_bufread_consume_to(args, dest_ty, dest),
+            "scratch_u8_fixed_v1.new" => self.emit_scratch_u8_fixed_new_to(args, dest_ty, dest),
+            "scratch_u8_fixed_v1.clear" => self.emit_scratch_u8_fixed_clear_to(args, dest_ty, dest),
+            "scratch_u8_fixed_v1.len" => self.emit_scratch_u8_fixed_len_to(args, dest_ty, dest),
+            "scratch_u8_fixed_v1.cap" => self.emit_scratch_u8_fixed_cap_to(args, dest_ty, dest),
+            "scratch_u8_fixed_v1.as_view" => {
+                self.emit_scratch_u8_fixed_as_view_to(args, dest_ty, dest)
+            }
+            "scratch_u8_fixed_v1.try_write" => {
+                self.emit_scratch_u8_fixed_try_write_to(args, dest_ty, dest)
+            }
+            "scratch_u8_fixed_v1.drop" => self.emit_scratch_u8_fixed_drop_to(args, dest_ty, dest),
 
             "codec.read_u32_le" => self.emit_codec_read_u32_le_to(args, dest_ty, dest),
             "codec.write_u32_le" => self.emit_codec_write_u32_le_to(args, dest_ty, dest),
@@ -7005,6 +7301,8 @@ impl<'a> Emitter<'a> {
 
             "vec_u8.with_capacity" => self.emit_vec_u8_new_to(args, dest_ty, dest),
             "vec_u8.len" => self.emit_vec_u8_len_to(args, dest_ty, dest),
+            "vec_u8.cap" => self.emit_vec_u8_cap_to(args, dest_ty, dest),
+            "vec_u8.clear" => self.emit_vec_u8_clear_to(args, dest_ty, dest),
             "vec_u8.get" => self.emit_vec_u8_get_to(args, dest_ty, dest),
             "vec_u8.set" => self.emit_vec_u8_set_to(args, dest_ty, dest),
             "vec_u8.push" => self.emit_vec_u8_push_to(args, dest_ty, dest),
@@ -8295,6 +8593,59 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         Ok(())
     }
 
+    fn emit_json_jcs_canon_doc_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_MATH,
+            native::ABI_MAJOR_V1,
+            "json.jcs.canon_doc_v1",
+        )?;
+        if args.len() != 4 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "json.jcs.canon_doc_v1 expects 4 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "json.jcs.canon_doc_v1 returns bytes".to_string(),
+            ));
+        }
+        let input = self.emit_expr_as_bytes_view(&args[0])?;
+        if input.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "json.jcs.canon_doc_v1 expects bytes_view".to_string(),
+            ));
+        }
+        let max_depth = self.emit_expr(&args[1])?;
+        let max_object_members = self.emit_expr(&args[2])?;
+        let max_object_total_bytes = self.emit_expr(&args[3])?;
+        if max_depth.ty != Ty::I32
+            || max_object_members.ty != Ty::I32
+            || max_object_total_bytes.ty != Ty::I32
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "json.jcs.canon_doc_v1 expects (bytes_view, i32, i32, i32)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_json_jcs_canon_doc_v1(ctx, {}, (uint32_t){}, (uint32_t){}, (uint32_t){});",
+            input.c_name,
+            max_depth.c_name,
+            max_object_members.c_name,
+            max_object_total_bytes.c_name
+        ));
+        self.release_temp_view_borrow(&input)?;
+        Ok(())
+    }
+
     fn emit_math_f64_from_i32_to(
         &mut self,
         args: &[Expr],
@@ -9448,6 +9799,161 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         self.line(&format!(
             "{dest} = x07_ext_fs_write_all_v1({}, {}, {});",
             path.c_name, data.c_name, caps.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_os_fs_stream_open_write_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.fs.stream_open_write_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.stream_open_write_v1",
+        )?;
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.fs.stream_open_write_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_open_write_v1 returns result_i32".to_string(),
+            ));
+        }
+        let path = self.emit_expr(&args[0])?;
+        let caps = self.emit_expr(&args[1])?;
+        if path.ty != Ty::Bytes || caps.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_open_write_v1 expects (bytes path, bytes caps)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_fs_stream_open_write_v1({}, {});",
+            path.c_name, caps.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_os_fs_stream_write_all_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.fs.stream_write_all_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.stream_write_all_v1",
+        )?;
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.fs.stream_write_all_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_write_all_v1 returns result_i32".to_string(),
+            ));
+        }
+        let handle = self.emit_expr(&args[0])?;
+        let data = self.emit_expr(&args[1])?;
+        if handle.ty != Ty::I32 || data.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_write_all_v1 expects (i32 writer_handle, bytes_view data)"
+                    .to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_fs_stream_write_all_v1((int32_t){}, (bytes_t){{ .ptr = {}.ptr, .len = {}.len }});",
+            handle.c_name, data.c_name, data.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_os_fs_stream_close_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.fs.stream_close_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.stream_close_v1",
+        )?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.fs.stream_close_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_close_v1 returns result_i32".to_string(),
+            ));
+        }
+        let handle = self.emit_expr(&args[0])?;
+        if handle.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_close_v1 expects i32 writer_handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_fs_stream_close_v1((int32_t){});",
+            handle.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_os_fs_stream_drop_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.fs.stream_drop_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.stream_drop_v1",
+        )?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.fs.stream_drop_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_drop_v1 returns i32".to_string(),
+            ));
+        }
+        let handle = self.emit_expr(&args[0])?;
+        if handle.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.stream_drop_v1 expects i32 writer_handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_fs_stream_drop_v1((int32_t){});",
+            handle.c_name
         ));
         Ok(())
     }
@@ -11497,6 +12003,232 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         Ok(())
     }
 
+    fn emit_scratch_u8_fixed_new_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "scratch_u8_fixed_v1.new expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.new returns i32".to_string(),
+            ));
+        }
+        let cap = self.emit_expr(&args[0])?;
+        if cap.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.new expects i32 cap".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scratch_u8_fixed_new(ctx, {});",
+            cap.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_scratch_u8_fixed_clear_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "scratch_u8_fixed_v1.clear expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.clear returns i32".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.clear expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scratch_u8_fixed_clear(ctx, {});",
+            h.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_scratch_u8_fixed_len_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "scratch_u8_fixed_v1.len expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.len returns i32".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.len expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scratch_u8_fixed_len(ctx, {});",
+            h.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_scratch_u8_fixed_cap_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "scratch_u8_fixed_v1.cap expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.cap returns i32".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.cap expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scratch_u8_fixed_cap(ctx, {});",
+            h.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_scratch_u8_fixed_as_view_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "scratch_u8_fixed_v1.as_view expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.as_view returns bytes_view".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.as_view expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scratch_u8_fixed_as_view(ctx, {});",
+            h.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_scratch_u8_fixed_try_write_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "scratch_u8_fixed_v1.try_write expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.try_write returns result_i32".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        let b = self.emit_expr_as_bytes_view(&args[1])?;
+        if h.ty != Ty::I32 || b.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.try_write expects (i32 handle, bytes_view)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scratch_u8_fixed_try_write(ctx, {}, {});",
+            h.c_name, b.c_name
+        ));
+        self.release_temp_view_borrow(&b)?;
+        Ok(())
+    }
+
+    fn emit_scratch_u8_fixed_drop_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "scratch_u8_fixed_v1.drop expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.drop returns i32".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "scratch_u8_fixed_v1.drop expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_scratch_u8_fixed_drop(ctx, {});",
+            h.c_name
+        ));
+        Ok(())
+    }
+
     fn emit_codec_read_u32_le_to(
         &mut self,
         args: &[Expr],
@@ -11795,6 +12527,138 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         self.line(&format!("{dest} = rt_vec_u8_len(ctx, {});", h.c_name));
+        Ok(())
+    }
+
+    fn emit_vec_u8_cap_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "vec_u8.cap expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_u8.cap returns i32".to_string(),
+            ));
+        }
+        if let Some(name) = args[0].as_ident() {
+            let Some(var) = self.lookup(name).cloned() else {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("unknown identifier: {name:?}"),
+                ));
+            };
+            if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                ));
+            }
+            if var.ty != Ty::VecU8 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "vec_u8.cap expects vec_u8".to_string(),
+                ));
+            }
+            self.line(&format!("{dest} = rt_vec_u8_cap(ctx, {});", var.c_name));
+            return Ok(());
+        }
+
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::VecU8 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_u8.cap expects vec_u8".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_vec_u8_cap(ctx, {});", h.c_name));
+        Ok(())
+    }
+
+    fn emit_vec_u8_clear_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "vec_u8.clear expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::VecU8 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_u8.clear returns vec_u8".to_string(),
+            ));
+        }
+        if let Expr::Ident { name, .. } = &args[0] {
+            let Some(var) = self.lookup(name).cloned() else {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("unknown identifier: {name:?}"),
+                ));
+            };
+            if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                ));
+            }
+            if var.borrow_count != 0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("vec_u8.clear while borrowed: {name:?}"),
+                ));
+            }
+            if var.ty != Ty::VecU8 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "vec_u8.clear expects vec_u8".to_string(),
+                ));
+            }
+            let var_c_name = var.c_name;
+            self.line(&format!(
+                "{var_c_name} = rt_vec_u8_clear(ctx, {var_c_name});",
+            ));
+            if dest != var_c_name.as_str() {
+                self.line(&format!("{dest} = {var_c_name};"));
+                self.line(&format!("{var_c_name} = {};", c_empty(Ty::VecU8)));
+                let moved_ptr = self.current_ptr.clone();
+                if let Some(v) = self.lookup_mut(name) {
+                    v.moved = true;
+                    v.moved_ptr = moved_ptr;
+                }
+            }
+            return Ok(());
+        }
+
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::VecU8 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_u8.clear expects vec_u8".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_vec_u8_clear(ctx, {});", h.c_name));
         Ok(())
     }
 
@@ -13170,14 +14034,44 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "option_i32.is_some returns i32".to_string(),
             ));
         }
-        let opt = self.emit_expr(&args[0])?;
-        if opt.ty != Ty::OptionI32 {
-            return Err(CompilerError::new(
-                CompileErrorKind::Typing,
-                "option_i32.is_some expects option_i32".to_string(),
-            ));
+        match &args[0] {
+            Expr::Ident { name, .. } if name != "input" => {
+                let Some(opt) = self.lookup(name).cloned() else {
+                    return Err(self.err(
+                        CompileErrorKind::Typing,
+                        format!("unknown identifier: {name:?}"),
+                    ));
+                };
+                if opt.moved {
+                    let moved_ptr = opt
+                        .moved_ptr
+                        .as_deref()
+                        .filter(|p| !p.is_empty())
+                        .unwrap_or("<unknown>");
+                    return Err(self.err(
+                        CompileErrorKind::Typing,
+                        format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                    ));
+                }
+                if opt.ty != Ty::OptionI32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "option_i32.is_some expects option_i32".to_string(),
+                    ));
+                }
+                self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", opt.c_name));
+            }
+            _ => {
+                let opt = self.emit_expr(&args[0])?;
+                if opt.ty != Ty::OptionI32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "option_i32.is_some expects option_i32".to_string(),
+                    ));
+                }
+                self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", opt.c_name));
+            }
         }
-        self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", opt.c_name));
         Ok(())
     }
 
@@ -13289,14 +14183,44 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "option_bytes.is_some returns i32".to_string(),
             ));
         }
-        let opt = self.emit_expr(&args[0])?;
-        if opt.ty != Ty::OptionBytes {
-            return Err(CompilerError::new(
-                CompileErrorKind::Typing,
-                "option_bytes.is_some expects option_bytes".to_string(),
-            ));
+        match &args[0] {
+            Expr::Ident { name, .. } if name != "input" => {
+                let Some(opt) = self.lookup(name).cloned() else {
+                    return Err(self.err(
+                        CompileErrorKind::Typing,
+                        format!("unknown identifier: {name:?}"),
+                    ));
+                };
+                if opt.moved {
+                    let moved_ptr = opt
+                        .moved_ptr
+                        .as_deref()
+                        .filter(|p| !p.is_empty())
+                        .unwrap_or("<unknown>");
+                    return Err(self.err(
+                        CompileErrorKind::Typing,
+                        format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                    ));
+                }
+                if opt.ty != Ty::OptionBytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "option_bytes.is_some expects option_bytes".to_string(),
+                    ));
+                }
+                self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", opt.c_name));
+            }
+            _ => {
+                let opt = self.emit_expr(&args[0])?;
+                if opt.ty != Ty::OptionBytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "option_bytes.is_some expects option_bytes".to_string(),
+                    ));
+                }
+                self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", opt.c_name));
+            }
         }
-        self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", opt.c_name));
         Ok(())
     }
 
@@ -13319,7 +14243,49 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         let opt = self.emit_expr(&args[0])?;
-        let default = self.emit_expr(&args[1])?;
+        let default_name: String;
+        let default_var: VarRef;
+        let default_is_ident = matches!(&args[1], Expr::Ident { name, .. } if name != "input");
+        let default = if default_is_ident {
+            let name = args[1].as_ident().unwrap_or_default();
+            let Some(v) = self.lookup(name).cloned() else {
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("unknown identifier: {name:?}"),
+                ));
+            };
+            if v.moved {
+                let moved_ptr = v
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                ));
+            }
+            if v.ty != Ty::Bytes {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "option_bytes.unwrap_or expects (option_bytes, bytes default)".to_string(),
+                ));
+            }
+            if v.borrow_count != 0 {
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("move while borrowed: {name:?}"),
+                ));
+            }
+            default_name = v.c_name.clone();
+            default_var = v;
+            &default_var
+        } else {
+            let v = self.emit_expr(&args[1])?;
+            default_name = v.c_name.clone();
+            default_var = v;
+            &default_var
+        };
         if opt.ty != Ty::OptionBytes || default.ty != Ty::Bytes {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
@@ -13334,8 +14300,8 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         self.indent -= 1;
         self.line("} else {");
         self.indent += 1;
-        self.line(&format!("{dest} = {};", default.c_name));
-        self.line(&format!("{} = rt_bytes_empty(ctx);", default.c_name));
+        self.line(&format!("{dest} = {default_name};"));
+        self.line(&format!("{default_name} = rt_bytes_empty(ctx);"));
         self.indent -= 1;
         self.line("}");
         Ok(())
@@ -13676,10 +14642,11 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let res = self.emit_expr(&args[0])?;
         match res.ty {
             Ty::ResultI32 => {
-                if self.fn_ret_ty != Ty::ResultI32 {
+                if !matches!(self.fn_ret_ty, Ty::ResultI32 | Ty::ResultBytes) {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
-                        "try(result_i32) requires function return type result_i32".to_string(),
+                        "try(result_i32) requires function return type result_i32 or result_bytes"
+                            .to_string(),
                     ));
                 }
                 if dest_ty != Ty::I32 {
@@ -13693,17 +14660,25 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 for (ty, c_name) in self.live_owned_drop_list(Some(&res.c_name)) {
                     self.emit_drop_var(ty, &c_name);
                 }
-                self.line(&format!("return {};", res.c_name));
+                if self.fn_ret_ty == Ty::ResultI32 {
+                    self.line(&format!("return {};", res.c_name));
+                } else {
+                    self.line(&format!(
+                        "return (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
+                        res.c_name
+                    ));
+                }
                 self.indent -= 1;
                 self.line("}");
                 self.line(&format!("{dest} = {}.payload.ok;", res.c_name));
                 Ok(())
             }
             Ty::ResultBytes => {
-                if self.fn_ret_ty != Ty::ResultBytes {
+                if !matches!(self.fn_ret_ty, Ty::ResultBytes | Ty::ResultI32) {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
-                        "try(result_bytes) requires function return type result_bytes".to_string(),
+                        "try(result_bytes) requires function return type result_bytes or result_i32"
+                            .to_string(),
                     ));
                 }
                 if dest_ty != Ty::Bytes {
@@ -13717,7 +14692,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 for (ty, c_name) in self.live_owned_drop_list(Some(&res.c_name)) {
                     self.emit_drop_var(ty, &c_name);
                 }
-                self.line(&format!("return {};", res.c_name));
+                if self.fn_ret_ty == Ty::ResultBytes {
+                    self.line(&format!("return {};", res.c_name));
+                } else {
+                    self.line(&format!(
+                        "return (result_i32_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
+                        res.c_name
+                    ));
+                }
                 self.indent -= 1;
                 self.line("}");
                 self.line(&format!("{dest} = {}.payload.ok;", res.c_name));
@@ -14809,6 +15791,32 @@ impl InferCtx {
                         }
                         Ok(Ty::ResultBytes)
                     }
+                    "json.jcs.canon_doc_v1" => {
+                        if args.len() != 4 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "json.jcs.canon_doc_v1 expects 4 args".to_string(),
+                            ));
+                        }
+                        let input = self.infer(&args[0])?;
+                        if input != Ty::Bytes && input != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "json.jcs.canon_doc_v1 expects bytes_view".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[1])? != Ty::I32
+                            || self.infer(&args[2])? != Ty::I32
+                            || self.infer(&args[3])? != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "json.jcs.canon_doc_v1 expects (bytes_view, i32, i32, i32)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::Bytes)
+                    }
                     "math.f64.from_i32_v1" => {
                         if args.len() != 1 {
                             return Err(CompilerError::new(
@@ -15255,6 +16263,75 @@ impl InferCtx {
                             ));
                         }
                         Ok(Ty::ResultI32)
+                    }
+                    "os.fs.stream_open_write_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.fs.stream_open_write_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes || self.infer(&args[1])? != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_open_write_v1 expects (bytes path, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32)
+                    }
+                    "os.fs.stream_write_all_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.fs.stream_write_all_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32
+                            || self.infer(&args[1])? != Ty::BytesView
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_write_all_v1 expects (i32 writer_handle, bytes_view data)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32)
+                    }
+                    "os.fs.stream_close_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.fs.stream_close_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_close_v1 expects i32 writer_handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32)
+                    }
+                    "os.fs.stream_drop_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.fs.stream_drop_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.stream_drop_v1 expects i32 writer_handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
                     }
                     "os.fs.mkdirs_v1" => {
                         self.require_standalone_only(head)?;
@@ -16252,6 +17329,76 @@ impl InferCtx {
                         }
                         Ok(Ty::I32)
                     }
+                    "scratch_u8_fixed_v1.new" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "scratch_u8_fixed_v1.new expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.new expects i32 cap".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "scratch_u8_fixed_v1.clear"
+                    | "scratch_u8_fixed_v1.len"
+                    | "scratch_u8_fixed_v1.cap"
+                    | "scratch_u8_fixed_v1.drop" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 1 arg"),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects i32 handle"),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "scratch_u8_fixed_v1.as_view" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "scratch_u8_fixed_v1.as_view expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.as_view expects i32 handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::BytesView)
+                    }
+                    "scratch_u8_fixed_v1.try_write" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "scratch_u8_fixed_v1.try_write expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.try_write expects i32 handle".to_string(),
+                            ));
+                        }
+                        let bty = self.infer(&args[1])?;
+                        if bty != Ty::Bytes && bty != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "scratch_u8_fixed_v1.try_write expects bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32)
+                    }
                     "await" | "task.spawn" => {
                         if head == "await" && !self.allow_async_ops {
                             return Err(CompilerError::new(
@@ -16727,6 +17874,36 @@ impl InferCtx {
                         }
                         Ok(Ty::I32)
                     }
+                    "vec_u8.cap" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "vec_u8.cap expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::VecU8 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_u8.cap expects vec_u8".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32)
+                    }
+                    "vec_u8.clear" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "vec_u8.clear expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::VecU8 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_u8.clear expects vec_u8".to_string(),
+                            ));
+                        }
+                        Ok(Ty::VecU8)
+                    }
                     "map_u32.len" => {
                         if args.len() != 1 {
                             return Err(CompilerError::new(
@@ -17167,21 +18344,19 @@ impl InferCtx {
                         }
                         match self.infer(&args[0])? {
                             Ty::ResultI32 => {
-                                if self.fn_ret_ty != Ty::ResultI32 {
+                                if !matches!(self.fn_ret_ty, Ty::ResultI32 | Ty::ResultBytes) {
                                     return Err(CompilerError::new(
                                         CompileErrorKind::Typing,
-                                        "try(result_i32) requires function return type result_i32"
-                                            .to_string(),
+                                        "try(result_i32) requires function return type result_i32 or result_bytes".to_string(),
                                     ));
                                 }
                                 Ok(Ty::I32)
                             }
                             Ty::ResultBytes => {
-                                if self.fn_ret_ty != Ty::ResultBytes {
+                                if !matches!(self.fn_ret_ty, Ty::ResultBytes | Ty::ResultI32) {
                                     return Err(CompilerError::new(
                                         CompileErrorKind::Typing,
-                                        "try(result_bytes) requires function return type result_bytes"
-                                            .to_string(),
+                                        "try(result_bytes) requires function return type result_bytes or result_i32".to_string(),
                                     ));
                                 }
                                 Ok(Ty::Bytes)
@@ -17930,6 +19105,7 @@ typedef struct rt_timer_ev_s rt_timer_ev_t;
 typedef struct rt_chan_bytes_s rt_chan_bytes_t;
 typedef struct rt_io_reader_s rt_io_reader_t;
 typedef struct rt_bufread_s rt_bufread_t;
+typedef struct rt_scratch_u8_fixed_s rt_scratch_u8_fixed_t;
 typedef struct rt_os_proc_s rt_os_proc_t;
 
 typedef struct {
@@ -18024,6 +19200,11 @@ typedef struct {
   uint32_t bufreads_len;
   uint32_t bufreads_cap;
 
+  // Deterministic fixed-capacity scratch buffers.
+  rt_scratch_u8_fixed_t* scratch_u8_fixed;
+  uint32_t scratch_u8_fixed_len;
+  uint32_t scratch_u8_fixed_cap;
+
   // Standalone OS process table (run-os*, non-deterministic).
   rt_os_proc_t* os_procs;
   uint32_t os_procs_len;
@@ -18075,6 +19256,10 @@ result_i32_t x07_ext_fs_rename_v1(bytes_t src, bytes_t dst, bytes_t caps);
 result_bytes_t x07_ext_fs_list_dir_sorted_text_v1(bytes_t path, bytes_t caps);
 result_bytes_t x07_ext_fs_walk_glob_sorted_text_v1(bytes_t root, bytes_t glob, bytes_t caps);
 result_bytes_t x07_ext_fs_stat_v1(bytes_t path, bytes_t caps);
+result_i32_t x07_ext_fs_stream_open_write_v1(bytes_t path, bytes_t caps);
+result_i32_t x07_ext_fs_stream_write_all_v1(int32_t writer_handle, bytes_t data);
+result_i32_t x07_ext_fs_stream_close_v1(int32_t writer_handle);
+int32_t x07_ext_fs_stream_drop_v1(int32_t writer_handle);
 
 // Native ext-db-sqlite backend entrypoints (linked from deps/x07/libx07_ext_db_sqlite.*).
 bytes_t x07_ext_db_sqlite_open_v1(bytes_t req, bytes_t caps);
@@ -21271,6 +22456,17 @@ static uint32_t rt_vec_u8_len(ctx_t* ctx, vec_u8_t v) {
   return v.len;
 }
 
+static uint32_t rt_vec_u8_cap(ctx_t* ctx, vec_u8_t v) {
+  (void)ctx;
+  return v.cap;
+}
+
+static vec_u8_t rt_vec_u8_clear(ctx_t* ctx, vec_u8_t v) {
+  (void)ctx;
+  v.len = 0;
+  return v;
+}
+
 static uint32_t rt_vec_u8_get(ctx_t* ctx, vec_u8_t v, uint32_t idx) {
   (void)ctx;
   if (idx >= v.len) rt_trap("vec_u8.get oob");
@@ -21495,6 +22691,1167 @@ static bytes_t rt_vec_u8_into_bytes(ctx_t* ctx, vec_u8_t* v) {
   v->dbg_aid = 0;
 #endif
   return out;
+}
+
+// --- X07_JSON_JCS_START
+//
+// JSON Canonicalization Scheme (RFC 8785) runtime canonicalizer.
+// Used by `std.stream.xf.json_canon_stream_v1` via the compiler builtin head:
+// `json.jcs.canon_doc_v1(bytes_view, max_depth, max_object_members, max_object_total_bytes) -> bytes`.
+//
+// Return format:
+// - ok:  [0]=1, followed by canonical JSON UTF-8 bytes.
+// - err: [0]=0, [1..5)=u32_le code, [5..9)=u32_le byte offset in input.
+//
+#define RT_JSON_JCS_E_JSON_SYNTAX UINT32_C(20)
+#define RT_JSON_JCS_E_JSON_NOT_IJSON UINT32_C(21)
+#define RT_JSON_JCS_E_JSON_TOO_DEEP UINT32_C(22)
+#define RT_JSON_JCS_E_JSON_OBJECT_TOO_LARGE UINT32_C(23)
+#define RT_JSON_JCS_E_JSON_TRAILING_DATA UINT32_C(24)
+
+typedef struct {
+  const uint8_t* buf;
+  uint32_t len;
+  uint32_t max_depth;
+  uint32_t max_object_members;
+  uint32_t max_object_total_bytes;
+  uint32_t err_code;
+  uint32_t err_off;
+} rt_json_jcs_state_t;
+
+static bytes_t rt_json_jcs_err_doc(ctx_t* ctx, uint32_t code, uint32_t off) {
+  bytes_t out = rt_bytes_alloc(ctx, UINT32_C(9));
+  out.ptr[0] = UINT8_C(0);
+  out.ptr[1] = (uint8_t)(code & UINT32_C(0xFF));
+  out.ptr[2] = (uint8_t)((code >> 8) & UINT32_C(0xFF));
+  out.ptr[3] = (uint8_t)((code >> 16) & UINT32_C(0xFF));
+  out.ptr[4] = (uint8_t)((code >> 24) & UINT32_C(0xFF));
+  out.ptr[5] = (uint8_t)(off & UINT32_C(0xFF));
+  out.ptr[6] = (uint8_t)((off >> 8) & UINT32_C(0xFF));
+  out.ptr[7] = (uint8_t)((off >> 16) & UINT32_C(0xFF));
+  out.ptr[8] = (uint8_t)((off >> 24) & UINT32_C(0xFF));
+  return out;
+}
+
+static uint32_t rt_json_jcs_fail(rt_json_jcs_state_t* st, uint32_t code, uint32_t off) {
+  if (!st->err_code) {
+    st->err_code = code;
+    st->err_off = off;
+  }
+  return UINT32_MAX;
+}
+
+static uint32_t rt_json_jcs_is_ws(uint8_t c) {
+  return (c == UINT8_C(0x20) || c == UINT8_C(0x09) || c == UINT8_C(0x0A) || c == UINT8_C(0x0D))
+    ? UINT32_C(1)
+    : UINT32_C(0);
+}
+
+static uint32_t rt_json_jcs_skip_ws(rt_json_jcs_state_t* st, uint32_t pos) {
+  while (pos < st->len) {
+    if (!rt_json_jcs_is_ws(st->buf[pos])) break;
+    pos += 1;
+  }
+  return pos;
+}
+
+static int rt_json_jcs_hex_val(uint8_t c) {
+  if (c >= (uint8_t)'0' && c <= (uint8_t)'9') return (int)(c - (uint8_t)'0');
+  if (c >= (uint8_t)'a' && c <= (uint8_t)'f') return (int)(c - (uint8_t)'a') + 10;
+  if (c >= (uint8_t)'A' && c <= (uint8_t)'F') return (int)(c - (uint8_t)'A') + 10;
+  return -1;
+}
+
+static uint32_t rt_json_jcs_read_u16_hex4(rt_json_jcs_state_t* st, uint32_t pos, uint32_t* out_u16) {
+  if (!out_u16) return 0;
+  if (pos > st->len || st->len - pos < 4) return 0;
+  int h0 = rt_json_jcs_hex_val(st->buf[pos + 0]);
+  int h1 = rt_json_jcs_hex_val(st->buf[pos + 1]);
+  int h2 = rt_json_jcs_hex_val(st->buf[pos + 2]);
+  int h3 = rt_json_jcs_hex_val(st->buf[pos + 3]);
+  if (h0 < 0 || h1 < 0 || h2 < 0 || h3 < 0) return 0;
+  *out_u16 = (uint32_t)((h0 << 12) | (h1 << 8) | (h2 << 4) | h3);
+  return 1;
+}
+
+static uint32_t rt_json_jcs_is_noncharacter(uint32_t cp) {
+  if (cp >= UINT32_C(0xFDD0) && cp <= UINT32_C(0xFDEF)) return 1;
+  uint32_t low = cp & UINT32_C(0xFFFF);
+  return (low == UINT32_C(0xFFFE) || low == UINT32_C(0xFFFF)) ? 1 : 0;
+}
+
+static uint32_t rt_json_jcs_decode_utf8(
+    rt_json_jcs_state_t* st,
+    uint32_t pos,
+    uint32_t* out_cp,
+    uint32_t* out_next
+) {
+  if (!out_cp || !out_next) return 0;
+  if (pos >= st->len) return 0;
+  const uint8_t* s = st->buf;
+  uint8_t b0 = s[pos];
+
+  if (b0 < UINT8_C(0x80)) {
+    *out_cp = (uint32_t)b0;
+    *out_next = pos + 1;
+    return 1;
+  }
+
+  if (b0 >= UINT8_C(0xC2) && b0 <= UINT8_C(0xDF)) {
+    if (st->len - pos < 2) return 0;
+    uint8_t b1 = s[pos + 1];
+    if ((b1 & UINT8_C(0xC0)) != UINT8_C(0x80)) return 0;
+    *out_cp = ((uint32_t)(b0 & UINT8_C(0x1F)) << 6) | (uint32_t)(b1 & UINT8_C(0x3F));
+    *out_next = pos + 2;
+    return 1;
+  }
+
+  if (b0 >= UINT8_C(0xE0) && b0 <= UINT8_C(0xEF)) {
+    if (st->len - pos < 3) return 0;
+    uint8_t b1 = s[pos + 1];
+    uint8_t b2 = s[pos + 2];
+    if ((b1 & UINT8_C(0xC0)) != UINT8_C(0x80)) return 0;
+    if ((b2 & UINT8_C(0xC0)) != UINT8_C(0x80)) return 0;
+    if (b0 == UINT8_C(0xE0) && b1 < UINT8_C(0xA0)) return 0; // overlong
+    if (b0 == UINT8_C(0xED) && b1 > UINT8_C(0x9F)) return 0; // surrogate
+    uint32_t cp = ((uint32_t)(b0 & UINT8_C(0x0F)) << 12)
+                | ((uint32_t)(b1 & UINT8_C(0x3F)) << 6)
+                | (uint32_t)(b2 & UINT8_C(0x3F));
+    *out_cp = cp;
+    *out_next = pos + 3;
+    return 1;
+  }
+
+  if (b0 >= UINT8_C(0xF0) && b0 <= UINT8_C(0xF4)) {
+    if (st->len - pos < 4) return 0;
+    uint8_t b1 = s[pos + 1];
+    uint8_t b2 = s[pos + 2];
+    uint8_t b3 = s[pos + 3];
+    if ((b1 & UINT8_C(0xC0)) != UINT8_C(0x80)) return 0;
+    if ((b2 & UINT8_C(0xC0)) != UINT8_C(0x80)) return 0;
+    if ((b3 & UINT8_C(0xC0)) != UINT8_C(0x80)) return 0;
+    if (b0 == UINT8_C(0xF0) && b1 < UINT8_C(0x90)) return 0; // overlong
+    if (b0 == UINT8_C(0xF4) && b1 > UINT8_C(0x8F)) return 0; // > U+10FFFF
+    uint32_t cp = ((uint32_t)(b0 & UINT8_C(0x07)) << 18)
+                | ((uint32_t)(b1 & UINT8_C(0x3F)) << 12)
+                | ((uint32_t)(b2 & UINT8_C(0x3F)) << 6)
+                | (uint32_t)(b3 & UINT8_C(0x3F));
+    if (cp > UINT32_C(0x10FFFF)) return 0;
+    *out_cp = cp;
+    *out_next = pos + 4;
+    return 1;
+  }
+
+  return 0;
+}
+
+static vec_u8_t rt_json_jcs_push_utf8(ctx_t* ctx, vec_u8_t out, uint32_t cp) {
+  if (cp < UINT32_C(0x80)) {
+    return rt_vec_u8_push(ctx, out, cp);
+  }
+  if (cp < UINT32_C(0x800)) {
+    out = rt_vec_u8_push(ctx, out, UINT32_C(0xC0) | (cp >> 6));
+    out = rt_vec_u8_push(ctx, out, UINT32_C(0x80) | (cp & UINT32_C(0x3F)));
+    return out;
+  }
+  if (cp < UINT32_C(0x10000)) {
+    out = rt_vec_u8_push(ctx, out, UINT32_C(0xE0) | (cp >> 12));
+    out = rt_vec_u8_push(ctx, out, UINT32_C(0x80) | ((cp >> 6) & UINT32_C(0x3F)));
+    out = rt_vec_u8_push(ctx, out, UINT32_C(0x80) | (cp & UINT32_C(0x3F)));
+    return out;
+  }
+  out = rt_vec_u8_push(ctx, out, UINT32_C(0xF0) | (cp >> 18));
+  out = rt_vec_u8_push(ctx, out, UINT32_C(0x80) | ((cp >> 12) & UINT32_C(0x3F)));
+  out = rt_vec_u8_push(ctx, out, UINT32_C(0x80) | ((cp >> 6) & UINT32_C(0x3F)));
+  out = rt_vec_u8_push(ctx, out, UINT32_C(0x80) | (cp & UINT32_C(0x3F)));
+  return out;
+}
+
+static vec_u8_t rt_json_jcs_push_escaped(ctx_t* ctx, vec_u8_t out, uint32_t cp) {
+  static const uint8_t hex[] = "0123456789abcdef";
+  if (cp <= UINT32_C(0x1F)) {
+    // Use the predefined JSON control escapes where available; otherwise \u00xx.
+    if (cp == UINT32_C(0x08)) {
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'\\');
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'b');
+      return out;
+    }
+    if (cp == UINT32_C(0x09)) {
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'\\');
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'t');
+      return out;
+    }
+    if (cp == UINT32_C(0x0A)) {
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'\\');
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'n');
+      return out;
+    }
+    if (cp == UINT32_C(0x0C)) {
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'\\');
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'f');
+      return out;
+    }
+    if (cp == UINT32_C(0x0D)) {
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'\\');
+      out = rt_vec_u8_push(ctx, out, (uint32_t)'r');
+      return out;
+    }
+    out = rt_vec_u8_push(ctx, out, (uint32_t)'\\');
+    out = rt_vec_u8_push(ctx, out, (uint32_t)'u');
+    out = rt_vec_u8_push(ctx, out, (uint32_t)'0');
+    out = rt_vec_u8_push(ctx, out, (uint32_t)'0');
+    out = rt_vec_u8_push(ctx, out, (uint32_t)hex[(cp >> 4) & UINT32_C(0xF)]);
+    out = rt_vec_u8_push(ctx, out, (uint32_t)hex[cp & UINT32_C(0xF)]);
+    return out;
+  }
+
+  if (cp == UINT32_C(0x22)) { // "
+    out = rt_vec_u8_push(ctx, out, (uint32_t)'\\');
+    out = rt_vec_u8_push(ctx, out, (uint32_t)'"');
+    return out;
+  }
+  if (cp == UINT32_C(0x5C)) { // \
+    out = rt_vec_u8_push(ctx, out, (uint32_t)'\\');
+    out = rt_vec_u8_push(ctx, out, (uint32_t)'\\');
+    return out;
+  }
+
+  return rt_json_jcs_push_utf8(ctx, out, cp);
+}
+
+static vec_u8_t rt_json_jcs_sort_push_u16be(ctx_t* ctx, vec_u8_t out, uint32_t cu) {
+  out = rt_vec_u8_push(ctx, out, (cu >> 8) & UINT32_C(0xFF));
+  out = rt_vec_u8_push(ctx, out, cu & UINT32_C(0xFF));
+  return out;
+}
+
+static vec_u8_t rt_json_jcs_sort_push_cp_utf16be(ctx_t* ctx, vec_u8_t out, uint32_t cp) {
+  if (cp <= UINT32_C(0xFFFF)) {
+    return rt_json_jcs_sort_push_u16be(ctx, out, cp);
+  }
+  uint32_t x = cp - UINT32_C(0x10000);
+  uint32_t hi = UINT32_C(0xD800) + (x >> 10);
+  uint32_t lo = UINT32_C(0xDC00) + (x & UINT32_C(0x3FF));
+  out = rt_json_jcs_sort_push_u16be(ctx, out, hi);
+  out = rt_json_jcs_sort_push_u16be(ctx, out, lo);
+  return out;
+}
+
+static uint32_t rt_json_jcs_parse_string(
+    ctx_t* ctx,
+    rt_json_jcs_state_t* st,
+    uint32_t pos,
+    uint32_t emit_quotes,
+    vec_u8_t* out_escaped,
+    vec_u8_t* out_sort
+) {
+  if (!out_escaped) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  if (pos >= st->len || st->buf[pos] != (uint8_t)'"') {
+    return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  }
+  pos += 1;
+  if (emit_quotes) {
+    *out_escaped = rt_vec_u8_push(ctx, *out_escaped, (uint32_t)'"');
+  }
+
+  for (;;) {
+    if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    uint8_t c = st->buf[pos];
+
+    if (c == (uint8_t)'"') {
+      pos += 1;
+      if (emit_quotes) {
+        *out_escaped = rt_vec_u8_push(ctx, *out_escaped, (uint32_t)'"');
+      }
+      return pos;
+    }
+
+    uint32_t cp = 0;
+    uint32_t next = pos;
+    uint32_t cp_off = pos;
+
+    if (c == (uint8_t)'\\') {
+      uint32_t esc_off = pos;
+      if (st->len - pos < 2) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+      uint8_t esc = st->buf[pos + 1];
+      pos += 2;
+
+      switch (esc) {
+        case (uint8_t)'"': cp = UINT32_C(0x22); break;
+        case (uint8_t)'\\': cp = UINT32_C(0x5C); break;
+        case (uint8_t)'/': cp = UINT32_C(0x2F); break;
+        case (uint8_t)'b': cp = UINT32_C(0x08); break;
+        case (uint8_t)'f': cp = UINT32_C(0x0C); break;
+        case (uint8_t)'n': cp = UINT32_C(0x0A); break;
+        case (uint8_t)'r': cp = UINT32_C(0x0D); break;
+        case (uint8_t)'t': cp = UINT32_C(0x09); break;
+        case (uint8_t)'u': {
+          uint32_t u = 0;
+          if (!rt_json_jcs_read_u16_hex4(st, pos, &u)) {
+            return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, esc_off);
+          }
+          pos += 4;
+
+          // Reject lone surrogates; accept valid surrogate pairs.
+          if (u >= UINT32_C(0xD800) && u <= UINT32_C(0xDBFF)) {
+            if (st->len - pos < 6) {
+              return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, esc_off);
+            }
+            if (st->buf[pos] != (uint8_t)'\\' || st->buf[pos + 1] != (uint8_t)'u') {
+              return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, esc_off);
+            }
+            uint32_t u2 = 0;
+            if (!rt_json_jcs_read_u16_hex4(st, pos + 2, &u2)) {
+              return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, esc_off);
+            }
+            if (u2 < UINT32_C(0xDC00) || u2 > UINT32_C(0xDFFF)) {
+              return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, esc_off);
+            }
+            pos += 6;
+            uint32_t hi = u - UINT32_C(0xD800);
+            uint32_t lo = u2 - UINT32_C(0xDC00);
+            cp = UINT32_C(0x10000) + ((hi << 10) | lo);
+          } else if (u >= UINT32_C(0xDC00) && u <= UINT32_C(0xDFFF)) {
+            return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, esc_off);
+          } else {
+            cp = u;
+          }
+          break;
+        }
+        default:
+          return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, esc_off);
+      }
+
+      if (rt_json_jcs_is_noncharacter(cp)) {
+        return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, esc_off);
+      }
+
+      cp_off = esc_off;
+      next = pos;
+    } else if (c < UINT8_C(0x20)) {
+      return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    } else if (c < UINT8_C(0x80)) {
+      cp = (uint32_t)c;
+      next = pos + 1;
+      if (rt_json_jcs_is_noncharacter(cp)) {
+        return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, pos);
+      }
+    } else {
+      if (!rt_json_jcs_decode_utf8(st, pos, &cp, &next)) {
+        return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, pos);
+      }
+      if (rt_json_jcs_is_noncharacter(cp)) {
+        return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, pos);
+      }
+    }
+
+    // Sorting uses UTF-16 code units of the unescaped string.
+    if (out_sort) {
+      *out_sort = rt_json_jcs_sort_push_cp_utf16be(ctx, *out_sort, cp);
+    }
+    *out_escaped = rt_json_jcs_push_escaped(ctx, *out_escaped, cp);
+    (void)cp_off;
+    pos = next;
+  }
+}
+
+static uint32_t rt_json_jcs_read_u32_le_at(const uint8_t* p) {
+  return (uint32_t)p[0]
+       | ((uint32_t)p[1] << 8)
+       | ((uint32_t)p[2] << 16)
+       | ((uint32_t)p[3] << 24);
+}
+
+static void rt_json_jcs_write_u32_le_at(uint8_t* p, uint32_t x) {
+  p[0] = (uint8_t)(x & UINT32_C(0xFF));
+  p[1] = (uint8_t)((x >> 8) & UINT32_C(0xFF));
+  p[2] = (uint8_t)((x >> 16) & UINT32_C(0xFF));
+  p[3] = (uint8_t)((x >> 24) & UINT32_C(0xFF));
+}
+
+static void rt_json_jcs_vec_write_u32_le(vec_u8_t* v, uint32_t off, uint32_t x) {
+  if (!v) rt_trap("json.jcs vec_write_u32_le null");
+  if (off > v->len || v->len - off < 4) rt_trap("json.jcs vec_write_u32_le oob");
+  rt_json_jcs_write_u32_le_at(v->data + off, x);
+}
+
+static vec_u8_t rt_json_jcs_vec_push_u32_le(ctx_t* ctx, vec_u8_t v, uint32_t x) {
+  v = rt_vec_u8_push(ctx, v, x & UINT32_C(0xFF));
+  v = rt_vec_u8_push(ctx, v, (x >> 8) & UINT32_C(0xFF));
+  v = rt_vec_u8_push(ctx, v, (x >> 16) & UINT32_C(0xFF));
+  v = rt_vec_u8_push(ctx, v, (x >> 24) & UINT32_C(0xFF));
+  return v;
+}
+
+static uint64_t rt_json_jcs_read_u64_le(bytes_t b) {
+  if (b.len != 8) rt_trap("json.jcs f64 bad len");
+  uint64_t x = 0;
+  x |= (uint64_t)b.ptr[0];
+  x |= (uint64_t)b.ptr[1] << 8;
+  x |= (uint64_t)b.ptr[2] << 16;
+  x |= (uint64_t)b.ptr[3] << 24;
+  x |= (uint64_t)b.ptr[4] << 32;
+  x |= (uint64_t)b.ptr[5] << 40;
+  x |= (uint64_t)b.ptr[6] << 48;
+  x |= (uint64_t)b.ptr[7] << 56;
+  return x;
+}
+
+static vec_u8_t rt_json_jcs_push_u32_dec(ctx_t* ctx, vec_u8_t out, uint32_t x) {
+  uint8_t scratch[16];
+  uint32_t n = 0;
+  if (x == 0) {
+    return rt_vec_u8_push(ctx, out, (uint32_t)'0');
+  }
+  while (x) {
+    uint32_t d = x % 10;
+    x /= 10;
+    scratch[n++] = (uint8_t)('0' + d);
+  }
+  while (n) {
+    out = rt_vec_u8_push(ctx, out, (uint32_t)scratch[n - 1]);
+    n -= 1;
+  }
+  return out;
+}
+
+static uint32_t rt_json_jcs_emit_number(ctx_t* ctx, rt_json_jcs_state_t* st, bytes_t f, vec_u8_t* out) {
+  if (!out) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, 0);
+  uint64_t bits = rt_json_jcs_read_u64_le(f);
+  uint32_t exp = (uint32_t)((bits >> 52) & UINT64_C(0x7FF));
+  if (exp == UINT32_C(0x7FF)) {
+    rt_bytes_drop(ctx, &f);
+    return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, st->err_off);
+  }
+  if (bits == UINT64_C(0x8000000000000000)) {
+    // -0 must serialize as 0.
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'0');
+    rt_bytes_drop(ctx, &f);
+    return 1;
+  }
+
+  bytes_t shortest = ev_math_f64_fmt_shortest_v1(f);
+
+  // Keep `f` alive until fmt_shortest has read it, then drop.
+  rt_bytes_drop(ctx, &f);
+
+  if (shortest.len == 2 && shortest.ptr[0] == (uint8_t)'-' && shortest.ptr[1] == (uint8_t)'0') {
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'0');
+    rt_bytes_drop(ctx, &shortest);
+    return 1;
+  }
+
+  // Parse ryu-style shortest string and re-emit per RFC 8785 number serialization rules.
+  uint32_t i = 0;
+  uint32_t neg = 0;
+  if (shortest.len && shortest.ptr[0] == (uint8_t)'-') {
+    neg = 1;
+    i = 1;
+  }
+
+  uint8_t digits[32];
+  uint32_t digits_len = 0;
+  uint32_t digits_before_dot = 0;
+  uint32_t seen_dot = 0;
+
+  while (i < shortest.len) {
+    uint8_t c = shortest.ptr[i];
+    if (c == (uint8_t)'e' || c == (uint8_t)'E') break;
+    if (c == (uint8_t)'.') {
+      seen_dot = 1;
+      i += 1;
+      continue;
+    }
+    if (c < (uint8_t)'0' || c > (uint8_t)'9') {
+      rt_bytes_drop(ctx, &shortest);
+      return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, st->err_off);
+    }
+    if (digits_len >= (uint32_t)(sizeof(digits) / sizeof(digits[0]))) {
+      rt_bytes_drop(ctx, &shortest);
+      return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, st->err_off);
+    }
+    digits[digits_len++] = c;
+    if (!seen_dot) digits_before_dot += 1;
+    i += 1;
+  }
+
+  if (digits_len == 0) {
+    rt_bytes_drop(ctx, &shortest);
+    return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, st->err_off);
+  }
+
+  uint32_t has_e = 0;
+  int32_t exp10 = 0;
+  if (i < shortest.len && (shortest.ptr[i] == (uint8_t)'e' || shortest.ptr[i] == (uint8_t)'E')) {
+    has_e = 1;
+    i += 1;
+    int32_t sign = 1;
+    if (i < shortest.len && (shortest.ptr[i] == (uint8_t)'-' || shortest.ptr[i] == (uint8_t)'+')) {
+      if (shortest.ptr[i] == (uint8_t)'-') sign = -1;
+      i += 1;
+    }
+    if (i >= shortest.len) {
+      rt_bytes_drop(ctx, &shortest);
+      return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, st->err_off);
+    }
+    int32_t e = 0;
+    for (; i < shortest.len; i++) {
+      uint8_t c = shortest.ptr[i];
+      if (c < (uint8_t)'0' || c > (uint8_t)'9') {
+        rt_bytes_drop(ctx, &shortest);
+        return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, st->err_off);
+      }
+      e = e * 10 + (int32_t)(c - (uint8_t)'0');
+      if (e > 1000000) break;
+    }
+    exp10 = sign * e;
+  } else if (i != shortest.len) {
+    rt_bytes_drop(ctx, &shortest);
+    return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, st->err_off);
+  }
+
+  if (!has_e) {
+    bytes_view_t v = rt_bytes_view(ctx, shortest);
+    *out = rt_vec_u8_extend_bytes(ctx, *out, v);
+    rt_bytes_drop(ctx, &shortest);
+    return 1;
+  }
+
+  // Scientific exponent for the value with a single digit before the decimal point.
+  int32_t sci_exp = exp10 + (int32_t)digits_before_dot - 1;
+
+  uint32_t use_exp = (sci_exp < -6 || sci_exp >= 21) ? 1 : 0;
+
+  if (neg) *out = rt_vec_u8_push(ctx, *out, (uint32_t)'-');
+
+  if (use_exp) {
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)digits[0]);
+    if (digits_len > 1) {
+      *out = rt_vec_u8_push(ctx, *out, (uint32_t)'.');
+      for (uint32_t di = 1; di < digits_len; di++) {
+        *out = rt_vec_u8_push(ctx, *out, (uint32_t)digits[di]);
+      }
+    }
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'e');
+    if (sci_exp >= 0) {
+      *out = rt_vec_u8_push(ctx, *out, (uint32_t)'+');
+      *out = rt_json_jcs_push_u32_dec(ctx, *out, (uint32_t)sci_exp);
+    } else {
+      *out = rt_vec_u8_push(ctx, *out, (uint32_t)'-');
+      uint32_t mag = (uint32_t)(-sci_exp);
+      *out = rt_json_jcs_push_u32_dec(ctx, *out, mag);
+    }
+    rt_bytes_drop(ctx, &shortest);
+    return 1;
+  }
+
+  // Decimal form for -6 <= sci_exp < 21: shift the decimal point and avoid exponent notation.
+  int32_t new_dp = (int32_t)digits_before_dot + exp10;
+  if (new_dp <= 0) {
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'0');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'.');
+    for (int32_t z = 0; z < -new_dp; z++) {
+      *out = rt_vec_u8_push(ctx, *out, (uint32_t)'0');
+    }
+    for (uint32_t di = 0; di < digits_len; di++) {
+      *out = rt_vec_u8_push(ctx, *out, (uint32_t)digits[di]);
+    }
+    rt_bytes_drop(ctx, &shortest);
+    return 1;
+  }
+
+  if (new_dp >= (int32_t)digits_len) {
+    for (uint32_t di = 0; di < digits_len; di++) {
+      *out = rt_vec_u8_push(ctx, *out, (uint32_t)digits[di]);
+    }
+    for (int32_t z = 0; z < new_dp - (int32_t)digits_len; z++) {
+      *out = rt_vec_u8_push(ctx, *out, (uint32_t)'0');
+    }
+    rt_bytes_drop(ctx, &shortest);
+    return 1;
+  }
+
+  for (int32_t di = 0; di < new_dp; di++) {
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)digits[(uint32_t)di]);
+  }
+  *out = rt_vec_u8_push(ctx, *out, (uint32_t)'.');
+  for (uint32_t di = (uint32_t)new_dp; di < digits_len; di++) {
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)digits[di]);
+  }
+  rt_bytes_drop(ctx, &shortest);
+  return 1;
+}
+
+static uint32_t rt_json_jcs_parse_value(
+    ctx_t* ctx,
+    rt_json_jcs_state_t* st,
+    uint32_t pos,
+    uint32_t depth,
+    vec_u8_t* out
+);
+
+static uint32_t rt_json_jcs_parse_array(
+    ctx_t* ctx,
+    rt_json_jcs_state_t* st,
+    uint32_t pos,
+    uint32_t depth,
+    vec_u8_t* out
+) {
+  if (!out) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  if (pos >= st->len || st->buf[pos] != (uint8_t)'[') return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+
+  *out = rt_vec_u8_push(ctx, *out, (uint32_t)'[');
+  pos += 1;
+  pos = rt_json_jcs_skip_ws(st, pos);
+  if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  if (st->buf[pos] == (uint8_t)']') {
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)']');
+    return pos + 1;
+  }
+
+  uint32_t first = 1;
+  for (uint32_t _ = 0; _ < st->len + 1; _++) {
+    if (!first) {
+      *out = rt_vec_u8_push(ctx, *out, (uint32_t)',');
+    }
+    first = 0;
+    pos = rt_json_jcs_parse_value(ctx, st, pos, depth, out);
+    if (pos == UINT32_MAX) return UINT32_MAX;
+    pos = rt_json_jcs_skip_ws(st, pos);
+    if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    uint8_t c = st->buf[pos];
+    if (c == (uint8_t)',') {
+      pos += 1;
+      pos = rt_json_jcs_skip_ws(st, pos);
+      continue;
+    }
+    if (c == (uint8_t)']') {
+      *out = rt_vec_u8_push(ctx, *out, (uint32_t)']');
+      return pos + 1;
+    }
+    return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  }
+  return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+}
+
+static uint32_t rt_json_jcs_parse_number(
+    ctx_t* ctx,
+    rt_json_jcs_state_t* st,
+    uint32_t pos,
+    vec_u8_t* out
+) {
+  if (!out) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  uint32_t start = pos;
+  if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  uint8_t c = st->buf[pos];
+  if (c == (uint8_t)'-') {
+    pos += 1;
+    if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, start);
+    c = st->buf[pos];
+  }
+  if (c == (uint8_t)'0') {
+    pos += 1;
+    if (pos < st->len) {
+      uint8_t d = st->buf[pos];
+      if (d >= (uint8_t)'0' && d <= (uint8_t)'9') {
+        return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, start);
+      }
+    }
+  } else if (c >= (uint8_t)'1' && c <= (uint8_t)'9') {
+    pos += 1;
+    while (pos < st->len) {
+      uint8_t d = st->buf[pos];
+      if (d < (uint8_t)'0' || d > (uint8_t)'9') break;
+      pos += 1;
+    }
+  } else {
+    return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, start);
+  }
+
+  if (pos < st->len && st->buf[pos] == (uint8_t)'.') {
+    pos += 1;
+    if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, start);
+    uint8_t d = st->buf[pos];
+    if (d < (uint8_t)'0' || d > (uint8_t)'9') return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, start);
+    pos += 1;
+    while (pos < st->len) {
+      d = st->buf[pos];
+      if (d < (uint8_t)'0' || d > (uint8_t)'9') break;
+      pos += 1;
+    }
+  }
+
+  if (pos < st->len && (st->buf[pos] == (uint8_t)'e' || st->buf[pos] == (uint8_t)'E')) {
+    pos += 1;
+    if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, start);
+    uint8_t sgn = st->buf[pos];
+    if (sgn == (uint8_t)'+' || sgn == (uint8_t)'-') {
+      pos += 1;
+      if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, start);
+    }
+    uint8_t d = st->buf[pos];
+    if (d < (uint8_t)'0' || d > (uint8_t)'9') return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, start);
+    pos += 1;
+    while (pos < st->len) {
+      d = st->buf[pos];
+      if (d < (uint8_t)'0' || d > (uint8_t)'9') break;
+      pos += 1;
+    }
+  }
+
+  bytes_t slice = (bytes_t){ .ptr = (uint8_t*)(st->buf + start), .len = pos - start };
+  result_bytes_t r = ev_math_f64_parse_v1(slice);
+  if (r.tag == UINT32_C(0)) {
+    return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, start);
+  }
+
+  bytes_t f = r.payload.ok;
+  st->err_off = start;
+  uint32_t ok = rt_json_jcs_emit_number(ctx, st, f, out);
+  if (ok == UINT32_MAX) return UINT32_MAX;
+  return pos;
+}
+
+static uint32_t rt_json_jcs_parse_object(
+    ctx_t* ctx,
+    rt_json_jcs_state_t* st,
+    uint32_t pos,
+    uint32_t depth,
+    vec_u8_t* out
+) {
+  if (!out) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  if (pos >= st->len || st->buf[pos] != (uint8_t)'{') return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+
+  uint32_t obj_off = pos;
+  pos += 1;
+  pos = rt_json_jcs_skip_ws(st, pos);
+  if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  if (st->buf[pos] == (uint8_t)'}') {
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'{');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'}');
+    return pos + 1;
+  }
+
+  vec_u8_t members = rt_vec_u8_new(ctx, 0);
+  vec_u8_t offsets = rt_vec_u8_new(ctx, 0);
+  vec_u8_t sort_tmp = rt_vec_u8_new(ctx, 0);
+
+  uint32_t count = 0;
+  uint32_t done = 0;
+
+  for (uint32_t _ = 0; _ < st->len + 1 && !done; _++) {
+    pos = rt_json_jcs_skip_ws(st, pos);
+    if (pos >= st->len) { rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos); goto fail; }
+    if (st->buf[pos] != (uint8_t)'"') { rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos); goto fail; }
+
+    if (st->max_object_members && count >= st->max_object_members) {
+      rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_OBJECT_TOO_LARGE, obj_off);
+      goto fail;
+    }
+
+    uint32_t rec_off = members.len;
+    uint32_t key_input_off = pos;
+    members = rt_json_jcs_vec_push_u32_le(ctx, members, key_input_off);
+
+    uint32_t key_len_off = members.len;
+    members = rt_vec_u8_extend_zeroes(ctx, members, 4);
+    uint32_t key_start = members.len;
+    sort_tmp = rt_vec_u8_clear(ctx, sort_tmp);
+    pos = rt_json_jcs_parse_string(ctx, st, pos, 0, &members, &sort_tmp);
+    if (pos == UINT32_MAX) goto fail;
+    uint32_t key_len = members.len - key_start;
+    rt_json_jcs_vec_write_u32_le(&members, key_len_off, key_len);
+
+    uint32_t sort_len_off = members.len;
+    members = rt_vec_u8_extend_zeroes(ctx, members, 4);
+    uint32_t sort_start = members.len;
+    bytes_view_t sortv = rt_vec_u8_as_view(ctx, sort_tmp);
+    members = rt_vec_u8_extend_bytes(ctx, members, sortv);
+    uint32_t sort_len = members.len - sort_start;
+    rt_json_jcs_vec_write_u32_le(&members, sort_len_off, sort_len);
+
+    pos = rt_json_jcs_skip_ws(st, pos);
+    if (pos >= st->len || st->buf[pos] != (uint8_t)':') { rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos); goto fail; }
+    pos += 1;
+    pos = rt_json_jcs_skip_ws(st, pos);
+
+    uint32_t val_len_off = members.len;
+    members = rt_vec_u8_extend_zeroes(ctx, members, 4);
+    uint32_t val_start = members.len;
+    pos = rt_json_jcs_parse_value(ctx, st, pos, depth, &members);
+    if (pos == UINT32_MAX) goto fail;
+    uint32_t val_len = members.len - val_start;
+    rt_json_jcs_vec_write_u32_le(&members, val_len_off, val_len);
+
+    offsets = rt_json_jcs_vec_push_u32_le(ctx, offsets, rec_off);
+    count += 1;
+
+    uint64_t used = (uint64_t)members.len + (uint64_t)offsets.len;
+    if (used > (uint64_t)st->max_object_total_bytes) {
+      rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_OBJECT_TOO_LARGE, obj_off);
+      goto fail;
+    }
+
+    pos = rt_json_jcs_skip_ws(st, pos);
+    if (pos >= st->len) { rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos); goto fail; }
+    uint8_t sep = st->buf[pos];
+    if (sep == (uint8_t)',') {
+      pos += 1;
+      continue;
+    }
+    if (sep == (uint8_t)'}') {
+      pos += 1;
+      done = 1;
+      break;
+    }
+    rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    goto fail;
+  }
+
+  if (!done) {
+    rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    goto fail;
+  }
+
+  if (offsets.len != count * 4) rt_trap("json.jcs offsets corrupt");
+  if (count == 0) {
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'{');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'}');
+    rt_vec_u8_drop(ctx, &sort_tmp);
+    rt_vec_u8_drop(ctx, &offsets);
+    rt_vec_u8_drop(ctx, &members);
+    return pos;
+  }
+
+  // Ensure sort scratch fits the object bounds.
+  uint64_t used_total = (uint64_t)members.len + (uint64_t)offsets.len + (uint64_t)count * 8ULL;
+  if (used_total > (uint64_t)st->max_object_total_bytes) {
+    rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_OBJECT_TOO_LARGE, obj_off);
+    goto fail;
+  }
+
+  uint32_t idx_bytes = count * 4;
+  uint32_t align = (uint32_t)_Alignof(uint32_t);
+  uint32_t* idxs = (uint32_t*)rt_alloc(ctx, idx_bytes, align);
+  uint32_t* tmp = (uint32_t*)rt_alloc(ctx, idx_bytes, align);
+  for (uint32_t i = 0; i < count; i++) idxs[i] = i;
+
+  const uint8_t* offp = offsets.data;
+  const uint8_t* memb = members.data;
+
+  // Bottom-up mergesort on indices.
+  for (uint32_t width = 1; width < count; width *= 2) {
+    for (uint32_t i = 0; i < count; i += 2 * width) {
+      uint32_t l = i;
+      uint32_t m = (i + width < count) ? (i + width) : count;
+      uint32_t r = (i + 2 * width < count) ? (i + 2 * width) : count;
+      uint32_t a = l;
+      uint32_t b = m;
+      uint32_t t = l;
+      while (a < m && b < r) {
+        uint32_t a_off = rt_json_jcs_read_u32_le_at(offp + idxs[a] * 4);
+        uint32_t b_off = rt_json_jcs_read_u32_le_at(offp + idxs[b] * 4);
+
+        uint32_t a_key_len = rt_json_jcs_read_u32_le_at(memb + a_off + 4);
+        uint32_t b_key_len = rt_json_jcs_read_u32_le_at(memb + b_off + 4);
+        uint32_t a_sort_len_off = a_off + 8 + a_key_len;
+        uint32_t b_sort_len_off = b_off + 8 + b_key_len;
+        uint32_t a_sort_len = rt_json_jcs_read_u32_le_at(memb + a_sort_len_off);
+        uint32_t b_sort_len = rt_json_jcs_read_u32_le_at(memb + b_sort_len_off);
+        const uint8_t* a_sort = memb + a_sort_len_off + 4;
+        const uint8_t* b_sort = memb + b_sort_len_off + 4;
+
+        uint32_t min_len = (a_sort_len < b_sort_len) ? a_sort_len : b_sort_len;
+        int cmp = 0;
+        if (min_len) cmp = memcmp(a_sort, b_sort, min_len);
+        if (cmp < 0 || (cmp == 0 && a_sort_len < b_sort_len)) {
+          tmp[t++] = idxs[a++];
+        } else {
+          tmp[t++] = idxs[b++];
+        }
+      }
+      while (a < m) tmp[t++] = idxs[a++];
+      while (b < r) tmp[t++] = idxs[b++];
+    }
+    memcpy(idxs, tmp, idx_bytes);
+    rt_mem_on_memcpy(ctx, idx_bytes);
+  }
+
+  // Duplicate detection (I-JSON requirement: no duplicate object member names).
+  for (uint32_t i = 1; i < count; i++) {
+    uint32_t a = idxs[i - 1];
+    uint32_t b = idxs[i];
+    uint32_t a_off = rt_json_jcs_read_u32_le_at(offp + a * 4);
+    uint32_t b_off = rt_json_jcs_read_u32_le_at(offp + b * 4);
+    uint32_t a_key_len = rt_json_jcs_read_u32_le_at(memb + a_off + 4);
+    uint32_t b_key_len = rt_json_jcs_read_u32_le_at(memb + b_off + 4);
+    uint32_t a_sort_len_off = a_off + 8 + a_key_len;
+    uint32_t b_sort_len_off = b_off + 8 + b_key_len;
+    uint32_t a_sort_len = rt_json_jcs_read_u32_le_at(memb + a_sort_len_off);
+    uint32_t b_sort_len = rt_json_jcs_read_u32_le_at(memb + b_sort_len_off);
+    if (a_sort_len != b_sort_len) continue;
+    const uint8_t* a_sort = memb + a_sort_len_off + 4;
+    const uint8_t* b_sort = memb + b_sort_len_off + 4;
+    if (a_sort_len && memcmp(a_sort, b_sort, a_sort_len) != 0) continue;
+    uint32_t dup_off = rt_json_jcs_read_u32_le_at(memb + b_off);
+    rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_NOT_IJSON, dup_off);
+    rt_free(ctx, tmp, idx_bytes, align);
+    rt_free(ctx, idxs, idx_bytes, align);
+    goto fail;
+  }
+
+  bytes_view_t mview = rt_vec_u8_as_view(ctx, members);
+  *out = rt_vec_u8_push(ctx, *out, (uint32_t)'{');
+  for (uint32_t i = 0; i < count; i++) {
+    if (i) *out = rt_vec_u8_push(ctx, *out, (uint32_t)',');
+    uint32_t rec_idx = idxs[i];
+    uint32_t rec_off = rt_json_jcs_read_u32_le_at(offp + rec_idx * 4);
+    uint32_t key_len = rt_json_jcs_read_u32_le_at(memb + rec_off + 4);
+    uint32_t key_start = rec_off + 8;
+    uint32_t sort_len_off = key_start + key_len;
+    uint32_t sort_len = rt_json_jcs_read_u32_le_at(memb + sort_len_off);
+    uint32_t val_len_off = sort_len_off + 4 + sort_len;
+    uint32_t val_len = rt_json_jcs_read_u32_le_at(memb + val_len_off);
+    uint32_t val_start = val_len_off + 4;
+
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'"');
+    *out = rt_vec_u8_extend_bytes_range(ctx, *out, mview, key_start, key_len);
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'"');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)':');
+    *out = rt_vec_u8_extend_bytes_range(ctx, *out, mview, val_start, val_len);
+  }
+  *out = rt_vec_u8_push(ctx, *out, (uint32_t)'}');
+
+  rt_free(ctx, tmp, idx_bytes, align);
+  rt_free(ctx, idxs, idx_bytes, align);
+  rt_vec_u8_drop(ctx, &sort_tmp);
+  rt_vec_u8_drop(ctx, &offsets);
+  rt_vec_u8_drop(ctx, &members);
+  return pos;
+
+fail:
+  rt_vec_u8_drop(ctx, &sort_tmp);
+  rt_vec_u8_drop(ctx, &offsets);
+  rt_vec_u8_drop(ctx, &members);
+  return UINT32_MAX;
+}
+
+static uint32_t rt_json_jcs_parse_value(
+    ctx_t* ctx,
+    rt_json_jcs_state_t* st,
+    uint32_t pos,
+    uint32_t depth,
+    vec_u8_t* out
+) {
+  if (!out) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  pos = rt_json_jcs_skip_ws(st, pos);
+  if (pos >= st->len) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+  uint8_t c = st->buf[pos];
+
+  if (c == (uint8_t)'{') {
+    if (depth >= st->max_depth) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_TOO_DEEP, pos);
+    return rt_json_jcs_parse_object(ctx, st, pos, depth + 1, out);
+  }
+  if (c == (uint8_t)'[') {
+    if (depth >= st->max_depth) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_TOO_DEEP, pos);
+    return rt_json_jcs_parse_array(ctx, st, pos, depth + 1, out);
+  }
+  if (c == (uint8_t)'"') {
+    return rt_json_jcs_parse_string(ctx, st, pos, 1, out, NULL);
+  }
+  if (c == (uint8_t)'t') {
+    if (st->len - pos < 4) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    if (memcmp(st->buf + pos, "true", 4) != 0) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'t');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'r');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'u');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'e');
+    return pos + 4;
+  }
+  if (c == (uint8_t)'f') {
+    if (st->len - pos < 5) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    if (memcmp(st->buf + pos, "false", 5) != 0) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'f');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'a');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'l');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'s');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'e');
+    return pos + 5;
+  }
+  if (c == (uint8_t)'n') {
+    if (st->len - pos < 4) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    if (memcmp(st->buf + pos, "null", 4) != 0) return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'n');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'u');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'l');
+    *out = rt_vec_u8_push(ctx, *out, (uint32_t)'l');
+    return pos + 4;
+  }
+  if (c == (uint8_t)'-' || (c >= (uint8_t)'0' && c <= (uint8_t)'9')) {
+    return rt_json_jcs_parse_number(ctx, st, pos, out);
+  }
+  return rt_json_jcs_fail(st, RT_JSON_JCS_E_JSON_SYNTAX, pos);
+}
+
+static bytes_t rt_json_jcs_canon_doc_v1(
+    ctx_t* ctx,
+    bytes_view_t input,
+    uint32_t max_depth,
+    uint32_t max_object_members,
+    uint32_t max_object_total_bytes
+) {
+#ifdef X07_DEBUG_BORROW
+  (void)rt_dbg_borrow_check(ctx, input.bid, input.off_bytes, input.len);
+#endif
+
+  rt_json_jcs_state_t st;
+  st.buf = input.ptr;
+  st.len = input.len;
+  st.max_depth = max_depth ? max_depth : UINT32_C(1);
+  st.max_object_members = max_object_members;
+  st.max_object_total_bytes = max_object_total_bytes;
+  st.err_code = 0;
+  st.err_off = 0;
+
+  vec_u8_t out = rt_vec_u8_new(ctx, (input.len < UINT32_MAX) ? (input.len + 1) : input.len);
+  out = rt_vec_u8_push(ctx, out, UINT32_C(1)); // tag=ok
+
+  uint32_t pos = rt_json_jcs_skip_ws(&st, 0);
+  if (pos >= st.len) {
+    rt_vec_u8_drop(ctx, &out);
+    return rt_json_jcs_err_doc(ctx, RT_JSON_JCS_E_JSON_SYNTAX, 0);
+  }
+  pos = rt_json_jcs_parse_value(ctx, &st, pos, 0, &out);
+  if (pos == UINT32_MAX) {
+    uint32_t code = st.err_code ? st.err_code : RT_JSON_JCS_E_JSON_SYNTAX;
+    uint32_t off = st.err_off;
+    rt_vec_u8_drop(ctx, &out);
+    return rt_json_jcs_err_doc(ctx, code, off);
+  }
+  pos = rt_json_jcs_skip_ws(&st, pos);
+  if (pos != st.len) {
+    rt_vec_u8_drop(ctx, &out);
+    return rt_json_jcs_err_doc(ctx, RT_JSON_JCS_E_JSON_TRAILING_DATA, pos);
+  }
+
+  return rt_vec_u8_into_bytes(ctx, &out);
+}
+
+// --- X07_JSON_JCS_END
+
+struct rt_scratch_u8_fixed_s {
+  uint32_t alive;
+  vec_u8_t buf;
+};
+
+static void rt_scratch_u8_fixed_ensure_cap(ctx_t* ctx, uint32_t need) {
+  if (need <= ctx->scratch_u8_fixed_cap) return;
+  rt_scratch_u8_fixed_t* old_items = ctx->scratch_u8_fixed;
+  uint32_t old_cap = ctx->scratch_u8_fixed_cap;
+  uint32_t old_bytes_total = old_cap * (uint32_t)sizeof(rt_scratch_u8_fixed_t);
+  uint32_t new_cap = ctx->scratch_u8_fixed_cap ? ctx->scratch_u8_fixed_cap : 8;
+  while (new_cap < need) {
+    if (new_cap > UINT32_MAX / 2) {
+      new_cap = need;
+      break;
+    }
+    new_cap *= 2;
+  }
+  rt_scratch_u8_fixed_t* items = (rt_scratch_u8_fixed_t*)rt_alloc_realloc(
+    ctx,
+    old_items,
+    old_bytes_total,
+    new_cap * (uint32_t)sizeof(rt_scratch_u8_fixed_t),
+    (uint32_t)_Alignof(rt_scratch_u8_fixed_t)
+  );
+  if (old_items && ctx->scratch_u8_fixed_len) {
+    uint32_t bytes = ctx->scratch_u8_fixed_len * (uint32_t)sizeof(rt_scratch_u8_fixed_t);
+    memcpy(items, old_items, bytes);
+    rt_mem_on_memcpy(ctx, bytes);
+  }
+  if (old_items && old_bytes_total) {
+    rt_free(ctx, old_items, old_bytes_total, (uint32_t)_Alignof(rt_scratch_u8_fixed_t));
+  }
+  ctx->scratch_u8_fixed = items;
+  ctx->scratch_u8_fixed_cap = new_cap;
+}
+
+static rt_scratch_u8_fixed_t* rt_scratch_u8_fixed_ptr(ctx_t* ctx, uint32_t handle) {
+  if (handle == 0 || handle > ctx->scratch_u8_fixed_len) rt_trap("scratch_u8_fixed invalid handle");
+  rt_scratch_u8_fixed_t* s = &ctx->scratch_u8_fixed[handle - 1];
+  if (!s->alive) rt_trap("scratch_u8_fixed invalid handle");
+  return s;
+}
+
+static uint32_t rt_scratch_u8_fixed_new(ctx_t* ctx, uint32_t cap) {
+  // Reuse a free slot if possible.
+  for (uint32_t i = 0; i < ctx->scratch_u8_fixed_len; i++) {
+    rt_scratch_u8_fixed_t* s = &ctx->scratch_u8_fixed[i];
+    if (s->alive) continue;
+    s->alive = 1;
+    s->buf = rt_vec_u8_new(ctx, cap);
+    return i + 1;
+  }
+
+  if (ctx->scratch_u8_fixed_len == UINT32_MAX) rt_trap("scratch_u8_fixed.new overflow");
+  uint32_t need = ctx->scratch_u8_fixed_len + 1;
+  rt_scratch_u8_fixed_ensure_cap(ctx, need);
+  uint32_t handle = need;
+  rt_scratch_u8_fixed_t* s = &ctx->scratch_u8_fixed[handle - 1];
+  s->alive = 1;
+  s->buf = rt_vec_u8_new(ctx, cap);
+  ctx->scratch_u8_fixed_len = need;
+  return handle;
+}
+
+static uint32_t rt_scratch_u8_fixed_clear(ctx_t* ctx, uint32_t handle) {
+  rt_scratch_u8_fixed_t* s = rt_scratch_u8_fixed_ptr(ctx, handle);
+  s->buf.len = 0;
+  return handle;
+}
+
+static uint32_t rt_scratch_u8_fixed_len(ctx_t* ctx, uint32_t handle) {
+  rt_scratch_u8_fixed_t* s = rt_scratch_u8_fixed_ptr(ctx, handle);
+  return s->buf.len;
+}
+
+static uint32_t rt_scratch_u8_fixed_cap(ctx_t* ctx, uint32_t handle) {
+  rt_scratch_u8_fixed_t* s = rt_scratch_u8_fixed_ptr(ctx, handle);
+  return s->buf.cap;
+}
+
+static bytes_view_t rt_scratch_u8_fixed_as_view(ctx_t* ctx, uint32_t handle) {
+  rt_scratch_u8_fixed_t* s = rt_scratch_u8_fixed_ptr(ctx, handle);
+  return rt_vec_u8_as_view(ctx, s->buf);
+}
+
+static result_i32_t rt_scratch_u8_fixed_try_write(ctx_t* ctx, uint32_t handle, bytes_view_t b) {
+#ifdef X07_DEBUG_BORROW
+  (void)rt_dbg_borrow_check(ctx, b.bid, b.off_bytes, b.len);
+#endif
+  rt_scratch_u8_fixed_t* s = rt_scratch_u8_fixed_ptr(ctx, handle);
+  if (b.len > UINT32_MAX - s->buf.len) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = UINT32_C(8) };
+  }
+  uint32_t need = s->buf.len + b.len;
+  if (need > s->buf.cap) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = UINT32_C(8) };
+  }
+  if (b.len) {
+    memcpy(s->buf.data + s->buf.len, b.ptr, b.len);
+    rt_mem_on_memcpy(ctx, b.len);
+  }
+  s->buf.len = need;
+  return (result_i32_t){ .tag = UINT32_C(1), .payload.ok = b.len };
+}
+
+static uint32_t rt_scratch_u8_fixed_drop(ctx_t* ctx, uint32_t handle) {
+  if (handle == 0 || handle > ctx->scratch_u8_fixed_len) return UINT32_C(0);
+  rt_scratch_u8_fixed_t* s = &ctx->scratch_u8_fixed[handle - 1];
+  if (!s->alive) return UINT32_C(0);
+  rt_vec_u8_drop(ctx, &s->buf);
+  s->alive = 0;
+  return UINT32_C(1);
 }
 
 typedef struct {
@@ -21731,6 +24088,24 @@ static void rt_ctx_cleanup(ctx_t* ctx) {
   ctx->bufreads = NULL;
   ctx->bufreads_len = 0;
   ctx->bufreads_cap = 0;
+
+  for (uint32_t i = 0; i < ctx->scratch_u8_fixed_len; i++) {
+    rt_scratch_u8_fixed_t* s = &ctx->scratch_u8_fixed[i];
+    if (!s->alive) continue;
+    rt_vec_u8_drop(ctx, &s->buf);
+    s->alive = 0;
+  }
+  if (ctx->scratch_u8_fixed && ctx->scratch_u8_fixed_cap) {
+    rt_free(
+      ctx,
+      ctx->scratch_u8_fixed,
+      ctx->scratch_u8_fixed_cap * (uint32_t)sizeof(rt_scratch_u8_fixed_t),
+      (uint32_t)_Alignof(rt_scratch_u8_fixed_t)
+    );
+  }
+  ctx->scratch_u8_fixed = NULL;
+  ctx->scratch_u8_fixed_len = 0;
+  ctx->scratch_u8_fixed_cap = 0;
 
   for (uint32_t i = 0; i < ctx->io_readers_len; i++) {
     rt_io_reader_t* r = &ctx->io_readers[i];

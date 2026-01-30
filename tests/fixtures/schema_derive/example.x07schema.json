@@ -1,0 +1,337 @@
+{
+  "schema_version": "x07schema.specrows@0.1.0",
+  "package": {
+    "name": "example",
+    "version": "0.1.0"
+  },
+  "defaults": {
+    "max_doc_bytes": 4096,
+    "max_map_entries": 16,
+    "max_number_bytes": 32,
+    "max_string_bytes": 2048,
+    "allow_unknown_fields": false
+  },
+  "types": [
+    {
+      "type_id": "api.req",
+      "version": 1,
+      "kind": "struct",
+      "err_base": 410000,
+      "budgets": {
+        "max_doc_bytes": 4096,
+        "max_map_entries": 16,
+        "allow_unknown_fields": false
+      },
+      "fields": [
+        {
+          "id": 1,
+          "name": "id",
+          "ty": "number",
+          "required": true,
+          "max_bytes": 32
+        },
+        {
+          "id": 2,
+          "name": "op",
+          "ty": "bytes",
+          "required": true,
+          "max_bytes": 64
+        },
+        {
+          "id": 3,
+          "name": "body",
+          "ty": "bytes",
+          "required": false,
+          "max_bytes": 2048
+        },
+        {
+          "id": 4,
+          "name": "timeout_ms",
+          "ty": "number",
+          "required": false,
+          "max_bytes": 16
+        },
+        {
+          "id": 5,
+          "name": "trace",
+          "ty": "bytes",
+          "required": false,
+          "max_bytes": 128
+        }
+      ],
+      "examples": [
+        {
+          "name": "ex0_all_fields",
+          "value": {
+            "id": "1",
+            "op": "get_user",
+            "body": "{\"user_id\":42}",
+            "timeout_ms": "250",
+            "trace": "trace-abc"
+          }
+        }
+      ]
+    },
+    {
+      "type_id": "api.resp",
+      "version": 1,
+      "kind": "struct",
+      "err_base": 411000,
+      "budgets": {
+        "max_doc_bytes": 4096,
+        "max_map_entries": 16,
+        "allow_unknown_fields": false
+      },
+      "fields": [
+        {
+          "id": 1,
+          "name": "id",
+          "ty": "number",
+          "required": true,
+          "max_bytes": 32
+        },
+        {
+          "id": 2,
+          "name": "ok",
+          "ty": "bool",
+          "required": true
+        },
+        {
+          "id": 3,
+          "name": "body",
+          "ty": "bytes",
+          "required": false,
+          "max_bytes": 2048
+        },
+        {
+          "id": 4,
+          "name": "err_code",
+          "ty": "number",
+          "required": false,
+          "max_bytes": 16
+        },
+        {
+          "id": 5,
+          "name": "err_msg",
+          "ty": "bytes",
+          "required": false,
+          "max_bytes": 256
+        }
+      ],
+      "examples": [
+        {
+          "name": "ex0_err",
+          "value": {
+            "id": "1",
+            "ok": false,
+            "err_code": "404",
+            "err_msg": "not_found"
+          }
+        }
+      ]
+    },
+    {
+      "type_id": "db.user_row",
+      "version": 1,
+      "kind": "struct",
+      "err_base": 420000,
+      "budgets": {
+        "max_doc_bytes": 4096,
+        "max_map_entries": 16,
+        "allow_unknown_fields": false
+      },
+      "fields": [
+        {
+          "id": 1,
+          "name": "user_id",
+          "ty": "number",
+          "required": true,
+          "max_bytes": 32
+        },
+        {
+          "id": 2,
+          "name": "email",
+          "ty": "bytes",
+          "required": true,
+          "max_bytes": 320
+        },
+        {
+          "id": 3,
+          "name": "is_active",
+          "ty": "bool",
+          "required": true
+        },
+        {
+          "id": 4,
+          "name": "created_at_ms",
+          "ty": "number",
+          "required": true,
+          "max_bytes": 32
+        },
+        {
+          "id": 5,
+          "name": "display_name",
+          "ty": "bytes",
+          "required": false,
+          "max_bytes": 128
+        },
+        {
+          "id": 6,
+          "name": "plan",
+          "ty": "bytes",
+          "required": false,
+          "max_bytes": 32
+        }
+      ],
+      "examples": [
+        {
+          "name": "ex0_basic",
+          "value": {
+            "user_id": "42",
+            "email": "alice@example.com",
+            "is_active": true,
+            "created_at_ms": "1700000000000",
+            "display_name": "Alice",
+            "plan": "pro"
+          }
+        }
+      ]
+    },
+    {
+      "type_id": "fs.record",
+      "version": 1,
+      "kind": "struct",
+      "err_base": 430000,
+      "budgets": {
+        "max_doc_bytes": 4096,
+        "max_map_entries": 16,
+        "allow_unknown_fields": false
+      },
+      "fields": [
+        {
+          "id": 1,
+          "name": "rec_id",
+          "ty": "number",
+          "required": true,
+          "max_bytes": 32
+        },
+        {
+          "id": 2,
+          "name": "ts_ms",
+          "ty": "number",
+          "required": true,
+          "max_bytes": 32
+        },
+        {
+          "id": 3,
+          "name": "level",
+          "ty": "bytes",
+          "required": true,
+          "max_bytes": 16
+        },
+        {
+          "id": 4,
+          "name": "msg",
+          "ty": "bytes",
+          "required": true,
+          "max_bytes": 1024
+        },
+        {
+          "id": 5,
+          "name": "source",
+          "ty": "bytes",
+          "required": false,
+          "max_bytes": 128
+        },
+        {
+          "id": 6,
+          "name": "user_id",
+          "ty": "number",
+          "required": false,
+          "max_bytes": 32
+        }
+      ],
+      "examples": [
+        {
+          "name": "ex0_basic",
+          "value": {
+            "rec_id": "9001",
+            "ts_ms": "1700000000123",
+            "level": "INFO",
+            "msg": "ingest_ok",
+            "source": "importer_v1",
+            "user_id": "42"
+          }
+        }
+      ]
+    },
+    {
+      "type_id": "api.batch_req",
+      "version": 1,
+      "kind": "struct",
+      "err_base": 412000,
+      "budgets": {
+        "max_doc_bytes": 4096,
+        "max_map_entries": 16,
+        "allow_unknown_fields": false
+      },
+      "fields": [
+        {
+          "id": 1,
+          "name": "id",
+          "ty": "number",
+          "required": true,
+          "max_bytes": 32
+        },
+        {
+          "id": 2,
+          "name": "inner",
+          "ty": "struct:api.req",
+          "required": true
+        },
+        {
+          "id": 3,
+          "name": "items",
+          "ty": "seq:struct:api.req",
+          "required": true,
+          "max_items": 4
+        },
+        {
+          "id": 4,
+          "name": "tags",
+          "ty": "seq:bytes",
+          "required": true,
+          "max_bytes": 16,
+          "max_items": 4
+        }
+      ],
+      "examples": [
+        {
+          "name": "ex0_basic",
+          "value": {
+            "id": "10",
+            "inner": {
+              "id": "1",
+              "op": "get_user"
+            },
+            "items": [
+              {
+                "id": "1",
+                "op": "get_user"
+              },
+              {
+                "id": "2",
+                "op": "get_user",
+                "body": "{\"user_id\":43}"
+              }
+            ],
+            "tags": [
+              "alpha",
+              "beta"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

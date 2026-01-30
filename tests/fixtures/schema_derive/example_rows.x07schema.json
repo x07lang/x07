@@ -1,0 +1,78 @@
+{
+  "schema_version": "x07schema.specrows@0.1.0",
+  "package": {
+    "name": "example",
+    "version": "0.1.0"
+  },
+  "defaults": {
+    "codec": "ext.data_model.doc_v1",
+    "allow_unknown_fields": false,
+    "budgets": {
+      "max_doc_bytes": 4096,
+      "max_depth": 64,
+      "max_map_entries": 16,
+      "max_seq_items": 4096,
+      "max_string_bytes": 2048,
+      "max_number_bytes": 32
+    }
+  },
+  "rows": [
+    [
+      "type",
+      "api.req",
+      1,
+      "struct",
+      {
+        "err_base": 450000,
+        "brand": "example.api.req_v1"
+      }
+    ],
+    [
+      "field",
+      "api.req",
+      1,
+      "id",
+      "number",
+      {
+        "required": true,
+        "max_number_bytes": 20
+      }
+    ],
+    [
+      "field",
+      "api.req",
+      2,
+      "op",
+      "bytes",
+      {
+        "required": true,
+        "max_string_bytes": 64
+      }
+    ],
+    [
+      "field",
+      "api.req",
+      3,
+      "tags",
+      "seq:bytes",
+      {
+        "required": true,
+        "max_string_bytes": 16,
+        "max_seq_items": 4
+      }
+    ],
+    [
+      "example",
+      "api.req",
+      "ex0_basic",
+      {
+        "id": "1",
+        "op": "get_user",
+        "tags": [
+          "alpha",
+          "beta"
+        ]
+      }
+    ]
+  ]
+}

@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand, ValueEnum};
@@ -15,7 +14,6 @@ use x07c::json_patch;
 use crate::util;
 
 const X07AST_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.schema.json");
-static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Args)]
 #[command(subcommand_required = false)]
@@ -190,7 +188,7 @@ fn cmd_init(args: AstInitArgs) -> Result<std::process::ExitCode> {
     let out_bytes = serde_json::to_string(&v)?.into_bytes();
     let out_bytes = with_trailing_newline(out_bytes);
 
-    write_atomic(&args.out, &out_bytes)
+    util::write_atomic(&args.out, &out_bytes)
         .with_context(|| format!("write: {}", args.out.display()))?;
 
     let report = AstInitReport {
@@ -274,7 +272,7 @@ fn cmd_get(args: AstGetArgs) -> Result<std::process::ExitCode> {
 
         let mut out_bytes = serde_json::to_string_pretty(&value)?.into_bytes();
         out_bytes = with_trailing_newline(out_bytes);
-        write_atomic(out_path, &out_bytes)
+        util::write_atomic(out_path, &out_bytes)
             .with_context(|| format!("write: {}", out_path.display()))?;
     }
 
@@ -388,7 +386,7 @@ fn cmd_apply_patch(args: AstApplyPatchArgs) -> Result<std::process::ExitCode> {
     let out_bytes = serde_json::to_string(&out_doc)?.into_bytes();
     let out_bytes = with_trailing_newline(out_bytes);
 
-    write_atomic(&out_path, &out_bytes)
+    util::write_atomic(&out_path, &out_bytes)
         .with_context(|| format!("write: {}", out_path.display()))?;
 
     let report = AstApplyPatchReport {
@@ -441,7 +439,7 @@ fn cmd_validate(args: AstValidateArgs) -> Result<std::process::ExitCode> {
     let diagnostics = validate_x07ast_doc(&doc)?;
     let report = diagnostics::Report::ok().with_diagnostics(diagnostics);
     if let Some(path) = &args.x07diag {
-        write_atomic(path, serde_json::to_string(&report)?.as_bytes())
+        util::write_atomic(path, serde_json::to_string(&report)?.as_bytes())
             .with_context(|| format!("write: {}", path.display()))?;
     }
 
@@ -502,7 +500,7 @@ fn cmd_canon(args: AstCanonArgs) -> Result<std::process::ExitCode> {
     let out_bytes = serde_json::to_string(&doc)?.into_bytes();
     let out_bytes = with_trailing_newline(out_bytes);
 
-    write_atomic(&out_path, &out_bytes)
+    util::write_atomic(&out_path, &out_bytes)
         .with_context(|| format!("write: {}", out_path.display()))?;
 
     let report = AstCanonReport {
@@ -650,36 +648,6 @@ fn canonicalize_x07ast_bytes_to_value(bytes: &[u8]) -> Result<Value> {
     let mut file = x07c::x07ast::parse_x07ast_json(bytes).map_err(|e| anyhow::anyhow!("{e}"))?;
     x07c::x07ast::canonicalize_x07ast_file(&mut file);
     Ok(x07c::x07ast::x07ast_file_to_value(&file))
-}
-
-fn write_atomic(path: &Path, contents: &[u8]) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create output dir: {}", parent.display()))?;
-    }
-
-    let tmp = temp_path_next_to(path);
-    std::fs::write(&tmp, contents).with_context(|| format!("write temp: {}", tmp.display()))?;
-
-    match std::fs::rename(&tmp, path) {
-        Ok(()) => Ok(()),
-        Err(_) => {
-            let _ = std::fs::remove_file(path);
-            std::fs::rename(&tmp, path).with_context(|| format!("rename: {}", path.display()))?;
-            Ok(())
-        }
-    }
-}
-
-fn temp_path_next_to(path: &Path) -> PathBuf {
-    let file_name = path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let pid = std::process::id();
-    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    path.with_file_name(format!(".{file_name}.{pid}.{n}.tmp"))
 }
 
 fn exit_with_error(err: impl std::fmt::Display) -> std::process::ExitCode {

@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use clap::{Args, ValueEnum};
@@ -7,8 +6,6 @@ use jsonschema::Draft;
 use serde::Serialize;
 use serde_json::Value;
 use x07_contracts::{RUN_OS_POLICY_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION};
-
-static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 const RUN_OS_POLICY_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../schemas/run-os-policy.schema.json");
@@ -151,7 +148,8 @@ fn cmd_policy_init(args: PolicyInitArgs) -> Result<std::process::ExitCode> {
                 args.mkdir_out,
             )
             .map_err(|e| anyhow::anyhow!("{e}"))?;
-            write_atomic(&out_path, &policy_bytes)?;
+            crate::util::write_atomic(&out_path, &policy_bytes)
+                .with_context(|| format!("write: {}", out_path.display()))?;
             "created"
         }
         true => {
@@ -167,7 +165,8 @@ fn cmd_policy_init(args: PolicyInitArgs) -> Result<std::process::ExitCode> {
                     args.mkdir_out,
                 )
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
-                write_atomic(&out_path, &policy_bytes)?;
+                crate::util::write_atomic(&out_path, &policy_bytes)
+                    .with_context(|| format!("write: {}", out_path.display()))?;
                 "overwritten"
             } else {
                 "exists_different"
@@ -704,36 +703,6 @@ fn print_x07diag(errors: Vec<String>) {
         bytes.push(b'\n');
         let _ = std::io::Write::write_all(&mut std::io::stdout(), &bytes);
     }
-}
-
-fn write_atomic(path: &Path, contents: &[u8]) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create output dir: {}", parent.display()))?;
-    }
-
-    let tmp = temp_path_next_to(path);
-    std::fs::write(&tmp, contents).with_context(|| format!("write temp: {}", tmp.display()))?;
-
-    match std::fs::rename(&tmp, path) {
-        Ok(()) => Ok(()),
-        Err(_) => {
-            let _ = std::fs::remove_file(path);
-            std::fs::rename(&tmp, path).with_context(|| format!("rename: {}", path.display()))?;
-            Ok(())
-        }
-    }
-}
-
-fn temp_path_next_to(path: &Path) -> PathBuf {
-    let file_name = path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let pid = std::process::id();
-    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    path.with_file_name(format!(".{file_name}.{pid}.{n}.tmp"))
 }
 
 fn rel(root: &Path, path: &Path) -> String {

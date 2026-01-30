@@ -30,6 +30,7 @@ mod policy_overrides;
 mod repair;
 mod rr;
 mod run;
+mod schema;
 mod toolchain;
 mod util;
 
@@ -78,6 +79,8 @@ enum Command {
     Pkg(pkg::PkgArgs),
     /// Inspect module exports and signatures.
     Doc(doc::DocArgs),
+    /// Derive schema modules from x07schema JSON.
+    Schema(schema::SchemaArgs),
     /// Record RR fixtures.
     #[command(hide = true)]
     Rr(rr::RrArgs),
@@ -240,6 +243,10 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Publish(_)) => vec!["pkg", "publish"],
             },
             Some(Command::Doc(_)) => vec!["doc"],
+            Some(Command::Schema(args)) => match &args.cmd {
+                None => vec!["schema"],
+                Some(schema::SchemaCommand::Derive(_)) => vec!["schema", "derive"],
+            },
             Some(Command::Rr(args)) => match &args.cmd {
                 None => vec!["rr"],
                 Some(rr::RrCommand::Record(_)) => vec!["rr", "record"],
@@ -272,6 +279,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Cli(args) => cli::cmd_cli(args),
         Command::Pkg(args) => pkg::cmd_pkg(args),
         Command::Doc(args) => doc::cmd_doc(args),
+        Command::Schema(args) => schema::cmd_schema(args),
         Command::Rr(args) => rr::cmd_rr(args),
     }
 }

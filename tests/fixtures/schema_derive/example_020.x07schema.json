@@ -1,0 +1,159 @@
+{
+  "schema_version": "x07schema.specrows@0.2.0",
+  "package": {
+    "name": "example",
+    "version": "0.1.0"
+  },
+  "defaults": {
+    "codec": "ext.data_model.doc_v1",
+    "canon_v1": {
+      "mode": "strict_reject_v1",
+      "map_key_order": "lex_u8_v1",
+      "unknown_fields": "reject_v1"
+    },
+    "number_style_default_v1": "int_ascii_v1",
+    "allow_unknown_fields": false,
+    "budgets": {
+      "max_doc_bytes": 4096,
+      "max_depth": 64,
+      "max_map_entries": 16,
+      "max_seq_items": 4096,
+      "max_string_bytes": 2048,
+      "max_number_bytes": 32
+    }
+  },
+  "rows": [
+    [
+      "type",
+      "api.req",
+      1,
+      "struct",
+      {
+        "err_base": 450000,
+        "brand": "example.api.req_v1"
+      }
+    ],
+    [
+      "field",
+      "api.req",
+      1,
+      "id",
+      "number",
+      {
+        "required": true,
+        "max_number_bytes": 20,
+        "number_style_v1": "uint_ascii_v1"
+      }
+    ],
+    [
+      "field",
+      "api.req",
+      2,
+      "op",
+      "bytes",
+      {
+        "required": true,
+        "max_string_bytes": 64
+      }
+    ],
+    [
+      "field",
+      "api.req",
+      3,
+      "delta",
+      "number",
+      {
+        "required": false,
+        "max_number_bytes": 8,
+        "number_style_v1": "int_ascii_v1"
+      }
+    ],
+    [
+      "field",
+      "api.req",
+      4,
+      "nums",
+      "seq:number",
+      {
+        "required": true,
+        "max_number_bytes": 8,
+        "max_seq_items": 4,
+        "number_style_v1": "uint_ascii_v1"
+      }
+    ],
+    [
+      "example",
+      "api.req",
+      "ex0_basic",
+      {
+        "id": "1",
+        "op": "get_user",
+        "delta": "0",
+        "nums": [
+          "1",
+          "2"
+        ]
+      }
+    ],
+    [
+      "type",
+      "api.msg",
+      1,
+      "enum",
+      {
+        "err_base": 460000,
+        "brand": "example.api.msg_v1"
+      }
+    ],
+    [
+      "variant",
+      "api.msg",
+      1,
+      "unit",
+      "unit"
+    ],
+    [
+      "variant",
+      "api.msg",
+      2,
+      "count",
+      "number"
+    ],
+    [
+      "variant",
+      "api.msg",
+      3,
+      "nums",
+      "seq:number"
+    ],
+    [
+      "example",
+      "api.msg",
+      "ex0_unit",
+      [
+        "unit"
+      ]
+    ],
+    [
+      "example",
+      "api.msg",
+      "ex1_count",
+      [
+        "count",
+        "0"
+      ]
+    ],
+    [
+      "example",
+      "api.msg",
+      "ex2_nums",
+      [
+        "nums",
+        [
+          "1",
+          "2"
+        ]
+      ]
+    ]
+  ]
+}

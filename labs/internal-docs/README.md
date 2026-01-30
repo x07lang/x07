@@ -11,9 +11,11 @@ Quick entry points:
 - ABI specs (C-facing value layouts): `spec/abi/`
 - Type system notes: `spec/types/type-system-v1.md`
 - Tooling internals: `dev/` and `cli/`
+- Schema derive tool internals: `cli/schema-derive.md`
 - Standalone OS runners: `standalone/`
 - Release and cross-repo propagation: `change-propagation.md`
 - Rename note: `rename.md`
+- Stream pipe internals: `spec/stream-pipe.md`
 
 End-user package contracts live under:
 

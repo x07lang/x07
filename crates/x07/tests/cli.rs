@@ -72,13 +72,13 @@ fn x07_test_smoke_suite() {
     );
     let v = parse_json_stdout(&out);
     assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
-    assert_eq!(v["summary"]["passed"], 5);
+    assert_eq!(v["summary"]["passed"], 29);
     assert_eq!(v["summary"]["failed"], 0);
     assert_eq!(v["summary"]["errors"], 0);
     assert_eq!(v["summary"]["xfail_failed"], 1);
 
     let tests = v["tests"].as_array().expect("tests[]");
-    assert_eq!(tests.len(), 6);
+    assert_eq!(tests.len(), 30);
     let ids: Vec<&str> = tests
         .iter()
         .map(|t| t["id"].as_str().expect("test.id"))
@@ -91,7 +91,31 @@ fn x07_test_smoke_suite() {
             "smoke/kv_get_pong",
             "smoke/pure_i32_eq",
             "smoke/pure_xfail_demo",
-            "smoke/rr_fetch_pong"
+            "smoke/rr_fetch_pong",
+            "smoke/stream_pipe_bytes_budget_items",
+            "smoke/stream_pipe_bytes_collect_identity",
+            "smoke/stream_pipe_bytes_filter_collect",
+            "smoke/stream_pipe_bytes_frame_u32le_collect",
+            "smoke/stream_pipe_bytes_hash_fnv1a32",
+            "smoke/stream_pipe_bytes_json_canon_collect",
+            "smoke/stream_pipe_bytes_json_canon_trailing_data_err",
+            "smoke/stream_pipe_bytes_map_bytes_collect",
+            "smoke/stream_pipe_bytes_map_in_place_buf_collect",
+            "smoke/stream_pipe_bytes_map_in_place_buf_overflow",
+            "smoke/stream_pipe_bytes_split_lines_collect",
+            "smoke/stream_pipe_bytes_split_lines_line_too_long",
+            "smoke/stream_pipe_bytes_take_collect",
+            "smoke/stream_pipe_bytes_u32frames_collect",
+            "smoke/stream_pipe_deframe_collect_ok",
+            "smoke/stream_pipe_deframe_empty_forbidden",
+            "smoke/stream_pipe_deframe_frame_too_large",
+            "smoke/stream_pipe_deframe_fs_hdr_split",
+            "smoke/stream_pipe_deframe_fs_payload_split",
+            "smoke/stream_pipe_deframe_max_frames",
+            "smoke/stream_pipe_deframe_truncated_drop_ok",
+            "smoke/stream_pipe_deframe_truncated_err",
+            "smoke/stream_pipe_fs_open_read_collect",
+            "smoke/stream_pipe_rr_send_collect"
         ]
     );
 
@@ -214,6 +238,149 @@ fn x07_cli_specrows_includes_nested_subcommands() {
             == Some("pkg.add")
     });
     assert!(has_pkg_add, "missing pkg.add in --cli-specrows output");
+}
+
+fn run_schema_derive_smoke(fixture: &PathBuf) {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_schema_derive");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let proj_path = dir.join("x07.json");
+    let mut proj: Value =
+        serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json"))
+            .expect("parse x07.json");
+    let roots = proj["module_roots"].as_array_mut().expect("module_roots[]");
+    if !roots.iter().any(|v| v.as_str() == Some("modules")) {
+        roots.push(Value::String("modules".to_string()));
+    }
+    std::fs::write(
+        &proj_path,
+        serde_json::to_vec_pretty(&proj).expect("serialize x07.json"),
+    )
+    .expect("write x07.json");
+
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-data-model@0.1.5"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    assert!(fixture.is_file(), "missing {}", fixture.display());
+    let schema_bytes = std::fs::read(fixture).expect("read schema fixture");
+    let schema_path = dir.join("schemas").join("example.x07schema.json");
+    write_bytes(&schema_path, &schema_bytes);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "schema",
+            "derive",
+            "--input",
+            "schemas/example.x07schema.json",
+            "--out-dir",
+            ".",
+            "--write",
+            "--report-json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], "x07.schema.derive.report@0.1.0");
+
+    let out = run_x07_in_dir(&dir, &["test", "--manifest", "tests/tests.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "schema",
+            "derive",
+            "--input",
+            "schemas/example.x07schema.json",
+            "--out-dir",
+            ".",
+            "--check",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let drift_path = dir.join("modules/example/schema/api/req_v1.x07.json");
+    let mut drift_bytes = std::fs::read(&drift_path).expect("read generated module");
+    drift_bytes.push(b' ');
+    std::fs::write(&drift_path, &drift_bytes).expect("write drifted module");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "schema",
+            "derive",
+            "--input",
+            "schemas/example.x07schema.json",
+            "--out-dir",
+            ".",
+            "--check",
+            "--report-json",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(1), "expected drift exit code");
+}
+
+#[test]
+fn x07_schema_derive_smoke() {
+    let root = repo_root();
+    let fixture = root.join("tests/fixtures/schema_derive/example.x07schema.json");
+    run_schema_derive_smoke(&fixture);
+}
+
+#[test]
+fn x07_schema_derive_rows_smoke() {
+    let root = repo_root();
+    let fixture = root.join("tests/fixtures/schema_derive/example_rows.x07schema.json");
+    run_schema_derive_smoke(&fixture);
+}
+
+#[test]
+fn x07_schema_derive_020_smoke() {
+    let root = repo_root();
+    let fixture = root.join("tests/fixtures/schema_derive/example_020.x07schema.json");
+    run_schema_derive_smoke(&fixture);
 }
 
 #[test]

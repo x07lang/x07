@@ -21,6 +21,7 @@
 - [Syntax & x07AST](language/syntax-x07ast.md)
 - [Types & memory model](language/types-memory.md)
 - [Concurrency & multiprocessing](language/concurrency-multiprocessing.md)
+- [Streaming pipes](language/stream-pipes.md)
 
 ## Worlds
 - [Worlds overview](worlds/index.md)
@@ -29,6 +30,7 @@
 
 ## Toolchain
 - [CLI](toolchain/cli.md)
+- [Schema derive](toolchain/schema-derive.md)
 - [Running programs](toolchain/running-programs.md)
 - [Embedding in C](toolchain/embedding-in-c.md)
 - [Repair loop](toolchain/repair-loop.md)

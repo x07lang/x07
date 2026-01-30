@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use sha2::{Digest, Sha256};
+
+static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
@@ -40,6 +43,24 @@ pub fn hex_lower(bytes: &[u8]) -> String {
     out
 }
 
+pub fn write_atomic(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let tmp = temp_path_next_to(path);
+    std::fs::write(&tmp, contents)?;
+
+    match std::fs::rename(&tmp, path) {
+        Ok(()) => Ok(()),
+        Err(_) => {
+            let _ = std::fs::remove_file(path);
+            std::fs::rename(&tmp, path)?;
+            Ok(())
+        }
+    }
+}
+
 pub(crate) fn resolve_sibling_or_path(name: &str) -> PathBuf {
     let Ok(exe) = std::env::current_exe() else {
         return PathBuf::from(name);
@@ -69,6 +90,17 @@ pub(crate) fn resolve_sibling_or_path(name: &str) -> PathBuf {
     }
 
     PathBuf::from(name)
+}
+
+fn temp_path_next_to(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let pid = std::process::id();
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    path.with_file_name(format!(".{file_name}.{pid}.{n}.tmp"))
 }
 
 fn nybble_to_hex(n: u8) -> char {

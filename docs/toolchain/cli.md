@@ -51,6 +51,14 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 doc <module-id>.<exported_symbol>`
   - Prints exported symbol signatures from a module file (useful for agents exploring unfamiliar modules).
 
+### Schema derive (generate modules + tests)
+
+- `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --write`
+- `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --check`
+- `x07 schema derive --report-json ...`
+
+See: [Schema derive](schema-derive.md).
+
 ### Packages (pack/lock/publish)
 
 - `x07 pkg add <name>@<version>`

@@ -298,6 +298,36 @@ fn std_json_extract_path_matches_suite_vectors() {
 }
 
 #[test]
+fn vec_u8_clear_preserves_capacity() {
+    let program = x07_program::entry(
+        &[],
+        json!([
+            "begin",
+            ["let", "v", ["vec_u8.with_capacity", 8]],
+            ["let", "c0", ["vec_u8.cap", "v"]],
+            ["set", "v", ["vec_u8.push", "v", 1]],
+            ["set", "v", ["vec_u8.push", "v", 2]],
+            ["set", "v", ["vec_u8.clear", "v"]],
+            ["let", "l", ["vec_u8.len", "v"]],
+            ["let", "c1", ["vec_u8.cap", "v"]],
+            [
+                "if",
+                [
+                    "if",
+                    ["=", "l", 0],
+                    ["if", ["=", "c0", "c1"], ["=", "c0", 8], 0],
+                    0
+                ],
+                ["bytes.lit", "OK"],
+                ["bytes.lit", "BAD"]
+            ]
+        ]),
+    );
+    let exe = compile_exe(program.as_slice());
+    assert_eq!(run_exe(&exe, b""), b"OK");
+}
+
+#[test]
 fn std_map_word_freq_sorted_matches_suite_vectors() {
     let program = x07_program::entry(
         &["std.map"],

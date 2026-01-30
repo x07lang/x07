@@ -14,6 +14,126 @@
       "expect": "fail"
     },
     {
+      "id": "smoke/stream_pipe_bytes_collect_identity",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_collect_identity",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_split_lines_collect",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_split_lines_collect",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_u32frames_collect",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_u32frames_collect",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_budget_items",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_budget_items",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_map_bytes_collect",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_map_bytes_collect",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_map_in_place_buf_collect",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_v11.pipe_bytes_map_in_place_buf_collect",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_map_in_place_buf_overflow",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_v11.pipe_bytes_map_in_place_buf_overflow",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_filter_collect",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_filter_collect",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_take_collect",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_take_collect",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_frame_u32le_collect",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_frame_u32le_collect",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_hash_fnv1a32",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_hash_fnv1a32",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_split_lines_line_too_long",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe.pipe_bytes_split_lines_line_too_long",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_json_canon_collect",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_json.pipe_bytes_json_canon_collect",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_bytes_json_canon_trailing_data_err",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_json.pipe_bytes_json_canon_trailing_data_err",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_deframe_collect_ok",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_deframe.pipe_bytes_deframe_collect_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_deframe_frame_too_large",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_deframe.pipe_bytes_deframe_frame_too_large",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_deframe_truncated_err",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_deframe.pipe_bytes_deframe_truncated_err",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_deframe_empty_forbidden",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_deframe.pipe_bytes_deframe_empty_forbidden",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_deframe_max_frames",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_deframe.pipe_bytes_deframe_max_frames",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_deframe_truncated_drop_ok",
+      "world": "solve-pure",
+      "entry": "smoke_stream_pipe_deframe.pipe_bytes_deframe_truncated_drop_ok",
+      "expect": "pass"
+    },
+    {
       "id": "smoke/fs_read_hello",
       "world": "solve-fs",
       "entry": "smoke_fs.fs_read_hello",
@@ -21,9 +141,37 @@
       "expect": "pass"
     },
     {
+      "id": "smoke/stream_pipe_fs_open_read_collect",
+      "world": "solve-fs",
+      "entry": "smoke_stream_pipe_fs.pipe_fs_open_read_collect",
+      "fixture_root": "fixtures/fs_smoke/root",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_deframe_fs_hdr_split",
+      "world": "solve-fs",
+      "entry": "smoke_stream_pipe_deframe_fs.pipe_fs_deframe_hdr_split",
+      "fixture_root": "fixtures/fs_smoke/root",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_deframe_fs_payload_split",
+      "world": "solve-fs",
+      "entry": "smoke_stream_pipe_deframe_fs.pipe_fs_deframe_payload_split",
+      "fixture_root": "fixtures/fs_smoke/root",
+      "expect": "pass"
+    },
+    {
       "id": "smoke/rr_fetch_pong",
       "world": "solve-rr",
       "entry": "smoke_rr.rr_fetch_pong",
+      "fixture_root": "fixtures/rr_smoke",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/stream_pipe_rr_send_collect",
+      "world": "solve-rr",
+      "entry": "smoke_stream_pipe_rr.pipe_rr_send_collect",
       "fixture_root": "fixtures/rr_smoke",
       "expect": "pass"
     },
