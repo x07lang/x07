@@ -3,8 +3,8 @@
   "dependencies": [
     {
       "name": "ext-cli",
-      "path": ".x07/deps/ext-cli/0.1.9",
-      "version": "0.1.9"
+      "path": ".x07/deps/ext-cli/0.1.10",
+      "version": "0.1.10"
     },
     {
       "name": "ext-data-model",
