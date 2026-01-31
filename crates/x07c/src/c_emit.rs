@@ -34183,6 +34183,10 @@ static int rt_write_exact(int fd, const uint8_t* src, uint32_t len) {
 }
 
 int main(void) {
+#if defined(SIGPIPE) && defined(SIG_IGN)
+  (void)signal(SIGPIPE, SIG_IGN);
+#endif
+
   const uint32_t mem_cap = (uint32_t)(X07_MEM_CAP);
   int mem_is_mmap = 0;
   uint8_t* mem = NULL;

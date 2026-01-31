@@ -37,11 +37,18 @@ install_one() {
 
   local dst="$deps_dir/$name"
 
-  if command -v install >/dev/null 2>&1; then
-    install -m 0755 "$src" "$dst"
+  if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then
+    : # already up to date
   else
-    cp -f "$src" "$dst"
-    chmod 0755 "$dst"
+    if [[ -L "$dst" ]]; then
+      rm -f "$dst"
+    fi
+    if command -v install >/dev/null 2>&1; then
+      install -m 0755 "$src" "$dst"
+    else
+      cp -f "$src" "$dst"
+      chmod 0755 "$dst"
+    fi
   fi
 
   if [[ "$src" == *.exe ]]; then

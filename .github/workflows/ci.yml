@@ -42,6 +42,9 @@ jobs:
             libcurl4-openssl-dev \
             zlib1g-dev \
             libsqlite3-dev
+      - name: Stage native math backend
+        shell: bash
+        run: ./scripts/ci/ensure_math_backend.sh
       - name: Build runner binaries (needed by x07 run tests)
         run: cargo build -p x07-host-runner -p x07-os-runner
       - name: cargo test

@@ -969,18 +969,33 @@ mod tests {
         assert!(src.is_file(), "missing helper binary: {}", src.display());
 
         let dst = deps_dir.join(name);
-        std::fs::copy(&src, &dst)
-            .unwrap_or_else(|e| panic!("copy helper {} -> {}: {e}", src.display(), dst.display()));
+        if dst.exists() {
+            std::fs::remove_file(&dst).unwrap_or_else(|e| panic!("remove {}: {e}", dst.display()));
+        }
 
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt as _;
-            let mut perms = std::fs::metadata(&dst)
-                .unwrap_or_else(|e| panic!("stat {}: {e}", dst.display()))
-                .permissions();
-            perms.set_mode(0o755);
-            std::fs::set_permissions(&dst, perms)
-                .unwrap_or_else(|e| panic!("chmod {}: {e}", dst.display()));
+            use std::os::unix::fs as unix_fs;
+
+            let rel_src = src
+                .strip_prefix(root)
+                .map(|p| PathBuf::from("..").join("..").join(p))
+                .unwrap_or_else(|_| src.clone());
+
+            unix_fs::symlink(&rel_src, &dst).unwrap_or_else(|e| {
+                panic!(
+                    "symlink helper {} -> {}: {e}",
+                    rel_src.display(),
+                    dst.display()
+                )
+            });
+        }
+
+        #[cfg(not(unix))]
+        {
+            std::fs::copy(&src, &dst).unwrap_or_else(|e| {
+                panic!("copy helper {} -> {}: {e}", src.display(), dst.display())
+            });
         }
     }
 
