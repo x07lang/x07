@@ -1,6 +1,7 @@
 [package]
 name = "x07-ext-db-mysql-native"
-version = "0.0.72"
+version = "0.0.73"
+
 
 
 
