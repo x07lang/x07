@@ -42,7 +42,8 @@
               ["set", "out", ["std.vec.push", "out", "c"]]
             ],
             0
-          ]
+          ],
+          0
         ],
         ["vec_u8.into_bytes", "out"]
       ]
@@ -145,15 +146,14 @@
                         ["let", "value", ["if", [">", "vlen", 0], ["view.slice", "line", 11, "vlen"], ["view.slice", "line", "n", 0]]],
                         ["let", "value_lower", ["ext.robots._ascii_lower_bytes_v1", "value"]],
                         [
-                          "begin",
-                          ["let", "value_lower_v", ["bytes.view", "value_lower"]],
-                          ["let", "star_b", ["bytes.lit", "*"]],
-                          ["let", "star_v", ["bytes.view", "star_b"]],
+                          "if",
+                          ["=", ["std.bytes.eq", ["bytes.view", "value_lower"], ["bytes.view", ["bytes.lit", "*"]]], 1],
+                          ["if", ["<", "cur_type", 1], ["set", "cur_type", 1], 0],
                           [
                             "if",
-                            ["=", ["std.bytes.eq", "value_lower_v", "star_v"], 1],
-                            ["if", ["<", "cur_type", 1], ["set", "cur_type", 1], 0],
-                            ["if", ["=", ["std.bytes.eq", "value_lower_v", ["bytes.view", "ua_lower"]], 1], ["set", "cur_type", 2], 0]
+                            ["=", ["std.bytes.eq", ["bytes.view", "value_lower"], ["bytes.view", "ua_lower"]], 1],
+                            ["set", "cur_type", 2],
+                            0
                           ]
                         ],
                         0
@@ -223,7 +223,8 @@
               ]
             ],
             0
-          ]
+          ],
+          0
         ],
         [
           "if",

@@ -633,9 +633,37 @@
         }
       ],
       "name": "ext-cbor-rs",
-      "package_manifest_sha256": "49ceb2bbce732be5f017b1b10f315346f9cfdb41c9d03f94adaea74132a4be26",
+      "package_manifest_sha256": "f17b6f4e92478e867c2ac82bac8796462adac00266a7bf0b580c0dc40d3ca240",
       "path": "packages/ext/x07-ext-cbor-rs/0.1.4",
       "version": "0.1.4"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.cbor.data_model",
+          "path": "packages/ext/x07-ext-cbor-rs/0.1.5/modules/ext/cbor/data_model.x07.json",
+          "sha256": "383637897d41f07610d38430ec2264e0cabfd369eb931e2b6338d32555ada4eb",
+          "size_bytes": 62812
+        },
+        {
+          "module_id": "ext.cbor.tests",
+          "path": "packages/ext/x07-ext-cbor-rs/0.1.5/modules/ext/cbor/tests.x07.json",
+          "sha256": "bdfbd9141dafdc3181859a85ae7de930ff4c6b6190175abe9c3ab27c707431f8",
+          "size_bytes": 12262
+        },
+        {
+          "module_id": "ext.cbor",
+          "path": "packages/ext/x07-ext-cbor-rs/0.1.5/modules/ext/cbor.x07.json",
+          "sha256": "5a1c02de55c197cadc96a8eefcfa7a1706ade507c3045de50b5750fe0cd596b7",
+          "size_bytes": 819
+        }
+      ],
+      "name": "ext-cbor-rs",
+      "package_manifest_sha256": "a06918be59aecbec2b810b42c6da3dd6aafc4b8aeab1f8a924d6648715004aaf",
+      "path": "packages/ext/x07-ext-cbor-rs/0.1.5",
+      "version": "0.1.5"
     },
     {
       "determinism_tier": "pure",
@@ -1080,6 +1108,46 @@
       "package_manifest_sha256": "647db9769cb720d9c7ed063dcaf1681717dc9299d8898758625c98ad7f05ca53",
       "path": "packages/ext/x07-ext-cli/0.1.8",
       "version": "0.1.8"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.cli.complete",
+          "path": "packages/ext/x07-ext-cli/0.1.9/modules/ext/cli/complete.x07.json",
+          "sha256": "e2019240ef981c4ec0653ba231e004b025f745b978a6f37d6c3aad7111716ec0",
+          "size_bytes": 558
+        },
+        {
+          "module_id": "ext.cli.help",
+          "path": "packages/ext/x07-ext-cli/0.1.9/modules/ext/cli/help.x07.json",
+          "sha256": "b9f65f30258d54335bad42bfbd4f6a55c80056780d236f5889f6e762efe6c360",
+          "size_bytes": 3394
+        },
+        {
+          "module_id": "ext.cli.specrows",
+          "path": "packages/ext/x07-ext-cli/0.1.9/modules/ext/cli/specrows.x07.json",
+          "sha256": "256b332b8d768b557b2112f6ffb5cd8a8314e4f38366147f839800e16e992df2",
+          "size_bytes": 11029
+        },
+        {
+          "module_id": "ext.cli.tests",
+          "path": "packages/ext/x07-ext-cli/0.1.9/modules/ext/cli/tests.x07.json",
+          "sha256": "c73c49e9fd349715ab7aa16c3e9fe977f77c1258e9499ebef3944a9c00d63b00",
+          "size_bytes": 11234
+        },
+        {
+          "module_id": "ext.cli",
+          "path": "packages/ext/x07-ext-cli/0.1.9/modules/ext/cli.x07.json",
+          "sha256": "260845142e572260a87f3aead984f94ac136c58b17e8a8757055cec0776ac137",
+          "size_bytes": 42108
+        }
+      ],
+      "name": "ext-cli",
+      "package_manifest_sha256": "f3dd51efc551accd7fe3ce74403cb0691746bcb930e764097c1fbc7c8c4adb72",
+      "path": "packages/ext/x07-ext-cli/0.1.9",
+      "version": "0.1.9"
     },
     {
       "determinism_tier": "pure",
@@ -2167,14 +2235,14 @@
         {
           "module_id": "ext.data_model.toml.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.6/modules/ext/data_model/toml/tests.x07.json",
-          "sha256": "a02829aaf93cb9a856504f372fc9d8f04030bb4a7b0326ecc8792f3af35d5a12",
-          "size_bytes": 8869
+          "sha256": "bfd92f6b9c49daaadfa6dfdd073fb4534bf1e8245e767e9e44dd9110b46e7f30",
+          "size_bytes": 8785
         },
         {
           "module_id": "ext.data_model.toml",
           "path": "packages/ext/x07-ext-data-model/0.1.6/modules/ext/data_model/toml.x07.json",
-          "sha256": "f8cabbfcef45c37566e8035d65293e3b9fee092ea646df65edda9beb5c890e09",
-          "size_bytes": 13511
+          "sha256": "2401c96bc52526d56b5044e710421fea8269f2cd1d8740ff98894b3aa342ecf0",
+          "size_bytes": 13389
         },
         {
           "module_id": "ext.data_model.yaml.tests",
@@ -2199,6 +2267,64 @@
       "package_manifest_sha256": "3c4262d2f9a7028d97f2f90ec6a974d57be76be1628f4956c7d9e1643b85faec",
       "path": "packages/ext/x07-ext-data-model/0.1.6",
       "version": "0.1.6"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.data_model.json.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.7/modules/ext/data_model/json/tests.x07.json",
+          "sha256": "0af030b9b17d03c554364c518841410f9263470d25e1f75ae70c582ad1182f01",
+          "size_bytes": 3931
+        },
+        {
+          "module_id": "ext.data_model.json",
+          "path": "packages/ext/x07-ext-data-model/0.1.7/modules/ext/data_model/json.x07.json",
+          "sha256": "6c634e7007fbb19db79262869e9348dc525339c59a5ff013837527bacd5a7294",
+          "size_bytes": 8176
+        },
+        {
+          "module_id": "ext.data_model.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.7/modules/ext/data_model/tests.x07.json",
+          "sha256": "620b200c7570a4c6841cba26f5cda5f8451a7996f78bb73aec0ea3f6aafb825a",
+          "size_bytes": 9392
+        },
+        {
+          "module_id": "ext.data_model.toml.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.7/modules/ext/data_model/toml/tests.x07.json",
+          "sha256": "a02829aaf93cb9a856504f372fc9d8f04030bb4a7b0326ecc8792f3af35d5a12",
+          "size_bytes": 8869
+        },
+        {
+          "module_id": "ext.data_model.toml",
+          "path": "packages/ext/x07-ext-data-model/0.1.7/modules/ext/data_model/toml.x07.json",
+          "sha256": "f8cabbfcef45c37566e8035d65293e3b9fee092ea646df65edda9beb5c890e09",
+          "size_bytes": 13511
+        },
+        {
+          "module_id": "ext.data_model.yaml.tests",
+          "path": "packages/ext/x07-ext-data-model/0.1.7/modules/ext/data_model/yaml/tests.x07.json",
+          "sha256": "40653f1ca6517d5443c3cd095f46613534f57485d1360ff9437c467a722f3fd6",
+          "size_bytes": 1508
+        },
+        {
+          "module_id": "ext.data_model.yaml",
+          "path": "packages/ext/x07-ext-data-model/0.1.7/modules/ext/data_model/yaml.x07.json",
+          "sha256": "63ef4d0ceedd55939c2fb459e430a03fa5b7c7b0d1ac82826df0223ff65598b7",
+          "size_bytes": 358
+        },
+        {
+          "module_id": "ext.data_model",
+          "path": "packages/ext/x07-ext-data-model/0.1.7/modules/ext/data_model.x07.json",
+          "sha256": "f725211ff55a6ad1db31f174dfbdcf55beccd7a24e44f8da929ecf7d5d0c0ccb",
+          "size_bytes": 17624
+        }
+      ],
+      "name": "ext-data-model",
+      "package_manifest_sha256": "86b16ad03ab222a4dbf4e3c72c584fa919be093c7a8f9311b2d794807ab2ce52",
+      "path": "packages/ext/x07-ext-data-model/0.1.7",
+      "version": "0.1.7"
     },
     {
       "determinism_tier": "os-world-only",
@@ -2511,14 +2637,54 @@
         {
           "module_id": "std.db",
           "path": "packages/ext/x07-ext-db-core/0.1.7/modules/std/db.x07.json",
-          "sha256": "49122422f3057827e81669955c3b03fa6c33912126d4085e71d7d6059e10c7b9",
-          "size_bytes": 4990
+          "sha256": "fe6bf2a56153931f856dc9283faf7b967f56ae70d6a61f2a5e0f4f79656adacc",
+          "size_bytes": 4949
         }
       ],
       "name": "ext-db-core",
       "package_manifest_sha256": "b075202a4cffc2ad9419f4b4b2f089fe1b6301c0e0477a9d89a159f6f9429389",
       "path": "packages/ext/x07-ext-db-core/0.1.7",
       "version": "0.1.7"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.db.dm",
+          "path": "packages/ext/x07-ext-db-core/0.1.8/modules/std/db/dm.x07.json",
+          "sha256": "5e324da1af86ac41a6c17f1da17a65256919a521c1776fb9aeaa0afc56e6e875",
+          "size_bytes": 2643
+        },
+        {
+          "module_id": "std.db.params",
+          "path": "packages/ext/x07-ext-db-core/0.1.8/modules/std/db/params.x07.json",
+          "sha256": "ee1379e753b430099a45c7bf43db56d2c0dac31f6f0bf35ec3bda9143e608a28",
+          "size_bytes": 4111
+        },
+        {
+          "module_id": "std.db.pool",
+          "path": "packages/ext/x07-ext-db-core/0.1.8/modules/std/db/pool.x07.json",
+          "sha256": "d072995ccf88503bfb6dfd368e70a6bdd3725fd2ca8acc9c2ab356748a6714fb",
+          "size_bytes": 2660
+        },
+        {
+          "module_id": "std.db.spec",
+          "path": "packages/ext/x07-ext-db-core/0.1.8/modules/std/db/spec.x07.json",
+          "sha256": "eda1a91783a0dc523d7887f3b87166bcfa76a1d4ac87ce76d45ef2f97b08853c",
+          "size_bytes": 9470
+        },
+        {
+          "module_id": "std.db",
+          "path": "packages/ext/x07-ext-db-core/0.1.8/modules/std/db.x07.json",
+          "sha256": "49122422f3057827e81669955c3b03fa6c33912126d4085e71d7d6059e10c7b9",
+          "size_bytes": 4990
+        }
+      ],
+      "name": "ext-db-core",
+      "package_manifest_sha256": "816d46bd020e41423182a378ba5cda988e6058525cf6a09a83db2e28ae8182b8",
+      "path": "packages/ext/x07-ext-db-core/0.1.8",
+      "version": "0.1.8"
     },
     {
       "determinism_tier": "os-world-only",
@@ -2651,14 +2817,42 @@
         {
           "module_id": "std.db.mysql",
           "path": "packages/ext/x07-ext-db-mysql/0.1.4/modules/std/db/mysql.x07.json",
-          "sha256": "b16eb6daadea61d40b1da6ef27ca783486f2ee22a14deec7bca165302717fc74",
-          "size_bytes": 6371
+          "sha256": "cb3ed262a8509059983a4f5b7554218f90d6c3a2f24bbd3d7c2e65a1bbf8ccc8",
+          "size_bytes": 6385
         }
       ],
       "name": "ext-db-mysql",
       "package_manifest_sha256": "4d1b88b177cc1d9cfc397792498dd603c292eff843100c15a87e9bc7b2119c81",
       "path": "packages/ext/x07-ext-db-mysql/0.1.4",
       "version": "0.1.4"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.db.mysql.pool",
+          "path": "packages/ext/x07-ext-db-mysql/0.1.5/modules/std/db/mysql/pool.x07.json",
+          "sha256": "48fc08860ece542697e95ed07bab95b5bfc1da65e09efce38358f613d89b5c4d",
+          "size_bytes": 3716
+        },
+        {
+          "module_id": "std.db.mysql.spec",
+          "path": "packages/ext/x07-ext-db-mysql/0.1.5/modules/std/db/mysql/spec.x07.json",
+          "sha256": "d36bf757a086fc6f6d46eb88aaed36de3236f473392d079fa15cc57bf251f29e",
+          "size_bytes": 4683
+        },
+        {
+          "module_id": "std.db.mysql",
+          "path": "packages/ext/x07-ext-db-mysql/0.1.5/modules/std/db/mysql.x07.json",
+          "sha256": "b16eb6daadea61d40b1da6ef27ca783486f2ee22a14deec7bca165302717fc74",
+          "size_bytes": 6371
+        }
+      ],
+      "name": "ext-db-mysql",
+      "package_manifest_sha256": "5aea82560d25732b789c3cad6d49a6eafd8a4ade67acf09e344e6ca1e6dbf37c",
+      "path": "packages/ext/x07-ext-db-mysql/0.1.5",
+      "version": "0.1.5"
     },
     {
       "determinism_tier": "os-world-only",
@@ -2791,14 +2985,42 @@
         {
           "module_id": "std.db.pg",
           "path": "packages/ext/x07-ext-db-postgres/0.1.4/modules/std/db/pg.x07.json",
-          "sha256": "227989bcaf027d171b4b7f6c8d36b6a2e02d44fef46cbaf2ded94ec702cef8e8",
-          "size_bytes": 6427
+          "sha256": "69f101344760a688359cc106da273d6d8f6b736911a90dc9b54a39f226029a3e",
+          "size_bytes": 6455
         }
       ],
       "name": "ext-db-postgres",
       "package_manifest_sha256": "91ea22995f7c1b415b088d4f626e7b59e397a4cd656f8fb071f6c44c633bc115",
       "path": "packages/ext/x07-ext-db-postgres/0.1.4",
       "version": "0.1.4"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.db.pg.pool",
+          "path": "packages/ext/x07-ext-db-postgres/0.1.5/modules/std/db/pg/pool.x07.json",
+          "sha256": "83dbf13c07be21f9a53176481d6598970582518b62577c24865eb02dde433949",
+          "size_bytes": 3653
+        },
+        {
+          "module_id": "std.db.pg.spec",
+          "path": "packages/ext/x07-ext-db-postgres/0.1.5/modules/std/db/pg/spec.x07.json",
+          "sha256": "3fc082dc7b768658cf7820401f68dfcebf17167da73d145dc4346ad69499d4a2",
+          "size_bytes": 4638
+        },
+        {
+          "module_id": "std.db.pg",
+          "path": "packages/ext/x07-ext-db-postgres/0.1.5/modules/std/db/pg.x07.json",
+          "sha256": "227989bcaf027d171b4b7f6c8d36b6a2e02d44fef46cbaf2ded94ec702cef8e8",
+          "size_bytes": 6427
+        }
+      ],
+      "name": "ext-db-postgres",
+      "package_manifest_sha256": "a576bf76ce0b0730cd170cb4a9dc2cefb952b1e3a95897d42b8634b94aa70f01",
+      "path": "packages/ext/x07-ext-db-postgres/0.1.5",
+      "version": "0.1.5"
     },
     {
       "determinism_tier": "os-world-only",
@@ -4841,9 +5063,37 @@
         }
       ],
       "name": "ext-msgpack-rs",
-      "package_manifest_sha256": "6b9f94ac2ffb311ed1254ce7dc7623007d5ed638ed1362624a631ef759764da4",
+      "package_manifest_sha256": "fda6391b7e5e1a909cba4826567bce1cb387379792efdce64aa5b92619177785",
       "path": "packages/ext/x07-ext-msgpack-rs/0.1.4",
       "version": "0.1.4"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.msgpack.data_model",
+          "path": "packages/ext/x07-ext-msgpack-rs/0.1.5/modules/ext/msgpack/data_model.x07.json",
+          "sha256": "93c73facb0c7414451519be28632d14971cdd7963f3e60cbfd4c075406e05f5d",
+          "size_bytes": 41993
+        },
+        {
+          "module_id": "ext.msgpack.tests",
+          "path": "packages/ext/x07-ext-msgpack-rs/0.1.5/modules/ext/msgpack/tests.x07.json",
+          "sha256": "6a64ba670e239f27d0f91aa96fe85e055273e1aca0770304e4055552ba739fd8",
+          "size_bytes": 20219
+        },
+        {
+          "module_id": "ext.msgpack",
+          "path": "packages/ext/x07-ext-msgpack-rs/0.1.5/modules/ext/msgpack.x07.json",
+          "sha256": "5b74a3ae63c07e6c788568ec88a3571ca2384d8a0a333c705c04c0acab07f417",
+          "size_bytes": 852
+        }
+      ],
+      "name": "ext-msgpack-rs",
+      "package_manifest_sha256": "617d5754b4479afb61524bbd51c778d35772744e822ab0b5ecb5e2289d25886c",
+      "path": "packages/ext/x07-ext-msgpack-rs/0.1.5",
+      "version": "0.1.5"
     },
     {
       "determinism_tier": "os-world-only",
@@ -6158,14 +6408,36 @@
         {
           "module_id": "ext.robots",
           "path": "packages/ext/x07-ext-robots-txt-rs/0.1.2/modules/ext/robots.x07.json",
+          "sha256": "90ed46eebb49b8a4e45eb958a76c2915b2997a83c1279c8876e33f943e7c8f29",
+          "size_bytes": 9188
+        }
+      ],
+      "name": "ext-robots-txt-rs",
+      "package_manifest_sha256": "764bf0c7bd0dfac8d2150503b417b096542c16a6aa0956b416ac520c611e5f5b",
+      "path": "packages/ext/x07-ext-robots-txt-rs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.robots.tests",
+          "path": "packages/ext/x07-ext-robots-txt-rs/0.1.3/modules/ext/robots/tests.x07.json",
+          "sha256": "979ca33c9f1bad5d24e6f254a97b72cf7534f179e3c3e5c2e20f47269d1f0c91",
+          "size_bytes": 1880
+        },
+        {
+          "module_id": "ext.robots",
+          "path": "packages/ext/x07-ext-robots-txt-rs/0.1.3/modules/ext/robots.x07.json",
           "sha256": "2551b1db2f6b6ed477645cd5c039db725d791a08f755d5d8037d669a6c77f220",
           "size_bytes": 9286
         }
       ],
       "name": "ext-robots-txt-rs",
-      "package_manifest_sha256": "d20998424bee832215b044655808578919db4cdf9c6e3e732038711b03fa734c",
-      "path": "packages/ext/x07-ext-robots-txt-rs/0.1.2",
-      "version": "0.1.2"
+      "package_manifest_sha256": "31cdfe3d7a9778fce7785315d3ee533501633e6de52b09c4651e3ae66fdf03d1",
+      "path": "packages/ext/x07-ext-robots-txt-rs/0.1.3",
+      "version": "0.1.3"
     },
     {
       "determinism_tier": "pure",
@@ -6349,14 +6621,36 @@
         {
           "module_id": "ext.sitemap",
           "path": "packages/ext/x07-ext-sitemap-rs/0.1.2/modules/ext/sitemap.x07.json",
+          "sha256": "03068643a7117bb9d41859a307aa45ca5df279a43fea1576dfdce9ad7a803d8d",
+          "size_bytes": 3150
+        }
+      ],
+      "name": "ext-sitemap-rs",
+      "package_manifest_sha256": "4fbb09886af648bf29a689aeefdd975ca43cf3540160c8fa0335beed483d81d1",
+      "path": "packages/ext/x07-ext-sitemap-rs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.sitemap.tests",
+          "path": "packages/ext/x07-ext-sitemap-rs/0.1.3/modules/ext/sitemap/tests.x07.json",
+          "sha256": "096ff34395e247119cf77b6b2b554fd7503569fbfad0acf564c87a4f9dc6e195",
+          "size_bytes": 1043
+        },
+        {
+          "module_id": "ext.sitemap",
+          "path": "packages/ext/x07-ext-sitemap-rs/0.1.3/modules/ext/sitemap.x07.json",
           "sha256": "f39c0dd7e39e347c72f52bc4214b0c444ed8c75cc26fc58e70205ed85119d778",
           "size_bytes": 3143
         }
       ],
       "name": "ext-sitemap-rs",
-      "package_manifest_sha256": "6e85e5aaa12357d6c6c78ef3bf07f9be9da0a9c1e1c2018aabdea2f712803d71",
-      "path": "packages/ext/x07-ext-sitemap-rs/0.1.2",
-      "version": "0.1.2"
+      "package_manifest_sha256": "966fe8dc86f6412adca5ffac9add63fec988d7c9c443073fc86f855fda8b5dba",
+      "path": "packages/ext/x07-ext-sitemap-rs/0.1.3",
+      "version": "0.1.3"
     },
     {
       "determinism_tier": "os-world-only",
@@ -7176,7 +7470,7 @@
       "version": "0.1.3"
     },
     {
-      "determinism_tier": "os-world-only",
+      "determinism_tier": "pure",
       "import_mode": "handwritten",
       "modules": [
         {
@@ -7206,8 +7500,8 @@
         {
           "module_id": "ext.time.os",
           "path": "packages/ext/x07-ext-time-rs/0.1.4/modules/ext/time/os.x07.json",
-          "sha256": "54ae6ec8d916a7718e000d3ed89be3d45f29d6cbf1ef1d2088065dc0d62ff0cd",
-          "size_bytes": 1085
+          "sha256": "de826ecdf01cea6cee15ca8f883511f87e2c0dc6ec1eac3387d6319234821009",
+          "size_bytes": 1093
         },
         {
           "module_id": "ext.time.rfc3339.tests",
@@ -7232,9 +7526,70 @@
         }
       ],
       "name": "ext-time-rs",
-      "package_manifest_sha256": "f8e53b61cdc9b3622d043170ce35566bf715a30c5245124ea6f050783a24621d",
+      "package_manifest_sha256": "66be5741972269a9d2bd3a4af0bbd978f94baa4faf74f514f3020569fd92b9f2",
       "path": "packages/ext/x07-ext-time-rs/0.1.4",
       "version": "0.1.4"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.time.civil",
+          "path": "packages/ext/x07-ext-time-rs/0.1.5/modules/ext/time/civil.x07.json",
+          "sha256": "ac2e60f05bd546d26749d6a6d97f977de547189991869f989e3139763552f9c0",
+          "size_bytes": 13992
+        },
+        {
+          "module_id": "ext.time.duration.tests",
+          "path": "packages/ext/x07-ext-time-rs/0.1.5/modules/ext/time/duration/tests.x07.json",
+          "sha256": "77b7bc566639f3814913b6c8f7596f7b3a03ea4edab1c03606bb7f694e2cfa77",
+          "size_bytes": 6279
+        },
+        {
+          "module_id": "ext.time.duration",
+          "path": "packages/ext/x07-ext-time-rs/0.1.5/modules/ext/time/duration.x07.json",
+          "sha256": "1b63d1ad771081c0b8cb8fe2cfaec645cc32282cf8c28e571ab7066dbb260c5b",
+          "size_bytes": 9912
+        },
+        {
+          "module_id": "ext.time.instant",
+          "path": "packages/ext/x07-ext-time-rs/0.1.5/modules/ext/time/instant.x07.json",
+          "sha256": "90acc8c89fcf252d13d2f045f7e1b70c886fac6c58329acc7934d9e59d3d0beb",
+          "size_bytes": 2830
+        },
+        {
+          "module_id": "ext.time.os",
+          "path": "packages/ext/x07-ext-time-rs/0.1.5/modules/ext/time/os.x07.json",
+          "sha256": "54ae6ec8d916a7718e000d3ed89be3d45f29d6cbf1ef1d2088065dc0d62ff0cd",
+          "size_bytes": 1085
+        },
+        {
+          "module_id": "ext.time.rfc3339.tests",
+          "path": "packages/ext/x07-ext-time-rs/0.1.5/modules/ext/time/rfc3339/tests.x07.json",
+          "sha256": "27dff7b19962aee5f33022fb0d12cf5be3b4b13cded282478262758d6197094f",
+          "size_bytes": 9509
+        },
+        {
+          "generated_by": "x07import",
+          "module_id": "ext.time.rfc3339",
+          "path": "packages/ext/x07-ext-time-rs/0.1.5/modules/ext/time/rfc3339.x07.json",
+          "sha256": "b788630b12770bc2362190e027ffc143096da53e58a854d0b9ae3d0cfbb39f40",
+          "size_bytes": 24494,
+          "source_path": "tests/x07import/fixtures/import_sources/rust/ext_time@0.1.0/rfc3339.rs",
+          "source_sha256": "59e9e1220778dbb4bca768c4c98af6ab12cf1f73b3d627a3f3933d24ce76e05f"
+        },
+        {
+          "module_id": "ext.time.tzdb",
+          "path": "packages/ext/x07-ext-time-rs/0.1.5/modules/ext/time/tzdb.x07.json",
+          "sha256": "85173e884640ee87b8c50f3f24f8c9f266323dbad46d6bced8d918759916ba33",
+          "size_bytes": 1716
+        }
+      ],
+      "name": "ext-time-rs",
+      "package_manifest_sha256": "a0705781fd883865f1417cc3863f120c81fbd1728ff268439086c67f91db645a",
+      "path": "packages/ext/x07-ext-time-rs/0.1.5",
+      "version": "0.1.5"
     },
     {
       "determinism_tier": "pure",
@@ -8785,6 +9140,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "b911ef045532ad7abe229c674a8bccd80dc48058160f23ad90c9d0f676df0a19",
+  "packages_hash": "8d3a0c5d8fb48d0752ca02ce3a5ff6f57a9c2995f4f29a282111c6f431785fee",
   "packages_root": "packages/ext"
 }

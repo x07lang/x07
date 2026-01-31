@@ -17,9 +17,9 @@
     },
     {
       "name": "ext-cbor-rs",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-cbor-rs/0.1.4",
-      "package_manifest_sha256": "49ceb2bbce732be5f017b1b10f315346f9cfdb41c9d03f94adaea74132a4be26",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-cbor-rs/0.1.5",
+      "package_manifest_sha256": "a06918be59aecbec2b810b42c6da3dd6aafc4b8aeab1f8a924d6648715004aaf",
       "module_root": "modules",
       "modules_sha256": {
         "ext.cbor": "5a1c02de55c197cadc96a8eefcfa7a1706ade507c3045de50b5750fe0cd596b7",
@@ -29,9 +29,9 @@
     },
     {
       "name": "ext-data-model",
-      "version": "0.1.6",
-      "path": ".x07/deps/ext-data-model/0.1.6",
-      "package_manifest_sha256": "3c4262d2f9a7028d97f2f90ec6a974d57be76be1628f4956c7d9e1643b85faec",
+      "version": "0.1.7",
+      "path": ".x07/deps/ext-data-model/0.1.7",
+      "package_manifest_sha256": "86b16ad03ab222a4dbf4e3c72c584fa919be093c7a8f9311b2d794807ab2ce52",
       "module_root": "modules",
       "modules_sha256": {
         "ext.data_model": "f725211ff55a6ad1db31f174dfbdcf55beccd7a24e44f8da929ecf7d5d0c0ccb",

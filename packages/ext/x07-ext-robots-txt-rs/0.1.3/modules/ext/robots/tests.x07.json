@@ -1,0 +1,46 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.robots.tests",
+  "imports": [
+    "ext.robots",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.robots.tests.test_allowed_basic"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.robots.tests.test_allowed_basic",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "v", ["vec_u8.with_capacity", 128]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "User-agent:*"]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "Disallow:/private"]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "Allow:/private/public"]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["let", "robots", ["vec_u8.into_bytes", "v"]],
+        ["let", "ua", ["bytes.lit", "*"]],
+        ["let", "u1", ["bytes.lit", "http://example.com/private/page"]],
+        ["let", "u2", ["bytes.lit", "http://example.com/private/public/page"]],
+        ["let", "u3", ["bytes.lit", "http://example.com/index"]],
+        ["let", "a1", ["ext.robots.allowed_v1", ["bytes.view", "robots"], ["bytes.view", "ua"], ["bytes.view", "u1"]]],
+        ["let", "a2", ["ext.robots.allowed_v1", ["bytes.view", "robots"], ["bytes.view", "ua"], ["bytes.view", "u2"]]],
+        ["let", "a3", ["ext.robots.allowed_v1", ["bytes.view", "robots"], ["bytes.view", "ua"], ["bytes.view", "u3"]]],
+        ["try", ["std.test.assert_i32_eq", "a1", 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", "a2", 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", "a3", 1, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}
+

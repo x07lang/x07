@@ -3,13 +3,13 @@
   "dependencies": [
     {
       "name": "ext-cli",
-      "path": ".x07/deps/ext-cli/0.1.8",
-      "version": "0.1.8"
+      "path": ".x07/deps/ext-cli/0.1.9",
+      "version": "0.1.9"
     },
     {
       "name": "ext-data-model",
-      "path": ".x07/deps/ext-data-model/0.1.6",
-      "version": "0.1.6"
+      "path": ".x07/deps/ext-data-model/0.1.7",
+      "version": "0.1.7"
     },
     {
       "name": "ext-json-rs",

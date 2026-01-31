@@ -8,13 +8,13 @@
     },
     {
       "name": "ext-cbor-rs",
-      "path": ".x07/deps/ext-cbor-rs/0.1.4",
-      "version": "0.1.4"
+      "path": ".x07/deps/ext-cbor-rs/0.1.5",
+      "version": "0.1.5"
     },
     {
       "name": "ext-data-model",
-      "path": ".x07/deps/ext-data-model/0.1.6",
-      "version": "0.1.6"
+      "path": ".x07/deps/ext-data-model/0.1.7",
+      "version": "0.1.7"
     },
     {
       "name": "ext-decimal-rs",

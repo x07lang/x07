@@ -17,9 +17,9 @@
     },
     {
       "name": "ext-data-model",
-      "version": "0.1.6",
-      "path": ".x07/deps/ext-data-model/0.1.6",
-      "package_manifest_sha256": "3c4262d2f9a7028d97f2f90ec6a974d57be76be1628f4956c7d9e1643b85faec",
+      "version": "0.1.7",
+      "path": ".x07/deps/ext-data-model/0.1.7",
+      "package_manifest_sha256": "86b16ad03ab222a4dbf4e3c72c584fa919be093c7a8f9311b2d794807ab2ce52",
       "module_root": "modules",
       "modules_sha256": {
         "ext.data_model": "f725211ff55a6ad1db31f174dfbdcf55beccd7a24e44f8da929ecf7d5d0c0ccb",
@@ -74,9 +74,9 @@
     },
     {
       "name": "ext-msgpack-rs",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-msgpack-rs/0.1.4",
-      "package_manifest_sha256": "6b9f94ac2ffb311ed1254ce7dc7623007d5ed638ed1362624a631ef759764da4",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-msgpack-rs/0.1.5",
+      "package_manifest_sha256": "617d5754b4479afb61524bbd51c778d35772744e822ab0b5ecb5e2289d25886c",
       "module_root": "modules",
       "modules_sha256": {
         "ext.msgpack": "5b74a3ae63c07e6c788568ec88a3571ca2384d8a0a333c705c04c0acab07f417",

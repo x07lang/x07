@@ -8,8 +8,8 @@
     },
     {
       "name": "ext-data-model",
-      "path": ".x07/deps/ext-data-model/0.1.6",
-      "version": "0.1.6"
+      "path": ".x07/deps/ext-data-model/0.1.7",
+      "version": "0.1.7"
     },
     {
       "name": "ext-decimal-rs",
@@ -28,8 +28,8 @@
     },
     {
       "name": "ext-msgpack-rs",
-      "path": ".x07/deps/ext-msgpack-rs/0.1.4",
-      "version": "0.1.4"
+      "path": ".x07/deps/ext-msgpack-rs/0.1.5",
+      "version": "0.1.5"
     },
     {
       "name": "ext-toml-rs",
