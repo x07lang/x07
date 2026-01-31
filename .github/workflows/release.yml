@@ -89,7 +89,7 @@ jobs:
 
           tmp="$(mktemp -d)"
           cat >"${tmp}/program.x07.json" <<'JSON'
-          {"schema_version":"x07.x07ast@0.2.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
+          {"schema_version":"x07.x07ast@0.3.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
           JSON
           printf 'hi' >"${tmp}/input.bin"
 
