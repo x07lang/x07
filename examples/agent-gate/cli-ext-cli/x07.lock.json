@@ -26,8 +26,8 @@
         "ext.data_model.json": "6c634e7007fbb19db79262869e9348dc525339c59a5ff013837527bacd5a7294",
         "ext.data_model.json.tests": "0af030b9b17d03c554364c518841410f9263470d25e1f75ae70c582ad1182f01",
         "ext.data_model.tests": "620b200c7570a4c6841cba26f5cda5f8451a7996f78bb73aec0ea3f6aafb825a",
-        "ext.data_model.toml": "2401c96bc52526d56b5044e710421fea8269f2cd1d8740ff98894b3aa342ecf0",
-        "ext.data_model.toml.tests": "bfd92f6b9c49daaadfa6dfdd073fb4534bf1e8245e767e9e44dd9110b46e7f30",
+        "ext.data_model.toml": "f8cabbfcef45c37566e8035d65293e3b9fee092ea646df65edda9beb5c890e09",
+        "ext.data_model.toml.tests": "a02829aaf93cb9a856504f372fc9d8f04030bb4a7b0326ecc8792f3af35d5a12",
         "ext.data_model.yaml": "63ef4d0ceedd55939c2fb459e430a03fa5b7c7b0d1ac82826df0223ff65598b7",
         "ext.data_model.yaml.tests": "40653f1ca6517d5443c3cd095f46613534f57485d1360ff9437c467a722f3fd6"
       }
