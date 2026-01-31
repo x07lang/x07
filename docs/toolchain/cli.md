@@ -35,6 +35,14 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 fix --input <path> --write`
   - Applies quickfixes (JSON Patch) and rewrites the file deterministically.
 
+### Architecture check (repo contracts)
+
+- `x07 arch check`
+  - Verifies the repo’s `*.x07.json` import graph against `arch/manifest.x07arch.json`.
+  - Emits an `x07.arch.report@0.1.0` report and optional JSON Patch suggestions.
+
+See: [Architecture check](arch-check.md).
+
 ### Patching (RFC 6902 JSON Patch)
 
 - `x07 ast apply-patch --in <path> --patch <patch.json> --out <path> --validate`

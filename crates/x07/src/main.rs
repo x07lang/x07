@@ -17,6 +17,7 @@ use x07_host_runner::{run_artifact_file, RunnerConfig, RunnerResult};
 use x07_worlds::WorldId;
 use x07c::project;
 
+mod arch;
 mod ast;
 mod bundle;
 mod cli;
@@ -53,6 +54,8 @@ enum Command {
     Init(init::InitArgs),
     /// Run deterministic test suites.
     Test(TestArgs),
+    /// Check architecture manifests (architecture as data).
+    Arch(arch::ArchArgs),
     /// Run X07 programs via the appropriate runner.
     Run(Box<run::RunArgs>),
     /// Produce a distributable native executable (no toolchain required at runtime).
@@ -204,6 +207,10 @@ fn try_main() -> Result<std::process::ExitCode> {
             None => Vec::new(),
             Some(Command::Test(_)) => vec!["test"],
             Some(Command::Init(_)) => vec!["init"],
+            Some(Command::Arch(args)) => match &args.cmd {
+                None => vec!["arch"],
+                Some(arch::ArchCommand::Check(_)) => vec!["arch", "check"],
+            },
             Some(Command::Run(_)) => vec!["run"],
             Some(Command::Bundle(_)) => vec!["bundle"],
             Some(Command::Guide(_)) => vec!["guide"],
@@ -266,6 +273,7 @@ fn try_main() -> Result<std::process::ExitCode> {
     match command {
         Command::Init(args) => init::cmd_init(args),
         Command::Test(args) => cmd_test(args),
+        Command::Arch(args) => arch::cmd_arch(args),
         Command::Run(args) => run::cmd_run(*args),
         Command::Bundle(args) => bundle::cmd_bundle(*args),
         Command::Guide(args) => guide::cmd_guide(args),

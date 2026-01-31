@@ -11,6 +11,7 @@ Quick entry points:
 - ABI specs (C-facing value layouts): `spec/abi/`
 - Type system notes: `spec/types/type-system-v1.md`
 - Tooling internals: `dev/` and `cli/`
+- Architecture manifest tooling: `dev/x07-arch.md`
 - Schema derive tool internals: `cli/schema-derive.md`
 - Standalone OS runners: `standalone/`
 - Release and cross-repo propagation: `change-propagation.md`

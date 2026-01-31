@@ -238,6 +238,704 @@ fn x07_cli_specrows_includes_nested_subcommands() {
             == Some("pkg.add")
     });
     assert!(has_pkg_add, "missing pkg.add in --cli-specrows output");
+
+    let has_arch_check = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("arch.check")
+    });
+    assert!(
+        has_arch_check,
+        "missing arch.check in --cli-specrows output"
+    );
+}
+
+fn write_json(path: &PathBuf, doc: &Value) {
+    let bytes = serde_json::to_vec_pretty(doc).expect("serialize JSON");
+    write_bytes(path, &bytes);
+}
+
+fn x07_module_doc(module_id: &str, imports: &[&str], decls: Vec<Value>) -> Value {
+    Value::Object(
+        [
+            (
+                "schema_version".to_string(),
+                Value::String("x07.x07ast@0.3.0".to_string()),
+            ),
+            ("kind".to_string(), Value::String("module".to_string())),
+            (
+                "module_id".to_string(),
+                Value::String(module_id.to_string()),
+            ),
+            (
+                "imports".to_string(),
+                Value::Array(
+                    imports
+                        .iter()
+                        .map(|s| Value::String((*s).to_string()))
+                        .collect(),
+                ),
+            ),
+            ("decls".to_string(), Value::Array(decls)),
+        ]
+        .into_iter()
+        .collect(),
+    )
+}
+
+fn x07_export_decl(names: &[&str]) -> Value {
+    serde_json::json!({"kind":"export","names": names})
+}
+
+fn x07_defn_decl(
+    name: &str,
+    params: Vec<Value>,
+    result: &str,
+    result_brand: Option<&str>,
+) -> Value {
+    let mut m = serde_json::Map::new();
+    m.insert("kind".to_string(), Value::String("defn".to_string()));
+    m.insert("name".to_string(), Value::String(name.to_string()));
+    m.insert("params".to_string(), Value::Array(params));
+    m.insert("result".to_string(), Value::String(result.to_string()));
+    if let Some(b) = result_brand {
+        m.insert("result_brand".to_string(), Value::String(b.to_string()));
+    }
+    m.insert("body".to_string(), Value::Number(0.into()));
+    Value::Object(m)
+}
+
+fn x07_param(name: &str, ty: &str, brand: Option<&str>) -> Value {
+    let mut m = serde_json::Map::new();
+    m.insert("name".to_string(), Value::String(name.to_string()));
+    m.insert("ty".to_string(), Value::String(ty.to_string()));
+    if let Some(b) = brand {
+        m.insert("brand".to_string(), Value::String(b.to_string()));
+    }
+    Value::Object(m)
+}
+
+fn arch_manifest_doc(
+    nodes: Vec<Value>,
+    rules: Vec<Value>,
+    checks: Value,
+    externals: Value,
+) -> Value {
+    serde_json::json!({
+      "schema_version": "x07.arch.manifest@0.1.0",
+      "repo": {"id":"test-repo","root":"."},
+      "externals": externals,
+      "nodes": nodes,
+      "rules": rules,
+      "checks": checks,
+      "tool_budgets": { "max_modules": 1000, "max_edges": 1000, "max_diags": 2000 }
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn arch_node_doc(
+    id: &str,
+    module_prefixes: &[&str],
+    world: &str,
+    visibility_mode: &str,
+    visible_to: &[&str],
+    deny_prefixes: &[&str],
+    allow_prefixes: &[&str],
+    smoke_entry: Option<&str>,
+) -> Value {
+    let mut node = serde_json::Map::new();
+    node.insert("id".to_string(), Value::String(id.to_string()));
+    node.insert(
+        "match".to_string(),
+        serde_json::json!({
+          "module_prefixes": module_prefixes,
+          "path_globs": []
+        }),
+    );
+    node.insert("world".to_string(), Value::String(world.to_string()));
+    node.insert(
+        "visibility".to_string(),
+        serde_json::json!({"mode": visibility_mode, "visible_to": visible_to}),
+    );
+    node.insert(
+        "imports".to_string(),
+        serde_json::json!({"deny_prefixes": deny_prefixes, "allow_prefixes": allow_prefixes}),
+    );
+    if let Some(s) = smoke_entry {
+        node.insert(
+            "contracts".to_string(),
+            serde_json::json!({"smoke_entry": s}),
+        );
+    }
+    Value::Object(node)
+}
+
+fn default_arch_checks() -> Value {
+    serde_json::json!({
+      "deny_cycles": true,
+      "deny_orphans": true,
+      "enforce_visibility": true,
+      "enforce_world_caps": true
+    })
+}
+
+fn default_arch_externals() -> Value {
+    serde_json::json!({"allowed_import_prefixes":["std.","ext."],"allowed_exact":[]})
+}
+
+fn diag_codes(v: &Value) -> Vec<String> {
+    v["diags"]
+        .as_array()
+        .expect("diags[]")
+        .iter()
+        .map(|d| d["code"].as_str().expect("code").to_string())
+        .collect()
+}
+
+#[test]
+fn x07_arch_check_pass_minimal() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_ok");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let mod_a = x07_module_doc(
+        "app.core.a",
+        &["std.vec"],
+        vec![
+            x07_export_decl(&["app.core.a.f"]),
+            x07_defn_decl("app.core.a.f", Vec::new(), "i32", None),
+        ],
+    );
+    write_json(&dir.join("src/app/core/a.x07.json"), &mod_a);
+
+    let manifest = arch_manifest_doc(
+        vec![arch_node_doc(
+            "core",
+            &["app.core."],
+            "solve-pure",
+            "restricted",
+            &[],
+            &[],
+            &["std.", "ext.", "app.core."],
+            None,
+        )],
+        vec![],
+        default_arch_checks(),
+        default_arch_externals(),
+    );
+    write_json(&dir.join("arch/manifest.x07arch.json"), &manifest);
+
+    let out = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], "x07.arch.report@0.1.0");
+    assert!(v["diags"].as_array().expect("diags[]").is_empty());
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_arch_check_orphan_module_errors_and_suggests_node_patch() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_orphan");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let mod_a = x07_module_doc(
+        "app.core.a",
+        &[],
+        vec![
+            x07_export_decl(&["app.core.a.f"]),
+            x07_defn_decl("app.core.a.f", Vec::new(), "i32", None),
+        ],
+    );
+    write_json(&dir.join("src/app/core/a.x07.json"), &mod_a);
+
+    let manifest = arch_manifest_doc(
+        vec![arch_node_doc(
+            "domain",
+            &["app.domain."],
+            "solve-pure",
+            "restricted",
+            &[],
+            &[],
+            &["std.", "ext.", "app.domain."],
+            None,
+        )],
+        vec![],
+        default_arch_checks(),
+        default_arch_externals(),
+    );
+    write_json(&dir.join("arch/manifest.x07arch.json"), &manifest);
+
+    let out = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    let codes = diag_codes(&v);
+    assert!(codes.contains(&"E_ARCH_NODE_ORPHAN_MODULE".to_string()));
+    assert!(
+        v["suggested_patches"]
+            .as_array()
+            .expect("suggested_patches[]")
+            .iter()
+            .any(|p| p["path"] == "arch/manifest.x07arch.json"),
+        "expected manifest patch suggestion for orphan modules"
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_arch_check_external_import_not_allowed_suggests_manifest_allow_exact_and_write_fixes() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_external");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let mod_a = x07_module_doc("app.core.a", &["thirdparty.hyper"], Vec::new());
+    write_json(&dir.join("src/app/core/a.x07.json"), &mod_a);
+
+    let manifest = arch_manifest_doc(
+        vec![arch_node_doc(
+            "core",
+            &["app.core."],
+            "solve-pure",
+            "restricted",
+            &[],
+            &[],
+            &["app.", "std.", "ext."],
+            None,
+        )],
+        vec![],
+        default_arch_checks(),
+        default_arch_externals(),
+    );
+    write_json(&dir.join("arch/manifest.x07arch.json"), &manifest);
+
+    let out = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(out.status.code(), Some(2));
+    let v = parse_json_stdout(&out);
+    let codes = diag_codes(&v);
+    assert!(codes.contains(&"E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED".to_string()));
+    assert!(
+        v["suggested_patches"]
+            .as_array()
+            .expect("suggested_patches[]")
+            .iter()
+            .any(|p| p["path"] == "arch/manifest.x07arch.json"),
+        "expected manifest patch suggestion"
+    );
+
+    let out = run_x07_in_dir(&dir, &["arch", "check", "--write"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert!(v["diags"].as_array().expect("diags[]").is_empty());
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_arch_check_emit_patch_writes_patchset() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_emit_patch");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let mod_a = x07_module_doc("app.core.a", &["thirdparty.hyper"], Vec::new());
+    write_json(&dir.join("src/app/core/a.x07.json"), &mod_a);
+
+    let manifest = arch_manifest_doc(
+        vec![arch_node_doc(
+            "core",
+            &["app.core."],
+            "solve-pure",
+            "restricted",
+            &[],
+            &[],
+            &["app.", "std.", "ext."],
+            None,
+        )],
+        vec![],
+        default_arch_checks(),
+        default_arch_externals(),
+    );
+    write_json(&dir.join("arch/manifest.x07arch.json"), &manifest);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &["arch", "check", "--emit-patch", "arch/patchset.json"],
+    );
+    assert_eq!(out.status.code(), Some(2));
+
+    let patchset_path = dir.join("arch/patchset.json");
+    assert!(
+        patchset_path.is_file(),
+        "missing {}",
+        patchset_path.display()
+    );
+    let patchset: Value =
+        serde_json::from_slice(&std::fs::read(&patchset_path).expect("read patchset"))
+            .expect("parse patchset");
+    assert_eq!(patchset["schema_version"], "x07.arch.patchset@0.1.0");
+    assert!(
+        patchset["patches"]
+            .as_array()
+            .expect("patches[]")
+            .iter()
+            .any(|p| p["path"] == "arch/manifest.x07arch.json"),
+        "expected manifest patch target"
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_arch_check_allowlist_mode_requires_explicit_internal_allows() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_allowlist");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let mod_a = x07_module_doc("app.a", &["app.b"], Vec::new());
+    let mod_b = x07_module_doc("app.b", &[], Vec::new());
+    write_json(&dir.join("src/app/a.x07.json"), &mod_a);
+    write_json(&dir.join("src/app/b.x07.json"), &mod_b);
+
+    let checks = serde_json::json!({
+      "deny_cycles": true,
+      "deny_orphans": true,
+      "enforce_visibility": true,
+      "enforce_world_caps": true,
+      "allowlist_mode": { "enabled": true, "default_allow_external": true, "default_allow_internal": false }
+    });
+
+    let manifest = arch_manifest_doc(
+        vec![
+            arch_node_doc(
+                "a",
+                &["app.a"],
+                "solve-pure",
+                "public",
+                &[],
+                &[],
+                &["app.", "std.", "ext."],
+                None,
+            ),
+            arch_node_doc(
+                "b",
+                &["app.b"],
+                "solve-pure",
+                "public",
+                &[],
+                &[],
+                &["app.", "std.", "ext."],
+                None,
+            ),
+        ],
+        vec![],
+        checks,
+        default_arch_externals(),
+    );
+    write_json(&dir.join("arch/manifest.x07arch.json"), &manifest);
+
+    let out = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(out.status.code(), Some(2));
+    let v = parse_json_stdout(&out);
+    let codes = diag_codes(&v);
+    assert!(codes.contains(&"E_ARCH_EDGE_NOT_ALLOWED".to_string()));
+
+    let manifest_patch = v["suggested_patches"]
+        .as_array()
+        .expect("suggested_patches[]")
+        .iter()
+        .find(|p| p["path"] == "arch/manifest.x07arch.json")
+        .expect("missing manifest suggested patch");
+    assert!(
+        manifest_patch["patch"]
+            .as_array()
+            .expect("patch[]")
+            .iter()
+            .any(|op| op["op"] == "add" && op["path"] == "/rules/-"),
+        "expected deps_v1 allow rule suggestion"
+    );
+
+    let out = run_x07_in_dir(&dir, &["arch", "check", "--write"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert!(v["diags"].as_array().expect("diags[]").is_empty());
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_arch_check_write_lock_creates_lock_and_detects_mismatch() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_lock");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let mod_a = x07_module_doc("app.core.a", &[], Vec::new());
+    write_json(&dir.join("src/app/core/a.x07.json"), &mod_a);
+
+    let manifest = arch_manifest_doc(
+        vec![arch_node_doc(
+            "core",
+            &["app.core."],
+            "solve-pure",
+            "restricted",
+            &[],
+            &[],
+            &["app.", "std.", "ext."],
+            None,
+        )],
+        vec![],
+        default_arch_checks(),
+        default_arch_externals(),
+    );
+    let manifest_path = dir.join("arch/manifest.x07arch.json");
+    write_json(&manifest_path, &manifest);
+
+    let out = run_x07_in_dir(&dir, &["arch", "check", "--write-lock"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let lock_path = dir.join("arch/manifest.lock.json");
+    assert!(lock_path.is_file(), "missing {}", lock_path.display());
+    let lock: Value =
+        serde_json::from_slice(&std::fs::read(&lock_path).expect("read lock")).expect("parse lock");
+    assert_eq!(lock["schema_version"], "x07.arch.manifest.lock@0.1.0");
+    assert_eq!(lock["manifest_path"], "arch/manifest.x07arch.json");
+    assert_eq!(lock["module_scan"]["include_globs"][0], "**/*.x07.json");
+
+    let mut manifest_v: Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).expect("read manifest"))
+            .expect("parse manifest");
+    manifest_v["externals"]["allowed_exact"] = serde_json::json!(["thirdparty.hyper"]);
+    write_json(&manifest_path, &manifest_v);
+
+    let out = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(out.status.code(), Some(2));
+    let v = parse_json_stdout(&out);
+    let codes = diag_codes(&v);
+    assert!(codes.contains(&"E_ARCH_LOCK_MISMATCH".to_string()));
+
+    let out = run_x07_in_dir(&dir, &["arch", "check", "--write-lock"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_arch_check_smoke_entry_missing() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_smoke");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let mod_a = x07_module_doc("app.core.a", &[], Vec::new());
+    write_json(&dir.join("src/app/core/a.x07.json"), &mod_a);
+
+    let manifest = arch_manifest_doc(
+        vec![arch_node_doc(
+            "core",
+            &["app.core."],
+            "solve-pure",
+            "restricted",
+            &[],
+            &[],
+            &["app.", "std.", "ext."],
+            Some("app.core.smoke_v1"),
+        )],
+        vec![],
+        default_arch_checks(),
+        default_arch_externals(),
+    );
+    write_json(&dir.join("arch/manifest.x07arch.json"), &manifest);
+
+    let out = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(out.status.code(), Some(2));
+    let v = parse_json_stdout(&out);
+    let codes = diag_codes(&v);
+    assert!(codes.contains(&"E_ARCH_SMOKE_MISSING".to_string()));
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_arch_check_public_bytes_unbranded() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_brand");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let symbol = "app.api.echo";
+    let mod_a = x07_module_doc(
+        "app.api",
+        &[],
+        vec![
+            x07_export_decl(&[symbol]),
+            x07_defn_decl(symbol, vec![x07_param("b", "bytes", None)], "bytes", None),
+        ],
+    );
+    write_json(&dir.join("src/app/api.x07.json"), &mod_a);
+
+    let manifest = arch_manifest_doc(
+        vec![arch_node_doc(
+            "api",
+            &["app.api"],
+            "solve-pure",
+            "public",
+            &[],
+            &[],
+            &["app.", "std.", "ext."],
+            None,
+        )],
+        vec![],
+        default_arch_checks(),
+        default_arch_externals(),
+    );
+    write_json(&dir.join("arch/manifest.x07arch.json"), &manifest);
+
+    let out = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(out.status.code(), Some(2));
+    let v = parse_json_stdout(&out);
+    let codes = diag_codes(&v);
+    assert!(codes.contains(&"E_ARCH_PUBLIC_BYTES_UNBRANDED".to_string()));
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_arch_check_world_of_imported_forbidden() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_world");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let mod_core = x07_module_doc("app.core.a", &["app.os.proc"], Vec::new());
+    let mod_os = x07_module_doc("app.os.proc", &[], Vec::new());
+    write_json(&dir.join("src/app/core/a.x07.json"), &mod_core);
+    write_json(&dir.join("src/app/os/proc.x07.json"), &mod_os);
+
+    let manifest = arch_manifest_doc(
+        vec![
+            arch_node_doc(
+                "core",
+                &["app.core."],
+                "solve-pure",
+                "public",
+                &[],
+                &[],
+                &["app.", "std.", "ext."],
+                None,
+            ),
+            arch_node_doc(
+                "os",
+                &["app.os."],
+                "run-os",
+                "public",
+                &[],
+                &[],
+                &["app.", "std.", "ext."],
+                None,
+            ),
+        ],
+        vec![],
+        default_arch_checks(),
+        default_arch_externals(),
+    );
+    write_json(&dir.join("arch/manifest.x07arch.json"), &manifest);
+
+    let out = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(out.status.code(), Some(2));
+    let v = parse_json_stdout(&out);
+    let codes = diag_codes(&v);
+    assert!(codes.contains(&"E_ARCH_WORLD_EDGE_FORBIDDEN".to_string()));
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_arch_check_is_deterministic() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_arch_determinism");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let mod_a = x07_module_doc("app.core.a", &["thirdparty.hyper"], Vec::new());
+    write_json(&dir.join("src/app/core/a.x07.json"), &mod_a);
+    let manifest = arch_manifest_doc(
+        vec![arch_node_doc(
+            "core",
+            &["app.core."],
+            "solve-pure",
+            "restricted",
+            &[],
+            &[],
+            &["app.", "std.", "ext."],
+            None,
+        )],
+        vec![],
+        default_arch_checks(),
+        default_arch_externals(),
+    );
+    write_json(&dir.join("arch/manifest.x07arch.json"), &manifest);
+
+    let out1 = run_x07_in_dir(&dir, &["arch", "check"]);
+    let out2 = run_x07_in_dir(&dir, &["arch", "check"]);
+    assert_eq!(out1.status.code(), out2.status.code());
+    assert_eq!(out1.stdout, out2.stdout);
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
 }
 
 fn run_schema_derive_smoke(fixture: &PathBuf) {

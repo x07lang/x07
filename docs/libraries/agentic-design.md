@@ -63,7 +63,9 @@ For large projects, keep a small `arch/` folder:
 - public API list (and encoding docs)
 - forbidden dependencies
 
-…and enforce it with a deterministic CI script.
+…and enforce it with `x07 arch check`.
+
+See: [Architecture check](../toolchain/arch-check.md).
 
 ## The architecture contract
 

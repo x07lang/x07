@@ -56,3 +56,36 @@ These codes appear as `[...]` prefixes in `x07 run` stderr output:
 - `X07PKG_LOCK_MISSING`: missing lockfile.
 - `X07PKG_LOCK_MISMATCH`: lockfile out of date.
 - `X07PKG_TRANSITIVE_MISSING`: transitive dependencies missing from `x07.json`.
+
+## `x07 arch check` (selected `E_ARCH_*`)
+
+Manifest / lock / scan:
+
+- `E_ARCH_MANIFEST_READ`: failed to read the manifest file.
+- `E_ARCH_MANIFEST_JSON_PARSE`: manifest is not valid JSON.
+- `E_ARCH_MANIFEST_SCHEMA_INVALID`: manifest JSON does not match `x07.arch.manifest@0.1.0`.
+- `E_ARCH_MANIFEST_INVALID`: manifest is schema-valid but semantically unsupported (for example, an invalid `world`).
+- `E_ARCH_LOCK_READ`: failed to read the lock file.
+- `E_ARCH_LOCK_JSON_PARSE`: lock is not valid JSON.
+- `E_ARCH_LOCK_SCHEMA_INVALID`: lock JSON does not match `x07.arch.manifest.lock@0.1.0`.
+- `E_ARCH_LOCK_INVALID`: lock is schema-valid but semantically unusable.
+- `E_ARCH_LOCK_MISMATCH`: manifest path/hash does not match the lock.
+- `E_ARCH_MODULE_PARSE`: failed to parse a scanned `*.x07.json` module.
+- `E_ARCH_DUPLICATE_MODULE_ID`: the scan found duplicate `module_id` values across files.
+- `E_ARCH_TOOL_BUDGET_EXCEEDED`: tool budget exceeded (exit code `4`).
+
+Architecture checks:
+
+- `E_ARCH_NODE_ORPHAN_MODULE`: a module matched 0 manifest nodes (when orphans are denied).
+- `E_ARCH_NODE_OVERLAP_MODULE`: a module matched multiple manifest nodes.
+- `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED`: external import not allowed by `externals.*`.
+- `E_ARCH_IMPORT_PREFIX_DENIED`: import denied by node `imports.deny_prefixes`.
+- `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED`: import not allowed by node `imports.allow_prefixes`.
+- `E_ARCH_VISIBILITY`: importing node not allowed by target node visibility.
+- `E_ARCH_DEPS_DENY`: node edge denied by a `deps_v1` rule.
+- `E_ARCH_LAYERS_VIOLATION`: node edge violates a `layers_v1` rule.
+- `E_ARCH_CYCLE`: cyclic node dependency detected.
+- `E_ARCH_EDGE_NOT_ALLOWED`: allowlist mode is enabled and the node edge is not explicitly allowed.
+- `E_ARCH_WORLD_EDGE_FORBIDDEN`: `solve-*` node depends on `run-os*` node.
+- `E_ARCH_SMOKE_MISSING`: node is missing a required `contracts.smoke_entry` export.
+- `E_ARCH_PUBLIC_BYTES_UNBRANDED`: public node exports a `bytes` boundary without a brand.

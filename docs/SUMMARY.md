@@ -30,6 +30,7 @@
 
 ## Toolchain
 - [CLI](toolchain/cli.md)
+- [Architecture check](toolchain/arch-check.md)
 - [Schema derive](toolchain/schema-derive.md)
 - [Running programs](toolchain/running-programs.md)
 - [Embedding in C](toolchain/embedding-in-c.md)

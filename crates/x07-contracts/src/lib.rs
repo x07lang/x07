@@ -20,6 +20,11 @@ pub const X07_POLICY_INIT_REPORT_SCHEMA_VERSION: &str = "x07.policy.init.report@
 pub const NATIVE_BACKENDS_SCHEMA_VERSION: &str = "x07.native-backends@0.1.0";
 pub const NATIVE_REQUIRES_SCHEMA_VERSION: &str = "x07.native-requires@0.1.0";
 
+pub const X07_ARCH_MANIFEST_SCHEMA_VERSION: &str = "x07.arch.manifest@0.1.0";
+pub const X07_ARCH_MANIFEST_LOCK_SCHEMA_VERSION: &str = "x07.arch.manifest.lock@0.1.0";
+pub const X07_ARCH_REPORT_SCHEMA_VERSION: &str = "x07.arch.report@0.1.0";
+pub const X07_ARCH_PATCHSET_SCHEMA_VERSION: &str = "x07.arch.patchset@0.1.0";
+
 pub const PROJECT_MANIFEST_SCHEMA_VERSION: &str = "x07.project@0.2.0";
 pub const PACKAGE_MANIFEST_SCHEMA_VERSION: &str = "x07.package@0.1.0";
 pub const PROJECT_LOCKFILE_SCHEMA_VERSION: &str = "x07.lock@0.2.0";
