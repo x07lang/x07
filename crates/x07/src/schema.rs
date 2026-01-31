@@ -177,6 +177,8 @@ struct SchemaType {
     version: i32,
     kind: String,
     err_base: i32,
+    #[serde(default)]
+    brand: Option<String>,
     budgets: Option<SchemaBudgets>,
     #[serde(default)]
     fields: Vec<SchemaField>,
@@ -291,6 +293,7 @@ struct TypeDef {
     tests_module_id: String,
     type_id: String,
     version: i32,
+    brand_id: String,
     kind: TypeKind,
     err_base: i32,
     max_doc_bytes: i32,
@@ -860,6 +863,7 @@ fn types_from_rows(schema: &X07SchemaFile) -> Result<Vec<SchemaType>> {
                     version,
                     kind,
                     err_base: opts.err_base,
+                    brand: Some(opts.brand),
                     budgets,
                     fields: Vec::new(),
                     variants: Vec::new(),
@@ -1212,6 +1216,22 @@ fn normalize_schema(schema_version: SchemaVersion, schema: &X07SchemaFile) -> Re
 
         let (module_id, tests_module_id) =
             derive_module_ids(schema.package.name.trim(), &t.type_id, t.version)?;
+        let derived_brand_id = derive_brand_id(schema.package.name.trim(), &t.type_id, t.version)?;
+        if let Some(raw_brand) = t.brand.as_deref() {
+            let brand = raw_brand.trim();
+            if brand.is_empty() {
+                anyhow::bail!("types[{idx}].brand must be non-empty if set");
+            }
+            x07c::validate::validate_module_id(brand)
+                .map_err(|e| anyhow::anyhow!("types[{idx}].brand invalid: {e}"))?;
+            if brand != derived_brand_id {
+                anyhow::bail!(
+                    "types[{idx}].brand must match derived brand_id {:?}; got {:?}",
+                    derived_brand_id,
+                    brand
+                );
+            }
+        }
 
         let mut variants: Vec<VariantDef> = Vec::new();
         let mut fields: Vec<FieldDef> = Vec::new();
@@ -1477,6 +1497,7 @@ fn normalize_schema(schema_version: SchemaVersion, schema: &X07SchemaFile) -> Re
             tests_module_id,
             type_id: t.type_id.trim().to_string(),
             version: t.version,
+            brand_id: derived_brand_id,
             kind,
             err_base: t.err_base,
             max_doc_bytes: effective_max_doc_bytes,
@@ -1800,15 +1821,7 @@ fn parse_example_value_typed(
 }
 
 fn derive_module_ids(pkg: &str, type_id: &str, version: i32) -> Result<(String, String)> {
-    let type_id = type_id.trim();
-    if type_id.is_empty() {
-        anyhow::bail!("type_id must be non-empty");
-    }
-    let type_mod = if let Some((prefix, last)) = type_id.rsplit_once('.') {
-        format!("{prefix}.{last}_v{version}")
-    } else {
-        format!("{type_id}_v{version}")
-    };
+    let type_mod = derive_type_mod(type_id, version)?;
     let module_id = format!("{pkg}.schema.{type_mod}");
     x07c::validate::validate_module_id(&module_id)
         .map_err(|e| anyhow::anyhow!("invalid derived module_id {module_id:?}: {e}"))?;
@@ -1818,6 +1831,30 @@ fn derive_module_ids(pkg: &str, type_id: &str, version: i32) -> Result<(String, 
         .map_err(|e| anyhow::anyhow!("invalid derived tests module_id {tests_module_id:?}: {e}"))?;
 
     Ok((module_id, tests_module_id))
+}
+
+fn derive_type_mod(type_id: &str, version: i32) -> Result<String> {
+    let type_id = type_id.trim();
+    if type_id.is_empty() {
+        anyhow::bail!("type_id must be non-empty");
+    }
+    if version <= 0 {
+        anyhow::bail!("type version must be >= 1");
+    }
+    let type_mod = if let Some((prefix, last)) = type_id.rsplit_once('.') {
+        format!("{prefix}.{last}_v{version}")
+    } else {
+        format!("{type_id}_v{version}")
+    };
+    Ok(type_mod)
+}
+
+fn derive_brand_id(pkg: &str, type_id: &str, version: i32) -> Result<String> {
+    let type_mod = derive_type_mod(type_id, version)?;
+    let brand_id = format!("{pkg}.{type_mod}");
+    x07c::validate::validate_module_id(&brand_id)
+        .map_err(|e| anyhow::anyhow!("invalid derived brand_id {brand_id:?}: {e}"))?;
+    Ok(brand_id)
 }
 
 fn generate_type_outputs(
@@ -2126,6 +2163,12 @@ fn generate_runtime_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Resul
     functions.push(gen_validate_doc(td)?);
     add_export_name(
         td,
+        &format!("{}.cast_doc_view_v1", td.module_id),
+        &mut exports,
+    );
+    functions.push(gen_cast_doc_view(td)?);
+    add_export_name(
+        td,
         &format!("{}.validate_value_v1", td.module_id),
         &mut exports,
     );
@@ -2283,6 +2326,12 @@ fn generate_runtime_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<
         &mut exports,
     );
     functions.push(gen_enum_validate_doc(type_index, td)?);
+    add_export_name(
+        td,
+        &format!("{}.cast_doc_view_v1", td.module_id),
+        &mut exports,
+    );
+    functions.push(gen_cast_doc_view(td)?);
 
     add_export_name(
         td,
@@ -3698,8 +3747,29 @@ fn gen_encode_doc(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::ResultBytes,
-        ret_brand: None,
+        ret_brand: Some(td.brand_id.clone()),
         body: e_begin(stmts),
+    })
+}
+
+fn gen_cast_doc_view(td: &TypeDef) -> Result<FunctionDef> {
+    Ok(FunctionDef {
+        name: format!("{}.cast_doc_view_v1", td.module_id),
+        params: vec![FunctionParam {
+            name: "doc".to_string(),
+            ty: Ty::BytesView,
+            brand: None,
+        }],
+        ret_ty: Ty::ResultBytesView,
+        ret_brand: Some(td.brand_id.clone()),
+        body: e_call(
+            "std.brand.cast_view_v1",
+            vec![
+                e_ident(&td.brand_id),
+                e_ident(format!("{}.validate_doc_v1", td.module_id)),
+                e_ident("doc"),
+            ],
+        ),
     })
 }
 
@@ -3809,7 +3879,7 @@ fn gen_encode_value(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::ResultBytes,
-        ret_brand: None,
+        ret_brand: Some(td.brand_id.clone()),
         body: e_begin(stmts),
     })
 }
@@ -4542,7 +4612,7 @@ fn gen_field_accessors(td: &TypeDef, f: &FieldDef) -> Result<Vec<FunctionDef>> {
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
-            brand: None,
+            brand: Some(td.brand_id.clone()),
         }],
         ret_ty: getter_ret,
         ret_brand: None,
@@ -4556,7 +4626,7 @@ fn gen_field_accessors(td: &TypeDef, f: &FieldDef) -> Result<Vec<FunctionDef>> {
             params: vec![FunctionParam {
                 name: "doc".to_string(),
                 ty: Ty::BytesView,
-                brand: None,
+                brand: Some(td.brand_id.clone()),
             }],
             ret_ty: Ty::I32,
             ret_brand: None,
@@ -5021,7 +5091,7 @@ fn gen_enum_get_tag_view(td: &TypeDef) -> Result<FunctionDef> {
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
-            brand: None,
+            brand: Some(td.brand_id.clone()),
         }],
         ret_ty: Ty::BytesView,
         ret_brand: None,
@@ -5038,7 +5108,7 @@ fn gen_enum_get_payload_value_view(td: &TypeDef) -> Result<FunctionDef> {
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
-            brand: None,
+            brand: Some(td.brand_id.clone()),
         }],
         ret_ty: Ty::BytesView,
         ret_brand: None,
@@ -8496,6 +8566,16 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
             e_call("bytes.view", vec![e_ident(format!("doc_{}", ex_prefix))]),
         ));
         stmts.push(e_let(
+            &format!("docv_typed_{}", ex_prefix),
+            e_call(
+                "try",
+                vec![e_call(
+                    &format!("{}.cast_doc_view_v1", td.module_id),
+                    vec![e_ident(format!("docv_{}", ex_prefix))],
+                )],
+            ),
+        ));
+        stmts.push(e_let(
             &format!("vr_{}", ex_prefix),
             e_call(
                 &format!("{}.validate_doc_v1", td.module_id),
@@ -8524,7 +8604,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                         &got,
                         e_call(
                             &format!("{}.get_{}_v1", td.module_id, f.name),
-                            vec![e_ident(format!("docv_{}", ex_prefix))],
+                            vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                         ),
                     ));
                     stmts.push(e_call(
@@ -8544,7 +8624,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                             &has,
                             e_call(
                                 &format!("{}.has_{}_v1", td.module_id, f.name),
-                                vec![e_ident(format!("docv_{}", ex_prefix))],
+                                vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                             ),
                         ));
                         stmts.push(e_call(
@@ -8567,7 +8647,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                         &got,
                         e_call(
                             &format!("{}.get_{}_v1", td.module_id, f.name),
-                            vec![e_ident(format!("docv_{}", ex_prefix))],
+                            vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                         ),
                     ));
                     stmts.push(e_call(
@@ -8585,7 +8665,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                         &has,
                         e_call(
                             &format!("{}.has_{}_v1", td.module_id, f.name),
-                            vec![e_ident(format!("docv_{}", ex_prefix))],
+                            vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                         ),
                     ));
                     stmts.push(e_call(
@@ -8606,7 +8686,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                         &got,
                         e_call(
                             &format!("{}.get_{}_view_v1", td.module_id, f.name),
-                            vec![e_ident(format!("docv_{}", ex_prefix))],
+                            vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                         ),
                     ));
                     stmts.push(e_call(
@@ -8629,7 +8709,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                             &has,
                             e_call(
                                 &format!("{}.has_{}_v1", td.module_id, f.name),
-                                vec![e_ident(format!("docv_{}", ex_prefix))],
+                                vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                             ),
                         ));
                         stmts.push(e_call(
@@ -8651,7 +8731,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                         &got,
                         e_call(
                             &format!("{}.get_{}_view_v1", td.module_id, f.name),
-                            vec![e_ident(format!("docv_{}", ex_prefix))],
+                            vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                         ),
                     ));
                     stmts.push(e_call(
@@ -8670,7 +8750,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                         &has,
                         e_call(
                             &format!("{}.has_{}_v1", td.module_id, f.name),
-                            vec![e_ident(format!("docv_{}", ex_prefix))],
+                            vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                         ),
                     ));
                     stmts.push(e_call(
@@ -8691,7 +8771,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                         &got,
                         e_call(
                             &format!("{}.get_{}_value_view_v1", td.module_id, f.name),
-                            vec![e_ident(format!("docv_{}", ex_prefix))],
+                            vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                         ),
                     ));
                     stmts.push(e_call(
@@ -8714,7 +8794,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                             &has,
                             e_call(
                                 &format!("{}.has_{}_v1", td.module_id, f.name),
-                                vec![e_ident(format!("docv_{}", ex_prefix))],
+                                vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                             ),
                         ));
                         stmts.push(e_call(
@@ -8736,7 +8816,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                         &got,
                         e_call(
                             &format!("{}.get_{}_value_view_v1", td.module_id, f.name),
-                            vec![e_ident(format!("docv_{}", ex_prefix))],
+                            vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                         ),
                     ));
                     stmts.push(e_call(
@@ -8755,7 +8835,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
                         &has,
                         e_call(
                             &format!("{}.has_{}_v1", td.module_id, f.name),
-                            vec![e_ident(format!("docv_{}", ex_prefix))],
+                            vec![e_ident(format!("docv_typed_{}", ex_prefix))],
                         ),
                     ));
                     stmts.push(e_call(
@@ -8891,6 +8971,16 @@ fn gen_test_vectors_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<Functio
             e_call("bytes.view", vec![e_ident(format!("doc_{}", ex_prefix))]),
         ));
         stmts.push(e_let(
+            &format!("docv_typed_{}", ex_prefix),
+            e_call(
+                "try",
+                vec![e_call(
+                    &format!("{}.cast_doc_view_v1", td.module_id),
+                    vec![e_ident(format!("docv_{}", ex_prefix))],
+                )],
+            ),
+        ));
+        stmts.push(e_let(
             &format!("vr_{}", ex_prefix),
             e_call(
                 &format!("{}.validate_doc_v1", td.module_id),
@@ -8915,7 +9005,7 @@ fn gen_test_vectors_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<Functio
             &format!("got_tag_{}", ex_prefix),
             e_call(
                 &format!("{}.get_tag_view_v1", td.module_id),
-                vec![e_ident(format!("docv_{}", ex_prefix))],
+                vec![e_ident(format!("docv_typed_{}", ex_prefix))],
             ),
         ));
         stmts.push(e_call(
@@ -8934,7 +9024,7 @@ fn gen_test_vectors_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<Functio
             &format!("got_payload_{}", ex_prefix),
             e_call(
                 &format!("{}.get_payload_value_view_v1", td.module_id),
-                vec![e_ident(format!("docv_{}", ex_prefix))],
+                vec![e_ident(format!("docv_typed_{}", ex_prefix))],
             ),
         ));
         stmts.push(e_call(

@@ -21,6 +21,9 @@ Internal notes for the schema derivation tool (end-user docs live in `docs/toolc
 - Generated modules: `modules/<pkg>/schema/**`
 - Generated test manifest: `tests/tests.json`
 - Optional report (`--report-json`): `schema_version: "x07.schema.derive.report@0.1.0"`
+- Derived runtime modules use branded bytes for validated docs:
+  - brand id is derived as `<pkg>.<type_id>_vN`
+  - modules export `cast_doc_view_v1(doc: bytes_view) -> result_bytes_view@brand`
 
 ## Canonicalization (`specrows@0.2.0`)
 
@@ -35,4 +38,3 @@ Internal notes for the schema derivation tool (end-user docs live in `docs/toolc
 
 - Schema derive smoke fixtures: `tests/fixtures/schema_derive/*.x07schema.json`
 - CLI smoke tests: `crates/x07/tests/cli.rs`
-

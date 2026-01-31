@@ -26,6 +26,11 @@ Notes:
 
 - Boundary encoding is pinned to `ext.data_model.doc_v1`.
 - Example values for `number` fields must be JSON strings (decimal bytes), not JSON numbers.
+- Derived runtime modules use branded bytes for validated docs:
+  - brand id is derived as `<pkg>.<type_id>_vN` (example: `example.api.req_v1`)
+  - `encode_doc_v1(...) -> result_bytes@brand`
+  - `cast_doc_view_v1(doc: bytes_view) -> result_bytes_view@brand` (validated cast)
+  - doc accessors accept `bytes_view@brand`
 
 ## Output layout
 
@@ -53,4 +58,3 @@ Derived tests include deterministic negative vectors for:
 - non-canonical map ordering
 - duplicate keys
 - non-canonical number representations (validator + encoder rejection)
-
