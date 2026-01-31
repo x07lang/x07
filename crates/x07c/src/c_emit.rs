@@ -8,9 +8,102 @@ use crate::native::NativeBackendReq;
 use crate::program::{AsyncFunctionDef, ExternFunctionDecl, FunctionDef, FunctionParam, Program};
 use crate::types::Ty;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TyBrand {
+    None,
+    Any,
+    Brand(String),
+}
+
+impl TyBrand {
+    fn is_none(&self) -> bool {
+        matches!(self, TyBrand::None)
+    }
+
+    fn as_str(&self) -> Option<&str> {
+        match self {
+            TyBrand::Brand(b) => Some(b.as_str()),
+            TyBrand::None | TyBrand::Any => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct TyInfo {
+    ty: Ty,
+    brand: TyBrand,
+    view_full: bool,
+}
+
+impl TyInfo {
+    fn unbranded(ty: Ty) -> Self {
+        Self {
+            ty,
+            brand: TyBrand::None,
+            view_full: false,
+        }
+    }
+
+    fn branded(ty: Ty, brand: String) -> Self {
+        Self {
+            ty,
+            brand: TyBrand::Brand(brand),
+            view_full: false,
+        }
+    }
+
+    fn is_ptr_ty(&self) -> bool {
+        self.ty.is_ptr_ty()
+    }
+}
+
+impl PartialEq for TyInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty && self.brand == other.brand
+    }
+}
+
+impl Eq for TyInfo {}
+
+impl From<Ty> for TyInfo {
+    fn from(ty: Ty) -> Self {
+        TyInfo::unbranded(ty)
+    }
+}
+
+impl PartialEq<Ty> for TyInfo {
+    fn eq(&self, other: &Ty) -> bool {
+        self.ty == *other
+    }
+}
+
+impl PartialEq<TyInfo> for Ty {
+    fn eq(&self, other: &TyInfo) -> bool {
+        *self == other.ty
+    }
+}
+
+fn ty_brand_from_opt(v: &Option<String>) -> TyBrand {
+    v.as_ref()
+        .map(|b| TyBrand::Brand(b.clone()))
+        .unwrap_or(TyBrand::None)
+}
+
+fn tybrand_diag(brand: &TyBrand) -> String {
+    if let Some(b) = brand.as_str() {
+        return b.to_string();
+    }
+    match brand {
+        TyBrand::Any => "any".to_string(),
+        TyBrand::None => "unbranded".to_string(),
+        TyBrand::Brand(_) => unreachable!(),
+    }
+}
+
 #[derive(Debug, Clone)]
 struct VarRef {
     ty: Ty,
+    brand: TyBrand,
     c_name: String,
     moved: bool,
     moved_ptr: Option<String>,
@@ -18,6 +111,7 @@ struct VarRef {
     // For `bytes_view` values that borrow from an owned buffer, this is the C local name of the
     // owner (`bytes_t` or `vec_u8_t`) whose backing allocation must outlive the view.
     borrow_of: Option<String>,
+    borrow_is_full: bool,
     // Temporaries participate in scope cleanup (drops / borrow releases).
     is_temp: bool,
 }
@@ -25,6 +119,7 @@ struct VarRef {
 #[derive(Debug, Clone)]
 struct AsyncVarRef {
     ty: Ty,
+    brand: TyBrand,
     c_name: String,
     moved: bool,
     moved_ptr: Option<String>,
@@ -120,6 +215,20 @@ fn merge_view_borrow_from(
     }
 }
 
+struct ViewBorrowFnCache<'a> {
+    cache: &'a mut BTreeMap<String, Option<usize>>,
+    visiting: &'a mut BTreeSet<String>,
+}
+
+impl<'a> ViewBorrowFnCache<'a> {
+    fn new(
+        cache: &'a mut BTreeMap<String, Option<usize>>,
+        visiting: &'a mut BTreeSet<String>,
+    ) -> Self {
+        Self { cache, visiting }
+    }
+}
+
 fn c_escape_string(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len());
     for &b in bytes {
@@ -173,6 +282,13 @@ fn is_owned_ty(ty: Ty) -> bool {
     )
 }
 
+fn is_view_like_ty(ty: Ty) -> bool {
+    matches!(
+        ty,
+        Ty::BytesView | Ty::OptionBytesView | Ty::ResultBytesView
+    )
+}
+
 fn is_task_handle_ty(ty: Ty) -> bool {
     matches!(ty, Ty::TaskHandleBytesV1 | Ty::TaskHandleResultBytesV1)
 }
@@ -187,6 +303,77 @@ fn ty_compat_call_arg(got: Ty, want: Ty) -> bool {
             (got, want),
             (Ty::Bytes, Ty::BytesView) | (Ty::VecU8, Ty::BytesView)
         )
+}
+
+fn tybrand_compat(base: Ty, got: &TyBrand, want: &TyBrand) -> bool {
+    match want {
+        TyBrand::None => true,
+        TyBrand::Any => matches!(got, TyBrand::Any),
+        TyBrand::Brand(want_brand) => match got {
+            TyBrand::Brand(got_brand) => got_brand == want_brand,
+            TyBrand::Any => matches!(
+                base,
+                Ty::OptionBytes | Ty::OptionBytesView | Ty::ResultBytes | Ty::ResultBytesView
+            ),
+            TyBrand::None => false,
+        },
+    }
+}
+
+fn tybrand_join(base: Ty, a: &TyBrand, b: &TyBrand) -> TyBrand {
+    let allow_any = matches!(
+        base,
+        Ty::OptionBytes | Ty::OptionBytesView | Ty::ResultBytes | Ty::ResultBytesView
+    );
+    if allow_any {
+        if matches!(a, TyBrand::Any) && matches!(b, TyBrand::Any) {
+            return TyBrand::Any;
+        }
+        if matches!(a, TyBrand::Any) {
+            return b.clone();
+        }
+        if matches!(b, TyBrand::Any) {
+            return a.clone();
+        }
+    }
+
+    match (a, b) {
+        (TyBrand::Brand(a), TyBrand::Brand(b)) if a == b => TyBrand::Brand(a.clone()),
+        _ => TyBrand::None,
+    }
+}
+
+fn tyinfo_compat_assign(got: &TyInfo, want: &TyInfo) -> bool {
+    ty_compat_task_handle_as_i32(got.ty, want.ty)
+        || (got.ty == want.ty && tybrand_compat(want.ty, &got.brand, &want.brand))
+}
+
+fn tyinfo_compat_call_arg(got: &TyInfo, want: &TyInfo) -> bool {
+    if ty_compat_task_handle_as_i32(got.ty, want.ty) {
+        return true;
+    }
+    if got.ty == want.ty {
+        return tybrand_compat(want.ty, &got.brand, &want.brand);
+    }
+    match (got.ty, want.ty) {
+        (Ty::Bytes, Ty::BytesView) => tybrand_compat(Ty::BytesView, &got.brand, &want.brand),
+        (Ty::VecU8, Ty::BytesView) => tybrand_compat(Ty::BytesView, &TyBrand::None, &want.brand),
+        _ => false,
+    }
+}
+
+fn call_arg_mismatch_message(head: &str, idx: usize, got: &TyInfo, want: &TyInfo) -> String {
+    let base_ok = ty_compat_call_arg(got.ty, want.ty) || got.ty == want.ty;
+    if base_ok && !want.brand.is_none() {
+        return format!(
+            "E_BRAND_MISMATCH: call {head:?} arg {idx} expected {:?}@{}, got {:?}@{}",
+            want.ty,
+            tybrand_diag(&want.brand),
+            got.ty,
+            tybrand_diag(&got.brand),
+        );
+    }
+    format!("call {head:?} arg {idx} expects {:?}", want.ty)
 }
 
 fn ty_compat_call_arg_extern(got: Ty, want: Ty) -> bool {
@@ -344,6 +531,8 @@ struct Emitter<'a> {
     async_fn_new_names: BTreeMap<String, String>,
     extern_functions: BTreeMap<String, ExternFunctionDecl>,
     fn_view_return_arg: BTreeMap<String, Option<usize>>,
+    fn_option_bytes_view_return_arg: BTreeMap<String, Option<usize>>,
+    fn_result_bytes_view_return_arg: BTreeMap<String, Option<usize>>,
     fn_ret_ty: Ty,
     allow_async_ops: bool,
     unsafe_depth: usize,
@@ -387,6 +576,8 @@ impl<'a> Emitter<'a> {
             async_fn_new_names,
             extern_functions,
             fn_view_return_arg: BTreeMap::new(),
+            fn_option_bytes_view_return_arg: BTreeMap::new(),
+            fn_result_bytes_view_return_arg: BTreeMap::new(),
             fn_ret_ty: Ty::Bytes,
             allow_async_ops: false,
             unsafe_depth: 0,
@@ -457,11 +648,13 @@ impl<'a> Emitter<'a> {
     fn make_var_ref(&self, ty: Ty, c_name: String, is_temp: bool) -> VarRef {
         VarRef {
             ty,
+            brand: TyBrand::None,
             c_name,
             moved: false,
             moved_ptr: None,
             borrow_count: 0,
             borrow_of: None,
+            borrow_is_full: false,
             is_temp,
         }
     }
@@ -518,7 +711,7 @@ impl<'a> Emitter<'a> {
     }
 
     fn release_temp_view_borrow(&mut self, view: &VarRef) -> Result<(), CompilerError> {
-        if view.ty != Ty::BytesView || !view.is_temp {
+        if !is_view_like_ty(view.ty) || !view.is_temp {
             return Ok(());
         }
         let Some(owner) = &view.borrow_of else {
@@ -653,6 +846,52 @@ impl<'a> Emitter<'a> {
                             (None, None) => Ok(None),
                         }
                     }
+                    "std.brand.erase_view_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.erase_view_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        self.borrow_of_view_expr(&args[0])
+                    }
+                    "__internal.brand.assume_view_v1" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.brand.assume_view_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        self.borrow_of_view_expr(&args[1])
+                    }
+                    "std.brand.view_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.view_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let Some(owner_name) = args.first().and_then(Expr::as_ident) else {
+                            return Err(self.err(
+                                CompileErrorKind::Typing,
+                                "std.brand.view_v1 requires an identifier owner (bind the value to a local with let first)"
+                                    .to_string(),
+                            ));
+                        };
+                        let Some(owner) = self.lookup(owner_name) else {
+                            return Err(self.err(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {owner_name:?}"),
+                            ));
+                        };
+                        if owner.ty != Ty::Bytes {
+                            return Err(self.err(
+                                CompileErrorKind::Typing,
+                                "std.brand.view_v1 expects bytes owner".to_string(),
+                            ));
+                        }
+                        Ok(Some(owner.c_name.clone()))
+                    }
                     "bytes.view" | "bytes.subview" => {
                         let Some(owner_name) = args.first().and_then(Expr::as_ident) else {
                             return Err(self.err(
@@ -707,6 +946,63 @@ impl<'a> Emitter<'a> {
                         }
                         self.borrow_of_view_expr(&args[0])
                     }
+                    "option_bytes_view.unwrap_or" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "option_bytes_view.unwrap_or expects 2 args".to_string(),
+                            ));
+                        }
+                        let a = self.borrow_of_as_bytes_view(&args[0])?;
+                        let b = self.borrow_of_as_bytes_view(&args[1])?;
+                        match (a, b) {
+                            (Some(a), Some(b)) => {
+                                if a != b {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "bytes_view must have a single borrow source across branches"
+                                            .to_string(),
+                                    ));
+                                }
+                                Ok(Some(a))
+                            }
+                            (Some(a), None) | (None, Some(a)) => Ok(Some(a)),
+                            (None, None) => Ok(None),
+                        }
+                    }
+                    "result_bytes_view.unwrap_or" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_bytes_view.unwrap_or expects 2 args".to_string(),
+                            ));
+                        }
+                        let a = self.borrow_of_as_bytes_view(&args[0])?;
+                        let b = self.borrow_of_as_bytes_view(&args[1])?;
+                        match (a, b) {
+                            (Some(a), Some(b)) => {
+                                if a != b {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "bytes_view must have a single borrow source across branches"
+                                            .to_string(),
+                                    ));
+                                }
+                                Ok(Some(a))
+                            }
+                            (Some(a), None) | (None, Some(a)) => Ok(Some(a)),
+                            (None, None) => Ok(None),
+                        }
+                    }
+                    "try" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "try expects 1 arg".to_string(),
+                            ));
+                        }
+                        self.borrow_of_as_bytes_view(&args[0])
+                    }
                     // Views that borrow from runtime state (not from a user-owned buffer).
                     "bufread.fill" => Ok(None),
                     "scratch_u8_fixed_v1.as_view" => Ok(None),
@@ -747,6 +1043,249 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    fn borrow_of_option_bytes_view_expr(
+        &self,
+        expr: &Expr,
+    ) -> Result<Option<String>, CompilerError> {
+        match expr {
+            Expr::Ident { name, .. } => {
+                let Some(v) = self.lookup(name) else {
+                    return Err(self.err(
+                        CompileErrorKind::Typing,
+                        format!("unknown identifier: {name:?}"),
+                    ));
+                };
+                if v.ty != Ty::OptionBytesView {
+                    return Err(self.err(
+                        CompileErrorKind::Typing,
+                        format!("expected option_bytes_view, got {:?} for {name:?}", v.ty),
+                    ));
+                }
+                Ok(v.borrow_of.clone())
+            }
+            Expr::List { items, .. } => {
+                let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "list head must be an identifier".to_string(),
+                    )
+                })?;
+                let args = &items[1..];
+                match head {
+                    "begin" | "unsafe" => {
+                        if args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("({head} ...) requires at least 1 expression"),
+                            ));
+                        }
+                        self.borrow_of_option_bytes_view_expr(&args[args.len() - 1])
+                    }
+                    "if" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "if form: (if <cond:i32> <then:any> <else:any>)".to_string(),
+                            ));
+                        }
+                        let t = self.borrow_of_option_bytes_view_expr(&args[1])?;
+                        let e = self.borrow_of_option_bytes_view_expr(&args[2])?;
+                        match (t, e) {
+                            (Some(a), Some(b)) => {
+                                if a != b {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "option_bytes_view must have a single borrow source across branches"
+                                            .to_string(),
+                                    ));
+                                }
+                                Ok(Some(a))
+                            }
+                            (Some(a), None) | (None, Some(a)) => Ok(Some(a)),
+                            (None, None) => Ok(None),
+                        }
+                    }
+                    "option_bytes_view.none" => Ok(None),
+                    "option_bytes_view.some" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "option_bytes_view.some expects 1 arg".to_string(),
+                            ));
+                        }
+                        self.borrow_of_view_expr(&args[0])
+                    }
+                    _ if self.fn_option_bytes_view_return_arg.contains_key(head) => {
+                        let Some(spec) = self.fn_option_bytes_view_return_arg.get(head) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Internal,
+                                format!(
+                                    "internal error: missing option_bytes_view return analysis for {head:?}"
+                                ),
+                            ));
+                        };
+                        match spec {
+                            Some(idx) => {
+                                if args.len() <= *idx {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        format!(
+                                            "call {head:?} needs arg {idx} to infer option_bytes_view borrow source"
+                                        ),
+                                    ));
+                                }
+                                self.borrow_of_as_bytes_view(&args[*idx])
+                            }
+                            None => Ok(None),
+                        }
+                    }
+                    _ => Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "cannot infer borrow source for option_bytes_view expression".to_string(),
+                    )),
+                }
+            }
+            _ => Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "cannot infer borrow source for option_bytes_view expression".to_string(),
+            )),
+        }
+    }
+
+    fn borrow_of_result_bytes_view_expr(
+        &self,
+        expr: &Expr,
+    ) -> Result<Option<String>, CompilerError> {
+        match expr {
+            Expr::Ident { name, .. } => {
+                let Some(v) = self.lookup(name) else {
+                    return Err(self.err(
+                        CompileErrorKind::Typing,
+                        format!("unknown identifier: {name:?}"),
+                    ));
+                };
+                if v.ty != Ty::ResultBytesView {
+                    return Err(self.err(
+                        CompileErrorKind::Typing,
+                        format!("expected result_bytes_view, got {:?} for {name:?}", v.ty),
+                    ));
+                }
+                Ok(v.borrow_of.clone())
+            }
+            Expr::List { items, .. } => {
+                let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "list head must be an identifier".to_string(),
+                    )
+                })?;
+                let args = &items[1..];
+                match head {
+                    "begin" | "unsafe" => {
+                        if args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("({head} ...) requires at least 1 expression"),
+                            ));
+                        }
+                        self.borrow_of_result_bytes_view_expr(&args[args.len() - 1])
+                    }
+                    "if" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "if form: (if <cond:i32> <then:any> <else:any>)".to_string(),
+                            ));
+                        }
+                        let t = self.borrow_of_result_bytes_view_expr(&args[1])?;
+                        let e = self.borrow_of_result_bytes_view_expr(&args[2])?;
+                        match (t, e) {
+                            (Some(a), Some(b)) => {
+                                if a != b {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "result_bytes_view must have a single borrow source across branches"
+                                            .to_string(),
+                                    ));
+                                }
+                                Ok(Some(a))
+                            }
+                            (Some(a), None) | (None, Some(a)) => Ok(Some(a)),
+                            (None, None) => Ok(None),
+                        }
+                    }
+                    "result_bytes_view.ok" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_bytes_view.ok expects 1 arg".to_string(),
+                            ));
+                        }
+                        self.borrow_of_view_expr(&args[0])
+                    }
+                    "result_bytes_view.err" => Ok(None),
+                    "std.brand.cast_view_v1" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_view_v1 expects 3 args".to_string(),
+                            ));
+                        }
+                        self.borrow_of_view_expr(&args[2])
+                    }
+                    _ if self.fn_result_bytes_view_return_arg.contains_key(head) => {
+                        let Some(spec) = self.fn_result_bytes_view_return_arg.get(head) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Internal,
+                                format!(
+                                    "internal error: missing result_bytes_view return analysis for {head:?}"
+                                ),
+                            ));
+                        };
+                        match spec {
+                            Some(idx) => {
+                                if args.len() <= *idx {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        format!(
+                                            "call {head:?} needs arg {idx} to infer result_bytes_view borrow source"
+                                        ),
+                                    ));
+                                }
+                                self.borrow_of_as_bytes_view(&args[*idx])
+                            }
+                            None => Ok(None),
+                        }
+                    }
+                    _ => Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "cannot infer borrow source for result_bytes_view expression".to_string(),
+                    )),
+                }
+            }
+            _ => Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "cannot infer borrow source for result_bytes_view expression".to_string(),
+            )),
+        }
+    }
+
+    fn borrow_of_view_like_expr(
+        &self,
+        ty: Ty,
+        expr: &Expr,
+    ) -> Result<Option<String>, CompilerError> {
+        match ty {
+            Ty::BytesView => self.borrow_of_view_expr(expr),
+            Ty::OptionBytesView => self.borrow_of_option_bytes_view_expr(expr),
+            Ty::ResultBytesView => self.borrow_of_result_bytes_view_expr(expr),
+            other => Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("internal error: borrow_of_view_like_expr unexpected type: {other:?}"),
+            )),
+        }
+    }
+
     fn borrow_of_as_bytes_view(&self, expr: &Expr) -> Result<Option<String>, CompilerError> {
         match expr {
             Expr::Ident { name, .. } => {
@@ -760,7 +1299,9 @@ impl<'a> Emitter<'a> {
                     ));
                 };
                 match v.ty {
-                    Ty::BytesView => Ok(v.borrow_of.clone()),
+                    Ty::BytesView | Ty::OptionBytesView | Ty::ResultBytesView => {
+                        Ok(v.borrow_of.clone())
+                    }
                     Ty::Bytes | Ty::VecU8 => Ok(Some(v.c_name.clone())),
                     other => Err(CompilerError::new(
                         CompileErrorKind::Typing,
@@ -770,8 +1311,10 @@ impl<'a> Emitter<'a> {
             }
             _ => {
                 let ty = self.infer_expr_in_new_scope(expr)?;
-                match ty {
-                    Ty::BytesView => self.borrow_of_view_expr(expr),
+                match ty.ty {
+                    Ty::BytesView | Ty::OptionBytesView | Ty::ResultBytesView => {
+                        self.borrow_of_view_like_expr(ty.ty, expr)
+                    }
                     Ty::Bytes | Ty::VecU8 => Err(CompilerError::new(
                         CompileErrorKind::Typing,
                         "bytes_view borrow source requires an identifier owner".to_string(),
@@ -786,13 +1329,13 @@ impl<'a> Emitter<'a> {
     }
 
     fn compute_view_return_args(&mut self) -> Result<(), CompilerError> {
-        let mut cache: BTreeMap<String, Option<usize>> = BTreeMap::new();
-        let mut visiting: BTreeSet<String> = BTreeSet::new();
+        let mut cache_view: BTreeMap<String, Option<usize>> = BTreeMap::new();
+        let mut visiting_view: BTreeSet<String> = BTreeSet::new();
         for f in &self.program.functions {
             if f.ret_ty != Ty::BytesView {
                 continue;
             }
-            self.view_return_arg_for_fn(&f.name, &mut cache, &mut visiting)
+            self.view_return_arg_for_fn(&f.name, &mut cache_view, &mut visiting_view)
                 .map_err(|e| {
                     CompilerError::new(
                         e.kind,
@@ -800,7 +1343,60 @@ impl<'a> Emitter<'a> {
                     )
                 })?;
         }
-        self.fn_view_return_arg = cache;
+        self.fn_view_return_arg = cache_view.clone();
+
+        let mut cache_view_seed = cache_view;
+        let mut visiting_view_seed: BTreeSet<String> = BTreeSet::new();
+
+        let mut cache_opt: BTreeMap<String, Option<usize>> = BTreeMap::new();
+        let mut visiting_opt: BTreeSet<String> = BTreeSet::new();
+        for f in &self.program.functions {
+            if f.ret_ty != Ty::OptionBytesView {
+                continue;
+            }
+            self.option_bytes_view_return_arg_for_fn(
+                &f.name,
+                &mut cache_opt,
+                &mut visiting_opt,
+                &mut cache_view_seed,
+                &mut visiting_view_seed,
+            )
+            .map_err(|e| {
+                CompilerError::new(
+                    e.kind,
+                    format!(
+                        "{} (option_bytes_view return analysis: {:?})",
+                        e.message, f.name
+                    ),
+                )
+            })?;
+        }
+        self.fn_option_bytes_view_return_arg = cache_opt;
+
+        let mut cache_res: BTreeMap<String, Option<usize>> = BTreeMap::new();
+        let mut visiting_res: BTreeSet<String> = BTreeSet::new();
+        for f in &self.program.functions {
+            if f.ret_ty != Ty::ResultBytesView {
+                continue;
+            }
+            self.result_bytes_view_return_arg_for_fn(
+                &f.name,
+                &mut cache_res,
+                &mut visiting_res,
+                &mut cache_view_seed,
+                &mut visiting_view_seed,
+            )
+            .map_err(|e| {
+                CompilerError::new(
+                    e.kind,
+                    format!(
+                        "{} (result_bytes_view return analysis: {:?})",
+                        e.message, f.name
+                    ),
+                )
+            })?;
+        }
+        self.fn_result_bytes_view_return_arg = cache_res;
         Ok(())
     }
 
@@ -834,7 +1430,9 @@ impl<'a> Emitter<'a> {
         let mut env = ViewBorrowEnv::new();
         for (idx, p) in f.params.iter().enumerate() {
             match p.ty {
-                Ty::BytesView => env.bind(p.name.clone(), ViewBorrowFrom::Param(idx)),
+                Ty::BytesView | Ty::OptionBytesView | Ty::ResultBytesView => {
+                    env.bind(p.name.clone(), ViewBorrowFrom::Param(idx))
+                }
                 Ty::Bytes | Ty::VecU8 => {
                     env.bind(p.name.clone(), ViewBorrowFrom::LocalOwned(p.name.clone()))
                 }
@@ -877,6 +1475,549 @@ impl<'a> Emitter<'a> {
         cache.insert(fn_name.to_string(), spec);
         visiting.remove(fn_name);
         Ok(spec)
+    }
+
+    fn option_bytes_view_return_arg_for_fn(
+        &self,
+        fn_name: &str,
+        cache: &mut BTreeMap<String, Option<usize>>,
+        visiting: &mut BTreeSet<String>,
+        view_cache: &mut BTreeMap<String, Option<usize>>,
+        view_visiting: &mut BTreeSet<String>,
+    ) -> Result<Option<usize>, CompilerError> {
+        let mut cache = ViewBorrowFnCache::new(cache, visiting);
+        let mut view_cache = ViewBorrowFnCache::new(view_cache, view_visiting);
+
+        if let Some(spec) = cache.cache.get(fn_name) {
+            return Ok(*spec);
+        }
+        if !cache.visiting.insert(fn_name.to_string()) {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("recursive option_bytes_view return borrow analysis: {fn_name:?}"),
+            ));
+        }
+
+        let Some(f) = self.program.functions.iter().find(|f| f.name == fn_name) else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Internal,
+                format!("internal error: missing function def for {fn_name:?}"),
+            ));
+        };
+        if f.ret_ty != Ty::OptionBytesView {
+            cache.visiting.remove(fn_name);
+            return Ok(None);
+        }
+
+        let mut env = ViewBorrowEnv::new();
+        for (idx, p) in f.params.iter().enumerate() {
+            match p.ty {
+                Ty::BytesView | Ty::OptionBytesView | Ty::ResultBytesView => {
+                    env.bind(p.name.clone(), ViewBorrowFrom::Param(idx))
+                }
+                Ty::Bytes | Ty::VecU8 => {
+                    env.bind(p.name.clone(), ViewBorrowFrom::LocalOwned(p.name.clone()))
+                }
+                _ => {}
+            }
+        }
+
+        let mut collector = ViewBorrowCollector::default();
+        let body_src = self.infer_option_bytes_view_borrow_from_expr(
+            fn_name,
+            &f.body,
+            &mut env,
+            &mut cache,
+            &mut view_cache,
+            &mut collector,
+        )?;
+        if let Some(src) = body_src {
+            collector.merge(fn_name, src)?;
+        }
+
+        let final_src = collector.src.unwrap_or(ViewBorrowFrom::Runtime);
+        let spec = match final_src {
+            ViewBorrowFrom::Runtime => None,
+            ViewBorrowFrom::Param(i) => Some(i),
+            ViewBorrowFrom::LocalOwned(owner) => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "function {fn_name:?} returns option_bytes_view borrowed from local owned buffer {owner:?}"
+                    ),
+                ));
+            }
+        };
+        cache.cache.insert(fn_name.to_string(), spec);
+        cache.visiting.remove(fn_name);
+        Ok(spec)
+    }
+
+    fn require_option_bytes_view_borrow_from_expr(
+        &self,
+        fn_name: &str,
+        expr: &Expr,
+        env: &mut ViewBorrowEnv,
+        cache: &mut ViewBorrowFnCache,
+        view_cache: &mut ViewBorrowFnCache,
+        collector: &mut ViewBorrowCollector,
+    ) -> Result<ViewBorrowFrom, CompilerError> {
+        if let Some(src) = self.infer_option_bytes_view_borrow_from_expr(
+            fn_name, expr, env, cache, view_cache, collector,
+        )? {
+            return Ok(src);
+        }
+        Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("cannot infer option_bytes_view borrow source in function {fn_name:?}"),
+        ))
+    }
+
+    fn infer_option_bytes_view_borrow_from_expr(
+        &self,
+        fn_name: &str,
+        expr: &Expr,
+        env: &mut ViewBorrowEnv,
+        cache: &mut ViewBorrowFnCache,
+        view_cache: &mut ViewBorrowFnCache,
+        collector: &mut ViewBorrowCollector,
+    ) -> Result<Option<ViewBorrowFrom>, CompilerError> {
+        match expr {
+            Expr::Int { .. } => Ok(None),
+            Expr::Ident { name, .. } => Ok(env.lookup(name)),
+            Expr::List { items, .. } => {
+                let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "list head must be an identifier".to_string(),
+                    )
+                })?;
+                let args = &items[1..];
+
+                match head {
+                    "begin" | "unsafe" => {
+                        if args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("({head} ...) requires at least 1 expression"),
+                            ));
+                        }
+                        env.push_scope();
+                        for e in &args[..args.len() - 1] {
+                            let _ = self.infer_option_bytes_view_borrow_from_expr(
+                                fn_name, e, env, cache, view_cache, collector,
+                            )?;
+                        }
+                        let out = self.infer_option_bytes_view_borrow_from_expr(
+                            fn_name,
+                            &args[args.len() - 1],
+                            env,
+                            cache,
+                            view_cache,
+                            collector,
+                        )?;
+                        env.pop_scope();
+                        Ok(out)
+                    }
+                    "if" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "if form: (if <cond:i32> <then:any> <else:any>)".to_string(),
+                            ));
+                        }
+                        env.push_scope();
+                        let t = self.infer_option_bytes_view_borrow_from_expr(
+                            fn_name, &args[1], env, cache, view_cache, collector,
+                        )?;
+                        env.pop_scope();
+
+                        env.push_scope();
+                        let e = self.infer_option_bytes_view_borrow_from_expr(
+                            fn_name, &args[2], env, cache, view_cache, collector,
+                        )?;
+                        env.pop_scope();
+
+                        match (t, e) {
+                            (Some(a), Some(b)) => Ok(Some(merge_view_borrow_from(fn_name, a, b)?)),
+                            (Some(a), None) | (None, Some(a)) => Ok(Some(a)),
+                            (None, None) => Ok(None),
+                        }
+                    }
+                    "let" | "set" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} form: ({head} <name> <expr>)"),
+                            ));
+                        }
+                        let name = args[0].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} name must be an identifier"),
+                            )
+                        })?;
+
+                        let src = self.infer_option_bytes_view_borrow_from_expr(
+                            fn_name, &args[1], env, cache, view_cache, collector,
+                        )?;
+                        if let Some(src) = &src {
+                            env.bind(name.to_string(), src.clone());
+                        }
+                        Ok(src)
+                    }
+                    "return" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "return form: (return <expr>)".to_string(),
+                            ));
+                        }
+                        let src = self.require_option_bytes_view_borrow_from_expr(
+                            fn_name, &args[0], env, cache, view_cache, collector,
+                        )?;
+                        collector.merge(fn_name, src)?;
+                        Ok(None)
+                    }
+                    "option_bytes_view.none" => Ok(Some(ViewBorrowFrom::Runtime)),
+                    "option_bytes_view.some" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "option_bytes_view.some expects 1 arg".to_string(),
+                            ));
+                        }
+                        let src = self.require_view_borrow_from_expr(
+                            fn_name,
+                            &args[0],
+                            env,
+                            &mut *view_cache.cache,
+                            &mut *view_cache.visiting,
+                            collector,
+                        )?;
+                        Ok(Some(src))
+                    }
+                    _ => {
+                        let Some(f) = self.program.functions.iter().find(|f| f.name == head) else {
+                            return Ok(None);
+                        };
+                        if f.ret_ty != Ty::OptionBytesView {
+                            return Ok(None);
+                        }
+                        let (cache_map, cache_visiting) = (&mut *cache.cache, &mut *cache.visiting);
+                        let (view_cache_map, view_cache_visiting) =
+                            (&mut *view_cache.cache, &mut *view_cache.visiting);
+                        let spec = self.option_bytes_view_return_arg_for_fn(
+                            head,
+                            cache_map,
+                            cache_visiting,
+                            view_cache_map,
+                            view_cache_visiting,
+                        )?;
+                        match spec {
+                            None => Ok(Some(ViewBorrowFrom::Runtime)),
+                            Some(idx) => {
+                                if args.len() <= idx {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        format!("call {head:?} missing arg {idx}"),
+                                    ));
+                                }
+                                let src = self.require_view_borrow_from_expr(
+                                    fn_name,
+                                    &args[idx],
+                                    env,
+                                    &mut *view_cache.cache,
+                                    &mut *view_cache.visiting,
+                                    collector,
+                                )?;
+                                Ok(Some(src))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn result_bytes_view_return_arg_for_fn(
+        &self,
+        fn_name: &str,
+        cache: &mut BTreeMap<String, Option<usize>>,
+        visiting: &mut BTreeSet<String>,
+        view_cache: &mut BTreeMap<String, Option<usize>>,
+        view_visiting: &mut BTreeSet<String>,
+    ) -> Result<Option<usize>, CompilerError> {
+        let mut cache = ViewBorrowFnCache::new(cache, visiting);
+        let mut view_cache = ViewBorrowFnCache::new(view_cache, view_visiting);
+
+        if let Some(spec) = cache.cache.get(fn_name) {
+            return Ok(*spec);
+        }
+        if !cache.visiting.insert(fn_name.to_string()) {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("recursive result_bytes_view return borrow analysis: {fn_name:?}"),
+            ));
+        }
+
+        let Some(f) = self.program.functions.iter().find(|f| f.name == fn_name) else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Internal,
+                format!("internal error: missing function def for {fn_name:?}"),
+            ));
+        };
+        if f.ret_ty != Ty::ResultBytesView {
+            cache.visiting.remove(fn_name);
+            return Ok(None);
+        }
+
+        let mut env = ViewBorrowEnv::new();
+        for (idx, p) in f.params.iter().enumerate() {
+            match p.ty {
+                Ty::BytesView | Ty::OptionBytesView | Ty::ResultBytesView => {
+                    env.bind(p.name.clone(), ViewBorrowFrom::Param(idx))
+                }
+                Ty::Bytes | Ty::VecU8 => {
+                    env.bind(p.name.clone(), ViewBorrowFrom::LocalOwned(p.name.clone()))
+                }
+                _ => {}
+            }
+        }
+
+        let mut collector = ViewBorrowCollector::default();
+        let body_src = self.infer_result_bytes_view_borrow_from_expr(
+            fn_name,
+            &f.body,
+            &mut env,
+            &mut cache,
+            &mut view_cache,
+            &mut collector,
+        )?;
+        if let Some(src) = body_src {
+            collector.merge(fn_name, src)?;
+        }
+
+        let final_src = collector.src.unwrap_or(ViewBorrowFrom::Runtime);
+        let spec = match final_src {
+            ViewBorrowFrom::Runtime => None,
+            ViewBorrowFrom::Param(i) => Some(i),
+            ViewBorrowFrom::LocalOwned(owner) => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "function {fn_name:?} returns result_bytes_view borrowed from local owned buffer {owner:?}"
+                    ),
+                ));
+            }
+        };
+        cache.cache.insert(fn_name.to_string(), spec);
+        cache.visiting.remove(fn_name);
+        Ok(spec)
+    }
+
+    fn require_result_bytes_view_borrow_from_expr(
+        &self,
+        fn_name: &str,
+        expr: &Expr,
+        env: &mut ViewBorrowEnv,
+        cache: &mut ViewBorrowFnCache,
+        view_cache: &mut ViewBorrowFnCache,
+        collector: &mut ViewBorrowCollector,
+    ) -> Result<ViewBorrowFrom, CompilerError> {
+        if let Some(src) = self.infer_result_bytes_view_borrow_from_expr(
+            fn_name, expr, env, cache, view_cache, collector,
+        )? {
+            return Ok(src);
+        }
+        Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("cannot infer result_bytes_view borrow source in function {fn_name:?}"),
+        ))
+    }
+
+    fn infer_result_bytes_view_borrow_from_expr(
+        &self,
+        fn_name: &str,
+        expr: &Expr,
+        env: &mut ViewBorrowEnv,
+        cache: &mut ViewBorrowFnCache,
+        view_cache: &mut ViewBorrowFnCache,
+        collector: &mut ViewBorrowCollector,
+    ) -> Result<Option<ViewBorrowFrom>, CompilerError> {
+        match expr {
+            Expr::Int { .. } => Ok(None),
+            Expr::Ident { name, .. } => Ok(env.lookup(name)),
+            Expr::List { items, .. } => {
+                let head = items.first().and_then(Expr::as_ident).ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "list head must be an identifier".to_string(),
+                    )
+                })?;
+                let args = &items[1..];
+
+                match head {
+                    "begin" | "unsafe" => {
+                        if args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("({head} ...) requires at least 1 expression"),
+                            ));
+                        }
+                        env.push_scope();
+                        for e in &args[..args.len() - 1] {
+                            let _ = self.infer_result_bytes_view_borrow_from_expr(
+                                fn_name, e, env, cache, view_cache, collector,
+                            )?;
+                        }
+                        let out = self.infer_result_bytes_view_borrow_from_expr(
+                            fn_name,
+                            &args[args.len() - 1],
+                            env,
+                            cache,
+                            view_cache,
+                            collector,
+                        )?;
+                        env.pop_scope();
+                        Ok(out)
+                    }
+                    "if" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "if form: (if <cond:i32> <then:any> <else:any>)".to_string(),
+                            ));
+                        }
+                        env.push_scope();
+                        let t = self.infer_result_bytes_view_borrow_from_expr(
+                            fn_name, &args[1], env, cache, view_cache, collector,
+                        )?;
+                        env.pop_scope();
+
+                        env.push_scope();
+                        let e = self.infer_result_bytes_view_borrow_from_expr(
+                            fn_name, &args[2], env, cache, view_cache, collector,
+                        )?;
+                        env.pop_scope();
+
+                        match (t, e) {
+                            (Some(a), Some(b)) => Ok(Some(merge_view_borrow_from(fn_name, a, b)?)),
+                            (Some(a), None) | (None, Some(a)) => Ok(Some(a)),
+                            (None, None) => Ok(None),
+                        }
+                    }
+                    "let" | "set" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} form: ({head} <name> <expr>)"),
+                            ));
+                        }
+                        let name = args[0].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} name must be an identifier"),
+                            )
+                        })?;
+
+                        let src = self.infer_result_bytes_view_borrow_from_expr(
+                            fn_name, &args[1], env, cache, view_cache, collector,
+                        )?;
+                        if let Some(src) = &src {
+                            env.bind(name.to_string(), src.clone());
+                        }
+                        Ok(src)
+                    }
+                    "return" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "return form: (return <expr>)".to_string(),
+                            ));
+                        }
+                        let src = self.require_result_bytes_view_borrow_from_expr(
+                            fn_name, &args[0], env, cache, view_cache, collector,
+                        )?;
+                        collector.merge(fn_name, src)?;
+                        Ok(None)
+                    }
+                    "result_bytes_view.ok" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_bytes_view.ok expects 1 arg".to_string(),
+                            ));
+                        }
+                        let src = self.require_view_borrow_from_expr(
+                            fn_name,
+                            &args[0],
+                            env,
+                            &mut *view_cache.cache,
+                            &mut *view_cache.visiting,
+                            collector,
+                        )?;
+                        Ok(Some(src))
+                    }
+                    "result_bytes_view.err" => Ok(Some(ViewBorrowFrom::Runtime)),
+                    "std.brand.cast_view_v1" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_view_v1 expects 3 args".to_string(),
+                            ));
+                        }
+                        let src = self.require_view_borrow_from_expr(
+                            fn_name,
+                            &args[2],
+                            env,
+                            &mut *view_cache.cache,
+                            &mut *view_cache.visiting,
+                            collector,
+                        )?;
+                        Ok(Some(src))
+                    }
+                    _ => {
+                        let Some(f) = self.program.functions.iter().find(|f| f.name == head) else {
+                            return Ok(None);
+                        };
+                        if f.ret_ty != Ty::ResultBytesView {
+                            return Ok(None);
+                        }
+                        let (cache_map, cache_visiting) = (&mut *cache.cache, &mut *cache.visiting);
+                        let (view_cache_map, view_cache_visiting) =
+                            (&mut *view_cache.cache, &mut *view_cache.visiting);
+                        let spec = self.result_bytes_view_return_arg_for_fn(
+                            head,
+                            cache_map,
+                            cache_visiting,
+                            view_cache_map,
+                            view_cache_visiting,
+                        )?;
+                        match spec {
+                            None => Ok(Some(ViewBorrowFrom::Runtime)),
+                            Some(idx) => {
+                                if args.len() <= idx {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        format!("call {head:?} missing arg {idx}"),
+                                    ));
+                                }
+                                let src = self.require_view_borrow_from_expr(
+                                    fn_name,
+                                    &args[idx],
+                                    env,
+                                    &mut *view_cache.cache,
+                                    &mut *view_cache.visiting,
+                                    collector,
+                                )?;
+                                Ok(Some(src))
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn require_view_borrow_from_expr(
@@ -1028,6 +2169,55 @@ impl<'a> Emitter<'a> {
                         )?;
                         Ok(Some(src))
                     }
+                    "try" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "try expects 1 arg".to_string(),
+                            ));
+                        }
+                        let src = self.require_view_borrow_from_expr(
+                            fn_name, &args[0], env, cache, visiting, collector,
+                        )?;
+                        Ok(Some(src))
+                    }
+                    "std.brand.erase_view_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.erase_view_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let src = self.require_view_borrow_from_expr(
+                            fn_name, &args[0], env, cache, visiting, collector,
+                        )?;
+                        Ok(Some(src))
+                    }
+                    "result_bytes_view.ok" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_bytes_view.ok expects 1 arg".to_string(),
+                            ));
+                        }
+                        let src = self.require_view_borrow_from_expr(
+                            fn_name, &args[0], env, cache, visiting, collector,
+                        )?;
+                        Ok(Some(src))
+                    }
+                    "result_bytes_view.err" => Ok(Some(ViewBorrowFrom::Runtime)),
+                    "std.brand.cast_view_v1" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_view_v1 expects 3 args".to_string(),
+                            ));
+                        }
+                        let src = self.require_view_borrow_from_expr(
+                            fn_name, &args[2], env, cache, visiting, collector,
+                        )?;
+                        Ok(Some(src))
+                    }
                     "bytes.view" | "bytes.subview" | "vec_u8.as_view" => {
                         let Some(owner_name) = args.first().and_then(Expr::as_ident) else {
                             let ptr = ptr.as_str();
@@ -1035,6 +2225,24 @@ impl<'a> Emitter<'a> {
                                 CompileErrorKind::Typing,
                                 format!(
                                     "{head} requires an identifier owner (bind the value to a local with let first) (ptr={ptr})"
+                                ),
+                            ));
+                        };
+                        Ok(Some(ViewBorrowFrom::LocalOwned(owner_name.to_string())))
+                    }
+                    "std.brand.view_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.view_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let Some(owner_name) = args.first().and_then(Expr::as_ident) else {
+                            let ptr = ptr.as_str();
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "std.brand.view_v1 requires an identifier owner (bind the value to a local with let first) (ptr={ptr})"
                                 ),
                             ));
                         };
@@ -1080,7 +2288,7 @@ impl<'a> Emitter<'a> {
         let mut borrows = Vec::<String>::new();
         for scope in &self.scopes {
             for v in scope.values() {
-                if v.ty == Ty::BytesView {
+                if is_view_like_ty(v.ty) {
                     if let Some(owner) = &v.borrow_of {
                         borrows.push(owner.clone());
                     }
@@ -1166,14 +2374,16 @@ impl<'a> Emitter<'a> {
                 let mut v = pre.clone();
                 v.moved = t.moved || e.moved;
                 v.borrow_count = 0;
-                if v.ty == Ty::BytesView {
+                if is_view_like_ty(v.ty) {
                     v.borrow_of = match (t.borrow_of.clone(), e.borrow_of.clone()) {
                         (Some(a), Some(b)) => {
                             if a != b {
                                 return Err(CompilerError::new(
                                     CompileErrorKind::Typing,
-                                    "bytes_view must have a single borrow source across branches"
-                                        .to_string(),
+                                    format!(
+                                        "{:?} must have a single borrow source across branches",
+                                        v.ty
+                                    ),
                                 ));
                             }
                             Some(a)
@@ -1414,20 +2624,35 @@ impl<'a> Emitter<'a> {
         }
 
         let functions = {
-            let mut functions: BTreeMap<String, (Ty, Vec<Ty>)> = BTreeMap::new();
+            let mut functions: BTreeMap<String, FnSig> = BTreeMap::new();
             for fun in &self.program.functions {
                 functions.insert(
                     fun.name.clone(),
-                    (
-                        fun.ret_ty,
-                        fun.params.iter().map(|p| p.ty).collect::<Vec<_>>(),
-                    ),
+                    FnSig {
+                        ret: TyInfo {
+                            ty: fun.ret_ty,
+                            brand: ty_brand_from_opt(&fun.ret_brand),
+                            view_full: false,
+                        },
+                        params: fun
+                            .params
+                            .iter()
+                            .map(|p| TyInfo {
+                                ty: p.ty,
+                                brand: ty_brand_from_opt(&p.brand),
+                                view_full: false,
+                            })
+                            .collect(),
+                    },
                 );
             }
             for fun in &self.program.async_functions {
-                let call_ret_ty = match fun.ret_ty {
-                    Ty::Bytes => Ty::TaskHandleBytesV1,
-                    Ty::ResultBytes => Ty::TaskHandleResultBytesV1,
+                let (call_ret_ty, call_ret_brand) = match fun.ret_ty {
+                    Ty::Bytes => (Ty::TaskHandleBytesV1, ty_brand_from_opt(&fun.ret_brand)),
+                    Ty::ResultBytes => (
+                        Ty::TaskHandleResultBytesV1,
+                        ty_brand_from_opt(&fun.ret_brand),
+                    ),
                     _ => {
                         return Err(CompilerError::new(
                             CompileErrorKind::Internal,
@@ -1440,10 +2665,22 @@ impl<'a> Emitter<'a> {
                 };
                 functions.insert(
                     fun.name.clone(),
-                    (
-                        call_ret_ty,
-                        fun.params.iter().map(|p| p.ty).collect::<Vec<_>>(),
-                    ),
+                    FnSig {
+                        ret: TyInfo {
+                            ty: call_ret_ty,
+                            brand: call_ret_brand,
+                            view_full: false,
+                        },
+                        params: fun
+                            .params
+                            .iter()
+                            .map(|p| TyInfo {
+                                ty: p.ty,
+                                brand: ty_brand_from_opt(&p.brand),
+                                view_full: false,
+                            })
+                            .collect(),
+                    },
                 );
             }
             functions
@@ -1451,7 +2688,7 @@ impl<'a> Emitter<'a> {
 
         struct Machine {
             options: CompileOptions,
-            functions: BTreeMap<String, (Ty, Vec<Ty>)>,
+            functions: BTreeMap<String, FnSig>,
             extern_functions: BTreeMap<String, ExternFunctionDecl>,
             fn_c_names: BTreeMap<String, String>,
             async_fn_new_names: BTreeMap<String, String>,
@@ -1534,16 +2771,17 @@ impl<'a> Emitter<'a> {
                 self.fields.push((name.clone(), ty));
                 Ok(AsyncVarRef {
                     ty,
+                    brand: TyBrand::None,
                     c_name: format!("f->{name}"),
                     moved: false,
                     moved_ptr: None,
                 })
             }
 
-            fn infer_expr(&self, expr: &Expr) -> Result<Ty, CompilerError> {
+            fn infer_expr(&self, expr: &Expr) -> Result<TyInfo, CompilerError> {
                 let mut infer = InferCtx {
                     options: self.options.clone(),
-                    fn_ret_ty: self.fn_ret_ty,
+                    fn_ret_ty: TyInfo::unbranded(self.fn_ret_ty),
                     allow_async_ops: true,
                     unsafe_depth: self.unsafe_depth,
                     task_scope_depth: self.task_scopes.len(),
@@ -1552,7 +2790,16 @@ impl<'a> Emitter<'a> {
                         .iter()
                         .map(|s| {
                             s.iter()
-                                .map(|(k, v)| (k.clone(), v.ty))
+                                .map(|(k, v)| {
+                                    (
+                                        k.clone(),
+                                        TyInfo {
+                                            ty: v.ty,
+                                            brand: v.brand.clone(),
+                                            view_full: false,
+                                        },
+                                    )
+                                })
                                 .collect::<BTreeMap<_, _>>()
                         })
                         .collect(),
@@ -2045,6 +3292,29 @@ impl<'a> Emitter<'a> {
                     return Ok(());
                 }
 
+                if head == "__internal.brand.assume_view_v1" {
+                    if args.len() != 2 || dest.ty != Ty::BytesView {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.brand.assume_view_v1 expects (brand_id, bytes_view) and returns bytes_view".to_string(),
+                        ));
+                    }
+                    let brand_id = args[0].as_ident().ok_or_else(|| {
+                        CompilerError::new(
+                            CompileErrorKind::Parse,
+                            "__internal.brand.assume_view_v1 expects a brand_id string".to_string(),
+                        )
+                    })?;
+                    crate::validate::validate_symbol(brand_id)
+                        .map_err(|message| CompilerError::new(CompileErrorKind::Parse, message))?;
+
+                    self.line(state, "rt_fuel(ctx, 1);");
+                    let expr_state = self.new_state();
+                    self.line(state, format!("goto st_{expr_state};"));
+                    self.emit_expr_entry(expr_state, &args[1], dest, cont)?;
+                    return Ok(());
+                }
+
                 if head == "ptr.cast" {
                     return self.emit_ptr_cast_form(state, args, dest, cont);
                 }
@@ -2059,10 +3329,12 @@ impl<'a> Emitter<'a> {
                     items: items.to_vec(),
                     ptr: String::new(),
                 })?;
-                if call_ty != dest.ty
-                    && call_ty != Ty::Never
-                    && !ty_compat_task_handle_as_i32(call_ty, dest.ty)
-                {
+                let dest_ty = TyInfo {
+                    ty: dest.ty,
+                    brand: dest.brand.clone(),
+                    view_full: false,
+                };
+                if call_ty != Ty::Never && !tyinfo_compat_assign(&call_ty, &dest_ty) {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
                         format!("call must evaluate to {:?}, got {:?}", dest.ty, call_ty),
@@ -2082,13 +3354,13 @@ impl<'a> Emitter<'a> {
                 } else if self.fn_c_names.contains_key(head)
                     || self.async_fn_new_names.contains_key(head)
                 {
-                    let (_ret, params) = self.functions.get(head).cloned().ok_or_else(|| {
+                    let sig = self.functions.get(head).cloned().ok_or_else(|| {
                         CompilerError::new(
                             CompileErrorKind::Internal,
                             format!("internal error: missing function signature for {head:?}"),
                         )
                     })?;
-                    Some(params)
+                    Some(sig.params.into_iter().map(|p| p.ty).collect())
                 } else {
                     None
                 };
@@ -2106,7 +3378,7 @@ impl<'a> Emitter<'a> {
                 for (i, arg_expr) in args.iter().enumerate() {
                     let ty = match &want_params {
                         Some(want) => want[i],
-                        None => self.infer_expr(arg_expr)?,
+                        None => self.infer_expr(arg_expr)?.ty,
                     };
                     let storage_ty = match ty {
                         Ty::Never => Ty::I32,
@@ -2197,7 +3469,7 @@ impl<'a> Emitter<'a> {
                     ));
                 }
 
-                let tmp = self.alloc_local("t_cast_", src_ty)?;
+                let tmp = self.alloc_local("t_cast_", src_ty.ty)?;
                 let expr_state = self.new_state();
                 let after = self.new_state();
                 self.line(state, format!("goto st_{expr_state};"));
@@ -2908,6 +4180,52 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, args[0].c_name
                             ),
                         );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "__internal.brand.view_to_bytes_preserve_brand_v1" => {
+                        if args.len() != 1 || dest.ty != Ty::Bytes || args[0].ty != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.brand.view_to_bytes_preserve_brand_v1 expects bytes_view"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_view_to_bytes(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "__internal.result_bytes.unwrap_ok_v1" => {
+                        if args.len() != 1 || dest.ty != Ty::Bytes || args[0].ty != Ty::ResultBytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.result_bytes.unwrap_ok_v1 expects result_bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("if ({}.tag == UINT32_C(1)) {{", args[0].c_name),
+                        );
+                        self.line(
+                            state,
+                            format!("{} = {}.payload.ok;", dest.c_name, args[0].c_name),
+                        );
+                        self.line(
+                            state,
+                            format!("{}.payload.ok = rt_bytes_empty(ctx);", args[0].c_name),
+                        );
+                        self.line(state, format!("{}.tag = UINT32_C(0);", args[0].c_name));
+                        self.line(state, "} else {");
+                        self.line(state, format!("{} = rt_bytes_empty(ctx);", dest.c_name));
+                        self.line(state, "}");
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -6620,7 +7938,7 @@ impl<'a> Emitter<'a> {
                         self.emit_expr_entry(s, e, dest.clone(), next)?;
                     } else {
                         let ty = self.infer_expr(e)?;
-                        let storage_ty = Self::storage_ty_for(ty);
+                        let storage_ty = Self::storage_ty_for(ty.ty);
                         let tmp = self.alloc_local("t_begin_", storage_ty)?;
                         self.emit_expr_entry(s, e, tmp, next)?;
                     }
@@ -6650,7 +7968,12 @@ impl<'a> Emitter<'a> {
                     )
                 })?;
                 let expr_ty = self.infer_expr(&args[1])?;
-                if expr_ty != dest.ty && expr_ty != Ty::Never {
+                let dest_ty = TyInfo {
+                    ty: dest.ty,
+                    brand: dest.brand.clone(),
+                    view_full: false,
+                };
+                if expr_ty != Ty::Never && !tyinfo_compat_assign(&expr_ty, &dest_ty) {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
                         format!("let expression must match context type {:?}", dest.ty),
@@ -6658,7 +7981,7 @@ impl<'a> Emitter<'a> {
                 }
 
                 self.line(state, "rt_fuel(ctx, 1);");
-                let storage_ty = Self::storage_ty_for(expr_ty);
+                let storage_ty = Self::storage_ty_for(expr_ty.ty);
                 let binding = self.alloc_local("v_", storage_ty)?;
 
                 let expr_state = self.new_state();
@@ -6669,7 +7992,8 @@ impl<'a> Emitter<'a> {
                 self.bind(
                     name.to_string(),
                     AsyncVarRef {
-                        ty: expr_ty,
+                        ty: expr_ty.ty,
+                        brand: expr_ty.brand.clone(),
                         c_name: binding.c_name.clone(),
                         moved: false,
                         moved_ptr: None,
@@ -6677,8 +8001,8 @@ impl<'a> Emitter<'a> {
                 );
 
                 if binding.c_name != dest.c_name && expr_ty != Ty::Never {
-                    if is_owned_ty(expr_ty) {
-                        self.line(after, format!("{} = {};", dest.c_name, c_empty(expr_ty)));
+                    if is_owned_ty(expr_ty.ty) {
+                        self.line(after, format!("{} = {};", dest.c_name, c_empty(expr_ty.ty)));
                     } else {
                         self.line(after, format!("{} = {};", dest.c_name, binding.c_name));
                     }
@@ -6879,6 +8203,7 @@ impl<'a> Emitter<'a> {
                     &args[1],
                     AsyncVarRef {
                         ty: Ty::I32,
+                        brand: TyBrand::None,
                         c_name: var.clone(),
                         moved: false,
                         moved_ptr: None,
@@ -6895,30 +8220,7 @@ impl<'a> Emitter<'a> {
 
                 self.push_scope();
                 let body_ty = self.infer_expr(&args[3])?;
-                let body_storage = match body_ty {
-                    Ty::I32 | Ty::Never => Ty::I32,
-                    Ty::Bytes => Ty::Bytes,
-                    Ty::BytesView => Ty::BytesView,
-                    Ty::VecU8 => Ty::VecU8,
-                    Ty::OptionI32 => Ty::OptionI32,
-                    Ty::OptionTaskSelectEvtV1 => Ty::OptionTaskSelectEvtV1,
-                    Ty::OptionBytes => Ty::OptionBytes,
-                    Ty::ResultI32 => Ty::ResultI32,
-                    Ty::ResultBytes => Ty::ResultBytes,
-                    Ty::ResultResultBytes => Ty::ResultResultBytes,
-                    Ty::Iface => Ty::Iface,
-                    Ty::PtrConstU8 => Ty::PtrConstU8,
-                    Ty::PtrMutU8 => Ty::PtrMutU8,
-                    Ty::PtrConstVoid => Ty::PtrConstVoid,
-                    Ty::PtrMutVoid => Ty::PtrMutVoid,
-                    Ty::PtrConstI32 => Ty::PtrConstI32,
-                    Ty::PtrMutI32 => Ty::PtrMutI32,
-                    Ty::TaskScopeV1 => Ty::TaskScopeV1,
-                    Ty::TaskHandleBytesV1 => Ty::TaskHandleBytesV1,
-                    Ty::TaskHandleResultBytesV1 => Ty::TaskHandleResultBytesV1,
-                    Ty::TaskSlotV1 => Ty::TaskSlotV1,
-                    Ty::TaskSelectEvtV1 => Ty::TaskSelectEvtV1,
-                };
+                let body_storage = Self::storage_ty_for(body_ty.ty);
                 let body_tmp = self.alloc_local("t_for_body_", body_storage)?;
                 self.emit_expr_entry(body_state, &args[3], body_tmp, inc_state)?;
                 self.pop_scope();
@@ -7525,6 +8827,7 @@ impl<'a> Emitter<'a> {
                     &args[0],
                     AsyncVarRef {
                         ty: self.fn_ret_ty,
+                        brand: TyBrand::None,
                         c_name: "f->ret".to_string(),
                         moved: false,
                         moved_ptr: None,
@@ -7581,6 +8884,7 @@ impl<'a> Emitter<'a> {
                 p.name.clone(),
                 AsyncVarRef {
                     ty: p.ty,
+                    brand: TyBrand::None,
                     c_name: format!("f->p{i}"),
                     moved: false,
                     moved_ptr: None,
@@ -7597,6 +8901,7 @@ impl<'a> Emitter<'a> {
             &f.body,
             AsyncVarRef {
                 ty: f.ret_ty,
+                brand: TyBrand::None,
                 c_name: "f->ret".to_string(),
                 moved: false,
                 moved_ptr: None,
@@ -7715,8 +9020,10 @@ impl<'a> Emitter<'a> {
             && f.ret_ty != Ty::VecU8
             && f.ret_ty != Ty::OptionI32
             && f.ret_ty != Ty::OptionBytes
+            && f.ret_ty != Ty::OptionBytesView
             && f.ret_ty != Ty::ResultI32
             && f.ret_ty != Ty::ResultBytes
+            && f.ret_ty != Ty::ResultBytesView
             && f.ret_ty != Ty::Iface
         {
             return Err(CompilerError::new(
@@ -7734,17 +9041,18 @@ impl<'a> Emitter<'a> {
         self.indent += 1;
 
         for (i, p) in f.params.iter().enumerate() {
-            self.bind(
-                p.name.clone(),
-                self.make_var_ref(p.ty, format!("p{i}"), false),
-            );
+            let mut v = self.make_var_ref(p.ty, format!("p{i}"), false);
+            v.brand = ty_brand_from_opt(&p.brand);
+            self.bind(p.name.clone(), v);
         }
 
         let result_ty = self.infer_expr_in_new_scope(&f.body)?;
-        if result_ty != f.ret_ty
-            && result_ty != Ty::Never
-            && !ty_compat_task_handle_as_i32(result_ty, f.ret_ty)
-        {
+        let want_ret_ty = TyInfo {
+            ty: f.ret_ty,
+            brand: ty_brand_from_opt(&f.ret_brand),
+            view_full: false,
+        };
+        if result_ty != Ty::Never && !tyinfo_compat_assign(&result_ty, &want_ret_ty) {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
                 format!(
@@ -7832,7 +9140,7 @@ impl<'a> Emitter<'a> {
         // Release borrows from views in this scope first so owned values can be dropped safely.
         let mut release = Vec::<String>::new();
         for v in scope.values() {
-            if v.ty == Ty::BytesView {
+            if is_view_like_ty(v.ty) {
                 if let Some(owner) = &v.borrow_of {
                     release.push(owner.clone());
                 }
@@ -7932,10 +9240,16 @@ impl<'a> Emitter<'a> {
             Ty::OptionBytes => {
                 self.line(&format!("option_bytes_t {name} = (option_bytes_t){{0}};"))
             }
+            Ty::OptionBytesView => self.line(&format!(
+                "option_bytes_view_t {name} = (option_bytes_view_t){{0}};"
+            )),
             Ty::ResultI32 => self.line(&format!("result_i32_t {name} = (result_i32_t){{0}};")),
             Ty::ResultBytes => {
                 self.line(&format!("result_bytes_t {name} = (result_bytes_t){{0}};"))
             }
+            Ty::ResultBytesView => self.line(&format!(
+                "result_bytes_view_t {name} = (result_bytes_view_t){{0}};"
+            )),
             Ty::ResultResultBytes => self.line(&format!(
                 "result_result_bytes_t {name} = (result_result_bytes_t){{0}};"
             )),
@@ -7974,20 +9288,24 @@ impl<'a> Emitter<'a> {
         let prev_ptr = self.current_ptr.replace(expr.ptr().to_string());
         let out = (|| {
             let ty = self.infer_expr_in_new_scope(expr)?;
-            let (storage_ty, name) = match ty {
+            let (storage_ty, name) = match ty.ty {
                 Ty::I32
                 | Ty::TaskHandleBytesV1
                 | Ty::TaskHandleResultBytesV1
                 | Ty::TaskSlotV1
-                | Ty::TaskSelectEvtV1 => (ty, self.alloc_local("t_i32_")?),
+                | Ty::TaskSelectEvtV1 => (ty.ty, self.alloc_local("t_i32_")?),
                 Ty::TaskScopeV1 => (Ty::TaskScopeV1, self.alloc_local("t_scope_")?),
                 Ty::Bytes => (Ty::Bytes, self.alloc_local("t_bytes_")?),
                 Ty::BytesView => (Ty::BytesView, self.alloc_local("t_view_")?),
                 Ty::VecU8 => (Ty::VecU8, self.alloc_local("t_vec_u8_")?),
-                Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => (ty, self.alloc_local("t_opt_i32_")?),
+                Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => {
+                    (ty.ty, self.alloc_local("t_opt_i32_")?)
+                }
                 Ty::OptionBytes => (Ty::OptionBytes, self.alloc_local("t_opt_bytes_")?),
+                Ty::OptionBytesView => (Ty::OptionBytesView, self.alloc_local("t_opt_view_")?),
                 Ty::ResultI32 => (Ty::ResultI32, self.alloc_local("t_res_i32_")?),
                 Ty::ResultBytes => (Ty::ResultBytes, self.alloc_local("t_res_bytes_")?),
+                Ty::ResultBytesView => (Ty::ResultBytesView, self.alloc_local("t_res_view_")?),
                 Ty::ResultResultBytes => {
                     (Ty::ResultResultBytes, self.alloc_local("t_res_res_bytes_")?)
                 }
@@ -8003,16 +9321,17 @@ impl<'a> Emitter<'a> {
             self.decl_local(storage_ty, &name);
             self.emit_expr_to(expr, storage_ty, &name)?;
 
-            let mut v = self.make_var_ref(ty, name.clone(), true);
-            if ty == Ty::BytesView {
-                let borrow_of = self.borrow_of_view_expr(expr)?;
+            let mut v = self.make_var_ref(ty.ty, name.clone(), true);
+            v.brand = ty.brand.clone();
+            if is_view_like_ty(ty.ty) {
+                let borrow_of = self.borrow_of_view_like_expr(ty.ty, expr)?;
                 if let Some(owner) = &borrow_of {
                     self.inc_borrow_count(owner)?;
                 }
                 v.borrow_of = borrow_of;
             }
 
-            if is_owned_ty(ty) || ty == Ty::BytesView {
+            if is_owned_ty(ty.ty) || is_view_like_ty(ty.ty) {
                 self.bind(format!("#tmp:{name}"), v.clone());
             }
 
@@ -8026,7 +9345,7 @@ impl<'a> Emitter<'a> {
         let prev_ptr = self.current_ptr.replace(expr.ptr().to_string());
         let out = (|| {
             let ty = self.infer_expr_in_new_scope(expr)?;
-            match ty {
+            match ty.ty {
                 Ty::BytesView => self.emit_expr(expr),
                 Ty::Bytes => match expr {
                     Expr::Ident { name, .. } if name != "input" => {
@@ -8059,7 +9378,9 @@ impl<'a> Emitter<'a> {
                         self.line(&format!("{tmp} = rt_bytes_view(ctx, {});", owner.c_name));
                         self.inc_borrow_count(&owner.c_name)?;
                         let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
+                        view.brand = owner.brand.clone();
                         view.borrow_of = Some(owner.c_name);
+                        view.borrow_is_full = true;
                         self.bind(format!("#tmp:{tmp}"), view.clone());
                         Ok(view)
                     }
@@ -8076,7 +9397,9 @@ impl<'a> Emitter<'a> {
                         self.line(&format!("{tmp} = rt_bytes_view(ctx, {});", owner.c_name));
                         self.inc_borrow_count(&owner.c_name)?;
                         let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
+                        view.brand = owner.brand.clone();
                         view.borrow_of = Some(owner.c_name);
+                        view.borrow_is_full = true;
                         self.bind(format!("#tmp:{tmp}"), view.clone());
                         Ok(view)
                     }
@@ -8116,6 +9439,7 @@ impl<'a> Emitter<'a> {
                         self.inc_borrow_count(&owner.c_name)?;
                         let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
                         view.borrow_of = Some(owner.c_name);
+                        view.borrow_is_full = true;
                         self.bind(format!("#tmp:{tmp}"), view.clone());
                         Ok(view)
                     }
@@ -8136,6 +9460,7 @@ impl<'a> Emitter<'a> {
                         self.inc_borrow_count(&owner.c_name)?;
                         let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
                         view.borrow_of = Some(owner.c_name);
+                        view.borrow_is_full = true;
                         self.bind(format!("#tmp:{tmp}"), view.clone());
                         Ok(view)
                     }
@@ -8275,10 +9600,11 @@ impl<'a> Emitter<'a> {
 
         let expr_ty = self.infer_expr_in_new_scope(&args[1])?;
         let c_name = self.alloc_local("v_")?;
-        self.decl_local(expr_ty, &c_name);
+        self.decl_local(expr_ty.ty, &c_name);
 
-        let mut var = self.make_var_ref(expr_ty, c_name.clone(), false);
-        if is_owned_ty(expr_ty) {
+        let mut var = self.make_var_ref(expr_ty.ty, c_name.clone(), false);
+        var.brand = expr_ty.brand.clone();
+        if is_owned_ty(expr_ty.ty) {
             match &args[1] {
                 Expr::Ident {
                     name: src_name,
@@ -8290,7 +9616,12 @@ impl<'a> Emitter<'a> {
                             format!("unknown identifier: {src_name:?}"),
                         ));
                     };
-                    if src.ty != expr_ty {
+                    if (TyInfo {
+                        ty: src.ty,
+                        brand: src.brand.clone(),
+                        view_full: false,
+                    }) != expr_ty
+                    {
                         return Err(CompilerError::new(
                             CompileErrorKind::Typing,
                             format!("type mismatch in move: {src_name:?}"),
@@ -8314,22 +9645,22 @@ impl<'a> Emitter<'a> {
                         ));
                     }
                     self.line(&format!("{c_name} = {};", src.c_name));
-                    self.line(&format!("{} = {};", src.c_name, c_empty(expr_ty)));
+                    self.line(&format!("{} = {};", src.c_name, c_empty(expr_ty.ty)));
                     if let Some(src_mut) = self.lookup_mut(src_name) {
                         src_mut.moved = true;
                         src_mut.moved_ptr = Some(src_ptr.clone());
                     }
                 }
                 _ => {
-                    self.emit_expr_to(&args[1], expr_ty, &c_name)?;
+                    self.emit_expr_to(&args[1], expr_ty.ty, &c_name)?;
                 }
             }
         } else {
-            self.emit_expr_to(&args[1], expr_ty, &c_name)?;
+            self.emit_expr_to(&args[1], expr_ty.ty, &c_name)?;
         }
 
-        if expr_ty == Ty::BytesView {
-            let borrow_of = self.borrow_of_view_expr(&args[1])?;
+        if is_view_like_ty(expr_ty.ty) {
+            let borrow_of = self.borrow_of_view_like_expr(expr_ty.ty, &args[1])?;
             if let Some(owner) = &borrow_of {
                 self.inc_borrow_count(owner)?;
             }
@@ -8384,11 +9715,11 @@ impl<'a> Emitter<'a> {
                 v.moved = false;
                 v.moved_ptr = None;
             }
-        } else if dst.ty == Ty::BytesView {
+        } else if is_view_like_ty(dst.ty) {
             let tmp = self.alloc_local("t_view_")?;
-            self.decl_local(Ty::BytesView, &tmp);
-            self.emit_expr_to(&args[1], Ty::BytesView, &tmp)?;
-            let new_borrow_of = self.borrow_of_view_expr(&args[1])?;
+            self.decl_local(dst.ty, &tmp);
+            self.emit_expr_to(&args[1], dst.ty, &tmp)?;
+            let new_borrow_of = self.borrow_of_view_like_expr(dst.ty, &args[1])?;
 
             let old_borrow_of = dst.borrow_of.clone();
             if let Some(owner) = &old_borrow_of {
@@ -8638,6 +9969,32 @@ impl<'a> Emitter<'a> {
             "view.eq" => self.emit_view_eq_to(args, dest_ty, dest),
             "view.cmp_range" => self.emit_view_cmp_range_to(args, dest_ty, dest),
 
+            "std.brand.erase_bytes_v1" => {
+                self.emit_std_brand_erase_bytes_v1_to(args, dest_ty, dest)
+            }
+            "std.brand.erase_view_v1" => self.emit_std_brand_erase_view_v1_to(args, dest_ty, dest),
+            "std.brand.view_v1" => self.emit_std_brand_view_v1_to(args, dest_ty, dest),
+            "std.brand.assume_bytes_v1" => {
+                self.emit_std_brand_assume_bytes_v1_to(args, dest_ty, dest)
+            }
+            "std.brand.cast_bytes_v1" => self.emit_std_brand_cast_bytes_v1_to(args, dest_ty, dest),
+            "std.brand.cast_view_copy_v1" => {
+                self.emit_std_brand_cast_view_copy_v1_to(args, dest_ty, dest)
+            }
+            "std.brand.cast_view_v1" => self.emit_std_brand_cast_view_v1_to(args, dest_ty, dest),
+            "std.brand.to_bytes_preserve_if_full_v1" => {
+                self.emit_std_brand_to_bytes_preserve_if_full_v1_to(args, dest_ty, dest)
+            }
+            "__internal.brand.assume_view_v1" => {
+                self.emit_internal_brand_assume_view_v1_to(args, dest_ty, dest)
+            }
+            "__internal.brand.view_to_bytes_preserve_brand_v1" => {
+                self.emit_internal_brand_view_to_bytes_preserve_brand_v1_to(args, dest_ty, dest)
+            }
+            "__internal.result_bytes.unwrap_ok_v1" => {
+                self.emit_internal_result_bytes_unwrap_ok_v1_to(args, dest_ty, dest)
+            }
+
             "vec_u8.as_ptr" => self.emit_vec_u8_as_ptr_to(args, dest_ty, dest),
             "vec_u8.as_mut_ptr" => self.emit_vec_u8_as_mut_ptr_to(args, dest_ty, dest),
 
@@ -8873,6 +10230,15 @@ impl<'a> Emitter<'a> {
             "option_bytes.is_some" => self.emit_option_bytes_is_some_to(args, dest_ty, dest),
             "option_bytes.unwrap_or" => self.emit_option_bytes_unwrap_or_to(args, dest_ty, dest),
 
+            "option_bytes_view.none" => self.emit_option_bytes_view_none_to(args, dest_ty, dest),
+            "option_bytes_view.some" => self.emit_option_bytes_view_some_to(args, dest_ty, dest),
+            "option_bytes_view.is_some" => {
+                self.emit_option_bytes_view_is_some_to(args, dest_ty, dest)
+            }
+            "option_bytes_view.unwrap_or" => {
+                self.emit_option_bytes_view_unwrap_or_to(args, dest_ty, dest)
+            }
+
             "result_i32.ok" => self.emit_result_i32_ok_to(args, dest_ty, dest),
             "result_i32.err" => self.emit_result_i32_err_to(args, dest_ty, dest),
             "result_i32.is_ok" => self.emit_result_i32_is_ok_to(args, dest_ty, dest),
@@ -8884,6 +10250,16 @@ impl<'a> Emitter<'a> {
             "result_bytes.is_ok" => self.emit_result_bytes_is_ok_to(args, dest_ty, dest),
             "result_bytes.err_code" => self.emit_result_bytes_err_code_to(args, dest_ty, dest),
             "result_bytes.unwrap_or" => self.emit_result_bytes_unwrap_or_to(args, dest_ty, dest),
+
+            "result_bytes_view.ok" => self.emit_result_bytes_view_ok_to(args, dest_ty, dest),
+            "result_bytes_view.err" => self.emit_result_bytes_view_err_to(args, dest_ty, dest),
+            "result_bytes_view.is_ok" => self.emit_result_bytes_view_is_ok_to(args, dest_ty, dest),
+            "result_bytes_view.err_code" => {
+                self.emit_result_bytes_view_err_code_to(args, dest_ty, dest)
+            }
+            "result_bytes_view.unwrap_or" => {
+                self.emit_result_bytes_view_unwrap_or_to(args, dest_ty, dest)
+            }
 
             "result_result_bytes.is_ok" => {
                 self.emit_result_result_bytes_is_ok_to(args, dest_ty, dest)
@@ -9009,11 +10385,12 @@ impl<'a> Emitter<'a> {
         }
 
         let c_name = self.alloc_local("v_")?;
-        self.decl_local(expr_ty, &c_name);
-        self.emit_expr_to(&args[1], expr_ty, &c_name)?;
-        let mut var = self.make_var_ref(expr_ty, c_name.clone(), false);
-        if expr_ty == Ty::BytesView {
-            let borrow_of = self.borrow_of_view_expr(&args[1])?;
+        self.decl_local(expr_ty.ty, &c_name);
+        self.emit_expr_to(&args[1], expr_ty.ty, &c_name)?;
+        let mut var = self.make_var_ref(expr_ty.ty, c_name.clone(), false);
+        var.brand = expr_ty.brand.clone();
+        if is_view_like_ty(expr_ty.ty) {
+            let borrow_of = self.borrow_of_view_like_expr(expr_ty.ty, &args[1])?;
             if let Some(owner) = &borrow_of {
                 self.inc_borrow_count(owner)?;
             }
@@ -9081,11 +10458,15 @@ impl<'a> Emitter<'a> {
 
         let then_ty = self.infer_expr_in_new_scope(&args[1])?;
         let else_ty = self.infer_expr_in_new_scope(&args[2])?;
-        let ok = match (then_ty, else_ty) {
-            (Ty::Never, Ty::Never) => true,
-            (Ty::Never, t) => t == dest_ty,
-            (t, Ty::Never) => t == dest_ty,
-            (t, e) => t == dest_ty && e == dest_ty,
+        let dest_info = TyInfo::unbranded(dest_ty);
+        let ok = if then_ty == Ty::Never && else_ty == Ty::Never {
+            true
+        } else if then_ty == Ty::Never {
+            tyinfo_compat_assign(&else_ty, &dest_info)
+        } else if else_ty == Ty::Never {
+            tyinfo_compat_assign(&then_ty, &dest_info)
+        } else {
+            tyinfo_compat_assign(&then_ty, &dest_info) && tyinfo_compat_assign(&else_ty, &dest_info)
         };
         if !ok {
             return Err(CompilerError::new(
@@ -10527,6 +11908,457 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         }
         self.line(&format!("{dest} = rt_view_to_bytes(ctx, {});", v.c_name));
         self.release_temp_view_borrow(&v)?;
+        Ok(())
+    }
+
+    fn emit_std_brand_erase_bytes_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.erase_bytes_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.erase_bytes_v1 returns bytes".to_string(),
+            ));
+        }
+        self.emit_expr_to(&args[0], Ty::Bytes, dest)
+    }
+
+    fn emit_std_brand_erase_view_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.erase_view_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.erase_view_v1 returns bytes_view".to_string(),
+            ));
+        }
+        self.emit_expr_to(&args[0], Ty::BytesView, dest)
+    }
+
+    fn emit_std_brand_view_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.view_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.view_v1 returns bytes_view".to_string(),
+            ));
+        }
+        let Some(b_name) = args[0].as_ident() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.view_v1 requires an identifier owner (bind the value to a local with let first)"
+                    .to_string(),
+            ));
+        };
+        let Some(b) = self.lookup(b_name).cloned() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("unknown identifier: {b_name:?}"),
+            ));
+        };
+        if b.moved {
+            let moved_ptr = b
+                .moved_ptr
+                .as_deref()
+                .filter(|p| !p.is_empty())
+                .unwrap_or("<unknown>");
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("use after move: {b_name:?} moved_ptr={moved_ptr}"),
+            ));
+        }
+        if b.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.view_v1 expects bytes".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_bytes_view(ctx, {});", b.c_name));
+        Ok(())
+    }
+
+    fn emit_std_brand_assume_bytes_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if self.unsafe_depth == 0 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "unsafe-required: std.brand.assume_bytes_v1".to_string(),
+            ));
+        }
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.assume_bytes_v1 expects 2 args".to_string(),
+            ));
+        }
+        let _brand_id = args[0].as_ident().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.assume_bytes_v1 expects a brand_id string".to_string(),
+            )
+        })?;
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.assume_bytes_v1 returns bytes".to_string(),
+            ));
+        }
+        self.emit_expr_to(&args[1], Ty::Bytes, dest)
+    }
+
+    fn emit_std_brand_cast_bytes_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.cast_bytes_v1 expects 3 args".to_string(),
+            ));
+        }
+        let _brand_id = args[0].as_ident().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.cast_bytes_v1 expects a brand_id string".to_string(),
+            )
+        })?;
+        let validator_id = args[1].as_ident().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.cast_bytes_v1 expects a validator symbol".to_string(),
+            )
+        })?;
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.cast_bytes_v1 returns result_bytes".to_string(),
+            ));
+        }
+
+        let b = self.emit_expr(&args[2])?;
+        if b.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.cast_bytes_v1 expects bytes".to_string(),
+            ));
+        }
+
+        let v = self.alloc_local("t_view_")?;
+        self.decl_local(Ty::BytesView, &v);
+        self.line(&format!("{v} = rt_bytes_view(ctx, {});", b.c_name));
+
+        let r = self.alloc_local("t_res_i32_")?;
+        self.decl_local(Ty::ResultI32, &r);
+        self.line(&format!(
+            "{r} = {}(ctx, input, {v});",
+            self.fn_c_name(validator_id)
+        ));
+
+        self.line(&format!("if (!{r}.tag) {{"));
+        self.indent += 1;
+        self.line(&format!("rt_bytes_drop(ctx, &{});", b.c_name));
+        self.line(&format!("{} = rt_bytes_empty(ctx);", b.c_name));
+        self.line(&format!(
+            "{dest} = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {r}.payload.err }};"
+        ));
+        self.indent -= 1;
+        self.line("} else {");
+        self.indent += 1;
+        self.line(&format!(
+            "{dest} = (result_bytes_t){{ .tag = UINT32_C(1), .payload.ok = {} }};",
+            b.c_name
+        ));
+        self.line(&format!("{} = rt_bytes_empty(ctx);", b.c_name));
+        self.indent -= 1;
+        self.line("}");
+        Ok(())
+    }
+
+    fn emit_std_brand_cast_view_copy_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.cast_view_copy_v1 expects 3 args".to_string(),
+            ));
+        }
+        let _brand_id = args[0].as_ident().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.cast_view_copy_v1 expects a brand_id string".to_string(),
+            )
+        })?;
+        let validator_id = args[1].as_ident().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.cast_view_copy_v1 expects a validator symbol".to_string(),
+            )
+        })?;
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.cast_view_copy_v1 returns result_bytes".to_string(),
+            ));
+        }
+
+        let v = self.emit_expr(&args[2])?;
+        if v.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.cast_view_copy_v1 expects bytes_view".to_string(),
+            ));
+        }
+
+        let r = self.alloc_local("t_res_i32_")?;
+        self.decl_local(Ty::ResultI32, &r);
+        self.line(&format!(
+            "{r} = {}(ctx, input, {});",
+            self.fn_c_name(validator_id),
+            v.c_name
+        ));
+
+        self.line(&format!("if (!{r}.tag) {{"));
+        self.indent += 1;
+        self.line(&format!(
+            "{dest} = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {r}.payload.err }};"
+        ));
+        self.indent -= 1;
+        self.line("} else {");
+        self.indent += 1;
+        let out = self.alloc_local("t_bytes_")?;
+        self.decl_local(Ty::Bytes, &out);
+        self.line(&format!("{out} = rt_view_to_bytes(ctx, {});", v.c_name));
+        self.line(&format!(
+            "{dest} = (result_bytes_t){{ .tag = UINT32_C(1), .payload.ok = {out} }};"
+        ));
+        self.indent -= 1;
+        self.line("}");
+        self.release_temp_view_borrow(&v)?;
+        Ok(())
+    }
+
+    fn emit_std_brand_cast_view_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.cast_view_v1 expects 3 args".to_string(),
+            ));
+        }
+        let _brand_id = args[0].as_ident().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.cast_view_v1 expects a brand_id string".to_string(),
+            )
+        })?;
+        let validator_id = args[1].as_ident().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.cast_view_v1 expects a validator symbol".to_string(),
+            )
+        })?;
+        if dest_ty != Ty::ResultBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.cast_view_v1 returns result_bytes_view".to_string(),
+            ));
+        }
+
+        let v = self.emit_expr(&args[2])?;
+        if v.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.cast_view_v1 expects bytes_view".to_string(),
+            ));
+        }
+
+        let r = self.alloc_local("t_res_i32_")?;
+        self.decl_local(Ty::ResultI32, &r);
+        self.line(&format!(
+            "{r} = {}(ctx, input, {});",
+            self.fn_c_name(validator_id),
+            v.c_name
+        ));
+
+        self.line(&format!("if (!{r}.tag) {{"));
+        self.indent += 1;
+        self.line(&format!(
+            "{dest} = (result_bytes_view_t){{ .tag = UINT32_C(0), .payload.err = {r}.payload.err }};"
+        ));
+        self.indent -= 1;
+        self.line("} else {");
+        self.indent += 1;
+        self.line(&format!(
+            "{dest} = (result_bytes_view_t){{ .tag = UINT32_C(1), .payload.ok = {} }};",
+            v.c_name
+        ));
+        self.indent -= 1;
+        self.line("}");
+
+        self.release_temp_view_borrow(&v)?;
+        Ok(())
+    }
+
+    fn emit_std_brand_to_bytes_preserve_if_full_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.brand.to_bytes_preserve_if_full_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.to_bytes_preserve_if_full_v1 returns bytes".to_string(),
+            ));
+        }
+        let v = self.emit_expr(&args[0])?;
+        if v.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.brand.to_bytes_preserve_if_full_v1 expects bytes_view".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_view_to_bytes(ctx, {});", v.c_name));
+        self.release_temp_view_borrow(&v)?;
+        Ok(())
+    }
+
+    fn emit_internal_brand_assume_view_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.brand.assume_view_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.brand.assume_view_v1 returns bytes_view".to_string(),
+            ));
+        }
+        let brand_id = args[0].as_ident().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.brand.assume_view_v1 expects a brand_id string".to_string(),
+            )
+        })?;
+        crate::validate::validate_symbol(brand_id)
+            .map_err(|message| CompilerError::new(CompileErrorKind::Parse, message))?;
+
+        self.emit_expr_to(&args[1], Ty::BytesView, dest)
+    }
+
+    fn emit_internal_brand_view_to_bytes_preserve_brand_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.brand.view_to_bytes_preserve_brand_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.brand.view_to_bytes_preserve_brand_v1 returns bytes".to_string(),
+            ));
+        }
+        self.emit_view_to_bytes_to(args, dest_ty, dest)
+    }
+
+    fn emit_internal_result_bytes_unwrap_ok_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.result_bytes.unwrap_ok_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.result_bytes.unwrap_ok_v1 returns bytes".to_string(),
+            ));
+        }
+        let res = self.emit_expr(&args[0])?;
+        if res.ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.result_bytes.unwrap_ok_v1 expects result_bytes".to_string(),
+            ));
+        }
+
+        self.line(&format!("if ({}.tag == UINT32_C(1)) {{", res.c_name));
+        self.indent += 1;
+        self.line(&format!("{dest} = {}.payload.ok;", res.c_name));
+        self.line(&format!("{}.payload.ok = rt_bytes_empty(ctx);", res.c_name));
+        self.line(&format!("{}.tag = UINT32_C(0);", res.c_name));
+        self.indent -= 1;
+        self.line("} else {");
+        self.indent += 1;
+        self.line(&format!("{dest} = rt_bytes_empty(ctx);"));
+        self.indent -= 1;
+        self.line("}");
         Ok(())
     }
 
@@ -16993,6 +18825,134 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         Ok(())
     }
 
+    fn emit_option_bytes_view_none_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !args.is_empty() {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "option_bytes_view.none expects 0 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::OptionBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "option_bytes_view.none returns option_bytes_view".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = (option_bytes_view_t){{ .tag = UINT32_C(0), .payload = rt_view_empty(ctx) }};"
+        ));
+        Ok(())
+    }
+
+    fn emit_option_bytes_view_some_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "option_bytes_view.some expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::OptionBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "option_bytes_view.some returns option_bytes_view".to_string(),
+            ));
+        }
+        let v = self.emit_expr(&args[0])?;
+        if v.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "option_bytes_view.some expects bytes_view".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = (option_bytes_view_t){{ .tag = UINT32_C(1), .payload = {} }};",
+            v.c_name
+        ));
+        self.release_temp_view_borrow(&v)?;
+        Ok(())
+    }
+
+    fn emit_option_bytes_view_is_some_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "option_bytes_view.is_some expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "option_bytes_view.is_some returns i32".to_string(),
+            ));
+        }
+        let opt = self.emit_expr(&args[0])?;
+        if opt.ty != Ty::OptionBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "option_bytes_view.is_some expects option_bytes_view".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", opt.c_name));
+        self.release_temp_view_borrow(&opt)?;
+        Ok(())
+    }
+
+    fn emit_option_bytes_view_unwrap_or_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "option_bytes_view.unwrap_or expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "option_bytes_view.unwrap_or returns bytes_view".to_string(),
+            ));
+        }
+        let opt = self.emit_expr(&args[0])?;
+        if opt.ty != Ty::OptionBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "option_bytes_view.unwrap_or expects option_bytes_view".to_string(),
+            ));
+        }
+
+        self.line(&format!("if ({}.tag == UINT32_C(1)) {{", opt.c_name));
+        self.indent += 1;
+        self.line(&format!("{dest} = {}.payload;", opt.c_name));
+        self.indent -= 1;
+        self.line("} else {");
+        self.indent += 1;
+        self.push_scope();
+        self.emit_expr_to(&args[1], Ty::BytesView, dest)?;
+        self.pop_scope()?;
+        self.indent -= 1;
+        self.line("}");
+        self.release_temp_view_borrow(&opt)?;
+        Ok(())
+    }
+
     fn emit_result_i32_ok_to(
         &mut self,
         args: &[Expr],
@@ -17318,6 +19278,174 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         Ok(())
     }
 
+    fn emit_result_bytes_view_ok_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "result_bytes_view.ok expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.ok returns result_bytes_view".to_string(),
+            ));
+        }
+        let v = self.emit_expr(&args[0])?;
+        if v.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.ok expects bytes_view".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = (result_bytes_view_t){{ .tag = UINT32_C(1), .payload.ok = {} }};",
+            v.c_name
+        ));
+        self.release_temp_view_borrow(&v)?;
+        Ok(())
+    }
+
+    fn emit_result_bytes_view_err_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "result_bytes_view.err expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.err returns result_bytes_view".to_string(),
+            ));
+        }
+        let code = self.emit_expr(&args[0])?;
+        if code.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.err expects i32".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = (result_bytes_view_t){{ .tag = UINT32_C(0), .payload.err = {} }};",
+            code.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_result_bytes_view_is_ok_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "result_bytes_view.is_ok expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.is_ok returns i32".to_string(),
+            ));
+        }
+        let res = self.emit_expr(&args[0])?;
+        if res.ty != Ty::ResultBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.is_ok expects result_bytes_view".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", res.c_name));
+        self.release_temp_view_borrow(&res)?;
+        Ok(())
+    }
+
+    fn emit_result_bytes_view_err_code_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "result_bytes_view.err_code expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.err_code returns i32".to_string(),
+            ));
+        }
+        let res = self.emit_expr(&args[0])?;
+        if res.ty != Ty::ResultBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.err_code expects result_bytes_view".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = ({}.tag == UINT32_C(0)) ? {}.payload.err : UINT32_C(0);",
+            res.c_name, res.c_name
+        ));
+        self.release_temp_view_borrow(&res)?;
+        Ok(())
+    }
+
+    fn emit_result_bytes_view_unwrap_or_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "result_bytes_view.unwrap_or expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.unwrap_or returns bytes_view".to_string(),
+            ));
+        }
+        let res = self.emit_expr(&args[0])?;
+        if res.ty != Ty::ResultBytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "result_bytes_view.unwrap_or expects result_bytes_view".to_string(),
+            ));
+        }
+        self.line(&format!("if ({}.tag == UINT32_C(1)) {{", res.c_name));
+        self.indent += 1;
+        self.line(&format!("{dest} = {}.payload.ok;", res.c_name));
+        self.indent -= 1;
+        self.line("} else {");
+        self.indent += 1;
+        self.push_scope();
+        self.emit_expr_to(&args[1], Ty::BytesView, dest)?;
+        self.pop_scope()?;
+        self.indent -= 1;
+        self.line("}");
+        self.release_temp_view_borrow(&res)?;
+        Ok(())
+    }
+
     fn emit_result_result_bytes_is_ok_to(
         &mut self,
         args: &[Expr],
@@ -17506,9 +19634,44 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 self.line(&format!("{}.tag = UINT32_C(0);", res.c_name));
                 Ok(())
             }
+            Ty::ResultBytesView => {
+                if !matches!(self.fn_ret_ty, Ty::ResultBytesView | Ty::ResultI32) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "try(result_bytes_view) requires function return type result_bytes_view or result_i32"
+                            .to_string(),
+                    ));
+                }
+                if dest_ty != Ty::BytesView {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "try(result_bytes_view) returns bytes_view".to_string(),
+                    ));
+                }
+                self.line(&format!("if ({}.tag == UINT32_C(0)) {{", res.c_name));
+                self.indent += 1;
+                for (ty, c_name) in self.live_owned_drop_list(None) {
+                    self.emit_drop_var(ty, &c_name);
+                }
+                if self.fn_ret_ty == Ty::ResultBytesView {
+                    self.line(&format!("return {};", res.c_name));
+                } else {
+                    self.line(&format!(
+                        "return (result_i32_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
+                        res.c_name
+                    ));
+                }
+                self.indent -= 1;
+                self.line("}");
+                self.line(&format!("{dest} = {}.payload.ok;", res.c_name));
+                self.release_temp_view_borrow(&res)?;
+                Ok(())
+            }
             other => Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                format!("try expects result_i32 or result_bytes, got {other:?}"),
+                format!(
+                    "try expects result_i32, result_bytes, or result_bytes_view, got {other:?}"
+                ),
             )),
         }
     }
@@ -17802,18 +19965,33 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         Ok(())
     }
 
-    fn infer_expr_in_new_scope(&self, expr: &Expr) -> Result<Ty, CompilerError> {
-        let mut functions: BTreeMap<String, (Ty, Vec<Ty>)> = BTreeMap::new();
+    fn infer_expr_in_new_scope(&self, expr: &Expr) -> Result<TyInfo, CompilerError> {
+        let mut functions: BTreeMap<String, FnSig> = BTreeMap::new();
         for f in &self.program.functions {
             functions.insert(
                 f.name.clone(),
-                (f.ret_ty, f.params.iter().map(|p| p.ty).collect::<Vec<_>>()),
+                FnSig {
+                    ret: TyInfo {
+                        ty: f.ret_ty,
+                        brand: ty_brand_from_opt(&f.ret_brand),
+                        view_full: false,
+                    },
+                    params: f
+                        .params
+                        .iter()
+                        .map(|p| TyInfo {
+                            ty: p.ty,
+                            brand: ty_brand_from_opt(&p.brand),
+                            view_full: false,
+                        })
+                        .collect(),
+                },
             );
         }
         for f in &self.program.async_functions {
-            let call_ret_ty = match f.ret_ty {
-                Ty::Bytes => Ty::TaskHandleBytesV1,
-                Ty::ResultBytes => Ty::TaskHandleResultBytesV1,
+            let (call_ret_ty, call_ret_brand) = match f.ret_ty {
+                Ty::Bytes => (Ty::TaskHandleBytesV1, ty_brand_from_opt(&f.ret_brand)),
+                Ty::ResultBytes => (Ty::TaskHandleResultBytesV1, ty_brand_from_opt(&f.ret_brand)),
                 _ => {
                     return Err(CompilerError::new(
                         CompileErrorKind::Internal,
@@ -17826,16 +20004,28 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             };
             functions.insert(
                 f.name.clone(),
-                (
-                    call_ret_ty,
-                    f.params.iter().map(|p| p.ty).collect::<Vec<_>>(),
-                ),
+                FnSig {
+                    ret: TyInfo {
+                        ty: call_ret_ty,
+                        brand: call_ret_brand,
+                        view_full: false,
+                    },
+                    params: f
+                        .params
+                        .iter()
+                        .map(|p| TyInfo {
+                            ty: p.ty,
+                            brand: ty_brand_from_opt(&p.brand),
+                            view_full: false,
+                        })
+                        .collect(),
+                },
             );
         }
 
         let mut infer = InferCtx {
             options: self.options.clone(),
-            fn_ret_ty: self.fn_ret_ty,
+            fn_ret_ty: TyInfo::unbranded(self.fn_ret_ty),
             allow_async_ops: self.allow_async_ops,
             unsafe_depth: self.unsafe_depth,
             task_scope_depth: 0,
@@ -17844,7 +20034,16 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 .iter()
                 .map(|s| {
                     s.iter()
-                        .map(|(k, v)| (k.clone(), v.ty))
+                        .map(|(k, v)| {
+                            (
+                                k.clone(),
+                                TyInfo {
+                                    ty: v.ty,
+                                    brand: v.brand.clone(),
+                                    view_full: false,
+                                },
+                            )
+                        })
                         .collect::<BTreeMap<_, _>>()
                 })
                 .collect(),
@@ -18224,14 +20423,20 @@ fn parse_task_select_cases_v1(expr: &Expr) -> Result<Vec<TaskSelectCaseV1>, Comp
     Ok(out)
 }
 
+#[derive(Debug, Clone)]
+struct FnSig {
+    ret: TyInfo,
+    params: Vec<TyInfo>,
+}
+
 struct InferCtx {
     options: CompileOptions,
-    fn_ret_ty: Ty,
+    fn_ret_ty: TyInfo,
     allow_async_ops: bool,
     unsafe_depth: usize,
     task_scope_depth: usize,
-    scopes: Vec<BTreeMap<String, Ty>>,
-    functions: BTreeMap<String, (Ty, Vec<Ty>)>,
+    scopes: Vec<BTreeMap<String, TyInfo>>,
+    functions: BTreeMap<String, FnSig>,
     extern_functions: BTreeMap<String, ExternFunctionDecl>,
 }
 
@@ -18284,6 +20489,28 @@ impl InferCtx {
         Ok(())
     }
 
+    fn require_brand_validator_v1(&self, validator_symbol: &str) -> Result<(), CompilerError> {
+        let Some(sig) = self.functions.get(validator_symbol) else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("unknown identifier: {validator_symbol:?}"),
+            ));
+        };
+        if sig.params.len() != 1
+            || sig.params[0].ty != Ty::BytesView
+            || !sig.params[0].brand.is_none()
+            || sig.ret.ty != Ty::ResultI32
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!(
+                    "validator must have signature (bytes_view)->result_i32: {validator_symbol:?}"
+                ),
+            ));
+        }
+        Ok(())
+    }
+
     fn push_scope(&mut self) {
         self.scopes.push(BTreeMap::new());
     }
@@ -18292,22 +20519,22 @@ impl InferCtx {
         self.scopes.pop();
     }
 
-    fn bind(&mut self, name: String, ty: Ty) {
+    fn bind(&mut self, name: String, ty: TyInfo) {
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name, ty);
         }
     }
 
-    fn lookup(&self, name: &str) -> Option<Ty> {
+    fn lookup(&self, name: &str) -> Option<TyInfo> {
         for scope in self.scopes.iter().rev() {
             if let Some(v) = scope.get(name) {
-                return Some(*v);
+                return Some(v.clone());
             }
         }
         None
     }
 
-    fn infer_immediate_defasync_call_expr(&mut self, expr: &Expr) -> Result<Ty, CompilerError> {
+    fn infer_immediate_defasync_call_expr(&mut self, expr: &Expr) -> Result<TyInfo, CompilerError> {
         let Expr::List { items, .. } = expr else {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
@@ -18322,43 +20549,43 @@ impl InferCtx {
         })?;
         let args = &items[1..];
 
-        let Some((ret_ty, params)) = self.functions.get(head).cloned() else {
+        let Some(sig) = self.functions.get(head).cloned() else {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
                 format!("unknown identifier: {head:?}"),
             ));
         };
-        if ret_ty != Ty::TaskHandleBytesV1 && ret_ty != Ty::TaskHandleResultBytesV1 {
+        if sig.ret.ty != Ty::TaskHandleBytesV1 && sig.ret.ty != Ty::TaskHandleResultBytesV1 {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
                 "X07E_SCOPE_002: expected an immediate defasync call expression".to_string(),
             ));
         }
-        if args.len() != params.len() {
+        if args.len() != sig.params.len() {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
-                format!("call {head:?} expects {} args", params.len()),
+                format!("call {head:?} expects {} args", sig.params.len()),
             ));
         }
-        for (i, (arg, want_ty)) in args.iter().zip(params.iter()).enumerate() {
+        for (i, (arg, want)) in args.iter().zip(sig.params.iter()).enumerate() {
             let got = self.infer(arg)?;
-            let ok = ty_compat_call_arg(got, *want_ty);
+            let ok = tyinfo_compat_call_arg(&got, want);
             if !ok {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("call {head:?} arg {i} expects {want_ty:?}"),
+                    call_arg_mismatch_message(head, i, &got, want),
                 ));
             }
         }
-        Ok(ret_ty)
+        Ok(sig.ret)
     }
 
-    fn infer(&mut self, expr: &Expr) -> Result<Ty, CompilerError> {
+    fn infer(&mut self, expr: &Expr) -> Result<TyInfo, CompilerError> {
         match expr {
-            Expr::Int { .. } => Ok(Ty::I32),
+            Expr::Int { .. } => Ok(TyInfo::unbranded(Ty::I32)),
             Expr::Ident { name, .. } => {
                 if name == "input" {
-                    return Ok(Ty::BytesView);
+                    return Ok(TyInfo::unbranded(Ty::BytesView));
                 }
                 self.lookup(name).ok_or_else(|| {
                     CompilerError::new(
@@ -18429,7 +20656,7 @@ impl InferCtx {
                                     call_items.first().and_then(Expr::as_ident)
                                 {
                                     if matches!(
-                                        self.functions.get(call_head).map(|(ret_ty, _)| *ret_ty),
+                                        self.functions.get(call_head).map(|s| s.ret.ty),
                                         Some(Ty::TaskHandleBytesV1 | Ty::TaskHandleResultBytesV1)
                                     ) {
                                         return Err(CompilerError::new(
@@ -18442,7 +20669,7 @@ impl InferCtx {
                             }
                         }
                         let ty = self.infer(&args[1])?;
-                        self.bind(name.to_string(), ty);
+                        self.bind(name.to_string(), ty.clone());
                         Ok(ty)
                     }
                     "set" => {
@@ -18465,7 +20692,7 @@ impl InferCtx {
                             )
                         })?;
                         let ty = self.infer(&args[1])?;
-                        if ty != prev {
+                        if !tyinfo_compat_assign(&ty, &prev) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 format!("type mismatch in set for variable {name:?}"),
@@ -18494,7 +20721,8 @@ impl InferCtx {
                         let else_ty = self.infer(&args[2])?;
                         self.pop_scope();
 
-                        if then_ty != else_ty && then_ty != Ty::Never && else_ty != Ty::Never {
+                        if then_ty != Ty::Never && else_ty != Ty::Never && then_ty.ty != else_ty.ty
+                        {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 format!(
@@ -18504,8 +20732,16 @@ impl InferCtx {
                         }
                         Ok(if then_ty == Ty::Never {
                             else_ty
-                        } else {
+                        } else if else_ty == Ty::Never {
                             then_ty
+                        } else {
+                            TyInfo {
+                                ty: then_ty.ty,
+                                brand: tybrand_join(then_ty.ty, &then_ty.brand, &else_ty.brand),
+                                view_full: then_ty.ty == Ty::BytesView
+                                    && then_ty.view_full
+                                    && else_ty.view_full,
+                            }
                         })
                     }
                     "for" => {
@@ -18522,7 +20758,7 @@ impl InferCtx {
                             )
                         })?;
                         match self.lookup(var) {
-                            Some(Ty::I32) => {}
+                            Some(v) if v.ty == Ty::I32 => {}
                             Some(_) => {
                                 return Err(CompilerError::new(
                                     CompileErrorKind::Typing,
@@ -18530,7 +20766,7 @@ impl InferCtx {
                                 ));
                             }
                             None => {
-                                self.bind(var.to_string(), Ty::I32);
+                                self.bind(var.to_string(), Ty::I32.into());
                             }
                         }
                         if self.infer(&args[1])? != Ty::I32 || self.infer(&args[2])? != Ty::I32 {
@@ -18542,7 +20778,7 @@ impl InferCtx {
                         self.push_scope();
                         self.infer_stmt(&args[3])?;
                         self.pop_scope();
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "return" => {
                         if args.len() != 1 {
@@ -18551,13 +20787,14 @@ impl InferCtx {
                                 "return form: (return <expr>)".to_string(),
                             ));
                         }
-                        if self.infer(&args[0])? != self.fn_ret_ty {
+                        let got = self.infer(&args[0])?;
+                        if !tyinfo_compat_assign(&got, &self.fn_ret_ty) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 format!("return expression must evaluate to {:?}", self.fn_ret_ty),
                             ));
                         }
-                        Ok(Ty::Never)
+                        Ok(Ty::Never.into())
                     }
                     "+" | "-" | "*" | "/" | "%" | "&" | "|" | "^" | "<<u" | ">>u" | "=" | "!="
                     | "<" | "<=" | ">" | ">=" | "<u" | ">=u" | ">u" | "<=u" => {
@@ -18573,7 +20810,7 @@ impl InferCtx {
                                 format!("{head} expects i32 args"),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "bytes.as_ptr" | "bytes.as_mut_ptr" => {
                         self.require_unsafe_world(head)?;
@@ -18589,11 +20826,12 @@ impl InferCtx {
                                 format!("{head} expects bytes"),
                             ));
                         }
-                        Ok(if head == "bytes.as_ptr" {
+                        Ok((if head == "bytes.as_ptr" {
                             Ty::PtrConstU8
                         } else {
                             Ty::PtrMutU8
                         })
+                        .into())
                     }
                     "view.as_ptr" => {
                         self.require_unsafe_world(head)?;
@@ -18609,7 +20847,7 @@ impl InferCtx {
                                 "view.as_ptr expects bytes_view".to_string(),
                             ));
                         }
-                        Ok(Ty::PtrConstU8)
+                        Ok(Ty::PtrConstU8.into())
                     }
                     "vec_u8.as_ptr" | "vec_u8.as_mut_ptr" => {
                         self.require_unsafe_world(head)?;
@@ -18625,11 +20863,12 @@ impl InferCtx {
                                 format!("{head} expects vec_u8"),
                             ));
                         }
-                        Ok(if head == "vec_u8.as_ptr" {
+                        Ok((if head == "vec_u8.as_ptr" {
                             Ty::PtrConstU8
                         } else {
                             Ty::PtrMutU8
                         })
+                        .into())
                     }
                     "ptr.null" => {
                         self.require_unsafe_world(head)?;
@@ -18639,7 +20878,7 @@ impl InferCtx {
                                 "ptr.null expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::PtrMutVoid)
+                        Ok(Ty::PtrMutVoid.into())
                     }
                     "ptr.as_const" => {
                         self.require_unsafe_world(head)?;
@@ -18650,18 +20889,19 @@ impl InferCtx {
                             ));
                         }
                         let ty = self.infer(&args[0])?;
-                        Ok(match ty {
+                        Ok(match ty.ty {
                             Ty::PtrMutU8 => Ty::PtrConstU8,
                             Ty::PtrMutVoid => Ty::PtrConstVoid,
                             Ty::PtrMutI32 => Ty::PtrConstI32,
-                            Ty::PtrConstU8 | Ty::PtrConstVoid | Ty::PtrConstI32 => ty,
+                            Ty::PtrConstU8 | Ty::PtrConstVoid | Ty::PtrConstI32 => ty.ty,
                             _ => {
                                 return Err(CompilerError::new(
                                     CompileErrorKind::Typing,
                                     "ptr.as_const expects a raw pointer".to_string(),
                                 ));
                             }
-                        })
+                        }
+                        .into())
                     }
                     "ptr.cast" => {
                         self.require_unsafe_world(head)?;
@@ -18697,7 +20937,7 @@ impl InferCtx {
                                 format!("ptr.cast expects a pointer, got {src:?}"),
                             ));
                         }
-                        Ok(target)
+                        Ok(target.into())
                     }
                     "addr_of" | "addr_of_mut" => {
                         self.require_unsafe_world(head)?;
@@ -18719,11 +20959,12 @@ impl InferCtx {
                                 format!("unknown identifier: {name:?}"),
                             ));
                         }
-                        Ok(if head == "addr_of" {
+                        Ok((if head == "addr_of" {
                             Ty::PtrConstVoid
                         } else {
                             Ty::PtrMutVoid
                         })
+                        .into())
                     }
                     "ptr.add" | "ptr.sub" | "ptr.offset" => {
                         self.require_unsafe_world(head)?;
@@ -18736,7 +20977,7 @@ impl InferCtx {
                         }
                         let ptr_ty = self.infer(&args[0])?;
                         if !matches!(
-                            ptr_ty,
+                            ptr_ty.ty,
                             Ty::PtrConstU8 | Ty::PtrMutU8 | Ty::PtrConstI32 | Ty::PtrMutI32
                         ) {
                             return Err(CompilerError::new(
@@ -18762,13 +21003,13 @@ impl InferCtx {
                             ));
                         }
                         let ptr_ty = self.infer(&args[0])?;
-                        if !matches!(ptr_ty, Ty::PtrConstU8 | Ty::PtrMutU8) {
+                        if !matches!(ptr_ty.ty, Ty::PtrConstU8 | Ty::PtrMutU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "ptr.read_u8 expects ptr_const_u8 or ptr_mut_u8".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "ptr.write_u8" => {
                         self.require_unsafe_world(head)?;
@@ -18786,7 +21027,7 @@ impl InferCtx {
                                 "ptr.write_u8 expects (ptr_mut_u8, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "ptr.read_i32" => {
                         self.require_unsafe_world(head)?;
@@ -18798,13 +21039,13 @@ impl InferCtx {
                             ));
                         }
                         let ptr_ty = self.infer(&args[0])?;
-                        if !matches!(ptr_ty, Ty::PtrConstI32 | Ty::PtrMutI32) {
+                        if !matches!(ptr_ty.ty, Ty::PtrConstI32 | Ty::PtrMutI32) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "ptr.read_i32 expects ptr_const_i32 or ptr_mut_i32".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "ptr.write_i32" => {
                         self.require_unsafe_world(head)?;
@@ -18823,7 +21064,7 @@ impl InferCtx {
                                 "ptr.write_i32 expects (ptr_mut_i32, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "memcpy" | "memmove" => {
                         self.require_unsafe_world(head)?;
@@ -18854,7 +21095,7 @@ impl InferCtx {
                                 format!("{head} expects i32 len"),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "memset" => {
                         self.require_unsafe_world(head)?;
@@ -18874,7 +21115,7 @@ impl InferCtx {
                                 "memset expects (ptr_mut_void, i32, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "bytes.len" | "bytes.get_u8" | "bytes.eq" | "bytes.cmp_range" => {
                         let (want_args, want_ty) = match head {
@@ -18899,7 +21140,7 @@ impl InferCtx {
                                         format!("{head} expects bytes_view"),
                                     ));
                                 }
-                                Ok(want_ty)
+                                Ok(want_ty.into())
                             }
                             "bytes.get_u8" => {
                                 let b = self.infer(&args[0])?;
@@ -18911,7 +21152,7 @@ impl InferCtx {
                                         "bytes.get_u8 expects (bytes_view, i32)".to_string(),
                                     ));
                                 }
-                                Ok(want_ty)
+                                Ok(want_ty.into())
                             }
                             "bytes.eq" => {
                                 let a = self.infer(&args[0])?;
@@ -18924,7 +21165,7 @@ impl InferCtx {
                                         format!("{head} expects (bytes_view, bytes_view)"),
                                     ));
                                 }
-                                Ok(want_ty)
+                                Ok(want_ty.into())
                             }
                             "bytes.cmp_range" => {
                                 let a = self.infer(&args[0])?;
@@ -18942,7 +21183,7 @@ impl InferCtx {
                                             .to_string(),
                                     ));
                                 }
-                                Ok(want_ty)
+                                Ok(want_ty.into())
                             }
                             _ => unreachable!(),
                         }
@@ -18963,7 +21204,7 @@ impl InferCtx {
                                 "bytes.set_u8 expects (bytes, i32, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "math.f64.add_v1" | "math.f64.sub_v1" | "math.f64.mul_v1"
                     | "math.f64.div_v1" | "math.f64.pow_v1" | "math.f64.atan2_v1"
@@ -18984,7 +21225,7 @@ impl InferCtx {
                                 format!("{head} expects (bytes_view, bytes_view)"),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "math.f64.sqrt_v1"
                     | "math.f64.neg_v1"
@@ -19011,7 +21252,7 @@ impl InferCtx {
                                 format!("{head} expects bytes_view"),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "math.f64.parse_v1" => {
                         if args.len() != 1 {
@@ -19027,7 +21268,7 @@ impl InferCtx {
                                 "math.f64.parse_v1 expects bytes_view".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(Ty::ResultBytes.into())
                     }
                     "json.jcs.canon_doc_v1" => {
                         if args.len() != 4 {
@@ -19053,7 +21294,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "math.f64.from_i32_v1" => {
                         if args.len() != 1 {
@@ -19068,7 +21309,7 @@ impl InferCtx {
                                 "math.f64.from_i32_v1 expects i32".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "math.f64.to_i32_trunc_v1" => {
                         if args.len() != 1 {
@@ -19084,7 +21325,7 @@ impl InferCtx {
                                 "math.f64.to_i32_trunc_v1 expects bytes_view".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "bytes.alloc" => {
                         if args.len() != 1 {
@@ -19099,7 +21340,7 @@ impl InferCtx {
                                 "bytes.alloc length must be i32".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "bytes.empty" => {
                         if !args.is_empty() {
@@ -19108,7 +21349,7 @@ impl InferCtx {
                                 "bytes.empty expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "bytes1" => {
                         if args.len() != 1 {
@@ -19123,7 +21364,7 @@ impl InferCtx {
                                 "bytes1 expects i32".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "bytes.lit" => {
                         if args.len() != 1 {
@@ -19138,7 +21379,7 @@ impl InferCtx {
                                 "bytes.lit expects a text string".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "bytes.copy" => {
                         if args.len() != 2 {
@@ -19154,7 +21395,7 @@ impl InferCtx {
                                 "bytes.copy expects (bytes, bytes)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "bytes.concat" => {
                         if args.len() != 2 {
@@ -19170,7 +21411,7 @@ impl InferCtx {
                                 "bytes.concat expects (bytes, bytes)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "bytes.slice" => {
                         if args.len() != 3 {
@@ -19189,7 +21430,7 @@ impl InferCtx {
                                 "bytes.slice expects (bytes_view, i32, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "bytes.view" => {
                         if args.len() != 1 {
@@ -19198,13 +21439,80 @@ impl InferCtx {
                                 "bytes.view expects 1 arg".to_string(),
                             ));
                         }
-                        if self.infer(&args[0])? != Ty::Bytes {
+                        let b = self.infer(&args[0])?;
+                        if b != Ty::Bytes {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "bytes.view expects bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::BytesView)
+                        Ok(TyInfo {
+                            ty: Ty::BytesView,
+                            brand: b.brand,
+                            view_full: true,
+                        })
+                    }
+                    "std.brand.erase_bytes_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.erase_bytes_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.brand.erase_bytes_v1 expects bytes".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo::unbranded(Ty::Bytes))
+                    }
+                    "std.brand.erase_view_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.erase_view_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let v = self.infer(&args[0])?;
+                        if v != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.brand.erase_view_v1 expects bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: Ty::BytesView,
+                            brand: TyBrand::None,
+                            view_full: v.view_full,
+                        })
+                    }
+                    "std.brand.view_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.view_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if args[0].as_ident().is_none() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.brand.view_v1 requires an identifier owner (bind the value to a local with let first)"
+                                    .to_string(),
+                            ));
+                        }
+                        let b = self.infer(&args[0])?;
+                        if b != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.brand.view_v1 expects bytes".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: Ty::BytesView,
+                            brand: b.brand,
+                            view_full: true,
+                        })
                     }
                     "bytes.subview" => {
                         if args.len() != 3 {
@@ -19222,7 +21530,7 @@ impl InferCtx {
                                 "bytes.subview expects (bytes, i32, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::BytesView)
+                        Ok(Ty::BytesView.into())
                     }
                     "view.len" => {
                         if args.len() != 1 {
@@ -19237,7 +21545,7 @@ impl InferCtx {
                                 "view.len expects bytes_view".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "view.get_u8" => {
                         if args.len() != 2 {
@@ -19254,7 +21562,7 @@ impl InferCtx {
                                 "view.get_u8 expects (bytes_view, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "view.slice" => {
                         if args.len() != 3 {
@@ -19272,7 +21580,7 @@ impl InferCtx {
                                 "view.slice expects (bytes_view, i32, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::BytesView)
+                        Ok(Ty::BytesView.into())
                     }
                     "view.to_bytes" => {
                         if args.len() != 1 {
@@ -19287,7 +21595,210 @@ impl InferCtx {
                                 "view.to_bytes expects bytes_view".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
+                    }
+                    "__internal.brand.assume_view_v1" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.brand.assume_view_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        let brand_id = args[0].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.brand.assume_view_v1 expects a brand_id string"
+                                    .to_string(),
+                            )
+                        })?;
+                        crate::validate::validate_symbol(brand_id).map_err(|message| {
+                            CompilerError::new(CompileErrorKind::Parse, message)
+                        })?;
+                        let v = self.infer(&args[1])?;
+                        if v != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.brand.assume_view_v1 expects bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: Ty::BytesView,
+                            brand: TyBrand::Brand(brand_id.to_string()),
+                            view_full: v.view_full,
+                        })
+                    }
+                    "__internal.brand.view_to_bytes_preserve_brand_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.brand.view_to_bytes_preserve_brand_v1 expects 1 arg"
+                                    .to_string(),
+                            ));
+                        }
+                        let v = self.infer(&args[0])?;
+                        if v != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.brand.view_to_bytes_preserve_brand_v1 expects bytes_view"
+                                    .to_string(),
+                            ));
+                        }
+                        let out_brand = match v.brand {
+                            TyBrand::Brand(b) => TyBrand::Brand(b),
+                            TyBrand::Any | TyBrand::None => TyBrand::None,
+                        };
+                        Ok(TyInfo {
+                            ty: Ty::Bytes,
+                            brand: out_brand,
+                            view_full: false,
+                        })
+                    }
+                    "std.brand.assume_bytes_v1" => {
+                        self.require_unsafe_block(head)?;
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.assume_bytes_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        let brand_id = args[0].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.assume_bytes_v1 expects a brand_id string".to_string(),
+                            )
+                        })?;
+                        crate::validate::validate_symbol(brand_id).map_err(|message| {
+                            CompilerError::new(CompileErrorKind::Parse, message)
+                        })?;
+                        let b = self.infer(&args[1])?;
+                        if b != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.brand.assume_bytes_v1 expects bytes".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo::branded(Ty::Bytes, brand_id.to_string()))
+                    }
+                    "std.brand.cast_bytes_v1" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_bytes_v1 expects 3 args".to_string(),
+                            ));
+                        }
+                        let brand_id = args[0].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_bytes_v1 expects a brand_id string".to_string(),
+                            )
+                        })?;
+                        crate::validate::validate_symbol(brand_id).map_err(|message| {
+                            CompilerError::new(CompileErrorKind::Parse, message)
+                        })?;
+                        let validator_id = args[1].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_bytes_v1 expects a validator symbol".to_string(),
+                            )
+                        })?;
+                        crate::validate::validate_symbol(validator_id).map_err(|message| {
+                            CompilerError::new(CompileErrorKind::Parse, message)
+                        })?;
+                        self.require_brand_validator_v1(validator_id)?;
+                        if self.infer(&args[2])? != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.brand.cast_bytes_v1 expects bytes".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo::branded(Ty::ResultBytes, brand_id.to_string()))
+                    }
+                    "std.brand.cast_view_copy_v1" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_view_copy_v1 expects 3 args".to_string(),
+                            ));
+                        }
+                        let brand_id = args[0].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_view_copy_v1 expects a brand_id string".to_string(),
+                            )
+                        })?;
+                        crate::validate::validate_symbol(brand_id).map_err(|message| {
+                            CompilerError::new(CompileErrorKind::Parse, message)
+                        })?;
+                        let validator_id = args[1].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_view_copy_v1 expects a validator symbol".to_string(),
+                            )
+                        })?;
+                        crate::validate::validate_symbol(validator_id).map_err(|message| {
+                            CompilerError::new(CompileErrorKind::Parse, message)
+                        })?;
+                        self.require_brand_validator_v1(validator_id)?;
+                        if self.infer(&args[2])? != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.brand.cast_view_copy_v1 expects bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo::branded(Ty::ResultBytes, brand_id.to_string()))
+                    }
+                    "std.brand.cast_view_v1" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_view_v1 expects 3 args".to_string(),
+                            ));
+                        }
+                        let brand_id = args[0].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_view_v1 expects a brand_id string".to_string(),
+                            )
+                        })?;
+                        crate::validate::validate_symbol(brand_id).map_err(|message| {
+                            CompilerError::new(CompileErrorKind::Parse, message)
+                        })?;
+                        let validator_id = args[1].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.cast_view_v1 expects a validator symbol".to_string(),
+                            )
+                        })?;
+                        crate::validate::validate_symbol(validator_id).map_err(|message| {
+                            CompilerError::new(CompileErrorKind::Parse, message)
+                        })?;
+                        self.require_brand_validator_v1(validator_id)?;
+                        if self.infer(&args[2])? != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.brand.cast_view_v1 expects bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo::branded(Ty::ResultBytesView, brand_id.to_string()))
+                    }
+                    "std.brand.to_bytes_preserve_if_full_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.brand.to_bytes_preserve_if_full_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let v = self.infer(&args[0])?;
+                        if v != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.brand.to_bytes_preserve_if_full_v1 expects bytes_view".to_string(),
+                            ));
+                        }
+                        match (&v.brand, v.view_full) {
+                            (TyBrand::Brand(b), true) => Ok(TyInfo::branded(Ty::Bytes, b.clone())),
+                            _ => Ok(TyInfo::unbranded(Ty::Bytes)),
+                        }
                     }
                     "view.eq" => {
                         if args.len() != 2 {
@@ -19304,7 +21815,7 @@ impl InferCtx {
                                 "view.eq expects (bytes_view, bytes_view)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "view.cmp_range" => {
                         if args.len() != 6 {
@@ -19326,7 +21837,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "fs.read" => {
                         if !self.options.enable_fs {
@@ -19342,13 +21853,13 @@ impl InferCtx {
                             ));
                         }
                         let path_ty = self.infer(&args[0])?;
-                        if !matches!(path_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(path_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "fs.read expects bytes_view path".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "fs.read_async" => {
                         if !self.options.enable_fs {
@@ -19364,13 +21875,13 @@ impl InferCtx {
                             ));
                         }
                         let path_ty = self.infer(&args[0])?;
-                        if !matches!(path_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(path_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "fs.read_async expects bytes_view path".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "fs.open_read" => {
                         if !self.options.enable_fs {
@@ -19386,13 +21897,13 @@ impl InferCtx {
                             ));
                         }
                         let path_ty = self.infer(&args[0])?;
-                        if !matches!(path_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(path_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "fs.open_read expects bytes_view path".to_string(),
                             ));
                         }
-                        Ok(Ty::Iface)
+                        Ok(Ty::Iface.into())
                     }
                     "io.open_read_bytes" => {
                         if args.len() != 1 {
@@ -19402,13 +21913,13 @@ impl InferCtx {
                             ));
                         }
                         let b_ty = self.infer(&args[0])?;
-                        if !matches!(b_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(b_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "io.open_read_bytes expects bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::Iface)
+                        Ok(Ty::Iface.into())
                     }
                     "fs.list_dir" => {
                         if !self.options.enable_fs {
@@ -19424,13 +21935,13 @@ impl InferCtx {
                             ));
                         }
                         let path_ty = self.infer(&args[0])?;
-                        if !matches!(path_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(path_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "fs.list_dir expects bytes_view path".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.fs.read_file" => {
                         self.require_standalone_only(head)?;
@@ -19446,7 +21957,7 @@ impl InferCtx {
                                 "os.fs.read_file expects bytes path".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.fs.write_file" => {
                         self.require_standalone_only(head)?;
@@ -19463,7 +21974,7 @@ impl InferCtx {
                                 "os.fs.write_file expects (bytes path, bytes data)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.fs.read_all_v1" => {
                         self.require_standalone_only(head)?;
@@ -19480,7 +21991,7 @@ impl InferCtx {
                                 "os.fs.read_all_v1 expects (bytes path, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(Ty::ResultBytes.into())
                     }
                     "os.fs.write_all_v1" => {
                         self.require_standalone_only(head)?;
@@ -19500,7 +22011,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "os.fs.stream_open_write_v1" => {
                         self.require_standalone_only(head)?;
@@ -19518,7 +22029,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "os.fs.stream_write_all_v1" => {
                         self.require_standalone_only(head)?;
@@ -19537,7 +22048,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "os.fs.stream_close_v1" => {
                         self.require_standalone_only(head)?;
@@ -19553,7 +22064,7 @@ impl InferCtx {
                                 "os.fs.stream_close_v1 expects i32 writer_handle".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "os.fs.stream_drop_v1" => {
                         self.require_standalone_only(head)?;
@@ -19569,7 +22080,7 @@ impl InferCtx {
                                 "os.fs.stream_drop_v1 expects i32 writer_handle".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.fs.mkdirs_v1" => {
                         self.require_standalone_only(head)?;
@@ -19586,7 +22097,7 @@ impl InferCtx {
                                 "os.fs.mkdirs_v1 expects (bytes path, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "os.fs.remove_file_v1" => {
                         self.require_standalone_only(head)?;
@@ -19603,7 +22114,7 @@ impl InferCtx {
                                 "os.fs.remove_file_v1 expects (bytes path, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "os.fs.remove_dir_all_v1" => {
                         self.require_standalone_only(head)?;
@@ -19621,7 +22132,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "os.fs.rename_v1" => {
                         self.require_standalone_only(head)?;
@@ -19641,7 +22152,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "os.fs.list_dir_sorted_text_v1" => {
                         self.require_standalone_only(head)?;
@@ -19659,7 +22170,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(Ty::ResultBytes.into())
                     }
                     "os.fs.walk_glob_sorted_text_v1" => {
                         self.require_standalone_only(head)?;
@@ -19679,7 +22190,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(Ty::ResultBytes.into())
                     }
                     "os.fs.stat_v1" => {
                         self.require_standalone_only(head)?;
@@ -19696,7 +22207,7 @@ impl InferCtx {
                                 "os.fs.stat_v1 expects (bytes path, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(Ty::ResultBytes.into())
                     }
                     "os.db.sqlite.open_v1" => {
                         self.require_standalone_only(head)?;
@@ -19713,7 +22224,7 @@ impl InferCtx {
                                 "os.db.sqlite.open_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.sqlite.query_v1" => {
                         self.require_standalone_only(head)?;
@@ -19730,7 +22241,7 @@ impl InferCtx {
                                 "os.db.sqlite.query_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.sqlite.exec_v1" => {
                         self.require_standalone_only(head)?;
@@ -19747,7 +22258,7 @@ impl InferCtx {
                                 "os.db.sqlite.exec_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.sqlite.close_v1" => {
                         self.require_standalone_only(head)?;
@@ -19764,7 +22275,7 @@ impl InferCtx {
                                 "os.db.sqlite.close_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.pg.open_v1" => {
                         self.require_standalone_only(head)?;
@@ -19781,7 +22292,7 @@ impl InferCtx {
                                 "os.db.pg.open_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.pg.query_v1" => {
                         self.require_standalone_only(head)?;
@@ -19798,7 +22309,7 @@ impl InferCtx {
                                 "os.db.pg.query_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.pg.exec_v1" => {
                         self.require_standalone_only(head)?;
@@ -19815,7 +22326,7 @@ impl InferCtx {
                                 "os.db.pg.exec_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.pg.close_v1" => {
                         self.require_standalone_only(head)?;
@@ -19832,7 +22343,7 @@ impl InferCtx {
                                 "os.db.pg.close_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.mysql.open_v1" => {
                         self.require_standalone_only(head)?;
@@ -19849,7 +22360,7 @@ impl InferCtx {
                                 "os.db.mysql.open_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.mysql.query_v1" => {
                         self.require_standalone_only(head)?;
@@ -19866,7 +22377,7 @@ impl InferCtx {
                                 "os.db.mysql.query_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.mysql.exec_v1" => {
                         self.require_standalone_only(head)?;
@@ -19883,7 +22394,7 @@ impl InferCtx {
                                 "os.db.mysql.exec_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.mysql.close_v1" => {
                         self.require_standalone_only(head)?;
@@ -19900,7 +22411,7 @@ impl InferCtx {
                                 "os.db.mysql.close_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.redis.open_v1" => {
                         self.require_standalone_only(head)?;
@@ -19917,7 +22428,7 @@ impl InferCtx {
                                 "os.db.redis.open_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.redis.cmd_v1" => {
                         self.require_standalone_only(head)?;
@@ -19934,7 +22445,7 @@ impl InferCtx {
                                 "os.db.redis.cmd_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.db.redis.close_v1" => {
                         self.require_standalone_only(head)?;
@@ -19951,7 +22462,7 @@ impl InferCtx {
                                 "os.db.redis.close_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.env.get" => {
                         self.require_standalone_only(head)?;
@@ -19967,7 +22478,7 @@ impl InferCtx {
                                 "os.env.get expects bytes key".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.time.now_unix_ms" => {
                         self.require_standalone_only(head)?;
@@ -19977,7 +22488,7 @@ impl InferCtx {
                                 "os.time.now_unix_ms expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.time.now_instant_v1" => {
                         self.require_standalone_only(head)?;
@@ -19987,7 +22498,7 @@ impl InferCtx {
                                 "os.time.now_instant_v1 expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.time.sleep_ms_v1" => {
                         self.require_standalone_only(head)?;
@@ -20003,7 +22514,7 @@ impl InferCtx {
                                 "os.time.sleep_ms_v1 expects i32 ms".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.time.local_tzid_v1" => {
                         self.require_standalone_only(head)?;
@@ -20013,7 +22524,7 @@ impl InferCtx {
                                 "os.time.local_tzid_v1 expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.time.tzdb_is_valid_tzid_v1" => {
                         if args.len() != 1 {
@@ -20028,7 +22539,7 @@ impl InferCtx {
                                 "os.time.tzdb_is_valid_tzid_v1 expects bytes_view tzid".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.time.tzdb_offset_duration_v1" => {
                         if args.len() != 3 {
@@ -20047,7 +22558,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.time.tzdb_snapshot_id_v1" => {
                         if !args.is_empty() {
@@ -20056,7 +22567,7 @@ impl InferCtx {
                                 "os.time.tzdb_snapshot_id_v1 expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.process.exit" => {
                         self.require_standalone_only(head)?;
@@ -20072,7 +22583,7 @@ impl InferCtx {
                                 "os.process.exit expects i32 code".to_string(),
                             ));
                         }
-                        Ok(Ty::Never)
+                        Ok(Ty::Never.into())
                     }
                     "os.process.spawn_capture_v1" => {
                         self.require_standalone_only(head)?;
@@ -20090,7 +22601,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.process.spawn_piped_v1" => {
                         self.require_standalone_only(head)?;
@@ -20108,7 +22619,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.process.try_join_capture_v1" => {
                         self.require_standalone_only(head)?;
@@ -20125,7 +22636,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::OptionBytes)
+                        Ok(Ty::OptionBytes.into())
                     }
                     "os.process.join_capture_v1" | "std.os.process.join_capture_v1" => {
                         self.require_standalone_only(head)?;
@@ -20148,7 +22659,7 @@ impl InferCtx {
                                 "os.process.join_capture_v1 expects i32 proc handle".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.process.stdout_read_v1" => {
                         self.require_standalone_only(head)?;
@@ -20165,7 +22676,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.process.stderr_read_v1" => {
                         self.require_standalone_only(head)?;
@@ -20182,7 +22693,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.process.stdin_write_v1" => {
                         self.require_standalone_only(head)?;
@@ -20199,7 +22710,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.process.stdin_close_v1" => {
                         self.require_standalone_only(head)?;
@@ -20215,7 +22726,7 @@ impl InferCtx {
                                 "os.process.stdin_close_v1 expects i32 proc handle".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.process.try_wait_v1" => {
                         self.require_standalone_only(head)?;
@@ -20231,7 +22742,7 @@ impl InferCtx {
                                 "os.process.try_wait_v1 expects i32 proc handle".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.process.join_exit_v1" | "std.os.process.join_exit_v1" => {
                         self.require_standalone_only(head)?;
@@ -20254,7 +22765,7 @@ impl InferCtx {
                                 "os.process.join_exit_v1 expects i32 proc handle".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.process.take_exit_v1" => {
                         self.require_standalone_only(head)?;
@@ -20270,7 +22781,7 @@ impl InferCtx {
                                 "os.process.take_exit_v1 expects i32 proc handle".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.process.kill_v1" => {
                         self.require_standalone_only(head)?;
@@ -20286,7 +22797,7 @@ impl InferCtx {
                                 "os.process.kill_v1 expects (i32 proc_handle, i32 sig)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.process.drop_v1" => {
                         self.require_standalone_only(head)?;
@@ -20302,7 +22813,7 @@ impl InferCtx {
                                 "os.process.drop_v1 expects i32 proc handle".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "os.process.run_capture_v1" => {
                         self.require_standalone_only(head)?;
@@ -20320,7 +22831,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "os.net.http_request" => {
                         self.require_standalone_only(head)?;
@@ -20336,7 +22847,7 @@ impl InferCtx {
                                 "os.net.http_request expects bytes req".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "rr.send_request" => {
                         if !self.options.enable_rr {
@@ -20352,13 +22863,13 @@ impl InferCtx {
                             ));
                         }
                         let req_ty = self.infer(&args[0])?;
-                        if !matches!(req_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(req_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "rr.send_request expects bytes_view".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "rr.fetch" => {
                         if !self.options.enable_rr {
@@ -20374,13 +22885,13 @@ impl InferCtx {
                             ));
                         }
                         let key_ty = self.infer(&args[0])?;
-                        if !matches!(key_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(key_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "rr.fetch expects bytes_view key".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "rr.send" => {
                         if !self.options.enable_rr {
@@ -20396,13 +22907,13 @@ impl InferCtx {
                             ));
                         }
                         let req_ty = self.infer(&args[0])?;
-                        if !matches!(req_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(req_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "rr.send expects bytes_view req".to_string(),
                             ));
                         }
-                        Ok(Ty::Iface)
+                        Ok(Ty::Iface.into())
                     }
                     "kv.get" => {
                         if !self.options.enable_kv {
@@ -20418,13 +22929,13 @@ impl InferCtx {
                             ));
                         }
                         let key_ty = self.infer(&args[0])?;
-                        if !matches!(key_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(key_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "kv.get expects bytes_view key".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "kv.get_async" => {
                         if !self.options.enable_kv {
@@ -20440,13 +22951,13 @@ impl InferCtx {
                             ));
                         }
                         let key_ty = self.infer(&args[0])?;
-                        if !matches!(key_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(key_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "kv.get_async expects bytes_view key".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "kv.get_stream" => {
                         if !self.options.enable_kv {
@@ -20462,13 +22973,13 @@ impl InferCtx {
                             ));
                         }
                         let key_ty = self.infer(&args[0])?;
-                        if !matches!(key_ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        if !matches!(key_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "kv.get_stream expects bytes_view key".to_string(),
                             ));
                         }
-                        Ok(Ty::Iface)
+                        Ok(Ty::Iface.into())
                     }
                     "kv.set" => {
                         if !self.options.enable_kv {
@@ -20490,7 +23001,7 @@ impl InferCtx {
                                 "kv.set expects (bytes, bytes)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "io.read" => {
                         if args.len() != 2 {
@@ -20505,7 +23016,7 @@ impl InferCtx {
                                 "io.read expects (iface, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "iface.make_v1" => {
                         if args.len() != 2 {
@@ -20520,7 +23031,7 @@ impl InferCtx {
                                 "iface.make_v1 expects (i32, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::Iface)
+                        Ok(Ty::Iface.into())
                     }
                     "bufread.new" => {
                         if args.len() != 2 {
@@ -20535,7 +23046,7 @@ impl InferCtx {
                                 "bufread.new expects (iface, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "bufread.fill" => {
                         if args.len() != 1 {
@@ -20550,7 +23061,7 @@ impl InferCtx {
                                 "bufread.fill expects i32 bufread handle".to_string(),
                             ));
                         }
-                        Ok(Ty::BytesView)
+                        Ok(Ty::BytesView.into())
                     }
                     "bufread.consume" => {
                         if args.len() != 2 {
@@ -20565,7 +23076,7 @@ impl InferCtx {
                                 "bufread.consume expects (i32, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "scratch_u8_fixed_v1.new" => {
                         if args.len() != 1 {
@@ -20580,7 +23091,7 @@ impl InferCtx {
                                 "scratch_u8_fixed_v1.new expects i32 cap".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "scratch_u8_fixed_v1.clear"
                     | "scratch_u8_fixed_v1.len"
@@ -20598,7 +23109,7 @@ impl InferCtx {
                                 format!("{head} expects i32 handle"),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "scratch_u8_fixed_v1.as_view" => {
                         if args.len() != 1 {
@@ -20613,7 +23124,7 @@ impl InferCtx {
                                 "scratch_u8_fixed_v1.as_view expects i32 handle".to_string(),
                             ));
                         }
-                        Ok(Ty::BytesView)
+                        Ok(Ty::BytesView.into())
                     }
                     "scratch_u8_fixed_v1.try_write" => {
                         if args.len() != 2 {
@@ -20635,7 +23146,7 @@ impl InferCtx {
                                 "scratch_u8_fixed_v1.try_write expects bytes_view".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "task.scope.cfg_v1" => Err(CompilerError::new(
                         CompileErrorKind::Typing,
@@ -20687,7 +23198,7 @@ impl InferCtx {
                             ));
                         }
                         let _call_ret = self.infer_immediate_defasync_call_expr(&args[0])?;
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "task.scope.cancel_all_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20702,7 +23213,7 @@ impl InferCtx {
                                 "task.scope.cancel_all_v1 expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "task.scope.wait_all_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20717,7 +23228,7 @@ impl InferCtx {
                                 "task.scope.wait_all_v1 expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "task.scope.async_let_bytes_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20739,7 +23250,7 @@ impl InferCtx {
                                 "task.scope.async_let_bytes_v1 expects a defasync that returns bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::TaskSlotV1)
+                        Ok(Ty::TaskSlotV1.into())
                     }
                     "task.scope.async_let_result_bytes_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20761,7 +23272,7 @@ impl InferCtx {
                                 "task.scope.async_let_result_bytes_v1 expects a defasync that returns result_bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::TaskSlotV1)
+                        Ok(Ty::TaskSlotV1.into())
                     }
                     "task.scope.await_slot_bytes_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20782,7 +23293,7 @@ impl InferCtx {
                                 "task.scope.await_slot_bytes_v1 expects task_slot_v1".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "task.scope.await_slot_result_bytes_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20803,7 +23314,7 @@ impl InferCtx {
                                 "task.scope.await_slot_result_bytes_v1 expects task_slot_v1".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(Ty::ResultBytes.into())
                     }
                     "task.scope.try_await_slot.bytes_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20824,7 +23335,7 @@ impl InferCtx {
                                 "task.scope.try_await_slot.bytes_v1 expects task_slot_v1".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(Ty::ResultBytes.into())
                     }
                     "task.scope.try_await_slot.result_bytes_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20845,7 +23356,7 @@ impl InferCtx {
                                 "task.scope.try_await_slot.result_bytes_v1 expects task_slot_v1".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultResultBytes)
+                        Ok(Ty::ResultResultBytes.into())
                     }
                     "task.scope.slot_is_finished_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20866,7 +23377,7 @@ impl InferCtx {
                                 "task.scope.slot_is_finished_v1 expects task_slot_v1".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "task.scope.slot_to_i32_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20887,7 +23398,7 @@ impl InferCtx {
                                 "task.scope.slot_to_i32_v1 expects task_slot_v1".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "task.scope.slot_from_i32_v1" => {
                         if self.task_scope_depth == 0 {
@@ -20908,7 +23419,7 @@ impl InferCtx {
                                 "task.scope.slot_from_i32_v1 expects i32".to_string(),
                             ));
                         }
-                        Ok(Ty::TaskSlotV1)
+                        Ok(Ty::TaskSlotV1.into())
                     }
                     "task.scope.select.cfg_v1" => Err(CompilerError::new(
                         CompileErrorKind::Typing,
@@ -20963,11 +23474,12 @@ impl InferCtx {
                                 }
                             }
                         }
-                        Ok(if head == "task.scope.select_v1" {
+                        Ok((if head == "task.scope.select_v1" {
                             Ty::TaskSelectEvtV1
                         } else {
                             Ty::OptionTaskSelectEvtV1
                         })
+                        .into())
                     }
                     "task.select_evt.tag_v1"
                     | "task.select_evt.case_index_v1"
@@ -20984,7 +23496,7 @@ impl InferCtx {
                                 format!("{head} expects task_select_evt_v1"),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "task.select_evt.take_bytes_v1" => {
                         if args.len() != 1 {
@@ -20999,7 +23511,7 @@ impl InferCtx {
                                 "task.select_evt.take_bytes_v1 expects task_select_evt_v1".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "task.select_evt.drop_v1" => {
                         if args.len() != 1 {
@@ -21014,7 +23526,7 @@ impl InferCtx {
                                 "task.select_evt.drop_v1 expects task_select_evt_v1".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "await" | "task.spawn" => {
                         if head == "await" && !self.allow_async_ops {
@@ -21038,7 +23550,15 @@ impl InferCtx {
                                         "await expects bytes task handle".to_string(),
                                     ));
                                 }
-                                Ok(Ty::Bytes)
+                                Ok(if hty.ty == Ty::TaskHandleBytesV1 {
+                                    TyInfo {
+                                        ty: Ty::Bytes,
+                                        brand: hty.brand,
+                                        view_full: false,
+                                    }
+                                } else {
+                                    Ty::Bytes.into()
+                                })
                             }
                             "task.spawn" => {
                                 if hty != Ty::TaskHandleBytesV1 && hty != Ty::TaskHandleResultBytesV1
@@ -21071,7 +23591,7 @@ impl InferCtx {
                                 "task.is_finished expects task handle".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "task.try_join.bytes" => {
                         if args.len() != 1 {
@@ -21087,7 +23607,15 @@ impl InferCtx {
                                 "task.try_join.bytes expects bytes task handle".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(if hty.ty == Ty::TaskHandleBytesV1 {
+                            TyInfo {
+                                ty: Ty::ResultBytes,
+                                brand: hty.brand,
+                                view_full: false,
+                            }
+                        } else {
+                            Ty::ResultBytes.into()
+                        })
                     }
                     "task.try_join.result_bytes" => {
                         if args.len() != 1 {
@@ -21104,7 +23632,15 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::ResultResultBytes)
+                        Ok(if hty.ty == Ty::TaskHandleResultBytesV1 {
+                            TyInfo {
+                                ty: Ty::ResultResultBytes,
+                                brand: hty.brand,
+                                view_full: false,
+                            }
+                        } else {
+                            Ty::ResultResultBytes.into()
+                        })
                     }
                     "task.join.bytes" | "task.join.result_bytes" | "task.cancel" => {
                         if (head == "task.join.bytes" || head == "task.join.result_bytes")
@@ -21130,7 +23666,15 @@ impl InferCtx {
                                         "task.join.bytes expects bytes task handle".to_string(),
                                     ));
                                 }
-                                Ok(Ty::Bytes)
+                                Ok(if hty.ty == Ty::TaskHandleBytesV1 {
+                                    TyInfo {
+                                        ty: Ty::Bytes,
+                                        brand: hty.brand,
+                                        view_full: false,
+                                    }
+                                } else {
+                                    Ty::Bytes.into()
+                                })
                             }
                             "task.join.result_bytes" => {
                                 if hty != Ty::TaskHandleResultBytesV1 && hty != Ty::I32 {
@@ -21140,7 +23684,15 @@ impl InferCtx {
                                             .to_string(),
                                     ));
                                 }
-                                Ok(Ty::ResultBytes)
+                                Ok(if hty.ty == Ty::TaskHandleResultBytesV1 {
+                                    TyInfo {
+                                        ty: Ty::ResultBytes,
+                                        brand: hty.brand,
+                                        view_full: false,
+                                    }
+                                } else {
+                                    Ty::ResultBytes.into()
+                                })
                             }
                             "task.cancel" => {
                                 if hty != Ty::TaskHandleBytesV1
@@ -21152,7 +23704,7 @@ impl InferCtx {
                                         "task.cancel expects task handle".to_string(),
                                     ));
                                 }
-                                Ok(Ty::I32)
+                                Ok(Ty::I32.into())
                             }
                             _ => unreachable!(),
                         }
@@ -21170,7 +23722,7 @@ impl InferCtx {
                                 "task.yield expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "task.sleep" => {
                         if !self.allow_async_ops {
@@ -21191,7 +23743,7 @@ impl InferCtx {
                                 "task.sleep expects i32 ticks".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "chan.bytes.new" => {
                         if args.len() != 1 {
@@ -21206,7 +23758,7 @@ impl InferCtx {
                                 "chan.bytes.new expects i32 cap".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "chan.bytes.send" => {
                         if !self.allow_async_ops {
@@ -21227,7 +23779,7 @@ impl InferCtx {
                                 "chan.bytes.send expects (i32, bytes)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "chan.bytes.try_send" => {
                         if args.len() != 2 {
@@ -21247,7 +23799,7 @@ impl InferCtx {
                                 "chan.bytes.try_send expects (i32, bytes_view)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "chan.bytes.recv" => {
                         if !self.allow_async_ops {
@@ -21268,7 +23820,7 @@ impl InferCtx {
                                 "chan.bytes.recv expects i32 chan handle".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "chan.bytes.try_recv" => {
                         if args.len() != 1 {
@@ -21283,7 +23835,7 @@ impl InferCtx {
                                 "chan.bytes.try_recv expects i32 chan handle".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(Ty::ResultBytes.into())
                     }
                     "chan.bytes.close" => {
                         if args.len() != 1 {
@@ -21298,7 +23850,7 @@ impl InferCtx {
                                 "chan.bytes.close expects i32 chan handle".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "codec.read_u32_le" => {
                         if args.len() != 2 {
@@ -21316,7 +23868,7 @@ impl InferCtx {
                                 "codec.read_u32_le expects (bytes_view, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "codec.write_u32_le" => {
                         if args.len() != 1 {
@@ -21331,7 +23883,7 @@ impl InferCtx {
                                 "codec.write_u32_le expects i32".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "fmt.u32_to_dec" | "fmt.s32_to_dec" => {
                         if args.len() != 1 {
@@ -21346,7 +23898,7 @@ impl InferCtx {
                                 format!("{head} expects i32"),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "parse.u32_dec" => {
                         if args.len() != 1 {
@@ -21361,7 +23913,7 @@ impl InferCtx {
                                 "parse.u32_dec expects bytes_view".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "parse.u32_dec_at" => {
                         if args.len() != 2 {
@@ -21378,7 +23930,7 @@ impl InferCtx {
                                 "parse.u32_dec_at expects (bytes_view, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "prng.lcg_next_u32" => {
                         if args.len() != 1 {
@@ -21393,7 +23945,7 @@ impl InferCtx {
                                 "prng.lcg_next_u32 expects i32".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "regex.compile_opts_v1" => {
                         if args.len() != 2 {
@@ -21410,7 +23962,7 @@ impl InferCtx {
                                 "regex.compile_opts_v1 expects (bytes_view, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "regex.exec_from_v1" => {
                         if args.len() != 3 {
@@ -21429,7 +23981,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "regex.exec_caps_from_v1" => {
                         if args.len() != 3 {
@@ -21448,7 +24000,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "regex.find_all_x7sl_v1" => {
                         if args.len() != 3 {
@@ -21467,7 +24019,10 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(TyInfo::branded(
+                            Ty::Bytes,
+                            "std.text.slices.x7sl_v1".to_string(),
+                        ))
                     }
                     "regex.split_v1" => {
                         if args.len() != 3 {
@@ -21485,7 +24040,10 @@ impl InferCtx {
                                 "regex.split_v1 expects (bytes_view, bytes_view, i32)".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(TyInfo::branded(
+                            Ty::Bytes,
+                            "std.text.slices.x7sl_v1".to_string(),
+                        ))
                     }
                     "regex.replace_all_v1" => {
                         if args.len() != 4 {
@@ -21505,7 +24063,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "vec_u8.with_capacity" => {
                         if args.len() != 1 {
@@ -21520,7 +24078,7 @@ impl InferCtx {
                                 "vec_u8.with_capacity expects i32 cap".to_string(),
                             ));
                         }
-                        Ok(Ty::VecU8)
+                        Ok(Ty::VecU8.into())
                     }
                     "map_u32.new" | "set_u32.new" => {
                         if args.len() != 1 {
@@ -21535,7 +24093,7 @@ impl InferCtx {
                                 format!("{head} expects i32"),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "vec_u8.len" => {
                         if args.len() != 1 {
@@ -21550,7 +24108,7 @@ impl InferCtx {
                                 "vec_u8.len expects vec_u8".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "vec_u8.cap" => {
                         if args.len() != 1 {
@@ -21565,7 +24123,7 @@ impl InferCtx {
                                 "vec_u8.cap expects vec_u8".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "vec_u8.clear" => {
                         if args.len() != 1 {
@@ -21580,7 +24138,7 @@ impl InferCtx {
                                 "vec_u8.clear expects vec_u8".to_string(),
                             ));
                         }
-                        Ok(Ty::VecU8)
+                        Ok(Ty::VecU8.into())
                     }
                     "map_u32.len" => {
                         if args.len() != 1 {
@@ -21595,7 +24153,7 @@ impl InferCtx {
                                 "map_u32.len expects i32 handle".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "vec_u8.reserve_exact" => {
                         if args.len() != 2 {
@@ -21610,7 +24168,7 @@ impl InferCtx {
                                 "vec_u8.reserve_exact expects (vec_u8, i32 additional)".to_string(),
                             ));
                         }
-                        Ok(Ty::VecU8)
+                        Ok(Ty::VecU8.into())
                     }
                     "vec_u8.extend_zeroes" => {
                         if args.len() != 2 {
@@ -21625,7 +24183,7 @@ impl InferCtx {
                                 "vec_u8.extend_zeroes expects (vec_u8, i32 n)".to_string(),
                             ));
                         }
-                        Ok(Ty::VecU8)
+                        Ok(Ty::VecU8.into())
                     }
                     "vec_u8.get" => {
                         if args.len() != 2 {
@@ -21640,7 +24198,7 @@ impl InferCtx {
                                 "vec_u8.get expects (vec_u8, i32 index)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "vec_u8.set" => {
                         if args.len() != 3 {
@@ -21658,7 +24216,7 @@ impl InferCtx {
                                 "vec_u8.set expects (vec_u8, i32 index, i32 value)".to_string(),
                             ));
                         }
-                        Ok(Ty::VecU8)
+                        Ok(Ty::VecU8.into())
                     }
                     "vec_u8.push" => {
                         if args.len() != 2 {
@@ -21673,7 +24231,7 @@ impl InferCtx {
                                 "vec_u8.push expects (vec_u8, i32 value)".to_string(),
                             ));
                         }
-                        Ok(Ty::VecU8)
+                        Ok(Ty::VecU8.into())
                     }
                     "vec_u8.extend_bytes" => {
                         if args.len() != 2 {
@@ -21691,7 +24249,7 @@ impl InferCtx {
                                 "vec_u8.extend_bytes expects (vec_u8, bytes_view)".to_string(),
                             ));
                         }
-                        Ok(Ty::VecU8)
+                        Ok(Ty::VecU8.into())
                     }
                     "vec_u8.extend_bytes_range" => {
                         if args.len() != 4 {
@@ -21711,7 +24269,7 @@ impl InferCtx {
                                 "vec_u8.extend_bytes_range expects (vec_u8, bytes_view, i32 start, i32 len)".to_string(),
                             ));
                         }
-                        Ok(Ty::VecU8)
+                        Ok(Ty::VecU8.into())
                     }
                     "vec_u8.into_bytes" => {
                         if args.len() != 1 {
@@ -21726,7 +24284,7 @@ impl InferCtx {
                                 "vec_u8.into_bytes expects vec_u8".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "vec_u8.as_view" => {
                         if args.len() != 1 {
@@ -21741,7 +24299,7 @@ impl InferCtx {
                                 "vec_u8.as_view expects vec_u8".to_string(),
                             ));
                         }
-                        Ok(Ty::BytesView)
+                        Ok(Ty::BytesView.into())
                     }
                     "option_i32.none" => {
                         if !args.is_empty() {
@@ -21750,7 +24308,7 @@ impl InferCtx {
                                 "option_i32.none expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::OptionI32)
+                        Ok(Ty::OptionI32.into())
                     }
                     "option_i32.some" => {
                         if args.len() != 1 {
@@ -21765,7 +24323,7 @@ impl InferCtx {
                                 "option_i32.some expects i32".to_string(),
                             ));
                         }
-                        Ok(Ty::OptionI32)
+                        Ok(Ty::OptionI32.into())
                     }
                     "option_i32.is_some" => {
                         if args.len() != 1 {
@@ -21780,7 +24338,7 @@ impl InferCtx {
                                 "option_i32.is_some expects option_i32".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "option_i32.unwrap_or" => {
                         if args.len() != 2 {
@@ -21798,7 +24356,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "option_bytes.none" => {
                         if !args.is_empty() {
@@ -21807,7 +24365,11 @@ impl InferCtx {
                                 "option_bytes.none expects 0 args".to_string(),
                             ));
                         }
-                        Ok(Ty::OptionBytes)
+                        Ok(TyInfo {
+                            ty: Ty::OptionBytes,
+                            brand: TyBrand::Any,
+                            view_full: false,
+                        })
                     }
                     "option_bytes.some" => {
                         if args.len() != 1 {
@@ -21816,13 +24378,18 @@ impl InferCtx {
                                 "option_bytes.some expects 1 arg".to_string(),
                             ));
                         }
-                        if self.infer(&args[0])? != Ty::Bytes {
+                        let payload = self.infer(&args[0])?;
+                        if payload != Ty::Bytes {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "option_bytes.some expects bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::OptionBytes)
+                        Ok(TyInfo {
+                            ty: Ty::OptionBytes,
+                            brand: payload.brand,
+                            view_full: false,
+                        })
                     }
                     "option_bytes.is_some" => {
                         if args.len() != 1 {
@@ -21837,7 +24404,7 @@ impl InferCtx {
                                 "option_bytes.is_some expects option_bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "option_bytes.unwrap_or" => {
                         if args.len() != 2 {
@@ -21846,16 +24413,98 @@ impl InferCtx {
                                 "option_bytes.unwrap_or expects 2 args".to_string(),
                             ));
                         }
-                        if self.infer(&args[0])? != Ty::OptionBytes
-                            || self.infer(&args[1])? != Ty::Bytes
-                        {
+                        let opt = self.infer(&args[0])?;
+                        let default = self.infer(&args[1])?;
+                        if opt != Ty::OptionBytes || default != Ty::Bytes {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "option_bytes.unwrap_or expects (option_bytes, bytes default)"
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        let out_brand = match opt.brand {
+                            TyBrand::Any => default.brand,
+                            other => tybrand_join(Ty::Bytes, &other, &default.brand),
+                        };
+                        Ok(TyInfo {
+                            ty: Ty::Bytes,
+                            brand: out_brand,
+                            view_full: false,
+                        })
+                    }
+                    "option_bytes_view.none" => {
+                        if !args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "option_bytes_view.none expects 0 args".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: Ty::OptionBytesView,
+                            brand: TyBrand::Any,
+                            view_full: false,
+                        })
+                    }
+                    "option_bytes_view.some" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "option_bytes_view.some expects 1 arg".to_string(),
+                            ));
+                        }
+                        let payload = self.infer(&args[0])?;
+                        if payload != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "option_bytes_view.some expects bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: Ty::OptionBytesView,
+                            brand: payload.brand,
+                            view_full: false,
+                        })
+                    }
+                    "option_bytes_view.is_some" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "option_bytes_view.is_some expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::OptionBytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "option_bytes_view.is_some expects option_bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "option_bytes_view.unwrap_or" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "option_bytes_view.unwrap_or expects 2 args".to_string(),
+                            ));
+                        }
+                        let opt = self.infer(&args[0])?;
+                        let default = self.infer(&args[1])?;
+                        if opt != Ty::OptionBytesView || default != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "option_bytes_view.unwrap_or expects (option_bytes_view, bytes_view default)"
+                                    .to_string(),
+                            ));
+                        }
+                        let out_brand = match opt.brand {
+                            TyBrand::Any => default.brand,
+                            other => tybrand_join(Ty::BytesView, &other, &default.brand),
+                        };
+                        Ok(TyInfo {
+                            ty: Ty::BytesView,
+                            brand: out_brand,
+                            view_full: false,
+                        })
                     }
                     "result_i32.ok" => {
                         if args.len() != 1 {
@@ -21870,7 +24519,7 @@ impl InferCtx {
                                 "result_i32.ok expects i32".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "result_i32.err" => {
                         if args.len() != 1 {
@@ -21885,7 +24534,7 @@ impl InferCtx {
                                 "result_i32.err expects i32".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultI32)
+                        Ok(Ty::ResultI32.into())
                     }
                     "result_i32.is_ok" => {
                         if args.len() != 1 {
@@ -21900,7 +24549,7 @@ impl InferCtx {
                                 "result_i32.is_ok expects result_i32".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "result_i32.err_code" => {
                         if args.len() != 1 {
@@ -21915,7 +24564,7 @@ impl InferCtx {
                                 "result_i32.err_code expects result_i32".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "result_i32.unwrap_or" => {
                         if args.len() != 2 {
@@ -21933,7 +24582,7 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "result_bytes.ok" => {
                         if args.len() != 1 {
@@ -21942,13 +24591,18 @@ impl InferCtx {
                                 "result_bytes.ok expects 1 arg".to_string(),
                             ));
                         }
-                        if self.infer(&args[0])? != Ty::Bytes {
+                        let payload = self.infer(&args[0])?;
+                        if payload != Ty::Bytes {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "result_bytes.ok expects bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(TyInfo {
+                            ty: Ty::ResultBytes,
+                            brand: payload.brand,
+                            view_full: false,
+                        })
                     }
                     "result_bytes.err" => {
                         if args.len() != 1 {
@@ -21963,7 +24617,11 @@ impl InferCtx {
                                 "result_bytes.err expects i32".to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        Ok(TyInfo {
+                            ty: Ty::ResultBytes,
+                            brand: TyBrand::Any,
+                            view_full: false,
+                        })
                     }
                     "result_bytes.is_ok" => {
                         if args.len() != 1 {
@@ -21978,7 +24636,7 @@ impl InferCtx {
                                 "result_bytes.is_ok expects result_bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "result_bytes.err_code" => {
                         if args.len() != 1 {
@@ -21993,7 +24651,7 @@ impl InferCtx {
                                 "result_bytes.err_code expects result_bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "result_bytes.unwrap_or" => {
                         if args.len() != 2 {
@@ -22011,7 +24669,144 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        let res = self.infer(&args[0])?;
+                        let default = self.infer(&args[1])?;
+                        if res != Ty::ResultBytes || default != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes.unwrap_or expects (result_bytes, bytes default)"
+                                    .to_string(),
+                            ));
+                        }
+                        let out_brand = match res.brand {
+                            TyBrand::Any => default.brand,
+                            other => tybrand_join(Ty::Bytes, &other, &default.brand),
+                        };
+                        Ok(TyInfo {
+                            ty: Ty::Bytes,
+                            brand: out_brand,
+                            view_full: false,
+                        })
+                    }
+                    "__internal.result_bytes.unwrap_ok_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.result_bytes.unwrap_ok_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let res = self.infer(&args[0])?;
+                        if res != Ty::ResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.result_bytes.unwrap_ok_v1 expects result_bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        let out_brand = match res.brand {
+                            TyBrand::Brand(b) => TyBrand::Brand(b),
+                            TyBrand::Any | TyBrand::None => TyBrand::None,
+                        };
+                        Ok(TyInfo {
+                            ty: Ty::Bytes,
+                            brand: out_brand,
+                            view_full: false,
+                        })
+                    }
+                    "result_bytes_view.ok" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_bytes_view.ok expects 1 arg".to_string(),
+                            ));
+                        }
+                        let payload = self.infer(&args[0])?;
+                        if payload != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes_view.ok expects bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: Ty::ResultBytesView,
+                            brand: payload.brand,
+                            view_full: false,
+                        })
+                    }
+                    "result_bytes_view.err" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_bytes_view.err expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes_view.err expects i32".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: Ty::ResultBytesView,
+                            brand: TyBrand::Any,
+                            view_full: false,
+                        })
+                    }
+                    "result_bytes_view.is_ok" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_bytes_view.is_ok expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::ResultBytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes_view.is_ok expects result_bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "result_bytes_view.err_code" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_bytes_view.err_code expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::ResultBytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes_view.err_code expects result_bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "result_bytes_view.unwrap_or" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "result_bytes_view.unwrap_or expects 2 args".to_string(),
+                            ));
+                        }
+                        let res = self.infer(&args[0])?;
+                        let default = self.infer(&args[1])?;
+                        if res != Ty::ResultBytesView || default != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes_view.unwrap_or expects (result_bytes_view, bytes_view default)"
+                                    .to_string(),
+                            ));
+                        }
+                        let out_brand = match res.brand {
+                            TyBrand::Any => default.brand,
+                            other => tybrand_join(Ty::BytesView, &other, &default.brand),
+                        };
+                        Ok(TyInfo {
+                            ty: Ty::BytesView,
+                            brand: out_brand,
+                            view_full: false,
+                        })
                     }
                     "result_result_bytes.is_ok" => {
                         if args.len() != 1 {
@@ -22026,7 +24821,7 @@ impl InferCtx {
                                 "result_result_bytes.is_ok expects result_result_bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "result_result_bytes.err_code" => {
                         if args.len() != 1 {
@@ -22041,7 +24836,7 @@ impl InferCtx {
                                 "result_result_bytes.err_code expects result_result_bytes".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "result_result_bytes.unwrap_or" => {
                         if args.len() != 2 {
@@ -22059,7 +24854,24 @@ impl InferCtx {
                                     .to_string(),
                             ));
                         }
-                        Ok(Ty::ResultBytes)
+                        let outer = self.infer(&args[0])?;
+                        let default = self.infer(&args[1])?;
+                        if outer != Ty::ResultResultBytes || default != Ty::ResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_result_bytes.unwrap_or expects (result_result_bytes, result_bytes default)"
+                                    .to_string(),
+                            ));
+                        }
+                        let out_brand = match outer.brand {
+                            TyBrand::Any => default.brand,
+                            other => tybrand_join(Ty::ResultBytes, &other, &default.brand),
+                        };
+                        Ok(TyInfo {
+                            ty: Ty::ResultBytes,
+                            brand: out_brand,
+                            view_full: false,
+                        })
                     }
                     "try" => {
                         if args.len() != 1 {
@@ -22068,28 +24880,51 @@ impl InferCtx {
                                 "try expects 1 arg".to_string(),
                             ));
                         }
-                        match self.infer(&args[0])? {
+                        let arg = self.infer(&args[0])?;
+                        match arg.ty {
                             Ty::ResultI32 => {
-                                if !matches!(self.fn_ret_ty, Ty::ResultI32 | Ty::ResultBytes) {
+                                if !matches!(self.fn_ret_ty.ty, Ty::ResultI32 | Ty::ResultBytes) {
                                     return Err(CompilerError::new(
                                         CompileErrorKind::Typing,
                                         "try(result_i32) requires function return type result_i32 or result_bytes".to_string(),
                                     ));
                                 }
-                                Ok(Ty::I32)
+                                Ok(Ty::I32.into())
                             }
                             Ty::ResultBytes => {
-                                if !matches!(self.fn_ret_ty, Ty::ResultBytes | Ty::ResultI32) {
+                                if !matches!(self.fn_ret_ty.ty, Ty::ResultBytes | Ty::ResultI32) {
                                     return Err(CompilerError::new(
                                         CompileErrorKind::Typing,
                                         "try(result_bytes) requires function return type result_bytes or result_i32".to_string(),
                                     ));
                                 }
-                                Ok(Ty::Bytes)
+                                Ok(TyInfo {
+                                    ty: Ty::Bytes,
+                                    brand: arg.brand,
+                                    view_full: false,
+                                })
+                            }
+                            Ty::ResultBytesView => {
+                                if !matches!(
+                                    self.fn_ret_ty.ty,
+                                    Ty::ResultBytesView | Ty::ResultI32
+                                ) {
+                                    return Err(CompilerError::new(
+                                        CompileErrorKind::Typing,
+                                        "try(result_bytes_view) requires function return type result_bytes_view or result_i32".to_string(),
+                                    ));
+                                }
+                                Ok(TyInfo {
+                                    ty: Ty::BytesView,
+                                    brand: arg.brand,
+                                    view_full: false,
+                                })
                             }
                             other => Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                format!("try expects result_i32 or result_bytes, got {other:?}"),
+                                format!(
+                                    "try expects result_i32, result_bytes, or result_bytes_view, got {other:?}"
+                                ),
                             )),
                         }
                     }
@@ -22109,7 +24944,7 @@ impl InferCtx {
                                 "map_u32.get expects (handle, key, default) all i32".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "map_u32.set" => {
                         if args.len() != 3 {
@@ -22127,7 +24962,7 @@ impl InferCtx {
                                 "map_u32.set expects (handle, key, val) all i32".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "map_u32.contains" | "set_u32.contains" => {
                         if args.len() != 2 {
@@ -22142,7 +24977,7 @@ impl InferCtx {
                                 format!("{head} expects (handle, key)"),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "map_u32.remove" | "set_u32.remove" => {
                         if args.len() != 2 {
@@ -22157,7 +24992,7 @@ impl InferCtx {
                                 format!("{head} expects (handle, key)"),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "set_u32.add" => {
                         if args.len() != 2 {
@@ -22172,7 +25007,7 @@ impl InferCtx {
                                 "set_u32.add expects (handle, key)".to_string(),
                             ));
                         }
-                        Ok(Ty::I32)
+                        Ok(Ty::I32.into())
                     }
                     "set_u32.dump_u32le" => {
                         if args.len() != 1 {
@@ -22187,7 +25022,7 @@ impl InferCtx {
                                 "set_u32.dump_u32le expects i32 handle".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     "map_u32.dump_kv_u32le_u32le" => {
                         if args.len() != 1 {
@@ -22202,7 +25037,7 @@ impl InferCtx {
                                 "map_u32.dump_kv_u32le_u32le expects i32 handle".to_string(),
                             ));
                         }
-                        Ok(Ty::Bytes)
+                        Ok(Ty::Bytes.into())
                     }
                     _ => {
                         if let Some(f) = self.extern_functions.get(head).cloned() {
@@ -22219,7 +25054,7 @@ impl InferCtx {
                             for (i, (arg, p)) in args.iter().zip(f.params.iter()).enumerate() {
                                 let got = self.infer(arg)?;
                                 let want = p.ty;
-                                let ok = ty_compat_call_arg_extern(got, want);
+                                let ok = ty_compat_call_arg_extern(got.ty, want);
                                 if !ok {
                                     return Err(CompilerError::new(
                                         CompileErrorKind::Typing,
@@ -22227,31 +25062,32 @@ impl InferCtx {
                                     ));
                                 }
                             }
-                            Ok(f.ret_ty)
+                            Ok(f.ret_ty.into())
                         } else {
                             match self.functions.get(head).cloned() {
-                                Some((ret_ty, params)) => {
-                                    if args.len() != params.len() {
+                                Some(sig) => {
+                                    if args.len() != sig.params.len() {
                                         return Err(CompilerError::new(
                                             CompileErrorKind::Parse,
-                                            format!("call {head:?} expects {} args", params.len()),
+                                            format!(
+                                                "call {head:?} expects {} args",
+                                                sig.params.len()
+                                            ),
                                         ));
                                     }
-                                    for (i, (arg, want_ty)) in
-                                        args.iter().zip(params.iter()).enumerate()
+                                    for (i, (arg, want)) in
+                                        args.iter().zip(sig.params.iter()).enumerate()
                                     {
                                         let got = self.infer(arg)?;
-                                        let ok = ty_compat_call_arg(got, *want_ty);
+                                        let ok = tyinfo_compat_call_arg(&got, want);
                                         if !ok {
                                             return Err(CompilerError::new(
                                                 CompileErrorKind::Typing,
-                                                format!(
-                                                    "call {head:?} arg {i} expects {want_ty:?}"
-                                                ),
+                                                call_arg_mismatch_message(head, i, &got, want),
                                             ));
                                         }
                                     }
-                                    Ok(ret_ty)
+                                    Ok(sig.ret)
                                 }
                                 None => Err(CompilerError::new(
                                     CompileErrorKind::Unsupported,
@@ -22334,7 +25170,7 @@ impl InferCtx {
                             )
                         })?;
                         match self.lookup(var) {
-                            Some(Ty::I32) => {}
+                            Some(v) if v.ty == Ty::I32 => {}
                             Some(_) => {
                                 return Err(CompilerError::new(
                                     CompileErrorKind::Typing,
@@ -22342,7 +25178,7 @@ impl InferCtx {
                                 ));
                             }
                             None => {
-                                self.bind(var.to_string(), Ty::I32);
+                                self.bind(var.to_string(), Ty::I32.into());
                             }
                         }
                         if self.infer(&args[1])? != Ty::I32 || self.infer(&args[2])? != Ty::I32 {
@@ -22356,10 +25192,10 @@ impl InferCtx {
                         self.pop_scope();
                         Ty::I32
                     }
-                    _ => self.infer(expr)?,
+                    _ => self.infer(expr)?.ty,
                 }
             }
-            _ => self.infer(expr)?,
+            _ => self.infer(expr)?.ty,
         };
 
         Ok(if ty == Ty::Never { Ty::Never } else { Ty::I32 })
@@ -22417,8 +25253,10 @@ fn c_ret_ty(ty: Ty) -> &'static str {
         Ty::VecU8 => "vec_u8_t",
         Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => "option_i32_t",
         Ty::OptionBytes => "option_bytes_t",
+        Ty::OptionBytesView => "option_bytes_view_t",
         Ty::ResultI32 => "result_i32_t",
         Ty::ResultBytes => "result_bytes_t",
+        Ty::ResultBytesView => "result_bytes_view_t",
         Ty::ResultResultBytes => "result_result_bytes_t",
         Ty::Iface => "iface_t",
         Ty::PtrConstU8 => "const uint8_t*",
@@ -22444,8 +25282,10 @@ fn c_zero(ty: Ty) -> &'static str {
         Ty::VecU8 => "(vec_u8_t){0}",
         Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => "(option_i32_t){0}",
         Ty::OptionBytes => "(option_bytes_t){0}",
+        Ty::OptionBytesView => "(option_bytes_view_t){0}",
         Ty::ResultI32 => "(result_i32_t){0}",
         Ty::ResultBytes => "(result_bytes_t){0}",
+        Ty::ResultBytesView => "(result_bytes_view_t){0}",
         Ty::ResultResultBytes => "(result_result_bytes_t){0}",
         Ty::Iface => "(iface_t){0}",
         Ty::PtrConstU8
@@ -22481,8 +25321,10 @@ fn c_param_list_value(params: &[FunctionParam]) -> String {
             Ty::VecU8 => "vec_u8_t",
             Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => "option_i32_t",
             Ty::OptionBytes => "option_bytes_t",
+            Ty::OptionBytesView => "option_bytes_view_t",
             Ty::ResultI32 => "result_i32_t",
             Ty::ResultBytes => "result_bytes_t",
+            Ty::ResultBytesView => "result_bytes_view_t",
             Ty::ResultResultBytes => "result_result_bytes_t",
             Ty::Iface => "iface_t",
             Ty::PtrConstU8 => "const uint8_t*",
@@ -22518,8 +25360,10 @@ fn c_param_list_user(params: &[FunctionParam]) -> String {
             Ty::VecU8 => "vec_u8_t",
             Ty::OptionI32 | Ty::OptionTaskSelectEvtV1 => "option_i32_t",
             Ty::OptionBytes => "option_bytes_t",
+            Ty::OptionBytesView => "option_bytes_view_t",
             Ty::ResultI32 => "result_i32_t",
             Ty::ResultBytes => "result_bytes_t",
+            Ty::ResultBytesView => "result_bytes_view_t",
             Ty::ResultResultBytes => "result_result_bytes_t",
             Ty::Iface => "iface_t",
             Ty::PtrConstU8 => "const uint8_t*",
@@ -22653,6 +25497,11 @@ typedef struct {
 
 typedef struct {
   uint32_t tag;
+  bytes_view_t payload;
+} option_bytes_view_t;
+
+typedef struct {
+  uint32_t tag;
   union {
     uint32_t ok;
     uint32_t err;
@@ -22666,6 +25515,14 @@ typedef struct {
     uint32_t err;
   } payload;
 } result_bytes_t;
+
+typedef struct {
+  uint32_t tag;
+  union {
+    bytes_view_t ok;
+    uint32_t err;
+  } payload;
+} result_bytes_view_t;
 
 typedef struct {
   uint32_t tag;

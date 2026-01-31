@@ -125,7 +125,7 @@ def main() -> int:
             "borrow_from_temporary",
             "X07-BORROW-0001",
             {
-                "schema_version": "x07.x07ast@0.2.0",
+                "schema_version": "x07.x07ast@0.3.0",
                 "kind": "entry",
                 "module_id": "main",
                 "imports": [],
@@ -137,7 +137,7 @@ def main() -> int:
             "use_after_move_bytes_concat",
             "X07-MOVE-0001",
             {
-                "schema_version": "x07.x07ast@0.2.0",
+                "schema_version": "x07.x07ast@0.3.0",
                 "kind": "entry",
                 "module_id": "main",
                 "imports": [],

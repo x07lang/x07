@@ -37,6 +37,106 @@ fn compile_accepts_result_try() {
 }
 
 #[test]
+fn compile_accepts_try_result_bytes_view() {
+    let program = x07_program::entry(
+        &[],
+        vec![
+            x07_program::defn(
+                "main.validate",
+                &[("v", "bytes_view")],
+                "result_i32",
+                json!(["result_i32.ok", 0]),
+            ),
+            x07_program::defn(
+                "main.cast",
+                &[("v", "bytes_view")],
+                "result_bytes_view",
+                json!([
+                    "std.brand.cast_view_v1",
+                    "main.brand_v1",
+                    "main.validate",
+                    "v"
+                ]),
+            ),
+            x07_program::defn(
+                "main.use_try",
+                &[("v", "bytes_view")],
+                "result_i32",
+                json!([
+                    "begin",
+                    ["let", "r", ["main.cast", "v"]],
+                    ["let", "ok_view", ["try", "r"]],
+                    ["result_i32.ok", ["view.len", "ok_view"]]
+                ]),
+            ),
+        ],
+        json!(["bytes.alloc", 0]),
+    );
+    compile_program_to_c(program.as_slice(), &CompileOptions::default())
+        .expect("program must compile");
+}
+
+#[test]
+fn compile_rejects_move_while_borrowed_result_bytes_view() {
+    let program = x07_program::entry(
+        &[],
+        vec![x07_program::defn(
+            "main.bad",
+            &[("b", "bytes")],
+            "bytes",
+            json!([
+                "begin",
+                ["let", "r", ["result_bytes_view.ok", ["bytes.view", "b"]]],
+                ["let", "moved", "b"],
+                "moved"
+            ]),
+        )],
+        json!(["bytes.alloc", 0]),
+    );
+    let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
+        .expect_err("must reject move while borrowed");
+    assert_eq!(err.kind, CompileErrorKind::Typing);
+    assert!(
+        err.message.contains("move while borrowed"),
+        "unexpected error message: {}",
+        err.message
+    );
+}
+
+#[test]
+fn compile_rejects_option_bytes_view_unwrap_or_borrow_mismatch() {
+    let program = x07_program::entry(
+        &[],
+        vec![x07_program::defn(
+            "main.bad",
+            &[],
+            "i32",
+            json!([
+                "begin",
+                ["let", "a", ["bytes.alloc", 1]],
+                ["let", "b", ["bytes.alloc", 1]],
+                [
+                    "let",
+                    "opt",
+                    ["option_bytes_view.some", ["bytes.view", "a"]]
+                ],
+                ["let", "def", ["bytes.view", "b"]],
+                ["bytes.len", ["option_bytes_view.unwrap_or", "opt", "def"]]
+            ]),
+        )],
+        json!(["bytes.alloc", 0]),
+    );
+    let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
+        .expect_err("must reject borrow mismatch");
+    assert_eq!(err.kind, CompileErrorKind::Typing);
+    assert!(
+        err.message.contains("single borrow source"),
+        "unexpected error message: {}",
+        err.message
+    );
+}
+
+#[test]
 fn compile_rejects_use_after_move_bytes() {
     let program = x07_program::entry(
         &[],

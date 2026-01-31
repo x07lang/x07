@@ -3,6 +3,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde_json::json;
+use x07_contracts::X07AST_SCHEMA_VERSION;
 use x07c::compile::{compile_program_to_c, CompileErrorKind, CompileOptions};
 
 mod x07_program;
@@ -119,16 +120,18 @@ fn compile_accepts_multi_expr_defn_and_defasync_bodies() {
 
 #[test]
 fn compile_accepts_x07ast_json_entry() {
-    let program = r#"
-      {
-        "schema_version": "x07.x07ast@0.2.0",
-        "kind": "entry",
-        "module_id": "main",
-        "imports": [],
-        "decls": [],
-        "solve": ["bytes.alloc", 0]
-      }
-    "#;
+    let program = format!(
+        r#"
+          {{
+            "schema_version": "{X07AST_SCHEMA_VERSION}",
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["bytes.alloc", 0]
+          }}
+        "#,
+    );
     compile_program_to_c(program.as_bytes(), &CompileOptions::default())
         .expect("program must compile");
 }

@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {"id": "ext.csv/parse_basic", "world": "solve-pure", "entry": "ext.csv.tests.test_parse_basic", "expect": "pass"},
+    {"id": "ext.csv/parse_crlf", "world": "solve-pure", "entry": "ext.csv.tests.test_parse_crlf", "expect": "pass"},
+    {"id": "ext.csv/quoted_comma_newline", "world": "solve-pure", "entry": "ext.csv.tests.test_quoted_comma_and_newline", "expect": "pass"},
+    {"id": "ext.csv/escape_quote_empty_field", "world": "solve-pure", "entry": "ext.csv.tests.test_escape_quote_and_empty_field", "expect": "pass"},
+    {"id": "ext.csv/unclosed_quote_is_err", "world": "solve-pure", "entry": "ext.csv.tests.test_unclosed_quote_is_err", "expect": "pass"}
+  ]
+}
+

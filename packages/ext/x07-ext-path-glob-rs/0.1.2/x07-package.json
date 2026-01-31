@@ -1,0 +1,28 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-path-glob-rs",
+  "description": "OS-world glob + walk helpers under std.os.fs.* (deterministic ordering).",
+  "docs": "OS-world glob + walk helpers.\n\nModules:\n- std.os.fs.glob\n- std.os.fs.walk\n- std.os.fs.ignore\n- std.os.fs.globwalk.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-path-glob-rs@0.1.2 --sync\n- Import std.os.fs.walk and std.os.fs.ignore.\n\nNotes:\n- Worlds: run-os only\n- Deterministic output: sort paths lexicographically\n",
+  "version": "0.1.2",
+  "module_root": "modules",
+  "modules": [
+    "std.os.fs.glob",
+    "std.os.fs.walk",
+    "std.os.fs.ignore",
+    "std.os.fs.globwalk.tests"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-error@0.1.4",
+      "ext-fs@0.1.4",
+      "ext-glob-rs@0.1.3"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-xml-rs",
+  "description": "XML parsing and ext.data_model integration.",
+  "docs": "XML parsing and ext.data_model integration.\n\nModules:\n- ext.xml\n- ext.xml.data_model\n- ext.xml.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-xml-rs@0.1.4\n- Import the modules listed above.\n",
+  "version": "0.1.4",
+  "module_root": "modules",
+  "modules": [
+    "ext.xml",
+    "ext.xml.data_model",
+    "ext.xml.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "x07import"
+  }
+}

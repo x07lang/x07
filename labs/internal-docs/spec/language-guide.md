@@ -4,12 +4,12 @@ IMPORTANT:
 - Output ONLY one JSON object (no preamble).
 - Do NOT use Markdown code fences.
 - Do NOT output extra prose.
-- Must satisfy x07AST schema_version `x07.x07ast@0.2.0`.
+- Must satisfy x07AST schema_version `x07.x07ast@0.3.0`.
 
 Program encoding: UTF-8 JSON text.
 
 Entry program object fields:
-- `schema_version`: `x07.x07ast@0.2.0`
+- `schema_version`: `x07.x07ast@0.3.0`
 - `kind`: `entry`
 - `module_id`: `main`
 - `imports`: array of module IDs (e.g. `std.bytes`)
@@ -28,10 +28,12 @@ Entry program object fields:
 - `bytes` for owned byte arrays (move-only; outputs and owned buffers)
 - `bytes_view` for borrowed byte views (zero-copy scanning/slicing)
 - `vec_u8` for mutable byte vectors (move-only; capacity-planned builders)
-- `option_i32`, `option_bytes` for typed optional values
-- `result_i32`, `result_bytes`, `result_result_bytes` for typed results with deterministic error codes
+- `option_i32`, `option_bytes`, `option_bytes_view` for typed optional values
+- `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes` for typed results with deterministic error codes
 - `iface` for interface records (used for streaming readers)
 - Raw pointer types (standalone-only; require unsafe capability): `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`
+
+Bytes-like types may also carry an optional compile-time brand (for example via `params[].brand` and `result_brand`).
 
 Move rules (critical):
 - Passing `bytes` / `vec_u8` to a function that expects `bytes` / `vec_u8` **moves** (consumes) the value.
@@ -58,7 +60,7 @@ Move rules (critical):
 ## Examples
 
 Echo (returns input):
-{"schema_version":"x07.x07ast@0.1.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
+{"schema_version":"x07.x07ast@0.3.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
 
 Arity reminder:
 - `if` is `["if", cond, then, else]`

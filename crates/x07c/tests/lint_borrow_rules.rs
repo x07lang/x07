@@ -1,10 +1,11 @@
 use serde_json::json;
+use x07_contracts::X07AST_SCHEMA_VERSION;
 use x07c::{lint, x07ast};
 
 #[test]
 fn lint_rejects_bytes_view_of_temporary() {
     let doc = json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": X07AST_SCHEMA_VERSION,
         "kind": "entry",
         "module_id": "main",
         "imports": [],

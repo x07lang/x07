@@ -1,12 +1,12 @@
 # X07 ABI v1 (value layouts)
 
-ABI v1 is a legacy spec kept for reference. The current active ABI is ABI v2 (`docs/spec/abi/abi-v2.md`).
+ABI v1 is a legacy spec kept for reference. The current active ABI is ABI v2 (`labs/internal-docs/spec/abi/abi-v2.md`).
 
 This document specifies **ABI v1** value layouts used by the X07 C backend for **generated code** and imported stdlib modules.
 
 Scope:
 - **Value layouts** for core runtime types (`bytes`, `bytes_view`, `vec_u8`, interface records, Option/Result encodings).
-- Not the solver executable I/O ABI (`stdin`/`stdout`), which is specified in `docs/spec/x07-c-backend.md`.
+- Not the solver executable I/O ABI (`stdin`/`stdout`), which is specified in `labs/internal-docs/spec/x07-c-backend.md`.
 
 Non-goals:
 - A stable ABI across **debug vs release** builds when `X07_DEBUG_BORROW` changes layouts. ABI v1 is defined for release layouts; debug-only fields are explicitly guarded by `#ifdef X07_DEBUG_BORROW` in the C header.

@@ -31,6 +31,38 @@ x07AST is an expression tree:
 
 The entrypoint expression returns **bytes**.
 
+## Schema version
+
+The root JSON object must include `schema_version`.
+
+Current schema version:
+
+- `x07.x07ast@0.3.0`
+
+Tooling (`x07 ast init`, `x07 fmt`, `x07 lint`) keeps the AST compatible with the current schema.
+
+## Branded bytes annotations
+
+X07 can attach a nominal **brand** to bytes-like parameters and results to model “validated bytes of encoding X” (compile-time only).
+
+In `defn`/`defasync` declarations:
+
+- `params[]` entries may include optional `brand` when `ty` is bytes-like.
+- `result_brand` may be provided when `result` is bytes-like.
+
+Example:
+
+```jsonc
+{
+  "kind": "defn",
+  "name": "main.parse_x7sl",
+  "params": [{"name":"b","ty":"bytes"}],
+  "result": "result_bytes",
+  "result_brand": "std.text.slices.x7sl_v1",
+  "body": ["std.text.slices.cast_bytes_v1","b"]
+}
+```
+
 ## Tooling
 
 For a full project skeleton (`x07.json`, lockfile, `src/`, `tests/`), use `x07 init`. The `x07 ast` subcommands are for working with individual `*.x07.json` files.

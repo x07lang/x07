@@ -33,10 +33,11 @@ pub fn guide_md() -> String {
     out.push_str("- `bytes` for owned byte arrays (move-only; outputs and owned buffers)\n");
     out.push_str("- `bytes_view` for borrowed byte views (zero-copy scanning/slicing)\n");
     out.push_str("- `vec_u8` for mutable byte vectors (move-only; capacity-planned builders)\n");
-    out.push_str("- `option_i32`, `option_bytes` for typed optional values\n");
+    out.push_str("- `option_i32`, `option_bytes`, `option_bytes_view` for typed optional values\n");
     out.push_str(
-        "- `result_i32`, `result_bytes`, `result_result_bytes` for typed results with deterministic error codes\n",
+        "- `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes` for typed results with deterministic error codes\n",
     );
+    out.push_str("- Bytes-like types may carry an optional compile-time brand (see `params[].brand` and `result_brand`)\n");
     out.push_str("- `iface` for interface records (used for streaming readers)\n");
     out.push_str("- Raw pointer types (standalone-only; require unsafe capability): `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`\n\n");
     out.push_str("Move rules (critical):\n");
@@ -141,7 +142,7 @@ pub fn guide_md() -> String {
     out.push_str("## Functions\n\n");
     out.push_str("- Define with a `decls[]` entry of kind `defn`.\n");
     out.push_str("  - `body` is a single expression; wrap multi-step bodies in `begin`.\n");
-    out.push_str("  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `result_i32`, `result_bytes`, `result_result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.\n");
+    out.push_str("  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `option_bytes_view`, `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.\n");
     out.push_str("  - Function names must be namespaced and start with the current module ID.\n");
     out.push_str("    - In the entry file, use module `main` (example: `main.helper`).\n");
     out.push_str("  - `input` (bytes_view) is available in all function bodies.\n");

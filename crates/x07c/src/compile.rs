@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde_json::Value;
+
 use crate::builtin_modules;
 use crate::c_emit;
 use crate::guide;
@@ -205,6 +207,8 @@ pub fn compile_program_to_c_with_meta(
         extern_functions: main.program.extern_functions,
         solve: main.program.solve,
     };
+    let mut module_metas: BTreeMap<String, BTreeMap<String, Value>> = BTreeMap::new();
+    module_metas.insert("main".to_string(), main.meta);
     for m in modules.values() {
         parsed_program.functions.extend(m.functions.clone());
         parsed_program
@@ -213,10 +217,11 @@ pub fn compile_program_to_c_with_meta(
         parsed_program
             .extern_functions
             .extend(m.extern_functions.clone());
+        module_metas.insert(m.module_id.clone(), m.meta.clone());
     }
 
     forbid_reserved_helper_function_names(&parsed_program)?;
-    stream_pipe::elaborate_stream_pipes(&mut parsed_program, options)?;
+    stream_pipe::elaborate_stream_pipes(&mut parsed_program, options, &module_metas)?;
     parsed_program.functions.sort_by(|a, b| a.name.cmp(&b.name));
     parsed_program
         .async_functions
@@ -327,15 +332,18 @@ struct ModuleInfo {
 
 #[derive(Debug, Clone)]
 struct ParsedModule {
+    module_id: String,
     functions: Vec<FunctionDef>,
     async_functions: Vec<AsyncFunctionDef>,
     extern_functions: Vec<crate::program::ExternFunctionDecl>,
+    meta: BTreeMap<String, Value>,
 }
 
 #[derive(Debug, Clone)]
 struct ParsedMain {
     imports: BTreeSet<String>,
     program: Program,
+    meta: BTreeMap<String, Value>,
 }
 
 const INTERNAL_ONLY_HEADS: &[&str] = &[
@@ -343,6 +351,9 @@ const INTERNAL_ONLY_HEADS: &[&str] = &[
     "map_u32.dump_kv_u32le_u32le",
     "task.scope.slot_to_i32_v1",
     "task.scope.slot_from_i32_v1",
+    "__internal.brand.assume_view_v1",
+    "__internal.brand.view_to_bytes_preserve_brand_v1",
+    "__internal.result_bytes.unwrap_ok_v1",
 ];
 
 fn find_internal_only_head(expr: &crate::ast::Expr) -> Option<&'static str> {
@@ -535,6 +546,7 @@ fn parse_main_file_x07ast(file: x07ast::X07AstFile) -> Result<ParsedMain, Compil
             extern_functions: file.extern_functions,
             solve,
         },
+        meta: file.meta,
     })
 }
 
@@ -587,9 +599,11 @@ fn parse_module_file_x07ast(
 
     Ok((
         ParsedModule {
+            module_id: module_id.to_string(),
             functions: file.functions,
             async_functions: file.async_functions,
             extern_functions: file.extern_functions,
+            meta: file.meta,
         },
         ModuleInfo {
             imports: file.imports,

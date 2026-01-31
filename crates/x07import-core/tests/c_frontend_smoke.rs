@@ -33,7 +33,7 @@ fn config() -> RunnerConfig {
 
 fn entry(imports: &[&str], solve: Value) -> Vec<u8> {
     serde_json::to_vec(&json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": "x07.x07ast@0.3.0",
         "kind": "entry",
         "module_id": "main",
         "imports": imports,

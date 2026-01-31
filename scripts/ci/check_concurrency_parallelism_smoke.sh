@@ -60,7 +60,7 @@ JSON
 
 cat >"$tmp/src/main.x07.json" <<'JSON'
 {
-  "schema_version": "x07.x07ast@0.2.0",
+  "schema_version": "x07.x07ast@0.3.0",
   "kind": "entry",
   "module_id": "main",
   "imports": [
@@ -80,7 +80,7 @@ cat >"$tmp/src/main.x07.json" <<'JSON'
         ["let", "exe", ["bytes.lit", "deps/x07/x07-proc-echo"]],
         ["let", "reqb", ["std.os.process.req_v1.new", "exe"]],
         ["let", "req", ["std.os.process.req_v1.finish", "reqb"]],
-        ["let", "caps", ["std.os.process.caps_v1.pack", 1048576, 1048576, 1000, 0]],
+        ["let", "caps", ["std.os.process.caps_v1.finish", 1048576, 1048576, 1000, 0]],
         ["let", "h", ["std.os.process.spawn_piped_v1", "req", "caps"]],
         ["let", "chunk", ["bytes.lit", "hello"]],
         ["std.os.process.stdin_write_v1", "h", "chunk"],

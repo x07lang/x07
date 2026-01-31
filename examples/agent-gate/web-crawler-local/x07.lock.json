@@ -3,81 +3,81 @@
   "dependencies": [
     {
       "name": "ext-curl-c",
-      "version": "0.1.5",
-      "path": ".x07/deps/ext-curl-c/0.1.5",
-      "package_manifest_sha256": "e89a5ed6478c1f5e7d05eb19bd091606ab9b43b7854aa718508968132b030616",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-curl-c/0.1.6",
+      "package_manifest_sha256": "d88b6b83b79d8d25cfcf154fa6fa280ab9efa3ec2395c4842e1f859ccd8ed37f",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.curl._ffi": "d0f6a102b0e5693b0c08fe3183a0cedad0b905220d341896acec256f3e06df30",
-        "ext.curl.http": "cd61c70c190555c34d89efe96b1fede41db2b878325f4f765d57a3418bf0eca0"
+        "ext.curl._ffi": "ef7ab5e230cc7bb054cf9b777ae803fe80907a43ab8254d99d231dc9b69d529f",
+        "ext.curl.http": "b7d884c62d109a666917dc2de20d9d30a7835103394afe61522632a02747e119"
       }
     },
     {
       "name": "ext-fs",
-      "version": "0.1.3",
-      "path": ".x07/deps/ext-fs/0.1.3",
-      "package_manifest_sha256": "737105f132f92c4ebe5fe1fda96689812133f0238b2ed56a3a0cbea0461f15e4",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-fs/0.1.4",
+      "package_manifest_sha256": "cf139c695712462ad40689e2b4435feb2eb942f2460a6159f140e84771c59fab",
       "module_root": "modules",
       "modules_sha256": {
-        "std.os.fs": "0439220cfcc7225d31f36f0482b4d96701d7aa67dacd7fd1ffd3b1f33a09d632",
-        "std.os.fs.spec": "1593e8eed5b16ec36f3bd310a38c8bc48d2ce7d51eba5829729cae50458c1787"
+        "std.os.fs": "c3067e3b7526d5e14a0c70493290f7512b7a6652af62f042e0629d842090ae31",
+        "std.os.fs.spec": "b2f5276147697446a50e5d73a6037da1ceb8fcde1c9eadbe5aac654ab1091c7f"
       }
     },
     {
       "name": "ext-html-lite-rs",
-      "version": "0.1.1",
-      "path": ".x07/deps/ext-html-lite-rs/0.1.1",
-      "package_manifest_sha256": "fb61a5c77911f54e7e758b0ad3a4f3db639bf8e21ebc9bb928ebb90fd4c6d94d",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-html-lite-rs/0.1.2",
+      "package_manifest_sha256": "8f1ce3cf92e87175f6ed1feb014b28049c134f0d5e4cb6c38207b99e05eaefb2",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.html": "d40aa1403de38712df60fd1d58d2756f8f45ae516118b2cbb1aad056a3f4005e",
-        "ext.html.tests": "293fd84742d845388d31a26b6b59797ebcf19233a045e95790b8ac7e277c311e"
+        "ext.html": "5f6fe19e89aaf7cabf93ff7b9beb36fc9769790160dfaed7241eb3f9e45634f2",
+        "ext.html.tests": "2a35c559f04ea27b731627611c04e04187943d87eaa6adfddb09fe7b07b18582"
       }
     },
     {
       "name": "ext-net",
-      "version": "0.1.6",
-      "path": ".x07/deps/ext-net/0.1.6",
-      "package_manifest_sha256": "0c86cf9f379dfecdc6df963d68248fef3374ff8bfe18cccf7c92a446847dc8e5",
+      "version": "0.1.7",
+      "path": ".x07/deps/ext-net/0.1.7",
+      "package_manifest_sha256": "9e1d8531f27c4f110573c364a72331c7335175631300a201c2316ad78857334b",
       "module_root": "modules",
       "modules_sha256": {
-        "std.net.codec": "e2fdadac2f15faeb4d7e955f1a82a74496a35be0337a7cfc885b01be189023bc",
-        "std.net.dns": "867c1a219895eb406f6cfd81ae288ce885c4f503ee9132a4fe9064923ebf337d",
-        "std.net.err": "fe7332e87ae4ba0606018cf42685662ee9e8225efd0a5042c486c8ef56892b0b",
-        "std.net.http": "6dafbe8454be0042b1e28d1517254e2c2ff9e3ea91d213f3ee5a39add567fa57",
-        "std.net.http.client": "7a5b0045d1aec39e63b6d79912468e39a436d12741e4e14ccdd51df91b2f0d34",
-        "std.net.http.server": "79907480efc0e073b4bf9c66962ba8a156d88ed1f8a479bb2d0a27faa1d99c38",
-        "std.net.http.spec": "21c66733fdab3a5561d0295a514d6c0f875aba9d8b428e23563a7132856844ee",
-        "std.net.io": "53223f5bc2310784c298f1130e65df97fbe95a126d779b79458f22c508f1ef39",
-        "std.net.tcp": "8cbcc318b945d08c2e0b79f740ca54ab4a8b0dc5ddf74fedb8448754002e1655",
-        "std.net.tls": "cf5c730a0627fe82dda1f794e3c8e31b04d8cdf0fe32270d8b3496155e96feee",
-        "std.net.udp": "e1353807a38186230ceadca1baab0b2ee3d12d1a683b3cacbbe34d9e1008588d"
+        "std.net.codec": "755e3dba3e9cf2ee57c86fc09f1bf4687d8348df8bf84f10ef0539ca9988e1c0",
+        "std.net.dns": "32133db3cb22b4d25272ecca3bd08881cabecbf3b9cc290b5e467b86cf3a0c94",
+        "std.net.err": "662a4b0385dc9730b7ee5791e73ce1b532ea6c0421c1aa2e4030a08c7535356e",
+        "std.net.http": "c65425c329faea952a1e2ece6a5d01cbb30e0f5e7c3ed8f996bcb6acc512f1a2",
+        "std.net.http.client": "eadb198ac302344827430d35063ed1e7a02d216c6ead3a5097636d2169e3b6fa",
+        "std.net.http.server": "0f8cd6c161fd3c16795b67ad79461cf85b2da3eb6145e0a6d11eddda45e5ca46",
+        "std.net.http.spec": "a4e5f352cc6f0aa695cff3ca59fce58e612a8ec5b4b6933876a1c0cce99285ab",
+        "std.net.io": "7d7b8fa79fa148c767e7f4f3503ab9e98b1e6c286e843fb795d1b39a8721235f",
+        "std.net.tcp": "b8a1c50a154c8bf5bcc321b4660b65aa1f845859f8be5e611bb2c70ab24b8e78",
+        "std.net.tls": "525a4e5181b94d59f30b2ae055b642421788a00bd776f7cef16376f2f921ea27",
+        "std.net.udp": "d632703b7e750934891a60b155ce10f9a9cc21d674f23933b0023b5ea53dad18"
       }
     },
     {
       "name": "ext-sockets-c",
-      "version": "0.1.5",
-      "path": ".x07/deps/ext-sockets-c/0.1.5",
-      "package_manifest_sha256": "ee55e57989b4e62feb93ea9ae09dca6042b7bf729d00111a9f585fb61ddc3534",
+      "version": "0.1.6",
+      "path": ".x07/deps/ext-sockets-c/0.1.6",
+      "package_manifest_sha256": "53e9c4ceb4c798a0dd013ac7e2d51b33f92652a7a43b63dbd31687520226dd6a",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.sockets._ffi": "9752f467c1b46fbd6d60e0d50a3e55f15fdcac109348d586c7bcc4e24f31864b",
-        "ext.sockets.net": "17265e8474646fd2866aa950bbb435da6ae3f410ddece65a62b09c0880b5b157"
+        "ext.sockets._ffi": "42e7d864c5f446762bbfa043b080b94280a9a4376a611266219b6f4eaa02554a",
+        "ext.sockets.net": "0929a1cd223dc356554a0ce9dd8b4cf822a962e12b9ab5af81582a4124d8a9d7"
       }
     },
     {
       "name": "ext-url-rs",
-      "version": "0.1.3",
-      "path": ".x07/deps/ext-url-rs/0.1.3",
-      "package_manifest_sha256": "4bf31339f55f18709ce146c0f3ebef2caef39358def3dcc917369c24e128a7d3",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-url-rs/0.1.4",
+      "package_manifest_sha256": "c87e3e68a8520ae7538a3b76ba497088cc76629075a90ef67ce31190051db4f4",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.http_types": "73fba2b09c167ff67d7e0134ce4a2772d67b1cb33f362f167fd48628ebec23d7",
-        "ext.httparse": "bd9566354c94ea1c70c508fe8e3243ada7358f4c277d5581c3a8cd4bb5225cd3",
-        "ext.httparse.tests": "0df25b863309f3bf4435c4780ce7da280547393cf695120fddcbda714b1eb017",
-        "ext.url.encode": "47fe442ce37fda0dae17a77817f1b816ba1da2bd4441197fda0cbd802e7afcf3",
-        "ext.url.parse": "4c9712ed662c4b2ddad7009bfd146939bea392f7ceef8b50f7e9c2efbe8485c3",
-        "ext.url.tests": "a91cd3c06d14609a88110d9182e898338459707f40dd0a4a6ab53dac2a31ef04"
+        "ext.http_types": "dd14b3da1a82a2424e7f7205df8d3b97559fbe556e319dcf7d32e9a2b46a6bbd",
+        "ext.httparse": "aa37f2a0973c9278463ecf596f98529115a593a83edc250e1a5fa0d9f7f04bb0",
+        "ext.httparse.tests": "7e3e79eef1f6bd112f6d06eeb34f8bae4cd261ccb960b41b7adf5cea4c50aafd",
+        "ext.url.encode": "7e234d2e46b57f246f5d96db9048008ae99baf7661163da60b7a372cb1397e88",
+        "ext.url.parse": "f2d6059e9e2f13f0e80e7780bc58686efdf82e08b87355c56348a236bc80bd5f",
+        "ext.url.tests": "34fc0a3c3c983c2a2e6f5928f00f02d97d66384fe62117dc96e096febf239523"
       }
     }
   ]

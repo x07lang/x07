@@ -1,0 +1,23 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.byteorder/u16_le_be_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.byteorder.tests.test_u16_le_be_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.byteorder/u32_le_be_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.byteorder.tests.test_u32_le_be_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.byteorder/read_default_oob",
+      "world": "solve-pure",
+      "entry": "ext.byteorder.tests.test_read_default_oob",
+      "expect": "pass"
+    }
+  ]
+}

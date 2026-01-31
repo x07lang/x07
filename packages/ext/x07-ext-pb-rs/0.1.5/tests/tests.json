@@ -1,0 +1,65 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.pb/wire_decode_ok",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_wire_decode_ok",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.pb/wire_decode_err_output_limit",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_wire_decode_err_output_limit",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.pb/wire_decode_err_truncated",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_wire_decode_err_truncated",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.pb/wire_encode_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_wire_encode_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.pb/wire_encode_err_output_limit",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_wire_encode_err_output_limit",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.pb/wire_encode_err_malformed_doc",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_wire_encode_err_malformed_doc",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.pb/schema_descriptor_set_basic",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_schema_descriptor_set_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.pb/data_model_emit_v1_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_data_model_emit_v1_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.pb/data_model_emit_schema_v2_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_data_model_emit_schema_v2_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.pb/data_model_emit_schema_v2_err_message_not_found",
+      "world": "solve-pure",
+      "entry": "ext.pb.tests.test_data_model_emit_schema_v2_err_message_not_found",
+      "expect": "pass"
+    }
+  ]
+}

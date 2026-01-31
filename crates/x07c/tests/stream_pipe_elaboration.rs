@@ -1,5 +1,7 @@
 use serde_json::json;
 
+use std::collections::BTreeMap;
+
 use x07_worlds::WorldId;
 use x07c::ast::expr_from_json;
 use x07c::compile::CompileOptions;
@@ -97,6 +99,7 @@ fn contains_head(expr: &x07c::ast::Expr, head: &str) -> bool {
 
 #[test]
 fn pipe_elaboration_injects_helper_and_rewrites_call_site() {
+    let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> = BTreeMap::new();
     let mut program = Program {
         functions: Vec::new(),
         async_functions: Vec::new(),
@@ -104,7 +107,7 @@ fn pipe_elaboration_injects_helper_and_rewrites_call_site() {
         solve: pipe_expr("in.txt"),
     };
 
-    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default())
+    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default(), &module_metas)
         .expect("elaboration");
 
     let helpers: Vec<_> = program
@@ -156,6 +159,7 @@ fn pipe_elaboration_injects_helper_and_rewrites_call_site() {
 
 #[test]
 fn pipe_elaboration_injects_async_helper_and_rewrites_call_site_to_await() {
+    let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> = BTreeMap::new();
     let mut program = Program {
         functions: Vec::new(),
         async_functions: vec![AsyncFunctionDef {
@@ -164,20 +168,23 @@ fn pipe_elaboration_injects_async_helper_and_rewrites_call_site_to_await() {
                 x07c::program::FunctionParam {
                     name: "ctx".to_string(),
                     ty: Ty::BytesView,
+                    brand: None,
                 },
                 x07c::program::FunctionParam {
                     name: "item".to_string(),
                     ty: Ty::Bytes,
+                    brand: None,
                 },
             ],
             ret_ty: Ty::Bytes,
+            ret_brand: None,
             body: ident("item"),
         }],
         extern_functions: Vec::new(),
         solve: pipe_expr_par_map(),
     };
 
-    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default())
+    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default(), &module_metas)
         .expect("elaboration");
     x07c::c_emit::check_c_program(&program, &CompileOptions::default()).expect("check_c_program");
 
@@ -235,11 +242,13 @@ fn pipe_elaboration_injects_async_helper_and_rewrites_call_site_to_await() {
 
 #[test]
 fn pipe_elaboration_rejects_concurrency_pipes_inside_defn() {
+    let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> = BTreeMap::new();
     let mut program = Program {
         functions: vec![FunctionDef {
             name: "main.f".to_string(),
             params: Vec::new(),
             ret_ty: Ty::Bytes,
+            ret_brand: None,
             body: pipe_expr_par_map(),
         }],
         async_functions: vec![AsyncFunctionDef {
@@ -248,21 +257,28 @@ fn pipe_elaboration_rejects_concurrency_pipes_inside_defn() {
                 x07c::program::FunctionParam {
                     name: "ctx".to_string(),
                     ty: Ty::BytesView,
+                    brand: None,
                 },
                 x07c::program::FunctionParam {
                     name: "item".to_string(),
                     ty: Ty::Bytes,
+                    brand: None,
                 },
             ],
             ret_ty: Ty::Bytes,
+            ret_brand: None,
             body: ident("item"),
         }],
         extern_functions: Vec::new(),
         solve: pipe_expr("in.txt"),
     };
 
-    let err = stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default())
-        .expect_err("must reject concurrency pipe in defn");
+    let err = stream_pipe::elaborate_stream_pipes(
+        &mut program,
+        &CompileOptions::default(),
+        &module_metas,
+    )
+    .expect_err("must reject concurrency pipe in defn");
     assert_eq!(err.kind, x07c::compile::CompileErrorKind::Typing);
     assert!(
         err.message.contains(
@@ -275,6 +291,7 @@ fn pipe_elaboration_rejects_concurrency_pipes_inside_defn() {
 
 #[test]
 fn pipe_elaboration_dedups_helper_by_hash_ignoring_expr_bodies() {
+    let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> = BTreeMap::new();
     let mut program = Program {
         functions: Vec::new(),
         async_functions: Vec::new(),
@@ -282,7 +299,7 @@ fn pipe_elaboration_dedups_helper_by_hash_ignoring_expr_bodies() {
         solve: list(vec![ident("begin"), pipe_expr("a.txt"), pipe_expr("b.txt")]),
     };
 
-    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default())
+    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default(), &module_metas)
         .expect("elaboration");
 
     let helper_count = program
@@ -295,6 +312,7 @@ fn pipe_elaboration_dedups_helper_by_hash_ignoring_expr_bodies() {
 
 #[test]
 fn pipe_elaboration_streaming_fs_sink_emits_stream_builtins() {
+    let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> = BTreeMap::new();
     let mut program = Program {
         functions: Vec::new(),
         async_functions: Vec::new(),
@@ -328,7 +346,8 @@ fn pipe_elaboration_streaming_fs_sink_emits_stream_builtins() {
         ..Default::default()
     };
 
-    stream_pipe::elaborate_stream_pipes(&mut program, &options).expect("elaboration");
+    stream_pipe::elaborate_stream_pipes(&mut program, &options, &module_metas)
+        .expect("elaboration");
 
     let helper = program
         .functions
@@ -344,11 +363,13 @@ fn pipe_elaboration_streaming_fs_sink_emits_stream_builtins() {
 
 #[test]
 fn pipe_elaboration_is_per_module() {
+    let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> = BTreeMap::new();
     let mut program = Program {
         functions: vec![FunctionDef {
             name: "foo.test".to_string(),
             params: Vec::new(),
             ret_ty: Ty::Bytes,
+            ret_brand: None,
             body: pipe_expr("in.txt"),
         }],
         async_functions: Vec::new(),
@@ -356,7 +377,7 @@ fn pipe_elaboration_is_per_module() {
         solve: pipe_expr("in.txt"),
     };
 
-    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default())
+    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default(), &module_metas)
         .expect("elaboration");
 
     let main_helpers: Vec<_> = program

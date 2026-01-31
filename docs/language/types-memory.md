@@ -56,6 +56,42 @@ Agents should prefer:
 - results over sentinel bytes (“ERR” strings),
 - stable error code spaces per module.
 
+### View-carrying results
+
+For zero-copy pipelines and parsers, X07 also provides view payload variants:
+
+- `option_bytes_view`: `None | Some(bytes_view)`
+- `result_bytes_view`: `Err(i32) | Ok(bytes_view)`
+
+These are especially useful with brand-aware casts (`std.brand.cast_view_v1`) and stream pipes, where validation can operate on a view without allocating.
+
+## Branded bytes (typed encodings)
+
+Bytes-like values can carry a nominal **brand** (compile-time only) to represent “validated bytes of encoding X”.
+
+Conceptually:
+
+- `bytes@B`, `bytes_view@B`
+- `option_bytes@B`, `result_bytes@B`
+- `option_bytes_view@B`, `result_bytes_view@B`
+
+Compatibility:
+
+- branded is assignable to unbranded (`bytes@B` can be passed as `bytes`)
+- unbranded is not assignable to branded without an explicit cast/assume
+
+Brand operators live under `std.brand.*`:
+
+- `std.brand.cast_bytes_v1(brand_id, validator_id, b: bytes) -> result_bytes@brand_id`
+- `std.brand.cast_view_v1(brand_id, validator_id, v: bytes_view) -> result_bytes_view@brand_id`
+- `std.brand.cast_view_copy_v1(brand_id, validator_id, v: bytes_view) -> result_bytes@brand_id` (copy on success)
+- `std.brand.assume_bytes_v1(brand_id, b: bytes) -> bytes@brand_id` (unsafe)
+- `std.brand.erase_bytes_v1`, `std.brand.erase_view_v1` (drop a brand)
+- `std.brand.view_v1(b: bytes@B) -> bytes_view@B` (full view)
+- `std.brand.to_bytes_preserve_if_full_v1(v: bytes_view@B) -> bytes` (preserves `B` only when `v` is provably a full view)
+
+Brands are also used by stream pipes as an item-level typecheck rail (see [Streaming pipes](stream-pipes.md)).
+
 ## Debug-only safety instrumentation
 
 In debug builds / diagnostic runs, X07 can enable:

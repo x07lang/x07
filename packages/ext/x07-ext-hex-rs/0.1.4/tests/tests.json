@@ -1,0 +1,23 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.hex/encode_decode_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.hex.tests.test_encode_decode_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.hex/decode_invalid_char",
+      "world": "solve-pure",
+      "entry": "ext.hex.tests.test_decode_invalid_char",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.hex/decode_odd_length",
+      "world": "solve-pure",
+      "entry": "ext.hex.tests.test_decode_odd_length",
+      "expect": "pass"
+    }
+  ]
+}

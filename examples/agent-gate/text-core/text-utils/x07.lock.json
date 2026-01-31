@@ -3,18 +3,18 @@
   "dependencies": [
     {
       "name": "ext-text",
-      "version": "0.1.1",
-      "path": ".x07/deps/ext-text/0.1.1",
-      "package_manifest_sha256": "d43ba1e2b4b9e87a62086e286d276f2ba46700a129a0899b866c72c3ad009ae1",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-text/0.1.2",
+      "package_manifest_sha256": "35817e98987848cf0711268f4172bfa49c205109c93bd17d18fb5f149bedae77",
       "module_root": "modules",
       "modules_sha256": {
-        "std.text": "34c68b30839a56cfc0c9f3079c5b61a4860e98c7414e577e2d17dce202ac3cb7",
-        "std.text.find": "24abdc6abb1568da5d3d96ade07f5eff63d602b6ab38f673e89fe7b83de2b525",
-        "std.text.join": "436799f5c3f04d042ef280c8ff1816d5d17d0e9fcd76554520cccfece75e9b47",
-        "std.text.lines": "eed5fe110a0d469673e59cdb4e2b4fd65580b76ae8122d963aa941e2fecdbce2",
-        "std.text.split": "0e2228faa70693d4e9b414aea640fc017f4895b8efcc8c40777b0e353c071c9c",
-        "std.text.tests": "93d2f0c49cf217666806430fcce6b152af95f51d9ecd979de3ddce5d67bb2138",
-        "std.text.ws": "1b7cc125e83ef5d8b9519a40d7e5530871d38e4ba29ab9d5e4254a35c572a3b5"
+        "std.text": "85f7c0c671f85106086fb14e581c472ce8361a77a34ca854d42ceb0a2f824c52",
+        "std.text.find": "0c84cefa81876012b56bb11c511ce5f72ae9734236e47b846043cf9a937b0026",
+        "std.text.join": "c84d4a822cf32a6f9e148c32f3fe583667fc17e8bf91450d82c39b8a09b61011",
+        "std.text.lines": "777bf1b599d3628e0834e22cd6925bcd9008547a65b6e69b912c2943cf831a7c",
+        "std.text.split": "dfd60f66759f0a0876c9d3cb1feaeeebb6b5282a139c3aa071ef231548664dbf",
+        "std.text.tests": "9ab717edbb0fdecb852901822dc8cc746b61e05a7155420f08e1d02abff4bdc1",
+        "std.text.ws": "7895ace61733e993fd025fe96d98432b734342a679f8cf925f024ba9d1f978f3"
       }
     }
   ]

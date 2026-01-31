@@ -8,13 +8,15 @@
   "dependencies": [
     {
       "name": "ext-unicode-rs",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-unicode-rs/0.1.4"
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-unicode-rs/0.1.5"
     }
   ],
   "lockfile": "x07.lock.json",
   "default_profile": "os",
   "profiles": {
-    "os": { "world": "run-os" }
+    "os": {
+      "world": "run-os"
+    }
   }
 }

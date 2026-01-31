@@ -30,7 +30,7 @@ JSON
 
 cat >"$tmp/src/main.x07.json" <<'JSON'
 {
-  "schema_version": "x07.x07ast@0.2.0",
+  "schema_version": "x07.x07ast@0.3.0",
   "kind": "entry",
   "module_id": "main",
   "imports": [],

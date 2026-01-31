@@ -29,7 +29,7 @@ cat >"$tmp/x07.lock.json" <<'JSON'
 JSON
 
 cat >"$tmp/src/main.x07.json" <<'JSON'
-{"schema_version":"x07.x07ast@0.2.0","module_id":"main","kind":"entry","imports":[],"decls":[],"solve":["begin",["for","i",0,1,["let","x",0],["set","x",1],0],["bytes.alloc",0]]}
+{"schema_version":"x07.x07ast@0.3.0","module_id":"main","kind":"entry","imports":[],"decls":[],"solve":["begin",["for","i",0,1,["let","x",0],["set","x",1],0],["bytes.alloc",0]]}
 JSON
 
 # Sanity: lint must fail pre-repair.

@@ -3,13 +3,13 @@
   "dependencies": [
     {
       "name": "ext-compress-rs",
-      "path": ".x07/deps/ext-compress-rs/0.1.4",
-      "version": "0.1.4"
+      "path": ".x07/deps/ext-compress-rs/0.1.5",
+      "version": "0.1.5"
     },
     {
       "name": "ext-error",
-      "path": ".x07/deps/ext-error/0.1.3",
-      "version": "0.1.3"
+      "path": ".x07/deps/ext-error/0.1.4",
+      "version": "0.1.4"
     }
   ],
   "entry": "src/main.x07.json",

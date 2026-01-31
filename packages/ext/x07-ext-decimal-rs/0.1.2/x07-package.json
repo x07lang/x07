@@ -1,0 +1,33 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-decimal-rs",
+  "description": "Fixed-point decimal utilities (codec_v1, parse, format, basic ops).",
+  "docs": "Fixed-point decimal utilities (codec_v1, parse, format, basic ops).\n\nModules:\n- std.math.decimal\n- std.math.decimal.codec_v1\n- std.math.decimal.parse\n- std.math.decimal.fmt\n- std.math.decimal.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-decimal-rs@0.1.2 --sync\n- Import the modules listed above.\n\nNotes:\n- Determinism: pure\n- Representation: (sign, scale, magnitude)\n- Encoding: std.math.decimal.codec_v1 (stable)\n",
+  "version": "0.1.2",
+  "module_root": "modules",
+  "modules": [
+    "std.math.decimal",
+    "std.math.decimal.codec_v1",
+    "std.math.decimal.parse",
+    "std.math.decimal.fmt",
+    "std.math.decimal.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-error@0.1.4",
+      "ext-bigint-rs@0.1.2"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07ast.schema.json",
-  "title": "X07 x07AST v0.2.0",
+  "title": "X07 x07AST v0.3.0",
   "description": "Canonical, JSON-based AST carrier for LLM-first X07 program generation and repair. Expressions are encoded as JSON S-expressions (json-sexpr).",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "kind", "module_id", "imports", "decls"],
   "properties": {
-    "schema_version": { "const": "x07.x07ast@0.2.0" },
+    "schema_version": { "const": "x07.x07ast@0.3.0" },
     "kind": {
       "type": "string",
       "enum": ["entry", "module"],
@@ -118,7 +118,8 @@
       "required": ["name", "ty"],
       "properties": {
         "name": { "$ref": "#/$defs/local_name" },
-        "ty": { "$ref": "#/$defs/type_name" }
+        "ty": { "$ref": "#/$defs/type_name" },
+        "brand": { "$ref": "#/$defs/symbol" }
       }
     },
     "decl_defn": {
@@ -134,6 +135,7 @@
           "default": []
         },
         "result": { "$ref": "#/$defs/type_name" },
+        "result_brand": { "$ref": "#/$defs/symbol" },
         "body": { "$ref": "#/$defs/sexpr" }
       }
     },
@@ -150,6 +152,7 @@
           "default": []
         },
         "result": { "$ref": "#/$defs/type_name" },
+        "result_brand": { "$ref": "#/$defs/symbol" },
         "body": { "$ref": "#/$defs/sexpr" }
       }
     },

@@ -6,12 +6,15 @@ use crate::ast::Expr;
 use crate::compile::{CompileErrorKind, CompileOptions, CompilerError};
 use crate::program::{AsyncFunctionDef, FunctionDef, FunctionParam, Program};
 use crate::types::Ty;
+use crate::validate;
 use crate::x07ast;
 
 pub fn elaborate_stream_pipes(
     program: &mut Program,
     options: &CompileOptions,
+    module_metas: &BTreeMap<String, BTreeMap<String, Value>>,
 ) -> Result<(), CompilerError> {
+    let fn_sigs = PipeFnSigsV1::build(program);
     let mut existing_names: BTreeSet<String> = BTreeSet::new();
     for f in &program.functions {
         existing_names.insert(f.name.clone());
@@ -25,6 +28,8 @@ pub fn elaborate_stream_pipes(
 
     let mut elab = Elaborator {
         options,
+        module_metas,
+        fn_sigs: &fn_sigs,
         existing_names,
         helpers: BTreeMap::new(),
         new_helpers: Vec::new(),
@@ -65,8 +70,71 @@ struct PipeHelperInfo {
     kind: PipeHelperKind,
 }
 
+#[derive(Debug, Clone)]
+struct PipeFnSigV1 {
+    params: Vec<FunctionParam>,
+    ret_ty: Ty,
+    ret_brand: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct PipeFnSigsV1 {
+    defns: BTreeMap<String, PipeFnSigV1>,
+    defasyncs: BTreeMap<String, PipeFnSigV1>,
+}
+
+impl PipeFnSigsV1 {
+    fn build(program: &Program) -> Self {
+        let mut defns: BTreeMap<String, PipeFnSigV1> = BTreeMap::new();
+        for f in &program.functions {
+            let _ = defns.insert(
+                f.name.clone(),
+                PipeFnSigV1 {
+                    params: f.params.clone(),
+                    ret_ty: f.ret_ty,
+                    ret_brand: f.ret_brand.clone(),
+                },
+            );
+        }
+        for f in &program.extern_functions {
+            let _ = defns.insert(
+                f.name.clone(),
+                PipeFnSigV1 {
+                    params: f.params.clone(),
+                    ret_ty: f.ret_ty,
+                    ret_brand: None,
+                },
+            );
+        }
+
+        let mut defasyncs: BTreeMap<String, PipeFnSigV1> = BTreeMap::new();
+        for f in &program.async_functions {
+            let _ = defasyncs.insert(
+                f.name.clone(),
+                PipeFnSigV1 {
+                    params: f.params.clone(),
+                    ret_ty: f.ret_ty,
+                    ret_brand: f.ret_brand.clone(),
+                },
+            );
+        }
+
+        Self { defns, defasyncs }
+    }
+
+    fn defn(&self, fn_id: &str) -> Option<&PipeFnSigV1> {
+        self.defns.get(fn_id)
+    }
+
+    fn defasync(&self, fn_id: &str) -> Option<&PipeFnSigV1> {
+        self.defasyncs.get(fn_id)
+    }
+}
+
 struct Elaborator<'a> {
     options: &'a CompileOptions,
+    module_metas: &'a BTreeMap<String, BTreeMap<String, Value>>,
+    fn_sigs: &'a PipeFnSigsV1,
     existing_names: BTreeSet<String>,
     helpers: BTreeMap<(String, String), PipeHelperInfo>,
     new_helpers: Vec<FunctionDef>,
@@ -106,11 +174,12 @@ impl Elaborator<'_> {
         ctx: RewriteCtx,
     ) -> Result<Expr, CompilerError> {
         let h8 = hash_pipe_without_expr_bodies(&expr)?;
-        let parsed = parse_pipe_v1(&expr)?;
+        let mut parsed = parse_pipe_v1(&expr)?;
+        self.typecheck_and_rewrite_item_brands_v1(&mut parsed, module_id)?;
         let needs_async = parsed
             .chain
             .iter()
-            .any(|xf| matches!(xf, PipeXfV1::ParMapStreamV1 { .. }));
+            .any(|xf| matches!(xf.kind, PipeXfV1::ParMapStreamV1 { .. }));
 
         let helper_full = format!("{module_id}.__std_stream_pipe_v1_{h8}");
         let helper_key = (module_id.to_string(), h8.clone());
@@ -142,9 +211,11 @@ impl Elaborator<'_> {
                             .map(|(idx, p)| FunctionParam {
                                 name: format!("p{idx}"),
                                 ty: p.ty,
+                                brand: None,
                             })
                             .collect(),
                         ret_ty: Ty::Bytes,
+                        ret_brand: None,
                         body,
                     });
                 }
@@ -158,9 +229,11 @@ impl Elaborator<'_> {
                             .map(|(idx, p)| FunctionParam {
                                 name: format!("p{idx}"),
                                 ty: p.ty,
+                                brand: None,
                             })
                             .collect(),
                         ret_ty: Ty::Bytes,
+                        ret_brand: None,
                         body,
                     });
                 }
@@ -207,6 +280,452 @@ impl Elaborator<'_> {
         });
         Ok(expr_list(begin_items))
     }
+
+    fn typecheck_and_rewrite_item_brands_v1(
+        &self,
+        pipe: &mut PipeParsed,
+        module_id: &str,
+    ) -> Result<(), CompilerError> {
+        let registry = match pipe.cfg.brand_registry_ref_v1.as_deref() {
+            Some(registry_module_id) => {
+                load_brand_registry_v1(registry_module_id, self.module_metas)?
+            }
+            None => load_brand_registry_optional_v1(module_id, self.module_metas)?,
+        };
+
+        // Resolve require_brand_v1 validators (always, even if typecheck is disabled).
+        for xf in pipe.chain.iter_mut() {
+            let PipeXfV1::RequireBrandV1 {
+                brand_id,
+                validator_id,
+                ..
+            } = &mut xf.kind
+            else {
+                continue;
+            };
+
+            let resolved = match validator_id.as_deref() {
+                Some(v) => v.to_string(),
+                None => registry.get(brand_id).cloned().ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "E_PIPE_BRAND_REGISTRY_MISSING: brand {brand_id:?} is missing meta.brands_v1.validate (ptr={})",
+                            xf.ptr
+                        ),
+                    )
+                })?,
+            };
+            ensure_brand_validator_sig_v1(&resolved, self.fn_sigs, &xf.ptr)?;
+            *validator_id = Some(resolved);
+        }
+
+        if pipe.cfg.typecheck_item_brands_v1 == 0 {
+            return Ok(());
+        }
+
+        let auto = pipe.cfg.auto_require_brand_v1 != 0;
+        let verify_produced = pipe.cfg.verify_produced_brands_v1 != 0;
+
+        let mut cur_brand: Option<String> = pipe.src.out_item_brand.clone();
+        let mut new_chain: Vec<PipeXfDescV1> = Vec::with_capacity(pipe.chain.len());
+
+        if verify_produced {
+            if let Some(b) = &cur_brand {
+                let validator_id = registry.get(b).cloned().ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "E_PIPE_BRAND_REGISTRY_MISSING: brand {b:?} is missing meta.brands_v1.validate (ptr={})",
+                            pipe.src.ptr
+                        ),
+                    )
+                })?;
+                ensure_brand_validator_sig_v1(&validator_id, self.fn_sigs, &pipe.src.ptr)?;
+                new_chain.push(PipeXfDescV1 {
+                    kind: PipeXfV1::RequireBrandV1 {
+                        brand_id: b.clone(),
+                        validator_id: Some(validator_id),
+                        max_item_bytes: 0,
+                    },
+                    in_item_brand: None,
+                    out_item_brand: None,
+                    ptr: pipe.src.ptr.clone(),
+                });
+            }
+        }
+
+        for xf in pipe.chain.iter() {
+            let req_in = infer_xf_req_in_v1(xf, self.fn_sigs)?;
+            match &req_in {
+                PipeItemBrandInV1::Any => {}
+                PipeItemBrandInV1::Same => {
+                    if cur_brand.is_none() {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!(
+                                "E_PIPE_BRAND_REQUIRED: stage requires branded items, got unbranded (ptr={})",
+                                xf.ptr
+                            ),
+                        ));
+                    }
+                }
+                PipeItemBrandInV1::Brand(want) => match &cur_brand {
+                    Some(got) if got == want => {}
+                    Some(got) => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!(
+                                "E_PIPE_BRAND_MISMATCH: expected bytes_view@{want}, got bytes_view@{got} (ptr={})",
+                                xf.ptr
+                            ),
+                        ));
+                    }
+                    None => {
+                        if auto {
+                            let validator_id = registry.get(want).cloned().ok_or_else(|| {
+                                CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    format!(
+                                        "E_PIPE_BRAND_REQUIRED: expected bytes_view@{want}, got unbranded; missing meta.brands_v1.validate and auto_require_brand_v1 cannot insert require_brand (ptr={})",
+                                        xf.ptr
+                                    ),
+                                )
+                            })?;
+                            ensure_brand_validator_sig_v1(&validator_id, self.fn_sigs, &xf.ptr)?;
+                            new_chain.push(PipeXfDescV1 {
+                                kind: PipeXfV1::RequireBrandV1 {
+                                    brand_id: want.clone(),
+                                    validator_id: Some(validator_id),
+                                    max_item_bytes: 0,
+                                },
+                                in_item_brand: None,
+                                out_item_brand: None,
+                                ptr: xf.ptr.clone(),
+                            });
+                            cur_brand = Some(want.clone());
+                        } else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "E_PIPE_BRAND_REQUIRED: expected bytes_view@{want}, got unbranded (ptr={})",
+                                    xf.ptr
+                                ),
+                            ));
+                        }
+                    }
+                },
+            }
+
+            let mut xf_out = xf.clone();
+            if let PipeXfV1::RequireBrandV1 {
+                brand_id,
+                validator_id,
+                ..
+            } = &mut xf_out.kind
+            {
+                let resolved = validator_id.as_deref().or_else(|| registry.get(brand_id).map(|s| s.as_str())).ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "E_PIPE_BRAND_REGISTRY_MISSING: brand {brand_id:?} is missing meta.brands_v1.validate (ptr={})",
+                            xf.ptr
+                        ),
+                    )
+                })?;
+                ensure_brand_validator_sig_v1(resolved, self.fn_sigs, &xf.ptr)?;
+                *validator_id = Some(resolved.to_string());
+            }
+
+            new_chain.push(xf_out.clone());
+
+            let (out, produced_claim) = infer_xf_out_v1(&xf_out, self.fn_sigs)?;
+            match &out {
+                PipeItemBrandOutV1::Same => {}
+                PipeItemBrandOutV1::None => cur_brand = None,
+                PipeItemBrandOutV1::Brand(b) => cur_brand = Some(b.clone()),
+            }
+
+            if verify_produced && produced_claim {
+                let Some(b) = &cur_brand else {
+                    continue;
+                };
+                let validator_id = registry.get(b).cloned().ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "E_PIPE_BRAND_REGISTRY_MISSING: brand {b:?} is missing meta.brands_v1.validate (ptr={})",
+                            xf.ptr
+                        ),
+                    )
+                })?;
+                ensure_brand_validator_sig_v1(&validator_id, self.fn_sigs, &xf.ptr)?;
+                new_chain.push(PipeXfDescV1 {
+                    kind: PipeXfV1::RequireBrandV1 {
+                        brand_id: b.clone(),
+                        validator_id: Some(validator_id),
+                        max_item_bytes: 0,
+                    },
+                    in_item_brand: None,
+                    out_item_brand: None,
+                    ptr: xf.ptr.clone(),
+                });
+            }
+        }
+
+        if let Some(req) = &pipe.sink.in_item_brand {
+            match req {
+                PipeItemBrandInV1::Any => {}
+                PipeItemBrandInV1::Same => {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Internal,
+                        "internal error: sink in_item_brand cannot be \"same\"".to_string(),
+                    ));
+                }
+                PipeItemBrandInV1::Brand(want) => match &cur_brand {
+                    Some(got) if got == want => {}
+                    Some(got) => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!(
+                                "E_PIPE_BRAND_MISMATCH: sink expected bytes_view@{want}, got bytes_view@{got} (ptr={})",
+                                pipe.sink.ptr
+                            ),
+                        ));
+                    }
+                    None => {
+                        if auto {
+                            let validator_id = registry.get(want).cloned().ok_or_else(|| {
+                                CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    format!(
+                                        "E_PIPE_BRAND_REQUIRED: sink expected bytes_view@{want}, got unbranded; missing meta.brands_v1.validate and auto_require_brand_v1 cannot insert require_brand (ptr={})",
+                                        pipe.sink.ptr
+                                    ),
+                                )
+                            })?;
+                            ensure_brand_validator_sig_v1(
+                                &validator_id,
+                                self.fn_sigs,
+                                &pipe.sink.ptr,
+                            )?;
+                            new_chain.push(PipeXfDescV1 {
+                                kind: PipeXfV1::RequireBrandV1 {
+                                    brand_id: want.clone(),
+                                    validator_id: Some(validator_id),
+                                    max_item_bytes: 0,
+                                },
+                                in_item_brand: None,
+                                out_item_brand: None,
+                                ptr: pipe.sink.ptr.clone(),
+                            });
+                        } else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "E_PIPE_BRAND_REQUIRED: sink expected bytes_view@{want}, got unbranded (ptr={})",
+                                    pipe.sink.ptr
+                                ),
+                            ));
+                        }
+                    }
+                },
+            }
+        }
+
+        pipe.chain = new_chain;
+        Ok(())
+    }
+}
+
+fn load_brand_registry_v1(
+    module_id: &str,
+    module_metas: &BTreeMap<String, BTreeMap<String, Value>>,
+) -> Result<BTreeMap<String, String>, CompilerError> {
+    let meta = module_metas.get(module_id).ok_or_else(|| {
+        CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("brand_registry_ref_v1 refers to unknown module_id: {module_id:?}"),
+        )
+    })?;
+    load_brand_registry_v1_from_meta_v1(meta)
+}
+
+fn load_brand_registry_optional_v1(
+    module_id: &str,
+    module_metas: &BTreeMap<String, BTreeMap<String, Value>>,
+) -> Result<BTreeMap<String, String>, CompilerError> {
+    let Some(meta) = module_metas.get(module_id) else {
+        return Ok(BTreeMap::new());
+    };
+    load_brand_registry_v1_from_meta_v1(meta)
+}
+
+fn load_brand_registry_v1_from_meta_v1(
+    meta: &BTreeMap<String, Value>,
+) -> Result<BTreeMap<String, String>, CompilerError> {
+    let Some(v) = meta.get("brands_v1") else {
+        return Ok(BTreeMap::new());
+    };
+    let Value::Object(map) = v else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "meta.brands_v1 must be a JSON object".to_string(),
+        ));
+    };
+
+    let mut out: BTreeMap<String, String> = BTreeMap::new();
+    for (brand_id, entry) in map {
+        validate::validate_symbol(brand_id)
+            .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+        let Value::Object(entry_obj) = entry else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("meta.brands_v1[{brand_id:?}] must be an object"),
+            ));
+        };
+        let Some(validate_v) = entry_obj.get("validate") else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("meta.brands_v1[{brand_id:?}] missing validate"),
+            ));
+        };
+        let Some(validator_id) = validate_v.as_str() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("meta.brands_v1[{brand_id:?}].validate must be a string"),
+            ));
+        };
+        validate::validate_symbol(validator_id)
+            .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+        if out
+            .insert(brand_id.clone(), validator_id.to_string())
+            .is_some()
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("meta.brands_v1 duplicate entry for {brand_id:?}"),
+            ));
+        }
+    }
+
+    Ok(out)
+}
+
+fn ensure_brand_validator_sig_v1(
+    validator_id: &str,
+    fn_sigs: &PipeFnSigsV1,
+    ptr: &str,
+) -> Result<(), CompilerError> {
+    let sig = fn_sigs.defn(validator_id).ok_or_else(|| {
+        CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("unknown identifier: {validator_id:?} (ptr={ptr})"),
+        )
+    })?;
+    if sig.params.len() != 1
+        || sig.params[0].ty != Ty::BytesView
+        || sig.params[0].brand.is_some()
+        || sig.ret_ty != Ty::ResultI32
+        || sig.ret_brand.is_some()
+    {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!(
+                "E_PIPE_BRAND_VALIDATOR_SIG: {validator_id:?} must have signature (bytes_view) -> result_i32 (ptr={ptr})"
+            ),
+        ));
+    }
+    Ok(())
+}
+
+fn infer_xf_req_in_v1(
+    xf: &PipeXfDescV1,
+    fn_sigs: &PipeFnSigsV1,
+) -> Result<PipeItemBrandInV1, CompilerError> {
+    if let Some(v) = &xf.in_item_brand {
+        return Ok(v.clone());
+    }
+    match &xf.kind {
+        PipeXfV1::MapBytes { fn_id } => {
+            if let Some(sig) = fn_sigs.defn(fn_id) {
+                if sig.params.len() == 1 && sig.params[0].ty == Ty::BytesView {
+                    if let Some(b) = &sig.params[0].brand {
+                        return Ok(PipeItemBrandInV1::Brand(b.clone()));
+                    }
+                }
+            }
+            Ok(PipeItemBrandInV1::Any)
+        }
+        PipeXfV1::ParMapStreamV1 { cfg } => {
+            if let Some(sig) = fn_sigs.defasync(&cfg.mapper_defasync) {
+                if sig.params.len() >= 2 && sig.params[1].ty == Ty::Bytes {
+                    if let Some(b) = &sig.params[1].brand {
+                        return Ok(PipeItemBrandInV1::Brand(b.clone()));
+                    }
+                }
+            }
+            Ok(PipeItemBrandInV1::Any)
+        }
+        PipeXfV1::RequireBrandV1 { .. } => Ok(PipeItemBrandInV1::Any),
+        PipeXfV1::Filter { .. }
+        | PipeXfV1::Take { .. }
+        | PipeXfV1::SplitLines { .. }
+        | PipeXfV1::FrameU32Le
+        | PipeXfV1::MapInPlaceBufV1 { .. }
+        | PipeXfV1::JsonCanonStreamV1 { .. }
+        | PipeXfV1::DeframeU32LeV1 { .. } => Ok(PipeItemBrandInV1::Any),
+    }
+}
+
+fn infer_xf_out_v1(
+    xf: &PipeXfDescV1,
+    fn_sigs: &PipeFnSigsV1,
+) -> Result<(PipeItemBrandOutV1, bool), CompilerError> {
+    if let Some(v) = &xf.out_item_brand {
+        return Ok((v.clone(), matches!(v, PipeItemBrandOutV1::Brand(_))));
+    }
+    match &xf.kind {
+        PipeXfV1::RequireBrandV1 { brand_id, .. } => {
+            Ok((PipeItemBrandOutV1::Brand(brand_id.clone()), false))
+        }
+        PipeXfV1::Filter { .. } | PipeXfV1::Take { .. } => Ok((PipeItemBrandOutV1::Same, false)),
+        PipeXfV1::SplitLines { .. }
+        | PipeXfV1::FrameU32Le
+        | PipeXfV1::MapInPlaceBufV1 { .. }
+        | PipeXfV1::JsonCanonStreamV1 { .. }
+        | PipeXfV1::DeframeU32LeV1 { .. } => Ok((PipeItemBrandOutV1::None, false)),
+        PipeXfV1::MapBytes { fn_id } => {
+            let out_brand = fn_sigs
+                .defn(fn_id)
+                .and_then(|sig| {
+                    if sig.ret_ty == Ty::Bytes {
+                        sig.ret_brand.clone()
+                    } else {
+                        None
+                    }
+                })
+                .map(PipeItemBrandOutV1::Brand)
+                .unwrap_or(PipeItemBrandOutV1::None);
+            let produced_claim = matches!(&out_brand, PipeItemBrandOutV1::Brand(_));
+            Ok((out_brand, produced_claim))
+        }
+        PipeXfV1::ParMapStreamV1 { cfg } => {
+            let out_brand = fn_sigs
+                .defasync(&cfg.mapper_defasync)
+                .and_then(|sig| {
+                    if matches!(sig.ret_ty, Ty::Bytes | Ty::ResultBytes) {
+                        sig.ret_brand.clone()
+                    } else {
+                        None
+                    }
+                })
+                .map(PipeItemBrandOutV1::Brand)
+                .unwrap_or(PipeItemBrandOutV1::None);
+            let produced_claim = matches!(&out_brand, PipeItemBrandOutV1::Brand(_));
+            Ok((out_brand, produced_claim))
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -215,13 +734,49 @@ struct PipeParam {
     expr: Expr,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PipeItemBrandInV1 {
+    Any,
+    Same,
+    Brand(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PipeItemBrandOutV1 {
+    Same,
+    None,
+    Brand(String),
+}
+
+#[derive(Debug, Clone)]
+struct PipeSrcDescV1 {
+    kind: PipeSrcV1,
+    out_item_brand: Option<String>,
+    ptr: String,
+}
+
+#[derive(Debug, Clone)]
+struct PipeXfDescV1 {
+    kind: PipeXfV1,
+    in_item_brand: Option<PipeItemBrandInV1>,
+    out_item_brand: Option<PipeItemBrandOutV1>,
+    ptr: String,
+}
+
+#[derive(Debug, Clone)]
+struct PipeSinkDescV1 {
+    kind: PipeSinkV1,
+    in_item_brand: Option<PipeItemBrandInV1>,
+    ptr: String,
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 struct PipeParsed {
     cfg: PipeCfgV1,
-    src: PipeSrcV1,
-    chain: Vec<PipeXfV1>,
-    sink: PipeSinkV1,
+    src: PipeSrcDescV1,
+    chain: Vec<PipeXfDescV1>,
+    sink: PipeSinkDescV1,
     params: Vec<PipeParam>,
 }
 
@@ -247,11 +802,11 @@ fn parse_pipe_v1(expr: &Expr) -> Result<PipeParsed, CompilerError> {
     let mut params: Vec<PipeParam> = Vec::new();
 
     let cfg = parse_cfg_v1(cfg)?;
-    let src = parse_src_v1(src, &mut params)?;
+    let mut src = parse_src_v1(src, &mut params)?;
     let mut chain = parse_chain_v1(chain, &mut params)?;
 
     // Desugaring: src.net_tcp_read_u32frames_v1 := src.net_tcp_read_stream_handle_v1 + xf.deframe_u32le_v1
-    let (src, chain) = match src {
+    match std::mem::replace(&mut src.kind, PipeSrcV1::Bytes { bytes_param: 0 }) {
         PipeSrcV1::NetTcpReadU32Frames {
             stream_handle_param,
             caps_param,
@@ -260,29 +815,36 @@ fn parse_pipe_v1(expr: &Expr) -> Result<PipeParsed, CompilerError> {
             on_timeout,
             on_eof,
         } => {
+            let out_item_brand = src.out_item_brand.take().map(PipeItemBrandOutV1::Brand);
+            let ptr = src.ptr.clone();
             chain.insert(
                 0,
-                PipeXfV1::DeframeU32LeV1 {
-                    cfg: DeframeU32LeCfgV1 {
-                        max_frame_bytes,
-                        max_frames: 0,
-                        allow_empty,
-                        on_truncated: DeframeOnTruncatedV1::Err,
+                PipeXfDescV1 {
+                    kind: PipeXfV1::DeframeU32LeV1 {
+                        cfg: DeframeU32LeCfgV1 {
+                            max_frame_bytes,
+                            max_frames: 0,
+                            allow_empty,
+                            on_truncated: DeframeOnTruncatedV1::Err,
+                        },
                     },
+                    in_item_brand: None,
+                    out_item_brand,
+                    ptr,
                 },
             );
-            (
-                PipeSrcV1::NetTcpReadStreamHandle {
-                    stream_handle_param,
-                    caps_param,
-                    on_timeout,
-                    on_eof,
-                },
-                chain,
-            )
+            src.kind = PipeSrcV1::NetTcpReadStreamHandle {
+                stream_handle_param,
+                caps_param,
+                on_timeout,
+                on_eof,
+            };
+            src.out_item_brand = None;
         }
-        src => (src, chain),
-    };
+        other => {
+            src.kind = other;
+        }
+    }
 
     let sink = parse_sink_v1(sink, &mut params)?;
 
@@ -307,6 +869,10 @@ struct PipeCfgV1 {
     emit_payload: Option<i32>,
     emit_stats: Option<i32>,
     allow_nondet_v1: i32,
+    typecheck_item_brands_v1: i32,
+    auto_require_brand_v1: i32,
+    brand_registry_ref_v1: Option<String>,
+    verify_produced_brands_v1: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -365,6 +931,11 @@ enum PipeXfV1 {
     },
     Filter {
         fn_id: String,
+    },
+    RequireBrandV1 {
+        brand_id: String,
+        validator_id: Option<String>,
+        max_item_bytes: i32,
     },
     Take {
         n_param: usize,
@@ -436,7 +1007,7 @@ enum PipeSinkV1 {
         path_param: usize,
     },
     U32Frames {
-        inner: Box<PipeSinkV1>,
+        inner: Box<PipeSinkDescV1>,
     },
     WorldFsWriteStream {
         path_param: usize,
@@ -507,6 +1078,10 @@ fn parse_cfg_v1(expr: &Expr) -> Result<PipeCfgV1, CompilerError> {
     let mut emit_payload = None;
     let mut emit_stats = None;
     let mut allow_nondet_v1 = None;
+    let mut typecheck_item_brands_v1 = None;
+    let mut auto_require_brand_v1 = None;
+    let mut brand_registry_ref_v1 = None;
+    let mut verify_produced_brands_v1 = None;
 
     for field in items.iter().skip(1) {
         let Expr::List { items: kv, .. } = field else {
@@ -527,17 +1102,28 @@ fn parse_cfg_v1(expr: &Expr) -> Result<PipeCfgV1, CompilerError> {
                 "cfg key must be an identifier".to_string(),
             ));
         };
-        let value = expect_i32(&kv[1], "cfg value must be an integer")?;
         match key {
-            "chunk_max_bytes" => chunk_max_bytes = Some(value),
-            "bufread_cap_bytes" => bufread_cap_bytes = Some(value),
-            "max_in_bytes" => max_in_bytes = Some(value),
-            "max_out_bytes" => max_out_bytes = Some(value),
-            "max_items" => max_items = Some(value),
-            "max_steps" => max_steps = Some(value),
-            "emit_payload" => emit_payload = Some(value),
-            "emit_stats" => emit_stats = Some(value),
+            "chunk_max_bytes" => {
+                chunk_max_bytes = Some(expect_i32(&kv[1], "chunk_max_bytes must be an integer")?)
+            }
+            "bufread_cap_bytes" => {
+                bufread_cap_bytes =
+                    Some(expect_i32(&kv[1], "bufread_cap_bytes must be an integer")?)
+            }
+            "max_in_bytes" => {
+                max_in_bytes = Some(expect_i32(&kv[1], "max_in_bytes must be an integer")?)
+            }
+            "max_out_bytes" => {
+                max_out_bytes = Some(expect_i32(&kv[1], "max_out_bytes must be an integer")?)
+            }
+            "max_items" => max_items = Some(expect_i32(&kv[1], "max_items must be an integer")?),
+            "max_steps" => max_steps = Some(expect_i32(&kv[1], "max_steps must be an integer")?),
+            "emit_payload" => {
+                emit_payload = Some(expect_i32(&kv[1], "emit_payload must be an integer")?)
+            }
+            "emit_stats" => emit_stats = Some(expect_i32(&kv[1], "emit_stats must be an integer")?),
             "allow_nondet_v1" => {
+                let value = expect_i32(&kv[1], "allow_nondet_v1 must be an integer")?;
                 if value != 0 && value != 1 {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
@@ -545,6 +1131,43 @@ fn parse_cfg_v1(expr: &Expr) -> Result<PipeCfgV1, CompilerError> {
                     ));
                 }
                 allow_nondet_v1 = Some(value);
+            }
+            "typecheck_item_brands_v1" => {
+                let value = expect_i32(&kv[1], "typecheck_item_brands_v1 must be an integer")?;
+                if value != 0 && value != 1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "typecheck_item_brands_v1 must be 0 or 1".to_string(),
+                    ));
+                }
+                typecheck_item_brands_v1 = Some(value);
+            }
+            "auto_require_brand_v1" => {
+                let value = expect_i32(&kv[1], "auto_require_brand_v1 must be an integer")?;
+                if value != 0 && value != 1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "auto_require_brand_v1 must be 0 or 1".to_string(),
+                    ));
+                }
+                auto_require_brand_v1 = Some(value);
+            }
+            "brand_registry_ref_v1" => {
+                let module_id =
+                    expect_bytes_lit_text(&kv[1], "brand_registry_ref_v1 must be bytes")?;
+                validate::validate_module_id(&module_id)
+                    .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+                brand_registry_ref_v1 = Some(module_id);
+            }
+            "verify_produced_brands_v1" => {
+                let value = expect_i32(&kv[1], "verify_produced_brands_v1 must be an integer")?;
+                if value != 0 && value != 1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "verify_produced_brands_v1 must be 0 or 1".to_string(),
+                    ));
+                }
+                verify_produced_brands_v1 = Some(value);
             }
             _ => {
                 return Err(CompilerError::new(
@@ -590,16 +1213,21 @@ fn parse_cfg_v1(expr: &Expr) -> Result<PipeCfgV1, CompilerError> {
         emit_payload,
         emit_stats,
         allow_nondet_v1: allow_nondet_v1.unwrap_or(0),
+        typecheck_item_brands_v1: typecheck_item_brands_v1.unwrap_or(1),
+        auto_require_brand_v1: auto_require_brand_v1.unwrap_or(0),
+        brand_registry_ref_v1,
+        verify_produced_brands_v1: verify_produced_brands_v1.unwrap_or(0),
     })
 }
 
-fn parse_src_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSrcV1, CompilerError> {
+fn parse_src_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSrcDescV1, CompilerError> {
     let Expr::List { items, .. } = expr else {
         return Err(CompilerError::new(
             CompileErrorKind::Typing,
             "pipe src must be a list".to_string(),
         ));
     };
+    let ptr = expr.ptr().to_string();
     let Some(head) = items.first().and_then(Expr::as_ident) else {
         return Err(CompilerError::new(
             CompileErrorKind::Typing,
@@ -609,55 +1237,134 @@ fn parse_src_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSrcV1, C
 
     match head {
         "std.stream.src.fs_open_read_v1" => {
-            if items.len() != 2 {
+            if items.len() < 2 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 1 argument"),
+                    format!("{head} expects at least 1 argument"),
                 ));
             }
             let path_param = parse_expr_v1(params, Ty::BytesView, &items[1])?;
-            Ok(PipeSrcV1::FsOpenRead { path_param })
+            let fields = parse_kv_fields(head, &items[2..])?;
+            for k in fields.keys() {
+                if k != "out_item_brand" {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} unknown field: {k}"),
+                    ));
+                }
+            }
+            let out_item_brand = fields
+                .get("out_item_brand")
+                .map(|v| parse_brand_id(v, "out_item_brand"))
+                .transpose()?;
+            Ok(PipeSrcDescV1 {
+                kind: PipeSrcV1::FsOpenRead { path_param },
+                out_item_brand,
+                ptr,
+            })
         }
         "std.stream.src.rr_send_v1" => {
-            if items.len() != 2 {
+            if items.len() < 2 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 1 argument"),
+                    format!("{head} expects at least 1 argument"),
                 ));
             }
             let key_param = parse_expr_v1(params, Ty::BytesView, &items[1])?;
-            Ok(PipeSrcV1::RrSend { key_param })
+            let fields = parse_kv_fields(head, &items[2..])?;
+            for k in fields.keys() {
+                if k != "out_item_brand" {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} unknown field: {k}"),
+                    ));
+                }
+            }
+            let out_item_brand = fields
+                .get("out_item_brand")
+                .map(|v| parse_brand_id(v, "out_item_brand"))
+                .transpose()?;
+            Ok(PipeSrcDescV1 {
+                kind: PipeSrcV1::RrSend { key_param },
+                out_item_brand,
+                ptr,
+            })
         }
         "std.stream.src.bytes_v1" => {
-            if items.len() != 2 {
+            if items.len() < 2 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 1 argument"),
+                    format!("{head} expects at least 1 argument"),
                 ));
             }
             let bytes_param = parse_expr_v1(params, Ty::Bytes, &items[1])?;
-            Ok(PipeSrcV1::Bytes { bytes_param })
+            let fields = parse_kv_fields(head, &items[2..])?;
+            for k in fields.keys() {
+                if k != "out_item_brand" {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} unknown field: {k}"),
+                    ));
+                }
+            }
+            let out_item_brand = fields
+                .get("out_item_brand")
+                .map(|v| parse_brand_id(v, "out_item_brand"))
+                .transpose()?;
+            Ok(PipeSrcDescV1 {
+                kind: PipeSrcV1::Bytes { bytes_param },
+                out_item_brand,
+                ptr,
+            })
         }
         "std.stream.src.db_rows_doc_v1" => {
-            if items.len() != 5 {
+            if items.len() < 5 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 4 arguments"),
+                    format!("{head} expects at least 4 arguments"),
                 ));
             }
             let conn_param = parse_expr_v1(params, Ty::I32, &items[1])?;
             let sql_param = parse_expr_v1(params, Ty::BytesView, &items[2])?;
             let params_doc_param = parse_expr_v1(params, Ty::Bytes, &items[3])?;
             let qcaps_doc_param = parse_expr_v1(params, Ty::Bytes, &items[4])?;
-            Ok(PipeSrcV1::DbRowsDoc {
-                conn_param,
-                sql_param,
-                params_doc_param,
-                qcaps_doc_param,
+            let fields = parse_kv_fields(head, &items[5..])?;
+            for k in fields.keys() {
+                if k != "out_item_brand" {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} unknown field: {k}"),
+                    ));
+                }
+            }
+            let out_item_brand = fields
+                .get("out_item_brand")
+                .map(|v| parse_brand_id(v, "out_item_brand"))
+                .transpose()?;
+            Ok(PipeSrcDescV1 {
+                kind: PipeSrcV1::DbRowsDoc {
+                    conn_param,
+                    sql_param,
+                    params_doc_param,
+                    qcaps_doc_param,
+                },
+                out_item_brand,
+                ptr,
             })
         }
         "std.stream.src.net_tcp_read_stream_handle_v1" => {
             let fields = parse_kv_fields(head, &items[1..])?;
+            for k in fields.keys() {
+                match k.as_str() {
+                    "stream_handle" | "caps" | "on_timeout" | "on_eof" | "out_item_brand" => {}
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} unknown field: {k}"),
+                        ));
+                    }
+                }
+            }
             let stream_handle = fields.get("stream_handle").ok_or_else(|| {
                 CompilerError::new(
                     CompileErrorKind::Typing,
@@ -700,15 +1407,35 @@ fn parse_src_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSrcV1, C
                     }
                 },
             };
-            Ok(PipeSrcV1::NetTcpReadStreamHandle {
-                stream_handle_param,
-                caps_param,
-                on_timeout,
-                on_eof,
+            let out_item_brand = fields
+                .get("out_item_brand")
+                .map(|v| parse_brand_id(v, "out_item_brand"))
+                .transpose()?;
+            Ok(PipeSrcDescV1 {
+                kind: PipeSrcV1::NetTcpReadStreamHandle {
+                    stream_handle_param,
+                    caps_param,
+                    on_timeout,
+                    on_eof,
+                },
+                out_item_brand,
+                ptr,
             })
         }
         "std.stream.src.net_tcp_read_u32frames_v1" => {
             let fields = parse_kv_fields(head, &items[1..])?;
+            for k in fields.keys() {
+                match k.as_str() {
+                    "stream_handle" | "caps" | "max_frame_bytes" | "allow_empty" | "on_timeout"
+                    | "on_eof" | "out_item_brand" => {}
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} unknown field: {k}"),
+                        ));
+                    }
+                }
+            }
             let stream_handle = fields.get("stream_handle").ok_or_else(|| {
                 CompilerError::new(
                     CompileErrorKind::Typing,
@@ -766,13 +1493,21 @@ fn parse_src_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSrcV1, C
                 },
             };
 
-            Ok(PipeSrcV1::NetTcpReadU32Frames {
-                stream_handle_param,
-                caps_param,
-                max_frame_bytes,
-                allow_empty,
-                on_timeout,
-                on_eof,
+            let out_item_brand = fields
+                .get("out_item_brand")
+                .map(|v| parse_brand_id(v, "out_item_brand"))
+                .transpose()?;
+            Ok(PipeSrcDescV1 {
+                kind: PipeSrcV1::NetTcpReadU32Frames {
+                    stream_handle_param,
+                    caps_param,
+                    max_frame_bytes,
+                    allow_empty,
+                    on_timeout,
+                    on_eof,
+                },
+                out_item_brand,
+                ptr,
             })
         }
         _ => Err(CompilerError::new(
@@ -785,7 +1520,7 @@ fn parse_src_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSrcV1, C
 fn parse_chain_v1(
     expr: &Expr,
     params: &mut Vec<PipeParam>,
-) -> Result<Vec<PipeXfV1>, CompilerError> {
+) -> Result<Vec<PipeXfDescV1>, CompilerError> {
     let Expr::List { items, .. } = expr else {
         return Err(CompilerError::new(
             CompileErrorKind::Typing,
@@ -805,78 +1540,150 @@ fn parse_chain_v1(
     Ok(xfs)
 }
 
-fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfV1, CompilerError> {
+fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfDescV1, CompilerError> {
     let Expr::List { items, .. } = expr else {
         return Err(CompilerError::new(
             CompileErrorKind::Typing,
             "pipe xf must be a list".to_string(),
         ));
     };
+    let ptr = expr.ptr().to_string();
     let Some(head) = items.first().and_then(Expr::as_ident) else {
         return Err(CompilerError::new(
             CompileErrorKind::Typing,
             "pipe xf must start with an identifier".to_string(),
         ));
     };
-    match head {
+    let (kind, in_item_brand, out_item_brand) = match head {
         "std.stream.xf.map_bytes_v1" => {
-            if items.len() != 2 {
+            if items.len() < 2 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 1 argument"),
+                    format!("{head} expects at least 1 argument"),
                 ));
             }
             let fn_id = parse_fn_v1(&items[1])?;
-            Ok(PipeXfV1::MapBytes { fn_id })
+            let fields = parse_kv_fields(head, &items[2..])?;
+            let (in_item_brand, out_item_brand) = parse_xf_item_brand_fields(head, &fields)?;
+            (PipeXfV1::MapBytes { fn_id }, in_item_brand, out_item_brand)
         }
         "std.stream.xf.filter_v1" => {
-            if items.len() != 2 {
+            if items.len() < 2 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 1 argument"),
+                    format!("{head} expects at least 1 argument"),
                 ));
             }
             let fn_id = parse_fn_v1(&items[1])?;
-            Ok(PipeXfV1::Filter { fn_id })
+            let fields = parse_kv_fields(head, &items[2..])?;
+            let (in_item_brand, out_item_brand) = parse_xf_item_brand_fields(head, &fields)?;
+            (PipeXfV1::Filter { fn_id }, in_item_brand, out_item_brand)
         }
-        "std.stream.xf.take_v1" => {
-            if items.len() != 2 {
+        "std.stream.xf.require_brand_v1" => {
+            let fields = parse_kv_fields(head, &items[1..])?;
+            for k in fields.keys() {
+                match k.as_str() {
+                    "brand" | "validator" | "max_item_bytes" => {}
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} unknown field: {k}"),
+                        ));
+                    }
+                }
+            }
+
+            let brand_id = fields
+                .get("brand")
+                .ok_or_else(|| {
+                    CompilerError::new(CompileErrorKind::Typing, format!("{head} missing brand"))
+                })
+                .and_then(|v| parse_brand_id(v, "brand"))?;
+
+            let validator_id = fields
+                .get("validator")
+                .map(|v| {
+                    v.as_ident().ok_or_else(|| {
+                        CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} validator must be an identifier"),
+                        )
+                    })
+                })
+                .transpose()?
+                .map(|validator_id| {
+                    validate::validate_symbol(validator_id)
+                        .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+                    Ok(validator_id.to_string())
+                })
+                .transpose()?;
+
+            let max_item_bytes = fields
+                .get("max_item_bytes")
+                .map(|v| expect_i32(v, "max_item_bytes must be an integer"))
+                .transpose()?
+                .unwrap_or(0);
+            if max_item_bytes < 0 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 1 argument"),
+                    format!("{head} max_item_bytes must be >= 0"),
+                ));
+            }
+
+            (
+                PipeXfV1::RequireBrandV1 {
+                    brand_id,
+                    validator_id,
+                    max_item_bytes,
+                },
+                None,
+                None,
+            )
+        }
+        "std.stream.xf.take_v1" => {
+            if items.len() < 2 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} expects at least 1 argument"),
                 ));
             }
             let n_param = parse_expr_v1(params, Ty::I32, &items[1])?;
-            Ok(PipeXfV1::Take { n_param })
+            let fields = parse_kv_fields(head, &items[2..])?;
+            let (in_item_brand, out_item_brand) = parse_xf_item_brand_fields(head, &fields)?;
+            (PipeXfV1::Take { n_param }, in_item_brand, out_item_brand)
         }
         "std.stream.xf.split_lines_v1" => {
-            if items.len() != 3 {
+            if items.len() < 3 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 2 arguments"),
+                    format!("{head} expects at least 2 arguments"),
                 ));
             }
             let delim_param = parse_expr_v1(params, Ty::I32, &items[1])?;
             let max_line_bytes_param = parse_expr_v1(params, Ty::I32, &items[2])?;
-            Ok(PipeXfV1::SplitLines {
-                delim_param,
-                max_line_bytes_param,
-            })
+            let fields = parse_kv_fields(head, &items[3..])?;
+            let (in_item_brand, out_item_brand) = parse_xf_item_brand_fields(head, &fields)?;
+            (
+                PipeXfV1::SplitLines {
+                    delim_param,
+                    max_line_bytes_param,
+                },
+                in_item_brand,
+                out_item_brand,
+            )
         }
         "std.stream.xf.frame_u32le_v1" => {
-            if items.len() != 1 {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!("{head} expects 0 arguments"),
-                ));
-            }
-            Ok(PipeXfV1::FrameU32Le)
+            let fields = parse_kv_fields(head, &items[1..])?;
+            let (in_item_brand, out_item_brand) = parse_xf_item_brand_fields(head, &fields)?;
+            (PipeXfV1::FrameU32Le, in_item_brand, out_item_brand)
         }
         "std.stream.xf.map_in_place_buf_v1" => {
             // v1.1; no expr_v1 params.
             let mut scratch_cap_bytes: Option<i32> = None;
             let mut clear_before_each: Option<i32> = None;
             let mut fn_id: Option<String> = None;
+            let mut in_item_brand: Option<PipeItemBrandInV1> = None;
+            let mut out_item_brand: Option<PipeItemBrandOutV1> = None;
 
             for item in items.iter().skip(1) {
                 let Expr::List { items: inner, .. } = item else {
@@ -943,6 +1750,24 @@ fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfV1, Com
                             ));
                         }
                     }
+                    "in_item_brand" => {
+                        if in_item_brand.is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} has duplicate in_item_brand"),
+                            ));
+                        }
+                        in_item_brand = Some(parse_item_brand_in(&inner[1], "in_item_brand")?);
+                    }
+                    "out_item_brand" => {
+                        if out_item_brand.is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} has duplicate out_item_brand"),
+                            ));
+                        }
+                        out_item_brand = Some(parse_item_brand_out(&inner[1], "out_item_brand")?);
+                    }
                     _ => {
                         return Err(CompilerError::new(
                             CompileErrorKind::Typing,
@@ -962,11 +1787,15 @@ fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfV1, Com
                 CompilerError::new(CompileErrorKind::Typing, format!("{head} missing fn"))
             })?;
 
-            Ok(PipeXfV1::MapInPlaceBufV1 {
-                scratch_cap_bytes,
-                clear_before_each: clear_before_each.unwrap_or(1),
-                fn_id,
-            })
+            (
+                PipeXfV1::MapInPlaceBufV1 {
+                    scratch_cap_bytes,
+                    clear_before_each: clear_before_each.unwrap_or(1),
+                    fn_id,
+                },
+                in_item_brand,
+                out_item_brand,
+            )
         }
         "std.stream.xf.json_canon_stream_v1" => {
             // v1.1; no expr_v1 params.
@@ -977,7 +1806,9 @@ fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfV1, Com
                     | "max_total_json_bytes"
                     | "max_object_members"
                     | "max_object_total_bytes"
-                    | "emit_chunk_max_bytes" => {}
+                    | "emit_chunk_max_bytes"
+                    | "in_item_brand"
+                    | "out_item_brand" => {}
                     _ => {
                         return Err(CompilerError::new(
                             CompileErrorKind::Typing,
@@ -1035,19 +1866,44 @@ fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfV1, Com
                 head,
             )?;
 
-            Ok(PipeXfV1::JsonCanonStreamV1 {
-                cfg: JsonCanonStreamCfgV1 {
-                    max_depth,
-                    max_total_json_bytes,
-                    max_object_members,
-                    max_object_total_bytes,
-                    emit_chunk_max_bytes,
+            let in_item_brand = fields
+                .get("in_item_brand")
+                .map(|v| parse_item_brand_in(v, "in_item_brand"))
+                .transpose()?;
+            let out_item_brand = fields
+                .get("out_item_brand")
+                .map(|v| parse_item_brand_out(v, "out_item_brand"))
+                .transpose()?;
+
+            (
+                PipeXfV1::JsonCanonStreamV1 {
+                    cfg: JsonCanonStreamCfgV1 {
+                        max_depth,
+                        max_total_json_bytes,
+                        max_object_members,
+                        max_object_total_bytes,
+                        emit_chunk_max_bytes,
+                    },
                 },
-            })
+                in_item_brand,
+                out_item_brand,
+            )
         }
         "std.stream.xf.deframe_u32le_v1" => {
             // v1.1 read-side; no expr_v1 params.
             let fields = parse_kv_fields(head, &items[1..])?;
+            for k in fields.keys() {
+                match k.as_str() {
+                    "max_frame_bytes" | "max_frames" | "allow_empty" | "on_truncated"
+                    | "in_item_brand" | "out_item_brand" => {}
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} unknown field: {k}"),
+                        ));
+                    }
+                }
+            }
 
             let max_frame_bytes = fields
                 .get("max_frame_bytes")
@@ -1085,14 +1941,27 @@ fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfV1, Com
                 },
             };
 
-            Ok(PipeXfV1::DeframeU32LeV1 {
-                cfg: DeframeU32LeCfgV1 {
-                    max_frame_bytes,
-                    max_frames,
-                    allow_empty,
-                    on_truncated,
+            let in_item_brand = fields
+                .get("in_item_brand")
+                .map(|v| parse_item_brand_in(v, "in_item_brand"))
+                .transpose()?;
+            let out_item_brand = fields
+                .get("out_item_brand")
+                .map(|v| parse_item_brand_out(v, "out_item_brand"))
+                .transpose()?;
+
+            (
+                PipeXfV1::DeframeU32LeV1 {
+                    cfg: DeframeU32LeCfgV1 {
+                        max_frame_bytes,
+                        max_frames,
+                        allow_empty,
+                        on_truncated,
+                    },
                 },
-            })
+                in_item_brand,
+                out_item_brand,
+            )
         }
         "std.stream.xf.par_map_stream_v1"
         | "std.stream.xf.par_map_stream_result_bytes_v1"
@@ -1107,7 +1976,9 @@ fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfV1, Com
                     | "max_out_item_bytes"
                     | "ctx"
                     | "mapper_defasync"
-                    | "scope_cfg" => {}
+                    | "scope_cfg"
+                    | "in_item_brand"
+                    | "out_item_brand" => {}
                     _ => {
                         return Err(CompilerError::new(
                             CompileErrorKind::Typing,
@@ -1217,34 +2088,59 @@ fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfV1, Com
                 }
             };
 
-            Ok(PipeXfV1::ParMapStreamV1 {
-                cfg: ParMapStreamCfgV1 {
-                    max_inflight,
-                    max_item_bytes,
-                    max_inflight_in_bytes,
-                    max_out_item_bytes,
-                    ctx_param,
-                    mapper_defasync,
-                    scope_cfg,
-                    unordered: head.contains("_unordered_"),
-                    result_bytes: head.contains("_result_bytes_"),
+            let in_item_brand = fields
+                .get("in_item_brand")
+                .map(|v| parse_item_brand_in(v, "in_item_brand"))
+                .transpose()?;
+            let out_item_brand = fields
+                .get("out_item_brand")
+                .map(|v| parse_item_brand_out(v, "out_item_brand"))
+                .transpose()?;
+
+            (
+                PipeXfV1::ParMapStreamV1 {
+                    cfg: ParMapStreamCfgV1 {
+                        max_inflight,
+                        max_item_bytes,
+                        max_inflight_in_bytes,
+                        max_out_item_bytes,
+                        ctx_param,
+                        mapper_defasync,
+                        scope_cfg,
+                        unordered: head.contains("_unordered_"),
+                        result_bytes: head.contains("_result_bytes_"),
+                    },
                 },
-            })
+                in_item_brand,
+                out_item_brand,
+            )
         }
-        _ => Err(CompilerError::new(
-            CompileErrorKind::Typing,
-            format!("unsupported pipe xf: {head}"),
-        )),
-    }
+        _ => {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("unsupported pipe xf: {head}"),
+            ))
+        }
+    };
+    Ok(PipeXfDescV1 {
+        kind,
+        in_item_brand,
+        out_item_brand,
+        ptr,
+    })
 }
 
-fn parse_sink_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSinkV1, CompilerError> {
+fn parse_sink_v1(
+    expr: &Expr,
+    params: &mut Vec<PipeParam>,
+) -> Result<PipeSinkDescV1, CompilerError> {
     let Expr::List { items, .. } = expr else {
         return Err(CompilerError::new(
             CompileErrorKind::Typing,
             "pipe sink must be a list".to_string(),
         ));
     };
+    let ptr = expr.ptr().to_string();
     let Some(head) = items.first().and_then(Expr::as_ident) else {
         return Err(CompilerError::new(
             CompileErrorKind::Typing,
@@ -1252,55 +2148,50 @@ fn parse_sink_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSinkV1,
         ));
     };
 
-    match head {
+    let (kind, in_item_brand) = match head {
         "std.stream.sink.collect_bytes_v1" => {
-            if items.len() != 1 {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!("{head} expects 0 arguments"),
-                ));
-            }
-            Ok(PipeSinkV1::CollectBytes)
+            let fields = parse_kv_fields(head, &items[1..])?;
+            let in_item_brand = parse_sink_item_brand_fields(head, &fields)?;
+            (PipeSinkV1::CollectBytes, in_item_brand)
         }
         "std.stream.sink.hash_fnv1a32_v1" => {
-            if items.len() != 1 {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!("{head} expects 0 arguments"),
-                ));
-            }
-            Ok(PipeSinkV1::HashFnv1a32)
+            let fields = parse_kv_fields(head, &items[1..])?;
+            let in_item_brand = parse_sink_item_brand_fields(head, &fields)?;
+            (PipeSinkV1::HashFnv1a32, in_item_brand)
         }
         "std.stream.sink.null_v1" => {
-            if items.len() != 1 {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!("{head} expects 0 arguments"),
-                ));
-            }
-            Ok(PipeSinkV1::Null)
+            let fields = parse_kv_fields(head, &items[1..])?;
+            let in_item_brand = parse_sink_item_brand_fields(head, &fields)?;
+            (PipeSinkV1::Null, in_item_brand)
         }
         "std.stream.sink.world_fs_write_file_v1" => {
-            if items.len() != 2 {
+            if items.len() < 2 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 1 argument"),
+                    format!("{head} expects at least 1 argument"),
                 ));
             }
             let path_param = parse_expr_v1(params, Ty::Bytes, &items[1])?;
-            Ok(PipeSinkV1::WorldFsWriteFile { path_param })
+            let fields = parse_kv_fields(head, &items[2..])?;
+            let in_item_brand = parse_sink_item_brand_fields(head, &fields)?;
+            (PipeSinkV1::WorldFsWriteFile { path_param }, in_item_brand)
         }
         "std.stream.sink.u32frames_v1" => {
-            if items.len() != 2 {
+            if items.len() < 2 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} expects 1 argument"),
+                    format!("{head} expects at least 1 argument"),
                 ));
             }
             let inner = parse_sink_v1(&items[1], params)?;
-            Ok(PipeSinkV1::U32Frames {
-                inner: Box::new(inner),
-            })
+            let fields = parse_kv_fields(head, &items[2..])?;
+            let in_item_brand = parse_sink_item_brand_fields(head, &fields)?;
+            (
+                PipeSinkV1::U32Frames {
+                    inner: Box::new(inner),
+                },
+                in_item_brand,
+            )
         }
         "std.stream.sink.world_fs_write_stream_v1"
         | "std.stream.sink.world_fs_write_stream_hash_fnv1a32_v1" => {
@@ -1315,7 +2206,7 @@ fn parse_sink_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSinkV1,
             let fields = parse_kv_fields(head, &items[3..])?;
             for k in fields.keys() {
                 match k.as_str() {
-                    "buf_cap_bytes" | "flush_min_bytes" | "max_flushes" => {}
+                    "buf_cap_bytes" | "flush_min_bytes" | "max_flushes" | "in_item_brand" => {}
                     _ => {
                         return Err(CompilerError::new(
                             CompileErrorKind::Typing,
@@ -1372,18 +2263,36 @@ fn parse_sink_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSinkV1,
                 flush_min_bytes,
                 max_flushes,
             };
+
+            let in_item_brand = fields
+                .get("in_item_brand")
+                .map(|v| parse_item_brand_in(v, "in_item_brand"))
+                .transpose()?;
+            if matches!(in_item_brand, Some(PipeItemBrandInV1::Same)) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} in_item_brand must be \"any\" or a brand id"),
+                ));
+            }
+
             if head == "std.stream.sink.world_fs_write_stream_v1" {
-                Ok(PipeSinkV1::WorldFsWriteStream {
-                    path_param,
-                    caps_param,
-                    cfg,
-                })
+                (
+                    PipeSinkV1::WorldFsWriteStream {
+                        path_param,
+                        caps_param,
+                        cfg,
+                    },
+                    in_item_brand,
+                )
             } else {
-                Ok(PipeSinkV1::WorldFsWriteStreamHashFnv1a32 {
-                    path_param,
-                    caps_param,
-                    cfg,
-                })
+                (
+                    PipeSinkV1::WorldFsWriteStreamHashFnv1a32 {
+                        path_param,
+                        caps_param,
+                        cfg,
+                    },
+                    in_item_brand,
+                )
             }
         }
         "std.stream.sink.net_tcp_write_stream_handle_v1" => {
@@ -1391,7 +2300,7 @@ fn parse_sink_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSinkV1,
             for k in fields.keys() {
                 match k.as_str() {
                     "stream_handle" | "caps" | "buf_cap_bytes" | "flush_min_bytes"
-                    | "on_finish" | "max_flushes" | "max_write_calls" => {}
+                    | "on_finish" | "max_flushes" | "max_write_calls" | "in_item_brand" => {}
                     _ => {
                         return Err(CompilerError::new(
                             CompileErrorKind::Typing,
@@ -1478,113 +2387,19 @@ fn parse_sink_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSinkV1,
                 ));
             }
 
-            Ok(PipeSinkV1::NetTcpWriteStreamHandle {
-                stream_handle_param,
-                caps_param,
-                cfg: NetTcpWriteStreamHandleCfgV1 {
-                    buf_cap_bytes,
-                    flush_min_bytes,
-                    max_flushes,
-                    max_write_calls,
-                    on_finish,
-                },
-            })
-        }
-        "std.stream.sink.net_tcp_write_u32frames_v1" => {
-            // Convenience wrapper: u32frames(net_tcp_write_stream_handle_v1(...)).
-            let fields = parse_kv_fields(head, &items[1..])?;
-            for k in fields.keys() {
-                match k.as_str() {
-                    "stream_handle" | "caps" | "buf_cap_bytes" | "flush_min_bytes"
-                    | "on_finish" | "max_flushes" | "max_write_calls" => {}
-                    _ => {
-                        return Err(CompilerError::new(
-                            CompileErrorKind::Typing,
-                            format!("{head} unknown field: {k}"),
-                        ));
-                    }
-                }
-            }
-
-            let stream_handle = fields.get("stream_handle").ok_or_else(|| {
-                CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!("{head} missing stream_handle"),
-                )
-            })?;
-            let caps = fields.get("caps").ok_or_else(|| {
-                CompilerError::new(CompileErrorKind::Typing, format!("{head} missing caps"))
-            })?;
-
-            // Canonical evaluation order (spec): stream_handle then caps.
-            let stream_handle_param = parse_expr_v1(params, Ty::I32, stream_handle)?;
-            let caps_param = parse_expr_v1(params, Ty::Bytes, caps)?;
-
-            let buf_cap_bytes = fields
-                .get("buf_cap_bytes")
-                .map(|v| expect_i32(v, "buf_cap_bytes must be an integer"))
-                .transpose()?
-                .unwrap_or(65536);
-            if buf_cap_bytes <= 0 {
+            let in_item_brand = fields
+                .get("in_item_brand")
+                .map(|v| parse_item_brand_in(v, "in_item_brand"))
+                .transpose()?;
+            if matches!(in_item_brand, Some(PipeItemBrandInV1::Same)) {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("{head} buf_cap_bytes must be >= 1"),
+                    format!("{head} in_item_brand must be \"any\" or a brand id"),
                 ));
             }
 
-            let flush_min_bytes = fields
-                .get("flush_min_bytes")
-                .map(|v| expect_i32(v, "flush_min_bytes must be an integer"))
-                .transpose()?
-                .unwrap_or(buf_cap_bytes);
-            if flush_min_bytes <= 0 || flush_min_bytes > buf_cap_bytes {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!("{head} flush_min_bytes must be in [1..buf_cap_bytes]"),
-                ));
-            }
-
-            let on_finish = match fields.get("on_finish") {
-                None => NetSinkOnFinishV1::LeaveOpen,
-                Some(v) => match v.as_ident() {
-                    Some("leave_open") => NetSinkOnFinishV1::LeaveOpen,
-                    Some("shutdown_write") => NetSinkOnFinishV1::ShutdownWrite,
-                    Some("close") => NetSinkOnFinishV1::Close,
-                    _ => {
-                        return Err(CompilerError::new(
-                            CompileErrorKind::Typing,
-                            format!("{head} on_finish must be \"leave_open\", \"shutdown_write\", or \"close\""),
-                        ));
-                    }
-                },
-            };
-
-            let max_flushes = fields
-                .get("max_flushes")
-                .map(|v| expect_i32(v, "max_flushes must be an integer"))
-                .transpose()?
-                .unwrap_or(0);
-            if max_flushes < 0 {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!("{head} max_flushes must be >= 0"),
-                ));
-            }
-
-            let max_write_calls = fields
-                .get("max_write_calls")
-                .map(|v| expect_i32(v, "max_write_calls must be an integer"))
-                .transpose()?
-                .unwrap_or(0);
-            if max_write_calls < 0 {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!("{head} max_write_calls must be >= 0"),
-                ));
-            }
-
-            Ok(PipeSinkV1::U32Frames {
-                inner: Box::new(PipeSinkV1::NetTcpWriteStreamHandle {
+            (
+                PipeSinkV1::NetTcpWriteStreamHandle {
                     stream_handle_param,
                     caps_param,
                     cfg: NetTcpWriteStreamHandleCfgV1 {
@@ -1594,15 +2409,143 @@ fn parse_sink_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSinkV1,
                         max_write_calls,
                         on_finish,
                     },
-                }),
-            })
+                },
+                in_item_brand,
+            )
+        }
+        "std.stream.sink.net_tcp_write_u32frames_v1" => {
+            // Convenience wrapper: u32frames(net_tcp_write_stream_handle_v1(...)).
+            let fields = parse_kv_fields(head, &items[1..])?;
+            for k in fields.keys() {
+                match k.as_str() {
+                    "stream_handle" | "caps" | "buf_cap_bytes" | "flush_min_bytes"
+                    | "on_finish" | "max_flushes" | "max_write_calls" | "in_item_brand" => {}
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} unknown field: {k}"),
+                        ));
+                    }
+                }
+            }
+
+            let stream_handle = fields.get("stream_handle").ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} missing stream_handle"),
+                )
+            })?;
+            let caps = fields.get("caps").ok_or_else(|| {
+                CompilerError::new(CompileErrorKind::Typing, format!("{head} missing caps"))
+            })?;
+
+            // Canonical evaluation order (spec): stream_handle then caps.
+            let stream_handle_param = parse_expr_v1(params, Ty::I32, stream_handle)?;
+            let caps_param = parse_expr_v1(params, Ty::Bytes, caps)?;
+
+            let buf_cap_bytes = fields
+                .get("buf_cap_bytes")
+                .map(|v| expect_i32(v, "buf_cap_bytes must be an integer"))
+                .transpose()?
+                .unwrap_or(65536);
+            if buf_cap_bytes <= 0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} buf_cap_bytes must be >= 1"),
+                ));
+            }
+
+            let flush_min_bytes = fields
+                .get("flush_min_bytes")
+                .map(|v| expect_i32(v, "flush_min_bytes must be an integer"))
+                .transpose()?
+                .unwrap_or(buf_cap_bytes);
+            if flush_min_bytes <= 0 || flush_min_bytes > buf_cap_bytes {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} flush_min_bytes must be in [1..buf_cap_bytes]"),
+                ));
+            }
+
+            let on_finish = match fields.get("on_finish") {
+                None => NetSinkOnFinishV1::LeaveOpen,
+                Some(v) => match v.as_ident() {
+                    Some("leave_open") => NetSinkOnFinishV1::LeaveOpen,
+                    Some("shutdown_write") => NetSinkOnFinishV1::ShutdownWrite,
+                    Some("close") => NetSinkOnFinishV1::Close,
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} on_finish must be \"leave_open\", \"shutdown_write\", or \"close\""),
+                        ));
+                    }
+                },
+            };
+
+            let max_flushes = fields
+                .get("max_flushes")
+                .map(|v| expect_i32(v, "max_flushes must be an integer"))
+                .transpose()?
+                .unwrap_or(0);
+            if max_flushes < 0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} max_flushes must be >= 0"),
+                ));
+            }
+
+            let max_write_calls = fields
+                .get("max_write_calls")
+                .map(|v| expect_i32(v, "max_write_calls must be an integer"))
+                .transpose()?
+                .unwrap_or(0);
+            if max_write_calls < 0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} max_write_calls must be >= 0"),
+                ));
+            }
+
+            let in_item_brand = fields
+                .get("in_item_brand")
+                .map(|v| parse_item_brand_in(v, "in_item_brand"))
+                .transpose()?;
+            if matches!(in_item_brand, Some(PipeItemBrandInV1::Same)) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} in_item_brand must be \"any\" or a brand id"),
+                ));
+            }
+
+            let inner = PipeSinkDescV1 {
+                kind: PipeSinkV1::NetTcpWriteStreamHandle {
+                    stream_handle_param,
+                    caps_param,
+                    cfg: NetTcpWriteStreamHandleCfgV1 {
+                        buf_cap_bytes,
+                        flush_min_bytes,
+                        max_flushes,
+                        max_write_calls,
+                        on_finish,
+                    },
+                },
+                in_item_brand: None,
+                ptr: ptr.clone(),
+            };
+
+            (
+                PipeSinkV1::U32Frames {
+                    inner: Box::new(inner),
+                },
+                in_item_brand,
+            )
         }
         "std.stream.sink.net_tcp_connect_write_v1" => {
             let fields = parse_kv_fields(head, &items[1..])?;
             for k in fields.keys() {
                 match k.as_str() {
                     "addr" | "caps" | "buf_cap_bytes" | "flush_min_bytes" | "on_finish"
-                    | "max_flushes" | "max_write_calls" => {}
+                    | "max_flushes" | "max_write_calls" | "in_item_brand" => {}
                     _ => {
                         return Err(CompilerError::new(
                             CompileErrorKind::Typing,
@@ -1685,23 +2628,45 @@ fn parse_sink_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeSinkV1,
                 ));
             }
 
-            Ok(PipeSinkV1::NetTcpConnectWrite {
-                addr_param,
-                caps_param,
-                cfg: NetTcpWriteStreamHandleCfgV1 {
-                    buf_cap_bytes,
-                    flush_min_bytes,
-                    max_flushes,
-                    max_write_calls,
-                    on_finish,
+            let in_item_brand = fields
+                .get("in_item_brand")
+                .map(|v| parse_item_brand_in(v, "in_item_brand"))
+                .transpose()?;
+            if matches!(in_item_brand, Some(PipeItemBrandInV1::Same)) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} in_item_brand must be \"any\" or a brand id"),
+                ));
+            }
+
+            (
+                PipeSinkV1::NetTcpConnectWrite {
+                    addr_param,
+                    caps_param,
+                    cfg: NetTcpWriteStreamHandleCfgV1 {
+                        buf_cap_bytes,
+                        flush_min_bytes,
+                        max_flushes,
+                        max_write_calls,
+                        on_finish,
+                    },
                 },
-            })
+                in_item_brand,
+            )
         }
-        _ => Err(CompilerError::new(
-            CompileErrorKind::Typing,
-            format!("unsupported pipe sink: {head}"),
-        )),
-    }
+        _ => {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("unsupported pipe sink: {head}"),
+            ));
+        }
+    };
+
+    Ok(PipeSinkDescV1 {
+        kind,
+        in_item_brand,
+        ptr,
+    })
 }
 
 fn validate_pipe_world_caps(
@@ -1716,16 +2681,16 @@ fn validate_pipe_world_caps(
             | PipeSinkV1::WorldFsWriteStreamHashFnv1a32 { .. }
             | PipeSinkV1::NetTcpWriteStreamHandle { .. }
             | PipeSinkV1::NetTcpConnectWrite { .. } => true,
-            PipeSinkV1::U32Frames { inner } => sink_needs_os(inner),
+            PipeSinkV1::U32Frames { inner } => sink_needs_os(&inner.kind),
         }
     }
 
     let src_needs_os = matches!(
-        pipe.src,
+        pipe.src.kind,
         PipeSrcV1::DbRowsDoc { .. } | PipeSrcV1::NetTcpReadStreamHandle { .. }
     );
 
-    let needs_os = src_needs_os || sink_needs_os(&pipe.sink);
+    let needs_os = src_needs_os || sink_needs_os(&pipe.sink.kind);
     if needs_os && !options.world.is_standalone_only() {
         return Err(CompilerError::new(
             CompileErrorKind::Unsupported,
@@ -1762,7 +2727,7 @@ fn gen_pipe_helper_body(
         let mut json_stage_count = 0;
         let mut max_total_json_bytes = 0;
         for xf in &pipe.chain {
-            if let PipeXfV1::JsonCanonStreamV1 { cfg: jcfg } = xf {
+            if let PipeXfV1::JsonCanonStreamV1 { cfg: jcfg } = &xf.kind {
                 json_stage_count += 1;
                 if json_stage_count > 1 {
                     return Err(CompilerError::new(
@@ -1788,7 +2753,7 @@ fn gen_pipe_helper_body(
         i32::try_from(steps.min(i32::MAX as i64)).unwrap_or(i32::MAX)
     };
 
-    let mut sink_shape = sink_shape_v1(&pipe.sink)?;
+    let mut sink_shape = sink_shape_v1(&pipe.sink.kind)?;
     match &mut sink_shape.base {
         SinkBaseV1::WorldFsWriteStream { cfg: fs_cfg, .. }
         | SinkBaseV1::WorldFsWriteStreamHashFnv1a32 { cfg: fs_cfg, .. } => {
@@ -1819,13 +2784,20 @@ fn gen_pipe_helper_body(
         _ => {}
     }
     let mut take_states: Vec<TakeState> = Vec::new();
+    let mut require_brand_states: Vec<RequireBrandState> = Vec::new();
     let mut map_in_place_states: Vec<MapInPlaceState> = Vec::new();
     let mut split_states: Vec<SplitLinesState> = Vec::new();
     let mut deframe_states: Vec<DeframeState> = Vec::new();
     let mut json_canon_states: Vec<JsonCanonState> = Vec::new();
     let mut par_map_states: Vec<ParMapState> = Vec::new();
     for (idx, xf) in pipe.chain.iter().enumerate() {
-        match xf {
+        match &xf.kind {
+            PipeXfV1::RequireBrandV1 { .. } => {
+                require_brand_states.push(RequireBrandState {
+                    stage_idx: idx,
+                    item_idx_var: format!("req_brand_item_idx_{idx}"),
+                });
+            }
             PipeXfV1::Take { n_param } => {
                 take_states.push(TakeState {
                     stage_idx: idx,
@@ -1980,6 +2952,7 @@ fn gen_pipe_helper_body(
 
     let cg = PipeCodegen {
         cfg: &cfg,
+        src_out_item_brand: pipe.src.out_item_brand.clone(),
         chain: pipe.chain.as_slice(),
         emit_payload,
         emit_stats,
@@ -1994,6 +2967,7 @@ fn gen_pipe_helper_body(
         } else {
             None
         },
+        require_brand_states,
         take_states,
         map_in_place_states,
         split_states,
@@ -2012,6 +2986,9 @@ fn gen_pipe_helper_body(
     items.push(let_i32(&cg.items_out_var, 0));
     if let Some(stop) = &cg.stop_var {
         items.push(let_i32(stop, 0));
+    }
+    for s in &cg.require_brand_states {
+        items.push(let_i32(&s.item_idx_var, 0));
     }
 
     // Init map_in_place_buf scratch handles.
@@ -2472,7 +3449,7 @@ fn gen_pipe_helper_body(
         ]));
     }
 
-    let main = match &pipe.src {
+    let main = match &pipe.src.kind {
         PipeSrcV1::Bytes { bytes_param } => cg.gen_run_bytes_source(*bytes_param)?,
         PipeSrcV1::FsOpenRead { path_param } => cg.gen_run_reader_source(
             "fs.open_read",
@@ -2555,6 +3532,9 @@ const E_NET_WRITE_FAILED: i32 = 64;
 const E_NET_SINK_MAX_FLUSHES: i32 = 65;
 const E_NET_SINK_MAX_WRITES: i32 = 66;
 
+const E_BRAND_ITEM_TOO_LARGE: i32 = 70;
+const E_BRAND_VALIDATE_FAILED: i32 = 71;
+
 const E_DEFRAME_FRAME_TOO_LARGE: i32 = 80;
 const E_DEFRAME_TRUNCATED: i32 = 81;
 const E_DEFRAME_EMPTY_FORBIDDEN: i32 = 82;
@@ -2569,6 +3549,12 @@ struct TakeState {
     stage_idx: usize,
     n_param: usize,
     rem_var: String,
+}
+
+#[derive(Clone)]
+struct RequireBrandState {
+    stage_idx: usize,
+    item_idx_var: String,
 }
 
 #[derive(Clone)]
@@ -2727,7 +3713,7 @@ fn sink_shape_v1(sink: &PipeSinkV1) -> Result<SinkShapeV1, CompilerError> {
             },
         }),
         PipeSinkV1::U32Frames { inner } => {
-            let inner = sink_shape_v1(inner)?;
+            let inner = sink_shape_v1(&inner.kind)?;
             if inner.framing_u32frames {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
@@ -2744,7 +3730,8 @@ fn sink_shape_v1(sink: &PipeSinkV1) -> Result<SinkShapeV1, CompilerError> {
 
 struct PipeCodegen<'a> {
     cfg: &'a PipeCfgV1,
-    chain: &'a [PipeXfV1],
+    src_out_item_brand: Option<String>,
+    chain: &'a [PipeXfDescV1],
     emit_payload: bool,
     emit_stats: bool,
     max_steps: i32,
@@ -2756,6 +3743,7 @@ struct PipeCodegen<'a> {
     items_out_var: String,
 
     stop_var: Option<String>,
+    require_brand_states: Vec<RequireBrandState>,
     take_states: Vec<TakeState>,
     map_in_place_states: Vec<MapInPlaceState>,
     split_states: Vec<SplitLinesState>,
@@ -2773,6 +3761,43 @@ impl PipeCodegen<'_> {
             || !self.deframe_states.is_empty()
             || !self.json_canon_states.is_empty()
             || !self.par_map_states.is_empty()
+    }
+
+    fn apply_src_out_item_brand(&self, item: Expr) -> Expr {
+        match &self.src_out_item_brand {
+            None => item,
+            Some(brand_id) => expr_list(vec![
+                expr_ident("__internal.brand.assume_view_v1"),
+                expr_ident(brand_id.clone()),
+                item,
+            ]),
+        }
+    }
+
+    fn apply_out_item_brand(&self, stage_idx: usize, item: Expr) -> Expr {
+        match self.chain[stage_idx].out_item_brand.as_ref() {
+            None | Some(PipeItemBrandOutV1::Same) => item,
+            Some(PipeItemBrandOutV1::None) => {
+                expr_list(vec![expr_ident("std.brand.erase_view_v1"), item])
+            }
+            Some(PipeItemBrandOutV1::Brand(brand_id)) => expr_list(vec![
+                expr_ident("__internal.brand.assume_view_v1"),
+                expr_ident(brand_id.clone()),
+                item,
+            ]),
+        }
+    }
+
+    fn require_brand_state(&self, stage_idx: usize) -> Result<&RequireBrandState, CompilerError> {
+        self.require_brand_states
+            .iter()
+            .find(|s| s.stage_idx == stage_idx)
+            .ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Internal,
+                    "internal error: missing require_brand state".to_string(),
+                )
+            })
     }
 
     fn gen_run_bytes_source(&self, bytes_param: usize) -> Result<Expr, CompilerError> {
@@ -2799,7 +3824,10 @@ impl PipeCodegen<'_> {
         ));
         stmts.push(set_add_i32(&self.items_in_var, expr_int(1)));
         stmts.push(self.budget_check_in()?);
-        stmts.push(self.gen_process_from(0, expr_ident("item_v".to_string()))?);
+        stmts.push(self.gen_process_from(
+            0,
+            self.apply_src_out_item_brand(expr_ident("item_v".to_string())),
+        )?);
 
         if let Some(stop) = &self.stop_var {
             stmts.push(expr_list(vec![
@@ -3064,7 +4092,10 @@ impl PipeCodegen<'_> {
         ));
         loop_body.push(set_add_i32(&self.items_in_var, expr_int(1)));
         loop_body.push(self.budget_check_in()?);
-        loop_body.push(self.gen_process_from(0, expr_ident("row".to_string()))?);
+        loop_body.push(self.gen_process_from(
+            0,
+            self.apply_src_out_item_brand(expr_ident("row".to_string())),
+        )?);
 
         loop_body.push(expr_list(vec![
             expr_ident("set"),
@@ -3533,7 +4564,10 @@ impl PipeCodegen<'_> {
                 set_add_i32(&self.bytes_in_var, expr_ident("pl_len".to_string())),
                 set_add_i32(&self.items_in_var, expr_int(1)),
                 self.budget_check_in()?,
-                self.gen_process_from(0, expr_ident("chunk".to_string()))?,
+                self.gen_process_from(
+                    0,
+                    self.apply_src_out_item_brand(expr_ident("chunk".to_string())),
+                )?,
             ]),
         ]));
         if let Some(stop) = &self.stop_var {
@@ -3639,7 +4673,10 @@ impl PipeCodegen<'_> {
         body.push(set_add_i32(&self.items_in_var, expr_int(1)));
         body.push(self.budget_check_in()?);
 
-        body.push(self.gen_process_from(0, expr_ident("chunk".to_string()))?);
+        body.push(self.gen_process_from(
+            0,
+            self.apply_src_out_item_brand(expr_ident("chunk".to_string())),
+        )?);
 
         body.push(expr_list(vec![
             expr_ident("bufread.consume"),
@@ -3681,7 +4718,7 @@ impl PipeCodegen<'_> {
         if stage_idx >= self.chain.len() {
             return self.emit_item(item);
         }
-        match &self.chain[stage_idx] {
+        match &self.chain[stage_idx].kind {
             PipeXfV1::MapBytes { fn_id } => {
                 let mapped_b = format!("mapped_{stage_idx}");
                 let mapped_v = format!("mappedv_{stage_idx}");
@@ -3697,7 +4734,10 @@ impl PipeCodegen<'_> {
                         expr_ident(mapped_v.clone()),
                         expr_list(vec![expr_ident("bytes.view"), expr_ident(mapped_b)]),
                     ]),
-                    self.gen_process_from(stage_idx + 1, expr_ident(mapped_v))?,
+                    self.gen_process_from(
+                        stage_idx + 1,
+                        self.apply_out_item_brand(stage_idx, expr_ident(mapped_v)),
+                    )?,
                 ]))
             }
             PipeXfV1::Filter { fn_id } => {
@@ -3713,10 +4753,24 @@ impl PipeCodegen<'_> {
                         expr_ident("if"),
                         expr_list(vec![expr_ident("="), expr_ident(keep), expr_int(0)]),
                         expr_int(0),
-                        self.gen_process_from(stage_idx + 1, item)?,
+                        self.gen_process_from(
+                            stage_idx + 1,
+                            self.apply_out_item_brand(stage_idx, item),
+                        )?,
                     ]),
                 ]))
             }
+            PipeXfV1::RequireBrandV1 {
+                brand_id,
+                validator_id,
+                max_item_bytes,
+            } => self.gen_require_brand_v1(
+                stage_idx,
+                item,
+                brand_id,
+                validator_id.as_deref(),
+                *max_item_bytes,
+            ),
             PipeXfV1::Take { .. } => {
                 let t = self
                     .take_states
@@ -3761,7 +4815,10 @@ impl PipeCodegen<'_> {
                                 expr_int(1),
                             ]),
                         ]),
-                        self.gen_process_from(stage_idx + 1, item)?,
+                        self.gen_process_from(
+                            stage_idx + 1,
+                            self.apply_out_item_brand(stage_idx, item),
+                        )?,
                     ]),
                 ]))
             }
@@ -3841,7 +4898,10 @@ impl PipeCodegen<'_> {
                         expr_ident(view_var.clone()),
                         expr_list(vec![expr_ident("bytes.view"), expr_ident(bytes_var)]),
                     ]),
-                    self.gen_process_from(stage_idx + 1, expr_ident(view_var))?,
+                    self.gen_process_from(
+                        stage_idx + 1,
+                        self.apply_out_item_brand(stage_idx, expr_ident(view_var)),
+                    )?,
                 ]))
             }
             PipeXfV1::MapInPlaceBufV1 { .. } => self.gen_map_in_place_buf(stage_idx, item),
@@ -3852,6 +4912,224 @@ impl PipeCodegen<'_> {
             }
             PipeXfV1::ParMapStreamV1 { .. } => self.gen_par_map_stream_process(stage_idx, item),
         }
+    }
+
+    fn gen_require_brand_v1(
+        &self,
+        stage_idx: usize,
+        item: Expr,
+        brand_id: &str,
+        validator_id: Option<&str>,
+        max_item_bytes: i32,
+    ) -> Result<Expr, CompilerError> {
+        let Some(validator_id) = validator_id else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Internal,
+                "internal error: require_brand stage missing validator_id".to_string(),
+            ));
+        };
+
+        let s = self.require_brand_state(stage_idx)?;
+        let item_idx_var = format!("req_brand_item_idx_{stage_idx}");
+
+        let mut stmts = Vec::new();
+
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(item_idx_var.clone()),
+            expr_ident(s.item_idx_var.clone()),
+        ]));
+        stmts.push(expr_list(vec![
+            expr_ident("set"),
+            expr_ident(s.item_idx_var.clone()),
+            expr_list(vec![
+                expr_ident("+"),
+                expr_ident(s.item_idx_var.clone()),
+                expr_int(1),
+            ]),
+        ]));
+
+        let item_n_var = format!("req_brand_item_n_{stage_idx}");
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(item_n_var.clone()),
+            expr_list(vec![expr_ident("view.len"), item.clone()]),
+        ]));
+        stmts.push(expr_list(vec![
+            expr_ident("if"),
+            expr_list(vec![
+                expr_ident("<"),
+                expr_ident(item_n_var.clone()),
+                expr_int(0),
+            ]),
+            expr_list(vec![
+                expr_ident("return"),
+                err_doc_const(E_BRAND_ITEM_TOO_LARGE, "stream:brand_item_too_large"),
+            ]),
+            expr_int(0),
+        ]));
+        if max_item_bytes > 0 {
+            stmts.push(expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident(">u"),
+                    expr_ident(item_n_var.clone()),
+                    expr_int(max_item_bytes),
+                ]),
+                expr_list(vec![
+                    expr_ident("return"),
+                    err_doc_const(E_BRAND_ITEM_TOO_LARGE, "stream:brand_item_too_large"),
+                ]),
+                expr_int(0),
+            ]));
+        }
+
+        let r_var = format!("req_brand_r_{stage_idx}");
+        stmts.push(expr_list(vec![
+            expr_ident("let"),
+            expr_ident(r_var.clone()),
+            expr_list(vec![expr_ident(validator_id.to_string()), item.clone()]),
+        ]));
+
+        let ok_branch = {
+            let branded_item = expr_list(vec![
+                expr_ident("__internal.brand.assume_view_v1"),
+                expr_ident(brand_id.to_string()),
+                item,
+            ]);
+            self.gen_process_from(
+                stage_idx + 1,
+                self.apply_out_item_brand(stage_idx, branded_item),
+            )?
+        };
+
+        let err_branch = {
+            let ec_var = format!("req_brand_ec_{stage_idx}");
+            let pl_var = format!("req_brand_pl_{stage_idx}");
+            let brand_b_var = format!("req_brand_brandb_{stage_idx}");
+            let brand_v_var = format!("req_brand_brandv_{stage_idx}");
+            let brand_len_var = format!("req_brand_brandlen_{stage_idx}");
+            let validator_b_var = format!("req_brand_vb_{stage_idx}");
+            let validator_v_var = format!("req_brand_vv_{stage_idx}");
+            let validator_len_var = format!("req_brand_vlen_{stage_idx}");
+
+            expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(ec_var.clone()),
+                    expr_list(vec![
+                        expr_ident("result_i32.err_code"),
+                        expr_ident(r_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(brand_b_var.clone()),
+                    expr_list(vec![
+                        expr_ident("bytes.lit"),
+                        expr_ident(brand_id.to_string()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(brand_v_var.clone()),
+                    expr_list(vec![
+                        expr_ident("bytes.view"),
+                        expr_ident(brand_b_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(brand_len_var.clone()),
+                    expr_list(vec![
+                        expr_ident("view.len"),
+                        expr_ident(brand_v_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(validator_b_var.clone()),
+                    expr_list(vec![
+                        expr_ident("bytes.lit"),
+                        expr_ident(validator_id.to_string()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(validator_v_var.clone()),
+                    expr_list(vec![
+                        expr_ident("bytes.view"),
+                        expr_ident(validator_b_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(validator_len_var.clone()),
+                    expr_list(vec![
+                        expr_ident("view.len"),
+                        expr_ident(validator_v_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(pl_var.clone()),
+                    expr_list(vec![
+                        expr_ident("vec_u8.with_capacity"),
+                        expr_list(vec![
+                            expr_ident("+"),
+                            expr_int(16),
+                            expr_list(vec![
+                                expr_ident("+"),
+                                expr_ident(brand_len_var.clone()),
+                                expr_ident(validator_len_var.clone()),
+                            ]),
+                        ]),
+                    ]),
+                ]),
+                extend_u32(&pl_var, expr_ident(brand_len_var.clone())),
+                expr_list(vec![
+                    expr_ident("set"),
+                    expr_ident(pl_var.clone()),
+                    expr_list(vec![
+                        expr_ident("vec_u8.extend_bytes"),
+                        expr_ident(pl_var.clone()),
+                        expr_ident(brand_v_var.clone()),
+                    ]),
+                ]),
+                extend_u32(&pl_var, expr_ident(validator_len_var.clone())),
+                expr_list(vec![
+                    expr_ident("set"),
+                    expr_ident(pl_var.clone()),
+                    expr_list(vec![
+                        expr_ident("vec_u8.extend_bytes"),
+                        expr_ident(pl_var.clone()),
+                        expr_ident(validator_v_var.clone()),
+                    ]),
+                ]),
+                extend_u32(&pl_var, expr_ident(ec_var.clone())),
+                extend_u32(&pl_var, expr_ident(item_idx_var)),
+                expr_list(vec![
+                    expr_ident("return"),
+                    err_doc_with_payload(
+                        expr_int(E_BRAND_VALIDATE_FAILED),
+                        "stream:brand_validate_failed",
+                        expr_list(vec![expr_ident("vec_u8.into_bytes"), expr_ident(pl_var)]),
+                    ),
+                ]),
+            ])
+        };
+
+        stmts.push(expr_list(vec![
+            expr_ident("if"),
+            expr_list(vec![expr_ident("result_i32.is_ok"), expr_ident(r_var)]),
+            ok_branch,
+            err_branch,
+        ]));
+
+        Ok(expr_list(
+            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
+        ))
     }
 
     fn gen_map_in_place_buf(&self, stage_idx: usize, item: Expr) -> Result<Expr, CompilerError> {
@@ -3902,7 +5180,10 @@ impl PipeCodegen<'_> {
                         scratch.clone(),
                     ]),
                 ]),
-                self.gen_process_from(stage_idx + 1, expr_ident("out".to_string()))?,
+                self.gen_process_from(
+                    stage_idx + 1,
+                    self.apply_out_item_brand(stage_idx, expr_ident("out".to_string())),
+                )?,
             ]),
             expr_list(vec![
                 expr_ident("begin"),
@@ -4036,12 +5317,15 @@ impl PipeCodegen<'_> {
                             ]),
                             self.gen_process_from(
                                 stage_idx + 1,
-                                expr_list(vec![
-                                    expr_ident("view.slice"),
-                                    chunk.clone(),
-                                    expr_ident("start".to_string()),
-                                    expr_ident("seg_len".to_string()),
-                                ]),
+                                self.apply_out_item_brand(
+                                    stage_idx,
+                                    expr_list(vec![
+                                        expr_ident("view.slice"),
+                                        chunk.clone(),
+                                        expr_ident("start".to_string()),
+                                        expr_ident("seg_len".to_string()),
+                                    ]),
+                                ),
                             )?,
                             expr_list(vec![
                                 expr_ident("begin"),
@@ -4071,7 +5355,10 @@ impl PipeCodegen<'_> {
                                 ]),
                                 self.gen_process_from(
                                     stage_idx + 1,
-                                    expr_ident("line_v".to_string()),
+                                    self.apply_out_item_brand(
+                                        stage_idx,
+                                        expr_ident("line_v".to_string()),
+                                    ),
                                 )?,
                                 expr_list(vec![
                                     expr_ident("set"),
@@ -4780,12 +6067,15 @@ impl PipeCodegen<'_> {
                 ]),
                 self.gen_process_from(
                     stage_idx + 1,
-                    expr_list(vec![
-                        expr_ident("view.slice"),
-                        expr_ident("canon".to_string()),
-                        expr_ident("pos".to_string()),
-                        expr_ident("take".to_string()),
-                    ]),
+                    self.apply_out_item_brand(
+                        stage_idx,
+                        expr_list(vec![
+                            expr_ident("view.slice"),
+                            expr_ident("canon".to_string()),
+                            expr_ident("pos".to_string()),
+                            expr_ident("take".to_string()),
+                        ]),
+                    ),
                 )?,
                 expr_int(0),
             ]),
@@ -4905,9 +6195,8 @@ impl PipeCodegen<'_> {
                         expr_ident("let"),
                         expr_ident(out_b_var.clone()),
                         expr_list(vec![
-                            expr_ident("result_bytes.unwrap_or"),
+                            expr_ident("__internal.result_bytes.unwrap_ok_v1"),
                             expr_ident(rb_var.clone()),
-                            expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
                         ]),
                     ]),
                     self.par_map_emit_one_downstream(stage_idx, p, &out_b_var, &out_v_var)?,
@@ -5262,9 +6551,8 @@ impl PipeCodegen<'_> {
                                     expr_ident("let"),
                                     expr_ident(out_b_var.clone()),
                                     expr_list(vec![
-                                        expr_ident("result_bytes.unwrap_or"),
+                                        expr_ident("__internal.result_bytes.unwrap_ok_v1"),
                                         expr_ident(inner_var.clone()),
-                                        expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
                                     ]),
                                 ]),
                                 remove_slot,
@@ -5421,9 +6709,8 @@ impl PipeCodegen<'_> {
                             expr_ident("let"),
                             expr_ident(out_b_var.clone()),
                             expr_list(vec![
-                                expr_ident("result_bytes.unwrap_or"),
+                                expr_ident("__internal.result_bytes.unwrap_ok_v1"),
                                 expr_ident(r_var.clone()),
-                                expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
                             ]),
                         ]),
                         remove_slot,
@@ -5608,7 +6895,10 @@ impl PipeCodegen<'_> {
                 expr_ident(out_b_var.to_string()),
             ]),
         ]));
-        stmts.push(self.gen_process_from(stage_idx + 1, expr_ident(out_v_var.to_string()))?);
+        stmts.push(self.gen_process_from(
+            stage_idx + 1,
+            self.apply_out_item_brand(stage_idx, expr_ident(out_v_var.to_string())),
+        )?);
         stmts.push(expr_int(0));
 
         Ok(expr_list(
@@ -5751,7 +7041,10 @@ impl PipeCodegen<'_> {
         stmts.push(expr_list(vec![
             expr_ident("let"),
             expr_ident(item_b_var.clone()),
-            expr_list(vec![expr_ident("view.to_bytes"), item]),
+            expr_list(vec![
+                expr_ident("__internal.brand.view_to_bytes_preserve_brand_v1"),
+                item,
+            ]),
         ]));
 
         let slot_var = format!("pm_slot_{stage_idx}");
@@ -5905,7 +7198,7 @@ impl PipeCodegen<'_> {
         if stage_idx >= self.chain.len() {
             return Ok(expr_int(0));
         }
-        match &self.chain[stage_idx] {
+        match &self.chain[stage_idx].kind {
             PipeXfV1::JsonCanonStreamV1 { .. } => self.gen_json_canon_stream_flush(stage_idx),
             PipeXfV1::ParMapStreamV1 { .. } => self.gen_par_map_stream_flush(stage_idx),
             PipeXfV1::SplitLines { .. } => {
@@ -5942,7 +7235,10 @@ impl PipeCodegen<'_> {
                                 expr_ident("line_b".to_string()),
                             ]),
                         ]),
-                        self.gen_process_from(stage_idx + 1, expr_ident("line_v".to_string()))?,
+                        self.gen_process_from(
+                            stage_idx + 1,
+                            self.apply_out_item_brand(stage_idx, expr_ident("line_v".to_string())),
+                        )?,
                         expr_int(0),
                     ]),
                     expr_int(0),
@@ -6035,7 +7331,9 @@ impl PipeCodegen<'_> {
             frames_var.clone(),
             expr_ident(new_frames_var.to_string()),
         ]));
-        stmts.push(self.gen_process_from(stage_idx + 1, payload)?);
+        stmts.push(
+            self.gen_process_from(stage_idx + 1, self.apply_out_item_brand(stage_idx, payload))?,
+        );
         stmts.push(expr_int(0));
         Ok(expr_list(
             vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
@@ -7861,6 +9159,7 @@ fn canon_stream_descriptor_pairs(v: &mut Value) {
                     | "std.stream.src.net_tcp_read_stream_handle_v1"
                     | "std.stream.xf.deframe_u32le_v1"
                     | "std.stream.xf.json_canon_stream_v1"
+                    | "std.stream.xf.require_brand_v1"
                     | "std.stream.xf.par_map_stream_v1"
                     | "std.stream.xf.par_map_stream_result_bytes_v1"
                     | "std.stream.xf.par_map_stream_unordered_v1"
@@ -7995,6 +9294,127 @@ fn expect_i32(expr: &Expr, message: &str) -> Result<i32, CompilerError> {
             message.to_string(),
         )),
     }
+}
+
+fn expect_bytes_lit_text(expr: &Expr, message: &str) -> Result<String, CompilerError> {
+    let Expr::List { items, .. } = expr else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            message.to_string(),
+        ));
+    };
+    if items.first().and_then(Expr::as_ident) != Some("bytes.lit") || items.len() != 2 {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            message.to_string(),
+        ));
+    }
+    let Some(text) = items[1].as_ident() else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            message.to_string(),
+        ));
+    };
+    Ok(text.to_string())
+}
+
+fn parse_brand_id(expr: &Expr, label: &str) -> Result<String, CompilerError> {
+    let Some(brand) = expr.as_ident() else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{label} must be an identifier"),
+        ));
+    };
+    validate::validate_symbol(brand)
+        .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+    Ok(brand.to_string())
+}
+
+fn parse_item_brand_in(expr: &Expr, label: &str) -> Result<PipeItemBrandInV1, CompilerError> {
+    let Some(v) = expr.as_ident() else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{label} must be an identifier"),
+        ));
+    };
+    match v {
+        "any" => Ok(PipeItemBrandInV1::Any),
+        "same" => Ok(PipeItemBrandInV1::Same),
+        other => {
+            validate::validate_symbol(other)
+                .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+            Ok(PipeItemBrandInV1::Brand(other.to_string()))
+        }
+    }
+}
+
+fn parse_item_brand_out(expr: &Expr, label: &str) -> Result<PipeItemBrandOutV1, CompilerError> {
+    let Some(v) = expr.as_ident() else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{label} must be an identifier"),
+        ));
+    };
+    match v {
+        "same" => Ok(PipeItemBrandOutV1::Same),
+        "none" => Ok(PipeItemBrandOutV1::None),
+        other => {
+            validate::validate_symbol(other)
+                .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+            Ok(PipeItemBrandOutV1::Brand(other.to_string()))
+        }
+    }
+}
+
+fn parse_xf_item_brand_fields(
+    head: &str,
+    fields: &BTreeMap<String, Expr>,
+) -> Result<(Option<PipeItemBrandInV1>, Option<PipeItemBrandOutV1>), CompilerError> {
+    for k in fields.keys() {
+        match k.as_str() {
+            "in_item_brand" | "out_item_brand" => {}
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} unknown field: {k}"),
+                ));
+            }
+        }
+    }
+    let in_item_brand = fields
+        .get("in_item_brand")
+        .map(|v| parse_item_brand_in(v, "in_item_brand"))
+        .transpose()?;
+    let out_item_brand = fields
+        .get("out_item_brand")
+        .map(|v| parse_item_brand_out(v, "out_item_brand"))
+        .transpose()?;
+    Ok((in_item_brand, out_item_brand))
+}
+
+fn parse_sink_item_brand_fields(
+    head: &str,
+    fields: &BTreeMap<String, Expr>,
+) -> Result<Option<PipeItemBrandInV1>, CompilerError> {
+    for k in fields.keys() {
+        if k != "in_item_brand" {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} unknown field: {k}"),
+            ));
+        }
+    }
+    let in_item_brand = fields
+        .get("in_item_brand")
+        .map(|v| parse_item_brand_in(v, "in_item_brand"))
+        .transpose()?;
+    if matches!(in_item_brand, Some(PipeItemBrandInV1::Same)) {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{head} in_item_brand must be \"any\" or a brand id"),
+        ));
+    }
+    Ok(in_item_brand)
 }
 
 fn expr_ident(name: impl Into<String>) -> Expr {

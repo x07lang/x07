@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-math",
+  "description": "Math utilities (integers and f64).",
+  "docs": "Math utilities (integers and f64).\n\nModules:\n- std.math\n- std.math.f64\n- std.math.f64.spec\n- std.math.i32\n\nUsage:\n- Add dependency: x07 pkg add ext-math@0.1.4\n- Import the modules listed above.\n",
+  "version": "0.1.4",
+  "module_root": "modules",
+  "modules": [
+    "std.math",
+    "std.math.f64",
+    "std.math.f64.spec",
+    "std.math.i32"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

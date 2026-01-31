@@ -29,6 +29,6 @@
 
 ## Related
 
-- ABI and execution model: `docs/spec/x07-c-backend.md`
-- Allocator interface: `docs/spec/abi/allocator-v1.md`
+- ABI and execution model: `labs/internal-docs/spec/x07-c-backend.md`
+- Allocator interface: `labs/internal-docs/spec/abi/allocator-v1.md`
 - Sanitizer gate: `./scripts/ci/check_asan_c_backend.sh`

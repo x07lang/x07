@@ -161,6 +161,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                     name: f.name,
                     params: f.params,
                     ret_ty: f.ret_ty,
+                    ret_brand: f.ret_brand,
                     body: f.body,
                 });
             }
@@ -176,6 +177,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                     name: f.name,
                     params: f.params,
                     ret_ty: f.ret_ty,
+                    ret_brand: f.ret_brand,
                     body: f.body,
                 });
             }
@@ -274,10 +276,41 @@ fn parse_def_like(
     })?;
     let ret_ty = Ty::parse_named(&ret_ty_name).ok_or_else(|| X07AstError {
         message: format!(
-            "unknown type: {ret_ty_name:?} (expected i32, bytes, bytes_view, vec_u8, option_i32, option_bytes, result_i32, result_bytes, iface, ptr_const_u8, ptr_mut_u8, ptr_const_void, ptr_mut_void, ptr_const_i32, or ptr_mut_i32)"
+            "unknown type: {ret_ty_name:?} (expected i32, bytes, bytes_view, vec_u8, option_i32, option_bytes, option_bytes_view, result_i32, result_bytes, result_bytes_view, result_result_bytes, iface, ptr_const_u8, ptr_mut_u8, ptr_const_void, ptr_mut_void, ptr_const_i32, or ptr_mut_i32)"
         ),
         ptr: format!("{ptr}/result"),
     })?;
+
+    let ret_brand = if let Some(v) = dobj.get("result_brand") {
+        let s = v.as_str().ok_or_else(|| X07AstError {
+            message: "result_brand must be a string".to_string(),
+            ptr: format!("{ptr}/result_brand"),
+        })?;
+        validate::validate_symbol(s).map_err(|message| X07AstError {
+            message,
+            ptr: format!("{ptr}/result_brand"),
+        })?;
+        Some(s.to_string())
+    } else {
+        None
+    };
+    if ret_brand.is_some()
+        && !matches!(
+            ret_ty,
+            Ty::Bytes
+                | Ty::OptionBytes
+                | Ty::OptionBytesView
+                | Ty::ResultBytes
+                | Ty::ResultBytesView
+        )
+    {
+        return Err(X07AstError {
+            message: format!(
+                "E_BRAND_BAD_TY: result_brand is not allowed on result type {ret_ty:?}"
+            ),
+            ptr: format!("{ptr}/result"),
+        });
+    }
 
     let body_v = dobj.get("body").ok_or_else(|| X07AstError {
         message: format!("missing required field: body in {kind_label}"),
@@ -289,6 +322,7 @@ fn parse_def_like(
         name,
         params,
         ret_ty,
+        ret_brand,
         body,
     })
 }
@@ -431,7 +465,42 @@ fn parse_params(
             ),
             ptr: format!("{pptr}/ty"),
         })?;
-        params.push(FunctionParam { name: arg_name, ty });
+
+        let brand = if let Some(v) = pobj.get("brand") {
+            let s = v.as_str().ok_or_else(|| X07AstError {
+                message: "brand must be a string".to_string(),
+                ptr: format!("{pptr}/brand"),
+            })?;
+            validate::validate_symbol(s).map_err(|message| X07AstError {
+                message,
+                ptr: format!("{pptr}/brand"),
+            })?;
+            Some(s.to_string())
+        } else {
+            None
+        };
+        if brand.is_some()
+            && !matches!(
+                ty,
+                Ty::Bytes
+                    | Ty::BytesView
+                    | Ty::OptionBytes
+                    | Ty::OptionBytesView
+                    | Ty::ResultBytes
+                    | Ty::ResultBytesView
+            )
+        {
+            return Err(X07AstError {
+                message: format!("E_BRAND_BAD_TY: brand is not allowed on param type {ty:?}"),
+                ptr: format!("{pptr}/ty"),
+            });
+        }
+
+        params.push(FunctionParam {
+            name: arg_name,
+            ty,
+            brand,
+        });
     }
     Ok(params)
 }
@@ -441,6 +510,7 @@ struct ParsedDefLike {
     name: String,
     params: Vec<FunctionParam>,
     ret_ty: Ty,
+    ret_brand: Option<String>,
     body: Expr,
 }
 
@@ -624,12 +694,22 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
     }
     for f in &file.functions {
         out.push(Value::Object(def_decl_value(
-            "defn", &f.name, &f.params, f.ret_ty, &f.body,
+            "defn",
+            &f.name,
+            &f.params,
+            f.ret_ty,
+            f.ret_brand.as_deref(),
+            &f.body,
         )));
     }
     for f in &file.async_functions {
         out.push(Value::Object(def_decl_value(
-            "defasync", &f.name, &f.params, f.ret_ty, &f.body,
+            "defasync",
+            &f.name,
+            &f.params,
+            f.ret_ty,
+            f.ret_brand.as_deref(),
+            &f.body,
         )));
     }
     out
@@ -650,6 +730,7 @@ fn def_decl_value(
     name: &str,
     params: &[FunctionParam],
     result: Ty,
+    result_brand: Option<&str>,
     body: &Expr,
 ) -> serde_json::Map<String, Value> {
     let mut m = serde_json::Map::new();
@@ -667,6 +748,9 @@ fn def_decl_value(
                         "ty".to_string(),
                         Value::String(ty_to_name(p.ty).to_string()),
                     );
+                    if let Some(brand) = &p.brand {
+                        pm.insert("brand".to_string(), Value::String(brand.clone()));
+                    }
                     Value::Object(pm)
                 })
                 .collect(),
@@ -676,6 +760,9 @@ fn def_decl_value(
         "result".to_string(),
         Value::String(ty_to_name(result).to_string()),
     );
+    if let Some(brand) = result_brand {
+        m.insert("result_brand".to_string(), Value::String(brand.to_string()));
+    }
     m.insert("body".to_string(), expr_to_value(body));
     m
 }
@@ -723,8 +810,10 @@ fn ty_to_name(ty: Ty) -> &'static str {
         Ty::OptionI32 => "option_i32",
         Ty::OptionTaskSelectEvtV1 => "option_i32",
         Ty::OptionBytes => "option_bytes",
+        Ty::OptionBytesView => "option_bytes_view",
         Ty::ResultI32 => "result_i32",
         Ty::ResultBytes => "result_bytes",
+        Ty::ResultBytesView => "result_bytes_view",
         Ty::ResultResultBytes => "result_result_bytes",
         Ty::Iface => "iface",
         Ty::PtrConstU8 => "ptr_const_u8",

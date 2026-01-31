@@ -1,1 +1,1 @@
-{"decls":[{"kind":"export","names":["std.rr.send_request"]},{"body":["rr.send_request","req"],"kind":"defn","name":"std.rr.send_request","params":[{"name":"req","ty":"bytes"}],"result":"bytes"}],"imports":[],"kind":"module","module_id":"std.rr","schema_version":"x07.x07ast@0.2.0"}
+{"decls":[{"kind":"export","names":["std.rr.send_request"]},{"body":["rr.send_request","req"],"kind":"defn","name":"std.rr.send_request","params":[{"name":"req","ty":"bytes"}],"result":"bytes"}],"imports":[],"kind":"module","module_id":"std.rr","schema_version":"x07.x07ast@0.3.0"}

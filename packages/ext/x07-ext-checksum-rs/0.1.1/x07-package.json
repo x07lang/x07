@@ -24,7 +24,6 @@
     "requires_packages": [
       "ext-u64-rs@0.1.3"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }

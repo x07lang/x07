@@ -2447,6 +2447,7 @@ fn add_export_defn(
         name,
         params,
         ret_ty,
+        ret_brand: None,
         body,
     });
 }
@@ -2531,26 +2532,32 @@ fn gen_cmp_bytes_range(td: &TypeDef) -> Result<FunctionDef> {
         FunctionParam {
             name: "a".to_string(),
             ty: Ty::BytesView,
+            brand: None,
         },
         FunctionParam {
             name: "a_start".to_string(),
             ty: Ty::I32,
+            brand: None,
         },
         FunctionParam {
             name: "a_len".to_string(),
             ty: Ty::I32,
+            brand: None,
         },
         FunctionParam {
             name: "b".to_string(),
             ty: Ty::BytesView,
+            brand: None,
         },
         FunctionParam {
             name: "b_start".to_string(),
             ty: Ty::I32,
+            brand: None,
         },
         FunctionParam {
             name: "b_len".to_string(),
             ty: Ty::I32,
+            brand: None,
         },
     ];
 
@@ -2616,6 +2623,7 @@ fn gen_cmp_bytes_range(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::I32,
+        ret_brand: None,
         body,
     })
 }
@@ -2627,13 +2635,16 @@ fn gen_is_canon_uint_ascii_v1(td: &TypeDef) -> Result<FunctionDef> {
             FunctionParam {
                 name: "v".to_string(),
                 ty: Ty::BytesView,
+                brand: None,
             },
             FunctionParam {
                 name: "max_bytes".to_string(),
                 ty: Ty::I32,
+                brand: None,
             },
         ],
         ret_ty: Ty::I32,
+        ret_brand: None,
         body: e_begin(vec![
             e_let("n", e_call("view.len", vec![e_ident("v")])),
             e_if(
@@ -2697,13 +2708,16 @@ fn gen_is_canon_int_ascii_v1(td: &TypeDef) -> Result<FunctionDef> {
             FunctionParam {
                 name: "v".to_string(),
                 ty: Ty::BytesView,
+                brand: None,
             },
             FunctionParam {
                 name: "max_bytes".to_string(),
                 ty: Ty::I32,
+                brand: None,
             },
         ],
         ret_ty: Ty::I32,
+        ret_brand: None,
         body: e_begin(vec![
             e_let("n", e_call("view.len", vec![e_ident("v")])),
             e_if(
@@ -2794,14 +2808,17 @@ fn gen_add_entry(td: &TypeDef) -> Result<FunctionDef> {
         FunctionParam {
             name: "entries".to_string(),
             ty: Ty::VecU8,
+            brand: None,
         },
         FunctionParam {
             name: "key".to_string(),
             ty: Ty::Bytes,
+            brand: None,
         },
         FunctionParam {
             name: "val".to_string(),
             ty: Ty::Bytes,
+            brand: None,
         },
     ];
 
@@ -2848,6 +2865,7 @@ fn gen_add_entry(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::VecU8,
+        ret_brand: None,
         body,
     })
 }
@@ -2857,6 +2875,7 @@ fn gen_validate_doc(td: &TypeDef) -> Result<FunctionDef> {
     let params = vec![FunctionParam {
         name: "doc".to_string(),
         ty: Ty::BytesView,
+        brand: None,
     }];
 
     let code_doc_invalid = td.err_base + 1;
@@ -2893,6 +2912,7 @@ fn gen_validate_doc(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::ResultI32,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -2902,6 +2922,7 @@ fn gen_validate_value(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDe
     let params = vec![FunctionParam {
         name: "value".to_string(),
         ty: Ty::BytesView,
+        brand: None,
     }];
 
     let code_root_kind = td.err_base + 2;
@@ -3096,6 +3117,7 @@ fn gen_validate_value(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDe
         name,
         params,
         ret_ty: Ty::ResultI32,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -3635,6 +3657,7 @@ fn gen_encode_doc(td: &TypeDef) -> Result<FunctionDef> {
         params.push(FunctionParam {
             name: param_name,
             ty,
+            brand: None,
         });
     }
 
@@ -3675,6 +3698,7 @@ fn gen_encode_doc(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::ResultBytes,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -3701,6 +3725,7 @@ fn gen_encode_value(td: &TypeDef) -> Result<FunctionDef> {
         params.push(FunctionParam {
             name: param_name,
             ty,
+            brand: None,
         });
     }
 
@@ -3784,6 +3809,7 @@ fn gen_encode_value(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::ResultBytes,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -4516,8 +4542,10 @@ fn gen_field_accessors(td: &TypeDef, f: &FieldDef) -> Result<Vec<FunctionDef>> {
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
+            brand: None,
         }],
         ret_ty: getter_ret,
+        ret_brand: None,
         body: getter_body,
     });
 
@@ -4528,8 +4556,10 @@ fn gen_field_accessors(td: &TypeDef, f: &FieldDef) -> Result<Vec<FunctionDef>> {
             params: vec![FunctionParam {
                 name: "doc".to_string(),
                 ty: Ty::BytesView,
+                brand: None,
             }],
             ret_ty: Ty::I32,
+            ret_brand: None,
             body: gen_has(td, f)?,
         });
     }
@@ -4775,10 +4805,12 @@ fn gen_enum_tag_view_at(td: &TypeDef) -> Result<FunctionDef> {
         FunctionParam {
             name: "value".to_string(),
             ty: Ty::BytesView,
+            brand: None,
         },
         FunctionParam {
             name: "root_off".to_string(),
             ty: Ty::I32,
+            brand: None,
         },
     ];
 
@@ -4886,6 +4918,7 @@ fn gen_enum_tag_view_at(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::BytesView,
+        ret_brand: None,
         body,
     })
 }
@@ -4896,10 +4929,12 @@ fn gen_enum_payload_value_view_at(td: &TypeDef) -> Result<FunctionDef> {
         FunctionParam {
             name: "value".to_string(),
             ty: Ty::BytesView,
+            brand: None,
         },
         FunctionParam {
             name: "root_off".to_string(),
             ty: Ty::I32,
+            brand: None,
         },
     ];
 
@@ -4975,6 +5010,7 @@ fn gen_enum_payload_value_view_at(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::BytesView,
+        ret_brand: None,
         body,
     })
 }
@@ -4985,8 +5021,10 @@ fn gen_enum_get_tag_view(td: &TypeDef) -> Result<FunctionDef> {
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
+            brand: None,
         }],
         ret_ty: Ty::BytesView,
+        ret_brand: None,
         body: e_call(
             &format!("{}._enum_tag_view_at_v1", td.module_id),
             vec![e_ident("doc"), e_int(1)],
@@ -5000,8 +5038,10 @@ fn gen_enum_get_payload_value_view(td: &TypeDef) -> Result<FunctionDef> {
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
+            brand: None,
         }],
         ret_ty: Ty::BytesView,
+        ret_brand: None,
         body: e_call(
             &format!("{}._enum_payload_value_view_at_v1", td.module_id),
             vec![e_ident("doc"), e_int(1)],
@@ -5014,6 +5054,7 @@ fn gen_enum_validate_doc(type_index: &TypeIndex, td: &TypeDef) -> Result<Functio
     let params = vec![FunctionParam {
         name: "doc".to_string(),
         ty: Ty::BytesView,
+        brand: None,
     }];
 
     let code_doc_invalid = td.err_base + 1;
@@ -5646,6 +5687,7 @@ fn gen_enum_validate_doc(type_index: &TypeIndex, td: &TypeDef) -> Result<Functio
         name,
         params,
         ret_ty: Ty::ResultI32,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -5655,6 +5697,7 @@ fn gen_enum_validate_value(type_index: &TypeIndex, td: &TypeDef) -> Result<Funct
     let params = vec![FunctionParam {
         name: "value".to_string(),
         ty: Ty::BytesView,
+        brand: None,
     }];
 
     let code_root_kind = td.err_base + 2;
@@ -6287,6 +6330,7 @@ fn gen_enum_validate_value(type_index: &TypeIndex, td: &TypeDef) -> Result<Funct
         name,
         params,
         ret_ty: Ty::ResultI32,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -6297,10 +6341,12 @@ fn gen_enum_encode_doc(td: &TypeDef) -> Result<FunctionDef> {
         FunctionParam {
             name: "variant_id".to_string(),
             ty: Ty::I32,
+            brand: None,
         },
         FunctionParam {
             name: "payload".to_string(),
             ty: Ty::BytesView,
+            brand: None,
         },
     ];
 
@@ -6327,6 +6373,7 @@ fn gen_enum_encode_doc(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::ResultBytes,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -6337,10 +6384,12 @@ fn gen_enum_encode_value(td: &TypeDef) -> Result<FunctionDef> {
         FunctionParam {
             name: "variant_id".to_string(),
             ty: Ty::I32,
+            brand: None,
         },
         FunctionParam {
             name: "payload".to_string(),
             ty: Ty::BytesView,
+            brand: None,
         },
     ];
 
@@ -6911,6 +6960,7 @@ fn gen_enum_encode_value(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params,
         ret_ty: Ty::ResultBytes,
+        ret_brand: None,
         body: e_begin(vec![chain]),
     })
 }
@@ -7197,6 +7247,7 @@ fn gen_golden_doc(type_index: &TypeIndex, td: &TypeDef, ex: &ExampleDef) -> Resu
         name,
         params: Vec::new(),
         ret_ty: Ty::ResultBytes,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -7344,6 +7395,7 @@ fn gen_golden_doc_enum(
         name,
         params: Vec::new(),
         ret_ty: Ty::ResultBytes,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -8015,6 +8067,7 @@ fn gen_test_negative(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef
         name,
         params: Vec::new(),
         ret_ty: Ty::ResultI32,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -8278,6 +8331,7 @@ fn gen_test_negative_enum(td: &TypeDef) -> Result<FunctionDef> {
         name,
         params: Vec::new(),
         ret_ty: Ty::ResultI32,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -8734,6 +8788,7 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
         name,
         params: Vec::new(),
         ret_ty: Ty::ResultI32,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }
@@ -8904,6 +8959,7 @@ fn gen_test_vectors_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<Functio
         name,
         params: Vec::new(),
         ret_ty: Ty::ResultI32,
+        ret_brand: None,
         body: e_begin(stmts),
     })
 }

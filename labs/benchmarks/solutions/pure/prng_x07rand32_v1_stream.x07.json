@@ -1,1 +1,1 @@
-{"decls":[],"imports":["std.prng"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.2.0","solve":["std.prng.x07rand32_v1_stream","input"]}
+{"decls":[],"imports":["std.prng"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.3.0","solve":["std.prng.x07rand32_v1_stream","input"]}

@@ -14,6 +14,12 @@ The elaborator:
 - rewrites the `std.stream.pipe_v1` call site to call the injected helper
 - deduplicates injected helpers by a stable hash of the descriptor with `expr_v1` bodies elided
 
+Brand typing notes (v1):
+
+- The elaborator optionally computes an item brand along the pipeline (`typecheck_item_brands_v1`).
+- It can insert `std.stream.xf.require_brand_v1` stages when `auto_require_brand_v1=1` (using `meta.brands_v1`).
+- `verify_produced_brands_v1=1` inserts `require_brand_v1` validators for any source/stage that claims it produces branded items (runtime cost).
+
 Concurrency notes:
 
 - Pipes that contain concurrency stages (currently `std.stream.xf.par_map_stream_*_v1`) inject a `defasync` helper and rewrite the call site to `await` it.
@@ -24,6 +30,11 @@ Concurrency notes:
 
 - The emitted pipeline helper is ordinary x07AST lowered to C like any other function.
 - JSON canonicalization (`std.stream.xf.json_canon_stream_v1`) uses a built-in C runtime canonicalizer (RFC 8785 / JCS) emitted by the backend.
+
+Runtime errors:
+
+- `70` = `E_BRAND_ITEM_TOO_LARGE` (require_brand item too large)
+- `71` = `E_BRAND_VALIDATE_FAILED` (validator failed; payload includes brand id, validator id, code, item index)
 
 Internal-only helpers / safety:
 

@@ -1,8 +1,12 @@
+use serde_json::json;
+use x07_contracts::X07AST_SCHEMA_VERSION;
 use x07c::diagnostics::QuickfixKind;
 use x07c::{json_patch, lint, x07ast};
 
 fn parse_doc(src: &str) -> serde_json::Value {
-    serde_json::from_str(src).expect("valid JSON")
+    let mut v: serde_json::Value = serde_json::from_str(src).expect("valid JSON");
+    v["schema_version"] = json!(X07AST_SCHEMA_VERSION);
+    v
 }
 
 #[test]
@@ -10,7 +14,6 @@ fn lint_quickfix_wraps_for_varargs_body_in_begin() {
     let mut doc = parse_doc(
         r#"
         {
-          "schema_version":"x07.x07ast@0.2.0",
           "kind":"entry",
           "module_id":"main",
           "imports":[],
@@ -58,7 +61,6 @@ fn lint_quickfix_rewrites_let_with_body_into_begin() {
     let mut doc = parse_doc(
         r#"
         {
-          "schema_version":"x07.x07ast@0.2.0",
           "kind":"entry",
           "module_id":"main",
           "imports":[],
@@ -98,7 +100,6 @@ fn lint_quickfix_removes_forbidden_imports() {
     let mut doc = parse_doc(
         r#"
         {
-          "schema_version":"x07.x07ast@0.2.0",
           "kind":"entry",
           "module_id":"main",
           "imports":["std.fs","std.bytes"],
@@ -143,7 +144,6 @@ fn lint_quickfix_copies_bytes_view_for_if_condition() {
     let mut doc = parse_doc(
         r#"
         {
-          "schema_version":"x07.x07ast@0.2.0",
           "kind":"entry",
           "module_id":"main",
           "imports":[],

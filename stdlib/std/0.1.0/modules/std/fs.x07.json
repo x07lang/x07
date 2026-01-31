@@ -1,1 +1,1 @@
-{"decls":[{"kind":"export","names":["std.fs.read"]},{"body":["fs.read","path"],"kind":"defn","name":"std.fs.read","params":[{"name":"path","ty":"bytes"}],"result":"bytes"}],"imports":[],"kind":"module","module_id":"std.fs","schema_version":"x07.x07ast@0.2.0"}
+{"decls":[{"kind":"export","names":["std.fs.read"]},{"body":["fs.read","path"],"kind":"defn","name":"std.fs.read","params":[{"name":"path","ty":"bytes"}],"result":"bytes"}],"imports":[],"kind":"module","module_id":"std.fs","schema_version":"x07.x07ast@0.3.0"}

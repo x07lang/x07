@@ -17,7 +17,7 @@ fn temp_dir(prefix: &str) -> PathBuf {
 
 fn module_file(module_id: &str, decls: Vec<serde_json::Value>) -> Vec<u8> {
     serde_json::to_vec(&json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": "x07.x07ast@0.3.0",
         "kind": "module",
         "module_id": module_id,
         "imports": [],

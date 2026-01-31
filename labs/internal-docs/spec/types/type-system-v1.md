@@ -16,19 +16,28 @@ Type names are identifiers (no generics yet).
 - `bytes`: owned byte buffer (`ptr + len`, dropped automatically)
 - `bytes_view`: borrowed byte view (`ptr + len` + debug-only borrow tracking fields)
 - `vec_u8`: owned, growable byte vector value (`data + len + cap`, dropped automatically)
-- `option_i32`, `option_bytes`: tagged options (Phase H1)
-- `result_i32`, `result_bytes`: tagged results with deterministic error codes (Phase H1)
+- `option_i32`, `option_bytes`, `option_bytes_view`: tagged options (Phase H1)
+- `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes`: tagged results with deterministic error codes (Phase H1)
 - `iface`: interface record (`data + vtable`) used for streaming readers (Phase H1/G2)
 - Raw pointers (Phase H4, standalone-only): `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`
+
+## Branded bytes
+
+Bytes-like types may carry an optional compile-time brand:
+
+- params: `{"name":"x","ty":"bytes","brand":"my.encoding_v1"}`
+- return values: `{"result":"bytes","result_brand":"my.encoding_v1", ...}`
+
+Brands exist only in typing and are erased during lowering (no runtime representation changes).
 
 ## ABI and lowering
 
 The C ABI for these types is defined by:
 
-- `docs/spec/abi/abi-v2.md`
+- `labs/internal-docs/spec/abi/abi-v2.md`
 - `crates/x07c/include/x07_abi_v2.h`
 
-`iface` is specified under `docs/spec/abi/interface-records-v1.md`.
+`iface` is specified under `labs/internal-docs/spec/abi/interface-records-v1.md`.
 
 ## Phase H1 builtins (typed)
 

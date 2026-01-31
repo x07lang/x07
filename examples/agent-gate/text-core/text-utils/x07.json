@@ -8,13 +8,15 @@
   "dependencies": [
     {
       "name": "ext-text",
-      "version": "0.1.1",
-      "path": ".x07/deps/ext-text/0.1.1"
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-text/0.1.2"
     }
   ],
   "lockfile": "x07.lock.json",
   "default_profile": "os",
   "profiles": {
-    "os": { "world": "run-os" }
+    "os": {
+      "world": "run-os"
+    }
   }
 }

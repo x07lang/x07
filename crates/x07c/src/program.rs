@@ -5,6 +5,7 @@ use crate::types::Ty;
 pub struct FunctionParam {
     pub name: String,
     pub ty: Ty,
+    pub brand: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -12,6 +13,7 @@ pub struct FunctionDef {
     pub name: String,
     pub params: Vec<FunctionParam>,
     pub ret_ty: Ty,
+    pub ret_brand: Option<String>,
     pub body: Expr,
 }
 
@@ -20,6 +22,7 @@ pub struct AsyncFunctionDef {
     pub name: String,
     pub params: Vec<FunctionParam>,
     pub ret_ty: Ty,
+    pub ret_brand: Option<String>,
     pub body: Expr,
 }
 

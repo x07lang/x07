@@ -1,0 +1,29 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-url-rs",
+  "description": "HTTP types/parsing and URL parsing/encoding.",
+  "docs": "HTTP types/parsing and URL parsing/encoding.\n\nModules:\n- ext.http_types\n- ext.httparse\n- ext.httparse.tests\n- ext.url.parse\n- ext.url.encode\n- ext.url.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-url-rs@0.1.4\n- Import the modules listed above.\n",
+  "version": "0.1.4",
+  "module_root": "modules",
+  "modules": [
+    "ext.http_types",
+    "ext.httparse",
+    "ext.httparse.tests",
+    "ext.url.parse",
+    "ext.url.encode",
+    "ext.url.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "x07import"
+  }
+}

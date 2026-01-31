@@ -25,7 +25,6 @@
     "requires_packages": [
       "ext-error@0.1.3"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }

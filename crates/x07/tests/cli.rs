@@ -393,7 +393,7 @@ fn x07_fix_applies_multiple_borrow_quickfixes() {
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
     let program = serde_json::to_vec(&serde_json::json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": "x07.x07ast@0.3.0",
         "kind": "entry",
         "module_id": "main",
         "imports": [],
@@ -1176,7 +1176,7 @@ fn x07_run_os_sandboxed_allows_write_under_write_root() {
     write_bytes(
         &dir.join("main.x07.json"),
         br#"{
-  "schema_version": "x07.x07ast@0.2.0",
+  "schema_version": "x07.x07ast@0.3.0",
   "kind": "entry",
   "module_id": "main",
   "imports": [],
@@ -1502,9 +1502,9 @@ fn x07_run_auto_adds_missing_external_package() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let app = r#"{"schema_version":"x07.x07ast@0.2.0","kind":"module","module_id":"app","imports":["ext.json.data_model"],"decls":[{"kind":"export","names":["app.solve"]},{"kind":"defn","name":"app.solve","params":[],"result":"bytes","body":["begin",["let","json",["bytes.lit","{\"x\":1}"]],["ext.json.data_model.parse",["bytes.view","json"]]]}]}"#;
+    let app = r#"{"schema_version":"x07.x07ast@0.3.0","kind":"module","module_id":"app","imports":["ext.json.data_model"],"decls":[{"kind":"export","names":["app.solve"]},{"kind":"defn","name":"app.solve","params":[],"result":"bytes","body":["begin",["let","json",["bytes.lit","{\"x\":1}"]],["ext.json.data_model.parse",["bytes.view","json"]]]}]}"#;
     write_bytes(&dir.join("src/app.x07.json"), app.as_bytes());
-    let main = r#"{"schema_version":"x07.x07ast@0.2.0","kind":"entry","module_id":"main","imports":["app"],"decls":[],"solve":["app.solve"]}"#;
+    let main = r#"{"schema_version":"x07.x07ast@0.3.0","kind":"entry","module_id":"main","imports":["app"],"decls":[],"solve":["app.solve"]}"#;
     write_bytes(&dir.join("src/main.x07.json"), main.as_bytes());
 
     let exe = env!("CARGO_BIN_EXE_x07");

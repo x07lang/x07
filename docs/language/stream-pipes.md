@@ -79,7 +79,13 @@ To read `err_code`:
   ["max_steps", <u32>],
   ["emit_payload", <i32>],
   ["emit_stats", <i32>],
-  ["allow_nondet_v1", <i32>]
+  ["allow_nondet_v1", <i32>],
+
+  // optional brand typing (v1):
+  ["typecheck_item_brands_v1", <i32>],           // default 1
+  ["auto_require_brand_v1", <i32>],              // default 0
+  ["brand_registry_ref_v1", ["bytes.lit","<module_id>"]],
+  ["verify_produced_brands_v1", <i32>]           // default 0
 ]
 ```
 
@@ -89,6 +95,124 @@ Budgets are hard limits: exceeding a budget terminates the pipeline with an `ERR
 
 - `0` (default): reject nondeterministic pipeline stages (for example unordered parallelism).
 - `1`: allow explicitly nondeterministic stages (currently: unordered `par_map_stream_*_v1`).
+
+`typecheck_item_brands_v1`:
+
+- `1` (default): the elaborator computes and checks a compile-time **item brand** along the pipeline.
+- `0`: disables item brand typechecking (but `require_brand_v1` still resolves its validator via the registry).
+
+`auto_require_brand_v1` (only when `typecheck_item_brands_v1=1`):
+
+- `0` (default): brand mismatches are compile errors.
+- `1`: on a mismatch, the elaborator inserts a `std.stream.xf.require_brand_v1` stage (using the brand registry).
+
+`brand_registry_ref_v1`:
+
+- Optional `bytes` literal containing a module id to use as the brand registry source.
+- If omitted, the pipeline uses `meta.brands_v1` from the defining module, if present.
+
+`verify_produced_brands_v1` (only when `typecheck_item_brands_v1=1`):
+
+- `0` (default): trust `out_item_brand` declarations and brand-producing stages.
+- `1`: insert `std.stream.xf.require_brand_v1` validators for any source/stage that *claims* it produces branded items (runtime cost).
+
+## Item brands (v1) (compile-time only)
+
+Pipelines process items as `bytes_view`. Item brands extend this with a nominal tag:
+
+- `bytes_view@<brand_id>` means each item is a complete, valid instance of that encoding.
+- Brands exist only at compile time; runtime items are still `bytes_view`.
+
+### Source item brand (`out_item_brand`)
+
+Sources may declare a brand for the items they emit:
+
+```jsonc
+["std.stream.src.fs_open_read_v1",
+  ["std.stream.expr_v1", ["bytes.lit","input.txt"]],
+  ["out_item_brand", "my.encoding_v1"]
+]
+```
+
+Important: a source should only declare `out_item_brand` if its contract guarantees every item is valid for that brand.
+
+### Stage item brand (`in_item_brand` / `out_item_brand`)
+
+Most stages accept optional item brand contracts:
+
+```jsonc
+["std.stream.xf.map_bytes_v1",
+  ["std.stream.fn_v1", "main.map_one"],
+  ["in_item_brand", "same"],
+  ["out_item_brand", "none"]
+]
+```
+
+`in_item_brand` is one of:
+
+- `any`: accept unbranded or branded items
+- `same`: require the current brand (if any)
+- `<brand_id>`: require exactly that brand
+
+`out_item_brand` is one of:
+
+- `same`: preserve the current brand
+- `none`: drop the brand
+- `<brand_id>`: claim the stage produces valid items of that brand
+
+Brand inference:
+
+- `std.stream.xf.map_bytes_v1` infers input/output brands from the referenced `defn` signature (bytes_view param brand and bytes result `result_brand`).
+- `std.stream.xf.par_map_stream_*_v1` infers brands from the referenced `defasync` signature (owned bytes param brand and bytes/result_bytes `result_brand`).
+
+### Sink item brand (`in_item_brand`)
+
+Sinks may require branded input:
+
+```jsonc
+["std.stream.sink.null_v1",
+  ["in_item_brand", "std.text.slices.x7sl_v1"]
+]
+```
+
+Sinks accept:
+
+- `any`
+- `<brand_id>`
+
+## Brand validation stage: `std.stream.xf.require_brand_v1`
+
+This stage validates each item and brands it (no copies).
+
+Descriptor:
+
+```jsonc
+["std.stream.xf.require_brand_v1",
+  ["brand", "std.text.slices.x7sl_v1"],
+  ["validator", "std.text.slices.validate_v1"],
+  ["max_item_bytes", 1048576]
+]
+```
+
+- `brand` (required): the brand id to attach to each item.
+- `validator` (optional): a `defn` symbol with signature `(bytes_view) -> result_i32`.
+  - If omitted, the elaborator resolves it via `meta.brands_v1` (from `brand_registry_ref_v1` or the defining module).
+- `max_item_bytes` (optional, default `0`): additional per-item size check (`0` = no extra check).
+
+## Brand registry (`meta.brands_v1`)
+
+To support `require_brand_v1` validator resolution and `auto_require_brand_v1`, a module may provide a registry:
+
+```jsonc
+"meta": {
+  "brands_v1": {
+    "std.text.slices.x7sl_v1": {
+      "validate": "std.text.slices.validate_v1",
+      "doc": "docs/text/x7sl-v1.md"
+    }
+  }
+}
+```
 
 ## Sources (`std.stream.src.*_v1`)
 
@@ -102,6 +226,7 @@ Budgets are hard limits: exceeding a budget terminates the pipeline with an `ERR
 ## Transducers (`std.stream.xf.*_v1`)
 
 - `std.stream.xf.map_bytes_v1` (map `bytes_view -> bytes`)
+- `std.stream.xf.require_brand_v1` (validate items and attach an item brand)
 - `std.stream.xf.map_in_place_buf_v1` (scratch-buffer map; fixed-capacity)
 - `std.stream.xf.filter_v1` (predicate `bytes_view -> i32`)
 - `std.stream.xf.take_v1` (stop after N items)
@@ -171,11 +296,24 @@ Notes:
 - `20..=24`: JSON canonicalization errors (syntax / I-JSON / depth / object size / trailing data)
 - `40..=43`: filesystem sink errors
 - `60..=66`: network sink/source errors
+- `70`: `require_brand_v1` item too large
+- `71`: `require_brand_v1` validator failed
 - `80..=84`: `deframe_u32le_v1` errors (oversize / truncated / empty / max frames / timeout)
 - `100`: `par_map_stream_*_v1` item too large (input item exceeded `max_item_bytes` / `max_inflight_in_bytes`)
 - `101`: `par_map_stream_*_v1` output item too large (output exceeded `max_out_item_bytes`)
 - `102`: `par_map_stream_result_bytes_v1` / `par_map_stream_unordered_result_bytes_v1` child returned `result_bytes` error
 - `103`: `par_map_stream_result_bytes_v1` / `par_map_stream_unordered_result_bytes_v1` child was canceled
+
+For `71`, the `ERR` doc payload is:
+
+```
+u32  brand_len
+bytes brand_id[brand_len]
+u32  validator_len
+bytes validator_id[validator_len]
+u32  validator_err_code
+u32  item_index
+```
 
 For `102` and `103`, the `ERR` doc payload is:
 

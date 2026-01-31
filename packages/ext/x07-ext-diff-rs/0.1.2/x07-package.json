@@ -1,0 +1,31 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-diff-rs",
+  "description": "Deterministic diff + patch helpers (bytes/lines) with a stable patch_v1 format.",
+  "docs": "Deterministic diff + patch helpers (bytes/lines).\n\nModules:\n- ext.diff.bytes\n- ext.diff.lines\n- ext.diff.patch_v1\n- ext.diff.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-diff-rs@0.1.2 --sync\n- Import ext.diff.bytes or ext.diff.lines to compute a patch.\n- Import ext.diff.patch_v1 to apply a patch.\n\nNotes:\n- Determinism: pure\n- Patch format: patch_v1 (stable)\n",
+  "version": "0.1.2",
+  "module_root": "modules",
+  "modules": [
+    "ext.diff.bytes",
+    "ext.diff.lines",
+    "ext.diff.patch_v1",
+    "ext.diff.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-error@0.1.4"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

@@ -56,7 +56,7 @@ fn proc_caps_v1_pack_encodes_bytes() {
     let cfg = config();
     let program = x07_program::entry(
         &["std.os.process.caps_v1"],
-        json!(["std.os.process.caps_v1.pack", 1, 2, 3, 4]),
+        json!(["std.os.process.caps_v1.finish", 1, 2, 3, 4]),
     );
 
     let compile = compile_program_with_options(

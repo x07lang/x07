@@ -60,7 +60,7 @@ patch="$tmp_dir/patch.json"
 
 cat >"$program" <<'JSON'
 {
-  "schema_version": "x07.x07ast@0.2.0",
+  "schema_version": "x07.x07ast@0.3.0",
   "kind": "entry",
   "module_id": "main",
   "imports": [],

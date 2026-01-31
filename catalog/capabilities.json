@@ -6,7 +6,7 @@
       "summary": "Parse CLI argv (argv_v1) and define CLI interfaces.",
       "canonical": {
         "name": "ext-cli",
-        "version": "0.1.7"
+        "version": "0.1.8"
       },
       "status": "stable"
     },
@@ -15,7 +15,7 @@
       "summary": "OS filesystem API (run-os*).",
       "canonical": {
         "name": "ext-fs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
@@ -28,12 +28,12 @@
       "summary": "HTTP client for OS worlds (GET/POST, headers, body).",
       "canonical": {
         "name": "ext-net",
-        "version": "0.1.6"
+        "version": "0.1.7"
       },
       "alternatives": [
         {
           "name": "ext-curl-c",
-          "version": "0.1.5"
+          "version": "0.1.6"
         }
       ],
       "worlds": [
@@ -48,7 +48,7 @@
       "summary": "libcurl bindings (advanced; required by ext-net HTTP client backend).",
       "canonical": {
         "name": "ext-curl-c",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "worlds": [
         "run-os",
@@ -62,7 +62,7 @@
       "summary": "Low-level sockets for OS worlds.",
       "canonical": {
         "name": "ext-sockets-c",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "worlds": [
         "run-os",
@@ -75,7 +75,7 @@
       "summary": "Parse and normalize URLs; stable URL primitives.",
       "canonical": {
         "name": "ext-url-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "stable"
     },
@@ -84,7 +84,7 @@
       "summary": "Extract links and visible text from HTML (crawler helpers).",
       "canonical": {
         "name": "ext-html-lite-rs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "status": "experimental"
     },
@@ -93,7 +93,7 @@
       "summary": "Parse robots.txt allow/disallow rules.",
       "canonical": {
         "name": "ext-robots-txt-rs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "status": "experimental"
     },
@@ -102,7 +102,7 @@
       "summary": "Parse sitemap XML and extract <loc> URLs.",
       "canonical": {
         "name": "ext-sitemap-rs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "status": "experimental"
     },
@@ -111,7 +111,7 @@
       "summary": "Typed DataModel values and deterministic codecs (JSON/TOML/YAML).",
       "canonical": {
         "name": "ext-data-model",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "status": "stable"
     },
@@ -120,7 +120,7 @@
       "summary": "JSON parse/encode.",
       "canonical": {
         "name": "ext-json-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "stable"
     },
@@ -129,7 +129,7 @@
       "summary": "YAML parse/encode.",
       "canonical": {
         "name": "ext-yaml-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "stable"
     },
@@ -138,7 +138,7 @@
       "summary": "CSV parse/encode.",
       "canonical": {
         "name": "ext-csv-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "stable"
     },
@@ -147,7 +147,7 @@
       "summary": "XML parse helpers.",
       "canonical": {
         "name": "ext-xml-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "stable"
     },
@@ -156,12 +156,12 @@
       "summary": "CBOR encode/decode + DataModel integration.",
       "canonical": {
         "name": "ext-cbor-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "alternatives": [
         {
           "name": "ext-data-model",
-          "version": "0.1.5"
+          "version": "0.1.6"
         }
       ],
       "status": "experimental"
@@ -171,12 +171,12 @@
       "summary": "MessagePack encode/decode + DataModel integration.",
       "canonical": {
         "name": "ext-msgpack-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "alternatives": [
         {
           "name": "ext-data-model",
-          "version": "0.1.5"
+          "version": "0.1.6"
         }
       ],
       "status": "experimental"
@@ -186,7 +186,7 @@
       "summary": "Big integer utilities (parse/format/codec_v1 + basic ops).",
       "canonical": {
         "name": "ext-bigint-rs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "status": "experimental"
     },
@@ -195,7 +195,7 @@
       "summary": "Fixed-point decimal utilities (parse/format/codec_v1 + basic ops).",
       "canonical": {
         "name": "ext-decimal-rs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "status": "experimental"
     },
@@ -204,12 +204,12 @@
       "summary": "Text utilities on bytes (trim/split/join/find/lines).",
       "canonical": {
         "name": "ext-text",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "alternatives": [
         {
           "name": "ext-regex",
-          "version": "0.2.3"
+          "version": "0.2.4"
         }
       ],
       "status": "experimental"
@@ -219,7 +219,7 @@
       "summary": "Unicode helpers (normalize/casefold/segment + encodings).",
       "canonical": {
         "name": "ext-unicode-rs",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "status": "experimental"
     },
@@ -228,7 +228,7 @@
       "summary": "Fast non-cryptographic checksums (CRC32C, xxhash64).",
       "canonical": {
         "name": "ext-checksum-rs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "status": "experimental"
     },
@@ -237,7 +237,7 @@
       "summary": "Deterministic diff/patch helpers with stable patch_v1 encoding.",
       "canonical": {
         "name": "ext-diff-rs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "status": "experimental"
     },
@@ -246,7 +246,7 @@
       "summary": "Zstd framing helpers (ext.zstd).",
       "canonical": {
         "name": "ext-compress-rs",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "status": "experimental"
     },
@@ -255,16 +255,16 @@
       "summary": "Regex match/search.",
       "canonical": {
         "name": "ext-regex",
-        "version": "0.2.3"
+        "version": "0.2.4"
       },
       "alternatives": [
         {
           "name": "ext-aho-corasick-rs",
-          "version": "0.1.3"
+          "version": "0.1.4"
         },
         {
           "name": "ext-memchr-rs",
-          "version": "0.1.3"
+          "version": "0.1.4"
         }
       ],
       "status": "stable",
@@ -275,12 +275,12 @@
       "summary": "Simple log record encoding/formatting (no span model).",
       "canonical": {
         "name": "ext-log",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "alternatives": [
         {
           "name": "ext-tracing",
-          "version": "0.1.3"
+          "version": "0.1.4"
         }
       ],
       "status": "stable",
@@ -291,7 +291,7 @@
       "summary": "Time utilities (encoding/format).",
       "canonical": {
         "name": "ext-time-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "status": "stable"
     },
@@ -300,7 +300,7 @@
       "summary": "Database core interfaces and pooling for OS worlds.",
       "canonical": {
         "name": "ext-db-core",
-        "version": "0.1.6"
+        "version": "0.1.7"
       },
       "worlds": [
         "run-os",
@@ -313,7 +313,7 @@
       "summary": "SQLite client for OS worlds.",
       "canonical": {
         "name": "ext-db-sqlite",
-        "version": "0.1.6"
+        "version": "0.1.7"
       },
       "worlds": [
         "run-os",
@@ -326,7 +326,7 @@
       "summary": "Postgres client for OS worlds.",
       "canonical": {
         "name": "ext-db-postgres",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
@@ -339,7 +339,7 @@
       "summary": "MySQL client for OS worlds.",
       "canonical": {
         "name": "ext-db-mysql",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
@@ -352,7 +352,7 @@
       "summary": "Redis client for OS worlds.",
       "canonical": {
         "name": "ext-db-redis",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
@@ -365,7 +365,7 @@
       "summary": "Glob-like wildcard matching for ASCII paths/tokens.",
       "canonical": {
         "name": "ext-glob-rs",
-        "version": "0.1.2"
+        "version": "0.1.3"
       },
       "status": "experimental"
     },
@@ -374,7 +374,7 @@
       "summary": "Directory traversal helpers for OS worlds.",
       "canonical": {
         "name": "ext-walkdir-rs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "worlds": [
         "run-os",
@@ -387,7 +387,7 @@
       "summary": "Glob + walk + ignore helpers for OS worlds (deterministic ordering).",
       "canonical": {
         "name": "ext-path-glob-rs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "worlds": [
         "run-os",

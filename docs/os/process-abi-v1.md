@@ -13,13 +13,27 @@ This document defines the **stable bytes encodings** used by the standalone-only
 Agents should build requests and caps via:
 
 - `stdlib/os/0.2.0/modules/std/os/process/req_v1.x07.json` (`std.os.process.req_v1.*`)
-- `stdlib/os/0.2.0/modules/std/os/process/caps_v1.x07.json` (`std.os.process.caps_v1.pack`)
+- `stdlib/os/0.2.0/modules/std/os/process/caps_v1.x07.json` (`std.os.process.caps_v1.finish`)
 
 Callers must import `std.os.process.req_v1` and `std.os.process.caps_v1`.
 
 Agents should decode results via:
 
 - `stdlib/os/0.2.0/modules/std/os/process.x07.json` (`std.os.process.is_err`, `std.os.process.err_code`, `std.os.process.resp_*`)
+
+## Branded stdlib wrappers
+
+The low-level `os.process.*` builtins accept raw `bytes` for `req`/`caps` and operate on the stable encodings defined below.
+
+The stdlib builders/wrappers use branded bytes to prevent mixing encodings:
+
+- `std.os.process.req_v1.finish(...) -> bytes@std.os.process.req_v1`
+- `std.os.process.caps_v1.finish(...) -> bytes@std.os.process.caps_v1`
+
+And validators are available for safe casting:
+
+- `std.os.process.req_v1.validate_v1(v: bytes_view) -> result_i32`
+- `std.os.process.caps_v1.validate_v1(v: bytes_view) -> result_i32`
 
 ## Conventions
 

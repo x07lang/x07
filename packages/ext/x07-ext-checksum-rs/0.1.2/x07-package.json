@@ -1,0 +1,30 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-checksum-rs",
+  "description": "Fast non-cryptographic checksums (CRC32C, xxhash64).",
+  "docs": "Fast non-cryptographic checksums.\n\nModules:\n- ext.checksum.crc32c\n- ext.checksum.xxhash64\n- ext.checksum.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-checksum-rs@0.1.2 --sync\n- Import ext.checksum.crc32c or ext.checksum.xxhash64.\n\nNotes:\n- Determinism: pure\n- Non-cryptographic checksums (not suitable for security).\n",
+  "version": "0.1.2",
+  "module_root": "modules",
+  "modules": [
+    "ext.checksum.crc32c",
+    "ext.checksum.xxhash64",
+    "ext.checksum.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-u64-rs@0.1.4"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

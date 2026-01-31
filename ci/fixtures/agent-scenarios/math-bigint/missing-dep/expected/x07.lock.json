@@ -3,29 +3,29 @@
   "dependencies": [
     {
       "name": "ext-bigint-rs",
-      "version": "0.1.1",
-      "path": ".x07/deps/ext-bigint-rs/0.1.1",
-      "package_manifest_sha256": "f4d9d77838337bba7ccab4996ab05c59d5a18cfc4ef7abca2904e0d41a7473cb",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-bigint-rs/0.1.2",
+      "package_manifest_sha256": "5568baf43318a97c2b7dc5561f6a7974f59e6cc0b5f3a02e8626d862150e75e4",
       "module_root": "modules",
       "modules_sha256": {
-        "std.math.bigint": "efb22181fad0445d366dc619718eeff120a5202d377c918a5021c55298f4762a",
-        "std.math.bigint.codec_v1": "3978a37df1089902a65a5ae0c03a6b852e92677793458f46a48052cdd1865ace",
-        "std.math.bigint.fmt": "fe5fef0d29040d22fd36461ac38a3805c8bce7e5de35fa46a2e88c40464b42c9",
-        "std.math.bigint.parse": "6dd4f647fbdeb3160783e149ed75305c83d47d31a449428e65c683a6ce92140a",
-        "std.math.bigint.tests": "af4b72f1346c35d3ef125ede0609ae205a7b2ebf2388666855c026ecb58c45a1"
+        "std.math.bigint": "bbfa024ebc697937d647602f4df12733ea4c4350276a042ab276677807a2c3e1",
+        "std.math.bigint.codec_v1": "ba1c575d8d210311703637ac3ba29cfbb264c8a4ef4b61c2360e8744881a7f57",
+        "std.math.bigint.fmt": "98675052af019d828e6e3cdb6aaab763e89acfb53f40d664feb6c1dbfc53f74d",
+        "std.math.bigint.parse": "542ab8498c612f921fb2c98e4bf94d8c22be87f2f255799daa0516079bc30a74",
+        "std.math.bigint.tests": "1c6d0ec34c448e7bb64a0e43a1d09dcbb1525c0637090f33d1933a24fbe8d1d7"
       }
     },
     {
       "name": "ext-error",
-      "version": "0.1.3",
-      "path": ".x07/deps/ext-error/0.1.3",
-      "package_manifest_sha256": "723a31c95753dd8c096ad51d3a073f14c56d7915884aa4742ca1229f15e77e88",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-error/0.1.4",
+      "package_manifest_sha256": "2583aae477f906bf67bd815972b333760588c54d7a1776831be85f1956bfc01e",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.error.chain": "c030554da4403f7f68612cea7ec235edd076c9570eac0a64e9800c4352f98c7f",
-        "ext.error.context": "10c3939f6635e851a87db46ad1dcb4cceb205e4a861c4e23c1e17e1af1c7fbf0",
-        "ext.error.fmt": "48cfcf0b1ee0f977fd30a4c3626e5979633d4d8142ae2a040a01b40f566ba455",
-        "ext.error.tests": "49fb5e57aab0fda9d7a19cb61f3cf1b0add2e7e451a6f3411d7f28d844d53586"
+        "ext.error.chain": "082d051b9eab7ffba7ab42f20ef6afdbe68389b9060d2fe876575d8fb9f1b76a",
+        "ext.error.context": "3eac73db10c689e7a1e2c944301aadead445e164c3b24c381445fbedac9c5400",
+        "ext.error.fmt": "ac94ff7ff9e4dae4b2a1739848addbb7e0aa87f25e3e73b80d5c6b822eb48c12",
+        "ext.error.tests": "94903cfffa1f37dd22c1e5c2cc063d56ec6030b92a704e3bf247b7e1367cc906"
       }
     }
   ]

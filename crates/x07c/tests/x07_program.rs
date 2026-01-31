@@ -1,10 +1,11 @@
 #![allow(dead_code)]
 
 use serde_json::{json, Value};
+use x07_contracts::X07AST_SCHEMA_VERSION;
 
 pub fn entry(imports: &[&str], decls: Vec<Value>, solve: Value) -> Vec<u8> {
     serde_json::to_vec(&json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": X07AST_SCHEMA_VERSION,
         "kind": "entry",
         "module_id": "main",
         "imports": imports,

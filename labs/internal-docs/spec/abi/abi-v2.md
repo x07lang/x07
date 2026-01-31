@@ -6,7 +6,7 @@ ABI v2 is a **breaking** change from ABI v1: `bytes` becomes an **owning** heap 
 
 Scope:
 - **Value layouts** for core runtime types (`bytes`, `bytes_view`, `vec_u8`, interface records, Option/Result encodings).
-- Not the solver executable I/O ABI (`stdin`/`stdout`), which is specified in `docs/spec/x07-c-backend.md`.
+- Not the solver executable I/O ABI (`stdin`/`stdout`), which is specified in `labs/internal-docs/spec/x07-c-backend.md`.
 
 Non-goals:
 - Stable ABI across **debug vs release** builds when `X07_DEBUG_BORROW` changes layouts. ABI v2 is defined for release layouts; debug-only fields are explicitly guarded by `#ifdef X07_DEBUG_BORROW` in the C header.
@@ -93,6 +93,11 @@ Result:
 Concrete v2 instantiations used by the built-in stdlib and compiler:
 - `option_i32`: `Option<i32>`
 - `option_bytes`: `Option<bytes>`
+- `option_bytes_view`: `Option<bytes_view>`
 - `result_i32`: `Result<i32, i32>` (err payload is an error code)
 - `result_bytes`: `Result<bytes, i32>` (err payload is an error code)
+- `result_bytes_view`: `Result<bytes_view, i32>` (err payload is an error code)
+- `result_result_bytes`: `Result<result_bytes, i32>` (err payload is an error code)
 
+Notes:
+- Brands (for bytes-like types) are compile-time only and do not affect ABI layouts.

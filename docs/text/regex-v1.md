@@ -1,6 +1,6 @@
 # Regex v1 (ext.regex)
 
-This document pins the v1 contract for `ext.regex` (reference implementation: `packages/ext/x07-ext-regex/0.2.3/modules/ext/regex.x07.json`).
+This document pins the v1 contract for `ext.regex` (reference implementation: `packages/ext/x07-ext-regex/0.2.4/modules/ext/regex.x07.json`).
 
 Build note: `ext.regex` is backed by a native static library; stage it with `./scripts/build_ext_regex.sh` before compiling programs that use it.
 
@@ -74,8 +74,10 @@ Accessors:
 
 These helpers return X7SL v1 slice lists (see [X7SL v1](x7sl-v1.md)), intended to be consumed via `std.text.slices`.
 
-- `ext.regex.find_all_x7sl_v1(compiled: bytes_view, text: bytes_view, max_matches_i32: i32) -> bytes` (match slices)
-- `ext.regex.split_v1(compiled: bytes_view, text: bytes_view, max_parts_i32: i32) -> bytes` (segment slices; includes empty segments)
+- `ext.regex.find_all_x7sl_v1(compiled: bytes_view, text: bytes_view, max_matches_i32: i32) -> bytes@std.text.slices.x7sl_v1` (match slices)
+- `ext.regex.split_v1(compiled: bytes_view, text: bytes_view, max_parts_i32: i32) -> bytes@std.text.slices.x7sl_v1` (segment slices; includes empty segments)
+
+If `compiled` is an `ERR` doc (failed compile), these helpers return an empty X7SL (count=0) rather than propagating the compile error.
 
 ## Replace
 

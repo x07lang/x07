@@ -4,12 +4,12 @@ IMPORTANT:
 - Output ONLY one JSON object (no preamble).
 - Do NOT wrap the JSON in Markdown code fences.
 - Do NOT output extra prose.
-- Must satisfy x07AST schema_version `x07.x07ast@0.2.0`.
+- Must satisfy x07AST schema_version `x07.x07ast@0.3.0`.
 
 Program encoding: UTF-8 JSON text.
 
 Entry program object fields:
-- `schema_version`: `x07.x07ast@0.2.0`
+- `schema_version`: `x07.x07ast@0.3.0`
 - `kind`: `entry`
 - `module_id`: `main`
 - `imports`: array of module IDs (e.g. `std.bytes`)
@@ -29,8 +29,9 @@ Entry program object fields:
 - `bytes` for owned byte arrays (move-only; outputs and owned buffers)
 - `bytes_view` for borrowed byte views (zero-copy scanning/slicing)
 - `vec_u8` for mutable byte vectors (move-only; capacity-planned builders)
-- `option_i32`, `option_bytes` for typed optional values
-- `result_i32`, `result_bytes`, `result_result_bytes` for typed results with deterministic error codes
+- `option_i32`, `option_bytes`, `option_bytes_view` for typed optional values
+- `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes` for typed results with deterministic error codes
+- Bytes-like types may carry an optional compile-time brand (see `params[].brand` and `result_brand`)
 - `iface` for interface records (used for streaming readers)
 - Raw pointer types (standalone-only; require unsafe capability): `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`
 
@@ -60,7 +61,7 @@ Move rules (critical):
 
 Echo (returns input):
 ```json
-{"schema_version":"x07.x07ast@0.2.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
+{"schema_version":"x07.x07ast@0.3.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
 ```
 
 Arity reminder:
@@ -144,7 +145,7 @@ Standalone unsafe + FFI:
 
 - Define with a `decls[]` entry of kind `defn`.
   - `body` is a single expression; wrap multi-step bodies in `begin`.
-  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `result_i32`, `result_bytes`, `result_result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.
+  - `ty` and `ret_ty` are `i32`, `bytes`, `bytes_view`, `vec_u8`, `option_i32`, `option_bytes`, `option_bytes_view`, `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes`, `iface`, `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, or `ptr_mut_i32`.
   - Function names must be namespaced and start with the current module ID.
     - In the entry file, use module `main` (example: `main.helper`).
   - `input` (bytes_view) is available in all function bodies.

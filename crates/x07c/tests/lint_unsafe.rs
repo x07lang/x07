@@ -1,10 +1,11 @@
 use serde_json::json;
+use x07_contracts::X07AST_SCHEMA_VERSION;
 use x07c::{lint, x07ast};
 
 #[test]
 fn lint_flags_unsafe_ops_in_solve_world() {
     let doc = json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": X07AST_SCHEMA_VERSION,
         "kind": "entry",
         "module_id": "main",
         "imports": [],
@@ -29,7 +30,7 @@ fn lint_flags_unsafe_ops_in_solve_world() {
 #[test]
 fn lint_flags_extern_decls_in_solve_world() {
     let doc = json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": X07AST_SCHEMA_VERSION,
         "kind": "entry",
         "module_id": "main",
         "imports": [],
@@ -63,7 +64,7 @@ fn lint_flags_extern_decls_in_solve_world() {
 #[test]
 fn lint_flags_raw_pointer_types_in_signatures_in_solve_world() {
     let doc = json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": X07AST_SCHEMA_VERSION,
         "kind": "entry",
         "module_id": "main",
         "imports": [],

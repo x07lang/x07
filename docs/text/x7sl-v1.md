@@ -73,11 +73,17 @@ See `stdlib/std/0.1.1/modules/std/text/slices.x07.json`:
 - Builder:
   - `std.text.slices.builder_new_v1(cap_hint)`
   - `std.text.slices.builder_push_v1(out,start,len)`
-  - `std.text.slices.builder_finish_v1(out,count)` → `bytes`
+  - `std.text.slices.builder_finish_v1(out,count)` → `bytes@std.text.slices.x7sl_v1`
+  - `std.text.slices.cast_bytes_v1(b)` → `result_bytes@std.text.slices.x7sl_v1` (validated cast)
 
 - Accessors:
-  - `std.text.slices.count_v1(x7sl)` → `i32` (count or `-1` on invalid)
+  - `std.text.slices.count_v1(x7sl)` → `i32` (count; requires branded X7SL)
   - `std.text.slices.start_v1(x7sl,idx)` → `i32`
   - `std.text.slices.len_v1(x7sl,idx)` → `i32`
   - `std.text.slices.view_at_v1(base_view,x7sl,idx)` → `bytes_view`
   - `std.text.slices.copy_at_v1(base_view,x7sl,idx)` → `bytes` (explicit copy)
+
+Type system integration:
+
+- The canonical X7SL brand id is `std.text.slices.x7sl_v1`.
+- `std.text.slices.validate_v1(x7sl: bytes_view) -> result_i32` is the validator used for safe casting and stream pipe item validation.

@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde_json::json;
 
+use x07_contracts::X07AST_SCHEMA_VERSION;
 use x07c::compile::{compile_program_to_c, CompileErrorKind, CompileOptions};
 
 mod x07_program;
@@ -39,19 +40,21 @@ fn compile_rejects_internal_only_builtins_in_entry_program() {
 
 #[test]
 fn compile_rejects_internal_only_builtins_in_filesystem_modules() {
-    let module = r#"{
-  "schema_version":"x07.x07ast@0.2.0",
-  "kind":"module",
-  "module_id":"app.internal",
-  "imports":[],
-  "decls":[
-    {"kind":"export","names":["app.internal.f"]},
-    {"kind":"defn","name":"app.internal.f","params":[{"name":"h","ty":"i32"}],"result":"bytes","body":["set_u32.dump_u32le","h"]}
-  ]
-}
-"#;
+    let module = json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind":"module",
+        "module_id":"app.internal",
+        "imports":[],
+        "decls":[
+          {"kind":"export","names":["app.internal.f"]},
+          {"kind":"defn","name":"app.internal.f","params":[{"name":"h","ty":"i32"}],"result":"bytes","body":["set_u32.dump_u32le","h"]}
+        ]
+    });
 
-    let module_root = write_temp_file(Path::new("app/internal.x07.json"), module);
+    let module_root = write_temp_file(
+        Path::new("app/internal.x07.json"),
+        &serde_json::to_string(&module).expect("encode module"),
+    );
 
     let mut options = CompileOptions::default();
     options.module_roots.push(module_root);

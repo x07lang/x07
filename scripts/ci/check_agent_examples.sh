@@ -520,6 +520,7 @@ copy_project "examples/agent-gate/web-crawler-local" "$crawler_work"
 
 seed_official_deps "$crawler_work"
 pkg_lock_check "$crawler_work"
+"$x07_bin" policy init --template http-client --project "$crawler_work/x07.json" --mkdir-out >/dev/null
 fmt_check_all "$crawler_work"
 lint_check_one "$crawler_work" "run-os-sandboxed" "src/main.x07.json"
 

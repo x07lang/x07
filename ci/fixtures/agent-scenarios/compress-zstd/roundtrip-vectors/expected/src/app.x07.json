@@ -1,2 +1,2 @@
-{"decls":[{"kind":"export","names":["app.solve"]},{"body":["bytes.lit","ok"],"kind":"defn","name":"app.solve","params":[{"name":"b","ty":"bytes_view"}],"result":"bytes"}],"imports":["ext.zstd"],"kind":"module","module_id":"app","schema_version":"x07.x07ast@0.2.0"}
+{"decls":[{"kind":"export","names":["app.solve"]},{"body":["bytes.lit","ok"],"kind":"defn","name":"app.solve","params":[{"name":"b","ty":"bytes_view"}],"result":"bytes"}],"imports":["ext.zstd"],"kind":"module","module_id":"app","schema_version":"x07.x07ast@0.3.0"}
 

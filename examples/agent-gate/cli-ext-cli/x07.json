@@ -3,33 +3,33 @@
   "dependencies": [
     {
       "name": "ext-cli",
-      "path": ".x07/deps/ext-cli/0.1.7",
-      "version": "0.1.7"
+      "path": ".x07/deps/ext-cli/0.1.8",
+      "version": "0.1.8"
     },
     {
       "name": "ext-data-model",
-      "path": ".x07/deps/ext-data-model/0.1.5",
-      "version": "0.1.5"
+      "path": ".x07/deps/ext-data-model/0.1.6",
+      "version": "0.1.6"
     },
     {
       "name": "ext-json-rs",
-      "path": ".x07/deps/ext-json-rs/0.1.3",
-      "version": "0.1.3"
+      "path": ".x07/deps/ext-json-rs/0.1.4",
+      "version": "0.1.4"
     },
     {
       "name": "ext-toml-rs",
-      "path": ".x07/deps/ext-toml-rs/0.1.4",
-      "version": "0.1.4"
+      "path": ".x07/deps/ext-toml-rs/0.1.5",
+      "version": "0.1.5"
     },
     {
       "name": "ext-unicode-rs",
-      "path": ".x07/deps/ext-unicode-rs/0.1.4",
-      "version": "0.1.4"
+      "path": ".x07/deps/ext-unicode-rs/0.1.5",
+      "version": "0.1.5"
     },
     {
       "name": "ext-yaml-rs",
-      "path": ".x07/deps/ext-yaml-rs/0.1.3",
-      "version": "0.1.3"
+      "path": ".x07/deps/ext-yaml-rs/0.1.4",
+      "version": "0.1.4"
     }
   ],
   "entry": "src/main.x07.json",

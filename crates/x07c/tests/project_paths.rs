@@ -359,7 +359,7 @@ fn project_module_roots_dedup_prevents_duplicate_module_hits() {
     std::fs::create_dir_all(&dep_mod_dir).expect("create dep module dir");
 
     let dep_module = json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": x07_contracts::X07AST_SCHEMA_VERSION,
         "kind": "module",
         "module_id": "dep.main",
         "imports": [],
@@ -375,7 +375,7 @@ fn project_module_roots_dedup_prevents_duplicate_module_hits() {
     .expect("write dep module");
 
     let entry = json!({
-        "schema_version": "x07.x07ast@0.2.0",
+        "schema_version": x07_contracts::X07AST_SCHEMA_VERSION,
         "kind": "entry",
         "module_id": "main",
         "imports": ["dep.main"],

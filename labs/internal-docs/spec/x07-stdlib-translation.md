@@ -1065,7 +1065,7 @@ mod rust_ref {
 
 fn compile_harness(module_root: PathBuf, solve: serde_json::Value) -> PathBuf {
     let program_src = serde_json::to_vec(&serde_json::json!({
-        "schema_version": "x07.x07ast@0.1.0",
+        "schema_version": "x07.x07ast@0.3.0",
         "kind": "entry",
         "module_id": "main",
         "imports": ["std.text.ascii"],
