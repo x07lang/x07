@@ -1,8 +1,8 @@
 {
   "schema_version": "x07.package@0.1.0",
   "name": "ext-time-rs",
-  "description": "Time utilities: durations, RFC 3339, and time zones.",
-  "docs": "Time utilities: durations, RFC 3339, and time zones.\n\nModules:\n- ext.time.duration\n- ext.time.rfc3339\n- ext.time.civil\n- ext.time.instant\n- ext.time.tzdb\n- ext.time.os\n- ext.time.rfc3339.tests\n- ext.time.duration.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-time-rs@0.1.4\n- Import the modules listed above.\n",
+  "description": "Time utilities: durations, RFC 3339, and time zones (run-os only).",
+  "docs": "Time utilities: durations, RFC 3339, and time zones (run-os only).\n\nModules:\n- ext.time.duration\n- ext.time.rfc3339\n- ext.time.civil\n- ext.time.instant\n- ext.time.tzdb\n- ext.time.os\n- ext.time.rfc3339.tests\n- ext.time.duration.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-time-rs@0.1.4\n- Import the modules listed above.\n",
   "version": "0.1.4",
   "module_root": "modules",
   "modules": [
@@ -16,13 +16,8 @@
     "ext.time.duration.tests"
   ],
   "meta": {
-    "determinism_tier": "pure",
+    "determinism_tier": "os-world-only",
     "worlds_allowed": [
-      "solve-pure",
-      "solve-fs",
-      "solve-rr",
-      "solve-kv",
-      "solve-full",
       "run-os",
       "run-os-sandboxed"
     ],

@@ -35,7 +35,7 @@
         ["let", "name", ["ext.xml.xml_tree_node_name", "doc", "node"]],
         [
           "if",
-          ["=", ["std.bytes.eq", ["bytes.view", "name"], ["bytes.view", ["bytes.lit", "loc"]]], 1],
+          ["=", ["std.bytes.eq", ["bytes.view", "name"], ["begin", ["let", "loc_b", ["bytes.lit", "loc"]], ["bytes.view", "loc_b"]]], 1],
           [
             "begin",
             ["let", "cc", ["ext.xml.xml_tree_child_count", "doc", "node"]],
@@ -60,10 +60,8 @@
                   0
                 ],
                 0
-              ],
-              0
-            ],
-            0
+              ]
+            ]
           ],
           0
         ],
@@ -83,8 +81,7 @@
               0
             ],
             0
-          ],
-          0
+          ]
         ],
         "out"
       ]
