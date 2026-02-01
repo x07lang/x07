@@ -104,7 +104,7 @@ def build_skills_pack_bytes(root: Path, *, tag: str | None) -> bytes:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="dist/x07-skills.tar.gz", help="Output path")
-    ap.add_argument("--tag", default=None, help="Release tag (for example: v0.0.75)")
+    ap.add_argument("--tag", default=None, help="Release tag (for example: v0.0.76)")
     ap.add_argument("--check", action="store_true", help="Validate determinism and (if present) output content")
     return ap.parse_args(argv)
 
