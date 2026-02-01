@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -66,6 +67,10 @@ pub fn cmd_doc(args: DocArgs) -> Result<std::process::ExitCode> {
             }
             anyhow::bail!("symbol not exported by {module_id}: {query}");
         }
+    }
+
+    if query.starts_with("std.") && try_print_stdlib_docs(query, &cwd)? {
+        return Ok(std::process::ExitCode::SUCCESS);
     }
 
     if let Some(project_path) = project_path.as_deref() {
@@ -365,6 +370,190 @@ fn print_symbol(symbol: &str, sig: &ExportSig) {
     if sig.kind != "defn" {
         println!("kind: {}", sig.kind);
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct StdlibLockFile {
+    format: String,
+    packages: Vec<StdlibLockPackage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StdlibLockPackage {
+    name: String,
+    path: String,
+    version: String,
+}
+
+#[derive(Debug, Clone)]
+struct StdlibResolvedPackage {
+    version: String,
+    path: PathBuf,
+}
+
+#[derive(Debug)]
+struct StdlibLocks {
+    base_dir: PathBuf,
+    stdlib_lock: PathBuf,
+    stdlib_os_lock: Option<PathBuf>,
+}
+
+fn parse_semver_triplet(v: &str) -> Option<(u32, u32, u32)> {
+    let parts: Vec<&str> = v.trim().split('.').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let major: u32 = parts[0].parse().ok()?;
+    let minor: u32 = parts[1].parse().ok()?;
+    let patch: u32 = parts[2].parse().ok()?;
+    Some((major, minor, patch))
+}
+
+fn resolve_stdlib_lock_path_best_effort(cwd: &Path) -> Option<PathBuf> {
+    let cand = util::resolve_existing_path_upwards_from(cwd, Path::new("stdlib.lock"));
+    if cand.is_file() {
+        return Some(cand);
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            for base in [Some(exe_dir), exe_dir.parent()] {
+                let Some(base) = base else { continue };
+                let cand = base.join("stdlib.lock");
+                if cand.is_file() {
+                    return Some(cand);
+                }
+            }
+        }
+    }
+
+    let home = std::env::var_os("HOME").map(PathBuf::from)?;
+    let toolchains_dir = home.join(".x07").join("toolchains");
+    let mut best: Option<((u32, u32, u32), PathBuf)> = None;
+    for entry in std::fs::read_dir(&toolchains_dir).ok()? {
+        let entry = entry.ok()?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let dir_name = path.file_name()?.to_string_lossy();
+        let dir_name = dir_name.strip_prefix('v').unwrap_or(&dir_name);
+        let Some(ver) = parse_semver_triplet(dir_name) else {
+            continue;
+        };
+        let lock = path.join("stdlib.lock");
+        if !lock.is_file() {
+            continue;
+        }
+        if best.as_ref().map(|(b, _)| ver > *b).unwrap_or(true) {
+            best = Some((ver, lock));
+        }
+    }
+
+    best.map(|(_, p)| p)
+}
+
+fn resolve_stdlib_locks_best_effort(cwd: &Path) -> Option<StdlibLocks> {
+    let stdlib_lock = resolve_stdlib_lock_path_best_effort(cwd)?;
+    let base_dir = stdlib_lock
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+    let os_lock = base_dir.join("stdlib.os.lock");
+    let stdlib_os_lock = os_lock.is_file().then_some(os_lock);
+    Some(StdlibLocks {
+        base_dir,
+        stdlib_lock,
+        stdlib_os_lock,
+    })
+}
+
+fn load_stdlib_index(locks: &StdlibLocks) -> Result<BTreeMap<String, StdlibResolvedPackage>> {
+    fn load_lock(
+        out: &mut BTreeMap<String, StdlibResolvedPackage>,
+        base_dir: &Path,
+        lock_path: &Path,
+    ) -> Result<()> {
+        let bytes = std::fs::read(lock_path)
+            .with_context(|| format!("read stdlib lock: {}", lock_path.display()))?;
+        let lock: StdlibLockFile = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse stdlib lock JSON: {}", lock_path.display()))?;
+        if lock.format.trim() != "x07.stdlib.lock@0.1.0" {
+            anyhow::bail!(
+                "unsupported stdlib lock format: {} (expected x07.stdlib.lock@0.1.0)",
+                lock.format
+            );
+        }
+
+        for pkg in lock.packages {
+            let name = pkg.name.trim();
+            if name.is_empty() {
+                continue;
+            }
+            let version = pkg.version.trim().to_string();
+            let path = pkg.path.trim();
+            if path.is_empty() {
+                continue;
+            }
+            let abs = if Path::new(path).is_absolute() {
+                PathBuf::from(path)
+            } else {
+                base_dir.join(path)
+            };
+
+            let replace = match out.get(name) {
+                None => true,
+                Some(existing) => {
+                    let a = parse_semver_triplet(&version).unwrap_or((0, 0, 0));
+                    let b = parse_semver_triplet(&existing.version).unwrap_or((0, 0, 0));
+                    a > b
+                }
+            };
+            if replace {
+                out.insert(
+                    name.to_string(),
+                    StdlibResolvedPackage { version, path: abs },
+                );
+            }
+        }
+        Ok(())
+    }
+
+    let mut out: BTreeMap<String, StdlibResolvedPackage> = BTreeMap::new();
+    load_lock(&mut out, &locks.base_dir, &locks.stdlib_lock)?;
+    if let Some(os_lock) = locks.stdlib_os_lock.as_deref() {
+        load_lock(&mut out, &locks.base_dir, os_lock)?;
+    }
+    Ok(out)
+}
+
+fn try_print_stdlib_docs(query: &str, cwd: &Path) -> Result<bool> {
+    let Some(locks) = resolve_stdlib_locks_best_effort(cwd) else {
+        anyhow::bail!(
+            "could not locate stdlib.lock (try running from the x07 repo root, or install a toolchain via x07up)"
+        );
+    };
+    let idx = load_stdlib_index(&locks)?;
+
+    if let Some(pkg) = idx.get(query) {
+        let (module_id, exports) = parse_module_file(&pkg.path)?;
+        print_module(&module_id, &pkg.path, &exports);
+        return Ok(true);
+    }
+
+    if let Some((module_id, _suffix)) = query.rsplit_once('.') {
+        if let Some(pkg) = idx.get(module_id) {
+            let (_mid, exports) = parse_module_file(&pkg.path)?;
+            if let Some(sig) = exports.get(query) {
+                print_symbol(query, sig);
+                return Ok(true);
+            }
+            anyhow::bail!("symbol not exported by {module_id}: {query}");
+        }
+    }
+
+    Ok(false)
 }
 
 #[cfg(test)]

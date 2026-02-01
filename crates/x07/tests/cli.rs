@@ -1612,6 +1612,59 @@ fn x07_pkg_versions_and_add_unpinned_and_remove() {
 }
 
 #[test]
+fn x07_doc_supports_stdlib_modules_and_symbols() {
+    let root = repo_root();
+
+    let out = run_x07_in_dir(&root, &["doc", "std.bytes"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("module: std.bytes"),
+        "unexpected stdout:\n{stdout}"
+    );
+
+    let out = run_x07_in_dir(&root, &["doc", "std.small_map.len_bytes_u32"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("std.small_map.len_bytes_u32("),
+        "unexpected stdout:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("bytes_view"),
+        "unexpected stdout:\n{stdout}"
+    );
+}
+
+#[test]
+fn x07_doc_supports_stdlib_os_modules() {
+    let root = repo_root();
+
+    let out = run_x07_in_dir(&root, &["doc", "std.os.fs"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("module: std.os.fs"),
+        "unexpected stdout:\n{stdout}"
+    );
+}
+
+#[test]
 fn x07_pkg_add_sync_is_atomic_on_failure() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_add_sync_atomic");
