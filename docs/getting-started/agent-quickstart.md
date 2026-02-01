@@ -166,7 +166,7 @@ Notes:
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
-- For stdlib modules, use `x07 doc std.<module>` (example: `x07 doc std.bytes`) and `x07 doc std.os.<module>` (example: `x07 doc std.os.fs`).
+- For stdlib modules, use `x07 doc std.<module>` (example: `x07 doc std.bytes`) and `x07 doc std.os.<module>` (example: `x07 doc std.os.env`).
 - For builtins (example: `std.brand.*`), use `x07 guide`.
 - For structured encodings, prefer branded bytes + validators over ad-hoc parsing (see `std.brand.cast_view_v1` / `std.brand.cast_view_copy_v1` in `x07 guide` and `meta.brands_v1` in schema-derived modules).
 - For streaming transforms, prefer `std.stream.pipe_v1` and `std.io.bufread` over manual loops (more predictable allocations; fewer borrow/ownership hazards).

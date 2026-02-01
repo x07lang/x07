@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -69,8 +68,13 @@ pub fn cmd_doc(args: DocArgs) -> Result<std::process::ExitCode> {
         }
     }
 
-    if query.starts_with("std.") && try_print_stdlib_docs(query, &cwd)? {
-        return Ok(std::process::ExitCode::SUCCESS);
+    if query.starts_with("std.") {
+        if try_print_builtin_stdlib_docs(query)? {
+            return Ok(std::process::ExitCode::SUCCESS);
+        }
+        if try_print_stdlib_docs(query, &cwd)? {
+            return Ok(std::process::ExitCode::SUCCESS);
+        }
     }
 
     if let Some(project_path) = project_path.as_deref() {
@@ -195,13 +199,10 @@ struct ExportSig {
     result: String,
 }
 
-fn parse_module_file(
-    path: &Path,
+fn parse_module_bytes(
+    bytes: &[u8],
 ) -> Result<(String, std::collections::BTreeMap<String, ExportSig>)> {
-    let bytes =
-        std::fs::read(path).with_context(|| format!("read module file: {}", path.display()))?;
-    let doc: Value = serde_json::from_slice(&bytes)
-        .with_context(|| format!("parse JSON: {}", path.display()))?;
+    let doc: Value = serde_json::from_slice(bytes).context("parse JSON")?;
     let obj = doc
         .as_object()
         .ok_or_else(|| anyhow::anyhow!("module file must be a JSON object"))?;
@@ -297,6 +298,14 @@ fn parse_module_file(
     Ok((module_id, sigs))
 }
 
+fn parse_module_file(
+    path: &Path,
+) -> Result<(String, std::collections::BTreeMap<String, ExportSig>)> {
+    let bytes =
+        std::fs::read(path).with_context(|| format!("read module file: {}", path.display()))?;
+    parse_module_bytes(&bytes).with_context(|| format!("parse module JSON: {}", path.display()))
+}
+
 fn find_module_file(module_id: &str, module_roots: &[PathBuf]) -> Option<PathBuf> {
     let rel = format!("{}.x07.json", module_id.trim().replace('.', "/"));
     for root in module_roots {
@@ -372,30 +381,27 @@ fn print_symbol(symbol: &str, sig: &ExportSig) {
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct StdlibLockFile {
-    format: String,
-    packages: Vec<StdlibLockPackage>,
-}
+fn try_print_builtin_stdlib_docs(query: &str) -> Result<bool> {
+    if let Some(src) = x07c::builtin_modules::builtin_module_source(query) {
+        let (module_id, exports) = parse_module_bytes(src.as_bytes())
+            .with_context(|| format!("parse builtin module: {query}"))?;
+        print_module(&module_id, Path::new("<builtin>"), &exports);
+        return Ok(true);
+    }
 
-#[derive(Debug, Deserialize)]
-struct StdlibLockPackage {
-    name: String,
-    path: String,
-    version: String,
-}
+    if let Some((module_id, _suffix)) = query.rsplit_once('.') {
+        if let Some(src) = x07c::builtin_modules::builtin_module_source(module_id) {
+            let (_mid, exports) = parse_module_bytes(src.as_bytes())
+                .with_context(|| format!("parse builtin module: {module_id}"))?;
+            if let Some(sig) = exports.get(query) {
+                print_symbol(query, sig);
+                return Ok(true);
+            }
+            anyhow::bail!("symbol not exported by {module_id}: {query}");
+        }
+    }
 
-#[derive(Debug, Clone)]
-struct StdlibResolvedPackage {
-    version: String,
-    path: PathBuf,
-}
-
-#[derive(Debug)]
-struct StdlibLocks {
-    base_dir: PathBuf,
-    stdlib_lock: PathBuf,
-    stdlib_os_lock: Option<PathBuf>,
+    Ok(false)
 }
 
 fn parse_semver_triplet(v: &str) -> Option<(u32, u32, u32)> {
@@ -409,20 +415,16 @@ fn parse_semver_triplet(v: &str) -> Option<(u32, u32, u32)> {
     Some((major, minor, patch))
 }
 
-fn resolve_stdlib_lock_path_best_effort(cwd: &Path) -> Option<PathBuf> {
+fn detect_toolchain_root_best_effort(cwd: &Path) -> Option<PathBuf> {
     let cand = util::resolve_existing_path_upwards_from(cwd, Path::new("stdlib.lock"));
     if cand.is_file() {
-        return Some(cand);
+        return cand.parent().map(|p| p.to_path_buf());
     }
 
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(exe_dir) = exe.parent() {
-            for base in [Some(exe_dir), exe_dir.parent()] {
-                let Some(base) = base else { continue };
-                let cand = base.join("stdlib.lock");
-                if cand.is_file() {
-                    return Some(cand);
-                }
+        for anc in exe.ancestors() {
+            if anc.join("stdlib.lock").is_file() {
+                return Some(anc.to_path_buf());
             }
         }
     }
@@ -441,110 +443,75 @@ fn resolve_stdlib_lock_path_best_effort(cwd: &Path) -> Option<PathBuf> {
         let Some(ver) = parse_semver_triplet(dir_name) else {
             continue;
         };
-        let lock = path.join("stdlib.lock");
-        if !lock.is_file() {
+        if !path.join("stdlib.lock").is_file() {
             continue;
         }
         if best.as_ref().map(|(b, _)| ver > *b).unwrap_or(true) {
-            best = Some((ver, lock));
+            best = Some((ver, path));
         }
     }
 
     best.map(|(_, p)| p)
 }
 
-fn resolve_stdlib_locks_best_effort(cwd: &Path) -> Option<StdlibLocks> {
-    let stdlib_lock = resolve_stdlib_lock_path_best_effort(cwd)?;
-    let base_dir = stdlib_lock
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf();
-    let os_lock = base_dir.join("stdlib.os.lock");
-    let stdlib_os_lock = os_lock.is_file().then_some(os_lock);
-    Some(StdlibLocks {
-        base_dir,
-        stdlib_lock,
-        stdlib_os_lock,
-    })
+fn semver_dirs_sorted_desc(base: &Path) -> Vec<PathBuf> {
+    let mut out: Vec<((u32, u32, u32), PathBuf)> = Vec::new();
+    let Ok(entries) = std::fs::read_dir(base) else {
+        return Vec::new();
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let Some(v) = parse_semver_triplet(name) else {
+            continue;
+        };
+        out.push((v, path));
+    }
+    out.sort_by(|(a, _), (b, _)| b.cmp(a));
+    out.into_iter().map(|(_, p)| p).collect()
 }
 
-fn load_stdlib_index(locks: &StdlibLocks) -> Result<BTreeMap<String, StdlibResolvedPackage>> {
-    fn load_lock(
-        out: &mut BTreeMap<String, StdlibResolvedPackage>,
-        base_dir: &Path,
-        lock_path: &Path,
-    ) -> Result<()> {
-        let bytes = std::fs::read(lock_path)
-            .with_context(|| format!("read stdlib lock: {}", lock_path.display()))?;
-        let lock: StdlibLockFile = serde_json::from_slice(&bytes)
-            .with_context(|| format!("parse stdlib lock JSON: {}", lock_path.display()))?;
-        if lock.format.trim() != "x07.stdlib.lock@0.1.0" {
-            anyhow::bail!(
-                "unsupported stdlib lock format: {} (expected x07.stdlib.lock@0.1.0)",
-                lock.format
-            );
+fn toolchain_stdlib_module_roots(toolchain_root: &Path) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    let stdlib_dir = toolchain_root.join("stdlib");
+    for family in ["os", "std"] {
+        let base = stdlib_dir.join(family);
+        if !base.is_dir() {
+            continue;
         }
-
-        for pkg in lock.packages {
-            let name = pkg.name.trim();
-            if name.is_empty() {
-                continue;
-            }
-            let version = pkg.version.trim().to_string();
-            let path = pkg.path.trim();
-            if path.is_empty() {
-                continue;
-            }
-            let abs = if Path::new(path).is_absolute() {
-                PathBuf::from(path)
-            } else {
-                base_dir.join(path)
-            };
-
-            let replace = match out.get(name) {
-                None => true,
-                Some(existing) => {
-                    let a = parse_semver_triplet(&version).unwrap_or((0, 0, 0));
-                    let b = parse_semver_triplet(&existing.version).unwrap_or((0, 0, 0));
-                    a > b
-                }
-            };
-            if replace {
-                out.insert(
-                    name.to_string(),
-                    StdlibResolvedPackage { version, path: abs },
-                );
+        for ver in semver_dirs_sorted_desc(&base) {
+            let modules = ver.join("modules");
+            if modules.is_dir() {
+                roots.push(modules);
             }
         }
-        Ok(())
     }
-
-    let mut out: BTreeMap<String, StdlibResolvedPackage> = BTreeMap::new();
-    load_lock(&mut out, &locks.base_dir, &locks.stdlib_lock)?;
-    if let Some(os_lock) = locks.stdlib_os_lock.as_deref() {
-        load_lock(&mut out, &locks.base_dir, os_lock)?;
-    }
-    Ok(out)
+    roots
 }
 
 fn try_print_stdlib_docs(query: &str, cwd: &Path) -> Result<bool> {
-    let Some(locks) = resolve_stdlib_locks_best_effort(cwd) else {
-        anyhow::bail!(
-            "could not locate stdlib.lock (try running from the x07 repo root, or install a toolchain via x07up)"
-        );
+    let Some(toolchain_root) = detect_toolchain_root_best_effort(cwd) else {
+        return Ok(false);
     };
-    let idx = load_stdlib_index(&locks)?;
+    let module_roots = toolchain_stdlib_module_roots(&toolchain_root);
+    if module_roots.is_empty() {
+        return Ok(false);
+    }
 
-    if let Some(pkg) = idx.get(query) {
-        let (module_id, exports) = parse_module_file(&pkg.path)?;
-        print_module(&module_id, &pkg.path, &exports);
+    if let Some(path) = find_module_file(query, &module_roots) {
+        let (module_id, exports) = parse_module_file(&path)?;
+        print_module(&module_id, &path, &exports);
         return Ok(true);
     }
 
     if let Some((module_id, _suffix)) = query.rsplit_once('.') {
-        if let Some(pkg) = idx.get(module_id) {
-            let (_mid, exports) = parse_module_file(&pkg.path)?;
+        if let Some(path) = find_module_file(module_id, &module_roots) {
+            let (_mid, exports) = parse_module_file(&path)?;
             if let Some(sig) = exports.get(query) {
                 print_symbol(query, sig);
                 return Ok(true);

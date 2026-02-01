@@ -1613,9 +1613,10 @@ fn x07_pkg_versions_and_add_unpinned_and_remove() {
 
 #[test]
 fn x07_doc_supports_stdlib_modules_and_symbols() {
-    let root = repo_root();
+    let dir = fresh_os_tmp_dir("x07_doc_stdlib");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
 
-    let out = run_x07_in_dir(&root, &["doc", "std.bytes"]);
+    let out = run_x07_in_dir(&dir, &["doc", "std.bytes"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -1628,7 +1629,7 @@ fn x07_doc_supports_stdlib_modules_and_symbols() {
         "unexpected stdout:\n{stdout}"
     );
 
-    let out = run_x07_in_dir(&root, &["doc", "std.small_map.len_bytes_u32"]);
+    let out = run_x07_in_dir(&dir, &["doc", "std.small_map.len_bytes_u32"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -1648,9 +1649,10 @@ fn x07_doc_supports_stdlib_modules_and_symbols() {
 
 #[test]
 fn x07_doc_supports_stdlib_os_modules() {
-    let root = repo_root();
+    let dir = fresh_os_tmp_dir("x07_doc_stdlib_os");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
 
-    let out = run_x07_in_dir(&root, &["doc", "std.os.fs"]);
+    let out = run_x07_in_dir(&dir, &["doc", "std.os.env"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -1659,7 +1661,7 @@ fn x07_doc_supports_stdlib_os_modules() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        stdout.contains("module: std.os.fs"),
+        stdout.contains("module: std.os.env"),
         "unexpected stdout:\n{stdout}"
     );
 }
