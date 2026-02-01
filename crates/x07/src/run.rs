@@ -1483,6 +1483,7 @@ fn pointers_from_compile_error(message: &str) -> Vec<String> {
     let mut raw: Vec<&str> = Vec::new();
     collect_pointers(message, "ptr=", &mut raw);
     collect_pointers(message, "moved_ptr=", &mut raw);
+    collect_pointers(message, "borrowed_ptr=", &mut raw);
 
     let mut out: Vec<String> = Vec::new();
     for p in raw {

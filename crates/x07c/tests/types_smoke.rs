@@ -169,6 +169,44 @@ fn compile_rejects_use_after_move_bytes() {
 }
 
 #[test]
+fn compile_rejects_set_while_borrowed_includes_borrowed_ptr() {
+    let program = x07_program::entry(
+        &[],
+        vec![x07_program::defn(
+            "main.bad",
+            &[],
+            "bytes",
+            json!([
+                "begin",
+                ["let", "b", ["bytes.alloc", 1]],
+                ["let", "v", ["bytes.view", "b"]],
+                ["set", "b", ["bytes.alloc", 2]],
+                "b"
+            ]),
+        )],
+        json!(["bytes.alloc", 0]),
+    );
+    let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
+        .expect_err("must reject set while borrowed");
+    assert_eq!(err.kind, CompileErrorKind::Typing);
+    assert!(
+        err.message.contains("set while borrowed"),
+        "unexpected error message: {}",
+        err.message
+    );
+    assert!(
+        err.message.contains("borrowed_by=\"v\""),
+        "expected borrowed_by in error message: {}",
+        err.message
+    );
+    assert!(
+        err.message.contains("borrowed_ptr=/"),
+        "expected borrowed_ptr in error message: {}",
+        err.message
+    );
+}
+
+#[test]
 fn compile_rejects_bytes_view_of_temporary_includes_hint_and_ptr() {
     let program = x07_program::entry(
         &[],

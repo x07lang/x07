@@ -117,6 +117,7 @@ struct VarRef {
     // For `bytes_view` values that borrow from an owned buffer, this is the C local name of the
     // owner (`bytes_t` or `vec_u8_t`) whose backing allocation must outlive the view.
     borrow_of: Option<String>,
+    borrow_ptr: Option<String>,
     borrow_is_full: bool,
     // Temporaries participate in scope cleanup (drops / borrow releases).
     is_temp: bool,
@@ -676,6 +677,7 @@ impl<'a> Emitter<'a> {
             moved_ptr: None,
             borrow_count: 0,
             borrow_of: None,
+            borrow_ptr: None,
             borrow_is_full: false,
             is_temp,
         }
@@ -732,6 +734,36 @@ impl<'a> Emitter<'a> {
         Ok(())
     }
 
+    fn find_any_borrower_for_owner(&self, owner_c_name: &str) -> Option<(String, VarRef)> {
+        for scope in self.scopes.iter().rev() {
+            for (name, v) in scope {
+                if !is_view_like_ty(v.ty) {
+                    continue;
+                }
+                if v.borrow_of.as_deref() != Some(owner_c_name) {
+                    continue;
+                }
+                return Some((name.clone(), v.clone()));
+            }
+        }
+        None
+    }
+
+    fn borrowed_by_diag_suffix(&self, owner_c_name: &str) -> String {
+        let Some((borrower_name, borrower)) = self.find_any_borrower_for_owner(owner_c_name) else {
+            return String::new();
+        };
+        let borrower_name = borrower_name
+            .strip_prefix("#tmp:")
+            .unwrap_or(borrower_name.as_str());
+        let ptr = borrower
+            .borrow_ptr
+            .as_deref()
+            .filter(|p| !p.is_empty())
+            .unwrap_or("<unknown>");
+        format!(" borrowed_by={borrower_name:?} borrowed_ptr={ptr}")
+    }
+
     fn release_temp_view_borrow(&mut self, view: &VarRef) -> Result<(), CompilerError> {
         if !is_view_like_ty(view.ty) || !view.is_temp {
             return Ok(());
@@ -742,6 +774,7 @@ impl<'a> Emitter<'a> {
         self.dec_borrow_count(owner)?;
         if let Some(tmp) = self.lookup_mut_by_c_name(&view.c_name) {
             tmp.borrow_of = None;
+            tmp.borrow_ptr = None;
         }
         Ok(())
     }
@@ -2455,6 +2488,11 @@ impl<'a> Emitter<'a> {
                             }
                             Some(a)
                         }
+                        (Some(a), None) | (None, Some(a)) => Some(a),
+                        (None, None) => None,
+                    };
+                    v.borrow_ptr = match (t.borrow_ptr.clone(), e.borrow_ptr.clone()) {
+                        (Some(a), Some(_b)) => Some(a),
                         (Some(a), None) | (None, Some(a)) => Some(a),
                         (None, None) => None,
                     };
@@ -9604,10 +9642,12 @@ impl<'a> Emitter<'a> {
             v.brand = ty.brand.clone();
             if is_view_like_ty(ty.ty) {
                 let borrow_of = self.borrow_of_view_like_expr(ty.ty, expr)?;
+                let borrow_ptr = borrow_of.as_ref().map(|_| expr.ptr().to_string());
                 if let Some(owner) = &borrow_of {
                     self.inc_borrow_count(owner)?;
                 }
                 v.borrow_of = borrow_of;
+                v.borrow_ptr = borrow_ptr;
             }
 
             if is_owned_ty(ty.ty) || is_view_like_ty(ty.ty) {
@@ -9659,6 +9699,7 @@ impl<'a> Emitter<'a> {
                         let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
                         view.brand = owner.brand.clone();
                         view.borrow_of = Some(owner.c_name);
+                        view.borrow_ptr = Some(expr.ptr().to_string());
                         view.borrow_is_full = true;
                         self.bind(format!("#tmp:{tmp}"), view.clone());
                         Ok(view)
@@ -9678,6 +9719,7 @@ impl<'a> Emitter<'a> {
                         let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
                         view.brand = owner.brand.clone();
                         view.borrow_of = Some(owner.c_name);
+                        view.borrow_ptr = Some(expr.ptr().to_string());
                         view.borrow_is_full = true;
                         self.bind(format!("#tmp:{tmp}"), view.clone());
                         Ok(view)
@@ -9718,6 +9760,7 @@ impl<'a> Emitter<'a> {
                         self.inc_borrow_count(&owner.c_name)?;
                         let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
                         view.borrow_of = Some(owner.c_name);
+                        view.borrow_ptr = Some(expr.ptr().to_string());
                         view.borrow_is_full = true;
                         self.bind(format!("#tmp:{tmp}"), view.clone());
                         Ok(view)
@@ -9739,6 +9782,7 @@ impl<'a> Emitter<'a> {
                         self.inc_borrow_count(&owner.c_name)?;
                         let mut view = self.make_var_ref(Ty::BytesView, tmp.clone(), true);
                         view.borrow_of = Some(owner.c_name);
+                        view.borrow_ptr = Some(expr.ptr().to_string());
                         view.borrow_is_full = true;
                         self.bind(format!("#tmp:{tmp}"), view.clone());
                         Ok(view)
@@ -9940,10 +9984,12 @@ impl<'a> Emitter<'a> {
 
         if is_view_like_ty(expr_ty.ty) {
             let borrow_of = self.borrow_of_view_like_expr(expr_ty.ty, &args[1])?;
+            let borrow_ptr = borrow_of.as_ref().map(|_| args[1].ptr().to_string());
             if let Some(owner) = &borrow_of {
                 self.inc_borrow_count(owner)?;
             }
             var.borrow_of = borrow_of;
+            var.borrow_ptr = borrow_ptr;
         }
 
         self.bind(name.to_string(), var);
@@ -9974,7 +10020,10 @@ impl<'a> Emitter<'a> {
             if dst.borrow_count != 0 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("set while borrowed: {name:?}"),
+                    format!(
+                        "set while borrowed: {name:?}{}",
+                        self.borrowed_by_diag_suffix(&dst.c_name)
+                    ),
                 ));
             }
 
@@ -9999,6 +10048,7 @@ impl<'a> Emitter<'a> {
             self.decl_local(dst.ty, &tmp);
             self.emit_expr_to(&args[1], dst.ty, &tmp)?;
             let new_borrow_of = self.borrow_of_view_like_expr(dst.ty, &args[1])?;
+            let new_borrow_ptr = new_borrow_of.as_ref().map(|_| args[1].ptr().to_string());
 
             let old_borrow_of = dst.borrow_of.clone();
             if let Some(owner) = &old_borrow_of {
@@ -10009,6 +10059,7 @@ impl<'a> Emitter<'a> {
             }
             if let Some(v) = self.lookup_mut(name) {
                 v.borrow_of = new_borrow_of;
+                v.borrow_ptr = new_borrow_ptr;
             }
 
             self.line(&format!("{} = {tmp};", dst.c_name));
@@ -10681,10 +10732,12 @@ impl<'a> Emitter<'a> {
         var.brand = expr_ty.brand.clone();
         if is_view_like_ty(expr_ty.ty) {
             let borrow_of = self.borrow_of_view_like_expr(expr_ty.ty, &args[1])?;
+            let borrow_ptr = borrow_of.as_ref().map(|_| args[1].ptr().to_string());
             if let Some(owner) = &borrow_of {
                 self.inc_borrow_count(owner)?;
             }
             var.borrow_of = borrow_of;
+            var.borrow_ptr = borrow_ptr;
         }
         self.bind(name.to_string(), var);
         self.line(&format!("{dest} = {c_name};"));
@@ -18195,7 +18248,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             if var.borrow_count != 0 {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,
-                    format!("vec_u8.set while borrowed: {name:?}"),
+                    format!(
+                        "vec_u8.set while borrowed: {name:?}{}",
+                        self.borrowed_by_diag_suffix(&var.c_name)
+                    ),
                 ));
             }
             if var.ty != Ty::VecU8 {
