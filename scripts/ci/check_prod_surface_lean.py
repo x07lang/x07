@@ -43,6 +43,7 @@ ALLOWED_TRACKED_ROOT_ENTRIES = {
     "stdlib.os.lock",
 
     # production content
+    "arch",
     "branding",
     "catalog",
     "ci",
