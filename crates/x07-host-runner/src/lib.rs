@@ -105,7 +105,6 @@ pub struct RunnerConfig {
     pub fixture_fs_root: Option<PathBuf>,
     pub fixture_fs_latency_index: Option<PathBuf>,
     pub fixture_rr_dir: Option<PathBuf>,
-    pub fixture_rr_index: Option<PathBuf>,
     pub fixture_kv_dir: Option<PathBuf>,
     pub fixture_kv_seed: Option<PathBuf>,
     pub solve_fuel: u64,
@@ -142,9 +141,12 @@ pub struct RunnerResult {
     pub heap_used: Option<u64>,
     pub fs_read_file_calls: Option<u64>,
     pub fs_list_dir_calls: Option<u64>,
-    pub rr_send_calls: Option<u64>,
-    pub rr_request_calls: Option<u64>,
-    pub rr_last_request_sha256: Option<String>,
+    pub rr_open_calls: Option<u64>,
+    pub rr_close_calls: Option<u64>,
+    pub rr_stats_calls: Option<u64>,
+    pub rr_next_calls: Option<u64>,
+    pub rr_next_miss_calls: Option<u64>,
+    pub rr_append_calls: Option<u64>,
     pub kv_get_calls: Option<u64>,
     pub kv_set_calls: Option<u64>,
     pub sched_stats: Option<SchedStats>,
@@ -207,10 +209,9 @@ pub fn compile_options_for_world(
             world.as_str()
         );
     }
-    Ok(x07c::world_config::compile_options_for_world(
-        world,
-        module_roots,
-    ))
+    let mut opts = x07c::world_config::compile_options_for_world(world, module_roots);
+    opts.arch_root = Some(std::env::current_dir().context("get cwd")?);
+    Ok(opts)
 }
 
 pub fn compile_and_run(
@@ -589,9 +590,12 @@ pub fn run_artifact_file(
             heap_used: None,
             fs_read_file_calls: None,
             fs_list_dir_calls: None,
-            rr_send_calls: None,
-            rr_request_calls: None,
-            rr_last_request_sha256: None,
+            rr_open_calls: None,
+            rr_close_calls: None,
+            rr_stats_calls: None,
+            rr_next_calls: None,
+            rr_next_miss_calls: None,
+            rr_append_calls: None,
             kv_get_calls: None,
             kv_set_calls: None,
             sched_stats: None,
@@ -612,9 +616,12 @@ pub fn run_artifact_file(
             heap_used: None,
             fs_read_file_calls: None,
             fs_list_dir_calls: None,
-            rr_send_calls: None,
-            rr_request_calls: None,
-            rr_last_request_sha256: None,
+            rr_open_calls: None,
+            rr_close_calls: None,
+            rr_stats_calls: None,
+            rr_next_calls: None,
+            rr_next_miss_calls: None,
+            rr_append_calls: None,
             kv_get_calls: None,
             kv_set_calls: None,
             sched_stats: None,
@@ -635,9 +642,12 @@ pub fn run_artifact_file(
             heap_used: None,
             fs_read_file_calls: None,
             fs_list_dir_calls: None,
-            rr_send_calls: None,
-            rr_request_calls: None,
-            rr_last_request_sha256: None,
+            rr_open_calls: None,
+            rr_close_calls: None,
+            rr_stats_calls: None,
+            rr_next_calls: None,
+            rr_next_miss_calls: None,
+            rr_append_calls: None,
             kv_get_calls: None,
             kv_set_calls: None,
             sched_stats: None,
@@ -676,11 +686,12 @@ pub fn run_artifact_file(
     let heap_used = metrics.as_ref().and_then(|m| m.heap_used);
     let fs_read_file_calls = metrics.as_ref().and_then(|m| m.fs_read_file_calls);
     let fs_list_dir_calls = metrics.as_ref().and_then(|m| m.fs_list_dir_calls);
-    let rr_send_calls = metrics.as_ref().and_then(|m| m.rr_send_calls);
-    let rr_request_calls = metrics.as_ref().and_then(|m| m.rr_request_calls);
-    let rr_last_request_sha256 = metrics
-        .as_ref()
-        .and_then(|m| m.rr_last_request_sha256.clone());
+    let rr_open_calls = metrics.as_ref().and_then(|m| m.rr_open_calls);
+    let rr_close_calls = metrics.as_ref().and_then(|m| m.rr_close_calls);
+    let rr_stats_calls = metrics.as_ref().and_then(|m| m.rr_stats_calls);
+    let rr_next_calls = metrics.as_ref().and_then(|m| m.rr_next_calls);
+    let rr_next_miss_calls = metrics.as_ref().and_then(|m| m.rr_next_miss_calls);
+    let rr_append_calls = metrics.as_ref().and_then(|m| m.rr_append_calls);
     let kv_get_calls = metrics.as_ref().and_then(|m| m.kv_get_calls);
     let kv_set_calls = metrics.as_ref().and_then(|m| m.kv_set_calls);
     let sched_stats = metrics.as_ref().and_then(|m| m.sched_stats.clone());
@@ -698,9 +709,12 @@ pub fn run_artifact_file(
         heap_used,
         fs_read_file_calls,
         fs_list_dir_calls,
-        rr_send_calls,
-        rr_request_calls,
-        rr_last_request_sha256,
+        rr_open_calls,
+        rr_close_calls,
+        rr_stats_calls,
+        rr_next_calls,
+        rr_next_miss_calls,
+        rr_append_calls,
         kv_get_calls,
         kv_set_calls,
         sched_stats,
@@ -716,9 +730,12 @@ pub struct MetricsLine {
     pub heap_used: Option<u64>,
     pub fs_read_file_calls: Option<u64>,
     pub fs_list_dir_calls: Option<u64>,
-    pub rr_send_calls: Option<u64>,
-    pub rr_request_calls: Option<u64>,
-    pub rr_last_request_sha256: Option<String>,
+    pub rr_open_calls: Option<u64>,
+    pub rr_close_calls: Option<u64>,
+    pub rr_stats_calls: Option<u64>,
+    pub rr_next_calls: Option<u64>,
+    pub rr_next_miss_calls: Option<u64>,
+    pub rr_append_calls: Option<u64>,
     pub kv_get_calls: Option<u64>,
     pub kv_set_calls: Option<u64>,
     pub sched_stats: Option<SchedStats>,
@@ -738,9 +755,12 @@ pub fn parse_metrics(stderr: &[u8]) -> Option<MetricsLine> {
                 || m.heap_used.is_some()
                 || m.fs_read_file_calls.is_some()
                 || m.fs_list_dir_calls.is_some()
-                || m.rr_send_calls.is_some()
-                || m.rr_request_calls.is_some()
-                || m.rr_last_request_sha256.is_some()
+                || m.rr_open_calls.is_some()
+                || m.rr_close_calls.is_some()
+                || m.rr_stats_calls.is_some()
+                || m.rr_next_calls.is_some()
+                || m.rr_next_miss_calls.is_some()
+                || m.rr_append_calls.is_some()
                 || m.kv_get_calls.is_some()
                 || m.kv_set_calls.is_some()
                 || m.sched_stats.is_some()
@@ -1665,24 +1685,6 @@ fn setup_run_dir(tmp: &TempDir, config: &RunnerConfig) -> Result<()> {
                 .with_context(|| format!("create rr fixture dir: {}", rr_dir.display()))?;
             copy_dir_contents(fixture, &rr_dir)
                 .with_context(|| format!("copy rr fixture dir: {}", fixture.display()))?;
-
-            let dst = rr_dir.join("index.evrr");
-            if let Some(rr_index) = config.fixture_rr_index.as_deref() {
-                ensure_safe_rel_path(rr_index)?;
-                let src = fixture.join(rr_index);
-                write_rr_index_evrr(&src, &dst)
-                    .with_context(|| format!("generate rr index from {}", src.display()))?;
-            } else if !dst.is_file() {
-                let src = fixture.join("index.json");
-                if !src.is_file() {
-                    anyhow::bail!(
-                        "missing rr fixture index (expected {} or prebuilt index.evrr)",
-                        src.display()
-                    );
-                }
-                write_rr_index_evrr(&src, &dst)
-                    .with_context(|| format!("generate rr index from {}", src.display()))?;
-            }
             #[cfg(unix)]
             make_readonly_recursive(tmp.path())?;
             Ok(())
@@ -1745,23 +1747,6 @@ fn setup_run_dir(tmp: &TempDir, config: &RunnerConfig) -> Result<()> {
                 .with_context(|| format!("create rr fixture dir: {}", rr_dir.display()))?;
             copy_dir_contents(rr_fixture, &rr_dir)
                 .with_context(|| format!("copy rr fixture dir: {}", rr_fixture.display()))?;
-            let dst = rr_dir.join("index.evrr");
-            if let Some(rr_index) = config.fixture_rr_index.as_deref() {
-                ensure_safe_rel_path(rr_index)?;
-                let src = rr_fixture.join(rr_index);
-                write_rr_index_evrr(&src, &dst)
-                    .with_context(|| format!("generate rr index from {}", src.display()))?;
-            } else if !dst.is_file() {
-                let src = rr_fixture.join("index.json");
-                if !src.is_file() {
-                    anyhow::bail!(
-                        "missing rr fixture index (expected {} or prebuilt index.evrr)",
-                        src.display()
-                    );
-                }
-                write_rr_index_evrr(&src, &dst)
-                    .with_context(|| format!("generate rr index from {}", src.display()))?;
-            }
 
             let kv_fixture = config
                 .fixture_kv_dir
@@ -1890,64 +1875,6 @@ fn write_fs_latency_evfslat(src_json: &Path, dst_bin: &Path) -> Result<()> {
     }
     std::fs::write(dst_bin, out)
         .with_context(|| format!("write fs latency bin: {}", dst_bin.display()))?;
-    Ok(())
-}
-
-#[derive(Debug, Deserialize)]
-struct RrFixtureIndexJsonV1 {
-    format: String,
-    default_latency_ticks: u64,
-    requests: BTreeMap<String, RrFixtureIndexRequestJsonV1>,
-}
-
-#[derive(Debug, Deserialize)]
-struct RrFixtureIndexRequestJsonV1 {
-    latency_ticks: u64,
-    body_file: String,
-}
-
-fn write_rr_index_evrr(src_json: &Path, dst_bin: &Path) -> Result<()> {
-    let obj = serde_json::from_slice::<RrFixtureIndexJsonV1>(
-        &std::fs::read(src_json)
-            .with_context(|| format!("read rr index json: {}", src_json.display()))?,
-    )
-    .with_context(|| format!("parse rr index json: {}", src_json.display()))?;
-    if obj.format != "x07.rr.fixture_index@0.1.0" {
-        anyhow::bail!("unexpected rr index format: {}", obj.format);
-    }
-    let default_ticks = u32::try_from(obj.default_latency_ticks)
-        .context("rr index default_latency_ticks out of u32 range")?;
-    let count = u32::try_from(obj.requests.len()).context("rr index requests too many")?;
-
-    let mut out = Vec::new();
-    out.extend_from_slice(b"X7RR");
-    out.extend_from_slice(&1u16.to_le_bytes());
-    out.extend_from_slice(&0u16.to_le_bytes());
-    out.extend_from_slice(&default_ticks.to_le_bytes());
-    out.extend_from_slice(&count.to_le_bytes());
-
-    for (key, req) in obj.requests {
-        let k = key.as_bytes();
-        let klen = u32::try_from(k.len()).context("rr index key too long")?;
-        out.extend_from_slice(&klen.to_le_bytes());
-        out.extend_from_slice(k);
-
-        let ticks =
-            u32::try_from(req.latency_ticks).context("rr index latency_ticks out of u32 range")?;
-        out.extend_from_slice(&ticks.to_le_bytes());
-
-        let body = req.body_file.as_bytes();
-        let blen = u32::try_from(body.len()).context("rr index body_file too long")?;
-        out.extend_from_slice(&blen.to_le_bytes());
-        out.extend_from_slice(body);
-    }
-
-    if let Some(parent) = dst_bin.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create dir: {}", parent.display()))?;
-    }
-    std::fs::write(dst_bin, out)
-        .with_context(|| format!("write rr index bin: {}", dst_bin.display()))?;
     Ok(())
 }
 

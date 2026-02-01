@@ -23,8 +23,8 @@ See also: [Fixture formats](fixture-formats.md).
 
 ## Request/response cassettes (solve-rr)
 
-- request bytes map to response fixtures
-- optional deterministic latency modeling via fixture metadata
+- request/response interactions are replayed from cassette files (`*.rrbin`)
+- deterministic latency modeling is supported via `latency_ticks` per entry
 
 ### Recording fixtures
 
@@ -34,12 +34,9 @@ To generate a minimal `solve-rr` fixture directory from a real HTTP response, us
 x07 rr record --out fixtures/rr example.com https://example.com
 ```
 
-This writes:
+This appends an entry to a cassette file under `fixtures/rr/` (see [Fixture formats](fixture-formats.md)).
 
-- `fixtures/rr/index.json` (fixture index)
-- `fixtures/rr/bodies/<sha256(key)>.bin` (raw response body bytes)
-
-Your program can then use `std.rr.fetch(key)` (or `std.rr.send(key)` for streaming) in `solve-rr`, and the runner will resolve `key` through the fixture index.
+In `solve-rr`, programs typically open cassettes via `std.rr.with_policy_v1` and then replay entries via `std.rr.next_v1` + `std.rr.entry_resp_v1`.
 
 ## Seeded KV (solve-kv)
 

@@ -82,7 +82,6 @@ class BenchSuite:
     fixture_root: str | None = None
     fs_root: str | None = None
     fs_latency_index: str | None = None
-    rr_index: str | None = None
     kv_seed: str | None = None
     requires_debug_borrow_checks: bool = False
 
@@ -165,7 +164,6 @@ def _load_suite_obj(obj: dict[str, Any]) -> BenchSuite:
     fixture_root = opt_str_field("fixture_root")
     fs_root = opt_str_field("fs_root")
     fs_latency_index = opt_str_field("fs_latency_index")
-    rr_index = opt_str_field("rr_index")
     kv_seed = opt_str_field("kv_seed")
     requires_debug_borrow_checks = bool(obj.get("requires_debug_borrow_checks") or False)
 
@@ -237,7 +235,6 @@ def _load_suite_obj(obj: dict[str, Any]) -> BenchSuite:
         fixture_root=fixture_root,
         fs_root=fs_root,
         fs_latency_index=fs_latency_index,
-        rr_index=rr_index,
         kv_seed=kv_seed,
         requires_debug_borrow_checks=requires_debug_borrow_checks,
     )
@@ -401,8 +398,6 @@ def _extend_runner_cmd_with_fixtures(*, cmd: list[str], suite: BenchSuite) -> No
 
     if suite.world == "solve-rr":
         cmd.extend(["--fixture-rr-dir", str(base_dir)])
-        if suite.rr_index:
-            cmd.extend(["--fixture-rr-index", str(suite.rr_index)])
         return
 
     if suite.world == "solve-kv":
@@ -419,7 +414,6 @@ def _extend_runner_cmd_with_fixtures(*, cmd: list[str], suite: BenchSuite) -> No
 
         fs_root = suite.fs_root
         fs_latency_index = suite.fs_latency_index
-        rr_index = suite.rr_index
         kv_seed = suite.kv_seed
 
         if fs_root is not None:
@@ -435,14 +429,12 @@ def _extend_runner_cmd_with_fixtures(*, cmd: list[str], suite: BenchSuite) -> No
             )
             if fs_dir2 != fs_dir:
                 fs_dir = fs_dir2
-        if rr_index is not None:
-            rr_dir, rr_index = _split_solve_full_fixture_root_component_path(
-                suite=suite, base_dir=fixture_root, rel_path=rr_index, component="rr"
-            )
         if kv_seed is not None:
             kv_dir, kv_seed = _split_solve_full_fixture_root_component_path(
                 suite=suite, base_dir=fixture_root, rel_path=kv_seed, component="kv"
             )
+
+        rr_dir = fixture_root / "rr" if (fixture_root / "rr").is_dir() else fixture_root
 
         cmd.extend(
             [
@@ -458,8 +450,6 @@ def _extend_runner_cmd_with_fixtures(*, cmd: list[str], suite: BenchSuite) -> No
             cmd.extend(["--fixture-fs-root", str(fs_root)])
         if fs_latency_index:
             cmd.extend(["--fixture-fs-latency-index", str(fs_latency_index)])
-        if rr_index:
-            cmd.extend(["--fixture-rr-index", str(rr_index)])
         if kv_seed:
             cmd.extend(["--fixture-kv-seed", str(kv_seed)])
         return
@@ -628,18 +618,18 @@ def _enforce_assertions(
 
         _require_nonempty_str(ss, "sched_trace_hash", ctx=ctx)
 
-    want_rr_req_min = assertions.get("min_rr_request_calls")
-    want_rr_req_max = assertions.get("max_rr_request_calls")
+    want_rr_req_min = assertions.get("min_rr_next_calls")
+    want_rr_req_max = assertions.get("max_rr_next_calls")
     if want_rr_req_min is not None or want_rr_req_max is not None:
-        got = solve_obj.get("rr_request_calls")
+        got = solve_obj.get("rr_next_calls")
         if not isinstance(got, int):
-            raise ValueError(f"{ctx}: missing rr_request_calls")
+            raise ValueError(f"{ctx}: missing rr_next_calls")
         _check_range(
             ctx=ctx,
             got=int(got),
             min_v=int(want_rr_req_min) if want_rr_req_min is not None else None,
             max_v=int(want_rr_req_max) if want_rr_req_max is not None else None,
-            label="rr_request_calls",
+            label="rr_next_calls",
         )
 
     want_min_read = assertions.get("min_fs_read_file_calls")
@@ -718,12 +708,12 @@ def _enforce_assertions(
                     raise ValueError(f"{ctx}: missing fs_list_dir_calls for {need}")
                 if got < 1:
                     raise ValueError(f"{ctx}: capability {need} requires fs_list_dir_calls >= 1")
-            elif need == "rr.fetch":
-                got = solve_obj.get("rr_request_calls")
+            elif need == "rr.next":
+                got = solve_obj.get("rr_next_calls")
                 if not isinstance(got, int):
-                    raise ValueError(f"{ctx}: missing rr_request_calls for {need}")
+                    raise ValueError(f"{ctx}: missing rr_next_calls for {need}")
                 if got < 1:
-                    raise ValueError(f"{ctx}: capability {need} requires rr_request_calls >= 1")
+                    raise ValueError(f"{ctx}: capability {need} requires rr_next_calls >= 1")
             elif need == "kv.get":
                 got = solve_obj.get("kv_get_calls")
                 if not isinstance(got, int):

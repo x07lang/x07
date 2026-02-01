@@ -16,7 +16,6 @@ fn solve_kv_reads_from_seeded_store() {
         fixture_fs_root: None,
         fixture_fs_latency_index: None,
         fixture_rr_dir: None,
-        fixture_rr_index: None,
         fixture_kv_dir: Some(fixture),
         fixture_kv_seed: Some(PathBuf::from("seed.json")),
         solve_fuel: 10_000_000,

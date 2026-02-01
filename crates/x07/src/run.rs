@@ -117,8 +117,6 @@ pub struct RunArgs {
     #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_rr_dir: Option<PathBuf>,
     #[arg(long, value_name = "PATH", hide = true)]
-    pub fixture_rr_index: Option<PathBuf>,
-    #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_kv_dir: Option<PathBuf>,
     #[arg(long, value_name = "PATH", hide = true)]
     pub fixture_kv_seed: Option<PathBuf>,
@@ -488,10 +486,6 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
             if let Some(dir) = fixtures.rr_dir {
                 argv.push("--fixture-rr-dir".to_string());
                 argv.push(dir.display().to_string());
-            }
-            if let Some(idx) = fixtures.rr_index {
-                argv.push("--fixture-rr-index".to_string());
-                argv.push(idx.display().to_string());
             }
             if let Some(dir) = fixtures.kv_dir {
                 argv.push("--fixture-kv-dir".to_string());
@@ -1178,7 +1172,6 @@ struct ResolvedFixtures {
     fs_root: Option<PathBuf>,
     fs_latency_index: Option<PathBuf>,
     rr_dir: Option<PathBuf>,
-    rr_index: Option<PathBuf>,
     kv_dir: Option<PathBuf>,
     kv_seed: Option<PathBuf>,
 }
@@ -1200,7 +1193,6 @@ fn resolve_fixtures(
         fs_root: args.fixture_fs_root.clone(),
         fs_latency_index: args.fixture_fs_latency_index.clone(),
         rr_dir: None,
-        rr_index: args.fixture_rr_index.clone(),
         kv_dir: None,
         kv_seed: args.fixture_kv_seed.clone(),
     };

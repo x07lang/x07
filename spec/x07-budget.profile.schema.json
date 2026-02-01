@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-budget.profile.schema.json",
+  "title": "x07.budget.profile@0.1.0",
+  "description": "Budget scope profile referenced by `arch/budgets/index.x07budgets.json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "cfg"],
+  "properties": {
+    "schema_version": { "const": "x07.budget.profile@0.1.0" },
+    "id": { "$ref": "#/$defs/id" },
+    "v": { "type": "integer", "minimum": 1 },
+    "cfg": { "$ref": "#/$defs/cfg" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["trap_v1", "result_err_v1", "stats_only_v1", "yield_v1"]
+    },
+    "u64": { "type": "integer", "minimum": 0 },
+    "u32": { "type": "integer", "minimum": 0 },
+    "cfg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "label"],
+      "properties": {
+        "mode": { "$ref": "#/$defs/mode" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "alloc_bytes": { "$ref": "#/$defs/u64", "default": 0 },
+        "alloc_calls": { "$ref": "#/$defs/u32", "default": 0 },
+        "realloc_calls": { "$ref": "#/$defs/u32", "default": 0 },
+        "memcpy_bytes": { "$ref": "#/$defs/u64", "default": 0 },
+        "sched_ticks": { "$ref": "#/$defs/u64", "default": 0 },
+        "fuel": { "$ref": "#/$defs/u64", "default": 0 }
+      }
+    }
+  }
+}

@@ -3,7 +3,6 @@
   "fixture_root": "ci/fixtures/bench/full/solve-full/stdlib-parity-suite-full@0.1.0",
   "fs_root": "fs/root",
   "fs_latency_index": "fs/latency.json",
-  "rr_index": "rr/index.json",
   "kv_seed": "kv/seed.json",
   "suite_id": "stdlib-parity-smoke@0.1.0",
   "tasks": [
@@ -36,7 +35,7 @@
         "replay_runs": 3,
         "capabilities_required": [
           "fs.read_file",
-          "rr.fetch",
+          "rr.next",
           "kv.get",
           "kv.set"
         ]
@@ -49,8 +48,8 @@
           "assertions": {
             "min_fs_read_file_calls": 3,
             "max_fs_read_file_calls": 4,
-            "min_rr_request_calls": 2,
-            "max_rr_request_calls": 2,
+            "min_rr_next_calls": 2,
+            "max_rr_next_calls": 2,
             "min_kv_get_calls": 3,
             "max_kv_get_calls": 4,
             "min_kv_set_calls": 2,
@@ -87,7 +86,7 @@
         "replay_required": true,
         "replay_runs": 3,
         "capabilities_required": [
-          "rr.fetch",
+          "rr.next",
           "kv.get",
           "kv.set"
         ]
@@ -98,8 +97,8 @@
           "input_b64": "BEFBQkE=",
           "expected_b64": "eyJpZCI6NywibmFtZSI6ImFsaWNlIiwic2NvcmUiOjEwfXsiaWQiOjcsIm5hbWUiOiJhbGljZSIsInNjb3JlIjoxMH17ImlkIjo0MiwibmFtZSI6ImJvYiIsInNjb3JlIjoyMH17ImlkIjo3LCJuYW1lIjoiYWxpY2UiLCJzY29yZSI6MTB9",
           "assertions": {
-            "min_rr_request_calls": 2,
-            "max_rr_request_calls": 2,
+            "min_rr_next_calls": 2,
+            "max_rr_next_calls": 2,
             "min_kv_get_calls": 4,
             "max_kv_get_calls": 4,
             "min_kv_set_calls": 2,

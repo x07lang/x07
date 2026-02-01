@@ -32,6 +32,7 @@ mod repair;
 mod rr;
 mod run;
 mod schema;
+mod sm;
 mod toolchain;
 mod util;
 
@@ -84,6 +85,8 @@ enum Command {
     Doc(doc::DocArgs),
     /// Derive schema modules from x07schema JSON.
     Schema(schema::SchemaArgs),
+    /// Generate and validate state machines.
+    Sm(sm::SmArgs),
     /// Record RR fixtures.
     #[command(hide = true)]
     Rr(rr::RrArgs),
@@ -254,6 +257,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 None => vec!["schema"],
                 Some(schema::SchemaCommand::Derive(_)) => vec!["schema", "derive"],
             },
+            Some(Command::Sm(args)) => match &args.cmd {
+                None => vec!["sm"],
+                Some(sm::SmCommand::Check(_)) => vec!["sm", "check"],
+                Some(sm::SmCommand::Gen(_)) => vec!["sm", "gen"],
+            },
             Some(Command::Rr(args)) => match &args.cmd {
                 None => vec!["rr"],
                 Some(rr::RrCommand::Record(_)) => vec!["rr", "record"],
@@ -288,6 +296,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Pkg(args) => pkg::cmd_pkg(args),
         Command::Doc(args) => doc::cmd_doc(args),
         Command::Schema(args) => schema::cmd_schema(args),
+        Command::Sm(args) => sm::cmd_sm(args),
         Command::Rr(args) => rr::cmd_rr(args),
     }
 }
@@ -550,6 +559,23 @@ fn matches_expectation_strs(expect: &str, status: &str) -> bool {
     )
 }
 
+fn infer_arch_root_from_manifest(manifest: &Path) -> Option<PathBuf> {
+    let start_dir = manifest
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let start_dir = std::fs::canonicalize(&start_dir).unwrap_or(start_dir);
+
+    let mut dir: Option<&Path> = Some(start_dir.as_path());
+    while let Some(d) = dir {
+        if d.join("arch").is_dir() {
+            return Some(d.to_path_buf());
+        }
+        dir = d.parent();
+    }
+    None
+}
+
 fn run_one_test(
     args: &TestArgs,
     module_roots: &[PathBuf],
@@ -594,8 +620,11 @@ fn run_one_test(
         (None, None, None)
     };
 
-    let compile_options =
+    let mut compile_options =
         x07c::world_config::compile_options_for_world(test.world, module_roots.to_vec());
+    compile_options.arch_root = infer_arch_root_from_manifest(&args.manifest)
+        .or_else(|| args.manifest.parent().map(|p| p.to_path_buf()))
+        .or_else(|| std::env::current_dir().ok());
 
     let runner_config = runner_config_for_test(test)?;
 
@@ -983,7 +1012,6 @@ fn runner_config_for_test(test: &TestDecl) -> Result<RunnerConfig> {
         fixture_fs_root: None,
         fixture_fs_latency_index: None,
         fixture_rr_dir: None,
-        fixture_rr_index: None,
         fixture_kv_dir: None,
         fixture_kv_seed: None,
         solve_fuel: 50_000_000,
@@ -1014,9 +1042,6 @@ fn runner_config_for_test(test: &TestDecl) -> Result<RunnerConfig> {
                 .as_deref()
                 .context("solve-rr requires fixture_root")?;
             cfg.fixture_rr_dir = Some(fixture.to_path_buf());
-            if fixture.join("index.json").is_file() {
-                cfg.fixture_rr_index = Some(PathBuf::from("index.json"));
-            }
         }
         WorldId::SolveKv => {
             let fixture = test
@@ -1046,9 +1071,6 @@ fn runner_config_for_test(test: &TestDecl) -> Result<RunnerConfig> {
             }
 
             cfg.fixture_rr_dir = Some(rr_fixture.clone());
-            if rr_fixture.join("index.json").is_file() {
-                cfg.fixture_rr_index = Some(PathBuf::from("index.json"));
-            }
 
             cfg.fixture_kv_dir = Some(kv_fixture.clone());
             if kv_fixture.join("seed.json").is_file() {

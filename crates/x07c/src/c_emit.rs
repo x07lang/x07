@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde_json::Value;
+
 use crate::ast::Expr;
 use crate::compile::{CompileErrorKind, CompileOptions, CompilerError};
 use crate::language;
@@ -7,6 +9,10 @@ use crate::native;
 use crate::native::NativeBackendReq;
 use crate::program::{AsyncFunctionDef, ExternFunctionDecl, FunctionDef, FunctionParam, Program};
 use crate::types::Ty;
+use x07_contracts::{
+    X07_ARCH_RR_INDEX_SCHEMA_VERSION, X07_ARCH_RR_POLICY_SCHEMA_VERSION,
+    X07_BUDGET_PROFILE_SCHEMA_VERSION,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TyBrand {
@@ -123,6 +129,20 @@ struct AsyncVarRef {
     c_name: String,
     moved: bool,
     moved_ptr: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+enum CleanupScope {
+    Task {
+        c_name: String,
+    },
+    Budget {
+        c_name: String,
+    },
+    Rr {
+        handle_c_name: String,
+        prev_c_name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -527,6 +547,7 @@ struct Emitter<'a> {
     local_count: usize,
     scopes: Vec<BTreeMap<String, VarRef>>,
     task_scopes: Vec<String>,
+    cleanup_scopes: Vec<CleanupScope>,
     fn_c_names: BTreeMap<String, String>,
     async_fn_new_names: BTreeMap<String, String>,
     extern_functions: BTreeMap<String, ExternFunctionDecl>,
@@ -572,6 +593,7 @@ impl<'a> Emitter<'a> {
             local_count: 0,
             scopes: vec![BTreeMap::new()],
             task_scopes: Vec::new(),
+            cleanup_scopes: Vec::new(),
             fn_c_names,
             async_fn_new_names,
             extern_functions,
@@ -765,6 +787,9 @@ impl<'a> Emitter<'a> {
             Ty::TaskScopeV1 => {
                 self.line(&format!("rt_scope_dispose_on_drop(ctx, &{c_name});"));
             }
+            Ty::BudgetScopeV1 => {
+                self.line(&format!("rt_budget_scope_dispose_on_drop(ctx, &{c_name});"));
+            }
             Ty::TaskSelectEvtV1 => {
                 self.line(&format!(
                     "if ({c_name} != 0) rt_select_evt_drop(ctx, {c_name});"
@@ -779,6 +804,48 @@ impl<'a> Emitter<'a> {
                 self.line("}");
                 self.line(&format!("{c_name}.tag = UINT32_C(0);"));
                 self.line(&format!("{c_name}.payload = UINT32_C(0);"));
+            }
+            _ => {}
+        }
+    }
+
+    fn emit_overwrite_result_with_err(&mut self, ty: Ty, c_name: &str, err_code: &str) {
+        match ty {
+            Ty::ResultI32 => {
+                self.line(&format!(
+                    "{c_name} = (result_i32_t){{ .tag = UINT32_C(0), .payload.err = {err_code} }};"
+                ));
+            }
+            Ty::ResultBytes => {
+                self.line(&format!("if ({c_name}.tag) {{"));
+                self.indent += 1;
+                self.line(&format!("rt_bytes_drop(ctx, &{c_name}.payload.ok);"));
+                self.indent -= 1;
+                self.line("}");
+                self.line(&format!(
+                    "{c_name} = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {err_code} }};"
+                ));
+            }
+            Ty::ResultBytesView => {
+                self.line(&format!(
+                    "{c_name} = (result_bytes_view_t){{ .tag = UINT32_C(0), .payload.err = {err_code} }};"
+                ));
+            }
+            Ty::ResultResultBytes => {
+                self.line(&format!("if ({c_name}.tag) {{"));
+                self.indent += 1;
+                self.line(&format!("if ({c_name}.payload.ok.tag) {{"));
+                self.indent += 1;
+                self.line(&format!(
+                    "rt_bytes_drop(ctx, &{c_name}.payload.ok.payload.ok);"
+                ));
+                self.indent -= 1;
+                self.line("}");
+                self.indent -= 1;
+                self.line("}");
+                self.line(&format!(
+                    "{c_name} = (result_result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {err_code} }};"
+                ));
             }
             _ => {}
         }
@@ -2460,39 +2527,8 @@ impl<'a> Emitter<'a> {
         let uses_json_jcs = program_uses_head(self.program, "json.jcs.canon_doc_v1");
 
         if self.options.enable_fs || self.options.enable_rr || self.options.enable_kv {
-            const FS_START: &str = "\n#if X07_ENABLE_FS\nstatic bytes_t rt_fs_read";
-            const SHA256_START: &str = "\nstatic uint32_t rt_sha256_rotr";
-            const SHA256_END: &str = "\nstatic void rt_hex_bytes";
-            const RR_SEND_REQUEST_START: &str = "\nstatic bytes_t rt_rr_send_request";
-            const RR_SEND_REQUEST_END: &str = "\nstatic void rt_rr_index_load";
-            const RR_SEND_START: &str =
-                "\nstatic uint32_t rt_rr_send(ctx_t* ctx, bytes_view_t req)";
-            const RR_SEND_END: &str = "\n#endif\n\nstatic uint32_t rt_kv_u32_le";
-
-            let uses_fs = program_uses_head(self.program, "fs.read")
-                || program_uses_head(self.program, "fs.read_async")
-                || program_uses_head(self.program, "fs.open_read")
-                || program_uses_head(self.program, "fs.list_dir");
-            let uses_rr_send_request = program_uses_head(self.program, "rr.send_request");
-            let uses_rr_send = program_uses_head(self.program, "rr.send");
-
             let mut preamble = RUNTIME_C_PREAMBLE.to_string();
 
-            if !uses_fs {
-                preamble = trim_preamble_section(&preamble, FS_START, SHA256_START, "fs runtime")?;
-            }
-            if !uses_rr_send_request {
-                preamble = trim_preamble_section(&preamble, SHA256_START, SHA256_END, "sha256")?;
-                preamble = trim_preamble_section(
-                    &preamble,
-                    RR_SEND_REQUEST_START,
-                    RR_SEND_REQUEST_END,
-                    "rr.send_request",
-                )?;
-            }
-            if !uses_rr_send {
-                preamble = trim_preamble_section(&preamble, RR_SEND_START, RR_SEND_END, "rr.send")?;
-            }
             if !uses_json_jcs {
                 preamble =
                     trim_preamble_section(&preamble, JSON_JCS_START, JSON_JCS_END, "json.jcs")?;
@@ -2698,6 +2734,7 @@ impl<'a> Emitter<'a> {
             unsafe_depth: usize,
             scopes: Vec<BTreeMap<String, AsyncVarRef>>,
             task_scopes: Vec<AsyncVarRef>,
+            cleanup_scopes: Vec<CleanupScope>,
             states: Vec<Vec<String>>,
             ret_state: usize,
             fn_name: String,
@@ -2934,6 +2971,10 @@ impl<'a> Emitter<'a> {
                     "set" => return self.emit_set(state, args, dest, cont),
                     "if" => return self.emit_if(state, args, dest, cont),
                     "for" => return self.emit_for(state, args, dest, cont),
+                    "budget.scope_v1" => return self.emit_budget_scope_v1(state, args, dest, cont),
+                    "budget.scope_from_arch_v1" => {
+                        return self.emit_budget_scope_from_arch_v1(state, args, dest, cont)
+                    }
                     "task.scope_v1" => return self.emit_task_scope_v1(state, args, dest, cont),
                     "task.scope.wait_all_v1" => {
                         return self.emit_task_scope_wait_all_v1(state, args, dest, cont)
@@ -6432,109 +6473,22 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "rr.send_request" => {
-                        if !self.options.enable_rr {
-                            return Err(CompilerError::new(
-                                CompileErrorKind::Unsupported,
-                                "rr.send_request is disabled in this world".to_string(),
-                            ));
-                        }
-                        if args.len() != 1
-                            || dest.ty != Ty::Bytes
-                            || !matches!(args[0].ty, Ty::Bytes | Ty::BytesView | Ty::VecU8)
-                        {
-                            return Err(CompilerError::new(
-                                CompileErrorKind::Typing,
-                                "rr.send_request expects bytes_view".to_string(),
-                            ));
-                        }
-                        let req = match args[0].ty {
-                            Ty::BytesView => args[0].c_name.clone(),
-                            Ty::Bytes => format!("rt_bytes_view(ctx, {})", args[0].c_name),
-                            Ty::VecU8 => format!("rt_vec_u8_as_view(ctx, {})", args[0].c_name),
-                            _ => unreachable!(),
-                        };
-                        self.line(
-                            state,
-                            format!("{} = rt_rr_send_request(ctx, {});", dest.c_name, req),
-                        );
-                        self.line(state, format!("goto st_{cont};"));
-                        return Ok(());
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Unsupported,
+                            "rr.send_request has been removed; use std.rr.with_policy_v1 + std.rr.next_v1 / std.rr.append_v1".to_string(),
+                        ));
                     }
                     "rr.fetch" => {
-                        if !self.options.enable_rr {
-                            return Err(CompilerError::new(
-                                CompileErrorKind::Unsupported,
-                                "rr.fetch is disabled in this world".to_string(),
-                            ));
-                        }
-                        if args.len() != 1
-                            || dest.ty != Ty::Bytes
-                            || !matches!(args[0].ty, Ty::Bytes | Ty::BytesView | Ty::VecU8)
-                        {
-                            return Err(CompilerError::new(
-                                CompileErrorKind::Typing,
-                                "rr.fetch expects bytes_view key".to_string(),
-                            ));
-                        }
-                        let key = match args[0].ty {
-                            Ty::BytesView => args[0].c_name.clone(),
-                            Ty::Bytes => format!("rt_bytes_view(ctx, {})", args[0].c_name),
-                            Ty::VecU8 => format!("rt_vec_u8_as_view(ctx, {})", args[0].c_name),
-                            _ => unreachable!(),
-                        };
-                        let done = self.new_state();
-                        self.line(
-                            state,
-                            format!("uint32_t ticks = rt_rr_latency_ticks(ctx, {});", key),
-                        );
-                        self.line(state, "if (ticks == UINT32_C(0)) {");
-                        self.line(
-                            state,
-                            format!("  {} = rt_rr_fetch_body(ctx, {});", dest.c_name, key),
-                        );
-                        self.line(state, format!("  goto st_{cont};"));
-                        self.line(state, "}");
-                        self.line(state, "rt_task_sleep(ctx, ticks);");
-                        self.line(state, format!("f->state = UINT32_C({done});"));
-                        self.line(state, "return UINT32_C(0);");
-                        self.line(
-                            done,
-                            format!("{} = rt_rr_fetch_body(ctx, {});", dest.c_name, key),
-                        );
-                        self.line(done, format!("goto st_{cont};"));
-                        return Ok(());
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Unsupported,
+                            "rr.fetch has been removed; use std.rr.with_policy_v1 + std.rr.next_v1 + std.rr.entry_resp_v1".to_string(),
+                        ));
                     }
                     "rr.send" => {
-                        if !self.options.enable_rr {
-                            return Err(CompilerError::new(
-                                CompileErrorKind::Unsupported,
-                                "rr.send is disabled in this world".to_string(),
-                            ));
-                        }
-                        if args.len() != 1
-                            || dest.ty != Ty::Iface
-                            || !matches!(args[0].ty, Ty::Bytes | Ty::BytesView | Ty::VecU8)
-                        {
-                            return Err(CompilerError::new(
-                                CompileErrorKind::Typing,
-                                "rr.send expects bytes_view req".to_string(),
-                            ));
-                        }
-                        let req = match args[0].ty {
-                            Ty::BytesView => args[0].c_name.clone(),
-                            Ty::Bytes => format!("rt_bytes_view(ctx, {})", args[0].c_name),
-                            Ty::VecU8 => format!("rt_vec_u8_as_view(ctx, {})", args[0].c_name),
-                            _ => unreachable!(),
-                        };
-                        self.line(
-                            state,
-                            format!(
-                                "{} = (iface_t){{ .data = rt_rr_send(ctx, {}), .vtable = RT_IFACE_VTABLE_IO_READER }};",
-                                dest.c_name, req
-                            ),
-                        );
-                        self.line(state, format!("goto st_{cont};"));
-                        return Ok(());
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Unsupported,
+                            "rr.send has been removed; use std.stream.src.rr_send_v1 inside std.stream.pipe_v1".to_string(),
+                        ));
                     }
                     "kv.get" => {
                         if !self.options.enable_kv {
@@ -8233,6 +8187,278 @@ impl<'a> Emitter<'a> {
                 Ok(())
             }
 
+            fn emit_overwrite_result_with_err(
+                &mut self,
+                state: usize,
+                ty: Ty,
+                c_name: &str,
+                err_code: &str,
+            ) {
+                match ty {
+                    Ty::ResultI32 => {
+                        self.line(
+                            state,
+                            format!(
+                                "{c_name} = (result_i32_t){{ .tag = UINT32_C(0), .payload.err = {err_code} }};"
+                            ),
+                        );
+                    }
+                    Ty::ResultBytes => {
+                        self.line(state, format!("if ({c_name}.tag) {{"));
+                        self.line(
+                            state,
+                            format!("  rt_bytes_drop(ctx, &{c_name}.payload.ok);"),
+                        );
+                        self.line(state, "}");
+                        self.line(
+                            state,
+                            format!(
+                                "{c_name} = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {err_code} }};"
+                            ),
+                        );
+                    }
+                    Ty::ResultBytesView => {
+                        self.line(
+                            state,
+                            format!(
+                                "{c_name} = (result_bytes_view_t){{ .tag = UINT32_C(0), .payload.err = {err_code} }};"
+                            ),
+                        );
+                    }
+                    Ty::ResultResultBytes => {
+                        self.line(state, format!("if ({c_name}.tag) {{"));
+                        self.line(state, format!("  if ({c_name}.payload.ok.tag) {{"));
+                        self.line(
+                            state,
+                            format!("    rt_bytes_drop(ctx, &{c_name}.payload.ok.payload.ok);"),
+                        );
+                        self.line(state, "  }");
+                        self.line(state, "}");
+                        self.line(
+                            state,
+                            format!(
+                                "{c_name} = (result_result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {err_code} }};"
+                            ),
+                        );
+                    }
+                    _ => {}
+                }
+            }
+
+            fn emit_budget_scope_v1(
+                &mut self,
+                state: usize,
+                args: &[Expr],
+                dest: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                if args.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "budget.scope_v1 expects 2 args".to_string(),
+                    ));
+                }
+                let cfg = parse_budget_scope_cfg_v1(&args[0])?;
+                if cfg.mode == BudgetScopeModeV1::ResultErrV1
+                    && !matches!(
+                        dest.ty,
+                        Ty::ResultI32
+                            | Ty::ResultBytes
+                            | Ty::ResultBytesView
+                            | Ty::ResultResultBytes
+                    )
+                {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.scope_v1 mode=result_err_v1 returns result_*".to_string(),
+                    ));
+                }
+
+                let mode = match cfg.mode {
+                    BudgetScopeModeV1::TrapV1 => "RT_BUDGET_MODE_TRAP",
+                    BudgetScopeModeV1::ResultErrV1 => "RT_BUDGET_MODE_RESULT_ERR",
+                    BudgetScopeModeV1::StatsOnlyV1 => "RT_BUDGET_MODE_STATS_ONLY",
+                    BudgetScopeModeV1::YieldV1 => "RT_BUDGET_MODE_YIELD",
+                };
+
+                self.line(state, "rt_fuel(ctx, 1);");
+                let scope = self.alloc_local("b_scope_", Ty::BudgetScopeV1)?;
+                let label_bytes = cfg.label.as_bytes();
+                self.tmp_counter += 1;
+                let label_name = format!("budget_label_{}", self.tmp_counter);
+                let label_escaped = c_escape_string(label_bytes);
+                self.line(
+                    state,
+                    format!("static const char {label_name}[] = \"{label_escaped}\";"),
+                );
+                self.line(
+                    state,
+                    format!(
+                        "rt_budget_scope_init(ctx, &{}, {mode}, (const uint8_t*){label_name}, UINT32_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}));",
+                        scope.c_name,
+                        label_bytes.len(),
+                        cfg.alloc_bytes,
+                        cfg.alloc_calls,
+                        cfg.realloc_calls,
+                        cfg.memcpy_bytes,
+                        cfg.sched_ticks,
+                        cfg.fuel
+                    ),
+                );
+
+                let body_state = self.new_state();
+                let exit_state = self.new_state();
+                self.line(state, format!("goto st_{body_state};"));
+
+                self.cleanup_scopes.push(CleanupScope::Budget {
+                    c_name: scope.c_name.clone(),
+                });
+                self.emit_expr_entry(body_state, &args[1], dest.clone(), exit_state)?;
+                let popped_cleanup = self.cleanup_scopes.pop();
+                debug_assert!(matches!(
+                    popped_cleanup,
+                    Some(CleanupScope::Budget { c_name }) if c_name == scope.c_name
+                ));
+
+                let resume = exit_state;
+                self.line(exit_state, "rt_fuel(ctx, 1);");
+                self.line(
+                    exit_state,
+                    format!("if (rt_budget_scope_exit_poll(ctx, &{})) {{", scope.c_name),
+                );
+                if cfg.mode == BudgetScopeModeV1::ResultErrV1 {
+                    self.line(exit_state, format!("  if ({}.violated) {{", scope.c_name));
+                    self.emit_overwrite_result_with_err(
+                        exit_state,
+                        dest.ty,
+                        &dest.c_name,
+                        &format!("{}.err_code", scope.c_name),
+                    );
+                    self.line(exit_state, "  }");
+                }
+                self.line(exit_state, format!("  goto st_{cont};"));
+                self.line(exit_state, "}");
+                self.line(exit_state, format!("f->state = UINT32_C({resume});"));
+                self.line(exit_state, "return UINT32_C(0);");
+                Ok(())
+            }
+
+            fn emit_budget_scope_from_arch_v1(
+                &mut self,
+                state: usize,
+                args: &[Expr],
+                dest: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                if args.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "budget.scope_from_arch_v1 expects 2 args".to_string(),
+                    ));
+                }
+                let Expr::List { items: lit, .. } = &args[0] else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.scope_from_arch_v1 expects bytes.lit profile_id".to_string(),
+                    ));
+                };
+                if lit.first().and_then(Expr::as_ident) != Some("bytes.lit") || lit.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.scope_from_arch_v1 expects bytes.lit profile_id".to_string(),
+                    ));
+                }
+                let Some(profile_id) = lit[1].as_ident() else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.scope_from_arch_v1 expects bytes.lit profile_id".to_string(),
+                    ));
+                };
+                let cfg = load_budget_profile_cfg_from_arch_v1(&self.options, profile_id)?;
+                if cfg.mode == BudgetScopeModeV1::ResultErrV1
+                    && !matches!(
+                        dest.ty,
+                        Ty::ResultI32
+                            | Ty::ResultBytes
+                            | Ty::ResultBytesView
+                            | Ty::ResultResultBytes
+                    )
+                {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.scope_from_arch_v1 returns result_* for this profile".to_string(),
+                    ));
+                }
+
+                let mode = match cfg.mode {
+                    BudgetScopeModeV1::TrapV1 => "RT_BUDGET_MODE_TRAP",
+                    BudgetScopeModeV1::ResultErrV1 => "RT_BUDGET_MODE_RESULT_ERR",
+                    BudgetScopeModeV1::StatsOnlyV1 => "RT_BUDGET_MODE_STATS_ONLY",
+                    BudgetScopeModeV1::YieldV1 => "RT_BUDGET_MODE_YIELD",
+                };
+
+                self.line(state, "rt_fuel(ctx, 1);");
+                let scope = self.alloc_local("b_scope_", Ty::BudgetScopeV1)?;
+                let label_bytes = cfg.label.as_bytes();
+                self.tmp_counter += 1;
+                let label_name = format!("budget_label_{}", self.tmp_counter);
+                let label_escaped = c_escape_string(label_bytes);
+                self.line(
+                    state,
+                    format!("static const char {label_name}[] = \"{label_escaped}\";"),
+                );
+                self.line(
+                    state,
+                    format!(
+                        "rt_budget_scope_init(ctx, &{}, {mode}, (const uint8_t*){label_name}, UINT32_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}));",
+                        scope.c_name,
+                        label_bytes.len(),
+                        cfg.alloc_bytes,
+                        cfg.alloc_calls,
+                        cfg.realloc_calls,
+                        cfg.memcpy_bytes,
+                        cfg.sched_ticks,
+                        cfg.fuel
+                    ),
+                );
+
+                let body_state = self.new_state();
+                let exit_state = self.new_state();
+                self.line(state, format!("goto st_{body_state};"));
+
+                self.cleanup_scopes.push(CleanupScope::Budget {
+                    c_name: scope.c_name.clone(),
+                });
+                self.emit_expr_entry(body_state, &args[1], dest.clone(), exit_state)?;
+                let popped_cleanup = self.cleanup_scopes.pop();
+                debug_assert!(matches!(
+                    popped_cleanup,
+                    Some(CleanupScope::Budget { c_name }) if c_name == scope.c_name
+                ));
+
+                let resume = exit_state;
+                self.line(exit_state, "rt_fuel(ctx, 1);");
+                self.line(
+                    exit_state,
+                    format!("if (rt_budget_scope_exit_poll(ctx, &{})) {{", scope.c_name),
+                );
+                if cfg.mode == BudgetScopeModeV1::ResultErrV1 {
+                    self.line(exit_state, format!("  if ({}.violated) {{", scope.c_name));
+                    self.emit_overwrite_result_with_err(
+                        exit_state,
+                        dest.ty,
+                        &dest.c_name,
+                        &format!("{}.err_code", scope.c_name),
+                    );
+                    self.line(exit_state, "  }");
+                }
+                self.line(exit_state, format!("  goto st_{cont};"));
+                self.line(exit_state, "}");
+                self.line(exit_state, format!("f->state = UINT32_C({resume});"));
+                self.line(exit_state, "return UINT32_C(0);");
+                Ok(())
+            }
+
             fn emit_task_scope_v1(
                 &mut self,
                 state: usize,
@@ -8268,9 +8494,17 @@ impl<'a> Emitter<'a> {
                 self.line(state, format!("goto st_{body_state};"));
 
                 self.task_scopes.push(scope.clone());
+                self.cleanup_scopes.push(CleanupScope::Task {
+                    c_name: scope.c_name.clone(),
+                });
                 self.emit_expr_entry(body_state, &args[1], dest, exit_state)?;
                 let popped = self.task_scopes.pop();
                 debug_assert_eq!(popped.as_ref().map(|v| &v.c_name), Some(&scope.c_name));
+                let popped_cleanup = self.cleanup_scopes.pop();
+                debug_assert!(matches!(
+                    popped_cleanup,
+                    Some(CleanupScope::Task { c_name }) if c_name == scope.c_name
+                ));
 
                 let resume = exit_state;
                 self.line(exit_state, "rt_fuel(ctx, 1);");
@@ -8816,6 +9050,7 @@ impl<'a> Emitter<'a> {
                 }
                 let scopes_snapshot = self.scopes.clone();
                 let task_scopes_snapshot = self.task_scopes.clone();
+                let cleanup_scopes_snapshot = self.cleanup_scopes.clone();
 
                 self.line(state, "rt_fuel(ctx, 1);");
                 let expr_state = self.new_state();
@@ -8835,18 +9070,56 @@ impl<'a> Emitter<'a> {
                     cleanup_start,
                 )?;
 
-                // Unwind any active task scopes (inner-to-outer) before returning.
+                // Unwind any active cleanup scopes (inner-to-outer) before returning.
                 let mut next = self.ret_state;
-                for scope in task_scopes_snapshot.iter() {
+                for scope in cleanup_scopes_snapshot.iter() {
                     let st = self.new_state();
                     let resume = st;
-                    self.line(
-                        st,
-                        format!(
-                            "if (rt_scope_exit_poll(ctx, &{})) goto st_{next};",
-                            scope.c_name
-                        ),
-                    );
+                    match scope {
+                        CleanupScope::Task { c_name } => {
+                            self.line(
+                                st,
+                                format!("if (rt_scope_exit_poll(ctx, &{c_name})) goto st_{next};"),
+                            );
+                        }
+                        CleanupScope::Budget { c_name } => {
+                            self.line(
+                                st,
+                                format!("if (rt_budget_scope_exit_poll(ctx, &{c_name})) {{"),
+                            );
+                            if matches!(
+                                self.fn_ret_ty,
+                                Ty::ResultI32
+                                    | Ty::ResultBytes
+                                    | Ty::ResultBytesView
+                                    | Ty::ResultResultBytes
+                            ) {
+                                self.line(
+                                    st,
+                                    format!(
+                                        "  if ({c_name}.mode == RT_BUDGET_MODE_RESULT_ERR && {c_name}.violated) {{"
+                                    ),
+                                );
+                                self.emit_overwrite_result_with_err(
+                                    st,
+                                    self.fn_ret_ty,
+                                    "f->ret",
+                                    &format!("{c_name}.err_code"),
+                                );
+                                self.line(st, "  }");
+                            }
+                            self.line(st, format!("  goto st_{next};"));
+                            self.line(st, "}");
+                        }
+                        CleanupScope::Rr {
+                            handle_c_name,
+                            prev_c_name,
+                        } => {
+                            self.line(st, format!("ctx->rr_current = {prev_c_name};"));
+                            self.line(st, format!("rt_rr_close_v1(ctx, {handle_c_name});"));
+                            self.line(st, format!("goto st_{next};"));
+                        }
+                    }
                     self.line(st, format!("f->state = UINT32_C({resume});"));
                     self.line(st, "return UINT32_C(0);");
                     next = st;
@@ -8857,6 +9130,7 @@ impl<'a> Emitter<'a> {
                 // expression must not affect the remaining compilation state.
                 self.scopes = scopes_snapshot;
                 self.task_scopes = task_scopes_snapshot;
+                self.cleanup_scopes = cleanup_scopes_snapshot;
                 Ok(())
             }
         }
@@ -8873,6 +9147,7 @@ impl<'a> Emitter<'a> {
             unsafe_depth: 0,
             scopes: vec![BTreeMap::new()],
             task_scopes: Vec::new(),
+            cleanup_scopes: Vec::new(),
             states: Vec::new(),
             ret_state: 0,
             fn_name: f.name.clone(),
@@ -9231,6 +9506,9 @@ impl<'a> Emitter<'a> {
             | Ty::TaskSelectEvtV1
             | Ty::Never => self.line(&format!("uint32_t {name} = UINT32_C(0);")),
             Ty::TaskScopeV1 => self.line(&format!("rt_scope_t {name} = (rt_scope_t){{0}};")),
+            Ty::BudgetScopeV1 => self.line(&format!(
+                "rt_budget_scope_t {name} = (rt_budget_scope_t){{0}};"
+            )),
             Ty::Bytes => self.line(&format!("bytes_t {name} = rt_bytes_empty(ctx);")),
             Ty::BytesView => self.line(&format!("bytes_view_t {name} = rt_view_empty(ctx);")),
             Ty::VecU8 => self.line(&format!("vec_u8_t {name} = (vec_u8_t){{0}};")),
@@ -9295,6 +9573,7 @@ impl<'a> Emitter<'a> {
                 | Ty::TaskSlotV1
                 | Ty::TaskSelectEvtV1 => (ty.ty, self.alloc_local("t_i32_")?),
                 Ty::TaskScopeV1 => (Ty::TaskScopeV1, self.alloc_local("t_scope_")?),
+                Ty::BudgetScopeV1 => (Ty::BudgetScopeV1, self.alloc_local("t_budget_scope_")?),
                 Ty::Bytes => (Ty::Bytes, self.alloc_local("t_bytes_")?),
                 Ty::BytesView => (Ty::BytesView, self.alloc_local("t_view_")?),
                 Ty::VecU8 => (Ty::VecU8, self.alloc_local("t_vec_u8_")?),
@@ -9839,6 +10118,10 @@ impl<'a> Emitter<'a> {
             "set" => self.emit_set_to(args, dest_ty, dest),
             "if" => self.emit_if_to(args, dest_ty, dest),
             "for" => self.emit_for_to(args, dest_ty, dest),
+            "budget.scope_v1" => self.emit_budget_scope_v1_to(args, dest_ty, dest),
+            "budget.scope_from_arch_v1" => {
+                self.emit_budget_scope_from_arch_v1_to(args, dest_ty, dest)
+            }
             "task.scope_v1" => self.emit_task_scope_v1_to(args, dest_ty, dest),
             "task.scope.slot_to_i32_v1" => {
                 self.emit_task_scope_slot_to_i32_v1_to(args, dest_ty, dest)
@@ -10170,9 +10453,16 @@ impl<'a> Emitter<'a> {
             }
             "os.net.http_request" => self.emit_os_net_http_request_to(args, dest_ty, dest),
 
-            "rr.send_request" => self.emit_rr_send_request_to(args, dest_ty, dest),
-            "rr.fetch" => self.emit_rr_fetch_to(args, dest_ty, dest),
-            "rr.send" => self.emit_rr_send_to(args, dest_ty, dest),
+            "rr.open_v1" => self.emit_rr_open_v1_to(args, dest_ty, dest),
+            "rr.close_v1" => self.emit_rr_close_v1_to(args, dest_ty, dest),
+            "rr.stats_v1" => self.emit_rr_stats_v1_to(args, dest_ty, dest),
+            "rr.next_v1" => self.emit_rr_next_v1_to(args, dest_ty, dest),
+            "rr.append_v1" => self.emit_rr_append_v1_to(args, dest_ty, dest),
+            "rr.current_v1" => self.emit_rr_current_v1_to(args, dest_ty, dest),
+            "rr.entry_resp_v1" => self.emit_rr_entry_resp_v1_to(args, dest_ty, dest),
+            "rr.entry_err_v1" => self.emit_rr_entry_err_v1_to(args, dest_ty, dest),
+            "std.rr.with_v1" => self.emit_std_rr_with_v1_to(args, dest_ty, dest),
+            "std.rr.with_policy_v1" => self.emit_std_rr_with_policy_v1_to(args, dest_ty, dest),
             "kv.get" => self.emit_kv_get_to(args, dest_ty, dest),
             "kv.get_async" => self.emit_kv_get_async_to(args, dest_ty, dest),
             "kv.get_stream" => self.emit_kv_get_stream_to(args, dest_ty, dest),
@@ -10582,6 +10872,7 @@ impl<'a> Emitter<'a> {
         }
         let scopes_snapshot = self.scopes.clone();
         let task_scopes_snapshot = self.task_scopes.clone();
+        let cleanup_scopes_snapshot = self.cleanup_scopes.clone();
         let v = self.emit_expr(&args[0])?;
         if v.ty != self.fn_ret_ty && !ty_compat_task_handle_as_i32(v.ty, self.fn_ret_ty) {
             return Err(CompilerError::new(
@@ -10590,9 +10881,8 @@ impl<'a> Emitter<'a> {
             ));
         }
 
-        let task_scopes = self.task_scopes.clone();
-        for scope_name in task_scopes.iter().rev() {
-            self.line(&format!("rt_scope_exit_block(ctx, &{scope_name});"));
+        for scope in cleanup_scopes_snapshot.iter().rev() {
+            self.emit_unwind_cleanup_scope(scope, v.ty, &v.c_name);
         }
         for (ty, c_name) in self.live_owned_drop_list(Some(&v.c_name)) {
             self.emit_drop_var(ty, &c_name);
@@ -10602,7 +10892,42 @@ impl<'a> Emitter<'a> {
         // expression must not affect the remaining compilation state.
         self.scopes = scopes_snapshot;
         self.task_scopes = task_scopes_snapshot;
+        self.cleanup_scopes = cleanup_scopes_snapshot;
         Ok(())
+    }
+
+    fn emit_unwind_cleanup_scope(&mut self, scope: &CleanupScope, ret_ty: Ty, ret_c_name: &str) {
+        match scope {
+            CleanupScope::Task { c_name } => {
+                self.line(&format!("rt_scope_exit_block(ctx, &{c_name});"));
+            }
+            CleanupScope::Budget { c_name } => {
+                self.line(&format!("rt_budget_scope_exit_block(ctx, &{c_name});"));
+                if matches!(
+                    ret_ty,
+                    Ty::ResultI32 | Ty::ResultBytes | Ty::ResultBytesView | Ty::ResultResultBytes
+                ) {
+                    self.line(&format!(
+                        "if ({c_name}.mode == RT_BUDGET_MODE_RESULT_ERR && {c_name}.violated) {{"
+                    ));
+                    self.indent += 1;
+                    self.emit_overwrite_result_with_err(
+                        ret_ty,
+                        ret_c_name,
+                        &format!("{c_name}.err_code"),
+                    );
+                    self.indent -= 1;
+                    self.line("}");
+                }
+            }
+            CleanupScope::Rr {
+                handle_c_name,
+                prev_c_name,
+            } => {
+                self.line(&format!("ctx->rr_current = {prev_c_name};"));
+                self.line(&format!("rt_rr_close_v1(ctx, {handle_c_name});"));
+            }
+        }
     }
 
     fn emit_binop_to(
@@ -12785,6 +13110,207 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         Ok(())
     }
 
+    fn emit_budget_scope_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "budget.scope_v1 expects 2 args".to_string(),
+            ));
+        }
+
+        let cfg = parse_budget_scope_cfg_v1(&args[0])?;
+        if cfg.mode == BudgetScopeModeV1::YieldV1 && !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "budget.scope_v1 mode=yield_v1 is only allowed in solve or defasync".to_string(),
+            ));
+        }
+
+        if cfg.mode == BudgetScopeModeV1::ResultErrV1
+            && !matches!(
+                dest_ty,
+                Ty::ResultI32 | Ty::ResultBytes | Ty::ResultBytesView | Ty::ResultResultBytes
+            )
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.scope_v1 mode=result_err_v1 returns result_*".to_string(),
+            ));
+        }
+
+        let body_ty = self.infer_expr_in_new_scope(&args[1])?;
+        if body_ty != dest_ty && body_ty != Ty::Never {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("budget.scope_v1 body must evaluate to {dest_ty:?} (or return)"),
+            ));
+        }
+
+        let mode = match cfg.mode {
+            BudgetScopeModeV1::TrapV1 => "RT_BUDGET_MODE_TRAP",
+            BudgetScopeModeV1::ResultErrV1 => "RT_BUDGET_MODE_RESULT_ERR",
+            BudgetScopeModeV1::StatsOnlyV1 => "RT_BUDGET_MODE_STATS_ONLY",
+            BudgetScopeModeV1::YieldV1 => "RT_BUDGET_MODE_YIELD",
+        };
+
+        let label_bytes = cfg.label.as_bytes();
+        self.tmp_counter += 1;
+        let label_name = format!("budget_label_{}", self.tmp_counter);
+        let label_escaped = c_escape_string(label_bytes);
+        self.line(&format!(
+            "static const char {label_name}[] = \"{label_escaped}\";"
+        ));
+
+        let scope_name = self.alloc_local("b_scope_")?;
+        self.decl_local(Ty::BudgetScopeV1, &scope_name);
+        self.line(&format!(
+            "rt_budget_scope_init(ctx, &{scope_name}, {mode}, (const uint8_t*){label_name}, UINT32_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}));",
+            label_bytes.len(),
+            cfg.alloc_bytes,
+            cfg.alloc_calls,
+            cfg.realloc_calls,
+            cfg.memcpy_bytes,
+            cfg.sched_ticks,
+            cfg.fuel
+        ));
+
+        self.cleanup_scopes.push(CleanupScope::Budget {
+            c_name: scope_name.clone(),
+        });
+        self.emit_expr_to(&args[1], dest_ty, dest)?;
+        let popped_cleanup = self.cleanup_scopes.pop();
+        debug_assert!(matches!(
+            popped_cleanup,
+            Some(CleanupScope::Budget { c_name }) if c_name == scope_name
+        ));
+
+        self.line(&format!("rt_budget_scope_exit_block(ctx, &{scope_name});"));
+        if cfg.mode == BudgetScopeModeV1::ResultErrV1 {
+            self.line(&format!("if ({scope_name}.violated) {{"));
+            self.indent += 1;
+            self.emit_overwrite_result_with_err(dest_ty, dest, &format!("{scope_name}.err_code"));
+            self.indent -= 1;
+            self.line("}");
+        }
+        Ok(())
+    }
+
+    fn emit_budget_scope_from_arch_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "budget.scope_from_arch_v1 expects 2 args".to_string(),
+            ));
+        }
+
+        let Expr::List { items: lit, .. } = &args[0] else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.scope_from_arch_v1 expects bytes.lit profile_id".to_string(),
+            ));
+        };
+        if lit.first().and_then(Expr::as_ident) != Some("bytes.lit") || lit.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.scope_from_arch_v1 expects bytes.lit profile_id".to_string(),
+            ));
+        }
+        let Some(profile_id) = lit[1].as_ident() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.scope_from_arch_v1 expects bytes.lit profile_id".to_string(),
+            ));
+        };
+
+        let cfg = load_budget_profile_cfg_from_arch_v1(&self.options, profile_id)?;
+        if cfg.mode == BudgetScopeModeV1::YieldV1 && !self.allow_async_ops {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "budget.scope_from_arch_v1 mode=yield_v1 is only allowed in solve or defasync"
+                    .to_string(),
+            ));
+        }
+
+        if cfg.mode == BudgetScopeModeV1::ResultErrV1
+            && !matches!(
+                dest_ty,
+                Ty::ResultI32 | Ty::ResultBytes | Ty::ResultBytesView | Ty::ResultResultBytes
+            )
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.scope_from_arch_v1 returns result_* for this profile".to_string(),
+            ));
+        }
+
+        let body_ty = self.infer_expr_in_new_scope(&args[1])?;
+        if body_ty != dest_ty && body_ty != Ty::Never {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("budget.scope_from_arch_v1 body must evaluate to {dest_ty:?} (or return)"),
+            ));
+        }
+
+        let mode = match cfg.mode {
+            BudgetScopeModeV1::TrapV1 => "RT_BUDGET_MODE_TRAP",
+            BudgetScopeModeV1::ResultErrV1 => "RT_BUDGET_MODE_RESULT_ERR",
+            BudgetScopeModeV1::StatsOnlyV1 => "RT_BUDGET_MODE_STATS_ONLY",
+            BudgetScopeModeV1::YieldV1 => "RT_BUDGET_MODE_YIELD",
+        };
+
+        let label_bytes = cfg.label.as_bytes();
+        self.tmp_counter += 1;
+        let label_name = format!("budget_label_{}", self.tmp_counter);
+        let label_escaped = c_escape_string(label_bytes);
+        self.line(&format!(
+            "static const char {label_name}[] = \"{label_escaped}\";"
+        ));
+
+        let scope_name = self.alloc_local("b_scope_")?;
+        self.decl_local(Ty::BudgetScopeV1, &scope_name);
+        self.line(&format!(
+            "rt_budget_scope_init(ctx, &{scope_name}, {mode}, (const uint8_t*){label_name}, UINT32_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}), UINT64_C({}));",
+            label_bytes.len(),
+            cfg.alloc_bytes,
+            cfg.alloc_calls,
+            cfg.realloc_calls,
+            cfg.memcpy_bytes,
+            cfg.sched_ticks,
+            cfg.fuel
+        ));
+
+        self.cleanup_scopes.push(CleanupScope::Budget {
+            c_name: scope_name.clone(),
+        });
+        self.emit_expr_to(&args[1], dest_ty, dest)?;
+        let popped_cleanup = self.cleanup_scopes.pop();
+        debug_assert!(matches!(
+            popped_cleanup,
+            Some(CleanupScope::Budget { c_name }) if c_name == scope_name
+        ));
+
+        self.line(&format!("rt_budget_scope_exit_block(ctx, &{scope_name});"));
+        if cfg.mode == BudgetScopeModeV1::ResultErrV1 {
+            self.line(&format!("if ({scope_name}.violated) {{"));
+            self.indent += 1;
+            self.emit_overwrite_result_with_err(dest_ty, dest, &format!("{scope_name}.err_code"));
+            self.indent -= 1;
+            self.line("}");
+        }
+
+        Ok(())
+    }
+
     fn emit_task_scope_v1_to(
         &mut self,
         args: &[Expr],
@@ -12825,9 +13351,17 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         ));
 
         self.task_scopes.push(scope_name.clone());
+        self.cleanup_scopes.push(CleanupScope::Task {
+            c_name: scope_name.clone(),
+        });
         self.emit_expr_to(&args[1], dest_ty, dest)?;
         let popped = self.task_scopes.pop();
         debug_assert_eq!(popped.as_deref(), Some(scope_name.as_str()));
+        let popped_cleanup = self.cleanup_scopes.pop();
+        debug_assert!(matches!(
+            popped_cleanup,
+            Some(CleanupScope::Task { c_name }) if c_name == scope_name
+        ));
 
         self.line(&format!("rt_scope_exit_block(ctx, &{scope_name});"));
         Ok(())
@@ -16039,7 +16573,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         Ok(())
     }
 
-    fn emit_rr_send_request_to(
+    fn emit_rr_open_v1_to(
         &mut self,
         args: &[Expr],
         dest_ty: Ty,
@@ -16048,37 +16582,34 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         if !self.options.enable_rr {
             return Err(CompilerError::new(
                 CompileErrorKind::Unsupported,
-                "rr.send_request is disabled in this world".to_string(),
+                "rr.open_v1 is disabled in this world".to_string(),
             ));
         }
         if args.len() != 1 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
-                "rr.send_request expects 1 arg".to_string(),
+                "rr.open_v1 expects 1 arg".to_string(),
             ));
         }
-        if dest_ty != Ty::Bytes {
+        if dest_ty != Ty::ResultI32 {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "rr.send_request returns bytes".to_string(),
+                "rr.open_v1 returns result_i32".to_string(),
             ));
         }
-        let req = self.emit_expr_as_bytes_view(&args[0])?;
-        if req.ty != Ty::BytesView {
+        let cfg = self.emit_expr_as_bytes_view(&args[0])?;
+        if cfg.ty != Ty::BytesView {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "rr.send_request expects bytes_view".to_string(),
+                "rr.open_v1 expects cfg bytes_view".to_string(),
             ));
         }
-        self.line(&format!(
-            "{dest} = rt_rr_send_request(ctx, {});",
-            req.c_name
-        ));
-        self.release_temp_view_borrow(&req)?;
+        self.line(&format!("{dest} = rt_rr_open_v1(ctx, {});", cfg.c_name));
+        self.release_temp_view_borrow(&cfg)?;
         Ok(())
     }
 
-    fn emit_rr_fetch_to(
+    fn emit_rr_close_v1_to(
         &mut self,
         args: &[Expr],
         dest_ty: Ty,
@@ -16087,34 +16618,120 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         if !self.options.enable_rr {
             return Err(CompilerError::new(
                 CompileErrorKind::Unsupported,
-                "rr.fetch is disabled in this world".to_string(),
+                "rr.close_v1 is disabled in this world".to_string(),
             ));
         }
         if args.len() != 1 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
-                "rr.fetch expects 1 arg".to_string(),
+                "rr.close_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.close_v1 returns i32".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.close_v1 expects i32 rr_handle_v1".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_rr_close_v1(ctx, {});", h.c_name));
+        Ok(())
+    }
+
+    fn emit_rr_stats_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.options.enable_rr {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "rr.stats_v1 is disabled in this world".to_string(),
+            ));
+        }
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "rr.stats_v1 expects 1 arg".to_string(),
             ));
         }
         if dest_ty != Ty::Bytes {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "rr.fetch returns bytes".to_string(),
+                "rr.stats_v1 returns bytes".to_string(),
             ));
         }
-        let key = self.emit_expr_as_bytes_view(&args[0])?;
-        if key.ty != Ty::BytesView {
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "rr.fetch expects bytes_view key".to_string(),
+                "rr.stats_v1 expects i32 rr_handle_v1".to_string(),
             ));
         }
-        self.line(&format!("{dest} = rt_rr_fetch_block(ctx, {});", key.c_name));
+        self.line(&format!("{dest} = rt_rr_stats_v1(ctx, {});", h.c_name));
+        Ok(())
+    }
+
+    fn emit_rr_next_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.options.enable_rr {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "rr.next_v1 is disabled in this world".to_string(),
+            ));
+        }
+        if args.len() != 4 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "rr.next_v1 expects 4 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.next_v1 returns result_bytes".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.next_v1 expects (i32 rr_handle_v1, bytes_view kind, bytes_view op, bytes_view key)"
+                    .to_string(),
+            ));
+        }
+        let kind = self.emit_expr_as_bytes_view(&args[1])?;
+        let op = self.emit_expr_as_bytes_view(&args[2])?;
+        let key = self.emit_expr_as_bytes_view(&args[3])?;
+        if kind.ty != Ty::BytesView || op.ty != Ty::BytesView || key.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.next_v1 expects (i32 rr_handle_v1, bytes_view kind, bytes_view op, bytes_view key)"
+                    .to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_rr_next_v1(ctx, {}, {}, {}, {});",
+            h.c_name, kind.c_name, op.c_name, key.c_name
+        ));
+        self.release_temp_view_borrow(&kind)?;
+        self.release_temp_view_borrow(&op)?;
         self.release_temp_view_borrow(&key)?;
         Ok(())
     }
 
-    fn emit_rr_send_to(
+    fn emit_rr_append_v1_to(
         &mut self,
         args: &[Expr],
         dest_ty: Ty,
@@ -16123,33 +16740,326 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         if !self.options.enable_rr {
             return Err(CompilerError::new(
                 CompileErrorKind::Unsupported,
-                "rr.send is disabled in this world".to_string(),
+                "rr.append_v1 is disabled in this world".to_string(),
+            ));
+        }
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "rr.append_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.append_v1 returns result_i32".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.append_v1 expects i32 rr_handle_v1".to_string(),
+            ));
+        }
+        let entry = self.emit_expr_as_bytes_view(&args[1])?;
+        if entry.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.append_v1 expects bytes_view entry".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_rr_append_v1(ctx, {}, {});",
+            h.c_name, entry.c_name
+        ));
+        self.release_temp_view_borrow(&entry)?;
+        Ok(())
+    }
+
+    fn emit_rr_current_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.options.enable_rr {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "rr.current_v1 is disabled in this world".to_string(),
+            ));
+        }
+        if !args.is_empty() {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "rr.current_v1 expects 0 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.current_v1 returns i32 rr_handle_v1".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = ctx->rr_current;"));
+        Ok(())
+    }
+
+    fn emit_rr_entry_resp_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.options.enable_rr {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "rr.entry_resp_v1 is disabled in this world".to_string(),
             ));
         }
         if args.len() != 1 {
             return Err(CompilerError::new(
                 CompileErrorKind::Parse,
-                "rr.send expects 1 arg".to_string(),
+                "rr.entry_resp_v1 expects 1 arg".to_string(),
             ));
         }
-        if dest_ty != Ty::Iface {
+        if dest_ty != Ty::Bytes {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "rr.send returns iface".to_string(),
+                "rr.entry_resp_v1 returns bytes".to_string(),
             ));
         }
-        let req = self.emit_expr_as_bytes_view(&args[0])?;
-        if req.ty != Ty::BytesView {
+        let entry = self.emit_expr_as_bytes_view(&args[0])?;
+        if entry.ty != Ty::BytesView {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
-                "rr.send expects bytes_view req".to_string(),
+                "rr.entry_resp_v1 expects bytes_view entry".to_string(),
             ));
         }
         self.line(&format!(
-            "{dest} = (iface_t){{ .data = rt_rr_send(ctx, {}), .vtable = RT_IFACE_VTABLE_IO_READER }};",
-            req.c_name
+            "{dest} = rt_rr_entry_resp_v1(ctx, {});",
+            entry.c_name
         ));
-        self.release_temp_view_borrow(&req)?;
+        self.release_temp_view_borrow(&entry)?;
+        Ok(())
+    }
+
+    fn emit_rr_entry_err_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.options.enable_rr {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "rr.entry_err_v1 is disabled in this world".to_string(),
+            ));
+        }
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "rr.entry_err_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.entry_err_v1 returns i32".to_string(),
+            ));
+        }
+        let entry = self.emit_expr_as_bytes_view(&args[0])?;
+        if entry.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "rr.entry_err_v1 expects bytes_view entry".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_rr_entry_err_v1(ctx, {});",
+            entry.c_name
+        ));
+        self.release_temp_view_borrow(&entry)?;
+        Ok(())
+    }
+
+    fn emit_std_rr_with_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.options.enable_rr {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "std.rr.with_v1 is disabled in this world".to_string(),
+            ));
+        }
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.rr.with_v1 expects 2 args".to_string(),
+            ));
+        }
+
+        let body_ty = self.infer_expr_in_new_scope(&args[1])?;
+        if body_ty != dest_ty && body_ty != Ty::Never {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("std.rr.with_v1 body must evaluate to {dest_ty:?} (or return)"),
+            ));
+        }
+
+        self.emit_rr_with_cfg_expr_to(&args[0], &args[1], dest_ty, dest)
+    }
+
+    fn emit_std_rr_with_policy_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if !self.options.enable_rr {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                "std.rr.with_policy_v1 is disabled in this world".to_string(),
+            ));
+        }
+        if args.len() != 4 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "std.rr.with_policy_v1 expects 4 args".to_string(),
+            ));
+        }
+
+        let body_ty = self.infer_expr_in_new_scope(&args[3])?;
+        if body_ty != dest_ty && body_ty != Ty::Never {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("std.rr.with_policy_v1 body must evaluate to {dest_ty:?} (or return)"),
+            ));
+        }
+
+        let policy_id = parse_bytes_lit_ascii(&args[0], "std.rr.with_policy_v1 policy_id")?;
+        let cassette_path = parse_bytes_lit_ascii(&args[1], "std.rr.with_policy_v1 cassette_path")?;
+        let mode_i32 = parse_i32_lit(&args[2], "std.rr.with_policy_v1 mode")?;
+
+        let cfg = load_rr_cfg_v1_from_arch_v1(&self.options, &policy_id, &cassette_path, mode_i32)?;
+
+        self.tmp_counter += 1;
+        let cfg_name = format!("rr_cfg_{}", self.tmp_counter);
+        let escaped = c_escape_string(cfg.as_slice());
+        self.line(&format!("static const char {cfg_name}[] = \"{escaped}\";"));
+
+        let cfg_bytes_name = self.alloc_local("t_rr_cfg_bytes_")?;
+        self.decl_local(Ty::Bytes, &cfg_bytes_name);
+        self.line(&format!(
+            "{cfg_bytes_name} = rt_bytes_from_literal(ctx, (const uint8_t*){cfg_name}, UINT32_C({}));",
+            cfg.len()
+        ));
+
+        let cfg_view_name = self.alloc_local("t_rr_cfg_view_")?;
+        self.decl_local(Ty::BytesView, &cfg_view_name);
+        self.line(&format!(
+            "{cfg_view_name} = rt_bytes_view(ctx, {cfg_bytes_name});"
+        ));
+
+        let open_res = self.alloc_local("t_rr_open_")?;
+        self.decl_local(Ty::ResultI32, &open_res);
+        self.line(&format!(
+            "{open_res} = rt_rr_open_v1(ctx, {cfg_view_name});"
+        ));
+        self.line(&format!("rt_bytes_drop(ctx, &{cfg_bytes_name});"));
+        self.line(&format!("{cfg_bytes_name} = rt_bytes_empty(ctx);"));
+
+        self.emit_rr_with_open_result_to(open_res.as_str(), &args[3], dest_ty, dest)?;
+        Ok(())
+    }
+
+    fn emit_rr_with_cfg_expr_to(
+        &mut self,
+        cfg_expr: &Expr,
+        body: &Expr,
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let cfg = self.emit_expr_as_bytes_view(cfg_expr)?;
+        if cfg.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.rr.with_v1 expects cfg bytes_view".to_string(),
+            ));
+        }
+
+        let open_res = self.alloc_local("t_rr_open_")?;
+        self.decl_local(Ty::ResultI32, &open_res);
+        self.line(&format!("{open_res} = rt_rr_open_v1(ctx, {});", cfg.c_name));
+        self.release_temp_view_borrow(&cfg)?;
+
+        self.emit_rr_with_open_result_to(open_res.as_str(), body, dest_ty, dest)
+    }
+
+    fn emit_rr_with_open_result_to(
+        &mut self,
+        open_res_c_name: &str,
+        body: &Expr,
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.line(&format!("if ({open_res_c_name}.tag == UINT32_C(0)) {{"));
+        self.indent += 1;
+        let ret_c_name = "rr_with_ret";
+        match self.fn_ret_ty {
+            Ty::ResultI32 => self.line(&format!(
+                "result_i32_t {ret_c_name} = (result_i32_t){{ .tag = UINT32_C(0), .payload.err = {open_res_c_name}.payload.err }};"
+            )),
+            Ty::ResultBytes => self.line(&format!(
+                "result_bytes_t {ret_c_name} = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {open_res_c_name}.payload.err }};"
+            )),
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "std.rr.with_* requires function return type result_i32 or result_bytes (open failure propagation)".to_string(),
+                ));
+            }
+        }
+        let cleanup_scopes_snapshot = self.cleanup_scopes.clone();
+        for scope in cleanup_scopes_snapshot.iter().rev() {
+            self.emit_unwind_cleanup_scope(scope, self.fn_ret_ty, ret_c_name);
+        }
+        for (ty, c_name) in self.live_owned_drop_list(None) {
+            self.emit_drop_var(ty, &c_name);
+        }
+        self.line(&format!("return {ret_c_name};"));
+        self.indent -= 1;
+        self.line("}");
+
+        let handle_name = self.alloc_local("t_rr_h_")?;
+        self.decl_local(Ty::I32, &handle_name);
+        self.line(&format!(
+            "{handle_name} = (int32_t){open_res_c_name}.payload.ok;"
+        ));
+
+        let prev_name = self.alloc_local("t_rr_prev_")?;
+        self.decl_local(Ty::I32, &prev_name);
+        self.line(&format!("{prev_name} = ctx->rr_current;"));
+        self.line(&format!("ctx->rr_current = {handle_name};"));
+
+        self.cleanup_scopes.push(CleanupScope::Rr {
+            handle_c_name: handle_name.clone(),
+            prev_c_name: prev_name.clone(),
+        });
+        self.emit_expr_to(body, dest_ty, dest)?;
+        let popped_cleanup = self.cleanup_scopes.pop();
+        debug_assert!(matches!(popped_cleanup, Some(CleanupScope::Rr { .. })));
+        self.emit_unwind_cleanup_scope(
+            &CleanupScope::Rr {
+                handle_c_name: handle_name,
+                prev_c_name: prev_name,
+            },
+            dest_ty,
+            dest,
+        );
         Ok(())
     }
 
@@ -19584,17 +20494,23 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 }
                 self.line(&format!("if ({}.tag == UINT32_C(0)) {{", res.c_name));
                 self.indent += 1;
+                let ret_c_name = "try_ret";
+                match self.fn_ret_ty {
+                    Ty::ResultI32 => self.line(&format!("result_i32_t {ret_c_name} = {};", res.c_name)),
+                    Ty::ResultBytes => self.line(&format!(
+                        "result_bytes_t {ret_c_name} = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
+                        res.c_name
+                    )),
+                    other => unreachable!("try(result_i32) invalid fn_ret_ty: {other:?}"),
+                }
+                let cleanup_scopes_snapshot = self.cleanup_scopes.clone();
+                for scope in cleanup_scopes_snapshot.iter().rev() {
+                    self.emit_unwind_cleanup_scope(scope, self.fn_ret_ty, ret_c_name);
+                }
                 for (ty, c_name) in self.live_owned_drop_list(Some(&res.c_name)) {
                     self.emit_drop_var(ty, &c_name);
                 }
-                if self.fn_ret_ty == Ty::ResultI32 {
-                    self.line(&format!("return {};", res.c_name));
-                } else {
-                    self.line(&format!(
-                        "return (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
-                        res.c_name
-                    ));
-                }
+                self.line(&format!("return {ret_c_name};"));
                 self.indent -= 1;
                 self.line("}");
                 self.line(&format!("{dest} = {}.payload.ok;", res.c_name));
@@ -19616,17 +20532,23 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 }
                 self.line(&format!("if ({}.tag == UINT32_C(0)) {{", res.c_name));
                 self.indent += 1;
+                let ret_c_name = "try_ret";
+                match self.fn_ret_ty {
+                    Ty::ResultBytes => self.line(&format!("result_bytes_t {ret_c_name} = {};", res.c_name)),
+                    Ty::ResultI32 => self.line(&format!(
+                        "result_i32_t {ret_c_name} = (result_i32_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
+                        res.c_name
+                    )),
+                    other => unreachable!("try(result_bytes) invalid fn_ret_ty: {other:?}"),
+                }
+                let cleanup_scopes_snapshot = self.cleanup_scopes.clone();
+                for scope in cleanup_scopes_snapshot.iter().rev() {
+                    self.emit_unwind_cleanup_scope(scope, self.fn_ret_ty, ret_c_name);
+                }
                 for (ty, c_name) in self.live_owned_drop_list(Some(&res.c_name)) {
                     self.emit_drop_var(ty, &c_name);
                 }
-                if self.fn_ret_ty == Ty::ResultBytes {
-                    self.line(&format!("return {};", res.c_name));
-                } else {
-                    self.line(&format!(
-                        "return (result_i32_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
-                        res.c_name
-                    ));
-                }
+                self.line(&format!("return {ret_c_name};"));
                 self.indent -= 1;
                 self.line("}");
                 self.line(&format!("{dest} = {}.payload.ok;", res.c_name));
@@ -19650,17 +20572,25 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 }
                 self.line(&format!("if ({}.tag == UINT32_C(0)) {{", res.c_name));
                 self.indent += 1;
+                let ret_c_name = "try_ret";
+                match self.fn_ret_ty {
+                    Ty::ResultBytesView => {
+                        self.line(&format!("result_bytes_view_t {ret_c_name} = {};", res.c_name))
+                    }
+                    Ty::ResultI32 => self.line(&format!(
+                        "result_i32_t {ret_c_name} = (result_i32_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
+                        res.c_name
+                    )),
+                    other => unreachable!("try(result_bytes_view) invalid fn_ret_ty: {other:?}"),
+                }
+                let cleanup_scopes_snapshot = self.cleanup_scopes.clone();
+                for scope in cleanup_scopes_snapshot.iter().rev() {
+                    self.emit_unwind_cleanup_scope(scope, self.fn_ret_ty, ret_c_name);
+                }
                 for (ty, c_name) in self.live_owned_drop_list(None) {
                     self.emit_drop_var(ty, &c_name);
                 }
-                if self.fn_ret_ty == Ty::ResultBytesView {
-                    self.line(&format!("return {};", res.c_name));
-                } else {
-                    self.line(&format!(
-                        "return (result_i32_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
-                        res.c_name
-                    ));
-                }
+                self.line(&format!("return {ret_c_name};"));
                 self.indent -= 1;
                 self.line("}");
                 self.line(&format!("{dest} = {}.payload.ok;", res.c_name));
@@ -20185,6 +21115,607 @@ fn parse_task_scope_cfg_v1(expr: &Expr) -> Result<TaskScopeCfgV1, CompilerError>
         max_join_polls: max_join_polls.unwrap_or(0),
         max_slot_result_bytes: max_slot_result_bytes.unwrap_or(0),
     })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BudgetScopeModeV1 {
+    TrapV1,
+    ResultErrV1,
+    StatsOnlyV1,
+    YieldV1,
+}
+
+#[derive(Debug, Clone)]
+struct BudgetScopeCfgV1 {
+    mode: BudgetScopeModeV1,
+    label: String,
+    alloc_bytes: u64,
+    alloc_calls: u64,
+    realloc_calls: u64,
+    memcpy_bytes: u64,
+    sched_ticks: u64,
+    fuel: u64,
+}
+
+fn parse_budget_scope_cfg_v1(expr: &Expr) -> Result<BudgetScopeCfgV1, CompilerError> {
+    let Expr::List { items, .. } = expr else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "budget.cfg_v1 must be a list".to_string(),
+        ));
+    };
+    if items.first().and_then(Expr::as_ident) != Some("budget.cfg_v1") {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            "budget scope cfg must be budget.cfg_v1".to_string(),
+        ));
+    }
+
+    let mut mode: Option<BudgetScopeModeV1> = None;
+    let mut label: Option<String> = None;
+
+    let mut alloc_bytes: Option<u64> = None;
+    let mut alloc_calls: Option<u64> = None;
+    let mut realloc_calls: Option<u64> = None;
+    let mut memcpy_bytes: Option<u64> = None;
+    let mut sched_ticks: Option<u64> = None;
+    let mut fuel: Option<u64> = None;
+
+    for field in items.iter().skip(1) {
+        let Expr::List { items: kv, .. } = field else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.cfg_v1 field must be a pair".to_string(),
+            ));
+        };
+        if kv.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.cfg_v1 field must be a pair".to_string(),
+            ));
+        }
+        let Some(key) = kv[0].as_ident() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.cfg_v1 key must be an identifier".to_string(),
+            ));
+        };
+
+        match key {
+            "mode" => {
+                let Some(v) = kv[1].as_ident() else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.cfg_v1 mode must be an identifier".to_string(),
+                    ));
+                };
+                let m = match v {
+                    "trap_v1" => BudgetScopeModeV1::TrapV1,
+                    "result_err_v1" => BudgetScopeModeV1::ResultErrV1,
+                    "stats_only_v1" => BudgetScopeModeV1::StatsOnlyV1,
+                    "yield_v1" => BudgetScopeModeV1::YieldV1,
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("budget.cfg_v1 mode is not supported: {v:?}"),
+                        ));
+                    }
+                };
+                if mode.replace(m).is_some() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.cfg_v1 has duplicate mode".to_string(),
+                    ));
+                }
+            }
+            "label" => {
+                let Expr::List {
+                    items: label_items, ..
+                } = &kv[1]
+                else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.cfg_v1 label must be bytes.lit".to_string(),
+                    ));
+                };
+                if label_items.first().and_then(Expr::as_ident) != Some("bytes.lit")
+                    || label_items.len() != 2
+                {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.cfg_v1 label must be bytes.lit".to_string(),
+                    ));
+                }
+                let Some(v) = label_items[1].as_ident() else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.cfg_v1 label bytes.lit expects a text string".to_string(),
+                    ));
+                };
+                if label.replace(v.to_string()).is_some() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.cfg_v1 has duplicate label".to_string(),
+                    ));
+                }
+            }
+            "alloc_bytes" | "alloc_calls" | "realloc_calls" | "memcpy_bytes" | "sched_ticks"
+            | "fuel" => {
+                let Expr::Int { value, .. } = &kv[1] else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.cfg_v1 value must be an integer".to_string(),
+                    ));
+                };
+                if *value < 0 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("budget.cfg_v1 {key} must be >= 0"),
+                    ));
+                }
+                let v = *value as u64;
+                match key {
+                    "alloc_bytes" => {
+                        if alloc_bytes.replace(v).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "budget.cfg_v1 has duplicate alloc_bytes".to_string(),
+                            ));
+                        }
+                    }
+                    "alloc_calls" => {
+                        if alloc_calls.replace(v).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "budget.cfg_v1 has duplicate alloc_calls".to_string(),
+                            ));
+                        }
+                    }
+                    "realloc_calls" => {
+                        if realloc_calls.replace(v).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "budget.cfg_v1 has duplicate realloc_calls".to_string(),
+                            ));
+                        }
+                    }
+                    "memcpy_bytes" => {
+                        if memcpy_bytes.replace(v).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "budget.cfg_v1 has duplicate memcpy_bytes".to_string(),
+                            ));
+                        }
+                    }
+                    "sched_ticks" => {
+                        if sched_ticks.replace(v).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "budget.cfg_v1 has duplicate sched_ticks".to_string(),
+                            ));
+                        }
+                    }
+                    "fuel" => {
+                        if fuel.replace(v).is_some() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "budget.cfg_v1 has duplicate fuel".to_string(),
+                            ));
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("budget.cfg_v1 unknown field: {key}"),
+                ));
+            }
+        }
+    }
+
+    Ok(BudgetScopeCfgV1 {
+        mode: mode.ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.cfg_v1 is missing mode".to_string(),
+            )
+        })?,
+        label: label.ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                "budget.cfg_v1 is missing label".to_string(),
+            )
+        })?,
+        alloc_bytes: alloc_bytes.unwrap_or(0),
+        alloc_calls: alloc_calls.unwrap_or(0),
+        realloc_calls: realloc_calls.unwrap_or(0),
+        memcpy_bytes: memcpy_bytes.unwrap_or(0),
+        sched_ticks: sched_ticks.unwrap_or(0),
+        fuel: fuel.unwrap_or(0),
+    })
+}
+
+fn load_budget_profile_cfg_from_arch_v1(
+    options: &CompileOptions,
+    profile_id: &str,
+) -> Result<BudgetScopeCfgV1, CompilerError> {
+    let Some(arch_root) = options.arch_root.as_ref() else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Unsupported,
+            "budget.scope_from_arch_v1 requires compile_options.arch_root".to_string(),
+        ));
+    };
+
+    let profile_path = arch_root
+        .join("arch")
+        .join("budgets")
+        .join("profiles")
+        .join(format!("{profile_id}.budget.json"));
+
+    let bytes = std::fs::read(&profile_path).map_err(|err| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            format!("read budget profile file {}: {err}", profile_path.display()),
+        )
+    })?;
+
+    let doc: Value = serde_json::from_slice(&bytes).map_err(|err| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            format!(
+                "parse budget profile JSON {}: {err}",
+                profile_path.display()
+            ),
+        )
+    })?;
+
+    let schema_version = doc
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if schema_version != X07_BUDGET_PROFILE_SCHEMA_VERSION {
+        return Err(CompilerError::new(
+            CompileErrorKind::Parse,
+            format!(
+                "budget profile schema_version mismatch: got {schema_version:?} expected {X07_BUDGET_PROFILE_SCHEMA_VERSION:?}"
+            ),
+        ));
+    }
+
+    let doc_id = doc.get("id").and_then(Value::as_str).unwrap_or("");
+    if doc_id != profile_id {
+        return Err(CompilerError::new(
+            CompileErrorKind::Parse,
+            format!("budget profile id mismatch: got {doc_id:?} expected {profile_id:?}"),
+        ));
+    }
+
+    let cfg = doc.get("cfg").and_then(Value::as_object).ok_or_else(|| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            "budget profile cfg must be an object".to_string(),
+        )
+    })?;
+
+    let mode_s = cfg.get("mode").and_then(Value::as_str).unwrap_or("");
+    let mode = match mode_s {
+        "trap_v1" => BudgetScopeModeV1::TrapV1,
+        "result_err_v1" => BudgetScopeModeV1::ResultErrV1,
+        "stats_only_v1" => BudgetScopeModeV1::StatsOnlyV1,
+        "yield_v1" => BudgetScopeModeV1::YieldV1,
+        _ => {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("budget profile cfg.mode is not supported: {mode_s:?}"),
+            ));
+        }
+    };
+
+    let label = cfg.get("label").and_then(Value::as_str).unwrap_or("");
+    if label.is_empty() {
+        return Err(CompilerError::new(
+            CompileErrorKind::Parse,
+            "budget profile cfg.label must be a non-empty string".to_string(),
+        ));
+    }
+
+    Ok(BudgetScopeCfgV1 {
+        mode,
+        label: label.to_string(),
+        alloc_bytes: cfg.get("alloc_bytes").and_then(Value::as_u64).unwrap_or(0),
+        alloc_calls: cfg.get("alloc_calls").and_then(Value::as_u64).unwrap_or(0),
+        realloc_calls: cfg
+            .get("realloc_calls")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        memcpy_bytes: cfg.get("memcpy_bytes").and_then(Value::as_u64).unwrap_or(0),
+        sched_ticks: cfg.get("sched_ticks").and_then(Value::as_u64).unwrap_or(0),
+        fuel: cfg.get("fuel").and_then(Value::as_u64).unwrap_or(0),
+    })
+}
+
+fn parse_bytes_lit_ascii(expr: &Expr, what: &str) -> Result<String, CompilerError> {
+    let Expr::List { items, .. } = expr else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{what} must be bytes.lit"),
+        ));
+    };
+    if items.first().and_then(Expr::as_ident) != Some("bytes.lit") || items.len() != 2 {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{what} must be bytes.lit"),
+        ));
+    }
+    let Some(s) = items[1].as_ident() else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{what} must be bytes.lit"),
+        ));
+    };
+    Ok(s.to_string())
+}
+
+fn parse_i32_lit(expr: &Expr, what: &str) -> Result<i32, CompilerError> {
+    let Expr::List { items, .. } = expr else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{what} must be i32.lit"),
+        ));
+    };
+    if items.first().and_then(Expr::as_ident) != Some("i32.lit") || items.len() != 2 {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{what} must be i32.lit"),
+        ));
+    }
+    let Expr::Int { value, .. } = items[1] else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!("{what} must be i32.lit"),
+        ));
+    };
+    Ok(value)
+}
+
+fn load_rr_cfg_v1_from_arch_v1(
+    options: &CompileOptions,
+    policy_id: &str,
+    cassette_path: &str,
+    mode_i32: i32,
+) -> Result<Vec<u8>, CompilerError> {
+    let Some(arch_root) = options.arch_root.as_ref() else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Unsupported,
+            "std.rr.with_policy_v1 requires compile_options.arch_root".to_string(),
+        ));
+    };
+
+    let index_path = arch_root.join("arch").join("rr").join("index.x07rr.json");
+    let index_bytes = std::fs::read(&index_path).map_err(|err| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            format!("read rr index file {}: {err}", index_path.display()),
+        )
+    })?;
+    let index_doc: Value = serde_json::from_slice(&index_bytes).map_err(|err| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            format!("parse rr index JSON {}: {err}", index_path.display()),
+        )
+    })?;
+
+    let index_schema_version = index_doc
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if index_schema_version != X07_ARCH_RR_INDEX_SCHEMA_VERSION {
+        return Err(CompilerError::new(
+            CompileErrorKind::Parse,
+            format!(
+                "rr index schema_version mismatch: got {index_schema_version:?} expected {X07_ARCH_RR_INDEX_SCHEMA_VERSION:?}"
+            ),
+        ));
+    }
+
+    let mut record_modes_allowed: Vec<String> = Vec::new();
+    if let Some(defaults) = index_doc.get("defaults").and_then(Value::as_object) {
+        if let Some(modes) = defaults
+            .get("record_modes_allowed")
+            .and_then(Value::as_array)
+        {
+            for v in modes {
+                if let Some(s) = v.as_str() {
+                    record_modes_allowed.push(s.to_string());
+                }
+            }
+        }
+    }
+    if record_modes_allowed.is_empty() {
+        record_modes_allowed.push("replay_v1".to_string());
+    }
+
+    let mode_s = match mode_i32 {
+        0 => "off",
+        1 => "record_v1",
+        2 => "replay_v1",
+        3 => "record_missing_v1",
+        4 => "rewrite_v1",
+        _ => {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "std.rr.with_policy_v1 mode must be one of: 0(off),1(record),2(replay),3(record_missing),4(rewrite)"
+                    .to_string(),
+            ));
+        }
+    };
+    if !record_modes_allowed.iter().any(|m| m == mode_s) {
+        return Err(CompilerError::new(
+            CompileErrorKind::Typing,
+            format!(
+                "std.rr.with_policy_v1 mode {mode_s:?} is not allowed by arch/rr index defaults.record_modes_allowed"
+            ),
+        ));
+    }
+
+    let policies = index_doc
+        .get("policies")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "rr index policies must be an array".to_string(),
+            )
+        })?;
+
+    let mut policy_path_rel: Option<String> = None;
+    for p in policies {
+        let Some(obj) = p.as_object() else {
+            continue;
+        };
+        let Some(id) = obj.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        if id != policy_id {
+            continue;
+        }
+        if let Some(path) = obj.get("policy_path").and_then(Value::as_str) {
+            policy_path_rel = Some(path.to_string());
+        }
+        break;
+    }
+    let Some(policy_path_rel) = policy_path_rel else {
+        return Err(CompilerError::new(
+            CompileErrorKind::Parse,
+            format!("rr policy {policy_id:?} not found in rr index policies"),
+        ));
+    };
+
+    let policy_path = arch_root.join(&policy_path_rel);
+    let policy_bytes = std::fs::read(&policy_path).map_err(|err| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            format!("read rr policy file {}: {err}", policy_path.display()),
+        )
+    })?;
+    let policy_doc: Value = serde_json::from_slice(&policy_bytes).map_err(|err| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            format!("parse rr policy JSON {}: {err}", policy_path.display()),
+        )
+    })?;
+
+    let policy_schema_version = policy_doc
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if policy_schema_version != X07_ARCH_RR_POLICY_SCHEMA_VERSION {
+        return Err(CompilerError::new(
+            CompileErrorKind::Parse,
+            format!(
+                "rr policy schema_version mismatch: got {policy_schema_version:?} expected {X07_ARCH_RR_POLICY_SCHEMA_VERSION:?}"
+            ),
+        ));
+    }
+
+    let doc_id = policy_doc.get("id").and_then(Value::as_str).unwrap_or("");
+    if doc_id != policy_id {
+        return Err(CompilerError::new(
+            CompileErrorKind::Parse,
+            format!("rr policy id mismatch: got {doc_id:?} expected {policy_id:?}"),
+        ));
+    }
+
+    let match_mode_s = policy_doc
+        .get("match_mode")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let match_mode_u8: u8 = match match_mode_s {
+        "lookup_v1" => 0,
+        "transcript_v1" => 1,
+        _ => {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("rr policy match_mode is not supported: {match_mode_s:?}"),
+            ));
+        }
+    };
+
+    let budgets = policy_doc
+        .get("budgets")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "rr policy budgets must be an object".to_string(),
+            )
+        })?;
+
+    fn get_u64_field(obj: &serde_json::Map<String, Value>, k: &str) -> Result<u64, CompilerError> {
+        obj.get(k).and_then(Value::as_u64).ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("rr policy budgets.{k} must be an integer"),
+            )
+        })
+    }
+
+    let max_cassette_bytes = get_u64_field(budgets, "max_cassette_bytes")?;
+    let max_entries_u64 = get_u64_field(budgets, "max_entries")?;
+    let max_req_bytes_u64 = get_u64_field(budgets, "max_req_bytes")?;
+    let max_resp_bytes_u64 = get_u64_field(budgets, "max_resp_bytes")?;
+    let max_key_bytes_u64 = get_u64_field(budgets, "max_key_bytes")?;
+
+    let max_entries = u32::try_from(max_entries_u64).map_err(|_| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            "rr policy budgets.max_entries out of u32 range".to_string(),
+        )
+    })?;
+    let max_req_bytes = u32::try_from(max_req_bytes_u64).map_err(|_| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            "rr policy budgets.max_req_bytes out of u32 range".to_string(),
+        )
+    })?;
+    let max_resp_bytes = u32::try_from(max_resp_bytes_u64).map_err(|_| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            "rr policy budgets.max_resp_bytes out of u32 range".to_string(),
+        )
+    })?;
+    let max_key_bytes = u32::try_from(max_key_bytes_u64).map_err(|_| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            "rr policy budgets.max_key_bytes out of u32 range".to_string(),
+        )
+    })?;
+
+    let cassette_bytes = cassette_path.as_bytes();
+    let cassette_len = u32::try_from(cassette_bytes.len()).map_err(|_| {
+        CompilerError::new(
+            CompileErrorKind::Parse,
+            "std.rr.with_policy_v1 cassette_path is too long".to_string(),
+        )
+    })?;
+
+    let mut out = Vec::new();
+    out.extend_from_slice(b"X7RC");
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out.push(mode_i32 as u8);
+    out.push(match_mode_u8);
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out.extend_from_slice(&max_cassette_bytes.to_le_bytes());
+    out.extend_from_slice(&max_entries.to_le_bytes());
+    out.extend_from_slice(&max_req_bytes.to_le_bytes());
+    out.extend_from_slice(&max_resp_bytes.to_le_bytes());
+    out.extend_from_slice(&max_key_bytes.to_le_bytes());
+    out.extend_from_slice(&cassette_len.to_le_bytes());
+    out.extend_from_slice(cassette_bytes);
+    Ok(out)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22849,71 +24380,186 @@ impl InferCtx {
                         }
                         Ok(Ty::Bytes.into())
                     }
-                    "rr.send_request" => {
+                    "rr.current_v1" => {
                         if !self.options.enable_rr {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
-                                "rr.send_request is disabled in this world".to_string(),
+                                "rr.current_v1 is disabled in this world".to_string(),
+                            ));
+                        }
+                        if !args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "rr.current_v1 expects 0 args".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "rr.open_v1" => {
+                        if !self.options.enable_rr {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "rr.open_v1 is disabled in this world".to_string(),
                             ));
                         }
                         if args.len() != 1 {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Parse,
-                                "rr.send_request expects 1 arg".to_string(),
+                                "rr.open_v1 expects 1 arg".to_string(),
                             ));
                         }
-                        let req_ty = self.infer(&args[0])?;
-                        if !matches!(req_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        let cfg_ty = self.infer(&args[0])?;
+                        if !matches!(cfg_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                "rr.send_request expects bytes_view".to_string(),
+                                "rr.open_v1 expects bytes_view cfg".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32.into())
+                    }
+                    "rr.close_v1" => {
+                        if !self.options.enable_rr {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "rr.close_v1 is disabled in this world".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "rr.close_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "rr.close_v1 expects i32 rr_handle_v1".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "rr.stats_v1" => {
+                        if !self.options.enable_rr {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "rr.stats_v1 is disabled in this world".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "rr.stats_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "rr.stats_v1 expects i32 rr_handle_v1".to_string(),
                             ));
                         }
                         Ok(Ty::Bytes.into())
                     }
-                    "rr.fetch" => {
+                    "rr.next_v1" => {
                         if !self.options.enable_rr {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
-                                "rr.fetch is disabled in this world".to_string(),
+                                "rr.next_v1 is disabled in this world".to_string(),
+                            ));
+                        }
+                        if args.len() != 4 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "rr.next_v1 expects 4 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "rr.next_v1 expects i32 rr_handle_v1".to_string(),
+                            ));
+                        }
+                        for (i, what) in ["kind", "op", "key"].into_iter().enumerate() {
+                            let ty = self.infer(&args[i + 1])?;
+                            if !matches!(ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    format!("rr.next_v1 expects bytes_view {what}"),
+                                ));
+                            }
+                        }
+                        Ok(Ty::ResultBytes.into())
+                    }
+                    "rr.append_v1" => {
+                        if !self.options.enable_rr {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "rr.append_v1 is disabled in this world".to_string(),
+                            ));
+                        }
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "rr.append_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "rr.append_v1 expects i32 rr_handle_v1".to_string(),
+                            ));
+                        }
+                        let ty = self.infer(&args[1])?;
+                        if !matches!(ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "rr.append_v1 expects bytes_view entry".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32.into())
+                    }
+                    "rr.entry_resp_v1" => {
+                        if !self.options.enable_rr {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "rr.entry_resp_v1 is disabled in this world".to_string(),
                             ));
                         }
                         if args.len() != 1 {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Parse,
-                                "rr.fetch expects 1 arg".to_string(),
+                                "rr.entry_resp_v1 expects 1 arg".to_string(),
                             ));
                         }
-                        let key_ty = self.infer(&args[0])?;
-                        if !matches!(key_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        let ty = self.infer(&args[0])?;
+                        if !matches!(ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                "rr.fetch expects bytes_view key".to_string(),
+                                "rr.entry_resp_v1 expects bytes_view entry".to_string(),
                             ));
                         }
                         Ok(Ty::Bytes.into())
                     }
-                    "rr.send" => {
+                    "rr.entry_err_v1" => {
                         if !self.options.enable_rr {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
-                                "rr.send is disabled in this world".to_string(),
+                                "rr.entry_err_v1 is disabled in this world".to_string(),
                             ));
                         }
                         if args.len() != 1 {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Parse,
-                                "rr.send expects 1 arg".to_string(),
+                                "rr.entry_err_v1 expects 1 arg".to_string(),
                             ));
                         }
-                        let req_ty = self.infer(&args[0])?;
-                        if !matches!(req_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                        let ty = self.infer(&args[0])?;
+                        if !matches!(ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                "rr.send expects bytes_view req".to_string(),
+                                "rr.entry_err_v1 expects bytes_view entry".to_string(),
                             ));
                         }
-                        Ok(Ty::Iface.into())
+                        Ok(Ty::I32.into())
                     }
                     "kv.get" => {
                         if !self.options.enable_kv {
@@ -23147,6 +24793,177 @@ impl InferCtx {
                             ));
                         }
                         Ok(Ty::ResultI32.into())
+                    }
+                    "budget.cfg_v1" => Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "budget.cfg_v1 is a descriptor; use it only as the first argument to budget.scope_v1".to_string(),
+                    )),
+                    "budget.scope_v1" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "budget.scope_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        let cfg = parse_budget_scope_cfg_v1(&args[0])?;
+                        if cfg.mode == BudgetScopeModeV1::YieldV1 && !self.allow_async_ops {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "budget.scope_v1 mode=yield_v1 is only allowed in solve or defasync".to_string(),
+                            ));
+                        }
+                        let body_ty = self.infer(&args[1])?;
+                        if cfg.mode == BudgetScopeModeV1::ResultErrV1 {
+                            if !matches!(
+                                body_ty.ty,
+                                Ty::ResultI32
+                                    | Ty::ResultBytes
+                                    | Ty::ResultBytesView
+                                    | Ty::ResultResultBytes
+                                    | Ty::Never
+                            ) {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "budget.scope_v1 mode=result_err_v1 requires a result_* body".to_string(),
+                                ));
+                            }
+                            if body_ty.ty == Ty::Never
+                                && !matches!(
+                                    self.fn_ret_ty.ty,
+                                    Ty::ResultI32
+                                        | Ty::ResultBytes
+                                        | Ty::ResultBytesView
+                                        | Ty::ResultResultBytes
+                                )
+                            {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "budget.scope_v1 mode=result_err_v1 requires the function return type to be result_* when the body returns".to_string(),
+                                ));
+                            }
+                        }
+                        Ok(body_ty)
+                    }
+                    "budget.scope_from_arch_v1" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "budget.scope_from_arch_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        let Expr::List { items: lit, .. } = &args[0] else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "budget.scope_from_arch_v1 expects bytes.lit profile_id".to_string(),
+                            ));
+                        };
+                        if lit.first().and_then(Expr::as_ident) != Some("bytes.lit") || lit.len() != 2
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "budget.scope_from_arch_v1 expects bytes.lit profile_id".to_string(),
+                            ));
+                        }
+                        let Some(profile_id) = lit[1].as_ident() else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "budget.scope_from_arch_v1 expects bytes.lit profile_id".to_string(),
+                            ));
+                        };
+                        let cfg = load_budget_profile_cfg_from_arch_v1(&self.options, profile_id)?;
+                        if cfg.mode == BudgetScopeModeV1::YieldV1 && !self.allow_async_ops {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "budget.scope_from_arch_v1 mode=yield_v1 is only allowed in solve or defasync".to_string(),
+                            ));
+                        }
+                        let body_ty = self.infer(&args[1])?;
+                        if cfg.mode == BudgetScopeModeV1::ResultErrV1 {
+                            if !matches!(
+                                body_ty.ty,
+                                Ty::ResultI32
+                                    | Ty::ResultBytes
+                                    | Ty::ResultBytesView
+                                    | Ty::ResultResultBytes
+                                    | Ty::Never
+                            ) {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "budget.scope_from_arch_v1 requires a result_* body for this profile".to_string(),
+                                ));
+                            }
+                            if body_ty.ty == Ty::Never
+                                && !matches!(
+                                    self.fn_ret_ty.ty,
+                                    Ty::ResultI32
+                                        | Ty::ResultBytes
+                                        | Ty::ResultBytesView
+                                        | Ty::ResultResultBytes
+                                )
+                            {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    "budget.scope_from_arch_v1 requires the function return type to be result_* when the body returns for this profile".to_string(),
+                                ));
+                            }
+                        }
+                        Ok(body_ty)
+                    }
+                    "std.rr.with_v1" => {
+                        if !self.options.enable_rr {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "std.rr.with_v1 is disabled in this world".to_string(),
+                            ));
+                        }
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.rr.with_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if !matches!(self.fn_ret_ty.ty, Ty::ResultI32 | Ty::ResultBytes) {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.rr.with_v1 requires function return type result_i32 or result_bytes (open failure propagation)".to_string(),
+                            ));
+                        }
+                        let cfg_ty = self.infer(&args[0])?;
+                        if !matches!(cfg_ty.ty, Ty::Bytes | Ty::BytesView | Ty::VecU8) {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.rr.with_v1 expects bytes_view cfg".to_string(),
+                            ));
+                        }
+                        let body_ty = self.infer(&args[1])?;
+                        Ok(body_ty)
+                    }
+                    "std.rr.with_policy_v1" => {
+                        if !self.options.enable_rr {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "std.rr.with_policy_v1 is disabled in this world".to_string(),
+                            ));
+                        }
+                        if args.len() != 4 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "std.rr.with_policy_v1 expects 4 args".to_string(),
+                            ));
+                        }
+                        if !matches!(self.fn_ret_ty.ty, Ty::ResultI32 | Ty::ResultBytes) {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "std.rr.with_policy_v1 requires function return type result_i32 or result_bytes (open failure propagation)".to_string(),
+                            ));
+                        }
+                        let policy_id = parse_bytes_lit_ascii(&args[0], "std.rr.with_policy_v1 policy_id")?;
+                        let cassette_path =
+                            parse_bytes_lit_ascii(&args[1], "std.rr.with_policy_v1 cassette_path")?;
+                        let mode_i32 = parse_i32_lit(&args[2], "std.rr.with_policy_v1 mode")?;
+                        let _cfg = load_rr_cfg_v1_from_arch_v1(&self.options, &policy_id, &cassette_path, mode_i32)?;
+                        let body_ty = self.infer(&args[3])?;
+                        Ok(body_ty)
                     }
                     "task.scope.cfg_v1" => Err(CompilerError::new(
                         CompileErrorKind::Typing,
@@ -25248,6 +27065,7 @@ fn c_ret_ty(ty: Ty) -> &'static str {
         | Ty::TaskSelectEvtV1
         | Ty::Never => "uint32_t",
         Ty::TaskScopeV1 => "rt_scope_t",
+        Ty::BudgetScopeV1 => "rt_budget_scope_t",
         Ty::Bytes => "bytes_t",
         Ty::BytesView => "bytes_view_t",
         Ty::VecU8 => "vec_u8_t",
@@ -25277,6 +27095,7 @@ fn c_zero(ty: Ty) -> &'static str {
         | Ty::TaskSelectEvtV1
         | Ty::Never => "UINT32_C(0)",
         Ty::TaskScopeV1 => "(rt_scope_t){0}",
+        Ty::BudgetScopeV1 => "(rt_budget_scope_t){0}",
         Ty::Bytes => "rt_bytes_empty(ctx)",
         Ty::BytesView => "rt_view_empty(ctx)",
         Ty::VecU8 => "(vec_u8_t){0}",
@@ -25316,6 +27135,7 @@ fn c_param_list_value(params: &[FunctionParam]) -> String {
             | Ty::TaskSelectEvtV1
             | Ty::Never => "uint32_t",
             Ty::TaskScopeV1 => "rt_scope_t",
+            Ty::BudgetScopeV1 => "rt_budget_scope_t",
             Ty::Bytes => "bytes_t",
             Ty::BytesView => "bytes_view_t",
             Ty::VecU8 => "vec_u8_t",
@@ -25355,6 +27175,7 @@ fn c_param_list_user(params: &[FunctionParam]) -> String {
             | Ty::TaskSelectEvtV1
             | Ty::Never => "uint32_t",
             Ty::TaskScopeV1 => "rt_scope_t",
+            Ty::BudgetScopeV1 => "rt_budget_scope_t",
             Ty::Bytes => "bytes_t",
             Ty::BytesView => "bytes_view_t",
             Ty::VecU8 => "vec_u8_t",
@@ -25624,10 +27445,53 @@ typedef struct {
 } fs_latency_entry_t;
 
 typedef struct {
-  bytes_t key;
+  uint32_t used;
+
   uint32_t latency_ticks;
-  bytes_t body_file;
-} rr_index_entry_t;
+
+  uint32_t kind_off;
+  uint32_t kind_len;
+
+  uint32_t op_off;
+  uint32_t op_len;
+
+  uint32_t key_off;
+  uint32_t key_len;
+
+  uint32_t payload_off;
+  uint32_t payload_len;
+} rr_entry_desc_t;
+
+typedef struct {
+  bytes_t path;
+  bytes_t blob;
+  rr_entry_desc_t* entries;
+  uint32_t entries_len;
+  uint32_t entries_cap;
+
+  uint64_t file_bytes;
+  void* append_f;
+} rr_cassette_t;
+
+typedef struct {
+  uint32_t alive;
+  uint8_t mode;
+  uint8_t match_mode;
+  uint16_t reserved;
+
+  uint64_t max_cassette_bytes;
+  uint32_t max_entries;
+  uint32_t max_req_bytes;
+  uint32_t max_resp_bytes;
+  uint32_t max_key_bytes;
+
+  uint32_t transcript_cassette;
+  uint32_t transcript_idx;
+
+  rr_cassette_t* cassettes;
+  uint32_t cassettes_len;
+  uint32_t cassettes_cap;
+} rr_handle_t;
 
 typedef struct {
   bytes_t key;
@@ -25729,6 +27593,7 @@ typedef struct rt_os_proc_s rt_os_proc_t;
 typedef struct {
   uint64_t fuel_init;
   uint64_t fuel;
+  uint32_t budget_fuel_depth;
   heap_t heap;
   allocator_v1_t allocator;
   uint32_t allocator_is_custom;
@@ -25755,9 +27620,18 @@ typedef struct {
 #endif
   uint64_t fs_read_file_calls;
   uint64_t fs_list_dir_calls;
-  uint64_t rr_send_calls;
-  uint64_t rr_request_calls;
-  uint8_t rr_last_request_sha256[32];
+  uint64_t rr_open_calls;
+  uint64_t rr_close_calls;
+  uint64_t rr_stats_calls;
+  uint64_t rr_next_calls;
+  uint64_t rr_next_miss_calls;
+  uint64_t rr_append_calls;
+
+  int32_t rr_current;
+
+  rr_handle_t* rr_handles;
+  uint32_t rr_handles_len;
+  uint32_t rr_handles_cap;
   uint64_t kv_get_calls;
   uint64_t kv_set_calls;
 
@@ -25767,12 +27641,6 @@ typedef struct {
   fs_latency_entry_t* fs_latency_entries;
   uint32_t fs_latency_len;
   bytes_t fs_latency_blob;
-
-  uint32_t rr_index_loaded;
-  uint32_t rr_index_default_latency_ticks;
-  rr_index_entry_t* rr_index_entries;
-  uint32_t rr_index_len;
-  bytes_t rr_index_blob;
 
   uint32_t kv_latency_loaded;
   uint32_t kv_latency_default_ticks;
@@ -25942,7 +27810,10 @@ static __attribute__((noreturn)) void rt_trap(const char* msg) {
 }
 
 static void rt_fuel(ctx_t* ctx, uint64_t amount) {
-  if (ctx->fuel < amount) rt_trap("fuel exhausted");
+  if (ctx->fuel < amount) {
+    if (ctx->budget_fuel_depth != 0) rt_trap("X07T_BUDGET_EXCEEDED_FUEL");
+    rt_trap("fuel exhausted");
+  }
   ctx->fuel -= amount;
 }
 
@@ -27713,6 +29584,197 @@ typedef struct {
   uint32_t select_rr_cursor;
 } rt_scope_t;
 
+typedef struct {
+  uint32_t active;
+  uint32_t mode;
+  uint32_t violated;
+  uint32_t err_code;
+  const uint8_t* label_ptr;
+  uint32_t label_len;
+
+  uint8_t yielded;
+  uint8_t fuel_clamped;
+  uint16_t reserved16;
+
+  uint64_t max_alloc_bytes;
+  uint64_t max_alloc_calls;
+  uint64_t max_realloc_calls;
+  uint64_t max_memcpy_bytes;
+  uint64_t max_sched_ticks;
+  uint64_t max_fuel;
+
+  uint64_t snap_alloc_bytes;
+  uint64_t snap_alloc_calls;
+  uint64_t snap_realloc_calls;
+  uint64_t snap_memcpy_bytes;
+  uint64_t snap_sched_ticks;
+
+  uint64_t snap_fuel_saved;
+  uint64_t snap_fuel_start;
+} rt_budget_scope_t;
+
+#define RT_BUDGET_MODE_TRAP UINT32_C(0)
+#define RT_BUDGET_MODE_RESULT_ERR UINT32_C(1)
+#define RT_BUDGET_MODE_STATS_ONLY UINT32_C(2)
+#define RT_BUDGET_MODE_YIELD UINT32_C(3)
+
+#define RT_ERR_BUDGET_ALLOC_BYTES UINT32_C(0x80000001)
+#define RT_ERR_BUDGET_ALLOC_CALLS UINT32_C(0x80000002)
+#define RT_ERR_BUDGET_REALLOC_CALLS UINT32_C(0x80000003)
+#define RT_ERR_BUDGET_MEMCPY_BYTES UINT32_C(0x80000004)
+#define RT_ERR_BUDGET_SCHED_TICKS UINT32_C(0x80000005)
+
+static void rt_budget_scope_drop(ctx_t* ctx, rt_budget_scope_t* s) {
+  if (!s->active) return;
+  if (s->fuel_clamped) {
+    uint64_t consumed = s->snap_fuel_start - ctx->fuel;
+    ctx->fuel = s->snap_fuel_saved - consumed;
+    if (ctx->budget_fuel_depth == 0) rt_trap("budget fuel depth underflow");
+    ctx->budget_fuel_depth -= 1;
+  }
+  s->active = UINT32_C(0);
+}
+
+static void rt_budget_scope_dispose_on_drop(ctx_t* ctx, rt_budget_scope_t* s) {
+  rt_budget_scope_drop(ctx, s);
+}
+
+static void rt_budget_scope_init(
+  ctx_t* ctx,
+  rt_budget_scope_t* s,
+  uint32_t mode,
+  const uint8_t* label_ptr,
+  uint32_t label_len,
+  uint64_t max_alloc_bytes,
+  uint64_t max_alloc_calls,
+  uint64_t max_realloc_calls,
+  uint64_t max_memcpy_bytes,
+  uint64_t max_sched_ticks,
+  uint64_t max_fuel
+) {
+  memset(s, 0, sizeof(*s));
+  s->active = UINT32_C(1);
+  s->mode = mode;
+  s->label_ptr = label_ptr;
+  s->label_len = label_len;
+  s->max_alloc_bytes = max_alloc_bytes;
+  s->max_alloc_calls = max_alloc_calls;
+  s->max_realloc_calls = max_realloc_calls;
+  s->max_memcpy_bytes = max_memcpy_bytes;
+  s->max_sched_ticks = max_sched_ticks;
+  s->max_fuel = max_fuel;
+
+  s->snap_alloc_bytes = ctx->mem_stats.bytes_alloc_total;
+  s->snap_alloc_calls = ctx->mem_stats.alloc_calls;
+  s->snap_realloc_calls = ctx->mem_stats.realloc_calls;
+  s->snap_memcpy_bytes = ctx->mem_stats.memcpy_bytes;
+  s->snap_sched_ticks = ctx->sched_now_ticks;
+
+  s->snap_fuel_saved = ctx->fuel;
+  s->snap_fuel_start = ctx->fuel;
+  if (max_fuel != 0 && ctx->fuel > max_fuel) {
+    s->snap_fuel_start = max_fuel;
+    ctx->fuel = max_fuel;
+    s->fuel_clamped = 1;
+    ctx->budget_fuel_depth += 1;
+  }
+}
+
+static void rt_budget_scope_check_exit(ctx_t* ctx, rt_budget_scope_t* s) {
+  if (!s->active) return;
+  s->violated = UINT32_C(0);
+  s->err_code = UINT32_C(0);
+
+  uint64_t alloc_bytes = ctx->mem_stats.bytes_alloc_total - s->snap_alloc_bytes;
+  if (s->max_alloc_bytes != 0 && alloc_bytes > s->max_alloc_bytes) {
+    if (s->mode == RT_BUDGET_MODE_STATS_ONLY) return;
+    if (s->mode == RT_BUDGET_MODE_RESULT_ERR) {
+      s->violated = UINT32_C(1);
+      s->err_code = RT_ERR_BUDGET_ALLOC_BYTES;
+      return;
+    }
+    rt_trap("X07T_BUDGET_EXCEEDED_ALLOC_BYTES");
+  }
+
+  uint64_t alloc_calls = ctx->mem_stats.alloc_calls - s->snap_alloc_calls;
+  if (s->max_alloc_calls != 0 && alloc_calls > s->max_alloc_calls) {
+    if (s->mode == RT_BUDGET_MODE_STATS_ONLY) return;
+    if (s->mode == RT_BUDGET_MODE_RESULT_ERR) {
+      s->violated = UINT32_C(1);
+      s->err_code = RT_ERR_BUDGET_ALLOC_CALLS;
+      return;
+    }
+    rt_trap("X07T_BUDGET_EXCEEDED_ALLOC_CALLS");
+  }
+
+  uint64_t realloc_calls = ctx->mem_stats.realloc_calls - s->snap_realloc_calls;
+  if (s->max_realloc_calls != 0 && realloc_calls > s->max_realloc_calls) {
+    if (s->mode == RT_BUDGET_MODE_STATS_ONLY) return;
+    if (s->mode == RT_BUDGET_MODE_RESULT_ERR) {
+      s->violated = UINT32_C(1);
+      s->err_code = RT_ERR_BUDGET_REALLOC_CALLS;
+      return;
+    }
+    rt_trap("X07T_BUDGET_EXCEEDED_REALLOC_CALLS");
+  }
+
+  uint64_t memcpy_bytes = ctx->mem_stats.memcpy_bytes - s->snap_memcpy_bytes;
+  if (s->max_memcpy_bytes != 0 && memcpy_bytes > s->max_memcpy_bytes) {
+    if (s->mode == RT_BUDGET_MODE_STATS_ONLY) return;
+    if (s->mode == RT_BUDGET_MODE_RESULT_ERR) {
+      s->violated = UINT32_C(1);
+      s->err_code = RT_ERR_BUDGET_MEMCPY_BYTES;
+      return;
+    }
+    rt_trap("X07T_BUDGET_EXCEEDED_MEMCPY_BYTES");
+  }
+
+  uint64_t sched_ticks = ctx->sched_now_ticks - s->snap_sched_ticks;
+  if (s->max_sched_ticks != 0 && sched_ticks > s->max_sched_ticks) {
+    if (s->mode == RT_BUDGET_MODE_STATS_ONLY || s->mode == RT_BUDGET_MODE_YIELD) return;
+    if (s->mode == RT_BUDGET_MODE_RESULT_ERR) {
+      s->violated = UINT32_C(1);
+      s->err_code = RT_ERR_BUDGET_SCHED_TICKS;
+      return;
+    }
+    rt_trap("X07T_BUDGET_EXCEEDED_SCHED_TICKS");
+  }
+}
+
+static uint32_t rt_budget_scope_exit_poll(ctx_t* ctx, rt_budget_scope_t* s) {
+  if (!s->active) return UINT32_C(1);
+
+  if (s->mode == RT_BUDGET_MODE_YIELD && !s->yielded && s->max_sched_ticks != 0) {
+    uint64_t ticks = ctx->sched_now_ticks - s->snap_sched_ticks;
+    if (ticks > s->max_sched_ticks) {
+      s->yielded = 1;
+      rt_task_yield(ctx);
+      s->snap_sched_ticks = ctx->sched_now_ticks;
+      return UINT32_C(0);
+    }
+  }
+
+  rt_budget_scope_check_exit(ctx, s);
+  rt_budget_scope_drop(ctx, s);
+  return UINT32_C(1);
+}
+
+static void rt_budget_scope_exit_block(ctx_t* ctx, rt_budget_scope_t* s) {
+  if (!s->active) return;
+
+  if (s->mode == RT_BUDGET_MODE_YIELD && !s->yielded && s->max_sched_ticks != 0) {
+    uint64_t ticks = ctx->sched_now_ticks - s->snap_sched_ticks;
+    if (ticks > s->max_sched_ticks) {
+      s->yielded = 1;
+      (void)rt_task_yield_block(ctx);
+      s->snap_sched_ticks = ctx->sched_now_ticks;
+    }
+  }
+
+  rt_budget_scope_check_exit(ctx, s);
+  rt_budget_scope_drop(ctx, s);
+}
+
 #define RT_SCOPE_SLOT_EMPTY UINT32_C(0)
 #define RT_SCOPE_SLOT_PENDING UINT32_C(1)
 #define RT_SCOPE_SLOT_TAKEN UINT32_C(2)
@@ -29255,218 +31317,867 @@ static void rt_hex_bytes(const uint8_t* bytes, uint32_t len, char* out) {
 }
 
 #if X07_ENABLE_RR
-static bytes_t rt_rr_send_request(ctx_t* ctx, bytes_view_t req) {
-  if (!X07_ENABLE_RR) rt_trap("rr disabled");
-  ctx->rr_send_calls += 1;
-  ctx->rr_request_calls += 1;
+#define RT_RR_MODE_OFF UINT8_C(0)
+#define RT_RR_MODE_RECORD_V1 UINT8_C(1)
+#define RT_RR_MODE_REPLAY_V1 UINT8_C(2)
+#define RT_RR_MODE_RECORD_MISSING_V1 UINT8_C(3)
+#define RT_RR_MODE_REWRITE_V1 UINT8_C(4)
 
-#ifdef X07_DEBUG_BORROW
-  (void)rt_dbg_borrow_check(ctx, req.bid, req.off_bytes, req.len);
-#endif
+#define RT_RR_MATCH_LOOKUP_V1 UINT8_C(0)
+#define RT_RR_MATCH_TRANSCRIPT_V1 UINT8_C(1)
 
-  uint8_t digest[32];
-  rt_sha256(req.ptr, req.len, digest);
-  memcpy(ctx->rr_last_request_sha256, digest, 32);
+#define RT_RR_ERR_CFG_INVALID UINT32_C(2000)
+#define RT_RR_ERR_CFG_UNSUPPORTED UINT32_C(2001)
+#define RT_RR_ERR_OPEN_FAILED UINT32_C(2002)
+#define RT_RR_ERR_BUDGET_CASSETTE_BYTES UINT32_C(2003)
+#define RT_RR_ERR_BUDGET_ENTRIES UINT32_C(2004)
+#define RT_RR_ERR_BUDGET_REQ_BYTES UINT32_C(2005)
+#define RT_RR_ERR_BUDGET_RESP_BYTES UINT32_C(2006)
+#define RT_RR_ERR_BUDGET_KEY_BYTES UINT32_C(2007)
+#define RT_RR_ERR_ENTRY_INVALID UINT32_C(2008)
+#define RT_RR_ERR_MISS UINT32_C(2009)
+#define RT_RR_ERR_KIND_MISMATCH UINT32_C(2010)
+#define RT_RR_ERR_OP_MISMATCH UINT32_C(2011)
+#define RT_RR_ERR_MODE_NO_REPLAY UINT32_C(2012)
+#define RT_RR_ERR_MODE_NO_APPEND UINT32_C(2013)
+#define RT_RR_ERR_TRUNCATED UINT32_C(2014)
 
-  char hex[65];
-  rt_hex_bytes(digest, 32, hex);
-
-  char path[96];
-  int n = snprintf(path, sizeof(path), ".x07_rr/responses/%s.bin", hex);
-  if (n < 0 || (size_t)n >= sizeof(path)) rt_trap("rr response path too long");
-
-  FILE* f = fopen(path, "rb");
-  if (!f) {
-    bytes_t miss = rt_bytes_alloc(ctx, 3);
-    miss.ptr[0] = UINT8_C(1);
-    miss.ptr[1] = UINT8_C(1);
-    miss.ptr[2] = UINT8_C(0);
-    return miss;
+static int rt_rr_cmp_bytes(const uint8_t* a, uint32_t a_len, const uint8_t* b, uint32_t b_len) {
+  uint32_t m = (a_len < b_len) ? a_len : b_len;
+  if (m) {
+    int cmp = memcmp(a, b, m);
+    if (cmp < 0) return -1;
+    if (cmp > 0) return 1;
   }
-
-  if (fseek(f, 0, SEEK_END) != 0) rt_trap("rr.send_request seek failed");
-  long end = ftell(f);
-  if (end < 0) rt_trap("rr.send_request tell failed");
-  if ((uint64_t)end > (uint64_t)UINT32_MAX) rt_trap("rr.send_request response too large");
-  if (fseek(f, 0, SEEK_SET) != 0) rt_trap("rr.send_request seek failed");
-
-  bytes_t out = rt_bytes_alloc(ctx, (uint32_t)end);
-  if (out.len != 0) {
-    size_t got = fread(out.ptr, 1, out.len, f);
-    if (got != out.len) rt_trap("rr.send_request short read");
-  }
-  fclose(f);
-  return out;
+  if (a_len < b_len) return -1;
+  if (a_len > b_len) return 1;
+  return 0;
 }
 
-static void rt_rr_index_load(ctx_t* ctx) {
-  if (ctx->rr_index_loaded) return;
-  ctx->rr_index_loaded = 1;
-  ctx->rr_index_default_latency_ticks = 0;
-  ctx->rr_index_entries = NULL;
-  ctx->rr_index_len = 0;
-  ctx->rr_index_blob = rt_bytes_empty(ctx);
+static uint32_t rt_dm_skip_value_depth(const uint8_t* doc, uint32_t n, uint32_t off, uint32_t depth) {
+  if (depth > 64) return 0;
+  if (off >= n) return 0;
+  uint8_t tag = doc[off];
 
-  FILE* f = fopen(".x07_rr/index.evrr", "rb");
-  if (!f) rt_trap("rr index open failed");
-  if (fseek(f, 0, SEEK_END) != 0) rt_trap("rr index seek failed");
-  long end = ftell(f);
-  if (end < 0) rt_trap("rr index tell failed");
-  if ((uint64_t)end > (uint64_t)UINT32_MAX) rt_trap("rr index too large");
-  if (fseek(f, 0, SEEK_SET) != 0) rt_trap("rr index seek failed");
-
-  bytes_t blob = rt_bytes_alloc(ctx, (uint32_t)end);
-  if (blob.len != 0) {
-    size_t got = fread(blob.ptr, 1, blob.len, f);
-    if (got != blob.len) rt_trap("rr index short read");
+  if (tag == UINT8_C(0)) return off + 1;
+  if (tag == UINT8_C(1)) {
+    if (n - off < 2) return 0;
+    return off + 2;
   }
-  fclose(f);
+  if (tag == UINT8_C(2) || tag == UINT8_C(3)) {
+    if (n - off < 5) return 0;
+    uint32_t len = rt_read_u32_le(doc + off + 1);
+    if (len > n - off - 5) return 0;
+    return off + 5 + len;
+  }
+  if (tag == UINT8_C(4)) {
+    if (n - off < 5) return 0;
+    uint32_t count = rt_read_u32_le(doc + off + 1);
+    uint32_t pos = off + 5;
+    for (uint32_t i = 0; i < count; i++) {
+      uint32_t next = rt_dm_skip_value_depth(doc, n, pos, depth + 1);
+      if (next == 0) return 0;
+      pos = next;
+    }
+    return pos;
+  }
+  if (tag == UINT8_C(5)) {
+    if (n - off < 5) return 0;
+    uint32_t count = rt_read_u32_le(doc + off + 1);
+    uint32_t pos = off + 5;
+    for (uint32_t i = 0; i < count; i++) {
+      if (n - pos < 4) return 0;
+      uint32_t klen = rt_read_u32_le(doc + pos);
+      pos += 4;
+      if (klen > n - pos) return 0;
+      pos += klen;
+      uint32_t next = rt_dm_skip_value_depth(doc, n, pos, depth + 1);
+      if (next == 0) return 0;
+      pos = next;
+    }
+    return pos;
+  }
 
-  if (blob.len < 16) rt_trap("rr index too short");
-  if (memcmp(blob.ptr, "X7RR", 4) != 0) rt_trap("rr index bad magic");
-  uint16_t ver = rt_read_u16_le(blob.ptr + 4);
-  if (ver != 1) rt_trap("rr index bad version");
+  return 0;
+}
 
-  uint32_t default_ticks = rt_read_u32_le(blob.ptr + 8);
-  uint32_t count = rt_read_u32_le(blob.ptr + 12);
+static uint32_t rt_dm_get_string_range(
+  const uint8_t* doc,
+  uint32_t n,
+  uint32_t off,
+  uint32_t* out_start,
+  uint32_t* out_len
+) {
+  if (off >= n) return 0;
+  if (doc[off] != UINT8_C(3)) return 0;
+  if (n - off < 5) return 0;
+  uint32_t len = rt_read_u32_le(doc + off + 1);
+  if (len > n - off - 5) return 0;
+  *out_start = off + 5;
+  *out_len = len;
+  return 1;
+}
 
-  rr_index_entry_t* entries = NULL;
-  if (count != 0) {
-    entries = (rr_index_entry_t*)rt_alloc(
+static uint32_t rt_dm_get_number_range(
+  const uint8_t* doc,
+  uint32_t n,
+  uint32_t off,
+  uint32_t* out_start,
+  uint32_t* out_len
+) {
+  if (off >= n) return 0;
+  if (doc[off] != UINT8_C(2)) return 0;
+  if (n - off < 5) return 0;
+  uint32_t len = rt_read_u32_le(doc + off + 1);
+  if (len > n - off - 5) return 0;
+  *out_start = off + 5;
+  *out_len = len;
+  return 1;
+}
+
+static uint32_t rt_rr_parse_entry_v1(ctx_t* ctx, rr_handle_t* h, const uint8_t* doc, uint32_t n, uint32_t blob_off, rr_entry_desc_t* out) {
+  (void)ctx;
+  if (n < 2) return RT_RR_ERR_ENTRY_INVALID;
+  if (doc[0] != UINT8_C(1)) return RT_RR_ERR_ENTRY_INVALID;
+  uint32_t map_off = 1;
+  if (doc[map_off] != UINT8_C(5)) return RT_RR_ERR_ENTRY_INVALID;
+  if (n - map_off < 5) return RT_RR_ERR_ENTRY_INVALID;
+  uint32_t count = rt_read_u32_le(doc + map_off + 1);
+  uint32_t pos = map_off + 5;
+
+  const uint8_t* prev_key_ptr = NULL;
+  uint32_t prev_key_len = 0;
+
+  uint32_t found_kind = 0;
+  uint32_t found_op = 0;
+  uint32_t found_key = 0;
+  uint32_t found_req = 0;
+  uint32_t found_resp = 0;
+  uint32_t found_err = 0;
+
+  uint32_t key_bytes_len = 0;
+  uint32_t req_bytes_len = 0;
+  uint32_t resp_bytes_len = 0;
+
+  out->latency_ticks = 0;
+
+  for (uint32_t i = 0; i < count; i++) {
+    if (n - pos < 4) return RT_RR_ERR_ENTRY_INVALID;
+    uint32_t klen = rt_read_u32_le(doc + pos);
+    pos += 4;
+    if (klen > n - pos) return RT_RR_ERR_ENTRY_INVALID;
+    const uint8_t* kptr = doc + pos;
+    if (i != 0) {
+      if (rt_rr_cmp_bytes(prev_key_ptr, prev_key_len, kptr, klen) >= 0) {
+        return RT_RR_ERR_ENTRY_INVALID;
+      }
+    }
+    prev_key_ptr = kptr;
+    prev_key_len = klen;
+    pos += klen;
+
+    uint32_t v_off = pos;
+    uint32_t v_end = rt_dm_skip_value_depth(doc, n, v_off, 0);
+    if (v_end == 0) return RT_RR_ERR_ENTRY_INVALID;
+
+    if (klen == 4 && memcmp(kptr, "kind", 4) == 0) {
+      uint32_t start = 0;
+      uint32_t len = 0;
+      if (!rt_dm_get_string_range(doc, n, v_off, &start, &len)) return RT_RR_ERR_ENTRY_INVALID;
+      out->kind_off = blob_off + start;
+      out->kind_len = len;
+      found_kind = 1;
+    } else if (klen == 2 && memcmp(kptr, "op", 2) == 0) {
+      uint32_t start = 0;
+      uint32_t len = 0;
+      if (!rt_dm_get_string_range(doc, n, v_off, &start, &len)) return RT_RR_ERR_ENTRY_INVALID;
+      out->op_off = blob_off + start;
+      out->op_len = len;
+      found_op = 1;
+    } else if (klen == 3 && memcmp(kptr, "key", 3) == 0) {
+      uint32_t start = 0;
+      uint32_t len = 0;
+      if (!rt_dm_get_string_range(doc, n, v_off, &start, &len)) return RT_RR_ERR_ENTRY_INVALID;
+      if (len > h->max_key_bytes) return RT_RR_ERR_BUDGET_KEY_BYTES;
+      out->key_off = blob_off + start;
+      out->key_len = len;
+      key_bytes_len = len;
+      found_key = 1;
+    } else if (klen == 3 && memcmp(kptr, "req", 3) == 0) {
+      uint32_t start = 0;
+      uint32_t len = 0;
+      if (!rt_dm_get_string_range(doc, n, v_off, &start, &len)) return RT_RR_ERR_ENTRY_INVALID;
+      if (len > h->max_req_bytes) return RT_RR_ERR_BUDGET_REQ_BYTES;
+      req_bytes_len = len;
+      found_req = 1;
+    } else if (klen == 4 && memcmp(kptr, "resp", 4) == 0) {
+      uint32_t start = 0;
+      uint32_t len = 0;
+      if (!rt_dm_get_string_range(doc, n, v_off, &start, &len)) return RT_RR_ERR_ENTRY_INVALID;
+      if (len > h->max_resp_bytes) return RT_RR_ERR_BUDGET_RESP_BYTES;
+      resp_bytes_len = len;
+      found_resp = 1;
+    } else if (klen == 3 && memcmp(kptr, "err", 3) == 0) {
+      uint32_t start = 0;
+      uint32_t len = 0;
+      if (!rt_dm_get_number_range(doc, n, v_off, &start, &len)) return RT_RR_ERR_ENTRY_INVALID;
+      found_err = 1;
+    } else if (klen == 13 && memcmp(kptr, "latency_ticks", 13) == 0) {
+      uint32_t start = 0;
+      uint32_t len = 0;
+      if (!rt_dm_get_number_range(doc, n, v_off, &start, &len)) return RT_RR_ERR_ENTRY_INVALID;
+      if (len == 0) return RT_RR_ERR_ENTRY_INVALID;
+      uint32_t acc = 0;
+      for (uint32_t j = 0; j < len; j++) {
+        uint8_t c = doc[start + j];
+        if (c < (uint8_t)'0' || c > (uint8_t)'9') return RT_RR_ERR_ENTRY_INVALID;
+        uint32_t d = (uint32_t)(c - (uint8_t)'0');
+        if (acc > (UINT32_MAX - d) / 10) return RT_RR_ERR_ENTRY_INVALID;
+        acc = acc * 10 + d;
+      }
+      out->latency_ticks = acc;
+    }
+
+    pos = v_end;
+  }
+  if (pos != n) return RT_RR_ERR_ENTRY_INVALID;
+  if (!found_kind || !found_op || !found_key || !found_req || !found_resp || !found_err) return RT_RR_ERR_ENTRY_INVALID;
+  if (key_bytes_len > h->max_key_bytes) return RT_RR_ERR_BUDGET_KEY_BYTES;
+  if (req_bytes_len > h->max_req_bytes) return RT_RR_ERR_BUDGET_REQ_BYTES;
+  if (resp_bytes_len > h->max_resp_bytes) return RT_RR_ERR_BUDGET_RESP_BYTES;
+  return 0;
+}
+
+static void rt_rr_handles_ensure_cap(ctx_t* ctx, uint32_t need) {
+  if (need <= ctx->rr_handles_cap) return;
+  rr_handle_t* old_items = ctx->rr_handles;
+  uint32_t old_cap = ctx->rr_handles_cap;
+  uint32_t old_bytes_total = old_cap * (uint32_t)sizeof(rr_handle_t);
+  uint32_t new_cap = ctx->rr_handles_cap ? ctx->rr_handles_cap : 8;
+  while (new_cap < need) {
+    if (new_cap > UINT32_MAX / 2) {
+      new_cap = need;
+      break;
+    }
+    new_cap *= 2;
+  }
+  rr_handle_t* items = (rr_handle_t*)rt_alloc_realloc(
+    ctx,
+    old_items,
+    old_bytes_total,
+    new_cap * (uint32_t)sizeof(rr_handle_t),
+    (uint32_t)_Alignof(rr_handle_t)
+  );
+  if (old_items && ctx->rr_handles_len) {
+    uint32_t bytes = ctx->rr_handles_len * (uint32_t)sizeof(rr_handle_t);
+    memcpy(items, old_items, bytes);
+    rt_mem_on_memcpy(ctx, bytes);
+  }
+  if (old_items && old_bytes_total) {
+    rt_free(ctx, old_items, old_bytes_total, (uint32_t)_Alignof(rr_handle_t));
+  }
+  ctx->rr_handles = items;
+  ctx->rr_handles_cap = new_cap;
+}
+
+static rr_handle_t* rt_rr_handle_ptr(ctx_t* ctx, int32_t handle_i32) {
+  if (handle_i32 <= 0) rt_trap("rr invalid handle");
+  uint32_t handle = (uint32_t)handle_i32;
+  if (!ctx->rr_handles || handle > ctx->rr_handles_len) rt_trap("rr invalid handle");
+  rr_handle_t* h = &ctx->rr_handles[handle - 1];
+  if (!h->alive) rt_trap("rr invalid handle");
+  return h;
+}
+
+static void rt_rr_entries_ensure_cap(ctx_t* ctx, rr_cassette_t* c, uint32_t need) {
+  if (need <= c->entries_cap) return;
+  rr_entry_desc_t* old_items = c->entries;
+  uint32_t old_cap = c->entries_cap;
+  uint32_t old_bytes_total = old_cap * (uint32_t)sizeof(rr_entry_desc_t);
+  uint32_t new_cap = c->entries_cap ? c->entries_cap : 8;
+  while (new_cap < need) {
+    if (new_cap > UINT32_MAX / 2) {
+      new_cap = need;
+      break;
+    }
+    new_cap *= 2;
+  }
+  rr_entry_desc_t* items = (rr_entry_desc_t*)rt_alloc_realloc(
+    ctx,
+    old_items,
+    old_bytes_total,
+    new_cap * (uint32_t)sizeof(rr_entry_desc_t),
+    (uint32_t)_Alignof(rr_entry_desc_t)
+  );
+  if (old_items && c->entries_len) {
+    uint32_t bytes = c->entries_len * (uint32_t)sizeof(rr_entry_desc_t);
+    memcpy(items, old_items, bytes);
+    rt_mem_on_memcpy(ctx, bytes);
+  }
+  if (old_items && old_bytes_total) {
+    rt_free(ctx, old_items, old_bytes_total, (uint32_t)_Alignof(rr_entry_desc_t));
+  }
+  c->entries = items;
+  c->entries_cap = new_cap;
+}
+
+static result_i32_t rt_rr_open_v1(ctx_t* ctx, bytes_view_t cfg) {
+  if (!X07_ENABLE_RR) rt_trap("rr disabled");
+  ctx->rr_open_calls += 1;
+
+#ifdef X07_DEBUG_BORROW
+  if (cfg.len != 0 && !rt_dbg_borrow_check(ctx, cfg.bid, cfg.off_bytes, cfg.len)) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+  }
+#endif
+
+  if (cfg.len < 40) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+  }
+  if (memcmp(cfg.ptr, "X7RC", 4) != 0) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+  }
+  uint16_t ver = rt_read_u16_le(cfg.ptr + 4);
+  if (ver != 1) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_UNSUPPORTED };
+  }
+
+  uint8_t mode = cfg.ptr[8];
+  uint8_t match_mode = cfg.ptr[9];
+  if (mode > RT_RR_MODE_REWRITE_V1) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+  }
+  if (match_mode != RT_RR_MATCH_LOOKUP_V1 && match_mode != RT_RR_MATCH_TRANSCRIPT_V1) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+  }
+
+  uint64_t max_cassette_bytes =
+    ((uint64_t)cfg.ptr[12])
+    | ((uint64_t)cfg.ptr[13] << 8)
+    | ((uint64_t)cfg.ptr[14] << 16)
+    | ((uint64_t)cfg.ptr[15] << 24)
+    | ((uint64_t)cfg.ptr[16] << 32)
+    | ((uint64_t)cfg.ptr[17] << 40)
+    | ((uint64_t)cfg.ptr[18] << 48)
+    | ((uint64_t)cfg.ptr[19] << 56);
+
+  uint32_t max_entries = rt_read_u32_le(cfg.ptr + 20);
+  uint32_t max_req_bytes = rt_read_u32_le(cfg.ptr + 24);
+  uint32_t max_resp_bytes = rt_read_u32_le(cfg.ptr + 28);
+  uint32_t max_key_bytes = rt_read_u32_le(cfg.ptr + 32);
+  uint32_t cassette_len = rt_read_u32_le(cfg.ptr + 36);
+  if (cassette_len > cfg.len - 40) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+  }
+  if (40 + cassette_len != cfg.len) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+  }
+
+  bytes_view_t cassette_path = rt_view_slice(ctx, cfg, 40, cassette_len);
+  if (!rt_fs_is_safe_rel_path(cassette_path)) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+  }
+
+  rt_rr_handles_ensure_cap(ctx, ctx->rr_handles_len + 1);
+  uint32_t handle_id = ctx->rr_handles_len + 1;
+  rr_handle_t* h = &ctx->rr_handles[handle_id - 1];
+  memset(h, 0, sizeof(*h));
+  h->alive = 1;
+  h->mode = mode;
+  h->match_mode = match_mode;
+  h->max_cassette_bytes = max_cassette_bytes;
+  h->max_entries = max_entries;
+  h->max_req_bytes = max_req_bytes;
+  h->max_resp_bytes = max_resp_bytes;
+  h->max_key_bytes = max_key_bytes;
+  h->transcript_cassette = 0;
+  h->transcript_idx = 0;
+
+  h->cassettes_len = 0;
+  h->cassettes_cap = 1;
+  h->cassettes = (rr_cassette_t*)rt_alloc(ctx, (uint32_t)sizeof(rr_cassette_t), (uint32_t)_Alignof(rr_cassette_t));
+  memset(h->cassettes, 0, (uint32_t)sizeof(rr_cassette_t));
+  h->cassettes_len = 1;
+
+  rr_cassette_t* c = &h->cassettes[0];
+  c->path = rt_view_to_bytes(ctx, cassette_path);
+  c->blob = rt_bytes_empty(ctx);
+  c->entries = NULL;
+  c->entries_len = 0;
+  c->entries_cap = 0;
+  c->file_bytes = 0;
+  c->append_f = NULL;
+
+  // Replay modes load entries from the cassette file.
+  if (mode == RT_RR_MODE_REPLAY_V1 || mode == RT_RR_MODE_RECORD_MISSING_V1) {
+    const uint32_t prefix_len = 8; // ".x07_rr/"
+    if (cassette_path.len > UINT32_MAX - prefix_len) {
+      return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+    }
+    uint32_t total = prefix_len + cassette_path.len;
+    char* path = (char*)rt_alloc(ctx, total + 1, 1);
+    memcpy(path, ".x07_rr/", prefix_len);
+    rt_mem_on_memcpy(ctx, prefix_len);
+    memcpy(path + prefix_len, cassette_path.ptr, cassette_path.len);
+    rt_mem_on_memcpy(ctx, cassette_path.len);
+    path[total] = 0;
+
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+      rt_free(ctx, path, total + 1, 1);
+      if (mode == RT_RR_MODE_REPLAY_V1) {
+        return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
+      }
+      // record_missing: allow empty cassette when missing.
+      ctx->rr_handles_len += 1;
+      return (result_i32_t){ .tag = UINT32_C(1), .payload.ok = handle_id };
+    }
+    rt_free(ctx, path, total + 1, 1);
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+      fclose(f);
+      return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
+    }
+    long end = ftell(f);
+    if (end < 0) {
+      fclose(f);
+      return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
+    }
+    if ((uint64_t)end > max_cassette_bytes) {
+      fclose(f);
+      return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_BUDGET_CASSETTE_BYTES };
+    }
+    if ((uint64_t)end > (uint64_t)UINT32_MAX) {
+      fclose(f);
+      return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+      fclose(f);
+      return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
+    }
+
+    bytes_t blob = rt_bytes_alloc(ctx, (uint32_t)end);
+    if (blob.len != 0) {
+      size_t got = fread(blob.ptr, 1, blob.len, f);
+      if (got != blob.len) {
+        fclose(f);
+        rt_bytes_drop(ctx, &blob);
+        return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
+      }
+    }
+    fclose(f);
+
+    c->blob = blob;
+    c->file_bytes = (uint64_t)blob.len;
+
+    uint32_t pos = 0;
+    while (pos != blob.len) {
+      if (blob.len - pos < 4) {
+        return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_TRUNCATED };
+      }
+      uint32_t plen = rt_read_u32_le(blob.ptr + pos);
+      pos += 4;
+      if (plen > blob.len - pos) {
+        return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_TRUNCATED };
+      }
+      uint32_t payload_off = pos;
+      pos += plen;
+
+      if (c->entries_len + 1 > max_entries) {
+        return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_BUDGET_ENTRIES };
+      }
+      rt_rr_entries_ensure_cap(ctx, c, c->entries_len + 1);
+      rr_entry_desc_t* e = &c->entries[c->entries_len];
+      memset(e, 0, sizeof(*e));
+      e->payload_off = payload_off;
+      e->payload_len = plen;
+      uint32_t err = rt_rr_parse_entry_v1(ctx, h, blob.ptr + payload_off, plen, payload_off, e);
+      if (err != 0) {
+        return (result_i32_t){ .tag = UINT32_C(0), .payload.err = err };
+      }
+      c->entries_len += 1;
+    }
+  }
+
+  ctx->rr_handles_len += 1;
+  return (result_i32_t){ .tag = UINT32_C(1), .payload.ok = handle_id };
+}
+
+static int32_t rt_rr_close_v1(ctx_t* ctx, int32_t handle_i32) {
+  if (!X07_ENABLE_RR) rt_trap("rr disabled");
+  ctx->rr_close_calls += 1;
+  if (handle_i32 <= 0) return 0;
+  uint32_t handle = (uint32_t)handle_i32;
+  if (!ctx->rr_handles || handle > ctx->rr_handles_len) return 0;
+  rr_handle_t* h = &ctx->rr_handles[handle - 1];
+  if (!h->alive) return 0;
+
+  for (uint32_t j = 0; j < h->cassettes_len; j++) {
+    rr_cassette_t* c = &h->cassettes[j];
+    if (c->append_f) {
+      fclose((FILE*)c->append_f);
+      c->append_f = NULL;
+    }
+    if (c->entries && c->entries_cap) {
+      rt_free(
+        ctx,
+        c->entries,
+        c->entries_cap * (uint32_t)sizeof(rr_entry_desc_t),
+        (uint32_t)_Alignof(rr_entry_desc_t)
+      );
+    }
+    c->entries = NULL;
+    c->entries_len = 0;
+    c->entries_cap = 0;
+    rt_bytes_drop(ctx, &c->blob);
+    c->blob = rt_bytes_empty(ctx);
+    rt_bytes_drop(ctx, &c->path);
+    c->path = rt_bytes_empty(ctx);
+    c->file_bytes = 0;
+  }
+
+  if (h->cassettes && h->cassettes_cap) {
+    rt_free(
       ctx,
-      count * (uint32_t)sizeof(rr_index_entry_t),
-      (uint32_t)_Alignof(rr_index_entry_t)
+      h->cassettes,
+      h->cassettes_cap * (uint32_t)sizeof(rr_cassette_t),
+      (uint32_t)_Alignof(rr_cassette_t)
     );
   }
+  h->cassettes = NULL;
+  h->cassettes_len = 0;
+  h->cassettes_cap = 0;
+  h->alive = 0;
 
-  uint32_t off = 16;
-  for (uint32_t i = 0; i < count; i++) {
-    if (off > blob.len || blob.len - off < 4) rt_trap("rr index truncated key_len");
-    uint32_t klen = rt_read_u32_le(blob.ptr + off);
-    off += 4;
-    if (off > blob.len || blob.len - off < klen) rt_trap("rr index truncated key");
-    entries[i].key = (bytes_t){blob.ptr + off, klen};
-    off += klen;
-
-    if (off > blob.len || blob.len - off < 4) rt_trap("rr index truncated ticks");
-    entries[i].latency_ticks = rt_read_u32_le(blob.ptr + off);
-    off += 4;
-
-    if (off > blob.len || blob.len - off < 4) rt_trap("rr index truncated body_len");
-    uint32_t blen = rt_read_u32_le(blob.ptr + off);
-    off += 4;
-    if (off > blob.len || blob.len - off < blen) rt_trap("rr index truncated body");
-    entries[i].body_file = (bytes_t){blob.ptr + off, blen};
-    off += blen;
+  if (ctx->rr_current == handle_i32) {
+    ctx->rr_current = 0;
   }
-  if (off != blob.len) rt_trap("rr index trailing bytes");
-
-  ctx->rr_index_default_latency_ticks = default_ticks;
-  ctx->rr_index_entries = entries;
-  ctx->rr_index_len = count;
-  ctx->rr_index_blob = blob;
+  return 1;
 }
 
-static rr_index_entry_t* rt_rr_index_find(ctx_t* ctx, bytes_view_t key) {
-  rt_rr_index_load(ctx);
+static bytes_t rt_rr_stats_v1(ctx_t* ctx, int32_t handle_i32) {
+  if (!X07_ENABLE_RR) rt_trap("rr disabled");
+  ctx->rr_stats_calls += 1;
+  rr_handle_t* h = rt_rr_handle_ptr(ctx, handle_i32);
+  uint32_t entries_total = 0;
+  uint32_t used_total = 0;
+  uint32_t bytes_total = 0;
+  for (uint32_t i = 0; i < h->cassettes_len; i++) {
+    rr_cassette_t* c = &h->cassettes[i];
+    entries_total += c->entries_len;
+    if (c->blob.len > UINT32_MAX - bytes_total) {
+      bytes_total = UINT32_MAX;
+    } else {
+      bytes_total += c->blob.len;
+    }
+    for (uint32_t j = 0; j < c->entries_len; j++) {
+      if (c->entries[j].used) used_total += 1;
+    }
+  }
+
+  char buf[256];
+  int n = snprintf(
+    buf,
+    sizeof(buf),
+    "{\"v\":1,\"mode\":%u,\"match_mode\":%u,\"cassettes\":%u,\"entries\":%u,\"used\":%u,\"bytes\":%u}",
+    (unsigned)h->mode,
+    (unsigned)h->match_mode,
+    (unsigned)h->cassettes_len,
+    (unsigned)entries_total,
+    (unsigned)used_total,
+    (unsigned)bytes_total
+  );
+  if (n < 0) rt_trap("rr.stats_v1 snprintf failed");
+  if ((size_t)n >= sizeof(buf)) n = (int)(sizeof(buf) - 1);
+  return rt_bytes_from_literal(ctx, (const uint8_t*)buf, (uint32_t)n);
+}
+
+static result_bytes_t rt_rr_next_v1(ctx_t* ctx, int32_t handle_i32, bytes_view_t kind, bytes_view_t op, bytes_view_t key) {
+  if (!X07_ENABLE_RR) rt_trap("rr disabled");
+  ctx->rr_next_calls += 1;
+
 #ifdef X07_DEBUG_BORROW
-  if (key.len != 0 && !rt_dbg_borrow_check(ctx, key.bid, key.off_bytes, key.len)) return NULL;
+  if (kind.len != 0 && !rt_dbg_borrow_check(ctx, kind.bid, kind.off_bytes, kind.len)) return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_ENTRY_INVALID };
+  if (op.len != 0 && !rt_dbg_borrow_check(ctx, op.bid, op.off_bytes, op.len)) return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_ENTRY_INVALID };
+  if (key.len != 0 && !rt_dbg_borrow_check(ctx, key.bid, key.off_bytes, key.len)) return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_ENTRY_INVALID };
 #endif
-  for (uint32_t i = 0; i < ctx->rr_index_len; i++) {
-    rr_index_entry_t* e = &ctx->rr_index_entries[i];
-    if (e->key.len != key.len) continue;
-    if (e->key.len == 0) return e;
-    if (memcmp(e->key.ptr, key.ptr, e->key.len) == 0) return e;
+
+  rr_handle_t* h = rt_rr_handle_ptr(ctx, handle_i32);
+
+  if (h->mode == RT_RR_MODE_OFF || h->mode == RT_RR_MODE_RECORD_V1 || h->mode == RT_RR_MODE_REWRITE_V1) {
+    return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_MODE_NO_REPLAY };
   }
-  return NULL;
+
+  if (key.len > h->max_key_bytes) {
+    return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_BUDGET_KEY_BYTES };
+  }
+
+  if (h->match_mode == RT_RR_MATCH_TRANSCRIPT_V1) {
+    // Consume entries sequentially.
+    for (;;) {
+      if (h->transcript_cassette >= h->cassettes_len) {
+        ctx->rr_next_miss_calls += 1;
+        return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_MISS };
+      }
+      rr_cassette_t* c = &h->cassettes[h->transcript_cassette];
+      if (h->transcript_idx >= c->entries_len) {
+        h->transcript_cassette += 1;
+        h->transcript_idx = 0;
+        continue;
+      }
+      rr_entry_desc_t* e = &c->entries[h->transcript_idx];
+      h->transcript_idx += 1;
+
+      const uint8_t* ekind = c->blob.ptr + e->kind_off;
+      const uint8_t* eop = c->blob.ptr + e->op_off;
+
+      if (e->kind_len != kind.len || memcmp(ekind, kind.ptr, kind.len) != 0) {
+        ctx->rr_next_miss_calls += 1;
+        return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_KIND_MISMATCH };
+      }
+      if (e->op_len != op.len || memcmp(eop, op.ptr, op.len) != 0) {
+        ctx->rr_next_miss_calls += 1;
+        return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OP_MISMATCH };
+      }
+
+      if (e->latency_ticks != 0) {
+        rt_task_sleep_block(ctx, e->latency_ticks);
+      }
+
+      bytes_t out = rt_bytes_alloc(ctx, e->payload_len);
+      if (e->payload_len) {
+        memcpy(out.ptr, c->blob.ptr + e->payload_off, e->payload_len);
+        rt_mem_on_memcpy(ctx, e->payload_len);
+      }
+      return (result_bytes_t){ .tag = UINT32_C(1), .payload.ok = out };
+    }
+  }
+
+  // lookup_v1: earliest unused entry matching (kind, op, key) within earliest cassette.
+  for (uint32_t ci = 0; ci < h->cassettes_len; ci++) {
+    rr_cassette_t* c = &h->cassettes[ci];
+    uint32_t best = UINT32_MAX;
+    for (uint32_t i = 0; i < c->entries_len; i++) {
+      rr_entry_desc_t* e = &c->entries[i];
+      if (e->used) continue;
+      if (e->kind_len != kind.len) continue;
+      if (e->op_len != op.len) continue;
+      if (e->key_len != key.len) continue;
+      if (e->kind_len && memcmp(c->blob.ptr + e->kind_off, kind.ptr, kind.len) != 0) continue;
+      if (e->op_len && memcmp(c->blob.ptr + e->op_off, op.ptr, op.len) != 0) continue;
+      if (e->key_len && memcmp(c->blob.ptr + e->key_off, key.ptr, key.len) != 0) continue;
+      best = i;
+      break;
+    }
+    if (best != UINT32_MAX) {
+      rr_entry_desc_t* e = &c->entries[best];
+      e->used = 1;
+      if (e->latency_ticks != 0) {
+        rt_task_sleep_block(ctx, e->latency_ticks);
+      }
+      bytes_t out = rt_bytes_alloc(ctx, e->payload_len);
+      if (e->payload_len) {
+        memcpy(out.ptr, c->blob.ptr + e->payload_off, e->payload_len);
+        rt_mem_on_memcpy(ctx, e->payload_len);
+      }
+      return (result_bytes_t){ .tag = UINT32_C(1), .payload.ok = out };
+    }
+  }
+
+  ctx->rr_next_miss_calls += 1;
+  return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_MISS };
 }
 
-static uint32_t rt_rr_latency_ticks(ctx_t* ctx, bytes_view_t key) {
+static uint32_t rt_rr_parse_i32_dec(const uint8_t* p, uint32_t n, int32_t* out) {
+  if (n == 0) return 0;
+  uint32_t i = 0;
+  int neg = 0;
+  if (p[0] == (uint8_t)'-') {
+    neg = 1;
+    i = 1;
+    if (n == 1) return 0;
+  }
+  int32_t acc = 0;
+  for (; i < n; i++) {
+    uint8_t c = p[i];
+    if (c < (uint8_t)'0' || c > (uint8_t)'9') return 0;
+    int32_t d = (int32_t)(c - (uint8_t)'0');
+    if (acc > (INT32_MAX - d) / 10) return 0;
+    acc = acc * 10 + d;
+  }
+  *out = neg ? -acc : acc;
+  return 1;
+}
+
+static bytes_t rt_rr_entry_resp_v1(ctx_t* ctx, bytes_view_t entry) {
   if (!X07_ENABLE_RR) rt_trap("rr disabled");
-  rr_index_entry_t* e = rt_rr_index_find(ctx, key);
-  if (!e) return ctx->rr_index_default_latency_ticks;
-  return e->latency_ticks;
+
+#ifdef X07_DEBUG_BORROW
+  (void)rt_dbg_borrow_check(ctx, entry.bid, entry.off_bytes, entry.len);
+#endif
+
+  if (entry.len < 2) rt_trap("rr.entry_resp_v1 invalid entry");
+  if (entry.ptr[0] != UINT8_C(1)) rt_trap("rr.entry_resp_v1 invalid entry");
+  uint32_t map_off = 1;
+  if (map_off >= entry.len || entry.ptr[map_off] != UINT8_C(5)) rt_trap("rr.entry_resp_v1 invalid entry");
+  if (entry.len - map_off < 5) rt_trap("rr.entry_resp_v1 invalid entry");
+  uint32_t count = rt_read_u32_le(entry.ptr + map_off + 1);
+  uint32_t pos = map_off + 5;
+  for (uint32_t i = 0; i < count; i++) {
+    if (entry.len - pos < 4) rt_trap("rr.entry_resp_v1 invalid entry");
+    uint32_t klen = rt_read_u32_le(entry.ptr + pos);
+    pos += 4;
+    if (klen > entry.len - pos) rt_trap("rr.entry_resp_v1 invalid entry");
+    const uint8_t* kptr = entry.ptr + pos;
+    pos += klen;
+    uint32_t v_off = pos;
+    uint32_t v_end = rt_dm_skip_value_depth(entry.ptr, entry.len, v_off, 0);
+    if (v_end == 0) rt_trap("rr.entry_resp_v1 invalid entry");
+    if (klen == 4 && memcmp(kptr, "resp", 4) == 0) {
+      uint32_t start = 0;
+      uint32_t len = 0;
+      if (!rt_dm_get_string_range(entry.ptr, entry.len, v_off, &start, &len)) rt_trap("rr.entry_resp_v1 invalid entry");
+      bytes_t out = rt_bytes_alloc(ctx, len);
+      if (len) {
+        memcpy(out.ptr, entry.ptr + start, len);
+        rt_mem_on_memcpy(ctx, len);
+      }
+      return out;
+    }
+    pos = v_end;
+  }
+  rt_trap("rr.entry_resp_v1 missing resp");
 }
 
-static bytes_t rt_rr_fetch_body(ctx_t* ctx, bytes_view_t key) {
+static int32_t rt_rr_entry_err_v1(ctx_t* ctx, bytes_view_t entry) {
   if (!X07_ENABLE_RR) rt_trap("rr disabled");
-  ctx->rr_request_calls += 1;
 
-  rr_index_entry_t* e = rt_rr_index_find(ctx, key);
-  if (!e) return rt_bytes_empty(ctx);
-  bytes_t body = e->body_file;
-  if (body.len == 0) return rt_bytes_empty(ctx);
-  if (!rt_fs_is_safe_rel_path(rt_bytes_view(ctx, body))) rt_trap("rr.fetch unsafe body path");
-  if (memchr(body.ptr, 0, body.len) != NULL) rt_trap("rr.fetch body path contains nul");
+#ifdef X07_DEBUG_BORROW
+  (void)rt_dbg_borrow_check(ctx, entry.bid, entry.off_bytes, entry.len);
+#endif
 
-  const uint32_t prefix_len = 8; // ".x07_rr/"
-  uint32_t total = prefix_len + body.len;
-  char* p = (char*)rt_alloc(ctx, total + 1, 1);
-  memcpy(p, ".x07_rr/", prefix_len);
-  rt_mem_on_memcpy(ctx, prefix_len);
-  memcpy(p + prefix_len, body.ptr, body.len);
-  rt_mem_on_memcpy(ctx, body.len);
-  p[total] = 0;
-
-  FILE* f = fopen(p, "rb");
-  if (!f) {
-    rt_free(ctx, p, total + 1, 1);
-    rt_trap("rr.fetch open failed");
+  if (entry.len < 2) rt_trap("rr.entry_err_v1 invalid entry");
+  if (entry.ptr[0] != UINT8_C(1)) rt_trap("rr.entry_err_v1 invalid entry");
+  uint32_t map_off = 1;
+  if (map_off >= entry.len || entry.ptr[map_off] != UINT8_C(5)) rt_trap("rr.entry_err_v1 invalid entry");
+  if (entry.len - map_off < 5) rt_trap("rr.entry_err_v1 invalid entry");
+  uint32_t count = rt_read_u32_le(entry.ptr + map_off + 1);
+  uint32_t pos = map_off + 5;
+  for (uint32_t i = 0; i < count; i++) {
+    if (entry.len - pos < 4) rt_trap("rr.entry_err_v1 invalid entry");
+    uint32_t klen = rt_read_u32_le(entry.ptr + pos);
+    pos += 4;
+    if (klen > entry.len - pos) rt_trap("rr.entry_err_v1 invalid entry");
+    const uint8_t* kptr = entry.ptr + pos;
+    pos += klen;
+    uint32_t v_off = pos;
+    uint32_t v_end = rt_dm_skip_value_depth(entry.ptr, entry.len, v_off, 0);
+    if (v_end == 0) rt_trap("rr.entry_err_v1 invalid entry");
+    if (klen == 3 && memcmp(kptr, "err", 3) == 0) {
+      uint32_t start = 0;
+      uint32_t len = 0;
+      if (!rt_dm_get_number_range(entry.ptr, entry.len, v_off, &start, &len)) rt_trap("rr.entry_err_v1 invalid entry");
+      int32_t out = 0;
+      if (!rt_rr_parse_i32_dec(entry.ptr + start, len, &out)) rt_trap("rr.entry_err_v1 invalid err");
+      return out;
+    }
+    pos = v_end;
   }
-  rt_free(ctx, p, total + 1, 1);
-  if (fseek(f, 0, SEEK_END) != 0) rt_trap("rr.fetch seek failed");
-  long end = ftell(f);
-  if (end < 0) rt_trap("rr.fetch tell failed");
-  if ((uint64_t)end > (uint64_t)UINT32_MAX) rt_trap("rr.fetch body too large");
-  if (fseek(f, 0, SEEK_SET) != 0) rt_trap("rr.fetch seek failed");
-
-  bytes_t out = rt_bytes_alloc(ctx, (uint32_t)end);
-  if (out.len != 0) {
-    size_t got = fread(out.ptr, 1, out.len, f);
-    if (got != out.len) rt_trap("rr.fetch short read");
-  }
-  fclose(f);
-  return out;
+  rt_trap("rr.entry_err_v1 missing err");
 }
 
-static bytes_t rt_rr_fetch_block(ctx_t* ctx, bytes_view_t key) {
-  uint32_t ticks = rt_rr_latency_ticks(ctx, key);
-  if (ticks != 0) {
-    rt_task_sleep_block(ctx, ticks);
-  }
-  return rt_rr_fetch_body(ctx, key);
-}
-
-static uint32_t rt_rr_send(ctx_t* ctx, bytes_view_t req) {
+static result_i32_t rt_rr_append_v1(ctx_t* ctx, int32_t handle_i32, bytes_view_t entry) {
   if (!X07_ENABLE_RR) rt_trap("rr disabled");
-  ctx->rr_request_calls += 1;
+  ctx->rr_append_calls += 1;
 
-  rr_index_entry_t* e = rt_rr_index_find(ctx, req);
-  uint32_t ticks = e ? e->latency_ticks : ctx->rr_index_default_latency_ticks;
-  if (!e || e->body_file.len == 0) {
-    return rt_io_reader_new_bytes(ctx, rt_bytes_empty(ctx), ticks);
+#ifdef X07_DEBUG_BORROW
+  if (entry.len != 0 && !rt_dbg_borrow_check(ctx, entry.bid, entry.off_bytes, entry.len)) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_ENTRY_INVALID };
+  }
+#endif
+
+  rr_handle_t* h = rt_rr_handle_ptr(ctx, handle_i32);
+  if (h->mode != RT_RR_MODE_RECORD_V1 && h->mode != RT_RR_MODE_RECORD_MISSING_V1 && h->mode != RT_RR_MODE_REWRITE_V1) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_MODE_NO_APPEND };
   }
 
-  bytes_t body = e->body_file;
-  if (!rt_fs_is_safe_rel_path(rt_bytes_view(ctx, body))) rt_trap("rr.send unsafe body path");
-  if (memchr(body.ptr, 0, body.len) != NULL) rt_trap("rr.send body path contains nul");
+  if (h->cassettes_len == 0) return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+  rr_cassette_t* c = &h->cassettes[h->cassettes_len - 1];
 
-  const uint32_t prefix_len = 8; // ".x07_rr/"
-  uint32_t total = prefix_len + body.len;
-  char* p = (char*)rt_alloc(ctx, total + 1, 1);
-  memcpy(p, ".x07_rr/", prefix_len);
-  rt_mem_on_memcpy(ctx, prefix_len);
-  memcpy(p + prefix_len, body.ptr, body.len);
-  rt_mem_on_memcpy(ctx, body.len);
-  p[total] = 0;
-
-  FILE* f = fopen(p, "rb");
-  if (!f) {
-    rt_free(ctx, p, total + 1, 1);
-    rt_trap("rr.send open failed");
+  // Validate entry doc.
+  rr_entry_desc_t desc;
+  memset(&desc, 0, sizeof(desc));
+  desc.payload_off = 0;
+  desc.payload_len = entry.len;
+  uint32_t err = rt_rr_parse_entry_v1(ctx, h, entry.ptr, entry.len, 0, &desc);
+  if (err != 0) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = err };
   }
-  rt_free(ctx, p, total + 1, 1);
-  return rt_io_reader_new_file(ctx, f, ticks);
+
+  if (c->entries_len + 1 > h->max_entries) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_BUDGET_ENTRIES };
+  }
+
+  uint64_t new_bytes = c->file_bytes + 4 + (uint64_t)entry.len;
+  if (new_bytes > h->max_cassette_bytes) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_BUDGET_CASSETTE_BYTES };
+  }
+
+  if (!c->append_f) {
+    bytes_view_t cassette_path = rt_bytes_view(ctx, c->path);
+    const uint32_t prefix_len = 8; // ".x07_rr/"
+    if (cassette_path.len > UINT32_MAX - prefix_len) {
+      return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
+    }
+    uint32_t total = prefix_len + cassette_path.len;
+    char* path = (char*)rt_alloc(ctx, total + 1, 1);
+    memcpy(path, ".x07_rr/", prefix_len);
+    rt_mem_on_memcpy(ctx, prefix_len);
+    memcpy(path + prefix_len, cassette_path.ptr, cassette_path.len);
+    rt_mem_on_memcpy(ctx, cassette_path.len);
+    path[total] = 0;
+
+    const char* open_mode = "ab";
+    if (h->mode == RT_RR_MODE_REWRITE_V1) {
+      open_mode = "wb";
+      h->mode = RT_RR_MODE_RECORD_V1;
+      c->file_bytes = 0;
+      if (c->entries_len) {
+        c->entries_len = 0;
+      }
+    }
+
+    FILE* f = fopen(path, open_mode);
+    rt_free(ctx, path, total + 1, 1);
+    if (!f) {
+      return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
+    }
+    c->append_f = f;
+  }
+
+  // Append frame.
+  uint8_t hdr[4];
+  rt_write_u32_le(hdr, entry.len);
+  if (fwrite(hdr, 1, 4, (FILE*)c->append_f) != 4) {
+    return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
+  }
+  if (entry.len != 0) {
+    if (fwrite(entry.ptr, 1, entry.len, (FILE*)c->append_f) != entry.len) {
+      return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
+    }
+  }
+  fflush((FILE*)c->append_f);
+
+  // Update in-memory list (blob is not updated).
+  rt_rr_entries_ensure_cap(ctx, c, c->entries_len + 1);
+  rr_entry_desc_t* e = &c->entries[c->entries_len];
+  memset(e, 0, sizeof(*e));
+  *e = desc;
+  e->used = 0;
+  c->entries_len += 1;
+  c->file_bytes = new_bytes;
+
+  return (result_i32_t){ .tag = UINT32_C(1), .payload.ok = UINT32_C(0) };
 }
 #endif
 
@@ -31622,18 +34333,61 @@ static void rt_ctx_cleanup(ctx_t* ctx) {
   rt_bytes_drop(ctx, &ctx->fs_latency_blob);
   ctx->fs_latency_blob = rt_bytes_empty(ctx);
 
-  if (ctx->rr_index_entries && ctx->rr_index_len) {
+#if X07_ENABLE_RR
+  for (uint32_t i = 0; i < ctx->rr_handles_len; i++) {
+    rr_handle_t* h = &ctx->rr_handles[i];
+    if (!h->alive) continue;
+
+    for (uint32_t j = 0; j < h->cassettes_len; j++) {
+      rr_cassette_t* c = &h->cassettes[j];
+      if (c->append_f) {
+        fclose((FILE*)c->append_f);
+        c->append_f = NULL;
+      }
+      if (c->entries && c->entries_cap) {
+        rt_free(
+          ctx,
+          c->entries,
+          c->entries_cap * (uint32_t)sizeof(rr_entry_desc_t),
+          (uint32_t)_Alignof(rr_entry_desc_t)
+        );
+      }
+      c->entries = NULL;
+      c->entries_len = 0;
+      c->entries_cap = 0;
+      rt_bytes_drop(ctx, &c->blob);
+      c->blob = rt_bytes_empty(ctx);
+      rt_bytes_drop(ctx, &c->path);
+      c->path = rt_bytes_empty(ctx);
+      c->file_bytes = 0;
+    }
+
+    if (h->cassettes && h->cassettes_cap) {
+      rt_free(
+        ctx,
+        h->cassettes,
+        h->cassettes_cap * (uint32_t)sizeof(rr_cassette_t),
+        (uint32_t)_Alignof(rr_cassette_t)
+      );
+    }
+    h->cassettes = NULL;
+    h->cassettes_len = 0;
+    h->cassettes_cap = 0;
+    h->alive = 0;
+  }
+  if (ctx->rr_handles && ctx->rr_handles_cap) {
     rt_free(
       ctx,
-      ctx->rr_index_entries,
-      ctx->rr_index_len * (uint32_t)sizeof(rr_index_entry_t),
-      (uint32_t)_Alignof(rr_index_entry_t)
+      ctx->rr_handles,
+      ctx->rr_handles_cap * (uint32_t)sizeof(rr_handle_t),
+      (uint32_t)_Alignof(rr_handle_t)
     );
   }
-  ctx->rr_index_entries = NULL;
-  ctx->rr_index_len = 0;
-  rt_bytes_drop(ctx, &ctx->rr_index_blob);
-  ctx->rr_index_blob = rt_bytes_empty(ctx);
+  ctx->rr_handles = NULL;
+  ctx->rr_handles_len = 0;
+  ctx->rr_handles_cap = 0;
+  ctx->rr_current = 0;
+#endif
 
   if (ctx->kv_latency_entries && ctx->kv_latency_len) {
     rt_free(
@@ -34260,8 +37014,6 @@ int main(void) {
     : (uint32_t)ctx.heap_peak_live_bytes;
   uint64_t fuel_used = ctx.fuel_init - ctx.fuel;
 
-  char rr_last_sha[65];
-  rt_hex_bytes(ctx.rr_last_request_sha256, 32, rr_last_sha);
   ctx.sched_stats.virtual_time_end = ctx.sched_now_ticks;
   rt_sched_trace_init(&ctx);
   char sched_trace_hash_str[19];
@@ -34276,7 +37028,8 @@ int main(void) {
   fprintf(
     stderr,
     "{\"fuel_used\":%" PRIu64 ",\"heap_used\":%u,\"fs_read_file_calls\":%" PRIu64 ",\"fs_list_dir_calls\":%" PRIu64 ","
-    "\"rr_send_calls\":%" PRIu64 ",\"rr_request_calls\":%" PRIu64 ",\"rr_last_request_sha256\":\"%s\","
+    "\"rr_open_calls\":%" PRIu64 ",\"rr_close_calls\":%" PRIu64 ",\"rr_stats_calls\":%" PRIu64 ","
+    "\"rr_next_calls\":%" PRIu64 ",\"rr_next_miss_calls\":%" PRIu64 ",\"rr_append_calls\":%" PRIu64 ","
     "\"kv_get_calls\":%" PRIu64 ",\"kv_set_calls\":%" PRIu64 ","
     "\"sched_stats\":{"
     "\"tasks_spawned\":%" PRIu64 ",\"spawn_calls\":%" PRIu64 ",\"join_calls\":%" PRIu64 ","
@@ -34296,9 +37049,12 @@ int main(void) {
     heap_used,
     ctx.fs_read_file_calls,
     ctx.fs_list_dir_calls,
-    ctx.rr_send_calls,
-    ctx.rr_request_calls,
-    rr_last_sha,
+    ctx.rr_open_calls,
+    ctx.rr_close_calls,
+    ctx.rr_stats_calls,
+    ctx.rr_next_calls,
+    ctx.rr_next_miss_calls,
+    ctx.rr_append_calls,
     ctx.kv_get_calls,
     ctx.kv_set_calls,
     ctx.sched_stats.tasks_spawned,
@@ -34329,7 +37085,8 @@ int main(void) {
   fprintf(
     stderr,
     "{\"fuel_used\":%" PRIu64 ",\"heap_used\":%u,\"fs_read_file_calls\":%" PRIu64 ",\"fs_list_dir_calls\":%" PRIu64 ","
-    "\"rr_send_calls\":%" PRIu64 ",\"rr_request_calls\":%" PRIu64 ",\"rr_last_request_sha256\":\"%s\","
+    "\"rr_open_calls\":%" PRIu64 ",\"rr_close_calls\":%" PRIu64 ",\"rr_stats_calls\":%" PRIu64 ","
+    "\"rr_next_calls\":%" PRIu64 ",\"rr_next_miss_calls\":%" PRIu64 ",\"rr_append_calls\":%" PRIu64 ","
     "\"kv_get_calls\":%" PRIu64 ",\"kv_set_calls\":%" PRIu64 ","
     "\"sched_stats\":{"
     "\"tasks_spawned\":%" PRIu64 ",\"spawn_calls\":%" PRIu64 ",\"join_calls\":%" PRIu64 ","
@@ -34347,9 +37104,12 @@ int main(void) {
     heap_used,
     ctx.fs_read_file_calls,
     ctx.fs_list_dir_calls,
-    ctx.rr_send_calls,
-    ctx.rr_request_calls,
-    rr_last_sha,
+    ctx.rr_open_calls,
+    ctx.rr_close_calls,
+    ctx.rr_stats_calls,
+    ctx.rr_next_calls,
+    ctx.rr_next_miss_calls,
+    ctx.rr_append_calls,
     ctx.kv_get_calls,
     ctx.kv_set_calls,
     ctx.sched_stats.tasks_spawned,

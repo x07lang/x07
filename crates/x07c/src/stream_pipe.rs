@@ -3456,9 +3456,7 @@ fn gen_pipe_helper_body(
             param_ident(*path_param),
             cfg.bufread_cap_bytes,
         )?,
-        PipeSrcV1::RrSend { key_param } => {
-            cg.gen_run_reader_source("rr.send", param_ident(*key_param), cfg.bufread_cap_bytes)?
-        }
+        PipeSrcV1::RrSend { key_param } => cg.gen_run_rr_send_source(*key_param)?,
         PipeSrcV1::DbRowsDoc {
             conn_param,
             sql_param,
@@ -3518,6 +3516,7 @@ const E_JSON_NOT_IJSON: i32 = 21;
 const E_JSON_TOO_DEEP: i32 = 22;
 const E_JSON_OBJECT_TOO_LARGE: i32 = 23;
 const E_JSON_TRAILING_DATA: i32 = 24;
+const E_RR_MISS: i32 = 11;
 
 const E_SINK_FS_OPEN_FAILED: i32 = 40;
 const E_SINK_FS_WRITE_FAILED: i32 = 41;
@@ -3800,9 +3799,7 @@ impl PipeCodegen<'_> {
             })
     }
 
-    fn gen_run_bytes_source(&self, bytes_param: usize) -> Result<Expr, CompilerError> {
-        let item_b = param_ident(bytes_param);
-
+    fn gen_run_bytes_source_expr(&self, item_b: Expr) -> Result<Expr, CompilerError> {
         let mut stmts = vec![
             expr_list(vec![
                 expr_ident("let"),
@@ -3842,6 +3839,75 @@ impl PipeCodegen<'_> {
             stmts.push(self.gen_flush_from(0)?);
         }
         stmts.push(self.gen_return_ok()?);
+
+        Ok(expr_list(
+            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
+        ))
+    }
+
+    fn gen_run_bytes_source(&self, bytes_param: usize) -> Result<Expr, CompilerError> {
+        self.gen_run_bytes_source_expr(param_ident(bytes_param))
+    }
+
+    fn gen_run_rr_send_source(&self, key_param: usize) -> Result<Expr, CompilerError> {
+        let stmts = vec![
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident("rr_h".to_string()),
+                expr_list(vec![expr_ident("rr.current_v1")]),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident("rr_entry_res".to_string()),
+                expr_list(vec![
+                    expr_ident("rr.next_v1"),
+                    expr_ident("rr_h".to_string()),
+                    expr_list(vec![expr_ident("bytes.lit"), expr_ident("rr".to_string())]),
+                    expr_list(vec![
+                        expr_ident("bytes.lit"),
+                        expr_ident("std.stream.src.rr_send_v1".to_string()),
+                    ]),
+                    param_ident(key_param),
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident("rr_entry".to_string()),
+                expr_list(vec![
+                    expr_ident("result_bytes.unwrap_or"),
+                    expr_ident("rr_entry_res".to_string()),
+                    expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_list(vec![
+                        expr_ident("bytes.len"),
+                        expr_ident("rr_entry".to_string()),
+                    ]),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("return"),
+                    err_doc_const(E_RR_MISS, "stream:rr_miss"),
+                ]),
+                expr_int(0),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident("rr_resp".to_string()),
+                expr_list(vec![
+                    expr_ident("rr.entry_resp_v1"),
+                    expr_list(vec![
+                        expr_ident("bytes.view"),
+                        expr_ident("rr_entry".to_string()),
+                    ]),
+                ]),
+            ]),
+            self.gen_run_bytes_source_expr(expr_ident("rr_resp".to_string()))?,
+        ];
 
         Ok(expr_list(
             vec![expr_ident("begin")].into_iter().chain(stmts).collect(),

@@ -570,7 +570,6 @@ fn builtin_map() -> BTreeMap<&'static str, &'static str> {
         ("bufread_fill", "bufread.fill"),
         ("bufread_consume", "bufread.consume"),
         ("fs_read", "fs.read"),
-        ("rr_send", "rr.send"),
         ("kv_get", "kv.get"),
         ("kv_set", "kv.set"),
     ])

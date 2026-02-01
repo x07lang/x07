@@ -1,13 +1,9 @@
-use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Args;
 use serde::Serialize;
-use serde_json::Value;
-
-use crate::util;
 
 #[derive(Debug, Args)]
 pub struct RrArgs {
@@ -17,17 +13,29 @@ pub struct RrArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum RrCommand {
-    /// Record an HTTP response into an RR fixture directory.
+    /// Record an HTTP response into an RR cassette file (`*.rrbin`).
     Record(RecordArgs),
 }
 
 #[derive(Debug, Args)]
 pub struct RecordArgs {
-    /// Fixture output directory (will contain `index.json` + `bodies/`).
+    /// Fixture output directory (will contain `*.rrbin`).
     #[arg(long, value_name = "DIR", default_value = "fixtures/rr")]
     pub out: PathBuf,
 
-    /// Key used by `rr.fetch(key)` / `rr.send(key)`.
+    /// Cassette file path relative to --out.
+    #[arg(long, value_name = "PATH", default_value = "cassette.rrbin")]
+    pub cassette: PathBuf,
+
+    /// Entry kind (defaults to `rr`).
+    #[arg(long, value_name = "KIND", default_value = "rr")]
+    pub kind: String,
+
+    /// Entry op id (defaults to `std.rr.fetch_v1`).
+    #[arg(long, value_name = "OP", default_value = "std.rr.fetch_v1")]
+    pub op: String,
+
+    /// Entry key (match key).
     #[arg(value_name = "KEY")]
     pub key: String,
 
@@ -35,11 +43,11 @@ pub struct RecordArgs {
     #[arg(value_name = "URL")]
     pub url: String,
 
-    /// Latency ticks recorded into the fixture index entry.
+    /// Latency ticks recorded into the entry (virtual-time ticks).
     #[arg(long, value_name = "TICKS", default_value_t = 0)]
     pub latency_ticks: u64,
 
-    /// Replace an existing entry for KEY.
+    /// Replace an existing matching entry (same kind+op+key).
     #[arg(long)]
     pub overwrite: bool,
 }
@@ -63,12 +71,14 @@ struct RrReport<T> {
 #[derive(Debug, Serialize)]
 struct RecordResult {
     out_dir: String,
+    cassette: String,
+    kind: String,
+    op: String,
     key: String,
     url: String,
     status: u16,
     bytes: usize,
-    body_file: String,
-    index: String,
+    seq: u64,
 }
 
 pub fn cmd_rr(args: RrArgs) -> Result<std::process::ExitCode> {
@@ -78,6 +88,277 @@ pub fn cmd_rr(args: RrArgs) -> Result<std::process::ExitCode> {
     match cmd {
         RrCommand::Record(args) => cmd_rr_record(args),
     }
+}
+
+fn ensure_safe_rel_path(rel: &std::path::Path) -> Result<()> {
+    if rel.as_os_str().is_empty() {
+        anyhow::bail!("expected non-empty relative path");
+    }
+    if rel.is_absolute() {
+        anyhow::bail!("expected safe relative path, got {}", rel.display());
+    }
+    for c in rel.components() {
+        match c {
+            std::path::Component::Normal(_) => {}
+            _ => anyhow::bail!("expected safe relative path, got {}", rel.display()),
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct RrEntryMeta {
+    kind: Vec<u8>,
+    op: Vec<u8>,
+    key: Vec<u8>,
+    seq: Option<u64>,
+}
+
+fn read_u32_le(buf: &[u8], off: usize) -> Option<u32> {
+    let bytes = buf.get(off..off + 4)?;
+    Some(u32::from_le_bytes(bytes.try_into().ok()?))
+}
+
+fn dm_skip_value_depth(buf: &[u8], mut off: usize, depth: u32) -> Option<usize> {
+    if depth > 64 {
+        return None;
+    }
+    let tag = *buf.get(off)?;
+    off += 1;
+
+    match tag {
+        0 => Some(off),
+        1 => Some(off + 1),
+        2 | 3 => {
+            let len = read_u32_le(buf, off)? as usize;
+            off += 4;
+            let end = off.checked_add(len)?;
+            if end > buf.len() {
+                return None;
+            }
+            Some(end)
+        }
+        4 => {
+            let count = read_u32_le(buf, off)? as usize;
+            off += 4;
+            for _ in 0..count {
+                off = dm_skip_value_depth(buf, off, depth + 1)?;
+            }
+            Some(off)
+        }
+        5 => {
+            let count = read_u32_le(buf, off)? as usize;
+            off += 4;
+            for _ in 0..count {
+                let klen = read_u32_le(buf, off)? as usize;
+                off += 4;
+                let key_end = off.checked_add(klen)?;
+                if key_end > buf.len() {
+                    return None;
+                }
+                off = key_end;
+                off = dm_skip_value_depth(buf, off, depth + 1)?;
+            }
+            Some(off)
+        }
+        _ => None,
+    }
+}
+
+fn dm_get_string_range(buf: &[u8], off: usize) -> Option<&[u8]> {
+    let tag = *buf.get(off)?;
+    if tag != 3 {
+        return None;
+    }
+    let len = read_u32_le(buf, off + 1)? as usize;
+    let start = off + 1 + 4;
+    let end = start.checked_add(len)?;
+    if end > buf.len() {
+        return None;
+    }
+    Some(&buf[start..end])
+}
+
+fn dm_get_number_str(buf: &[u8], off: usize) -> Option<&[u8]> {
+    let tag = *buf.get(off)?;
+    if tag != 2 {
+        return None;
+    }
+    let len = read_u32_le(buf, off + 1)? as usize;
+    let start = off + 1 + 4;
+    let end = start.checked_add(len)?;
+    if end > buf.len() {
+        return None;
+    }
+    Some(&buf[start..end])
+}
+
+fn parse_u64_dec(bytes: &[u8]) -> Option<u64> {
+    if bytes.is_empty() {
+        return None;
+    }
+    let mut acc: u64 = 0;
+    for &b in bytes {
+        if !b.is_ascii_digit() {
+            return None;
+        }
+        let d = (b - b'0') as u64;
+        acc = acc.checked_mul(10)?;
+        acc = acc.checked_add(d)?;
+    }
+    Some(acc)
+}
+
+fn parse_entry_meta_v1(doc: &[u8]) -> Result<RrEntryMeta> {
+    if doc.len() < 6 {
+        anyhow::bail!("entry doc too short");
+    }
+    if doc[0] != 1 {
+        anyhow::bail!("entry doc is not an ok doc");
+    }
+    if doc[1] != 5 {
+        anyhow::bail!("entry doc root is not a map");
+    }
+    let count = read_u32_le(doc, 2).context("read map count")? as usize;
+    let mut pos: usize = 6;
+    let mut found_kind: Option<Vec<u8>> = None;
+    let mut found_op: Option<Vec<u8>> = None;
+    let mut found_key: Option<Vec<u8>> = None;
+    let mut found_seq: Option<u64> = None;
+
+    for _ in 0..count {
+        let klen = read_u32_le(doc, pos).context("read key len")? as usize;
+        pos += 4;
+        let key_end = pos.checked_add(klen).context("key len overflow")?;
+        if key_end > doc.len() {
+            anyhow::bail!("entry doc truncated");
+        }
+        let key = &doc[pos..key_end];
+        pos = key_end;
+
+        let v_off = pos;
+        let v_end = dm_skip_value_depth(doc, v_off, 0).context("skip value")?;
+        pos = v_end;
+
+        match key {
+            b"kind" => {
+                let v = dm_get_string_range(doc, v_off).context("kind must be a string")?;
+                found_kind = Some(v.to_vec());
+            }
+            b"op" => {
+                let v = dm_get_string_range(doc, v_off).context("op must be a string")?;
+                found_op = Some(v.to_vec());
+            }
+            b"key" => {
+                let v = dm_get_string_range(doc, v_off).context("key must be a string")?;
+                found_key = Some(v.to_vec());
+            }
+            b"seq" => {
+                let v = dm_get_number_str(doc, v_off).context("seq must be a number")?;
+                found_seq = parse_u64_dec(v);
+            }
+            _ => {}
+        }
+    }
+    if pos != doc.len() {
+        anyhow::bail!("entry doc has trailing bytes");
+    }
+    Ok(RrEntryMeta {
+        kind: found_kind.context("entry doc missing kind")?,
+        op: found_op.context("entry doc missing op")?,
+        key: found_key.context("entry doc missing key")?,
+        seq: found_seq,
+    })
+}
+
+fn dm_write_u32_le(out: &mut Vec<u8>, v: u32) {
+    out.extend_from_slice(&v.to_le_bytes());
+}
+
+fn dm_write_string(out: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+    let len = u32::try_from(bytes.len()).context("string too long")?;
+    out.push(3);
+    dm_write_u32_le(out, len);
+    out.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn dm_write_number_bytes(out: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+    let len = u32::try_from(bytes.len()).context("number string too long")?;
+    out.push(2);
+    dm_write_u32_le(out, len);
+    out.extend_from_slice(bytes);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn make_entry_v1(
+    kind: &[u8],
+    op: &[u8],
+    key: &[u8],
+    req: &[u8],
+    resp: &[u8],
+    err: i32,
+    latency_ticks: Option<u32>,
+    seq: u64,
+) -> Result<Vec<u8>> {
+    let mut items: Vec<(&[u8], Vec<u8>, bool)> = vec![
+        // String values (tag 3)
+        (b"key", key.to_vec(), true),
+        (b"kind", kind.to_vec(), true),
+        (b"op", op.to_vec(), true),
+        (b"req", req.to_vec(), true),
+        (b"resp", resp.to_vec(), true),
+        // Number values (tag 2) stored as ASCII bytes in the Vec.
+        (b"err", err.to_string().into_bytes(), false),
+        (b"seq", seq.to_string().into_bytes(), false),
+        (b"v", b"1".to_vec(), false),
+    ];
+    if let Some(lat) = latency_ticks {
+        items.push((b"latency_ticks", lat.to_string().into_bytes(), false));
+    }
+
+    items.sort_by(|(ka, _, _), (kb, _, _)| ka.cmp(kb));
+
+    let mut out = Vec::new();
+    out.push(1);
+    out.push(5);
+    dm_write_u32_le(
+        &mut out,
+        u32::try_from(items.len()).context("too many map items")?,
+    );
+    for (k, v, is_string) in items {
+        dm_write_u32_le(&mut out, u32::try_from(k.len()).context("key too long")?);
+        out.extend_from_slice(k);
+        if is_string {
+            dm_write_string(&mut out, &v)?;
+        } else {
+            dm_write_number_bytes(&mut out, &v)?;
+        }
+    }
+    Ok(out)
+}
+
+fn write_rrbin_frame(mut w: impl std::io::Write, payload: &[u8]) -> Result<()> {
+    let len = u32::try_from(payload.len()).context("rr entry too large")?;
+    w.write_all(&len.to_le_bytes())?;
+    w.write_all(payload)?;
+    Ok(())
+}
+
+fn read_exact_or_eof(r: &mut impl std::io::Read, buf: &mut [u8]) -> Result<bool> {
+    let mut pos = 0;
+    while pos < buf.len() {
+        let n = r.read(&mut buf[pos..])?;
+        if n == 0 {
+            if pos == 0 {
+                return Ok(false);
+            }
+            anyhow::bail!("unexpected EOF");
+        }
+        pos += n;
+    }
+    Ok(true)
 }
 
 fn cmd_rr_record(args: RecordArgs) -> Result<std::process::ExitCode> {
@@ -109,15 +390,33 @@ fn cmd_rr_record(args: RecordArgs) -> Result<std::process::ExitCode> {
         println!("{}", serde_json::to_string(&report)?);
         return Ok(std::process::ExitCode::from(20));
     }
-
-    let key_hash = util::sha256_hex(key.as_bytes());
-    let body_rel = format!("bodies/{key_hash}.bin");
-
-    let out_dir = args.out;
-    let body_path = out_dir.join(&body_rel);
-    if let Some(parent) = body_path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create dir: {}", parent.display()))?;
+    let kind = args.kind.trim();
+    if kind.is_empty() {
+        let report = RrReport::<RecordResult> {
+            ok: false,
+            command: "rr.record",
+            result: None,
+            error: Some(RrError {
+                code: "X07RR_KIND_EMPTY".to_string(),
+                message: "kind must be non-empty".to_string(),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+    let op = args.op.trim();
+    if op.is_empty() {
+        let report = RrReport::<RecordResult> {
+            ok: false,
+            command: "rr.record",
+            result: None,
+            error: Some(RrError {
+                code: "X07RR_OP_EMPTY".to_string(),
+                message: "op must be non-empty".to_string(),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
     }
 
     let resp = match ureq::get(url)
@@ -149,105 +448,185 @@ fn cmd_rr_record(args: RecordArgs) -> Result<std::process::ExitCode> {
         .read_to_end(&mut body)
         .context("read http response body")?;
 
-    std::fs::write(&body_path, &body).with_context(|| format!("write: {}", body_path.display()))?;
-
-    let index_path = out_dir.join("index.json");
-    let mut index_doc: Value = if index_path.is_file() {
-        let bytes = std::fs::read(&index_path)
-            .with_context(|| format!("read: {}", index_path.display()))?;
-        serde_json::from_slice(&bytes)
-            .with_context(|| format!("parse JSON: {}", index_path.display()))?
-    } else {
-        Value::Object(serde_json::Map::new())
-    };
-
-    let Some(obj) = index_doc.as_object_mut() else {
-        anyhow::bail!("rr index must be a JSON object: {}", index_path.display());
-    };
-    let format = obj
-        .get("format")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .trim();
-    if !format.is_empty() && format != "x07.rr.fixture_index@0.1.0" {
-        anyhow::bail!(
-            "rr index format mismatch: expected x07.rr.fixture_index@0.1.0 got {:?} ({})",
-            format,
-            index_path.display()
-        );
-    }
-    obj.insert(
-        "format".to_string(),
-        Value::String("x07.rr.fixture_index@0.1.0".to_string()),
-    );
-    if !obj.contains_key("default_latency_ticks") {
-        obj.insert("default_latency_ticks".to_string(), Value::Number(0.into()));
-    }
-
-    let requests_val = obj
-        .entry("requests".to_string())
-        .or_insert_with(|| Value::Object(serde_json::Map::new()));
-    let Some(requests_obj) = requests_val.as_object_mut() else {
-        anyhow::bail!(
-            "rr index requests must be a JSON object: {}",
-            index_path.display()
-        );
-    };
-
-    if requests_obj.contains_key(key) && !args.overwrite {
+    if args.latency_ticks > u64::from(u32::MAX) {
         let report = RrReport::<RecordResult> {
             ok: false,
             command: "rr.record",
             result: None,
             error: Some(RrError {
-                code: "X07RR_KEY_EXISTS".to_string(),
-                message: format!("fixture already contains key (use --overwrite): {key}"),
+                code: "X07RR_LATENCY_OUT_OF_RANGE".to_string(),
+                message: format!("latency_ticks must fit in u32, got {}", args.latency_ticks),
             }),
         };
         println!("{}", serde_json::to_string(&report)?);
         return Ok(std::process::ExitCode::from(20));
     }
 
-    let mut req_obj = serde_json::Map::new();
-    req_obj.insert(
-        "latency_ticks".to_string(),
-        Value::Number(serde_json::Number::from(args.latency_ticks)),
-    );
-    req_obj.insert("body_file".to_string(), Value::String(body_rel.clone()));
-    req_obj.insert("status".to_string(), Value::Number(status.into()));
-    requests_obj.insert(key.to_string(), Value::Object(req_obj));
+    ensure_safe_rel_path(&args.cassette).context("validate --cassette")?;
 
-    let sorted: BTreeMap<String, Value> = requests_obj
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
-    obj.insert(
-        "requests".to_string(),
-        Value::Object(sorted.into_iter().collect()),
-    );
-
-    let mut out = serde_json::to_vec_pretty(&index_doc)?;
-    if out.last() != Some(&b'\n') {
-        out.push(b'\n');
-    }
-    if let Some(parent) = index_path.parent() {
+    let out_dir = args.out;
+    let cassette_path = out_dir.join(&args.cassette);
+    if let Some(parent) = cassette_path.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("create dir: {}", parent.display()))?;
     }
-    std::fs::write(&index_path, &out)
-        .with_context(|| format!("write: {}", index_path.display()))?;
+
+    let kind_b = kind.as_bytes();
+    let op_b = op.as_bytes();
+    let key_b = key.as_bytes();
+    let latency_u32 = u32::try_from(args.latency_ticks).ok();
+
+    let mut found = false;
+    let mut max_seq: Option<u64> = None;
+    if cassette_path.is_file() {
+        let mut f = std::fs::File::open(&cassette_path)
+            .with_context(|| format!("open: {}", cassette_path.display()))?;
+        loop {
+            let mut hdr = [0u8; 4];
+            if !read_exact_or_eof(&mut f, &mut hdr).context("read rrbin frame header")? {
+                break;
+            }
+            let len = u32::from_le_bytes(hdr) as usize;
+            let mut payload = vec![0u8; len];
+            f.read_exact(&mut payload)
+                .context("read rrbin frame payload")?;
+            let meta = parse_entry_meta_v1(&payload).context("parse existing entry")?;
+            if meta.kind == kind_b && meta.op == op_b && meta.key == key_b {
+                found = true;
+            }
+            if let Some(seq) = meta.seq {
+                max_seq = Some(max_seq.map_or(seq, |m| m.max(seq)));
+            }
+        }
+    }
+
+    if found && !args.overwrite {
+        let report = RrReport::<RecordResult> {
+            ok: false,
+            command: "rr.record",
+            result: None,
+            error: Some(RrError {
+                code: "X07RR_ENTRY_EXISTS".to_string(),
+                message: format!(
+                    "cassette already contains entry (use --overwrite): {kind} {op} {key}"
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let seq = max_seq.and_then(|s| s.checked_add(1)).unwrap_or(0);
+
+    if args.overwrite && cassette_path.is_file() && found {
+        let file_name = cassette_path
+            .file_name()
+            .unwrap_or_else(|| std::ffi::OsStr::new("cassette.rrbin"))
+            .to_string_lossy();
+        let tmp_path = cassette_path.with_file_name(format!("{file_name}.tmp"));
+
+        let mut fin = std::fs::File::open(&cassette_path)
+            .with_context(|| format!("open: {}", cassette_path.display()))?;
+        let mut fout = std::fs::File::create(&tmp_path)
+            .with_context(|| format!("create: {}", tmp_path.display()))?;
+        let mut max_kept_seq: Option<u64> = None;
+
+        loop {
+            let mut hdr = [0u8; 4];
+            if !read_exact_or_eof(&mut fin, &mut hdr).context("read rrbin frame header")? {
+                break;
+            }
+            let len = u32::from_le_bytes(hdr) as usize;
+            let mut payload = vec![0u8; len];
+            fin.read_exact(&mut payload)
+                .context("read rrbin frame payload")?;
+            let meta = parse_entry_meta_v1(&payload).context("parse existing entry")?;
+            if meta.kind == kind_b && meta.op == op_b && meta.key == key_b {
+                continue;
+            }
+            if let Some(seq) = meta.seq {
+                max_kept_seq = Some(max_kept_seq.map_or(seq, |m| m.max(seq)));
+            }
+            write_rrbin_frame(&mut fout, &payload).context("write rrbin frame")?;
+        }
+
+        let seq = max_kept_seq.and_then(|s| s.checked_add(1)).unwrap_or(0);
+        let entry = make_entry_v1(
+            kind_b,
+            op_b,
+            key_b,
+            key_b,
+            &body,
+            0,
+            latency_u32.filter(|v| *v != 0),
+            seq,
+        )?;
+        write_rrbin_frame(&mut fout, &entry).context("append rrbin entry")?;
+        fout.sync_all().ok();
+
+        if cassette_path.is_file() {
+            std::fs::remove_file(&cassette_path)
+                .with_context(|| format!("remove: {}", cassette_path.display()))?;
+        }
+        std::fs::rename(&tmp_path, &cassette_path).with_context(|| {
+            format!(
+                "rename {} -> {}",
+                tmp_path.display(),
+                cassette_path.display()
+            )
+        })?;
+
+        let report = RrReport {
+            ok: true,
+            command: "rr.record",
+            result: Some(RecordResult {
+                out_dir: out_dir.display().to_string(),
+                cassette: args.cassette.display().to_string(),
+                kind: kind.to_string(),
+                op: op.to_string(),
+                key: key.to_string(),
+                url: url.to_string(),
+                status,
+                bytes: body.len(),
+                seq,
+            }),
+            error: None,
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::SUCCESS);
+    }
+
+    let entry = make_entry_v1(
+        kind_b,
+        op_b,
+        key_b,
+        key_b,
+        &body,
+        0,
+        latency_u32.filter(|v| *v != 0),
+        seq,
+    )?;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&cassette_path)
+        .with_context(|| format!("open: {}", cassette_path.display()))?;
+    write_rrbin_frame(&mut f, &entry).context("append rrbin entry")?;
+    f.sync_all().ok();
 
     let report = RrReport {
         ok: true,
         command: "rr.record",
         result: Some(RecordResult {
             out_dir: out_dir.display().to_string(),
+            cassette: args.cassette.display().to_string(),
+            kind: kind.to_string(),
+            op: op.to_string(),
             key: key.to_string(),
             url: url.to_string(),
             status,
             bytes: body.len(),
-            body_file: body_rel,
-            index: index_path.display().to_string(),
+            seq,
         }),
         error: None,
     };

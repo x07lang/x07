@@ -212,9 +212,12 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "heap_used": solve.heap_used,
                 "fs_read_file_calls": solve.fs_read_file_calls,
                 "fs_list_dir_calls": solve.fs_list_dir_calls,
-                "rr_send_calls": solve.rr_send_calls,
-                "rr_request_calls": solve.rr_request_calls,
-                "rr_last_request_sha256": solve.rr_last_request_sha256,
+                "rr_open_calls": solve.rr_open_calls,
+                "rr_close_calls": solve.rr_close_calls,
+                "rr_stats_calls": solve.rr_stats_calls,
+                "rr_next_calls": solve.rr_next_calls,
+                "rr_next_miss_calls": solve.rr_next_miss_calls,
+                "rr_append_calls": solve.rr_append_calls,
                 "kv_get_calls": solve.kv_get_calls,
                 "kv_set_calls": solve.kv_set_calls,
                 "sched_stats": solve.sched_stats,
@@ -457,9 +460,12 @@ fn runner_json(
         "heap_used": solve.heap_used,
         "fs_read_file_calls": solve.fs_read_file_calls,
         "fs_list_dir_calls": solve.fs_list_dir_calls,
-        "rr_send_calls": solve.rr_send_calls,
-        "rr_request_calls": solve.rr_request_calls,
-        "rr_last_request_sha256": solve.rr_last_request_sha256,
+        "rr_open_calls": solve.rr_open_calls,
+        "rr_close_calls": solve.rr_close_calls,
+        "rr_stats_calls": solve.rr_stats_calls,
+        "rr_next_calls": solve.rr_next_calls,
+        "rr_next_miss_calls": solve.rr_next_miss_calls,
+        "rr_append_calls": solve.rr_append_calls,
         "kv_get_calls": solve.kv_get_calls,
         "kv_set_calls": solve.kv_set_calls,
         "sched_stats": solve.sched_stats,
@@ -476,7 +482,6 @@ fn compile_runner_config(cli: &Cli, max_output_bytes: usize) -> RunnerConfig {
         fixture_fs_root: None,
         fixture_fs_latency_index: None,
         fixture_rr_dir: None,
-        fixture_rr_index: None,
         fixture_kv_dir: None,
         fixture_kv_seed: None,
         solve_fuel: cli.solve_fuel,
@@ -787,9 +792,12 @@ fn run_os_artifact(inv: &RunInvocation<'_>) -> Result<RunnerResult> {
             heap_used: None,
             fs_read_file_calls: None,
             fs_list_dir_calls: None,
-            rr_send_calls: None,
-            rr_request_calls: None,
-            rr_last_request_sha256: None,
+            rr_open_calls: None,
+            rr_close_calls: None,
+            rr_stats_calls: None,
+            rr_next_calls: None,
+            rr_next_miss_calls: None,
+            rr_append_calls: None,
             kv_get_calls: None,
             kv_set_calls: None,
             sched_stats: None,
@@ -810,9 +818,12 @@ fn run_os_artifact(inv: &RunInvocation<'_>) -> Result<RunnerResult> {
             heap_used: None,
             fs_read_file_calls: None,
             fs_list_dir_calls: None,
-            rr_send_calls: None,
-            rr_request_calls: None,
-            rr_last_request_sha256: None,
+            rr_open_calls: None,
+            rr_close_calls: None,
+            rr_stats_calls: None,
+            rr_next_calls: None,
+            rr_next_miss_calls: None,
+            rr_append_calls: None,
             kv_get_calls: None,
             kv_set_calls: None,
             sched_stats: None,
@@ -833,9 +844,12 @@ fn run_os_artifact(inv: &RunInvocation<'_>) -> Result<RunnerResult> {
             heap_used: None,
             fs_read_file_calls: None,
             fs_list_dir_calls: None,
-            rr_send_calls: None,
-            rr_request_calls: None,
-            rr_last_request_sha256: None,
+            rr_open_calls: None,
+            rr_close_calls: None,
+            rr_stats_calls: None,
+            rr_next_calls: None,
+            rr_next_miss_calls: None,
+            rr_append_calls: None,
             kv_get_calls: None,
             kv_set_calls: None,
             sched_stats: None,
@@ -874,11 +888,12 @@ fn run_os_artifact(inv: &RunInvocation<'_>) -> Result<RunnerResult> {
     let heap_used = metrics.as_ref().and_then(|m| m.heap_used);
     let fs_read_file_calls = metrics.as_ref().and_then(|m| m.fs_read_file_calls);
     let fs_list_dir_calls = metrics.as_ref().and_then(|m| m.fs_list_dir_calls);
-    let rr_send_calls = metrics.as_ref().and_then(|m| m.rr_send_calls);
-    let rr_request_calls = metrics.as_ref().and_then(|m| m.rr_request_calls);
-    let rr_last_request_sha256 = metrics
-        .as_ref()
-        .and_then(|m| m.rr_last_request_sha256.clone());
+    let rr_open_calls = metrics.as_ref().and_then(|m| m.rr_open_calls);
+    let rr_close_calls = metrics.as_ref().and_then(|m| m.rr_close_calls);
+    let rr_stats_calls = metrics.as_ref().and_then(|m| m.rr_stats_calls);
+    let rr_next_calls = metrics.as_ref().and_then(|m| m.rr_next_calls);
+    let rr_next_miss_calls = metrics.as_ref().and_then(|m| m.rr_next_miss_calls);
+    let rr_append_calls = metrics.as_ref().and_then(|m| m.rr_append_calls);
     let kv_get_calls = metrics.as_ref().and_then(|m| m.kv_get_calls);
     let kv_set_calls = metrics.as_ref().and_then(|m| m.kv_set_calls);
     let sched_stats = metrics.as_ref().and_then(|m| m.sched_stats.clone());
@@ -896,9 +911,12 @@ fn run_os_artifact(inv: &RunInvocation<'_>) -> Result<RunnerResult> {
         heap_used,
         fs_read_file_calls,
         fs_list_dir_calls,
-        rr_send_calls,
-        rr_request_calls,
-        rr_last_request_sha256,
+        rr_open_calls,
+        rr_close_calls,
+        rr_stats_calls,
+        rr_next_calls,
+        rr_next_miss_calls,
+        rr_append_calls,
         kv_get_calls,
         kv_set_calls,
         sched_stats,
@@ -1022,7 +1040,6 @@ mod tests {
             fixture_fs_root: None,
             fixture_fs_latency_index: None,
             fixture_rr_dir: None,
-            fixture_rr_index: None,
             fixture_kv_dir: None,
             fixture_kv_seed: None,
             solve_fuel: 10_000_000,
@@ -1063,6 +1080,7 @@ mod tests {
             enable_rr: false,
             enable_kv: false,
             module_roots,
+            arch_root: None,
             emit_main: true,
             freestanding: false,
             allow_unsafe: None,

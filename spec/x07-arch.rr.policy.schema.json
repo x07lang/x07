@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.rr.policy.schema.json",
+  "title": "x07.arch.rr.policy@0.1.0",
+  "description": "RR policy file referenced by `arch/rr/index.x07rr.json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "mode_default", "match_mode", "budgets"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.rr.policy@0.1.0" },
+    "id": { "$ref": "#/$defs/id" },
+    "v": { "type": "integer", "minimum": 1 },
+    "mode_default": { "$ref": "#/$defs/record_mode" },
+    "match_mode": { "type": "string", "enum": ["lookup_v1", "transcript_v1"] },
+    "budgets": { "$ref": "#/$defs/budgets" },
+    "http": { "$ref": "#/$defs/http", "default": {} }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "record_mode": {
+      "type": "string",
+      "enum": ["off", "record_v1", "replay_v1", "record_missing_v1", "rewrite_v1"]
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_cassette_bytes", "max_entries", "max_req_bytes", "max_resp_bytes", "max_key_bytes"],
+      "properties": {
+        "max_cassette_bytes": { "type": "integer", "minimum": 0 },
+        "max_entries": { "type": "integer", "minimum": 0 },
+        "max_req_bytes": { "type": "integer", "minimum": 0 },
+        "max_resp_bytes": { "type": "integer", "minimum": 0 },
+        "max_key_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "http": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key_v1": { "$ref": "#/$defs/http_key_v1" }
+      }
+    },
+    "http_key_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["include_headers", "ignore_headers", "query_sort", "body_hash"],
+      "properties": {
+        "include_headers": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 128 }, "default": [] },
+        "ignore_headers": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 128 }, "default": [] },
+        "query_sort": { "type": "string", "enum": ["lex_u8_v1"], "default": "lex_u8_v1" },
+        "body_hash": { "type": "string", "enum": ["sha256_v1"], "default": "sha256_v1" }
+      }
+    }
+  }
+}

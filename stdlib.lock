@@ -335,8 +335,8 @@
       "name": "std.rr",
       "path": "stdlib/std/0.1.1/modules/std/rr.x07.json",
       "relpath": "std/0.1.1/modules/std/rr.x07.json",
-      "sha256": "1795be98dc9939b804e29ce8174ee06daea61180e15ecd51a4aec49ae097edbd",
-      "size_bytes": 713,
+      "sha256": "a43944e1db282ccf46b6a505e1b63d36a206e3f1b17fe8addd26a4b8ba949319",
+      "size_bytes": 1445,
       "version": "0.1.1"
     },
     {
@@ -482,6 +482,6 @@
       "version": "0.1.1"
     }
   ],
-  "stdlib_hash": "941183cdfc549b4d8006f738092c27c860ca9ff2b25bc2e2a9bd1d0d628abcf6",
+  "stdlib_hash": "7c38b1ebf8f4f02c3e7569a3622647d38c6afa75be80ef3e95ed79cbf8aa7998",
   "stdlib_root": "stdlib/std"
 }

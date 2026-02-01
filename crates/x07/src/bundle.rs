@@ -323,6 +323,7 @@ pub fn cmd_bundle(args: BundleArgs) -> Result<std::process::ExitCode> {
         .and_then(|p| p.cpu_time_limit_seconds));
 
     let mut compile_options = x07c::world_config::compile_options_for_world(world, module_roots);
+    compile_options.arch_root = project_root.clone();
     if world == WorldId::RunOsSandboxed {
         compile_options.allow_unsafe = policy_allow_unsafe;
         compile_options.allow_ffi = policy_allow_ffi;

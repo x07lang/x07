@@ -427,7 +427,7 @@ fn cmd_schema_derive(args: SchemaDeriveArgs) -> Result<std::process::ExitCode> {
     let raw_sha256_hex = util::sha256_hex(&input_bytes);
 
     let input_value: Value = serde_json::from_slice(&input_bytes).context("parse schema JSON")?;
-    let jcs_sha256_hex = util::sha256_hex(&canonical_jcs_bytes(&input_value)?);
+    let jcs_sha256_hex = util::sha256_hex(&util::canonical_jcs_bytes(&input_value)?);
 
     let mut schema_file: X07SchemaFile =
         serde_json::from_value(input_value.clone()).context("parse schema JSON")?;
@@ -513,13 +513,6 @@ fn cmd_schema_derive(args: SchemaDeriveArgs) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::from(1));
     }
     Ok(std::process::ExitCode::SUCCESS)
-}
-
-fn canonical_jcs_bytes(v: &Value) -> Result<Vec<u8>> {
-    let mut v = v.clone();
-    x07c::x07ast::canon_value_jcs(&mut v);
-    let bytes = serde_json::to_vec(&v)?;
-    Ok(bytes)
 }
 
 #[derive(Debug, Clone, Copy)]

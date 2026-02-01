@@ -413,9 +413,14 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.world.fs.read_file_async","path_bytes"]` -> bytes
 
 - `std.rr` (solve-rr only)
-  - `["std.rr.send_request","req_bytes"]` -> bytes
-  - `["std.rr.fetch","key_bytes"]` -> bytes
-  - `["std.rr.send","key_bytes"]` -> iface
+  - `["std.rr.open_v1","cfg"]` -> result_i32
+  - `["std.rr.close_v1","h"]` -> i32
+  - `["std.rr.stats_v1","h"]` -> bytes
+  - `["std.rr.next_v1","h","kind","op","key"]` -> result_bytes
+  - `["std.rr.append_v1","h","entry"]` -> result_i32
+  - `["std.rr.entry_resp_v1","entry"]` -> bytes
+  - `["std.rr.entry_err_v1","entry"]` -> i32
+  - `["std.rr.current_v1"]` -> i32
 
 - `std.kv` (solve-kv only)
   - `["std.kv.get","key_bytes"]` -> bytes
@@ -499,13 +504,20 @@ Views are explicit, borrowed slices used for scan/trim/split without copying.
 
 ## Request/Response (solve-rr only)
 
-- `["rr.send_request","req_bytes"]` -> bytes
-  - Fixture-backed request/response (no real network).
-  - `req_bytes` are hashed as `sha256(req_bytes)` and mapped to a response blob under `./.x07_rr/`.
-- `["rr.fetch","key_bytes"]` -> bytes
-  - Fixture-backed request/response with deterministic latency modeling.
-- `["rr.send","key_bytes"]` -> iface
-  - Returns an `iface` reader for streaming reads.
+Deterministic replay/record from cassette files under `./.x07_rr/`.
+
+Core builtins:
+
+- `["rr.open_v1","cfg"]` -> result_i32
+- `["rr.close_v1","h"]` -> i32
+- `["rr.stats_v1","h"]` -> bytes
+- `["rr.next_v1","h","kind","op","key"]` -> result_bytes
+- `["rr.append_v1","h","entry"]` -> result_i32
+
+Entry helpers:
+
+- `["rr.entry_resp_v1","entry"]` -> bytes
+- `["rr.entry_err_v1","entry"]` -> i32
 
 ## Key/Value (solve-kv only)
 

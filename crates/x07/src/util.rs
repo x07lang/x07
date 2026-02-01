@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use anyhow::Result;
 use sha2::{Digest, Sha256};
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -61,6 +62,12 @@ pub fn write_atomic(path: &Path, contents: &[u8]) -> std::io::Result<()> {
     }
 }
 
+pub fn canonical_jcs_bytes(v: &serde_json::Value) -> Result<Vec<u8>> {
+    let mut v = v.clone();
+    x07c::x07ast::canon_value_jcs(&mut v);
+    Ok(serde_json::to_vec(&v)?)
+}
+
 pub(crate) fn resolve_sibling_or_path(name: &str) -> PathBuf {
     let Ok(exe) = std::env::current_exe() else {
         return PathBuf::from(name);
@@ -69,23 +76,20 @@ pub(crate) fn resolve_sibling_or_path(name: &str) -> PathBuf {
         return PathBuf::from(name);
     };
 
-    let mut candidates = Vec::new();
-
-    candidates.push(dir.join(name));
-
+    let sibling = dir.join(name);
+    if sibling.is_file() {
+        return sibling;
+    }
     if dir
         .file_name()
         .and_then(|n| n.to_str())
         .is_some_and(|n| n == "deps")
     {
         if let Some(parent) = dir.parent() {
-            candidates.push(parent.join(name));
-        }
-    }
-
-    for cand in candidates {
-        if cand.is_file() {
-            return cand;
+            let sibling = parent.join(name);
+            if sibling.is_file() {
+                return sibling;
+            }
         }
     }
 

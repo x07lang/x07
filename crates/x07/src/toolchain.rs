@@ -449,6 +449,7 @@ pub fn cmd_build(args: BuildArgs) -> Result<std::process::ExitCode> {
     };
 
     let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
+    options.arch_root = Some(base.to_path_buf());
     if args.freestanding {
         options.emit_main = false;
         options.freestanding = true;

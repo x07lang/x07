@@ -823,6 +823,7 @@ fn ty_to_name(ty: Ty) -> &'static str {
         Ty::PtrConstI32 => "ptr_const_i32",
         Ty::PtrMutI32 => "ptr_mut_i32",
         Ty::TaskScopeV1 => "i32",
+        Ty::BudgetScopeV1 => "i32",
         Ty::TaskHandleBytesV1
         | Ty::TaskHandleResultBytesV1
         | Ty::TaskSlotV1

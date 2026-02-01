@@ -19,7 +19,6 @@ Prefer streaming parsing and zero-copy views over full-buffer copies.
   - `bufread.fill` + `bufread.consume`
 - Prefer world adapters that return reader `iface`s:
   - `std.fs.open_read`
-  - `std.rr.send`
   - `std.kv.get_stream`
 
 For the built-in reference guide, use `x07 guide` and search for `std.io` / `std.io.bufread`.

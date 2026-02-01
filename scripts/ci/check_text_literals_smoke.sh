@@ -48,7 +48,7 @@ r = json.load(open(sys.argv[1], "r", encoding="utf-8"))
 assert r.get("schema_version") == "x07.run.report@0.1.0", r.get("schema_version")
 assert r.get("runner") == "host", r.get("runner")
 rep = r.get("report") or {}
-assert rep.get("schema_version") == "x07-host-runner.report@0.2.0", rep.get("schema_version")
+assert rep.get("schema_version") == "x07-host-runner.report@0.3.0", rep.get("schema_version")
 assert rep.get("exit_code") == 0, rep.get("exit_code")
 compile = rep.get("compile") or {}
 assert compile.get("ok") is True, compile

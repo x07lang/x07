@@ -42,41 +42,39 @@ The runner compiles this into a binary index at `.x07_fs/latency.evfslat` inside
 
 In `solve-rr`, fixtures live under a `.x07_rr/` directory in the run directory.
 
-The runner requires an RR index and will accept either:
+The runner copies your fixture directory into `.x07_rr/` (read-only) and the runtime reads cassette files from there.
 
-- `index.evrr` (prebuilt binary index), or
-- `index.json` (source index; the runner will compile it to `index.evrr`).
+### Cassette files (`*.rrbin`)
 
-### `index.json` (`x07.rr.fixture_index@0.1.0`)
+A cassette file is a **u32-le framed stream**:
 
-```json
-{
-  "format": "x07.rr.fixture_index@0.1.0",
-  "default_latency_ticks": 0,
-  "requests": {
-    "example.com": { "latency_ticks": 0, "body_file": "bodies/9c56cc51.bin" }
-  }
-}
 ```
+[u32_le length][length bytes payload][u32_le length][payload]...
+```
+
+Each payload is one RR `entry_v1` record encoded as a DataModel doc.
+
+`entry_v1` is a DataModel ok-map with required keys:
+
+- `kind` (bytes string): operation kind (for example `http`, `process`, `tcp_stream`, `file`, or `rr`)
+- `op` (bytes string): stable operation id
+- `key` (bytes string): match key (may be empty for transcript-mode cassettes)
+- `req` (bytes string): request payload
+- `resp` (bytes string): response payload
+- `err` (number-as-bytes): `"0"` for ok; otherwise stable error code
+
+Optional keys:
+
+- `latency_ticks` (number-as-bytes): virtual-time ticks to sleep before returning the entry
 
 Notes:
 
-- `requests` maps a key (bytes in `std.rr.fetch(key)` / `std.rr.send(key)`) to a response.
-- `body_file` is a safe relative path under `.x07_rr/` (for example `bodies/<...>.bin`).
-- Additional fields may appear (for example `status`) and are ignored by the runner.
+- Map keys must be sorted lexicographically (canonical encoding).
+- Values are validated against RR budgets at load/append time.
 
 ### Recording fixtures with `x07 rr record`
 
-`x07 rr record --out fixtures/rr <key> <url>` writes:
-
-- `fixtures/rr/index.json`
-- `fixtures/rr/bodies/<sha256(key)>.bin` (raw response body bytes)
-
-### `rr.send_request` response blobs
-
-`std.rr.send_request(req_bytes)` uses a direct sha256 mapping (it does not consult `index.json`):
-
-- `.x07_rr/responses/<sha256(req_bytes)>.bin`
+`x07 rr record` appends a single `entry_v1` record to a cassette file under your fixture directory (creating it if missing).
 
 ## Key/value fixtures (solve-kv)
 
@@ -119,4 +117,3 @@ Notes:
 - `kv/` (key/value fixtures)
 
 Each subdirectory follows the same format rules as the corresponding single-world fixture.
-

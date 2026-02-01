@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.budgets.index.schema.json",
+  "title": "x07.arch.budgets.index@0.1.0",
+  "description": "Pinned budgets index (contracts-as-data) consumed by `x07 arch check`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profiles"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.budgets.index@0.1.0" },
+    "profiles": { "type": "array", "items": { "$ref": "#/$defs/profile" }, "default": [] }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "enforce_mode": { "type": "string", "enum": ["error", "warn", "off"] },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_prefix", "fn"],
+      "properties": {
+        "module_prefix": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "fn": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "profile_path", "enforce", "selectors", "worlds_allowed"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "profile_path": { "$ref": "#/$defs/rel_path" },
+        "enforce": { "$ref": "#/$defs/enforce_mode" },
+        "selectors": { "type": "array", "items": { "$ref": "#/$defs/selector" }, "default": [] },
+        "worlds_allowed": { "type": "array", "items": { "$ref": "#/$defs/world_id" }, "default": [] }
+      }
+    }
+  }
+}

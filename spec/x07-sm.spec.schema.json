@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-sm.spec.schema.json",
+  "title": "x07.sm.spec@0.1.0",
+  "description": "Pinned state machine spec consumed by `x07 sm check` and `x07 sm gen`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "machine_id", "version", "world", "states", "events", "transitions"],
+  "properties": {
+    "schema_version": { "const": "x07.sm.spec@0.1.0" },
+    "machine_id": { "$ref": "#/$defs/id" },
+    "version": { "type": "integer", "minimum": 1 },
+    "world": { "$ref": "#/$defs/world_id" },
+    "brand": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "states": { "type": "array", "items": { "$ref": "#/$defs/state" }, "default": [] },
+    "events": { "type": "array", "items": { "$ref": "#/$defs/event" }, "default": [] },
+    "transitions": { "type": "array", "items": { "$ref": "#/$defs/transition" }, "default": [] },
+    "context": { "$ref": "#/$defs/context" },
+    "budgets": { "$ref": "#/$defs/budgets" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "terminal"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "terminal": { "type": "boolean" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "on", "to", "action"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "from": { "type": "integer", "minimum": 0 },
+        "on": { "type": "integer", "minimum": 0 },
+        "to": { "type": "integer", "minimum": 0 },
+        "action": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["codec", "max_ctx_bytes"],
+      "properties": {
+        "codec": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "max_ctx_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_events_per_step", "max_actions_per_step", "max_cmds_per_step", "max_cmd_bytes"],
+      "properties": {
+        "max_events_per_step": { "type": "integer", "minimum": 0 },
+        "max_actions_per_step": { "type": "integer", "minimum": 0 },
+        "max_cmds_per_step": { "type": "integer", "minimum": 0 },
+        "max_cmd_bytes": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

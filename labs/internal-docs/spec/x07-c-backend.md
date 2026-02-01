@@ -19,7 +19,7 @@ The solver artifact is a native executable that:
 - Writes to stdout: `u32_le output_len` then `output_len` bytes.
 - Writes metrics to stderr as a single JSON line at exit, including deterministic memory stats.
   - Example shape:
-    - `{"fuel_used":123,"heap_used":456,"fs_read_file_calls":7,"rr_send_calls":1,"rr_request_calls":3,"rr_last_request_sha256":"<hex>","kv_get_calls":2,"kv_set_calls":0,"mem_stats":{"alloc_calls":1,"realloc_calls":2,"free_calls":1,"bytes_alloc_total":64,"bytes_freed_total":64,"live_bytes":0,"peak_live_bytes":64,"live_allocs":0,"peak_live_allocs":3,"memcpy_bytes":64},"sched_stats":{"tasks_spawned":3,"spawn_calls":3,"join_calls":3,"yield_calls":0,"sleep_calls":3,"chan_send_calls":0,"chan_recv_calls":0,"ctx_switches":10,"wake_events":3,"blocked_waits":0,"virtual_time_end":55,"sched_trace_hash":"0x..."},"debug_stats":{"borrow_violations":0}}`
+    - `{"fuel_used":123,"heap_used":456,"fs_read_file_calls":7,"rr_open_calls":1,"rr_close_calls":1,"rr_stats_calls":0,"rr_next_calls":3,"rr_next_miss_calls":0,"rr_append_calls":0,"kv_get_calls":2,"kv_set_calls":0,"mem_stats":{"alloc_calls":1,"realloc_calls":2,"free_calls":1,"bytes_alloc_total":64,"bytes_freed_total":64,"live_bytes":0,"peak_live_bytes":64,"live_allocs":0,"peak_live_allocs":3,"memcpy_bytes":64},"sched_stats":{"tasks_spawned":3,"spawn_calls":3,"join_calls":3,"yield_calls":0,"sleep_calls":3,"chan_send_calls":0,"chan_recv_calls":0,"ctx_switches":10,"wake_events":3,"blocked_waits":0,"virtual_time_end":55,"sched_trace_hash":"0x..."},"debug_stats":{"borrow_violations":0}}`
 
 Notes:
 - The compiled program sees `input` as a `bytes_view` (borrowed) and must return owned `bytes`.
@@ -35,12 +35,18 @@ Notes:
   - Phase G2 streaming adapters:
     - `["fs.open_read", path_bytes]` → `iface` reader
     - `["io.read", reader_iface, max_i32]` → next chunk (bytes)
-- `solve-rr`: deterministic fixture-backed request/response (no real network).
-  - `["rr.send_request", req_bytes]` reads `./.x07_rr/responses/<sha256(req_bytes)>.bin`.
-  - Phase G2 fixture index + deterministic latency:
-    - `["rr.fetch", key_bytes]` → response body bytes (with virtual-time latency)
-    - `["rr.send", key_bytes]` → `iface` reader (streaming)
-    - runner materializes `./.x07_rr/index.evrr`
+- `solve-rr`: deterministic replay/record backed by cassette files under `./.x07_rr/`.
+  - Cassette files are `*.rrbin` and contain u32-le framed RR `entry_v1` records (DataModel docs).
+  - Core builtins:
+    - `["rr.open_v1", cfg_bytes_view]` → `result_i32` (ok = handle)
+    - `["rr.close_v1", handle_i32]` → `i32`
+    - `["rr.stats_v1", handle_i32]` → `bytes` (JSON)
+    - `["rr.next_v1", handle_i32, kind_bytes_view, op_bytes_view, key_bytes_view]` → `result_bytes` (ok = entry bytes)
+    - `["rr.append_v1", handle_i32, entry_bytes_view]` → `result_i32`
+  - Entry helpers:
+    - `["rr.entry_resp_v1", entry_bytes_view]` → `bytes`
+    - `["rr.entry_err_v1", entry_bytes_view]` → `i32`
+  - Programs typically use `std.rr.with_policy_v1` / `std.rr.with_v1` to manage `rr.open_v1`/`rr.close_v1` as a structured scope.
 - `solve-kv`: deterministic key/value store (seeded per case; reset per case).
   - `["kv.get", key_bytes]` returns the value bytes or empty if missing.
   - `["kv.get_async", key_bytes]` returns the value bytes or empty if missing.

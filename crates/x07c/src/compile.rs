@@ -22,6 +22,7 @@ pub struct CompileOptions {
     pub enable_rr: bool,
     pub enable_kv: bool,
     pub module_roots: Vec<std::path::PathBuf>,
+    pub arch_root: Option<std::path::PathBuf>,
     pub emit_main: bool,
     pub freestanding: bool,
     pub allow_unsafe: Option<bool>,
@@ -36,6 +37,7 @@ impl Default for CompileOptions {
             enable_rr: false,
             enable_kv: false,
             module_roots: Vec::new(),
+            arch_root: None,
             emit_main: true,
             freestanding: false,
             allow_unsafe: None,
@@ -885,7 +887,18 @@ fn validate_program_world_caps(
     }
 
     if !options.enable_rr {
-        for head in ["rr.send_request", "rr.fetch", "rr.send"] {
+        for head in [
+            "rr.current_v1",
+            "rr.open_v1",
+            "rr.close_v1",
+            "rr.stats_v1",
+            "rr.next_v1",
+            "rr.append_v1",
+            "rr.entry_resp_v1",
+            "rr.entry_err_v1",
+            "std.rr.with_v1",
+            "std.rr.with_policy_v1",
+        ] {
             if program_uses_head(program, head) {
                 return Err(CompilerError::new(
                     CompileErrorKind::Typing,

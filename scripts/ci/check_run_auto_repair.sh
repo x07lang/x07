@@ -76,7 +76,7 @@ assert repair.get("last_lint_ok") is True, repair
 
 runner = run_report.get("report")
 assert isinstance(runner, dict), type(runner)
-assert runner.get("schema_version") == "x07-host-runner.report@0.2.0", runner.get("schema_version")
+assert runner.get("schema_version") == "x07-host-runner.report@0.3.0", runner.get("schema_version")
 assert runner.get("exit_code") == 0, runner.get("exit_code")
 
 compile = runner.get("compile") or {}

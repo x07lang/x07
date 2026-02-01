@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.rr.sanitize.schema.json",
+  "title": "x07.arch.rr.sanitize@0.1.0",
+  "description": "RR sanitizer file referenced by `arch/rr/index.x07rr.json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "redact_headers", "redact_token"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.rr.sanitize@0.1.0" },
+    "id": { "$ref": "#/$defs/id" },
+    "v": { "type": "integer", "minimum": 1 },
+    "redact_headers": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 128 }, "default": [] },
+    "redact_token": { "type": "string", "minLength": 0, "maxLength": 256 },
+    "stable_pseudonym_salt": { "type": "string", "minLength": 0, "maxLength": 256 }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    }
+  }
+}

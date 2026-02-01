@@ -2,9 +2,13 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde_json::json;
-use x07_host_runner::{compile_program, run_artifact_file, RunnerConfig};
+use x07_host_runner::{
+    compile_options_for_world, compile_program, compile_program_with_options, run_artifact_file,
+    RunnerConfig,
+};
 use x07_worlds::WorldId;
 
+mod rr_fixture;
 mod x07_program;
 
 fn create_temp_dir(prefix: &str) -> PathBuf {
@@ -32,7 +36,6 @@ fn base_cfg(world: WorldId) -> RunnerConfig {
         fixture_fs_root: None,
         fixture_fs_latency_index: None,
         fixture_rr_dir: None,
-        fixture_rr_index: None,
         fixture_kv_dir: None,
         fixture_kv_seed: None,
         solve_fuel: 10_000_000,
@@ -500,27 +503,79 @@ fn solve_fs_bufread_fill_and_consume_work() {
 #[test]
 fn solve_rr_send_and_io_read_respect_latency_index() {
     let fixture = create_temp_dir("x07_concurrency_smoke_rr");
-    std::fs::create_dir_all(fixture.join("bodies")).expect("mkdir bodies");
-    std::fs::write(fixture.join("bodies/A.bin"), b"HELLO").expect("write A.bin");
-    std::fs::write(
-        fixture.join("index.json"),
-        br#"{"format":"x07.rr.fixture_index@0.1.0","default_latency_ticks":0,"requests":{"A":{"latency_ticks":50,"body_file":"bodies/A.bin"}}}"#,
+
+    rr_fixture::write_min_rr_arch(&fixture, "smoke_rr_v1").expect("write rr arch");
+    rr_fixture::write_single_entry_rrbin(
+        &fixture.join("smoke.rrbin"),
+        &rr_fixture::RrEntry {
+            kind: b"rr",
+            op: b"std.stream.src.rr_send_v1",
+            key: b"A",
+            req: b"A",
+            resp: b"HELLO",
+            err_dec: b"0",
+            latency_ticks: Some(50),
+        },
     )
-    .expect("write index.json");
+    .expect("write smoke.rrbin");
 
     let mut cfg = base_cfg(WorldId::SolveRr);
     cfg.fixture_rr_dir = Some(fixture.clone());
-    cfg.fixture_rr_index = Some(PathBuf::from("index.json"));
 
-    let program = x07_program::entry(
-        &[],
-        json!([
-            "begin",
-            ["let", "r", ["rr.send", ["bytes.lit", "A"]]],
-            ["io.read", "r", 100]
-        ]),
+    let program = x07_program::entry_with_decls(
+        &["std.rr"],
+        vec![x07_program::defn(
+            "main.run",
+            &[],
+            "result_bytes",
+            json!([
+                "std.rr.with_policy_v1",
+                ["bytes.lit", "smoke_rr_v1"],
+                ["bytes.lit", "smoke.rrbin"],
+                ["i32.lit", 2],
+                [
+                    "begin",
+                    ["let", "h", ["std.rr.current_v1"]],
+                    [
+                        "let",
+                        "entry_res",
+                        [
+                            "std.rr.next_v1",
+                            "h",
+                            ["bytes.lit", "rr"],
+                            ["bytes.lit", "std.stream.src.rr_send_v1"],
+                            ["bytes.lit", "A"]
+                        ]
+                    ],
+                    [
+                        "let",
+                        "entry",
+                        ["result_bytes.unwrap_or", "entry_res", ["bytes.alloc", 0]]
+                    ],
+                    [
+                        "let",
+                        "resp",
+                        ["std.rr.entry_resp_v1", ["bytes.view", "entry"]]
+                    ],
+                    ["let", "r", ["io.open_read_bytes", "resp"]],
+                    ["let", "out", ["io.read", "r", 100]],
+                    ["result_bytes.ok", "out"]
+                ]
+            ]),
+        )],
+        json!(["result_bytes.unwrap_or", ["main.run"], ["bytes.alloc", 0]]),
     );
-    let compile = compile_program(program.as_slice(), &cfg, None).expect("compile ok");
+
+    let mut compile_options = compile_options_for_world(cfg.world, Vec::new()).expect("opts");
+    compile_options.arch_root = Some(fixture.clone());
+    let compile = compile_program_with_options(
+        program.as_slice(),
+        &cfg,
+        None,
+        &compile_options,
+        &[] as &[String],
+    )
+    .expect("compile ok");
     assert!(compile.ok, "compile_error={:?}", compile.compile_error);
     let exe = compile.compiled_exe.expect("compiled exe");
 
@@ -532,7 +587,10 @@ fn solve_rr_send_and_io_read_respect_latency_index() {
         String::from_utf8_lossy(&res.stderr)
     );
     assert_eq!(res.solve_output, b"HELLO");
-    assert_eq!(res.rr_request_calls, Some(1));
+    assert_eq!(res.rr_open_calls, Some(1));
+    assert_eq!(res.rr_close_calls, Some(1));
+    assert_eq!(res.rr_next_calls, Some(1));
+    assert_eq!(res.rr_next_miss_calls, Some(0));
     assert_eq!(
         res.sched_stats.as_ref().map(|s| s.virtual_time_end),
         Some(50)

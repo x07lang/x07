@@ -19,6 +19,7 @@ pub enum Ty {
     PtrConstI32,
     PtrMutI32,
     TaskScopeV1,
+    BudgetScopeV1,
     TaskHandleBytesV1,
     TaskHandleResultBytesV1,
     TaskSlotV1,

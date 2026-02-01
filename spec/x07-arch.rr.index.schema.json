@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.rr.index.schema.json",
+  "title": "x07.arch.rr.index@0.1.0",
+  "description": "Pinned RR policy index (contracts-as-data) consumed by `x07 arch check`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "policies"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.rr.index@0.1.0" },
+    "policies": { "type": "array", "items": { "$ref": "#/$defs/policy_ref" }, "default": [] },
+    "defaults": { "$ref": "#/$defs/defaults", "default": { "record_modes_allowed": ["replay_v1"] } }
+  },
+  "$defs": {
+    "sha256_hex": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "record_mode": {
+      "type": "string",
+      "enum": ["off", "record_v1", "replay_v1", "record_missing_v1", "rewrite_v1"]
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_modes_allowed"],
+      "properties": {
+        "record_modes_allowed": { "type": "array", "items": { "$ref": "#/$defs/record_mode" } }
+      }
+    },
+    "policy_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "policy_path",
+        "sanitize_id",
+        "sanitize_path",
+        "worlds_allowed",
+        "kinds_allowed",
+        "ops_allowed",
+        "cassette_brand"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "policy_path": { "$ref": "#/$defs/rel_path" },
+        "sanitize_id": { "$ref": "#/$defs/id" },
+        "sanitize_path": { "$ref": "#/$defs/rel_path" },
+        "worlds_allowed": { "type": "array", "items": { "$ref": "#/$defs/world_id" } },
+        "kinds_allowed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+        },
+        "ops_allowed": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 256 } },
+        "cassette_brand": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    }
+  }
+}

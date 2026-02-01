@@ -44,6 +44,7 @@
       "items": { "$ref": "#/$defs/rule" },
       "default": []
     },
+    "contracts_v1": { "$ref": "#/$defs/contracts_v1" },
     "checks": { "$ref": "#/$defs/checks" },
     "tool_budgets": { "$ref": "#/$defs/tool_budgets" }
   },
@@ -242,9 +243,67 @@
       "properties": {
         "max_modules": { "type": "integer", "minimum": 0, "default": 5000 },
         "max_edges": { "type": "integer", "minimum": 0, "default": 50000 },
-        "max_diags": { "type": "integer", "minimum": 0, "default": 2000 }
+        "max_diags": { "type": "integer", "minimum": 0, "default": 2000 },
+        "contracts_budgets": { "$ref": "#/$defs/contracts_budgets" }
+      }
+    },
+    "contracts_budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_contract_files", "max_contract_bytes"],
+      "properties": {
+        "max_contract_files": { "type": "integer", "minimum": 0, "default": 2000 },
+        "max_contract_bytes": { "type": "integer", "minimum": 0, "default": 67108864 }
+      }
+    },
+    "contracts_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonical_json"],
+      "properties": {
+        "rr": { "$ref": "#/$defs/contracts_rr_v1" },
+        "sm": { "$ref": "#/$defs/contracts_sm_v1" },
+        "budgets": { "$ref": "#/$defs/contracts_budgets_v1" },
+        "canonical_json": { "$ref": "#/$defs/contracts_canonical_json_v1" }
+      }
+    },
+    "contracts_canonical_json_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["jcs_rfc8785_v1"], "default": "jcs_rfc8785_v1" }
+      }
+    },
+    "contracts_rr_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index_path", "gen_dir", "require_policy_for_os_calls"],
+      "properties": {
+        "index_path": { "$ref": "#/$defs/rel_path" },
+        "gen_dir": { "$ref": "#/$defs/rel_path" },
+        "require_policy_for_os_calls": { "type": "boolean", "default": true }
+      }
+    },
+    "contracts_sm_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index_path", "gen_dir", "require_gen_uptodate"],
+      "properties": {
+        "index_path": { "$ref": "#/$defs/rel_path" },
+        "gen_dir": { "$ref": "#/$defs/rel_path" },
+        "require_gen_uptodate": { "type": "boolean", "default": true }
+      }
+    },
+    "contracts_budgets_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index_path", "gen_dir", "require_scopes"],
+      "properties": {
+        "index_path": { "$ref": "#/$defs/rel_path" },
+        "gen_dir": { "$ref": "#/$defs/rel_path" },
+        "require_scopes": { "type": "boolean", "default": true }
       }
     }
   }
 }
-
