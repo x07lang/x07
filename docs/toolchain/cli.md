@@ -77,8 +77,13 @@ See: [State machines](state-machines.md).
 
 ### Packages (pack/lock/publish)
 
+- `x07 pkg add <name>`
+- `x07 pkg add <name> --sync`
 - `x07 pkg add <name>@<version>`
 - `x07 pkg add <name>@<version> --sync`
+- `x07 pkg remove <name>`
+- `x07 pkg remove <name> --sync`
+- `x07 pkg versions <name>`
 - `x07 pkg lock --project x07.json`
 - `x07 pkg provides <module-id>`
 - `x07 pkg pack --package <dir> --out <path>`
@@ -87,7 +92,8 @@ See: [State machines](state-machines.md).
 
 Notes:
 
-- `x07 pkg add` edits `x07.json` only (no network) unless you pass `--sync`.
+- `x07 pkg add <name>@<version>` edits `x07.json` only (no network) unless you pass `--sync`.
+- `x07 pkg add <name>` consults the index to resolve a version (network unless you use a file-based index).
 - `x07 pkg lock` uses the official registry index by default when fetching is required; override with `--index` or use `--offline`.
 - Use `x07 pkg lock --check` in CI to fail if `x07.lock.json` is out of date.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).

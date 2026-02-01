@@ -12,6 +12,7 @@
 
 ## Agent
 - [Agent contracts](agent/contract.md)
+- [Readiness checks](agent/readiness-checks.md)
 
 ## Recipes
 - [Patch-based recipes](recipes/index.md)

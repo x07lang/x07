@@ -17,6 +17,15 @@ Performance rule:
 - Use views for parsing/scanning.
 - Convert to owning bytes only when you must persist.
 
+### Creating views (owner bindings)
+
+`bytes.view` requires an identifier owner. You can’t create a view of a temporary expression; bind it first:
+
+```json
+["let","b",["bytes.lit","hello"]],
+["let","v",["bytes.view","b"]]
+```
+
 ## Vectors (capacity-planned builders)
 
 Use `vec_u8` for output building:

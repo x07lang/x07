@@ -30,6 +30,10 @@ pub struct PkgArgs {
 pub enum PkgCommand {
     /// Add a dependency entry to `x07.json`.
     Add(AddArgs),
+    /// Remove a dependency entry from `x07.json`.
+    Remove(RemoveArgs),
+    /// List available versions of a package from the index.
+    Versions(VersionsArgs),
     /// Pack a local package directory into a publishable archive.
     Pack(PackArgs),
     /// Resolve project dependencies and write `x07.lock.json`.
@@ -60,9 +64,42 @@ pub struct AddArgs {
     #[arg(long, value_name = "PATH")]
     pub path: Option<String>,
 
-    /// Package spec in `NAME@VERSION` form.
-    #[arg(value_name = "NAME@VERSION")]
+    /// Package spec in `NAME` or `NAME@VERSION` form.
+    ///
+    /// If only `NAME` is provided, this command resolves the latest non-yanked semver version from
+    /// the index and writes it into `x07.json`.
+    #[arg(value_name = "NAME[@VERSION]")]
     pub spec: String,
+}
+
+#[derive(Debug, Args)]
+pub struct RemoveArgs {
+    /// Project manifest path (`x07.json`).
+    #[arg(long, value_name = "PATH", default_value = "x07.json")]
+    pub project: PathBuf,
+
+    /// After removing the dependency, resolve and update `x07.lock.json`.
+    #[arg(long)]
+    pub sync: bool,
+
+    /// Sparse index URL used when fetching dependencies (default: official registry).
+    #[arg(long, value_name = "URL")]
+    pub index: Option<String>,
+
+    /// Package name.
+    #[arg(value_name = "NAME")]
+    pub name: String,
+}
+
+#[derive(Debug, Args)]
+pub struct VersionsArgs {
+    /// Sparse index URL (example: `sparse+https://registry.x07.io/index/`).
+    #[arg(long, value_name = "URL")]
+    pub index: Option<String>,
+
+    /// Package name.
+    #[arg(value_name = "NAME")]
+    pub name: String,
 }
 
 #[derive(Debug, Args)]
@@ -209,6 +246,8 @@ pub fn cmd_pkg(args: PkgArgs) -> Result<std::process::ExitCode> {
 
     match cmd {
         PkgCommand::Add(args) => cmd_pkg_add(args),
+        PkgCommand::Remove(args) => cmd_pkg_remove(args),
+        PkgCommand::Versions(args) => cmd_pkg_versions(args),
         PkgCommand::Pack(args) => cmd_pkg_pack(args),
         PkgCommand::Lock(args) => cmd_pkg_lock(args),
         PkgCommand::Provides(args) => cmd_pkg_provides(args),
@@ -386,8 +425,61 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
         .as_object_mut()
         .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
 
-    let (name, version) = match parse_pkg_spec(&args.spec) {
-        Ok(out) => out,
+    let (name, version) = match parse_user_pkg_spec(&args.spec) {
+        Ok(ParsedUserPkgSpec::Pinned { name, version }) => (name, version),
+        Ok(ParsedUserPkgSpec::Unpinned { name }) => {
+            let index = args.index.as_deref().unwrap_or(DEFAULT_INDEX_URL);
+            let token = x07_pkg::load_token(index).unwrap_or(None);
+            let client = match SparseIndexClient::from_index_url(index, token) {
+                Ok(c) => c,
+                Err(err) => {
+                    let report = PkgReport::<AddResult> {
+                        ok: false,
+                        command: "pkg.add",
+                        result: None,
+                        error: Some(PkgError {
+                            code: "X07PKG_INDEX_CONFIG".to_string(),
+                            message: format!("{err:#}"),
+                        }),
+                    };
+                    return Ok((std::process::ExitCode::from(20), report));
+                }
+            };
+
+            let entries = match client.fetch_entries(&name) {
+                Ok(entries) => entries,
+                Err(err) => {
+                    let report = PkgReport::<AddResult> {
+                        ok: false,
+                        command: "pkg.add",
+                        result: None,
+                        error: Some(PkgError {
+                            code: "X07PKG_INDEX_FETCH".to_string(),
+                            message: format!(
+                                "fetch index entries for {:?}: {err:#} (hint: check the package name and index URL)",
+                                name
+                            ),
+                        }),
+                    };
+                    return Ok((std::process::ExitCode::from(20), report));
+                }
+            };
+
+            let Some(version) = latest_non_yanked_semver_version(&entries) else {
+                let report = PkgReport::<AddResult> {
+                    ok: false,
+                    command: "pkg.add",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_INDEX_NO_MATCH".to_string(),
+                        message: format!("no non-yanked semver versions found for {:?}", name),
+                    }),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            };
+
+            (name, version)
+        }
         Err(err) => {
             let report = PkgReport::<AddResult> {
                 ok: false,
@@ -492,6 +584,264 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
     Ok((std::process::ExitCode::SUCCESS, report))
 }
 
+#[derive(Debug, Serialize)]
+struct RemoveResult {
+    project: String,
+    name: String,
+    removed: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lock: Option<LockResult>,
+}
+
+fn cmd_pkg_remove(args: RemoveArgs) -> Result<std::process::ExitCode> {
+    let (code, report) = pkg_remove_report(&args)?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(code)
+}
+
+fn pkg_remove_report(
+    args: &RemoveArgs,
+) -> Result<(std::process::ExitCode, PkgReport<RemoveResult>)> {
+    let project_path = util::resolve_existing_path_upwards(&args.project);
+
+    // Validate using the canonical parser for better error messages and stricter checks.
+    project::load_project_manifest(&project_path).context("load project manifest")?;
+
+    let project_bytes = std::fs::read(&project_path)
+        .with_context(|| format!("read: {}", project_path.display()))?;
+    let original_project_bytes = project_bytes.clone();
+    let mut doc: Value = serde_json::from_slice(&project_bytes).with_context(|| {
+        format!(
+            "[X07PROJECT_PARSE] parse project JSON: {}",
+            project_path.display()
+        )
+    })?;
+    let obj = doc
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+
+    let name = match parse_pkg_name(&args.name) {
+        Ok(name) => name,
+        Err(err) => {
+            let report = PkgReport::<RemoveResult> {
+                ok: false,
+                command: "pkg.remove",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SPEC_INVALID".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let Some(deps_val) = obj.get_mut("dependencies") else {
+        let report = PkgReport::<RemoveResult> {
+            ok: false,
+            command: "pkg.remove",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_DEP_NOT_FOUND".to_string(),
+                message: format!("dependency not found: {name}"),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    };
+    let deps = deps_val
+        .as_array_mut()
+        .ok_or_else(|| anyhow::anyhow!("project.dependencies must be an array"))?;
+
+    let before_len = deps.len();
+    deps.retain(|dep| dep.get("name").and_then(Value::as_str) != Some(name.as_str()));
+    let removed = before_len.saturating_sub(deps.len());
+    if removed == 0 {
+        let report = PkgReport::<RemoveResult> {
+            ok: false,
+            command: "pkg.remove",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_DEP_NOT_FOUND".to_string(),
+                message: format!("dependency not found: {name}"),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    sort_project_deps(deps);
+    write_canonical_json_file(&project_path, &doc)
+        .with_context(|| format!("write: {}", project_path.display()))?;
+
+    let mut result = RemoveResult {
+        project: project_path.display().to_string(),
+        name,
+        removed,
+        lock: None,
+    };
+
+    if args.sync {
+        let lock_args = LockArgs {
+            project: project_path.clone(),
+            index: args.index.clone(),
+            check: false,
+            offline: false,
+        };
+        let (lock_code, lock_report) = match pkg_lock_report(&lock_args) {
+            Ok(out) => out,
+            Err(err) => {
+                if let Err(rollback_err) = std::fs::write(&project_path, &original_project_bytes) {
+                    return Err(anyhow::anyhow!(
+                        "{err}\nrollback failed ({}): {rollback_err}",
+                        project_path.display()
+                    ));
+                }
+                return Err(err);
+            }
+        };
+        result.lock = lock_report.result;
+        if !lock_report.ok {
+            std::fs::write(&project_path, &original_project_bytes)
+                .with_context(|| format!("rollback write: {}", project_path.display()))?;
+            let report = PkgReport::<RemoveResult> {
+                ok: false,
+                command: "pkg.remove",
+                result: Some(result),
+                error: lock_report.error,
+            };
+            return Ok((lock_code, report));
+        }
+    }
+
+    let report = PkgReport {
+        ok: true,
+        command: "pkg.remove",
+        result: Some(result),
+        error: None,
+    };
+    Ok((std::process::ExitCode::SUCCESS, report))
+}
+
+#[derive(Debug, Serialize)]
+struct VersionsRow {
+    version: String,
+    yanked: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct VersionsResult {
+    index: String,
+    name: String,
+    versions: Vec<VersionsRow>,
+}
+
+fn cmd_pkg_versions(args: VersionsArgs) -> Result<std::process::ExitCode> {
+    let (code, report) = pkg_versions_report(&args)?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(code)
+}
+
+fn pkg_versions_report(
+    args: &VersionsArgs,
+) -> Result<(std::process::ExitCode, PkgReport<VersionsResult>)> {
+    let index = args.index.as_deref().unwrap_or(DEFAULT_INDEX_URL);
+    let name = match parse_pkg_name(&args.name) {
+        Ok(name) => name,
+        Err(err) => {
+            let report = PkgReport::<VersionsResult> {
+                ok: false,
+                command: "pkg.versions",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SPEC_INVALID".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let token = x07_pkg::load_token(index).unwrap_or(None);
+    let client = match SparseIndexClient::from_index_url(index, token) {
+        Ok(c) => c,
+        Err(err) => {
+            let report = PkgReport::<VersionsResult> {
+                ok: false,
+                command: "pkg.versions",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_INDEX_CONFIG".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let entries = match client.fetch_entries(&name) {
+        Ok(entries) => entries,
+        Err(err) => {
+            let report = PkgReport::<VersionsResult> {
+                ok: false,
+                command: "pkg.versions",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_INDEX_FETCH".to_string(),
+                    message: format!(
+                        "fetch index entries for {:?}: {err:#} (hint: check the package name and index URL)",
+                        name
+                    ),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let mut versions: Vec<(SemverVersion, VersionsRow)> = Vec::new();
+    for entry in entries {
+        if entry.name != name {
+            continue;
+        }
+        let Some(semver) = parse_semver_version(&entry.version) else {
+            continue;
+        };
+        versions.push((
+            semver,
+            VersionsRow {
+                version: entry.version,
+                yanked: entry.yanked,
+            },
+        ));
+    }
+    versions.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+    let versions: Vec<VersionsRow> = versions.into_iter().map(|(_, row)| row).collect();
+
+    if versions.is_empty() {
+        let report = PkgReport::<VersionsResult> {
+            ok: false,
+            command: "pkg.versions",
+            result: None,
+            error: Some(PkgError {
+                code: "X07PKG_INDEX_NO_MATCH".to_string(),
+                message: format!("no semver versions found for {:?}", name),
+            }),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
+
+    let report = PkgReport {
+        ok: true,
+        command: "pkg.versions",
+        result: Some(VersionsResult {
+            index: index.to_string(),
+            name,
+            versions,
+        }),
+        error: None,
+    };
+    Ok((std::process::ExitCode::SUCCESS, report))
+}
+
 pub(crate) fn pkg_add_sync_quiet(
     project: PathBuf,
     spec: String,
@@ -528,11 +878,8 @@ fn parse_pkg_spec(spec: &str) -> Result<(String, String)> {
     let Some((name, version)) = spec.split_once('@') else {
         anyhow::bail!("expected NAME@VERSION, got {:?}", spec);
     };
-    let name = name.trim();
+    let name = parse_pkg_name(name)?;
     let version = version.trim();
-    if name.is_empty() {
-        anyhow::bail!("package name must be non-empty");
-    }
     if version.is_empty() {
         anyhow::bail!("package version must be non-empty");
     }
@@ -541,6 +888,14 @@ fn parse_pkg_spec(spec: &str) -> Result<(String, String)> {
             "package version must be semver (MAJOR.MINOR.PATCH), got {:?}",
             version
         );
+    }
+    Ok((name, version.to_string()))
+}
+
+fn parse_pkg_name(raw: &str) -> Result<String> {
+    let name = raw.trim();
+    if name.is_empty() {
+        anyhow::bail!("package name must be non-empty");
     }
     if !name
         .as_bytes()
@@ -553,7 +908,41 @@ fn parse_pkg_spec(spec: &str) -> Result<(String, String)> {
     {
         anyhow::bail!("package name must match ^[a-z][a-z0-9_-]*$: got {:?}", name);
     }
-    Ok((name.to_string(), version.to_string()))
+    Ok(name.to_string())
+}
+
+#[derive(Debug, Clone)]
+enum ParsedUserPkgSpec {
+    Pinned { name: String, version: String },
+    Unpinned { name: String },
+}
+
+fn parse_user_pkg_spec(spec: &str) -> Result<ParsedUserPkgSpec> {
+    let spec = spec.trim();
+    if spec.is_empty() {
+        anyhow::bail!("package spec must be non-empty");
+    }
+    if let Some((name, version)) = spec.split_once('@') {
+        let name = parse_pkg_name(name)?;
+        let version = version.trim();
+        if version.is_empty() {
+            anyhow::bail!("package version must be non-empty");
+        }
+        if !is_valid_semver_version(version) {
+            anyhow::bail!(
+                "package version must be semver (MAJOR.MINOR.PATCH), got {:?}",
+                version
+            );
+        }
+        return Ok(ParsedUserPkgSpec::Pinned {
+            name,
+            version: version.to_string(),
+        });
+    }
+
+    Ok(ParsedUserPkgSpec::Unpinned {
+        name: parse_pkg_name(spec)?,
+    })
 }
 
 fn is_valid_semver_version(version: &str) -> bool {
@@ -643,6 +1032,128 @@ fn is_valid_semver_build_identifier(id: &str) -> bool {
     id.as_bytes()
         .iter()
         .all(|b| b.is_ascii_alphanumeric() || *b == b'-')
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum SemverPreId {
+    Numeric(u64),
+    AlphaNum(String),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct SemverVersion {
+    major: u64,
+    minor: u64,
+    patch: u64,
+    pre: Vec<SemverPreId>,
+}
+
+impl Ord for SemverVersion {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.major
+            .cmp(&other.major)
+            .then_with(|| self.minor.cmp(&other.minor))
+            .then_with(|| self.patch.cmp(&other.patch))
+            .then_with(|| match (self.pre.is_empty(), other.pre.is_empty()) {
+                (true, true) => std::cmp::Ordering::Equal,
+                (true, false) => std::cmp::Ordering::Greater,
+                (false, true) => std::cmp::Ordering::Less,
+                (false, false) => {
+                    let n = std::cmp::min(self.pre.len(), other.pre.len());
+                    for i in 0..n {
+                        let a = &self.pre[i];
+                        let b = &other.pre[i];
+                        let c = match (a, b) {
+                            (SemverPreId::Numeric(a), SemverPreId::Numeric(b)) => a.cmp(b),
+                            (SemverPreId::Numeric(_), SemverPreId::AlphaNum(_)) => {
+                                std::cmp::Ordering::Less
+                            }
+                            (SemverPreId::AlphaNum(_), SemverPreId::Numeric(_)) => {
+                                std::cmp::Ordering::Greater
+                            }
+                            (SemverPreId::AlphaNum(a), SemverPreId::AlphaNum(b)) => a.cmp(b),
+                        };
+                        if c != std::cmp::Ordering::Equal {
+                            return c;
+                        }
+                    }
+                    self.pre.len().cmp(&other.pre.len())
+                }
+            })
+    }
+}
+
+impl PartialOrd for SemverVersion {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+fn parse_semver_version(version: &str) -> Option<SemverVersion> {
+    let (core_and_pre, _build) = version.split_once('+').unwrap_or((version, ""));
+    let (core, pre) = core_and_pre.split_once('-').unwrap_or((core_and_pre, ""));
+
+    let mut parts = core.split('.');
+    let major = parts.next()?;
+    let minor = parts.next()?;
+    let patch = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    if !is_valid_semver_numeric_identifier(major)
+        || !is_valid_semver_numeric_identifier(minor)
+        || !is_valid_semver_numeric_identifier(patch)
+    {
+        return None;
+    }
+    let major = major.parse::<u64>().ok()?;
+    let minor = minor.parse::<u64>().ok()?;
+    let patch = patch.parse::<u64>().ok()?;
+
+    let mut pre_ids: Vec<SemverPreId> = Vec::new();
+    if !pre.is_empty() {
+        for raw in pre.split('.') {
+            if raw.is_empty() {
+                return None;
+            }
+            if raw.as_bytes().iter().all(|b| b.is_ascii_digit()) {
+                if !is_valid_semver_numeric_identifier(raw) {
+                    return None;
+                }
+                pre_ids.push(SemverPreId::Numeric(raw.parse::<u64>().ok()?));
+            } else {
+                if !is_valid_semver_prerelease_identifier(raw) {
+                    return None;
+                }
+                pre_ids.push(SemverPreId::AlphaNum(raw.to_string()));
+            }
+        }
+    }
+
+    Some(SemverVersion {
+        major,
+        minor,
+        patch,
+        pre: pre_ids,
+    })
+}
+
+fn latest_non_yanked_semver_version(entries: &[x07_pkg::IndexEntry]) -> Option<String> {
+    let mut best: Option<(SemverVersion, String)> = None;
+    for entry in entries {
+        if entry.yanked {
+            continue;
+        }
+        let Some(v) = parse_semver_version(&entry.version) else {
+            continue;
+        };
+        match &best {
+            None => best = Some((v, entry.version.clone())),
+            Some((cur, _)) if v > *cur => best = Some((v, entry.version.clone())),
+            _ => {}
+        }
+    }
+    best.map(|(_, version)| version)
 }
 
 fn cmd_pkg_pack(args: PackArgs) -> Result<std::process::ExitCode> {

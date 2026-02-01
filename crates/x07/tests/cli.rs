@@ -44,6 +44,24 @@ fn write_bytes(path: &PathBuf, bytes: &[u8]) {
     std::fs::write(path, bytes).expect("write file");
 }
 
+fn file_url_for_dir(dir: &std::path::Path) -> String {
+    let abs = dir.canonicalize().expect("canonicalize");
+    format!("file://{}/", abs.display())
+}
+
+fn sparse_index_rel_path(package_name: &str) -> String {
+    let name = package_name.trim();
+    assert_eq!(name, name.to_ascii_lowercase(), "name must be lowercase");
+    assert!(!name.is_empty(), "name must be non-empty");
+    let shard = match name.len() {
+        1 => "1".to_string(),
+        2 => "2".to_string(),
+        3 => format!("3/{}", &name[0..1]),
+        _ => format!("{}/{}", &name[0..2], &name[2..4]),
+    };
+    format!("{shard}/{name}")
+}
+
 fn fresh_tmp_dir(root: &std::path::Path, name: &str) -> PathBuf {
     let pid = std::process::id();
     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -239,6 +257,28 @@ fn x07_cli_specrows_includes_nested_subcommands() {
             == Some("pkg.add")
     });
     assert!(has_pkg_add, "missing pkg.add in --cli-specrows output");
+
+    let has_pkg_remove = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("pkg.remove")
+    });
+    assert!(
+        has_pkg_remove,
+        "missing pkg.remove in --cli-specrows output"
+    );
+
+    let has_pkg_versions = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("pkg.versions")
+    });
+    assert!(
+        has_pkg_versions,
+        "missing pkg.versions in --cli-specrows output"
+    );
 
     let has_arch_check = rows.iter().any(|row| {
         row.as_array()
@@ -1460,6 +1500,115 @@ fn x07_pkg_add_updates_project_manifest() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
     assert_eq!(v["error"]["code"], "X07PKG_DEP_EXISTS");
+}
+
+#[test]
+fn x07_pkg_versions_and_add_unpinned_and_remove() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_versions_add_unpinned_remove");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    // Create a minimal file:// sparse index with 3 versions (latest is yanked).
+    let index_dir = dir.join("fake_index");
+    std::fs::create_dir_all(index_dir.join("dl")).expect("create dl dir");
+    std::fs::create_dir_all(index_dir.join("api")).expect("create api dir");
+    let index_url = file_url_for_dir(&index_dir);
+
+    let cfg = serde_json::json!({
+        "dl": format!("{index_url}dl/"),
+        "api": format!("{index_url}api/"),
+        "auth-required": false,
+    });
+    write_bytes(
+        &index_dir.join("config.json"),
+        serde_json::to_vec_pretty(&cfg).unwrap().as_slice(),
+    );
+
+    let pkg = "hello";
+    let rel = sparse_index_rel_path(pkg);
+    let index_file = index_dir.join(rel);
+    let entries = [
+        serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":pkg,"version":"0.1.0","cksum":"00","yanked":false}),
+        serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":pkg,"version":"0.2.0","cksum":"11","yanked":false}),
+        serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":pkg,"version":"0.3.0","cksum":"22","yanked":true}),
+    ];
+    let mut ndjson = String::new();
+    for e in entries {
+        ndjson.push_str(&serde_json::to_string(&e).unwrap());
+        ndjson.push('\n');
+    }
+    write_bytes(&index_file, ndjson.as_bytes());
+
+    // versions: list all versions (including yanked).
+    let out = run_x07(&["pkg", "versions", pkg, "--index", index_url.as_str()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "pkg.versions");
+    assert_eq!(v["result"]["name"], pkg);
+    assert_eq!(v["result"]["index"], index_url);
+    let versions = v["result"]["versions"].as_array().expect("versions[]");
+    assert_eq!(
+        versions
+            .iter()
+            .map(|row| row["version"].as_str().expect("version string"))
+            .collect::<Vec<_>>(),
+        vec!["0.1.0", "0.2.0", "0.3.0"]
+    );
+
+    // init + add without pinning a version: should pick latest non-yanked (0.2.0).
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(&dir, &["pkg", "add", pkg, "--index", index_url.as_str()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "pkg.add");
+    assert_eq!(v["result"]["name"], pkg);
+    assert_eq!(v["result"]["version"], "0.2.0");
+
+    let doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    let deps = doc["dependencies"].as_array().expect("dependencies[]");
+    assert_eq!(deps.len(), 1);
+    assert_eq!(deps[0]["name"], pkg);
+    assert_eq!(deps[0]["version"], "0.2.0");
+    assert_eq!(deps[0]["path"], ".x07/deps/hello/0.2.0");
+
+    // remove.
+    let out = run_x07_in_dir(&dir, &["pkg", "remove", pkg]);
+    assert_eq!(out.status.code(), Some(0));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "pkg.remove");
+    assert_eq!(v["result"]["name"], pkg);
+    assert_eq!(v["result"]["removed"], 1);
+
+    let doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    let deps = doc["dependencies"].as_array().expect("dependencies[]");
+    assert_eq!(deps.len(), 0);
+
+    let out = run_x07_in_dir(&dir, &["pkg", "remove", pkg]);
+    assert_eq!(out.status.code(), Some(20));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["command"], "pkg.remove");
+    assert_eq!(v["error"]["code"], "X07PKG_DEP_NOT_FOUND");
 }
 
 #[test]

@@ -70,7 +70,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
     if schema_version != X07AST_SCHEMA_VERSION {
         return Err(X07AstError {
             message: format!(
-                "unsupported schema_version: expected {X07AST_SCHEMA_VERSION} got {schema_version:?}"
+                "unsupported schema_version: expected {X07AST_SCHEMA_VERSION} got {schema_version:?} (hint: if this comes from a dependency package, upgrade to a newer package version)"
             ),
             ptr: "/schema_version".to_string(),
         });

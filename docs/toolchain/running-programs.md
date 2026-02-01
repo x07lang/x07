@@ -137,5 +137,5 @@ If compilation fails because a module can’t be resolved, the report will have:
 Fix:
 
 - discover candidates: `x07 pkg provides <module-id>`
-- for packages: add the dependency (`x07 pkg add <name>@<ver> --sync`) so `x07.lock.json` provides module roots, or
+- for packages: add the dependency (`x07 pkg add <name> --sync`, or pin with `x07 pkg add <name>@<ver> --sync`) so `x07.lock.json` provides module roots, or
 - for standalone `--program` runs: ensure the module exists under a `--module-root` directory.

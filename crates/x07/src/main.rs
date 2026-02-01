@@ -246,6 +246,8 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Pkg(args)) => match &args.cmd {
                 None => vec!["pkg"],
                 Some(pkg::PkgCommand::Add(_)) => vec!["pkg", "add"],
+                Some(pkg::PkgCommand::Remove(_)) => vec!["pkg", "remove"],
+                Some(pkg::PkgCommand::Versions(_)) => vec!["pkg", "versions"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
                 Some(pkg::PkgCommand::Provides(_)) => vec!["pkg", "provides"],

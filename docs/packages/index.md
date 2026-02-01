@@ -28,8 +28,15 @@ cd mypkg
 x07 init
 
 # Browse packages at https://x07.io/packages
-# Pick NAME@VERSION from the registry catalog (or the capability map for canonical picks).
+# Add the latest non-yanked version from the index:
+x07 pkg add NAME --sync
+
+# Or pin explicitly:
+x07 pkg versions NAME
 x07 pkg add NAME@VERSION --sync
+
+# Remove a dependency:
+x07 pkg remove NAME --sync
 ```
 
 `x07 init` also writes the agent kit (`AGENT.md`, `x07-toolchain.toml`, `.agent/skills/`, and `.agent/docs/`).
