@@ -13,6 +13,16 @@ Used for:
 
 OS worlds are always opt-in, and sandboxed variants are governed by explicit policy.
 
+## Deterministic worlds (fixture worlds)
+
+Fixture worlds exist to make tests and repair loops reproducible:
+
+- `solve-pure`: pure compute only
+- `solve-fs`: deterministic filesystem fixtures
+- `solve-rr`: deterministic record/replay from cassettes (see [Record/replay](record-replay.md))
+- `solve-kv`: deterministic key/value fixtures
+- `solve-full`: “full fixture” world (combined)
+
 ## World matrix
 
 - `run-os`: real OS adapters (disk/net/time/env/process)

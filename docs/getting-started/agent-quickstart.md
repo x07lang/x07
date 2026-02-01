@@ -6,7 +6,16 @@ This page is a single entry point for LLM agents. Use the published agent portal
 
 - X07 source is **x07AST JSON** (`*.x07.json`), not text.
 - The toolchain is **JSON-first**: diagnostics, patches, and reports are structured.
-- Programs run in OS worlds: `run-os` and `run-os-sandboxed`.
+- Programs run in worlds (fixture or OS); OS worlds are `run-os` and `run-os-sandboxed`.
+
+High-level primitives to learn early (the “one whole system”):
+
+- Streaming pipes: [`std.stream.pipe_v1`](../language/stream-pipes.md) (deterministic, budgeted streaming composition)
+- Branded bytes: [`bytes@B` + `std.brand.*`](../language/types-memory.md#branded-bytes-typed-encodings) (typed boundary encodings)
+- Structured concurrency: [`task.scope_v1`](../language/concurrency-multiprocessing.md#structured-concurrency-taskscopev1) (no orphan tasks; slots/select)
+- Record/replay: [`std.rr` + rr scopes](../worlds/record-replay.md) (OS → deterministic cassette)
+- Budget scopes: [`budget.scope_v1`](../language/budget-scopes.md) (localize cost contracts; arch-driven budgets)
+- Contracts tooling: `x07 arch check`, `x07 schema derive`, `x07 sm gen` (pinned contracts → deterministic checks/generation)
 
 ## 1) Install and verify the toolchain
 

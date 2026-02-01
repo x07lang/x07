@@ -13,7 +13,8 @@ In OS worlds (`run-os*`), use subprocess spawning for multi-core parallelism. In
 
 ## Canonical patterns
 
-- Use `defasync` + `task.*` + `chan.bytes.*` for structured concurrency.
+- Use `task.scope_v1` for structured concurrency (no orphan tasks; slots/select are scope-owned).
+- Use `defasync` + `task.*` + `chan.bytes.*` inside scopes to build deterministic async topologies.
 - Keep `await` / `task.join.bytes` in `solve` expressions or inside `defasync` (they are not allowed inside `defn`).
 - Keep OS effects (fs/net/process/time) isolated behind adapters and policies.
 - Keep scheduling decisions explicit and data-driven (inputs → outputs), so behavior is reproducible.

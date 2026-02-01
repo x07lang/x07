@@ -45,6 +45,15 @@ X07 provides deterministic async concurrency for fixture worlds and structured c
 
 See [Concurrency & multiprocessing](concurrency-multiprocessing.md).
 
+## Budget scopes
+
+To localize performance/cost contracts, X07 provides budget scopes:
+
+- `budget.scope_v1`
+- `budget.scope_from_arch_v1` (pinned budgets from `arch/budgets/`)
+
+See [Budget scopes](budget-scopes.md).
+
 ## “Single canonical way”
 
 Where many languages offer multiple competing patterns, X07 standardizes:

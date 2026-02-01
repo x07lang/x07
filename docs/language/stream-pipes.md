@@ -214,11 +214,13 @@ To support `require_brand_v1` validator resolution and `auto_require_brand_v1`, 
 }
 ```
 
+Only `validate` is required by the compiler; `doc` is optional metadata (useful for linking to human docs).
+
 ## Sources (`std.stream.src.*_v1`)
 
 - `std.stream.src.bytes_v1` (single-item source)
 - `std.stream.src.fs_open_read_v1` (filesystem reader; requires fs/OS worlds)
-- `std.stream.src.rr_send_v1` (RR fixture streaming; requires rr/OS worlds)
+- `std.stream.src.rr_send_v1` (RR fixture streaming; requires rr/OS worlds; see [Record/replay](../worlds/record-replay.md))
 - `std.stream.src.db_rows_doc_v1` (DB rows; OS worlds)
 - `std.stream.src.net_tcp_read_stream_handle_v1` (OS worlds)
 - `std.stream.src.net_tcp_read_u32frames_v1` (OS worlds; convenience source)

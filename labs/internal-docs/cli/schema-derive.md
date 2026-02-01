@@ -24,6 +24,7 @@ Internal notes for the schema derivation tool (end-user docs live in `docs/toolc
 - Derived runtime modules use branded bytes for validated docs:
   - brand id is derived as `<pkg>.<type_id>_vN`
   - modules export `cast_doc_view_v1(doc: bytes_view) -> result_bytes_view@brand`
+  - generated modules include `meta.brands_v1[brand].validate = "<module_id>.validate_doc_v1"`
 
 ## Canonicalization (`specrows@0.2.0`)
 

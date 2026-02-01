@@ -117,4 +117,13 @@ Agent-written code is far more reliable if your system architecture makes bounda
 - deterministic tests separated from OS worlds,
 - adapters kept thin and declarative.
 
+High-level primitives that make this “explicit boundaries” rule concrete:
+
+- Use [Streaming pipes](../language/stream-pipes.md) to make streaming composition canonical and budgeted.
+- Use [Branded bytes](../language/types-memory.md#branded-bytes-typed-encodings) to make boundary encodings typechecked.
+- Use [Structured concurrency](../language/concurrency-multiprocessing.md#structured-concurrency-taskscopev1) (`task.scope_v1`) to prevent orphan tasks.
+- Use [Record/replay](../worlds/record-replay.md) to turn OS runs into deterministic cassettes.
+- Use [Budget scopes](../language/budget-scopes.md) to localize performance/cost contracts.
+- Enforce repo-level invariants with [`x07 arch check`](../toolchain/arch-check.md).
+
 The “ports and adapters” (hexagonal) model is a good default because it keeps I/O at the edges and preserves a stable functional core. See Alistair Cockburn’s write-up for background.

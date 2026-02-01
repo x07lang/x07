@@ -110,3 +110,5 @@ X07’s fixture worlds enforce deterministic budgets:
 - I/O caps (bytes read, request counts, etc.)
 
 In OS worlds, policies enforce caps for safety, but behavior is not deterministic.
+
+For local (per-region) budgets in code, see: [Budget scopes](budget-scopes.md).

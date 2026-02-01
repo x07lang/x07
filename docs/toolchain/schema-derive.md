@@ -31,6 +31,7 @@ Notes:
   - `encode_doc_v1(...) -> result_bytes@brand`
   - `cast_doc_view_v1(doc: bytes_view) -> result_bytes_view@brand` (validated cast)
   - doc accessors accept `bytes_view@brand`
+  - generated modules include a `meta.brands_v1` entry for the derived brand (validator = `validate_doc_v1`)
 
 ## Output layout
 

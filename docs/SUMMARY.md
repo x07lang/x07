@@ -22,16 +22,19 @@
 - [Types & memory model](language/types-memory.md)
 - [Concurrency & multiprocessing](language/concurrency-multiprocessing.md)
 - [Streaming pipes](language/stream-pipes.md)
+- [Budget scopes](language/budget-scopes.md)
 
 ## Worlds
 - [Worlds overview](worlds/index.md)
 - [OS worlds](worlds/os-worlds.md)
+- [Record/replay](worlds/record-replay.md)
 - [Sandbox policy walkthrough](worlds/sandbox-policy-walkthrough.md)
 
 ## Toolchain
 - [CLI](toolchain/cli.md)
 - [Architecture check](toolchain/arch-check.md)
 - [Schema derive](toolchain/schema-derive.md)
+- [State machines](toolchain/state-machines.md)
 - [Running programs](toolchain/running-programs.md)
 - [Embedding in C](toolchain/embedding-in-c.md)
 - [Repair loop](toolchain/repair-loop.md)

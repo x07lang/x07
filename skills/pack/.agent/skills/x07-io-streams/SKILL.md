@@ -14,6 +14,7 @@ Prefer streaming parsing and zero-copy views over full-buffer copies.
 ## Canonical patterns
 
 - Prefer `bytes_view` + `view.*` builtins for scan/trim/split without copying.
+- Prefer `std.stream.pipe_v1` for deterministic, budgeted streaming composition (source → transducers → sink).
 - Prefer `std.io` / `std.io.bufread` for streaming reads:
   - `io.read`
   - `bufread.fill` + `bufread.consume`

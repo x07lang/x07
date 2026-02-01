@@ -67,6 +67,14 @@ See: [Architecture check](arch-check.md).
 
 See: [Schema derive](schema-derive.md).
 
+### State machines (generate step functions + tests)
+
+- `x07 sm check --input <sm.json>`
+- `x07 sm gen --input <sm.json> --out <dir> --write`
+- `x07 sm gen --input <sm.json> --out <dir> --check`
+
+See: [State machines](state-machines.md).
+
 ### Packages (pack/lock/publish)
 
 - `x07 pkg add <name>@<version>`

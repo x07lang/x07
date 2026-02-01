@@ -24,6 +24,14 @@ Canonical docs:
 
 - https://x07lang.org/docs/toolchain/repair-loop/
 - https://x07lang.org/docs/toolchain/running-programs/
+- https://x07lang.org/docs/language/stream-pipes/
+- https://x07lang.org/docs/language/types-memory/  (branded bytes)
+- https://x07lang.org/docs/language/concurrency-multiprocessing/
+- https://x07lang.org/docs/worlds/record-replay/
+- https://x07lang.org/docs/language/budget-scopes/
+- https://x07lang.org/docs/toolchain/arch-check/
+- https://x07lang.org/docs/toolchain/schema-derive/
+- https://x07lang.org/docs/toolchain/state-machines/
 
 ## Single canonical agent loop (edit → run → test)
 

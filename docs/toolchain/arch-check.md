@@ -133,6 +133,23 @@ If enabled, “public” nodes must not export functions that accept/return raw 
 
 Violations: `E_ARCH_PUBLIC_BYTES_UNBRANDED`.
 
+### Contracts: rr / sm / budgets (`contracts_v1`)
+
+If `manifest.contracts_v1` is present, `x07 arch check` can also validate repo-local “contracts as data” under `arch/`:
+
+- `contracts_v1.rr` (record/replay contracts)
+  - validates the rr index and referenced policies/sanitizers
+  - can require rr-aware OS calls to be inside a `std.rr.with_policy_v1` scope (`require_policy_for_os_calls=true`)
+  - see: [Record/replay](../worlds/record-replay.md)
+- `contracts_v1.sm` (state machine contracts)
+  - validates the SM index and referenced SM spec files
+  - can require generated machine modules under `gen_dir` to be present and up to date (`require_gen_uptodate=true`)
+  - see: [State machines](state-machines.md)
+- `contracts_v1.budgets` (budget contracts)
+  - validates the budgets index and referenced profile files
+  - can require selected boundaries to be wrapped in `budget.scope_from_arch_v1` (`require_scopes=true`)
+  - see: [Budget scopes](../language/budget-scopes.md)
+
 ## Output
 
 By default, `x07 arch check` prints a report JSON object to stdout:

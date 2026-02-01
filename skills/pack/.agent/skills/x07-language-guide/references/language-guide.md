@@ -32,6 +32,14 @@ Entry program object fields:
 - `option_i32`, `option_bytes`, `option_bytes_view` for typed optional values
 - `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes` for typed results with deterministic error codes
 - Bytes-like types may carry an optional compile-time brand (see `params[].brand` and `result_brand`)
+  - Brand builtins (`std.brand.*`):
+    - `std.brand.cast_bytes_v1(brand_id, validator_id, b: bytes) -> result_bytes@brand_id`
+    - `std.brand.cast_view_v1(brand_id, validator_id, v: bytes_view) -> result_bytes_view@brand_id`
+    - `std.brand.cast_view_copy_v1(brand_id, validator_id, v: bytes_view) -> result_bytes@brand_id`
+    - `std.brand.assume_bytes_v1(brand_id, b: bytes) -> bytes@brand_id` (unsafe)
+    - `std.brand.erase_bytes_v1(b: bytes@B) -> bytes`, `std.brand.erase_view_v1(v: bytes_view@B) -> bytes_view`
+    - `std.brand.view_v1(b: bytes@B) -> bytes_view@B`
+    - `std.brand.to_bytes_preserve_if_full_v1(v: bytes_view@B) -> bytes`
 - `iface` for interface records (used for streaming readers)
 - Raw pointer types (standalone-only; require unsafe capability): `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`
 
@@ -88,7 +96,7 @@ Module IDs are dot-separated identifiers like `app.rle` or `std.bytes`.
 
 Module resolution is deterministic:
 
-- Built-in modules: `std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque_u32`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.path`, `std.os.env`, `std.os.fs`, `std.os.net`, `std.os.process`, `std.os.process.req_v1`, `std.os.process.caps_v1`, `std.os.process_pool`, `std.os.time`
+- Built-in modules: `std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque_u32`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.kv`, `std.rr`, `std.world.fs`, `std.path`, `std.os.env`, `std.os.fs`, `std.os.net`, `std.os.process`, `std.os.process.req_v1`, `std.os.process.caps_v1`, `std.os.process_pool`, `std.os.time`
 - Filesystem modules (standalone): `x07 run --program <prog.x07.json> --module-root <dir>` resolves `a.b` to `<dir>/a/b.x07.json`
 
 Standalone binding override:
@@ -410,6 +418,23 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.fs.list_dir","path_bytes"]` -> bytes
   - `["std.fs.list_dir_sorted","path_bytes"]` -> bytes
 
+- `std.kv` (world-bound)
+  - `["std.kv.get","key"]` -> bytes (`key` is bytes_view)
+  - `["std.kv.get_async","key"]` -> bytes (`key` is bytes_view)
+  - `["std.kv.get_stream","key"]` -> iface (`key` is bytes_view)
+  - `["std.kv.get_task","key"]` -> i32 task handle (`key` is bytes; await returns bytes)
+  - `["std.kv.set","key","val"]` -> i32 (`key`/`val` are bytes)
+
+- `std.rr` (solve-rr)
+  - `["std.rr.open_v1","cfg"]` -> result_i32 (`cfg` is bytes_view)
+  - `["std.rr.close_v1","h"]` -> i32
+  - `["std.rr.stats_v1","h"]` -> bytes
+  - `["std.rr.next_v1","h","kind","op","key"]` -> result_bytes (all bytes_view)
+  - `["std.rr.append_v1","h","entry"]` -> result_i32 (`entry` is bytes_view)
+  - `["std.rr.entry_resp_v1","entry"]` -> bytes (`entry` is bytes_view)
+  - `["std.rr.entry_err_v1","entry"]` -> i32 (`entry` is bytes_view)
+  - `["std.rr.current_v1"]` -> i32
+
 - `std.world.fs` (adapter module; world-selected)
   - `["std.world.fs.read_file","path_bytes"]` -> bytes
   - `["std.world.fs.read_file_async","path_bytes"]` -> bytes
@@ -502,6 +527,18 @@ Note: `bytes.view`, `bytes.subview`, and `vec_u8.as_view` require an identifier 
 OS effects are accessed through `std.os.*` modules, which call `os.*` builtins (listed above).
 In sandboxed execution, these calls are gated by policy.
 
+## Record/replay (rr)
+
+In rr-enabled worlds, X07 can replay (and optionally record) external interactions from a cassette file.
+
+Structured scope forms:
+
+- `["std.rr.with_v1", cfg_bytes_view_expr, body_expr]` -> type of `body_expr`
+- `["std.rr.with_policy_v1", ["bytes.lit","POLICY_ID"], ["bytes.lit","CASSETTE_PATH"], ["i32.lit",mode], body_expr]` -> type of `body_expr`
+  - mode: 0=off, 1=record, 2=replay, 3=record_missing, 4=rewrite
+
+Low-level APIs live in the built-in `std.rr` module (see built-in modules below).
+
 ## Streaming I/O
 
 Readers are `iface` values returned by world adapters.
@@ -511,6 +548,16 @@ Readers are `iface` values returned by world adapters.
 - `["bufread.new","reader_iface","cap_i32"]` -> i32
 - `["bufread.fill","br"]` -> bytes_view
 - `["bufread.consume","br","n_i32"]` -> i32
+
+For deterministic, budgeted streaming composition, prefer `std.stream.pipe_v1` (see end-user docs).
+
+Pipe shape:
+
+- `["std.stream.pipe_v1", cfg_v1, src_v1, chain_v1, sink_v1]` -> bytes (a stream doc)
+- `cfg_v1`: `["std.stream.cfg_v1", ...]`
+- `src_v1`: `std.stream.src.*_v1` descriptor
+- `chain_v1`: `["std.stream.chain_v1", ...]`
+- `sink_v1`: `std.stream.sink.*_v1` descriptor
 
 ## Vectors
 
@@ -560,6 +607,19 @@ Typed results:
 Propagation sugar:
 
 - `["try","r"]` -> `i32` or `bytes` (requires the current `defn` return type is `result_i32` or `result_bytes`)
+
+## Budget scopes
+
+Budget scopes are special forms that enforce local resource limits (alloc/memcpy/scheduler ticks/fuel).
+
+- `["budget.scope_v1", ["budget.cfg_v1", ...], body_expr]` -> type of `body_expr` (or a `result_*` in `mode=result_err_v1`)
+- `["budget.scope_from_arch_v1", ["bytes.lit","PROFILE_ID"], body_expr]` -> loads a pinned cfg from `arch/budgets/profiles/PROFILE_ID.budget.json`
+
+`budget.cfg_v1` fields:
+
+- `mode`: `trap_v1` | `result_err_v1` | `stats_only_v1` | `yield_v1`
+- `label`: bytes literal (for diagnostics)
+- Optional caps: `alloc_bytes`, `alloc_calls`, `realloc_calls`, `memcpy_bytes`, `sched_ticks`, `fuel`
 
 ## Memory / Performance Tips
 

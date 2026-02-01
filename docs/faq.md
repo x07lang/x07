@@ -28,3 +28,15 @@ In OS worlds, safety depends on policies and host sandboxing.
 X07 compiles to C and can call native shims for performance-critical workloads.
 
 The main performance risk is agent-written O(n²) logic—so the ecosystem includes budgets, metrics, and canonical builders.
+
+## What is the canonical way to do streaming transforms?
+
+Use [Streaming pipes](language/stream-pipes.md) (`std.stream.pipe_v1`): they are deterministic, budgeted, and have a single canonical composition model (source → transducers → sink).
+
+## How do I make OS-world behavior reproducible for agents?
+
+Use [Record/replay](worlds/record-replay.md) (`std.rr`) to record real interactions into cassettes under `.x07_rr/`, then replay deterministically in `solve-rr`.
+
+## How do I prevent “agent refactor” performance regressions?
+
+Use [Budget scopes](language/budget-scopes.md) to localize resource contracts, and enforce repo-wide invariants with [`x07 arch check`](toolchain/arch-check.md).

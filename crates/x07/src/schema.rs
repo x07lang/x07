@@ -2195,6 +2195,15 @@ fn generate_runtime_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Resul
         functions.extend(gen_field_accessors(td, f)?);
     }
 
+    let mut meta: BTreeMap<String, Value> = BTreeMap::new();
+    meta.insert(
+        "brands_v1".to_string(),
+        serde_json::json!({
+            (td.brand_id.clone()): {
+                "validate": format!("{}.validate_doc_v1", td.module_id),
+            }
+        }),
+    );
     let mut file = X07AstFile {
         kind: X07AstKind::Module,
         module_id: td.module_id.clone(),
@@ -2204,7 +2213,7 @@ fn generate_runtime_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Resul
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
         solve: None,
-        meta: BTreeMap::new(),
+        meta,
     };
 
     x07c::x07ast::canonicalize_x07ast_file(&mut file);
@@ -2343,6 +2352,15 @@ fn generate_runtime_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<
     );
     functions.push(gen_enum_encode_value(td)?);
 
+    let mut meta: BTreeMap<String, Value> = BTreeMap::new();
+    meta.insert(
+        "brands_v1".to_string(),
+        serde_json::json!({
+            (td.brand_id.clone()): {
+                "validate": format!("{}.validate_doc_v1", td.module_id),
+            }
+        }),
+    );
     let mut file = X07AstFile {
         kind: X07AstKind::Module,
         module_id: td.module_id.clone(),
@@ -2352,7 +2370,7 @@ fn generate_runtime_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
         solve: None,
-        meta: BTreeMap::new(),
+        meta,
     };
 
     x07c::x07ast::canonicalize_x07ast_file(&mut file);
