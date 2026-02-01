@@ -13,6 +13,11 @@ This page contains the canonical “readiness prompts” used to validate that a
 - If you need to undo a dependency:
   - `x07 pkg remove NAME --sync`
 
+## Guardrails (brands + pipes)
+
+- For structured bytes encodings, prefer branded bytes + validators over ad-hoc parsing. Schema-derived modules expose `meta.brands_v1`; use `std.brand.cast_view_v1` / `std.brand.cast_view_copy_v1` (see `x07 guide`).
+- For streaming transforms, prefer `std.stream.pipe_v1` and `std.io.bufread` over manual loops (more predictable allocations; fewer borrow/ownership hazards).
+
 If you hit:
 
 ```
@@ -44,9 +49,11 @@ TOOLCHAIN + PROJECT SETUP
    - default_profile = "sandbox"
    - profiles.sandbox.world = "run-os-sandboxed"
    - profiles.sandbox.policy = "policy/sandbox.base.json" (deny all net, deny all filesystem by default).
-3) Add dependencies:
+3) Generate a schema-valid base sandbox policy:
+   - `x07 policy init --template worker --out policy/sandbox.base.json --mkdir-out`
+4) Add dependencies:
    - ext-cli (for argv_v1 parsing)
-4) Run `x07 pkg lock` and commit `x07.lock.json`.
+5) Run `x07 pkg lock` and commit `x07.lock.json`.
 
 FUNCTIONAL REQUIREMENTS
 A) Exercise X07 core memory model patterns explicitly:
@@ -503,4 +510,3 @@ TESTS
   - generated outputs drift (`x07 sm gen --check`)
   - arch contracts drift (`x07 arch check` errors)
 ```
-

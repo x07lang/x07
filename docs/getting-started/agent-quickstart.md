@@ -166,6 +166,10 @@ Notes:
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
+- For stdlib modules, use `x07 doc std.<module>` (example: `x07 doc std.bytes`) and `x07 doc std.os.<module>` (example: `x07 doc std.os.fs`).
+- For builtins (example: `std.brand.*`), use `x07 guide`.
+- For structured encodings, prefer branded bytes + validators over ad-hoc parsing (see `std.brand.cast_view_v1` / `std.brand.cast_view_copy_v1` in `x07 guide` and `meta.brands_v1` in schema-derived modules).
+- For streaming transforms, prefer `std.stream.pipe_v1` and `std.io.bufread` over manual loops (more predictable allocations; fewer borrow/ownership hazards).
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 - Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).
@@ -176,6 +180,12 @@ See also: [Packages & projects](../packages/index.md).
 
 - `run-os`: real OS adapters (disk/network/time/env/process)
 - `run-os-sandboxed`: policy-gated OS adapters (not a hardened sandbox)
+
+For `run-os-sandboxed`, start from a schema-valid policy template instead of hand-writing JSON:
+
+```bash
+x07 policy init --template worker --out policy/sandbox.base.json --mkdir-out
+```
 
 Prefer profiles (`x07.json.default_profile` + `x07.json.profiles`) so agents usually run:
 
@@ -190,7 +200,7 @@ See: [OS worlds](../worlds/os-worlds.md).
 - Schemas: `spec/*.schema.json` (and the synced copies on x07lang.org under `/agent/.../schemas/`)
 - External packages index: `GET /agent/latest/packages/index.json` on x07lang.org
 - Offline docs: `x07up docs path --json`
-- Local module inspection: `x07 doc <module-or-symbol>` (example: `x07 doc std.net.http.client`)
+- Local module inspection: `x07 doc <module-or-symbol>` (example: `x07 doc std.bytes`)
 - Local package inspection (project deps): `x07 doc <package-name>` (example: `x07 doc ext-net`)
 - Built-in reference guide: `x07 guide`
 
