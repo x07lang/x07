@@ -40,6 +40,7 @@ jobs:
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
+            liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev
       - name: Stage native math backend
@@ -72,6 +73,7 @@ jobs:
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
+            liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev
       - name: cargo clippy --all-targets -- -D warnings
@@ -100,6 +102,7 @@ jobs:
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
+            liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev
       - name: LLM/tool contracts
@@ -124,6 +127,7 @@ jobs:
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
+            liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev
       - name: x07 test smoke
@@ -153,6 +157,7 @@ jobs:
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
+            liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev
       - name: Canary gate
@@ -182,6 +187,7 @@ jobs:
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
+            liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev
       - name: Package manager contracts (pack + lock)
@@ -235,6 +241,7 @@ jobs:
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
+            liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev
       - name: Installer smoke (local channels)

@@ -32,6 +32,7 @@ jobs:
             libcurl4-openssl-dev \
             libsqlite3-dev \
             libssl-dev \
+            liblzma-dev \
             pkg-config \
             python3 \
             python3-venv \
