@@ -236,7 +236,33 @@ Only `validate` is required by the compiler; `doc` is optional metadata (useful 
 - `std.stream.xf.frame_u32le_v1` (prefix each item with a u32 length)
 - `std.stream.xf.deframe_u32le_v1` (parse u32-length frames from raw chunks)
 - `std.stream.xf.json_canon_stream_v1` (RFC 8785 JCS canonicalization)
+- `std.stream.xf.plugin_v1` (generic stream transducer plugin)
 - `std.stream.xf.par_map_stream_v1` (parallel map; structured concurrency)
+
+### Plugin transducers (`std.stream.xf.plugin_v1`)
+
+`std.stream.xf.plugin_v1` is a generic transducer stage implemented by a pinned native plugin descriptor (no dynamic loading).
+
+Shape:
+
+```jsonc
+["std.stream.xf.plugin_v1",
+  ["id", ["bytes.lit", "<plugin_id>"]],
+  ["cfg", ["std.stream.expr_v1", <bytes_expr>]],
+
+  // optional:
+  ["opts_v1", ["opts_v1",
+    ["strict_brands", <i32>],      // default 1
+    ["strict_cfg_canon", <i32>]    // default 1
+  ]]
+]
+```
+
+Notes:
+
+- `id` MUST be a `bytes.lit` so the compiler can resolve the plugin deterministically and `x07 arch check` can verify it against the pinned registry.
+- Plugin ids are resolved from toolchain contracts under `arch/stream/plugins/index.x07sp.json`.
+- Some built-in stages (for example `split_lines_v1`, `frame_u32le_v1`, `deframe_u32le_v1`, `json_canon_stream_v1`) are implemented via the same plugin mechanism internally, without requiring `.x07.json` rewrites.
 
 ### Parallel map (`par_map_stream_*_v1`)
 
@@ -305,6 +331,14 @@ Notes:
 - `101`: `par_map_stream_*_v1` output item too large (output exceeded `max_out_item_bytes`)
 - `102`: `par_map_stream_result_bytes_v1` / `par_map_stream_unordered_result_bytes_v1` child returned `result_bytes` error
 - `103`: `par_map_stream_result_bytes_v1` / `par_map_stream_unordered_result_bytes_v1` child was canceled
+- `110`: stream plugin cfg too large
+- `111`: stream plugin cfg is non-canonical JSON (when required)
+- `112`: stream plugin emitted an invalid output stream
+- `113`: stream plugin requested an oversized output buffer (`emit_alloc`)
+- `114`: stream plugin exceeded per-step output bytes cap
+- `115`: stream plugin exceeded per-step output items cap
+- `116`: stream plugin committed `len > cap` (`emit_commit`)
+- `117`: stream plugin descriptor invalid / ABI mismatch
 
 For `71`, the `ERR` doc payload is:
 

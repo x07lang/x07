@@ -356,6 +356,10 @@ const INTERNAL_ONLY_HEADS: &[&str] = &[
     "__internal.brand.assume_view_v1",
     "__internal.brand.view_to_bytes_preserve_brand_v1",
     "__internal.result_bytes.unwrap_ok_v1",
+    "__internal.bytes.alloc_aligned_v1",
+    "__internal.stream_xf.plugin_init_v1",
+    "__internal.stream_xf.plugin_step_v1",
+    "__internal.stream_xf.plugin_flush_v1",
 ];
 
 fn find_internal_only_head(expr: &crate::ast::Expr) -> Option<&'static str> {

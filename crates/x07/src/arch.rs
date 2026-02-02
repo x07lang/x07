@@ -14,6 +14,7 @@ use x07_contracts::{
     X07_ARCH_PATCHSET_SCHEMA_VERSION, X07_ARCH_REPORT_SCHEMA_VERSION,
     X07_ARCH_RR_INDEX_SCHEMA_VERSION, X07_ARCH_RR_POLICY_SCHEMA_VERSION,
     X07_ARCH_RR_SANITIZE_SCHEMA_VERSION, X07_ARCH_SM_INDEX_SCHEMA_VERSION,
+    X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION, X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION,
     X07_BUDGET_PROFILE_SCHEMA_VERSION, X07_SM_SPEC_SCHEMA_VERSION,
 };
 use x07_worlds::WorldId;
@@ -38,6 +39,10 @@ const X07_ARCH_SM_INDEX_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-arch.sm.index.schema.json");
 const X07_ARCH_BUDGETS_INDEX_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-arch.budgets.index.schema.json");
+const X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.stream-plugins.index.schema.json");
+const X07_ARCH_STREAM_PLUGIN_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.stream-plugin.schema.json");
 const X07_BUDGET_PROFILE_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-budget.profile.schema.json");
 const X07_SM_SPEC_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07-sm.spec.schema.json");
@@ -280,6 +285,7 @@ struct ArchContractsV1 {
     rr: Option<ArchContractsRrV1>,
     sm: Option<ArchContractsSmV1>,
     budgets: Option<ArchContractsBudgetsV1>,
+    stream_plugins: Option<ArchContractsStreamPluginsV1>,
     canonical_json: ArchContractsCanonicalJsonV1,
 }
 
@@ -311,6 +317,14 @@ struct ArchContractsBudgetsV1 {
     index_path: String,
     gen_dir: String,
     require_scopes: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchContractsStreamPluginsV1 {
+    index_path: String,
+    gen_dir: String,
+    require_registry_uptodate: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -423,6 +437,89 @@ struct ArchBudgetsIndexProfile {
     selectors: Vec<ArchBudgetsIndexSelector>,
     #[serde(default)]
     worlds_allowed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchStreamPluginsIndex {
+    schema_version: String,
+    #[serde(default)]
+    plugins: Vec<ArchStreamPluginsIndexEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchStreamPluginsIndexEntry {
+    plugin_id: String,
+    plugin_spec_path: String,
+    budget_profile_id: String,
+    native_backend_id: String,
+    abi_major: u32,
+    export_symbol: String,
+    determinism: String,
+    #[serde(default)]
+    worlds_allowed: Vec<String>,
+    in_item_brand: String,
+    out_item_brand: String,
+    state_bytes: u32,
+    scratch_bytes: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchStreamPluginSpec {
+    schema_version: String,
+    plugin_id: String,
+    v: u32,
+    abi: ArchStreamPluginAbi,
+    determinism: String,
+    #[serde(default)]
+    worlds_allowed: Vec<String>,
+    brands: ArchStreamPluginBrands,
+    budgets: ArchStreamPluginBudgets,
+    cfg: ArchStreamPluginCfg,
+    limits: ArchStreamPluginLimits,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchStreamPluginAbi {
+    native_backend_id: String,
+    abi_major: u32,
+    export_symbol: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchStreamPluginBrands {
+    in_item_brand: String,
+    out_item_brand: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchStreamPluginBudgets {
+    state_bytes: u32,
+    scratch_bytes: u32,
+    #[serde(default)]
+    max_expand_ratio: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchStreamPluginCfg {
+    max_bytes: u32,
+    canon_mode: String,
+    #[serde(default)]
+    schema_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchStreamPluginLimits {
+    max_out_bytes_per_step: u32,
+    max_out_items_per_step: u32,
+    max_out_buf_bytes: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2337,6 +2434,9 @@ fn check_contracts_v1(
     }
 
     fn rr_kind_for_op(op: &str) -> Option<&'static str> {
+        if op.starts_with("std.rr.") || op == "std.stream.src.rr_send_v1" {
+            return Some("rr");
+        }
         if op.starts_with("std.net.http.") {
             return Some("http");
         }
@@ -3342,6 +3442,460 @@ fn check_contracts_v1(
         }
     }
 
+    // stream plugin contracts
+    let mut stream_plugins_by_id: BTreeMap<String, ArchStreamPluginsIndexEntry> = BTreeMap::new();
+    if let Some(stream_cfg) = &contracts.stream_plugins {
+        let dir = repo_root.join("arch/stream/plugins");
+        if !dir.is_dir() {
+            diags.push(diag_lint_error(
+                "E_ARCH_STREAM_PLUGINS_DIR_MISSING",
+                "stream plugins contracts directory is missing (expected arch/stream/plugins/)",
+                None,
+                BTreeMap::new(),
+            ));
+        }
+
+        let gen_dir = resolve_path_under_root(repo_root, Path::new(&stream_cfg.gen_dir));
+        if !gen_dir.is_dir() {
+            let mut data = BTreeMap::new();
+            data.insert(
+                "gen_dir".to_string(),
+                Value::String(display_relpath(repo_root, &gen_dir)),
+            );
+            diags.push(diag_lint_error(
+                "E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING",
+                "stream plugins gen_dir directory is missing",
+                Some(&stream_cfg.gen_dir),
+                data,
+            ));
+        }
+
+        if let Some((index_path, index_doc)) = load_contract_json(
+            repo_root,
+            budgets,
+            &mut budget_state,
+            diags,
+            &stream_cfg.index_path,
+            "E_ARCH_STREAM_PLUGINS_INDEX_READ",
+            "E_ARCH_STREAM_PLUGINS_INDEX_JSON_PARSE",
+        )? {
+            if index_doc.get("schema_version").and_then(Value::as_str)
+                != Some(X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION)
+            {
+                diags.push(diag_parse_error(
+                    "E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION",
+                    "schema_version mismatch for stream plugins index",
+                    Some(&display_relpath(repo_root, &index_path)),
+                ));
+            } else {
+                let schema_diags = validate_schema(
+                    "E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_INVALID",
+                    X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_BYTES,
+                    &index_doc,
+                )?;
+                for d in schema_diags {
+                    diags.push(d);
+                }
+            }
+
+            indexes.insert(
+                display_relpath(repo_root, &index_path),
+                lock_entry_for_doc(&index_doc)?,
+            );
+
+            if let Ok(index_obj) =
+                serde_json::from_value::<ArchStreamPluginsIndex>(index_doc.clone())
+            {
+                let require_registry_uptodate = stream_cfg.require_registry_uptodate;
+                if index_obj.schema_version != X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION {
+                    diags.push(diag_parse_error(
+                        "E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION",
+                        "schema_version mismatch for stream plugins index",
+                        Some(&display_relpath(repo_root, &index_path)),
+                    ));
+                }
+
+                if require_registry_uptodate {
+                    // Determinism constraints: sorted plugins by id.
+                    let ids: Vec<String> = index_obj
+                        .plugins
+                        .iter()
+                        .map(|p| p.plugin_id.clone())
+                        .collect();
+                    let mut ids_sorted = ids.clone();
+                    ids_sorted.sort();
+                    if ids != ids_sorted {
+                        let mut data = BTreeMap::new();
+                        data.insert(
+                            "index_path".to_string(),
+                            Value::String(display_relpath(repo_root, &index_path)),
+                        );
+                        diags.push(diag_lint_error(
+                            "E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED",
+                            "plugins[] must be sorted by plugin_id",
+                            None,
+                            data,
+                        ));
+                    }
+                }
+
+                let mut seen: BTreeSet<String> = BTreeSet::new();
+                for p in &index_obj.plugins {
+                    if !seen.insert(p.plugin_id.clone()) {
+                        let mut data = BTreeMap::new();
+                        data.insert("plugin_id".to_string(), Value::String(p.plugin_id.clone()));
+                        diags.push(diag_lint_error(
+                            "E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID",
+                            "plugins[] must not contain duplicate plugin_id",
+                            None,
+                            data,
+                        ));
+                        continue;
+                    }
+
+                    stream_plugins_by_id.insert(p.plugin_id.clone(), p.clone());
+
+                    if !budgets_profiles_by_id.contains_key(&p.budget_profile_id) {
+                        let mut data = BTreeMap::new();
+                        data.insert("plugin_id".to_string(), Value::String(p.plugin_id.clone()));
+                        data.insert(
+                            "budget_profile_id".to_string(),
+                            Value::String(p.budget_profile_id.clone()),
+                        );
+                        diags.push(diag_lint_error(
+                            "E_ARCH_STREAM_PLUGIN_BUDGET_MISSING",
+                            "budget profile id is not declared in arch budgets index",
+                            Some(&p.plugin_spec_path),
+                            data,
+                        ));
+                    }
+
+                    if let Some((spec_path, spec_doc)) = load_contract_json(
+                        repo_root,
+                        budgets,
+                        &mut budget_state,
+                        diags,
+                        &p.plugin_spec_path,
+                        "E_ARCH_STREAM_PLUGIN_SPEC_READ",
+                        "E_ARCH_STREAM_PLUGIN_SPEC_JSON_PARSE",
+                    )? {
+                        if spec_doc.get("schema_version").and_then(Value::as_str)
+                            != Some(X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION)
+                        {
+                            diags.push(diag_parse_error(
+                                "E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION",
+                                "schema_version mismatch for stream plugin spec",
+                                Some(&display_relpath(repo_root, &spec_path)),
+                            ));
+                        } else {
+                            let schema_diags = validate_schema(
+                                "E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_INVALID",
+                                X07_ARCH_STREAM_PLUGIN_SCHEMA_BYTES,
+                                &spec_doc,
+                            )?;
+                            for d in schema_diags {
+                                diags.push(d);
+                            }
+                        }
+
+                        files.insert(
+                            display_relpath(repo_root, &spec_path),
+                            lock_entry_for_doc(&spec_doc)?,
+                        );
+
+                        if let Ok(spec_obj) =
+                            serde_json::from_value::<ArchStreamPluginSpec>(spec_doc.clone())
+                        {
+                            if spec_obj.schema_version != X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION {
+                                diags.push(diag_parse_error(
+                                    "E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION",
+                                    "schema_version mismatch for stream plugin spec",
+                                    Some(&display_relpath(repo_root, &spec_path)),
+                                ));
+                            }
+
+                            if spec_obj.plugin_id != p.plugin_id {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "index_plugin_id".to_string(),
+                                    Value::String(p.plugin_id.clone()),
+                                );
+                                data.insert(
+                                    "spec_plugin_id".to_string(),
+                                    Value::String(spec_obj.plugin_id.clone()),
+                                );
+                                diags.push(diag_lint_error(
+                                    "E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH",
+                                    "plugin_id mismatch between index and spec",
+                                    Some(&p.plugin_spec_path),
+                                    data,
+                                ));
+                            }
+
+                            // A few inexpensive invariants (schema already enforces most).
+                            if !matches!(
+                                spec_obj.cfg.canon_mode.as_str(),
+                                "none_v1" | "canon_json_v1"
+                            ) {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "plugin_id".to_string(),
+                                    Value::String(p.plugin_id.clone()),
+                                );
+                                data.insert(
+                                    "canon_mode".to_string(),
+                                    Value::String(spec_obj.cfg.canon_mode.clone()),
+                                );
+                                diags.push(diag_lint_error(
+                                    "E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE",
+                                    "unsupported cfg.canon_mode in stream plugin spec",
+                                    Some(&p.plugin_spec_path),
+                                    data,
+                                ));
+                            }
+                            if spec_obj.limits.max_out_bytes_per_step != 0
+                                && spec_obj.limits.max_out_buf_bytes
+                                    > spec_obj.limits.max_out_bytes_per_step
+                            {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "plugin_id".to_string(),
+                                    Value::String(p.plugin_id.clone()),
+                                );
+                                data.insert(
+                                    "max_out_bytes_per_step".to_string(),
+                                    Value::Number(
+                                        (spec_obj.limits.max_out_bytes_per_step as u64).into(),
+                                    ),
+                                );
+                                data.insert(
+                                    "max_out_buf_bytes".to_string(),
+                                    Value::Number(
+                                        (spec_obj.limits.max_out_buf_bytes as u64).into(),
+                                    ),
+                                );
+                                diags.push(diag_lint_error(
+                                    "E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID",
+                                    "stream plugin limits invalid (max_out_buf_bytes exceeds max_out_bytes_per_step)",
+                                    Some(&p.plugin_spec_path),
+                                    data,
+                                ));
+                            }
+                            // Read for completeness (kept in the pinned contract).
+                            let _ = spec_obj.v;
+                            let _ = spec_obj.cfg.max_bytes;
+                            let _ = spec_obj.cfg.schema_path.as_deref();
+                            let _ = spec_obj.budgets.max_expand_ratio;
+                            let _ = spec_obj.limits.max_out_items_per_step;
+
+                            if spec_obj.abi.native_backend_id != p.native_backend_id
+                                || spec_obj.abi.abi_major != p.abi_major
+                                || spec_obj.abi.export_symbol != p.export_symbol
+                            {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "plugin_id".to_string(),
+                                    Value::String(p.plugin_id.clone()),
+                                );
+                                data.insert(
+                                    "index_native_backend_id".to_string(),
+                                    Value::String(p.native_backend_id.clone()),
+                                );
+                                data.insert(
+                                    "spec_native_backend_id".to_string(),
+                                    Value::String(spec_obj.abi.native_backend_id.clone()),
+                                );
+                                data.insert(
+                                    "index_abi_major".to_string(),
+                                    Value::Number((p.abi_major as u64).into()),
+                                );
+                                data.insert(
+                                    "spec_abi_major".to_string(),
+                                    Value::Number((spec_obj.abi.abi_major as u64).into()),
+                                );
+                                data.insert(
+                                    "index_export_symbol".to_string(),
+                                    Value::String(p.export_symbol.clone()),
+                                );
+                                data.insert(
+                                    "spec_export_symbol".to_string(),
+                                    Value::String(spec_obj.abi.export_symbol.clone()),
+                                );
+                                diags.push(diag_lint_error(
+                                    "E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH",
+                                    "ABI mismatch between index and spec",
+                                    Some(&p.plugin_spec_path),
+                                    data,
+                                ));
+                            }
+
+                            if spec_obj.budgets.state_bytes != p.state_bytes
+                                || spec_obj.budgets.scratch_bytes != p.scratch_bytes
+                            {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "plugin_id".to_string(),
+                                    Value::String(p.plugin_id.clone()),
+                                );
+                                data.insert(
+                                    "index_state_bytes".to_string(),
+                                    Value::Number((p.state_bytes as u64).into()),
+                                );
+                                data.insert(
+                                    "spec_state_bytes".to_string(),
+                                    Value::Number((spec_obj.budgets.state_bytes as u64).into()),
+                                );
+                                data.insert(
+                                    "index_scratch_bytes".to_string(),
+                                    Value::Number((p.scratch_bytes as u64).into()),
+                                );
+                                data.insert(
+                                    "spec_scratch_bytes".to_string(),
+                                    Value::Number((spec_obj.budgets.scratch_bytes as u64).into()),
+                                );
+                                diags.push(diag_lint_error(
+                                    "E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH",
+                                    "budgets mismatch between index and spec",
+                                    Some(&p.plugin_spec_path),
+                                    data,
+                                ));
+                            }
+
+                            if spec_obj.brands.in_item_brand != p.in_item_brand
+                                || spec_obj.brands.out_item_brand != p.out_item_brand
+                            {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "plugin_id".to_string(),
+                                    Value::String(p.plugin_id.clone()),
+                                );
+                                data.insert(
+                                    "index_in_item_brand".to_string(),
+                                    Value::String(p.in_item_brand.clone()),
+                                );
+                                data.insert(
+                                    "spec_in_item_brand".to_string(),
+                                    Value::String(spec_obj.brands.in_item_brand.clone()),
+                                );
+                                data.insert(
+                                    "index_out_item_brand".to_string(),
+                                    Value::String(p.out_item_brand.clone()),
+                                );
+                                data.insert(
+                                    "spec_out_item_brand".to_string(),
+                                    Value::String(spec_obj.brands.out_item_brand.clone()),
+                                );
+                                diags.push(diag_lint_error(
+                                    "E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH",
+                                    "brand mismatch between index and spec",
+                                    Some(&p.plugin_spec_path),
+                                    data,
+                                ));
+                            }
+
+                            if spec_obj.determinism != p.determinism {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "plugin_id".to_string(),
+                                    Value::String(p.plugin_id.clone()),
+                                );
+                                data.insert(
+                                    "index_determinism".to_string(),
+                                    Value::String(p.determinism.clone()),
+                                );
+                                data.insert(
+                                    "spec_determinism".to_string(),
+                                    Value::String(spec_obj.determinism.clone()),
+                                );
+                                diags.push(diag_lint_error(
+                                    "E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH",
+                                    "determinism mismatch between index and spec",
+                                    Some(&p.plugin_spec_path),
+                                    data,
+                                ));
+                            }
+
+                            if spec_obj.worlds_allowed != p.worlds_allowed {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "plugin_id".to_string(),
+                                    Value::String(p.plugin_id.clone()),
+                                );
+                                data.insert(
+                                    "index_worlds_allowed".to_string(),
+                                    Value::Array(
+                                        p.worlds_allowed
+                                            .iter()
+                                            .cloned()
+                                            .map(Value::String)
+                                            .collect(),
+                                    ),
+                                );
+                                data.insert(
+                                    "spec_worlds_allowed".to_string(),
+                                    Value::Array(
+                                        spec_obj
+                                            .worlds_allowed
+                                            .iter()
+                                            .cloned()
+                                            .map(Value::String)
+                                            .collect(),
+                                    ),
+                                );
+                                diags.push(diag_lint_error(
+                                    "E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH",
+                                    "worlds_allowed mismatch between index and spec",
+                                    Some(&p.plugin_spec_path),
+                                    data,
+                                ));
+                            }
+                        }
+                    }
+                }
+
+                if require_registry_uptodate {
+                    // Validate usage: std.stream.xf.plugin_v1(...).
+                    for (module_id, m) in modules_by_id {
+                        let Some(node_id) = module_to_node.get(module_id) else {
+                            continue;
+                        };
+                        let Some(node) = node_by_id.get(node_id) else {
+                            continue;
+                        };
+                        let world = node.world.as_str();
+                        for fun in &m.parsed.functions {
+                            scan_stream_plugin_usage_expr(
+                                &stream_plugins_by_id,
+                                world,
+                                &m.rel_path,
+                                &fun.body,
+                                diags,
+                            );
+                        }
+                        for fun in &m.parsed.async_functions {
+                            scan_stream_plugin_usage_expr(
+                                &stream_plugins_by_id,
+                                world,
+                                &m.rel_path,
+                                &fun.body,
+                                diags,
+                            );
+                        }
+                        if let Some(solve) = &m.parsed.solve {
+                            scan_stream_plugin_usage_expr(
+                                &stream_plugins_by_id,
+                                world,
+                                &m.rel_path,
+                                solve,
+                                diags,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // contracts lock (v1.1)
     let contracts_lock_doc = ArchContractsLock {
         schema_version: X07_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION.to_string(),
@@ -3529,6 +4083,112 @@ fn scan_budget_usage_expr(
 
             for item in items {
                 scan_budget_usage_expr(profiles_by_id, world, module_path, item, diags);
+            }
+        }
+    }
+}
+
+fn scan_stream_plugin_usage_expr(
+    plugins_by_id: &BTreeMap<String, ArchStreamPluginsIndexEntry>,
+    world: &str,
+    module_path: &str,
+    expr: &x07c::ast::Expr,
+    diags: &mut DiagSink,
+) {
+    match expr {
+        x07c::ast::Expr::Int { .. } | x07c::ast::Expr::Ident { .. } => {}
+        x07c::ast::Expr::List { items, .. } => {
+            if items.first().and_then(x07c::ast::Expr::as_ident) == Some("std.stream.xf.plugin_v1")
+            {
+                let mut plugin_id: Option<String> = None;
+                let mut plugin_id_ptr: Option<String> = None;
+                for item in items.iter().skip(1) {
+                    let x07c::ast::Expr::List { items: kv, .. } = item else {
+                        continue;
+                    };
+                    if kv.len() != 2 || kv[0].as_ident() != Some("id") {
+                        continue;
+                    }
+                    plugin_id_ptr = Some(kv[1].ptr().to_string());
+
+                    if let Some(id) = expr_parse_bytes_lit(&kv[1]) {
+                        plugin_id = Some(id);
+                        break;
+                    }
+                    if let x07c::ast::Expr::List { items: inner, .. } = &kv[1] {
+                        if inner.first().and_then(x07c::ast::Expr::as_ident)
+                            == Some("std.stream.expr_v1")
+                            && inner.len() == 2
+                        {
+                            if let Some(id) = expr_parse_bytes_lit(&inner[1]) {
+                                plugin_id = Some(id);
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                if plugin_id.is_none() {
+                    diags.push(diagnostics::Diagnostic {
+                        code: "W_ARCH_CONTRACT_OPAQUE_USAGE".to_string(),
+                        severity: diagnostics::Severity::Warning,
+                        stage: diagnostics::Stage::Lint,
+                        message: "std.stream.xf.plugin_v1 id must be bytes.lit for arch check"
+                            .to_string(),
+                        loc: Some(diagnostics::Location::X07Ast {
+                            ptr: plugin_id_ptr.unwrap_or_default(),
+                        }),
+                        notes: Vec::new(),
+                        related: Vec::new(),
+                        data: BTreeMap::new(),
+                        quickfix: None,
+                    });
+                }
+
+                if let Some(pid) = plugin_id {
+                    if let Some(p) = plugins_by_id.get(&pid) {
+                        if !p.worlds_allowed.is_empty()
+                            && !p.worlds_allowed.iter().any(|w| w == world)
+                        {
+                            let mut data = BTreeMap::new();
+                            data.insert("plugin_id".to_string(), Value::String(pid.clone()));
+                            data.insert("world".to_string(), Value::String(world.to_string()));
+                            diags.push(diag_lint_error(
+                                "E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION",
+                                "stream plugin is not allowed in this world",
+                                Some(module_path),
+                                data,
+                            ));
+                        }
+                        if p.determinism == "nondet_os_only_v1"
+                            && !matches!(world, "run-os" | "run-os-sandboxed")
+                        {
+                            let mut data = BTreeMap::new();
+                            data.insert("plugin_id".to_string(), Value::String(pid));
+                            data.insert("world".to_string(), Value::String(world.to_string()));
+                            diags.push(diag_lint_error(
+                                "E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION",
+                                "OS-only stream plugin is not allowed in solve worlds",
+                                Some(module_path),
+                                data,
+                            ));
+                        }
+                    } else {
+                        let mut data = BTreeMap::new();
+                        data.insert("plugin_id".to_string(), Value::String(pid));
+                        diags.push(diag_lint_error(
+                            "E_ARCH_STREAM_PLUGIN_NOT_FOUND",
+                            "stream plugin_id is not declared in stream plugins index",
+                            Some(module_path),
+                            data,
+                        ));
+                    }
+                }
+            }
+
+            for item in items {
+                scan_stream_plugin_usage_expr(plugins_by_id, world, module_path, item, diags);
             }
         }
     }

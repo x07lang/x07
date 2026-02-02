@@ -54,11 +54,17 @@ cargo build -p x07-host-runner -p x07-os-runner
 step "stage native math backend"
 ./scripts/ci/ensure_math_backend.sh
 
+step "stage native stream-xf backend"
+./scripts/ci/ensure_stream_xf_backend.sh
+
 step "cargo test"
 cargo test
 
 step "cargo clippy --all-targets -- -D warnings"
 cargo clippy --all-targets -- -D warnings
+
+step "stream plugins smoke"
+./scripts/ci/check_stream_plugins_smoke.sh
 
 step "pkg contracts"
 "$python_bin" scripts/check_pkg_contracts.py --check

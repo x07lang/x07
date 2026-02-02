@@ -30,6 +30,9 @@ pub const X07_ARCH_RR_POLICY_SCHEMA_VERSION: &str = "x07.arch.rr.policy@0.1.0";
 pub const X07_ARCH_RR_SANITIZE_SCHEMA_VERSION: &str = "x07.arch.rr.sanitize@0.1.0";
 pub const X07_ARCH_SM_INDEX_SCHEMA_VERSION: &str = "x07.arch.sm.index@0.1.0";
 pub const X07_ARCH_BUDGETS_INDEX_SCHEMA_VERSION: &str = "x07.arch.budgets.index@0.1.0";
+pub const X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION: &str =
+    "x07.arch.stream.plugins.index@0.1.0";
+pub const X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION: &str = "x07.arch.stream.plugin@0.1.0";
 pub const X07_BUDGET_PROFILE_SCHEMA_VERSION: &str = "x07.budget.profile@0.1.0";
 pub const X07_SM_SPEC_SCHEMA_VERSION: &str = "x07.sm.spec@0.1.0";
 

@@ -29,7 +29,12 @@ Concurrency notes:
 ## Runtime pieces
 
 - The emitted pipeline helper is ordinary x07AST lowered to C like any other function.
-- JSON canonicalization (`std.stream.xf.json_canon_stream_v1`) uses a built-in C runtime canonicalizer (RFC 8785 / JCS) emitted by the backend.
+- Stream plugin stages (`std.stream.xf.plugin_v1`, and selected built-in `std.stream.xf.*_v1` stages) lower to internal-only plugin builtins:
+  - `__internal.stream_xf.plugin_init_v1`
+  - `__internal.stream_xf.plugin_step_v1`
+  - `__internal.stream_xf.plugin_flush_v1`
+- Plugin ids are resolved deterministically at compile time from the toolchain registry under `arch/stream/plugins/index.x07sp.json`, and the lowering emits `native_requires` entries for the owning native backend (currently `x07.stream.xf`).
+- JSON canonicalization (`std.stream.xf.json_canon_stream_v1`) is implemented as a stream plugin (`xf.json_canon_stream_v1`) in the `x07.stream.xf` native backend, and uses the built-in C JSON JCS runtime section emitted by `crates/x07c/src/c_emit.rs`.
 
 Runtime errors:
 
@@ -39,6 +44,7 @@ Runtime errors:
 Internal-only helpers / safety:
 
 - Concurrency pipe helpers use internal-only builtins for slot bookkeeping; user code must not call them directly.
+- Plugin-backed stream stages use internal-only plugin builtins; user code must not call them directly.
 - Stream pipe helper function names are reserved (`<module_id>.__std_stream_pipe_v1_<hash>`); `x07c` rejects user-defined functions using this prefix.
 
 ## Filesystem streaming sink

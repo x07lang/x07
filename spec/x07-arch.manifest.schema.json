@@ -264,6 +264,7 @@
         "rr": { "$ref": "#/$defs/contracts_rr_v1" },
         "sm": { "$ref": "#/$defs/contracts_sm_v1" },
         "budgets": { "$ref": "#/$defs/contracts_budgets_v1" },
+        "stream_plugins": { "$ref": "#/$defs/contracts_stream_plugins_v1" },
         "canonical_json": { "$ref": "#/$defs/contracts_canonical_json_v1" }
       }
     },
@@ -303,6 +304,16 @@
         "index_path": { "$ref": "#/$defs/rel_path" },
         "gen_dir": { "$ref": "#/$defs/rel_path" },
         "require_scopes": { "type": "boolean", "default": true }
+      }
+    },
+    "contracts_stream_plugins_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index_path", "gen_dir", "require_registry_uptodate"],
+      "properties": {
+        "index_path": { "$ref": "#/$defs/rel_path" },
+        "gen_dir": { "$ref": "#/$defs/rel_path" },
+        "require_registry_uptodate": { "type": "boolean", "default": true }
       }
     }
   }

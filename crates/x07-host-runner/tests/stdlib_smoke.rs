@@ -24,10 +24,19 @@ fn config() -> RunnerConfig {
 }
 
 fn compile_exe(program: &[u8]) -> PathBuf {
-    let cfg = config();
-    let compile = compile_program(program, &cfg, None).expect("compile ok");
-    assert!(compile.ok, "compile_error={:?}", compile.compile_error);
-    compile.compiled_exe.expect("compiled exe")
+    let program = program.to_vec();
+    std::thread::Builder::new()
+        .name("stdlib_smoke_compile_exe".to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || {
+            let cfg = config();
+            let compile = compile_program(program.as_slice(), &cfg, None).expect("compile ok");
+            assert!(compile.ok, "compile_error={:?}", compile.compile_error);
+            compile.compiled_exe.expect("compiled exe")
+        })
+        .expect("spawn compile_exe thread")
+        .join()
+        .expect("join compile_exe thread")
 }
 
 fn run_exe(exe: &Path, input: &[u8]) -> Vec<u8> {
@@ -398,7 +407,14 @@ fn std_regex_lite_find_literal_works() {
 fn std_csv_module_is_removed() {
     let program = x07_program::entry(&["std.csv"], json!(["std.csv.sum_i32_status_le", "input"]));
     let cfg = config();
-    let compile = compile_program(program.as_slice(), &cfg, None).expect("compile ran");
+    let program = program.to_vec();
+    let compile = std::thread::Builder::new()
+        .name("stdlib_smoke_compile_program".to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || compile_program(program.as_slice(), &cfg, None).expect("compile ran"))
+        .expect("spawn compile_program thread")
+        .join()
+        .expect("join compile_program thread");
     assert!(!compile.ok);
     assert!(compile
         .compile_error

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -591,6 +591,9 @@ fn try_main() -> Result<std::process::ExitCode> {
             let world = x07c::world_config::parse_world_id(&manifest.world)
                 .with_context(|| format!("invalid project world {:?}", manifest.world))?;
             let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
+            options.arch_root = infer_arch_root_from_path(&project_path)
+                .or_else(|| Some(base.to_path_buf()))
+                .or_else(|| std::env::current_dir().ok());
             if freestanding {
                 options.emit_main = false;
                 options.freestanding = true;
@@ -643,6 +646,8 @@ fn try_main() -> Result<std::process::ExitCode> {
             let program_bytes = std::fs::read(&program)
                 .with_context(|| format!("read program: {}", program.display()))?;
             let mut options = x07c::world_config::compile_options_for_world(world, module_root);
+            options.arch_root =
+                infer_arch_root_from_path(&program).or_else(|| std::env::current_dir().ok());
             if freestanding {
                 options.emit_main = false;
                 options.freestanding = true;
@@ -684,6 +689,24 @@ fn try_main() -> Result<std::process::ExitCode> {
 fn print_json<T: Serialize>(value: &T) -> Result<()> {
     println!("{}", serde_json::to_string(value)?);
     Ok(())
+}
+
+fn infer_arch_root_from_path(start: &Path) -> Option<PathBuf> {
+    let start_dir = if start.is_dir() {
+        start.to_path_buf()
+    } else {
+        start.parent().map(Path::to_path_buf)?
+    };
+    let start_dir = std::fs::canonicalize(&start_dir).unwrap_or(start_dir);
+
+    let mut dir: Option<&Path> = Some(start_dir.as_path());
+    while let Some(d) = dir {
+        if d.join("arch").is_dir() {
+            return Some(d.to_path_buf());
+        }
+        dir = d.parent();
+    }
+    None
 }
 
 fn diagnostic_error(

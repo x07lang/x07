@@ -41,6 +41,8 @@ schemas = [
     root / "spec" / "x07-package.schema.json",
     root / "spec" / "x07-capabilities.schema.json",
     root / "spec" / "x07-website.package-index.schema.json",
+    root / "spec" / "x07-arch.stream-plugins.index.schema.json",
+    root / "spec" / "x07-arch.stream-plugin.schema.json",
 ]
 
 for p in schemas:

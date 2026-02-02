@@ -149,6 +149,10 @@ If `manifest.contracts_v1` is present, `x07 arch check` can also validate repo-l
   - validates the budgets index and referenced profile files
   - can require selected boundaries to be wrapped in `budget.scope_from_arch_v1` (`require_scopes=true`)
   - see: [Budget scopes](../language/budget-scopes.md)
+- `contracts_v1.stream_plugins` (stream plugin contracts)
+  - validates the stream plugins index and referenced plugin spec files
+  - locks the registry into `arch/contracts.lock.json`
+  - verifies `std.stream.xf.plugin_v1` usage references declared plugins (and is allowed in the module’s world)
 
 ## Output
 

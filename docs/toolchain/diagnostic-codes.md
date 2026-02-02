@@ -89,3 +89,29 @@ Architecture checks:
 - `E_ARCH_WORLD_EDGE_FORBIDDEN`: `solve-*` node depends on `run-os*` node.
 - `E_ARCH_SMOKE_MISSING`: node is missing a required `contracts.smoke_entry` export.
 - `E_ARCH_PUBLIC_BYTES_UNBRANDED`: public node exports a `bytes` boundary without a brand.
+
+Stream plugins contracts (`contracts_v1.stream_plugins`):
+
+- `E_ARCH_STREAM_PLUGINS_DIR_MISSING`: stream plugins contract root directory is missing.
+- `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING`: stream plugins `gen_dir` is missing (when `require_registry_uptodate=true`).
+- `E_ARCH_STREAM_PLUGINS_INDEX_READ`: failed to read the stream plugins index file.
+- `E_ARCH_STREAM_PLUGINS_INDEX_JSON_PARSE`: index is not valid JSON.
+- `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION`: index `schema_version` mismatch.
+- `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_INVALID`: index JSON does not match the pinned schema.
+- `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED`: index `plugins[]` is not sorted by `plugin_id`.
+- `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID`: duplicate `plugin_id` in the index.
+- `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING`: index entry references a missing `budget_profile_id`.
+- `E_ARCH_STREAM_PLUGIN_SPEC_READ`: failed to read a referenced plugin spec file.
+- `E_ARCH_STREAM_PLUGIN_SPEC_JSON_PARSE`: spec is not valid JSON.
+- `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION`: spec `schema_version` mismatch.
+- `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_INVALID`: spec JSON does not match the pinned schema.
+- `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH`: spec `plugin_id` does not match the index entry.
+- `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE`: spec has an invalid cfg canonicalization mode.
+- `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID`: spec has invalid output limit fields.
+- `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH`: spec ABI fields do not match the index entry.
+- `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH`: spec budgets do not match the index entry.
+- `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH`: spec brands do not match the index entry.
+- `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH`: spec determinism does not match the index entry.
+- `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`: spec `worlds_allowed` does not match the index entry.
+- `E_ARCH_STREAM_PLUGIN_NOT_FOUND`: a module references a `std.stream.xf.plugin_v1` id that is not declared.
+- `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`: plugin usage is forbidden in the module’s world.

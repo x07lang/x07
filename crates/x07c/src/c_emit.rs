@@ -438,6 +438,67 @@ fn program_uses_head(program: &Program, head: &str) -> bool {
     false
 }
 
+fn expr_uses_stream_xf_plugin_json_jcs(expr: &Expr) -> bool {
+    match expr {
+        Expr::Int { .. } | Expr::Ident { .. } => false,
+        Expr::List { items, .. } => {
+            if items
+                .first()
+                .and_then(Expr::as_ident)
+                .is_some_and(|h| h == "__internal.stream_xf.plugin_init_v1")
+            {
+                let export_symbol = items
+                    .get(3)
+                    .and_then(|e| {
+                        let Expr::List { items, .. } = e else {
+                            return None;
+                        };
+                        if items.len() != 2
+                            || items.first().and_then(Expr::as_ident) != Some("bytes.lit")
+                        {
+                            return None;
+                        }
+                        items.get(1).and_then(Expr::as_ident)
+                    })
+                    .unwrap_or_default();
+                if export_symbol == "x07_xf_json_canon_stream_v1" {
+                    return true;
+                }
+
+                let canon_mode = items.get(8).and_then(|e| match e {
+                    Expr::Int { value, .. } => Some(*value),
+                    _ => None,
+                });
+                let strict_cfg_canon = items.get(9).and_then(|e| match e {
+                    Expr::Int { value, .. } => Some(*value),
+                    _ => None,
+                });
+                if canon_mode == Some(1) && strict_cfg_canon == Some(1) {
+                    return true;
+                }
+            }
+            items.iter().any(expr_uses_stream_xf_plugin_json_jcs)
+        }
+    }
+}
+
+fn program_uses_stream_xf_plugin_json_jcs(program: &Program) -> bool {
+    if expr_uses_stream_xf_plugin_json_jcs(&program.solve) {
+        return true;
+    }
+    for f in &program.functions {
+        if expr_uses_stream_xf_plugin_json_jcs(&f.body) {
+            return true;
+        }
+    }
+    for f in &program.async_functions {
+        if expr_uses_stream_xf_plugin_json_jcs(&f.body) {
+            return true;
+        }
+    }
+    false
+}
+
 fn trim_preamble_section(
     src: &str,
     start: &str,
@@ -2562,7 +2623,17 @@ impl<'a> Emitter<'a> {
         const JSON_JCS_START: &str = "\n// --- X07_JSON_JCS_START";
         const JSON_JCS_END: &str = "\n// --- X07_JSON_JCS_END";
 
-        let uses_json_jcs = program_uses_head(self.program, "json.jcs.canon_doc_v1");
+        const STREAM_XF_PLUGIN_START: &str = "\n// --- X07_STREAM_XF_PLUGIN_START";
+        const STREAM_XF_PLUGIN_END: &str = "\n// --- X07_STREAM_XF_PLUGIN_END";
+
+        let uses_stream_xf_plugin =
+            program_uses_head(self.program, "__internal.bytes.alloc_aligned_v1")
+                || program_uses_head(self.program, "__internal.stream_xf.plugin_init_v1")
+                || program_uses_head(self.program, "__internal.stream_xf.plugin_step_v1")
+                || program_uses_head(self.program, "__internal.stream_xf.plugin_flush_v1");
+
+        let uses_json_jcs = program_uses_head(self.program, "json.jcs.canon_doc_v1")
+            || program_uses_stream_xf_plugin_json_jcs(self.program);
 
         if self.options.enable_fs || self.options.enable_rr || self.options.enable_kv {
             let mut preamble = RUNTIME_C_PREAMBLE.to_string();
@@ -2570,6 +2641,14 @@ impl<'a> Emitter<'a> {
             if !uses_json_jcs {
                 preamble =
                     trim_preamble_section(&preamble, JSON_JCS_START, JSON_JCS_END, "json.jcs")?;
+            }
+            if !uses_stream_xf_plugin {
+                preamble = trim_preamble_section(
+                    &preamble,
+                    STREAM_XF_PLUGIN_START,
+                    STREAM_XF_PLUGIN_END,
+                    "stream_xf_plugin",
+                )?;
             }
 
             self.push_str(&preamble);
@@ -2582,6 +2661,14 @@ impl<'a> Emitter<'a> {
         let mut preamble = RUNTIME_C_PREAMBLE.to_string();
         if !uses_json_jcs {
             preamble = trim_preamble_section(&preamble, JSON_JCS_START, JSON_JCS_END, "json.jcs")?;
+        }
+        if !uses_stream_xf_plugin {
+            preamble = trim_preamble_section(
+                &preamble,
+                STREAM_XF_PLUGIN_START,
+                STREAM_XF_PLUGIN_END,
+                "stream_xf_plugin",
+            )?;
         }
 
         let (head, rest) = preamble.split_once(FIXTURE_START).ok_or_else(|| {
@@ -2766,6 +2853,7 @@ impl<'a> Emitter<'a> {
             extern_functions: BTreeMap<String, ExternFunctionDecl>,
             fn_c_names: BTreeMap<String, String>,
             async_fn_new_names: BTreeMap<String, String>,
+            native_requires: BTreeMap<String, NativeReqAcc>,
             fields: Vec<(String, Ty)>,
             tmp_counter: u32,
             local_count: usize,
@@ -2827,6 +2915,113 @@ impl<'a> Emitter<'a> {
                     }
                 }
                 None
+            }
+
+            fn require_native_backend(
+                &mut self,
+                backend_id: &str,
+                abi_major: u32,
+                feature: &str,
+            ) -> Result<(), CompilerError> {
+                let mismatch = {
+                    let entry = self
+                        .native_requires
+                        .entry(backend_id.to_string())
+                        .or_insert_with(|| NativeReqAcc {
+                            abi_major,
+                            features: BTreeSet::new(),
+                        });
+
+                    if entry.abi_major != abi_major {
+                        Some(entry.abi_major)
+                    } else {
+                        entry.features.insert(feature.to_string());
+                        None
+                    }
+                };
+
+                if let Some(expected) = mismatch {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Internal,
+                        format!(
+                            "native backend ABI mismatch for {backend_id}: got {abi_major} expected {expected}"
+                        ),
+                    ));
+                }
+                Ok(())
+            }
+
+            fn parse_bytes_lit_text_arg(
+                &self,
+                head: &str,
+                arg: &Expr,
+            ) -> Result<String, CompilerError> {
+                let Expr::List { items, .. } = arg else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects bytes.lit"),
+                    ));
+                };
+                if items.first().and_then(Expr::as_ident) != Some("bytes.lit") || items.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects bytes.lit"),
+                    ));
+                }
+                let Some(text) = items[1].as_ident() else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects bytes.lit"),
+                    ));
+                };
+                Ok(text.to_string())
+            }
+
+            fn parse_i32_lit_arg(&self, head: &str, arg: &Expr) -> Result<i32, CompilerError> {
+                let Expr::Int { value, .. } = arg else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects integer literal"),
+                    ));
+                };
+                Ok(*value)
+            }
+
+            fn lookup_borrowed_bytes_ident_arg(
+                &self,
+                head: &str,
+                arg: &Expr,
+            ) -> Result<AsyncVarRef, CompilerError> {
+                let Some(name) = arg.as_ident() else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects bytes identifier"),
+                    ));
+                };
+                let Some(var) = self.lookup(name) else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("unknown identifier: {name:?}"),
+                    ));
+                };
+                if var.moved {
+                    let moved_ptr = var
+                        .moved_ptr
+                        .as_deref()
+                        .filter(|p| !p.is_empty())
+                        .unwrap_or("<unknown>");
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                    ));
+                }
+                if var.ty != Ty::Bytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects bytes identifier"),
+                    ));
+                }
+                Ok(var)
             }
 
             fn alloc_local(&mut self, prefix: &str, ty: Ty) -> Result<AsyncVarRef, CompilerError> {
@@ -3166,6 +3361,188 @@ impl<'a> Emitter<'a> {
                     }
                 }
 
+                if head == "result_bytes.is_ok" {
+                    if args.len() != 1 || dest.ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "result_bytes.is_ok expects (result_bytes) and returns i32".to_string(),
+                        ));
+                    }
+                    if let Expr::Ident { name, ptr: use_ptr } = &args[0] {
+                        self.line(state, "rt_fuel(ctx, 1);");
+                        let Some(v) = self.lookup(name) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {name:?}"),
+                            ));
+                        };
+                        if v.moved {
+                            let moved_ptr = v
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                ),
+                            ));
+                        }
+                        if v.ty != Ty::ResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes.is_ok expects result_bytes".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("{} = ({}.tag == UINT32_C(1));", dest.c_name, v.c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                }
+
+                if head == "result_bytes.err_code" {
+                    if args.len() != 1 || dest.ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "result_bytes.err_code expects (result_bytes) and returns i32"
+                                .to_string(),
+                        ));
+                    }
+                    if let Expr::Ident { name, ptr: use_ptr } = &args[0] {
+                        self.line(state, "rt_fuel(ctx, 1);");
+                        let Some(v) = self.lookup(name) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {name:?}"),
+                            ));
+                        };
+                        if v.moved {
+                            let moved_ptr = v
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                ),
+                            ));
+                        }
+                        if v.ty != Ty::ResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes.err_code expects result_bytes".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = ({}.tag == UINT32_C(0)) ? {}.payload.err : UINT32_C(0);",
+                                dest.c_name, v.c_name, v.c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                }
+
+                if head == "result_result_bytes.is_ok" {
+                    if args.len() != 1 || dest.ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "result_result_bytes.is_ok expects (result_result_bytes) and returns i32"
+                                .to_string(),
+                        ));
+                    }
+                    if let Expr::Ident { name, ptr: use_ptr } = &args[0] {
+                        self.line(state, "rt_fuel(ctx, 1);");
+                        let Some(v) = self.lookup(name) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {name:?}"),
+                            ));
+                        };
+                        if v.moved {
+                            let moved_ptr = v
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                ),
+                            ));
+                        }
+                        if v.ty != Ty::ResultResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_result_bytes.is_ok expects result_result_bytes".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("{} = ({}.tag == UINT32_C(1));", dest.c_name, v.c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                }
+
+                if head == "result_result_bytes.err_code" {
+                    if args.len() != 1 || dest.ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "result_result_bytes.err_code expects (result_result_bytes) and returns i32"
+                                .to_string(),
+                        ));
+                    }
+                    if let Expr::Ident { name, ptr: use_ptr } = &args[0] {
+                        self.line(state, "rt_fuel(ctx, 1);");
+                        let Some(v) = self.lookup(name) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unknown identifier: {name:?}"),
+                            ));
+                        };
+                        if v.moved {
+                            let moved_ptr = v
+                                .moved_ptr
+                                .as_deref()
+                                .filter(|p| !p.is_empty())
+                                .unwrap_or("<unknown>");
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!(
+                                    "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                ),
+                            ));
+                        }
+                        if v.ty != Ty::ResultResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_result_bytes.err_code expects result_result_bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = ({}.tag == UINT32_C(0)) ? {}.payload.err : UINT32_C(0);",
+                                dest.c_name, v.c_name, v.c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                }
+
                 if head == "bytes.view" {
                     if args.len() != 1 || dest.ty != Ty::BytesView {
                         return Err(CompilerError::new(
@@ -3367,6 +3744,321 @@ impl<'a> Emitter<'a> {
                             lit_bytes.len()
                         ),
                     );
+                    self.line(state, format!("goto st_{cont};"));
+                    return Ok(());
+                }
+
+                if head == "__internal.stream_xf.plugin_init_v1" {
+                    if args.len() != 12 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Parse,
+                            "__internal.stream_xf.plugin_init_v1 expects 12 args".to_string(),
+                        ));
+                    }
+                    if dest.ty != Ty::ResultBytes {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_init_v1 returns result_bytes".to_string(),
+                        ));
+                    }
+
+                    let backend_id = self.parse_bytes_lit_text_arg(
+                        "__internal.stream_xf.plugin_init_v1 backend_id",
+                        &args[0],
+                    )?;
+                    crate::validate::validate_symbol(&backend_id)
+                        .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+                    let abi_major_i32 = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_init_v1 abi_major",
+                        &args[1],
+                    )?;
+                    let abi_major = u32::try_from(abi_major_i32).unwrap_or(0);
+                    if abi_major == 0 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_init_v1 abi_major must be >= 1"
+                                .to_string(),
+                        ));
+                    }
+
+                    let export_symbol = self.parse_bytes_lit_text_arg(
+                        "__internal.stream_xf.plugin_init_v1 export_symbol",
+                        &args[2],
+                    )?;
+                    crate::validate::validate_local_name(&export_symbol)
+                        .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+                    self.require_native_backend(&backend_id, abi_major, &export_symbol)?;
+
+                    let state_b = self.lookup_borrowed_bytes_ident_arg(
+                        "__internal.stream_xf.plugin_init_v1 state",
+                        &args[3],
+                    )?;
+                    let scratch_b = self.lookup_borrowed_bytes_ident_arg(
+                        "__internal.stream_xf.plugin_init_v1 scratch",
+                        &args[4],
+                    )?;
+                    let cfg_b = self.lookup_borrowed_bytes_ident_arg(
+                        "__internal.stream_xf.plugin_init_v1 cfg",
+                        &args[5],
+                    )?;
+
+                    let cfg_max_bytes = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_init_v1 cfg_max_bytes",
+                        &args[6],
+                    )?;
+                    if cfg_max_bytes < 0 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_init_v1 cfg_max_bytes must be >= 0"
+                                .to_string(),
+                        ));
+                    }
+
+                    let canon_mode = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_init_v1 canon_mode",
+                        &args[7],
+                    )?;
+                    if canon_mode != 0 && canon_mode != 1 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_init_v1 canon_mode must be 0 or 1"
+                                .to_string(),
+                        ));
+                    }
+
+                    let strict_cfg_canon = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_init_v1 strict_cfg_canon",
+                        &args[8],
+                    )?;
+                    if strict_cfg_canon != 0 && strict_cfg_canon != 1 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_init_v1 strict_cfg_canon must be 0 or 1"
+                                .to_string(),
+                        ));
+                    }
+
+                    let max_out_bytes_per_step = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_init_v1 max_out_bytes_per_step",
+                        &args[9],
+                    )?;
+                    let max_out_items_per_step = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_init_v1 max_out_items_per_step",
+                        &args[10],
+                    )?;
+                    let max_out_buf_bytes = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_init_v1 max_out_buf_bytes",
+                        &args[11],
+                    )?;
+                    if max_out_bytes_per_step < 0
+                        || max_out_items_per_step < 0
+                        || max_out_buf_bytes < 0
+                    {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_init_v1 limits must be >= 0".to_string(),
+                        ));
+                    }
+
+                    self.line(state, "rt_fuel(ctx, 1);");
+                    self.line(
+                        state,
+                        format!("extern x07_stream_xf_plugin_v1 {export_symbol};"),
+                    );
+                    self.line(state, format!(
+                        "{} = rt_stream_xf_plugin_init_v1(ctx, &{export_symbol}, UINT32_C({abi_major}), {}, {}, {}, (uint32_t){cfg_max_bytes}, (uint32_t){canon_mode}, (uint32_t){strict_cfg_canon}, (uint32_t){max_out_bytes_per_step}, (uint32_t){max_out_items_per_step}, (uint32_t){max_out_buf_bytes});",
+                        dest.c_name,
+                        state_b.c_name,
+                        scratch_b.c_name,
+                        cfg_b.c_name,
+                    ));
+                    self.line(state, format!("goto st_{cont};"));
+                    return Ok(());
+                }
+
+                if head == "__internal.stream_xf.plugin_step_v1" {
+                    if args.len() != 9 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Parse,
+                            "__internal.stream_xf.plugin_step_v1 expects 9 args".to_string(),
+                        ));
+                    }
+                    if dest.ty != Ty::ResultBytes {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_step_v1 returns result_bytes".to_string(),
+                        ));
+                    }
+
+                    let backend_id = self.parse_bytes_lit_text_arg(
+                        "__internal.stream_xf.plugin_step_v1 backend_id",
+                        &args[0],
+                    )?;
+                    crate::validate::validate_symbol(&backend_id)
+                        .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+                    let abi_major_i32 = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_step_v1 abi_major",
+                        &args[1],
+                    )?;
+                    let abi_major = u32::try_from(abi_major_i32).unwrap_or(0);
+                    if abi_major == 0 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_step_v1 abi_major must be >= 1"
+                                .to_string(),
+                        ));
+                    }
+
+                    let export_symbol = self.parse_bytes_lit_text_arg(
+                        "__internal.stream_xf.plugin_step_v1 export_symbol",
+                        &args[2],
+                    )?;
+                    crate::validate::validate_local_name(&export_symbol)
+                        .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+                    self.require_native_backend(&backend_id, abi_major, &export_symbol)?;
+
+                    let state_b = self.lookup_borrowed_bytes_ident_arg(
+                        "__internal.stream_xf.plugin_step_v1 state",
+                        &args[3],
+                    )?;
+                    let scratch_b = self.lookup_borrowed_bytes_ident_arg(
+                        "__internal.stream_xf.plugin_step_v1 scratch",
+                        &args[4],
+                    )?;
+
+                    let max_out_bytes_per_step = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_step_v1 max_out_bytes_per_step",
+                        &args[5],
+                    )?;
+                    let max_out_items_per_step = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_step_v1 max_out_items_per_step",
+                        &args[6],
+                    )?;
+                    let max_out_buf_bytes = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_step_v1 max_out_buf_bytes",
+                        &args[7],
+                    )?;
+                    if max_out_bytes_per_step < 0
+                        || max_out_items_per_step < 0
+                        || max_out_buf_bytes < 0
+                    {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_step_v1 limits must be >= 0".to_string(),
+                        ));
+                    }
+
+                    let input_tmp = self.alloc_local("t_xf_in_", Ty::BytesView)?;
+                    let expr_state = self.new_state();
+                    let after = self.new_state();
+                    self.line(state, format!("goto st_{expr_state};"));
+                    self.emit_expr_entry(expr_state, &args[8], input_tmp.clone(), after)?;
+
+                    self.line(after, "rt_fuel(ctx, 1);");
+                    self.line(
+                        after,
+                        format!("extern x07_stream_xf_plugin_v1 {export_symbol};"),
+                    );
+                    self.line(after, format!(
+                        "{} = rt_stream_xf_plugin_step_v1(ctx, &{export_symbol}, UINT32_C({abi_major}), {}, {}, (uint32_t){max_out_bytes_per_step}, (uint32_t){max_out_items_per_step}, (uint32_t){max_out_buf_bytes}, {});",
+                        dest.c_name,
+                        state_b.c_name,
+                        scratch_b.c_name,
+                        input_tmp.c_name,
+                    ));
+                    self.line(after, format!("goto st_{cont};"));
+                    return Ok(());
+                }
+
+                if head == "__internal.stream_xf.plugin_flush_v1" {
+                    if args.len() != 8 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Parse,
+                            "__internal.stream_xf.plugin_flush_v1 expects 8 args".to_string(),
+                        ));
+                    }
+                    if dest.ty != Ty::ResultBytes {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_flush_v1 returns result_bytes".to_string(),
+                        ));
+                    }
+
+                    let backend_id = self.parse_bytes_lit_text_arg(
+                        "__internal.stream_xf.plugin_flush_v1 backend_id",
+                        &args[0],
+                    )?;
+                    crate::validate::validate_symbol(&backend_id)
+                        .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+                    let abi_major_i32 = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_flush_v1 abi_major",
+                        &args[1],
+                    )?;
+                    let abi_major = u32::try_from(abi_major_i32).unwrap_or(0);
+                    if abi_major == 0 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_flush_v1 abi_major must be >= 1"
+                                .to_string(),
+                        ));
+                    }
+
+                    let export_symbol = self.parse_bytes_lit_text_arg(
+                        "__internal.stream_xf.plugin_flush_v1 export_symbol",
+                        &args[2],
+                    )?;
+                    crate::validate::validate_local_name(&export_symbol)
+                        .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+                    self.require_native_backend(&backend_id, abi_major, &export_symbol)?;
+
+                    let state_b = self.lookup_borrowed_bytes_ident_arg(
+                        "__internal.stream_xf.plugin_flush_v1 state",
+                        &args[3],
+                    )?;
+                    let scratch_b = self.lookup_borrowed_bytes_ident_arg(
+                        "__internal.stream_xf.plugin_flush_v1 scratch",
+                        &args[4],
+                    )?;
+
+                    let max_out_bytes_per_step = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_flush_v1 max_out_bytes_per_step",
+                        &args[5],
+                    )?;
+                    let max_out_items_per_step = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_flush_v1 max_out_items_per_step",
+                        &args[6],
+                    )?;
+                    let max_out_buf_bytes = self.parse_i32_lit_arg(
+                        "__internal.stream_xf.plugin_flush_v1 max_out_buf_bytes",
+                        &args[7],
+                    )?;
+                    if max_out_bytes_per_step < 0
+                        || max_out_items_per_step < 0
+                        || max_out_buf_bytes < 0
+                    {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "__internal.stream_xf.plugin_flush_v1 limits must be >= 0".to_string(),
+                        ));
+                    }
+
+                    self.line(state, "rt_fuel(ctx, 1);");
+                    self.line(
+                        state,
+                        format!("extern x07_stream_xf_plugin_v1 {export_symbol};"),
+                    );
+                    self.line(state, format!(
+                        "{} = rt_stream_xf_plugin_flush_v1(ctx, &{export_symbol}, UINT32_C({abi_major}), {}, {}, (uint32_t){max_out_bytes_per_step}, (uint32_t){max_out_items_per_step}, (uint32_t){max_out_buf_bytes});",
+                        dest.c_name,
+                        state_b.c_name,
+                        scratch_b.c_name,
+                    ));
                     self.line(state, format!("goto st_{cont};"));
                     return Ok(());
                 }
@@ -3828,6 +4520,11 @@ impl<'a> Emitter<'a> {
                     "math.f64.add_v1" | "math.f64.sub_v1" | "math.f64.mul_v1"
                     | "math.f64.div_v1" | "math.f64.pow_v1" | "math.f64.atan2_v1"
                     | "math.f64.min_v1" | "math.f64.max_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_MATH,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if args.len() != 2
                             || dest.ty != Ty::Bytes
                             || (args[0].ty != Ty::Bytes && args[0].ty != Ty::BytesView)
@@ -3881,6 +4578,11 @@ impl<'a> Emitter<'a> {
                     | "math.f64.ceil_v1"
                     | "math.f64.fmt_shortest_v1"
                     | "math.f64.to_bits_u64le_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_MATH,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if args.len() != 1
                             || dest.ty != Ty::Bytes
                             || (args[0].ty != Ty::Bytes && args[0].ty != Ty::BytesView)
@@ -3918,6 +4620,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "math.f64.from_i32_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_MATH,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if args.len() != 1 || dest.ty != Ty::Bytes || args[0].ty != Ty::I32 {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
@@ -3935,6 +4642,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "math.f64.to_i32_trunc_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_MATH,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if args.len() != 1
                             || dest.ty != Ty::ResultI32
                             || (args[0].ty != Ty::Bytes && args[0].ty != Ty::BytesView)
@@ -3960,6 +4672,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "math.f64.parse_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_MATH,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if args.len() != 1
                             || dest.ty != Ty::ResultBytes
                             || (args[0].ty != Ty::Bytes && args[0].ty != Ty::BytesView)
@@ -3994,6 +4711,27 @@ impl<'a> Emitter<'a> {
                         self.line(
                             state,
                             format!("{} = rt_bytes_alloc(ctx, {});", dest.c_name, args[0].c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "__internal.bytes.alloc_aligned_v1" => {
+                        if args.len() != 2
+                            || dest.ty != Ty::Bytes
+                            || args[0].ty != Ty::I32
+                            || args[1].ty != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.bytes.alloc_aligned_v1 expects (i32 len, i32 align) and returns bytes".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_bytes_alloc_aligned(ctx, (uint32_t){}, (uint32_t){});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
                         );
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
@@ -5195,6 +5933,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.read_all_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5222,6 +5965,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.write_all_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5251,6 +5999,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.stream_open_write_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5279,6 +6032,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.stream_write_all_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5307,6 +6065,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.stream_close_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5330,6 +6093,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.stream_drop_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5353,6 +6121,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.mkdirs_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5380,6 +6153,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.remove_file_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5407,6 +6185,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.remove_dir_all_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5435,6 +6218,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.rename_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5464,6 +6252,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.list_dir_sorted_text_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5492,6 +6285,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.walk_glob_sorted_text_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5521,6 +6319,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.fs.stat_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_FS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5548,6 +6351,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.sqlite.open_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_SQLITE,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5575,6 +6383,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.sqlite.query_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_SQLITE,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5602,6 +6415,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.sqlite.exec_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_SQLITE,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5629,6 +6447,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.sqlite.close_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_SQLITE,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5656,6 +6479,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.pg.open_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_PG,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5683,6 +6511,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.pg.query_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_PG,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5710,6 +6543,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.pg.exec_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_PG,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5737,6 +6575,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.pg.close_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_PG,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5764,6 +6607,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.mysql.open_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_MYSQL,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5791,6 +6639,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.mysql.query_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_MYSQL,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5818,6 +6671,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.mysql.exec_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_MYSQL,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5845,6 +6703,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.mysql.close_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_MYSQL,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5872,6 +6735,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.redis.open_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_REDIS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5899,6 +6767,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.redis.cmd_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_REDIS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -5926,6 +6799,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.db.redis.close_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_DB_REDIS,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Unsupported,
@@ -6058,6 +6936,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.time.tzdb_is_valid_tzid_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_TIME,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::BytesView {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
@@ -6075,6 +6958,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.time.tzdb_offset_duration_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_TIME,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if args.len() != 3
                             || dest.ty != Ty::Bytes
                             || args[0].ty != Ty::BytesView
@@ -6097,6 +6985,11 @@ impl<'a> Emitter<'a> {
                         return Ok(());
                     }
                     "os.time.tzdb_snapshot_id_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_TIME,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
                         if !args.is_empty() || dest.ty != Ty::Bytes {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
@@ -7764,6 +8657,196 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
+                    "result_bytes.ok" => {
+                        if args.len() != 1 || dest.ty != Ty::ResultBytes || args[0].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes.ok expects (bytes)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = (result_bytes_t){{ .tag = UINT32_C(1), .payload.ok = {} }};",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("{} = rt_bytes_empty(ctx);", args[0].c_name));
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "result_bytes.err" => {
+                        if args.len() != 1 || dest.ty != Ty::ResultBytes || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes.err expects (i32)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {} }};",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "result_bytes.is_ok" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::ResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes.is_ok expects (result_bytes)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("{} = ({}.tag == UINT32_C(1));", dest.c_name, args[0].c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "result_bytes.err_code" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::ResultBytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes.err_code expects (result_bytes)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = ({}.tag == UINT32_C(0)) ? {}.payload.err : UINT32_C(0);",
+                                dest.c_name, args[0].c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "result_bytes.unwrap_or" => {
+                        if args.len() != 2
+                            || dest.ty != Ty::Bytes
+                            || args[0].ty != Ty::ResultBytes
+                            || args[1].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_bytes.unwrap_or expects (result_bytes, bytes default)"
+                                    .to_string(),
+                            ));
+                        }
+                        let res = &args[0];
+                        let default = &args[1];
+                        self.line(state, format!("if ({}.tag == UINT32_C(1)) {{", res.c_name));
+                        self.line(
+                            state,
+                            format!("  {} = {}.payload.ok;", dest.c_name, res.c_name),
+                        );
+                        self.line(
+                            state,
+                            format!("  {}.payload.ok = rt_bytes_empty(ctx);", res.c_name),
+                        );
+                        self.line(state, format!("  {}.tag = UINT32_C(0);", res.c_name));
+                        self.line(state, "} else {");
+                        if dest.c_name != default.c_name {
+                            self.line(state, format!("  {} = {};", dest.c_name, default.c_name));
+                            self.line(
+                                state,
+                                format!("  {} = rt_bytes_empty(ctx);", default.c_name),
+                            );
+                        }
+                        self.line(state, "}");
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "result_result_bytes.is_ok" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::ResultResultBytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_result_bytes.is_ok expects (result_result_bytes)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("{} = ({}.tag == UINT32_C(1));", dest.c_name, args[0].c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "result_result_bytes.err_code" => {
+                        if args.len() != 1
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::ResultResultBytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_result_bytes.err_code expects (result_result_bytes)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = ({}.tag == UINT32_C(0)) ? {}.payload.err : UINT32_C(0);",
+                                dest.c_name, args[0].c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "result_result_bytes.unwrap_or" => {
+                        if args.len() != 2
+                            || dest.ty != Ty::ResultBytes
+                            || args[0].ty != Ty::ResultResultBytes
+                            || args[1].ty != Ty::ResultBytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "result_result_bytes.unwrap_or expects (result_result_bytes, result_bytes default)"
+                                    .to_string(),
+                            ));
+                        }
+                        let res = &args[0];
+                        let default = &args[1];
+                        self.line(state, format!("if ({}.tag == UINT32_C(1)) {{", res.c_name));
+                        self.line(
+                            state,
+                            format!("  {} = {}.payload.ok;", dest.c_name, res.c_name),
+                        );
+                        self.line(
+                            state,
+                            format!(
+                                "  {}.payload.ok = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = UINT32_C(0) }};",
+                                res.c_name
+                            ),
+                        );
+                        self.line(state, format!("  {}.tag = UINT32_C(0);", res.c_name));
+                        self.line(
+                            state,
+                            format!("  {}.payload.err = UINT32_C(0);", res.c_name),
+                        );
+                        self.line(state, "} else {");
+                        if dest.c_name != default.c_name {
+                            self.line(state, format!("  {} = {};", dest.c_name, default.c_name));
+                            self.line(
+                                state,
+                                format!("  {}.payload.ok = rt_bytes_empty(ctx);", default.c_name),
+                            );
+                            self.line(state, format!("  {}.tag = UINT32_C(0);", default.c_name));
+                            self.line(
+                                state,
+                                format!("  {}.payload.err = UINT32_C(0);", default.c_name),
+                            );
+                        }
+                        self.line(state, "}");
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
                     _ if self.extern_functions.contains_key(head) => {
                         let f = self.extern_functions.get(head).cloned().ok_or_else(|| {
                             CompilerError::new(
@@ -8128,15 +9211,89 @@ impl<'a> Emitter<'a> {
                     ),
                 );
 
+                let then_ty = self.infer_expr(&args[1])?;
+                let else_ty = self.infer_expr(&args[2])?;
+                let scopes_before = self.scopes.clone();
+
+                self.scopes = scopes_before.clone();
                 self.push_scope();
                 self.emit_expr_entry(then_state, &args[1], dest.clone(), cont)?;
                 self.pop_scope();
+                let scopes_then = self.scopes.clone();
 
+                self.scopes = scopes_before.clone();
                 self.push_scope();
                 self.emit_expr_entry(else_state, &args[2], dest, cont)?;
                 self.pop_scope();
+                let scopes_else = self.scopes.clone();
+
+                self.scopes = if then_ty.ty == Ty::Never && else_ty.ty == Ty::Never {
+                    scopes_before
+                } else if then_ty.ty == Ty::Never {
+                    scopes_else
+                } else if else_ty.ty == Ty::Never {
+                    scopes_then
+                } else {
+                    self.merge_if_states(&scopes_before, &scopes_then, &scopes_else)?
+                };
 
                 Ok(())
+            }
+
+            fn merge_if_states(
+                &self,
+                before: &[BTreeMap<String, AsyncVarRef>],
+                then_state: &[BTreeMap<String, AsyncVarRef>],
+                else_state: &[BTreeMap<String, AsyncVarRef>],
+            ) -> Result<Vec<BTreeMap<String, AsyncVarRef>>, CompilerError> {
+                if before.len() != then_state.len() || before.len() != else_state.len() {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Internal,
+                        "internal error: if scope depth mismatch".to_string(),
+                    ));
+                }
+
+                let mut merged_scopes = Vec::with_capacity(before.len());
+                for (i, before_scope) in before.iter().enumerate() {
+                    let then_scope = &then_state[i];
+                    let else_scope = &else_state[i];
+                    let mut merged = BTreeMap::new();
+                    for (name, pre) in before_scope {
+                        let Some(t) = then_scope.get(name) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Internal,
+                                "internal error: missing var in then branch".to_string(),
+                            ));
+                        };
+                        let Some(e) = else_scope.get(name) else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Internal,
+                                "internal error: missing var in else branch".to_string(),
+                            ));
+                        };
+                        if pre.ty != t.ty
+                            || pre.ty != e.ty
+                            || pre.c_name != t.c_name
+                            || pre.c_name != e.c_name
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Internal,
+                                "internal error: if branch var mismatch".to_string(),
+                            ));
+                        }
+
+                        let mut v = pre.clone();
+                        v.moved = t.moved || e.moved;
+                        v.moved_ptr = if v.moved {
+                            t.moved_ptr.clone().or_else(|| e.moved_ptr.clone())
+                        } else {
+                            None
+                        };
+                        merged.insert(name.clone(), v);
+                    }
+                    merged_scopes.push(merged);
+                }
+                Ok(merged_scopes)
             }
 
             fn emit_for(
@@ -9179,6 +10336,7 @@ impl<'a> Emitter<'a> {
             extern_functions: self.extern_functions.clone(),
             fn_c_names: self.fn_c_names.clone(),
             async_fn_new_names: self.async_fn_new_names.clone(),
+            native_requires: BTreeMap::new(),
             fields,
             tmp_counter: 0,
             local_count: 0,
@@ -9221,6 +10379,12 @@ impl<'a> Emitter<'a> {
             },
             ret_state,
         )?;
+
+        for (backend_id, acc) in machine.native_requires.iter() {
+            for feature in acc.features.iter() {
+                self.require_native_backend(backend_id, acc.abi_major, feature)?;
+            }
+        }
 
         match f.ret_ty {
             Ty::Bytes => {
@@ -10327,6 +11491,18 @@ impl<'a> Emitter<'a> {
             }
             "__internal.result_bytes.unwrap_ok_v1" => {
                 self.emit_internal_result_bytes_unwrap_ok_v1_to(args, dest_ty, dest)
+            }
+            "__internal.bytes.alloc_aligned_v1" => {
+                self.emit_internal_bytes_alloc_aligned_v1_to(args, dest_ty, dest)
+            }
+            "__internal.stream_xf.plugin_init_v1" => {
+                self.emit_internal_stream_xf_plugin_init_v1_to(args, dest_ty, dest)
+            }
+            "__internal.stream_xf.plugin_step_v1" => {
+                self.emit_internal_stream_xf_plugin_step_v1_to(args, dest_ty, dest)
+            }
+            "__internal.stream_xf.plugin_flush_v1" => {
+                self.emit_internal_stream_xf_plugin_flush_v1_to(args, dest_ty, dest)
             }
 
             "vec_u8.as_ptr" => self.emit_vec_u8_as_ptr_to(args, dest_ty, dest),
@@ -12737,6 +13913,362 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         self.line(&format!("{dest} = rt_bytes_empty(ctx);"));
         self.indent -= 1;
         self.line("}");
+        Ok(())
+    }
+
+    fn emit_internal_bytes_alloc_aligned_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.bytes.alloc_aligned_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.bytes.alloc_aligned_v1 returns bytes".to_string(),
+            ));
+        }
+        let len = self.emit_expr(&args[0])?;
+        let align = self.emit_expr(&args[1])?;
+        if len.ty != Ty::I32 || align.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.bytes.alloc_aligned_v1 expects (i32 len, i32 align)".to_string(),
+            ));
+        }
+
+        self.line(&format!(
+            "{dest} = rt_bytes_alloc_aligned(ctx, (uint32_t){}, (uint32_t){});",
+            len.c_name, align.c_name
+        ));
+        Ok(())
+    }
+
+    fn parse_bytes_lit_text_arg(&self, head: &str, arg: &Expr) -> Result<String, CompilerError> {
+        let Expr::List { items, .. } = arg else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects bytes.lit"),
+            ));
+        };
+        if items.first().and_then(Expr::as_ident) != Some("bytes.lit") || items.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects bytes.lit"),
+            ));
+        }
+        let Some(text) = items[1].as_ident() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects bytes.lit"),
+            ));
+        };
+        Ok(text.to_string())
+    }
+
+    fn parse_i32_lit_arg(&self, head: &str, arg: &Expr) -> Result<i32, CompilerError> {
+        let Expr::Int { value, .. } = arg else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects integer literal"),
+            ));
+        };
+        Ok(*value)
+    }
+
+    fn lookup_borrowed_bytes_ident_arg(
+        &self,
+        head: &str,
+        arg: &Expr,
+    ) -> Result<VarRef, CompilerError> {
+        let Some(name) = arg.as_ident() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects bytes identifier"),
+            ));
+        };
+        let Some(var) = self.lookup(name).cloned() else {
+            return Err(self.err(
+                CompileErrorKind::Typing,
+                format!("unknown identifier: {name:?}"),
+            ));
+        };
+        if var.moved {
+            let moved_ptr = var
+                .moved_ptr
+                .as_deref()
+                .filter(|p| !p.is_empty())
+                .unwrap_or("<unknown>");
+            return Err(self.err(
+                CompileErrorKind::Typing,
+                format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+            ));
+        }
+        if var.ty != Ty::Bytes {
+            return Err(self.err(
+                CompileErrorKind::Typing,
+                format!("{head} expects bytes identifier"),
+            ));
+        }
+        Ok(var)
+    }
+
+    fn emit_internal_stream_xf_plugin_init_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 12 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.stream_xf.plugin_init_v1 expects 12 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.stream_xf.plugin_init_v1 returns result_bytes".to_string(),
+            ));
+        }
+
+        let backend_id = self
+            .parse_bytes_lit_text_arg("__internal.stream_xf.plugin_init_v1 backend_id", &args[0])?;
+        crate::validate::validate_symbol(&backend_id)
+            .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+        let abi_major_i32 =
+            self.parse_i32_lit_arg("__internal.stream_xf.plugin_init_v1 abi_major", &args[1])?;
+        let abi_major = u32::try_from(abi_major_i32).unwrap_or(0);
+        if abi_major == 0 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.stream_xf.plugin_init_v1 abi_major must be >= 1".to_string(),
+            ));
+        }
+        let export_symbol = self.parse_bytes_lit_text_arg(
+            "__internal.stream_xf.plugin_init_v1 export_symbol",
+            &args[2],
+        )?;
+        crate::validate::validate_local_name(&export_symbol)
+            .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+        self.require_native_backend(&backend_id, abi_major, &export_symbol)?;
+        let needs_json_jcs = export_symbol == "x07_xf_json_canon_stream_v1"
+            || matches!(
+                (&args[7], &args[8]),
+                (Expr::Int { value: 1, .. }, Expr::Int { value: 1, .. })
+            );
+        if needs_json_jcs {
+            self.require_native_backend(
+                native::BACKEND_ID_MATH,
+                native::ABI_MAJOR_V1,
+                "json.jcs.canon_doc_v1",
+            )?;
+        }
+
+        let state_b = self.lookup_borrowed_bytes_ident_arg(
+            "__internal.stream_xf.plugin_init_v1 state",
+            &args[3],
+        )?;
+        let scratch_b = self.lookup_borrowed_bytes_ident_arg(
+            "__internal.stream_xf.plugin_init_v1 scratch",
+            &args[4],
+        )?;
+        let cfg_b = self
+            .lookup_borrowed_bytes_ident_arg("__internal.stream_xf.plugin_init_v1 cfg", &args[5])?;
+        let cfg_max_bytes = self.emit_expr(&args[6])?;
+        let canon_mode = self.emit_expr(&args[7])?;
+        let strict_cfg_canon = self.emit_expr(&args[8])?;
+        let max_out_bytes_per_step = self.emit_expr(&args[9])?;
+        let max_out_items_per_step = self.emit_expr(&args[10])?;
+        let max_out_buf_bytes = self.emit_expr(&args[11])?;
+        if cfg_max_bytes.ty != Ty::I32
+            || canon_mode.ty != Ty::I32
+            || strict_cfg_canon.ty != Ty::I32
+            || max_out_bytes_per_step.ty != Ty::I32
+            || max_out_items_per_step.ty != Ty::I32
+            || max_out_buf_bytes.ty != Ty::I32
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.stream_xf.plugin_init_v1 arg types mismatch".to_string(),
+            ));
+        }
+
+        self.line(&format!("extern x07_stream_xf_plugin_v1 {export_symbol};"));
+        self.line(&format!(
+            "{dest} = rt_stream_xf_plugin_init_v1(ctx, &{export_symbol}, UINT32_C({abi_major}), {}, {}, {}, (uint32_t){}, (uint32_t){}, (uint32_t){}, (uint32_t){}, (uint32_t){}, (uint32_t){});",
+            state_b.c_name,
+            scratch_b.c_name,
+            cfg_b.c_name,
+            cfg_max_bytes.c_name,
+            canon_mode.c_name,
+            strict_cfg_canon.c_name,
+            max_out_bytes_per_step.c_name,
+            max_out_items_per_step.c_name,
+            max_out_buf_bytes.c_name,
+        ));
+        Ok(())
+    }
+
+    fn emit_internal_stream_xf_plugin_step_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 9 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.stream_xf.plugin_step_v1 expects 9 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.stream_xf.plugin_step_v1 returns result_bytes".to_string(),
+            ));
+        }
+
+        let backend_id = self
+            .parse_bytes_lit_text_arg("__internal.stream_xf.plugin_step_v1 backend_id", &args[0])?;
+        crate::validate::validate_symbol(&backend_id)
+            .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+        let abi_major_i32 =
+            self.parse_i32_lit_arg("__internal.stream_xf.plugin_step_v1 abi_major", &args[1])?;
+        let abi_major = u32::try_from(abi_major_i32).unwrap_or(0);
+        if abi_major == 0 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.stream_xf.plugin_step_v1 abi_major must be >= 1".to_string(),
+            ));
+        }
+        let export_symbol = self.parse_bytes_lit_text_arg(
+            "__internal.stream_xf.plugin_step_v1 export_symbol",
+            &args[2],
+        )?;
+        crate::validate::validate_local_name(&export_symbol)
+            .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+        self.require_native_backend(&backend_id, abi_major, &export_symbol)?;
+
+        let state_b = self.lookup_borrowed_bytes_ident_arg(
+            "__internal.stream_xf.plugin_step_v1 state",
+            &args[3],
+        )?;
+        let scratch_b = self.lookup_borrowed_bytes_ident_arg(
+            "__internal.stream_xf.plugin_step_v1 scratch",
+            &args[4],
+        )?;
+        let max_out_bytes_per_step = self.emit_expr(&args[5])?;
+        let max_out_items_per_step = self.emit_expr(&args[6])?;
+        let max_out_buf_bytes = self.emit_expr(&args[7])?;
+        let input = self.emit_expr(&args[8])?;
+        if max_out_bytes_per_step.ty != Ty::I32
+            || max_out_items_per_step.ty != Ty::I32
+            || max_out_buf_bytes.ty != Ty::I32
+            || input.ty != Ty::BytesView
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.stream_xf.plugin_step_v1 arg types mismatch".to_string(),
+            ));
+        }
+
+        self.line(&format!("extern x07_stream_xf_plugin_v1 {export_symbol};"));
+        self.line(&format!(
+            "{dest} = rt_stream_xf_plugin_step_v1(ctx, &{export_symbol}, UINT32_C({abi_major}), {}, {}, (uint32_t){}, (uint32_t){}, (uint32_t){}, {});",
+            state_b.c_name,
+            scratch_b.c_name,
+            max_out_bytes_per_step.c_name,
+            max_out_items_per_step.c_name,
+            max_out_buf_bytes.c_name,
+            input.c_name,
+        ));
+
+        self.release_temp_view_borrow(&input)?;
+        Ok(())
+    }
+
+    fn emit_internal_stream_xf_plugin_flush_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 8 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.stream_xf.plugin_flush_v1 expects 8 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.stream_xf.plugin_flush_v1 returns result_bytes".to_string(),
+            ));
+        }
+
+        let backend_id = self.parse_bytes_lit_text_arg(
+            "__internal.stream_xf.plugin_flush_v1 backend_id",
+            &args[0],
+        )?;
+        crate::validate::validate_symbol(&backend_id)
+            .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+        let abi_major_i32 =
+            self.parse_i32_lit_arg("__internal.stream_xf.plugin_flush_v1 abi_major", &args[1])?;
+        let abi_major = u32::try_from(abi_major_i32).unwrap_or(0);
+        if abi_major == 0 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.stream_xf.plugin_flush_v1 abi_major must be >= 1".to_string(),
+            ));
+        }
+        let export_symbol = self.parse_bytes_lit_text_arg(
+            "__internal.stream_xf.plugin_flush_v1 export_symbol",
+            &args[2],
+        )?;
+        crate::validate::validate_local_name(&export_symbol)
+            .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+        self.require_native_backend(&backend_id, abi_major, &export_symbol)?;
+
+        let state_b = self.lookup_borrowed_bytes_ident_arg(
+            "__internal.stream_xf.plugin_flush_v1 state",
+            &args[3],
+        )?;
+        let scratch_b = self.lookup_borrowed_bytes_ident_arg(
+            "__internal.stream_xf.plugin_flush_v1 scratch",
+            &args[4],
+        )?;
+        let max_out_bytes_per_step = self.emit_expr(&args[5])?;
+        let max_out_items_per_step = self.emit_expr(&args[6])?;
+        let max_out_buf_bytes = self.emit_expr(&args[7])?;
+        if max_out_bytes_per_step.ty != Ty::I32
+            || max_out_items_per_step.ty != Ty::I32
+            || max_out_buf_bytes.ty != Ty::I32
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.stream_xf.plugin_flush_v1 arg types mismatch".to_string(),
+            ));
+        }
+
+        self.line(&format!("extern x07_stream_xf_plugin_v1 {export_symbol};"));
+        self.line(&format!(
+            "{dest} = rt_stream_xf_plugin_flush_v1(ctx, &{export_symbol}, UINT32_C({abi_major}), {}, {}, (uint32_t){}, (uint32_t){}, (uint32_t){});",
+            state_b.c_name,
+            scratch_b.c_name,
+            max_out_bytes_per_step.c_name,
+            max_out_items_per_step.c_name,
+            max_out_buf_bytes.c_name,
+        ));
         Ok(())
     }
 
@@ -20160,6 +21692,34 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "result_bytes.is_ok returns i32".to_string(),
             ));
         }
+        if let Expr::Ident { name, .. } = &args[0] {
+            let Some(var) = self.lookup(name).cloned() else {
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("unknown identifier: {name:?}"),
+                ));
+            };
+            if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                ));
+            }
+            if var.ty != Ty::ResultBytes {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "result_bytes.is_ok expects result_bytes".to_string(),
+                ));
+            }
+            self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", var.c_name));
+            return Ok(());
+        }
+
         let res = self.emit_expr(&args[0])?;
         if res.ty != Ty::ResultBytes {
             return Err(CompilerError::new(
@@ -20189,6 +21749,37 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "result_bytes.err_code returns i32".to_string(),
             ));
         }
+        if let Expr::Ident { name, .. } = &args[0] {
+            let Some(var) = self.lookup(name).cloned() else {
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("unknown identifier: {name:?}"),
+                ));
+            };
+            if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                ));
+            }
+            if var.ty != Ty::ResultBytes {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "result_bytes.err_code expects result_bytes".to_string(),
+                ));
+            }
+            self.line(&format!(
+                "{dest} = ({}.tag == UINT32_C(0)) ? {}.payload.err : UINT32_C(0);",
+                var.c_name, var.c_name
+            ));
+            return Ok(());
+        }
+
         let res = self.emit_expr(&args[0])?;
         if res.ty != Ty::ResultBytes {
             return Err(CompilerError::new(
@@ -20430,6 +22021,34 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "result_result_bytes.is_ok returns i32".to_string(),
             ));
         }
+        if let Expr::Ident { name, .. } = &args[0] {
+            let Some(var) = self.lookup(name).cloned() else {
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("unknown identifier: {name:?}"),
+                ));
+            };
+            if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                ));
+            }
+            if var.ty != Ty::ResultResultBytes {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "result_result_bytes.is_ok expects result_result_bytes".to_string(),
+                ));
+            }
+            self.line(&format!("{dest} = ({}.tag == UINT32_C(1));", var.c_name));
+            return Ok(());
+        }
+
         let res = self.emit_expr(&args[0])?;
         if res.ty != Ty::ResultResultBytes {
             return Err(CompilerError::new(
@@ -20459,6 +22078,37 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "result_result_bytes.err_code returns i32".to_string(),
             ));
         }
+        if let Expr::Ident { name, .. } = &args[0] {
+            let Some(var) = self.lookup(name).cloned() else {
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("unknown identifier: {name:?}"),
+                ));
+            };
+            if var.moved {
+                let moved_ptr = var
+                    .moved_ptr
+                    .as_deref()
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or("<unknown>");
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                ));
+            }
+            if var.ty != Ty::ResultResultBytes {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    "result_result_bytes.err_code expects result_result_bytes".to_string(),
+                ));
+            }
+            self.line(&format!(
+                "{dest} = ({}.tag == UINT32_C(0)) ? {}.payload.err : UINT32_C(0);",
+                var.c_name, var.c_name
+            ));
+            return Ok(());
+        }
+
         let res = self.emit_expr(&args[0])?;
         if res.ty != Ty::ResultResultBytes {
             return Err(CompilerError::new(
@@ -26585,6 +28235,96 @@ impl InferCtx {
                             brand: out_brand,
                             view_full: false,
                         })
+                    }
+                    "__internal.bytes.alloc_aligned_v1" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.bytes.alloc_aligned_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 || self.infer(&args[1])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.bytes.alloc_aligned_v1 expects (i32 len, i32 align)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::Bytes.into())
+                    }
+                    "__internal.stream_xf.plugin_init_v1" => {
+                        if args.len() != 12 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.stream_xf.plugin_init_v1 expects 12 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes
+                            || self.infer(&args[1])? != Ty::I32
+                            || self.infer(&args[2])? != Ty::Bytes
+                            || self.infer(&args[3])? != Ty::Bytes
+                            || self.infer(&args[4])? != Ty::Bytes
+                            || self.infer(&args[5])? != Ty::Bytes
+                            || self.infer(&args[6])? != Ty::I32
+                            || self.infer(&args[7])? != Ty::I32
+                            || self.infer(&args[8])? != Ty::I32
+                            || self.infer(&args[9])? != Ty::I32
+                            || self.infer(&args[10])? != Ty::I32
+                            || self.infer(&args[11])? != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.stream_xf.plugin_init_v1 arg types mismatch".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes.into())
+                    }
+                    "__internal.stream_xf.plugin_step_v1" => {
+                        if args.len() != 9 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.stream_xf.plugin_step_v1 expects 9 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes
+                            || self.infer(&args[1])? != Ty::I32
+                            || self.infer(&args[2])? != Ty::Bytes
+                            || self.infer(&args[3])? != Ty::Bytes
+                            || self.infer(&args[4])? != Ty::Bytes
+                            || self.infer(&args[5])? != Ty::I32
+                            || self.infer(&args[6])? != Ty::I32
+                            || self.infer(&args[7])? != Ty::I32
+                            || self.infer(&args[8])? != Ty::BytesView
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.stream_xf.plugin_step_v1 arg types mismatch".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes.into())
+                    }
+                    "__internal.stream_xf.plugin_flush_v1" => {
+                        if args.len() != 8 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.stream_xf.plugin_flush_v1 expects 8 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes
+                            || self.infer(&args[1])? != Ty::I32
+                            || self.infer(&args[2])? != Ty::Bytes
+                            || self.infer(&args[3])? != Ty::Bytes
+                            || self.infer(&args[4])? != Ty::Bytes
+                            || self.infer(&args[5])? != Ty::I32
+                            || self.infer(&args[6])? != Ty::I32
+                            || self.infer(&args[7])? != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.stream_xf.plugin_flush_v1 arg types mismatch".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes.into())
                     }
                     "result_bytes_view.ok" => {
                         if args.len() != 1 {
@@ -32849,6 +34589,10 @@ static bytes_t rt_vec_u8_into_bytes(ctx_t* ctx, vec_u8_t* v) {
   return out;
 }
 
+#ifndef X07_JSON_JCS_ENABLED
+#define X07_JSON_JCS_ENABLED 0
+#endif
+
 // --- X07_JSON_JCS_START
 //
 // JSON Canonicalization Scheme (RFC 8785) runtime canonicalizer.
@@ -32859,6 +34603,9 @@ static bytes_t rt_vec_u8_into_bytes(ctx_t* ctx, vec_u8_t* v) {
 // - ok:  [0]=1, followed by canonical JSON UTF-8 bytes.
 // - err: [0]=0, [1..5)=u32_le code, [5..9)=u32_le byte offset in input.
 //
+#undef X07_JSON_JCS_ENABLED
+#define X07_JSON_JCS_ENABLED 1
+
 #define RT_JSON_JCS_E_JSON_SYNTAX UINT32_C(20)
 #define RT_JSON_JCS_E_JSON_NOT_IJSON UINT32_C(21)
 #define RT_JSON_JCS_E_JSON_TOO_DEEP UINT32_C(22)
@@ -33894,6 +35641,526 @@ static bytes_t rt_json_jcs_canon_doc_v1(
 }
 
 // --- X07_JSON_JCS_END
+
+// --- X07_STREAM_XF_PLUGIN_START
+//
+// Stream transducer plugin runtime wrapper.
+// Used by compiler-internal builtins:
+// - __internal.bytes.alloc_aligned_v1
+// - __internal.stream_xf.plugin_init_v1
+// - __internal.stream_xf.plugin_step_v1
+// - __internal.stream_xf.plugin_flush_v1
+//
+// Output blob format (bytes):
+// - u32_le count
+// - repeated count times:
+//   - u32_le len
+//   - len bytes payload
+//
+// Notes:
+// - Plugin callback return codes are normalized into non-negative stream error codes:
+//   - rc == 0 => ok
+//   - rc < 0 => err_code = -rc
+//   - rc > 0 => err_code = rc
+//
+// - Budget scope violations use RT_ERR_BUDGET_* codes (high bit set); those are handled by
+//   the surrounding `budget.scope_from_arch_v1` wrapper.
+//
+#define RT_XF_ABI_TAG_X7XF UINT32_C(0x46584637) // 'X7XF'
+#define RT_XF_ABI_VERSION_1 UINT32_C(1)
+
+#define RT_XF_E_CFG_TOO_LARGE UINT32_C(110)
+#define RT_XF_E_CFG_NON_CANON UINT32_C(111)
+#define RT_XF_E_OUT_INVALID UINT32_C(112)
+#define RT_XF_E_EMIT_BUF_TOO_LARGE UINT32_C(113)
+#define RT_XF_E_EMIT_STEP_BYTES_EXCEEDED UINT32_C(114)
+#define RT_XF_E_EMIT_STEP_ITEMS_EXCEEDED UINT32_C(115)
+#define RT_XF_E_EMIT_LEN_GT_CAP UINT32_C(116)
+#define RT_XF_E_PLUGIN_INVALID UINT32_C(117)
+
+typedef bytes_t ev_bytes;
+
+typedef struct {
+  const uint8_t* ptr;
+  uint32_t len;
+} x07_bytes_view_v1;
+
+typedef struct {
+  uint8_t* ptr;
+  uint32_t cap;
+  uint32_t len;
+} x07_out_buf_v1;
+
+typedef struct {
+  uint8_t* ptr;
+  uint32_t cap;
+  uint32_t used;
+} x07_scratch_v1;
+
+typedef struct {
+  uint32_t max_out_bytes_per_step;
+  uint32_t max_out_items_per_step;
+  uint32_t max_out_buf_bytes;
+  uint32_t max_state_bytes;
+  uint32_t max_cfg_bytes;
+  uint32_t max_scratch_bytes;
+} x07_xf_budget_v1;
+
+typedef struct x07_xf_emit_v1 {
+  void* emit_ctx;
+  int32_t (*emit_alloc)(void* emit_ctx, uint32_t cap, x07_out_buf_v1* out);
+  int32_t (*emit_commit)(void* emit_ctx, const x07_out_buf_v1* out);
+} x07_xf_emit_v1;
+
+typedef struct {
+  uint32_t abi_tag;
+  uint32_t abi_version;
+  const uint8_t* plugin_id;
+  uint32_t flags;
+  const uint8_t* in_item_brand;
+  const uint8_t* out_item_brand;
+  uint32_t state_size;
+  uint32_t state_align;
+  uint32_t scratch_hint;
+  uint32_t scratch_max;
+  int32_t (*init)(
+    void* state,
+    x07_scratch_v1* scratch,
+    x07_bytes_view_v1 cfg,
+    x07_xf_emit_v1 emit,
+    x07_xf_budget_v1 budget
+  );
+  int32_t (*step)(
+    void* state,
+    x07_scratch_v1* scratch,
+    x07_bytes_view_v1 in,
+    x07_xf_emit_v1 emit,
+    x07_xf_budget_v1 budget
+  );
+  int32_t (*flush)(
+    void* state,
+    x07_scratch_v1* scratch,
+    x07_xf_emit_v1 emit,
+    x07_xf_budget_v1 budget
+  );
+  void (*drop)(void* state);
+} x07_stream_xf_plugin_v1;
+
+static bytes_t rt_bytes_alloc_aligned(ctx_t* ctx, uint32_t len, uint32_t align) {
+  if (len == 0) return rt_bytes_empty(ctx);
+  if (align == 0) align = 1;
+  // Require power-of-two alignment (C ABI).
+  if ((align & (align - 1)) != 0) rt_trap("bytes.alloc_aligned align must be power of two");
+  bytes_t out;
+  out.len = len;
+  out.ptr = (uint8_t*)rt_alloc(ctx, len, align);
+#ifdef X07_DEBUG_BORROW
+  (void)rt_dbg_alloc_register(ctx, out.ptr, len);
+#endif
+  return out;
+}
+
+typedef struct {
+  ctx_t* ctx;
+  vec_u8_t out;
+  uint32_t out_count;
+  uint32_t emit_bytes;
+  uint32_t emit_items;
+  uint32_t max_out_bytes_per_step;
+  uint32_t max_out_items_per_step;
+  uint32_t max_out_buf_bytes;
+  uint32_t pending_active;
+  bytes_t pending;
+} rt_stream_xf_emit_ctx_v1;
+
+static void rt_stream_xf_emit_ctx_init(
+    ctx_t* ctx,
+    rt_stream_xf_emit_ctx_v1* e,
+    uint32_t max_out_bytes_per_step,
+    uint32_t max_out_items_per_step,
+    uint32_t max_out_buf_bytes
+) {
+  memset(e, 0, sizeof(*e));
+  e->ctx = ctx;
+  e->max_out_bytes_per_step = max_out_bytes_per_step;
+  e->max_out_items_per_step = max_out_items_per_step;
+  e->max_out_buf_bytes = max_out_buf_bytes;
+  e->pending_active = 0;
+  e->pending = rt_bytes_empty(ctx);
+
+  // Reserve output header (u32 count).
+  e->out = rt_vec_u8_new(ctx, 4);
+  e->out = rt_vec_u8_extend_zeroes(ctx, e->out, 4);
+}
+
+static void rt_stream_xf_emit_ctx_drop(ctx_t* ctx, rt_stream_xf_emit_ctx_v1* e) {
+  if (!e) return;
+  if (e->pending_active) {
+    rt_bytes_drop(ctx, &e->pending);
+    e->pending_active = 0;
+  }
+  rt_vec_u8_drop(ctx, &e->out);
+}
+
+static int32_t rt_stream_xf_emit_alloc_v1(void* emit_ctx, uint32_t cap, x07_out_buf_v1* out) {
+  if (!emit_ctx || !out) return (int32_t)RT_XF_E_OUT_INVALID;
+  rt_stream_xf_emit_ctx_v1* e = (rt_stream_xf_emit_ctx_v1*)emit_ctx;
+  if (!e->ctx) return (int32_t)RT_XF_E_OUT_INVALID;
+  if (e->pending_active) return (int32_t)RT_XF_E_OUT_INVALID;
+
+  if (e->max_out_buf_bytes != 0 && cap > e->max_out_buf_bytes) {
+    return (int32_t)RT_XF_E_EMIT_BUF_TOO_LARGE;
+  }
+
+  if (e->max_out_items_per_step != 0) {
+    uint32_t next_items = e->emit_items + 1;
+    if (next_items < e->emit_items || next_items > e->max_out_items_per_step) {
+      return (int32_t)RT_XF_E_EMIT_STEP_ITEMS_EXCEEDED;
+    }
+  }
+
+  if (e->max_out_bytes_per_step != 0) {
+    if (cap > UINT32_MAX - e->emit_bytes) {
+      return (int32_t)RT_XF_E_EMIT_STEP_BYTES_EXCEEDED;
+    }
+    uint32_t next_bytes = e->emit_bytes + cap;
+    if (next_bytes > e->max_out_bytes_per_step) {
+      return (int32_t)RT_XF_E_EMIT_STEP_BYTES_EXCEEDED;
+    }
+  }
+
+  bytes_t b = rt_bytes_alloc(e->ctx, cap);
+  e->pending = b;
+  e->pending_active = 1;
+
+  out->ptr = b.ptr;
+  out->cap = cap;
+  out->len = 0;
+
+  e->emit_items += 1;
+  e->emit_bytes += cap;
+  return 0;
+}
+
+static int32_t rt_stream_xf_emit_commit_v1(void* emit_ctx, const x07_out_buf_v1* out) {
+  if (!emit_ctx || !out) return (int32_t)RT_XF_E_OUT_INVALID;
+  rt_stream_xf_emit_ctx_v1* e = (rt_stream_xf_emit_ctx_v1*)emit_ctx;
+  if (!e->ctx) return (int32_t)RT_XF_E_OUT_INVALID;
+  if (!e->pending_active) return (int32_t)RT_XF_E_OUT_INVALID;
+  if (out->ptr != e->pending.ptr || out->cap != e->pending.len) return (int32_t)RT_XF_E_OUT_INVALID;
+  if (out->len > out->cap) return (int32_t)RT_XF_E_EMIT_LEN_GT_CAP;
+  if (out->len > (uint32_t)INT32_MAX) return (int32_t)RT_XF_E_OUT_INVALID;
+
+  // Append: u32 len, then payload bytes.
+  uint32_t len_off = e->out.len;
+  e->out = rt_vec_u8_extend_zeroes(e->ctx, e->out, 4);
+  rt_write_u32_le(e->out.data + len_off, out->len);
+
+  if (out->len != 0) {
+    uint32_t pos = e->out.len;
+    e->out = rt_vec_u8_extend_zeroes(e->ctx, e->out, out->len);
+    memcpy(e->out.data + pos, out->ptr, out->len);
+    rt_mem_on_memcpy(e->ctx, out->len);
+  }
+
+  e->out_count += 1;
+  if (e->out_count > (uint32_t)INT32_MAX) return (int32_t)RT_XF_E_OUT_INVALID;
+
+  rt_bytes_drop(e->ctx, &e->pending);
+  e->pending_active = 0;
+  return 0;
+}
+
+static uint32_t rt_stream_xf_norm_err_code(int32_t rc) {
+  if (rc == 0) return 0;
+  if (rc == INT32_MIN) return RT_XF_E_PLUGIN_INVALID;
+  if (rc < 0) return (uint32_t)(-rc);
+  return (uint32_t)rc;
+}
+
+static uint32_t rt_stream_xf_is_pow2_u32(uint32_t x) {
+  return (x != 0 && (x & (x - 1)) == 0) ? 1 : 0;
+}
+
+static uint32_t rt_stream_xf_validate_plugin(
+    const x07_stream_xf_plugin_v1* p,
+    uint32_t abi_major,
+    bytes_t state_b,
+    bytes_t scratch_b
+) {
+  if (!p) return RT_XF_E_PLUGIN_INVALID;
+  if (p->abi_tag != RT_XF_ABI_TAG_X7XF) return RT_XF_E_PLUGIN_INVALID;
+  if (p->abi_version != RT_XF_ABI_VERSION_1) return RT_XF_E_PLUGIN_INVALID;
+  if (abi_major != p->abi_version) return RT_XF_E_PLUGIN_INVALID;
+  if (!p->plugin_id || p->plugin_id[0] == 0) return RT_XF_E_PLUGIN_INVALID;
+  if (!p->init || !p->step || !p->flush) return RT_XF_E_PLUGIN_INVALID;
+  if (p->state_align < 8 || !rt_stream_xf_is_pow2_u32(p->state_align) || p->state_align > RT_HEAP_ALIGN) {
+    return RT_XF_E_PLUGIN_INVALID;
+  }
+  if (p->state_size != state_b.len) return RT_XF_E_PLUGIN_INVALID;
+  if (p->scratch_max != scratch_b.len) return RT_XF_E_PLUGIN_INVALID;
+  if (state_b.len != 0) {
+    uintptr_t sp = (uintptr_t)state_b.ptr;
+    if ((sp & (uintptr_t)(p->state_align - 1)) != 0) return RT_XF_E_PLUGIN_INVALID;
+  }
+  return 0;
+}
+
+static result_bytes_t rt_stream_xf_result_ok(bytes_t b) {
+  result_bytes_t r;
+  r.tag = UINT32_C(1);
+  r.payload.ok = b;
+  return r;
+}
+
+static result_bytes_t rt_stream_xf_result_err(uint32_t code) {
+  result_bytes_t r;
+  r.tag = UINT32_C(0);
+  r.payload.err = code;
+  return r;
+}
+
+static bytes_view_t rt_view_from_ptr(ctx_t* ctx, const uint8_t* ptr, uint32_t len) {
+  bytes_view_t v;
+  v.ptr = (uint8_t*)ptr;
+  v.len = len;
+#ifdef X07_DEBUG_BORROW
+  if (len == 0) return rt_view_empty(ctx);
+  uint32_t off = 0;
+  uint64_t aid = rt_dbg_alloc_find(ctx, (uint8_t*)ptr, len, &off);
+  v.aid = aid;
+  v.off_bytes = off;
+  v.bid = rt_dbg_alloc_borrow_id(ctx, aid);
+#endif
+  return v;
+}
+
+// Exported for native stream xf plugins that need to canonicalize JSON documents via the runtime.
+ev_bytes x07_json_jcs_canon_doc_v1(
+    const uint8_t* input_ptr,
+    uint32_t input_len,
+    int32_t max_depth,
+    int32_t max_object_members,
+    int32_t max_object_total_bytes
+) {
+#if X07_JSON_JCS_ENABLED
+  if (!rt_ext_ctx) rt_trap(NULL);
+  ctx_t* ctx = rt_ext_ctx;
+  uint32_t md = (max_depth > 0) ? (uint32_t)max_depth : 0;
+  uint32_t mm = (max_object_members > 0) ? (uint32_t)max_object_members : 0;
+  uint32_t mb = (max_object_total_bytes > 0) ? (uint32_t)max_object_total_bytes : 0;
+  bytes_view_t in = rt_view_from_ptr(ctx, input_ptr, input_len);
+  return rt_json_jcs_canon_doc_v1(ctx, in, md, mm, mb);
+#else
+  rt_trap("x07_json_jcs_canon_doc_v1 requires json.jcs");
+#endif
+}
+
+static result_bytes_t rt_stream_xf_plugin_init_v1(
+    ctx_t* ctx,
+    const x07_stream_xf_plugin_v1* p,
+    uint32_t abi_major,
+    bytes_t state_b,
+    bytes_t scratch_b,
+    bytes_t cfg_b,
+    uint32_t cfg_max_bytes,
+    uint32_t canon_mode,
+    uint32_t strict_cfg_canon,
+    uint32_t max_out_bytes_per_step,
+    uint32_t max_out_items_per_step,
+    uint32_t max_out_buf_bytes
+) {
+  uint32_t v = rt_stream_xf_validate_plugin(p, abi_major, state_b, scratch_b);
+  if (v) return rt_stream_xf_result_err(v);
+  if (cfg_max_bytes != 0 && cfg_b.len > cfg_max_bytes) return rt_stream_xf_result_err(RT_XF_E_CFG_TOO_LARGE);
+
+  if (canon_mode == 1 && strict_cfg_canon == 1) {
+#if X07_JSON_JCS_ENABLED
+    bytes_view_t cfg_v = rt_bytes_view(ctx, cfg_b);
+    bytes_t canon = rt_json_jcs_canon_doc_v1(ctx, cfg_v, 64, 4096, cfg_max_bytes);
+    if (canon.len < 1 || canon.ptr[0] != 1) {
+      rt_bytes_drop(ctx, &canon);
+      return rt_stream_xf_result_err(RT_XF_E_CFG_NON_CANON);
+    }
+    uint32_t canon_len = canon.len - 1;
+    if (canon_len != cfg_b.len || (canon_len != 0 && memcmp(canon.ptr + 1, cfg_b.ptr, canon_len) != 0)) {
+      rt_bytes_drop(ctx, &canon);
+      return rt_stream_xf_result_err(RT_XF_E_CFG_NON_CANON);
+    }
+    rt_bytes_drop(ctx, &canon);
+#else
+    return rt_stream_xf_result_err(RT_XF_E_CFG_NON_CANON);
+#endif
+  }
+
+  rt_stream_xf_emit_ctx_v1 emit_ctx;
+  rt_stream_xf_emit_ctx_init(ctx, &emit_ctx, max_out_bytes_per_step, max_out_items_per_step, max_out_buf_bytes);
+  x07_xf_emit_v1 emit;
+  emit.emit_ctx = (void*)&emit_ctx;
+  emit.emit_alloc = rt_stream_xf_emit_alloc_v1;
+  emit.emit_commit = rt_stream_xf_emit_commit_v1;
+
+  x07_scratch_v1 scratch;
+  scratch.ptr = scratch_b.ptr;
+  scratch.cap = scratch_b.len;
+  scratch.used = 0;
+
+  x07_bytes_view_v1 cfg;
+  cfg.ptr = cfg_b.ptr;
+  cfg.len = cfg_b.len;
+
+  x07_xf_budget_v1 budget;
+  budget.max_out_bytes_per_step = max_out_bytes_per_step;
+  budget.max_out_items_per_step = max_out_items_per_step;
+  budget.max_out_buf_bytes = max_out_buf_bytes;
+  budget.max_state_bytes = state_b.len;
+  budget.max_cfg_bytes = cfg_max_bytes;
+  budget.max_scratch_bytes = scratch_b.len;
+
+  int32_t rc = p->init(state_b.ptr, &scratch, cfg, emit, budget);
+  if (rc != 0) {
+    uint32_t err_code = rt_stream_xf_norm_err_code(rc);
+    rt_stream_xf_emit_ctx_drop(ctx, &emit_ctx);
+    return rt_stream_xf_result_err(err_code);
+  }
+  if (emit_ctx.pending_active) {
+    rt_stream_xf_emit_ctx_drop(ctx, &emit_ctx);
+    return rt_stream_xf_result_err(RT_XF_E_OUT_INVALID);
+  }
+
+  if (emit_ctx.out.len < 4) {
+    rt_stream_xf_emit_ctx_drop(ctx, &emit_ctx);
+    return rt_stream_xf_result_err(RT_XF_E_OUT_INVALID);
+  }
+  rt_write_u32_le(emit_ctx.out.data, emit_ctx.out_count);
+  bytes_t out_b = rt_vec_u8_into_bytes(ctx, &emit_ctx.out);
+  if (out_b.len < 4 || out_b.len > (uint32_t)INT32_MAX) {
+    rt_bytes_drop(ctx, &out_b);
+    return rt_stream_xf_result_err(RT_XF_E_OUT_INVALID);
+  }
+  return rt_stream_xf_result_ok(out_b);
+}
+
+static result_bytes_t rt_stream_xf_plugin_step_v1(
+    ctx_t* ctx,
+    const x07_stream_xf_plugin_v1* p,
+    uint32_t abi_major,
+    bytes_t state_b,
+    bytes_t scratch_b,
+    uint32_t max_out_bytes_per_step,
+    uint32_t max_out_items_per_step,
+    uint32_t max_out_buf_bytes,
+    bytes_view_t input
+) {
+  uint32_t v = rt_stream_xf_validate_plugin(p, abi_major, state_b, scratch_b);
+  if (v) return rt_stream_xf_result_err(v);
+
+  rt_stream_xf_emit_ctx_v1 emit_ctx;
+  rt_stream_xf_emit_ctx_init(ctx, &emit_ctx, max_out_bytes_per_step, max_out_items_per_step, max_out_buf_bytes);
+  x07_xf_emit_v1 emit;
+  emit.emit_ctx = (void*)&emit_ctx;
+  emit.emit_alloc = rt_stream_xf_emit_alloc_v1;
+  emit.emit_commit = rt_stream_xf_emit_commit_v1;
+
+  x07_scratch_v1 scratch;
+  scratch.ptr = scratch_b.ptr;
+  scratch.cap = scratch_b.len;
+  scratch.used = 0;
+
+  x07_bytes_view_v1 in;
+  in.ptr = input.ptr;
+  in.len = input.len;
+
+  x07_xf_budget_v1 budget;
+  budget.max_out_bytes_per_step = max_out_bytes_per_step;
+  budget.max_out_items_per_step = max_out_items_per_step;
+  budget.max_out_buf_bytes = max_out_buf_bytes;
+  budget.max_state_bytes = state_b.len;
+  budget.max_cfg_bytes = 0;
+  budget.max_scratch_bytes = scratch_b.len;
+
+  int32_t rc = p->step(state_b.ptr, &scratch, in, emit, budget);
+  if (rc != 0) {
+    uint32_t err_code = rt_stream_xf_norm_err_code(rc);
+    rt_stream_xf_emit_ctx_drop(ctx, &emit_ctx);
+    return rt_stream_xf_result_err(err_code);
+  }
+  if (emit_ctx.pending_active) {
+    rt_stream_xf_emit_ctx_drop(ctx, &emit_ctx);
+    return rt_stream_xf_result_err(RT_XF_E_OUT_INVALID);
+  }
+
+  if (emit_ctx.out.len < 4) {
+    rt_stream_xf_emit_ctx_drop(ctx, &emit_ctx);
+    return rt_stream_xf_result_err(RT_XF_E_OUT_INVALID);
+  }
+  rt_write_u32_le(emit_ctx.out.data, emit_ctx.out_count);
+  bytes_t out_b = rt_vec_u8_into_bytes(ctx, &emit_ctx.out);
+  if (out_b.len < 4 || out_b.len > (uint32_t)INT32_MAX) {
+    rt_bytes_drop(ctx, &out_b);
+    return rt_stream_xf_result_err(RT_XF_E_OUT_INVALID);
+  }
+  return rt_stream_xf_result_ok(out_b);
+}
+
+static result_bytes_t rt_stream_xf_plugin_flush_v1(
+    ctx_t* ctx,
+    const x07_stream_xf_plugin_v1* p,
+    uint32_t abi_major,
+    bytes_t state_b,
+    bytes_t scratch_b,
+    uint32_t max_out_bytes_per_step,
+    uint32_t max_out_items_per_step,
+    uint32_t max_out_buf_bytes
+) {
+  uint32_t v = rt_stream_xf_validate_plugin(p, abi_major, state_b, scratch_b);
+  if (v) return rt_stream_xf_result_err(v);
+
+  rt_stream_xf_emit_ctx_v1 emit_ctx;
+  rt_stream_xf_emit_ctx_init(ctx, &emit_ctx, max_out_bytes_per_step, max_out_items_per_step, max_out_buf_bytes);
+  x07_xf_emit_v1 emit;
+  emit.emit_ctx = (void*)&emit_ctx;
+  emit.emit_alloc = rt_stream_xf_emit_alloc_v1;
+  emit.emit_commit = rt_stream_xf_emit_commit_v1;
+
+  x07_scratch_v1 scratch;
+  scratch.ptr = scratch_b.ptr;
+  scratch.cap = scratch_b.len;
+  scratch.used = 0;
+
+  x07_xf_budget_v1 budget;
+  budget.max_out_bytes_per_step = max_out_bytes_per_step;
+  budget.max_out_items_per_step = max_out_items_per_step;
+  budget.max_out_buf_bytes = max_out_buf_bytes;
+  budget.max_state_bytes = state_b.len;
+  budget.max_cfg_bytes = 0;
+  budget.max_scratch_bytes = scratch_b.len;
+
+  int32_t rc = p->flush(state_b.ptr, &scratch, emit, budget);
+  if (rc != 0) {
+    uint32_t err_code = rt_stream_xf_norm_err_code(rc);
+    rt_stream_xf_emit_ctx_drop(ctx, &emit_ctx);
+    return rt_stream_xf_result_err(err_code);
+  }
+  if (emit_ctx.pending_active) {
+    rt_stream_xf_emit_ctx_drop(ctx, &emit_ctx);
+    return rt_stream_xf_result_err(RT_XF_E_OUT_INVALID);
+  }
+
+  if (emit_ctx.out.len < 4) {
+    rt_stream_xf_emit_ctx_drop(ctx, &emit_ctx);
+    return rt_stream_xf_result_err(RT_XF_E_OUT_INVALID);
+  }
+  rt_write_u32_le(emit_ctx.out.data, emit_ctx.out_count);
+  bytes_t out_b = rt_vec_u8_into_bytes(ctx, &emit_ctx.out);
+  if (out_b.len < 4 || out_b.len > (uint32_t)INT32_MAX) {
+    rt_bytes_drop(ctx, &out_b);
+    return rt_stream_xf_result_err(RT_XF_E_OUT_INVALID);
+  }
+  return rt_stream_xf_result_ok(out_b);
+}
+
+// --- X07_STREAM_XF_PLUGIN_END
 
 struct rt_scratch_u8_fixed_s {
   uint32_t alive;

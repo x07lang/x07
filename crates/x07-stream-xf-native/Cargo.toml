@@ -1,0 +1,14 @@
+[package]
+name = "x07-stream-xf-native"
+version = "0.0.79"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+name = "x07_stream_xf"
+crate-type = ["staticlib"]
+test = false
+doctest = false
+
+[dependencies]
+

@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "stream_xf_plugin_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "result_err_v1",
+    "label": "stream_xf_plugin_v1",
+    "alloc_bytes": 134217728,
+    "alloc_calls": 0,
+    "realloc_calls": 0,
+    "memcpy_bytes": 268435456,
+    "sched_ticks": 0,
+    "fuel": 0
+  }
+}

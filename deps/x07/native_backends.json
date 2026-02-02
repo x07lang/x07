@@ -156,6 +156,28 @@
       }
     },
     {
+      "backend_id": "x07.stream.xf",
+      "abi_major": 1,
+      "link": {
+        "linux": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_stream_xf.a"],
+          "args": [],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        },
+        "macos": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_stream_xf.a"],
+          "args": [],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        }
+      }
+    },
+    {
       "backend_id": "x07.time",
       "abi_major": 1,
       "link": {

@@ -1,6 +1,7 @@
 use serde_json::json;
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use x07_worlds::WorldId;
 use x07c::ast::expr_from_json;
@@ -85,6 +86,34 @@ fn pipe_expr_par_map() -> x07c::ast::Expr {
     .expect("expr_from_json")
 }
 
+fn pipe_expr_plugin_stage_frame_u32le() -> x07c::ast::Expr {
+    expr_from_json(&json!([
+        "std.stream.pipe_v1",
+        [
+            "std.stream.cfg_v1",
+            ["chunk_max_bytes", 64],
+            ["bufread_cap_bytes", 64],
+            ["max_in_bytes", 1024],
+            ["max_out_bytes", 1024],
+            ["max_items", 100]
+        ],
+        [
+            "std.stream.src.bytes_v1",
+            ["std.stream.expr_v1", ["bytes.lit", "hi"]]
+        ],
+        [
+            "std.stream.chain_v1",
+            [
+                "std.stream.xf.plugin_v1",
+                ["id", ["bytes.lit", "xf.frame_u32le_v1"]],
+                ["cfg", ["std.stream.expr_v1", ["bytes.lit", ""]]]
+            ]
+        ],
+        ["std.stream.sink.collect_bytes_v1"]
+    ]))
+    .expect("expr_from_json")
+}
+
 fn contains_head(expr: &x07c::ast::Expr, head: &str) -> bool {
     match expr {
         x07c::ast::Expr::Int { .. } | x07c::ast::Expr::Ident { .. } => false,
@@ -97,6 +126,17 @@ fn contains_head(expr: &x07c::ast::Expr, head: &str) -> bool {
     }
 }
 
+fn compile_options_with_repo_arch_root() -> CompileOptions {
+    let mut options = CompileOptions::default();
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("repo root")
+        .to_path_buf();
+    options.arch_root = Some(repo_root);
+    options
+}
+
 #[test]
 fn pipe_elaboration_injects_helper_and_rewrites_call_site() {
     let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> = BTreeMap::new();
@@ -107,7 +147,8 @@ fn pipe_elaboration_injects_helper_and_rewrites_call_site() {
         solve: pipe_expr("in.txt"),
     };
 
-    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default(), &module_metas)
+    let options = compile_options_with_repo_arch_root();
+    stream_pipe::elaborate_stream_pipes(&mut program, &options, &module_metas)
         .expect("elaboration");
 
     let helpers: Vec<_> = program
@@ -184,9 +225,19 @@ fn pipe_elaboration_injects_async_helper_and_rewrites_call_site_to_await() {
         solve: pipe_expr_par_map(),
     };
 
-    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default(), &module_metas)
+    let options = compile_options_with_repo_arch_root();
+    stream_pipe::elaborate_stream_pipes(&mut program, &options, &module_metas)
         .expect("elaboration");
-    x07c::c_emit::check_c_program(&program, &CompileOptions::default()).expect("check_c_program");
+    let check_program = program.clone();
+    let check_options = options.clone();
+    std::thread::Builder::new()
+        .name("stream_pipe_elaboration_check_c_program".to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || x07c::c_emit::check_c_program(&check_program, &check_options))
+        .expect("spawn check_c_program thread")
+        .join()
+        .expect("join check_c_program thread")
+        .expect("check_c_program");
 
     let helpers: Vec<_> = program
         .async_functions
@@ -241,6 +292,40 @@ fn pipe_elaboration_injects_async_helper_and_rewrites_call_site_to_await() {
 }
 
 #[test]
+fn pipe_elaboration_plugin_stage_emits_native_requires() {
+    std::thread::Builder::new()
+        .name("stream_pipe_elaboration_plugin_stage".to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> =
+                BTreeMap::new();
+            let mut program = Program {
+                functions: Vec::new(),
+                async_functions: Vec::new(),
+                extern_functions: Vec::new(),
+                solve: pipe_expr_plugin_stage_frame_u32le(),
+            };
+
+            let options = compile_options_with_repo_arch_root();
+            stream_pipe::elaborate_stream_pipes(&mut program, &options, &module_metas)
+                .expect("elaboration");
+            let (_c_src, native_requires) =
+                x07c::c_emit::emit_c_program_with_native_requires(&program, &options)
+                    .expect("emit");
+
+            assert!(
+                native_requires
+                    .iter()
+                    .any(|r| r.backend_id == "x07.stream.xf" && r.abi_major == 1),
+                "expected x07.stream.xf in native requires: {native_requires:?}"
+            );
+        })
+        .expect("spawn plugin stage test")
+        .join()
+        .expect("join plugin stage test");
+}
+
+#[test]
 fn pipe_elaboration_rejects_concurrency_pipes_inside_defn() {
     let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> = BTreeMap::new();
     let mut program = Program {
@@ -273,12 +358,9 @@ fn pipe_elaboration_rejects_concurrency_pipes_inside_defn() {
         solve: pipe_expr("in.txt"),
     };
 
-    let err = stream_pipe::elaborate_stream_pipes(
-        &mut program,
-        &CompileOptions::default(),
-        &module_metas,
-    )
-    .expect_err("must reject concurrency pipe in defn");
+    let options = compile_options_with_repo_arch_root();
+    let err = stream_pipe::elaborate_stream_pipes(&mut program, &options, &module_metas)
+        .expect_err("must reject concurrency pipe in defn");
     assert_eq!(err.kind, x07c::compile::CompileErrorKind::Typing);
     assert!(
         err.message.contains(
@@ -299,7 +381,8 @@ fn pipe_elaboration_dedups_helper_by_hash_ignoring_expr_bodies() {
         solve: list(vec![ident("begin"), pipe_expr("a.txt"), pipe_expr("b.txt")]),
     };
 
-    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default(), &module_metas)
+    let options = compile_options_with_repo_arch_root();
+    stream_pipe::elaborate_stream_pipes(&mut program, &options, &module_metas)
         .expect("elaboration");
 
     let helper_count = program
@@ -377,7 +460,8 @@ fn pipe_elaboration_is_per_module() {
         solve: pipe_expr("in.txt"),
     };
 
-    stream_pipe::elaborate_stream_pipes(&mut program, &CompileOptions::default(), &module_metas)
+    let options = compile_options_with_repo_arch_root();
+    stream_pipe::elaborate_stream_pipes(&mut program, &options, &module_metas)
         .expect("elaboration");
 
     let main_helpers: Vec<_> = program

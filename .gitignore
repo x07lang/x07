@@ -80,3 +80,8 @@ dist/.tmp_toolchain_*
 /deps/x07/libx07_ext_db_redis.a
 /deps/x07/x07_ext_db_redis.lib
 /deps/x07/include/x07_ext_db_redis_abi_v1.h
+
+# Native stream-xf backend artifacts (built by scripts/build_ext_stream_xf.sh)
+/deps/x07/libx07_stream_xf.a
+/deps/x07/x07_stream_xf.lib
+/deps/x07/include/x07_stream_xf_plugin_abi_v1.h

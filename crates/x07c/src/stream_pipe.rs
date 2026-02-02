@@ -34,6 +34,7 @@ pub fn elaborate_stream_pipes(
         helpers: BTreeMap::new(),
         new_helpers: Vec::new(),
         new_async_helpers: Vec::new(),
+        stream_plugin_registry: None,
     };
 
     program.solve = elab.rewrite_expr(program.solve.clone(), "main", RewriteCtx::Solve)?;
@@ -139,6 +140,7 @@ struct Elaborator<'a> {
     helpers: BTreeMap<(String, String), PipeHelperInfo>,
     new_helpers: Vec<FunctionDef>,
     new_async_helpers: Vec<AsyncFunctionDef>,
+    stream_plugin_registry: Option<StreamPluginRegistryV1>,
 }
 
 impl Elaborator<'_> {
@@ -175,6 +177,7 @@ impl Elaborator<'_> {
     ) -> Result<Expr, CompilerError> {
         let h8 = hash_pipe_without_expr_bodies(&expr)?;
         let mut parsed = parse_pipe_v1(&expr)?;
+        self.resolve_stream_plugins_v1(&mut parsed)?;
         self.typecheck_and_rewrite_item_brands_v1(&mut parsed, module_id)?;
         let needs_async = parsed
             .chain
@@ -536,6 +539,483 @@ impl Elaborator<'_> {
         pipe.chain = new_chain;
         Ok(())
     }
+
+    fn resolve_stream_plugins_v1(&mut self, pipe: &mut PipeParsed) -> Result<(), CompilerError> {
+        let needs_registry = pipe
+            .chain
+            .iter()
+            .any(|xf| matches!(xf.kind, PipeXfV1::PluginV1 { resolved: None, .. }));
+        if !needs_registry {
+            return Ok(());
+        }
+
+        let Some(arch_root) = self.options.arch_root.as_ref() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "E_PIPE_PLUGIN_NEEDS_ARCH_ROOT: std.stream.xf.plugin_v1 requires compile_options.arch_root"
+                    .to_string(),
+            ));
+        };
+
+        if self.stream_plugin_registry.is_none() {
+            self.stream_plugin_registry = Some(StreamPluginRegistryV1::load(arch_root)?);
+        }
+        let registry = self.stream_plugin_registry.as_ref().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Internal,
+                "internal error: missing stream plugin registry".to_string(),
+            )
+        })?;
+
+        let world = self.options.world.as_str();
+
+        for xf in pipe.chain.iter_mut() {
+            let PipeXfV1::PluginV1 {
+                plugin_id,
+                resolved,
+                ..
+            } = &mut xf.kind
+            else {
+                continue;
+            };
+            if resolved.is_some() {
+                continue;
+            }
+
+            let p = registry.by_id.get(plugin_id).ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_NOT_FOUND: stream plugin_id {plugin_id:?} is not declared in arch/stream/plugins/index.x07sp.json (ptr={})",
+                        xf.ptr
+                    ),
+                )
+            })?;
+
+            if !p.worlds_allowed.is_empty() && !p.worlds_allowed.iter().any(|w| w == world) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Unsupported,
+                    format!(
+                        "E_PIPE_PLUGIN_WORLD_VIOLATION: stream plugin_id {plugin_id:?} is not allowed in world {world} (ptr={})",
+                        xf.ptr
+                    ),
+                ));
+            }
+
+            if p.determinism == StreamPluginDeterminismV1::NondetOsOnlyV1
+                && !matches!(world, "run-os" | "run-os-sandboxed")
+            {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Unsupported,
+                    format!(
+                        "E_PIPE_PLUGIN_WORLD_VIOLATION: OS-only stream plugin_id {plugin_id:?} is not allowed in solve worlds (ptr={})",
+                        xf.ptr
+                    ),
+                ));
+            }
+
+            xf.in_item_brand = Some(p.in_item_brand.clone());
+            xf.out_item_brand = Some(p.out_item_brand.clone());
+            *resolved = Some(p.clone());
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct StreamPluginRegistryV1 {
+    by_id: BTreeMap<String, StreamPluginResolvedV1>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StreamPluginDeterminismV1 {
+    DeterministicV1,
+    NondetOsOnlyV1,
+}
+
+#[derive(Debug, Clone)]
+struct StreamPluginCfgV1 {
+    max_bytes: u32,
+    canon_mode: StreamPluginCfgCanonModeV1,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StreamPluginCfgCanonModeV1 {
+    NoneV1,
+    CanonJsonV1,
+}
+
+#[derive(Debug, Clone)]
+struct StreamPluginLimitsV1 {
+    max_out_bytes_per_step: u32,
+    max_out_items_per_step: u32,
+    max_out_buf_bytes: u32,
+}
+
+#[derive(Debug, Clone)]
+struct StreamPluginBudgetsV1 {
+    state_bytes: u32,
+    scratch_bytes: u32,
+}
+
+#[derive(Debug, Clone)]
+struct StreamPluginResolvedV1 {
+    plugin_id: String,
+    native_backend_id: String,
+    abi_major: u32,
+    export_symbol: String,
+    budget_profile_id: String,
+    determinism: StreamPluginDeterminismV1,
+    worlds_allowed: Vec<String>,
+    in_item_brand: PipeItemBrandInV1,
+    out_item_brand: PipeItemBrandOutV1,
+    budgets: StreamPluginBudgetsV1,
+    cfg: StreamPluginCfgV1,
+    limits: StreamPluginLimitsV1,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct StreamPluginsIndexFileV1 {
+    schema_version: String,
+    #[serde(default)]
+    plugins: Vec<StreamPluginsIndexEntryV1>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct StreamPluginsIndexEntryV1 {
+    plugin_id: String,
+    plugin_spec_path: String,
+    budget_profile_id: String,
+    native_backend_id: String,
+    abi_major: u32,
+    export_symbol: String,
+    determinism: String,
+    #[serde(default)]
+    worlds_allowed: Vec<String>,
+    in_item_brand: String,
+    out_item_brand: String,
+    state_bytes: u32,
+    scratch_bytes: u32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct StreamPluginSpecFileV1 {
+    schema_version: String,
+    plugin_id: String,
+    v: u32,
+    abi: StreamPluginSpecAbiV1,
+    determinism: String,
+    #[serde(default)]
+    worlds_allowed: Vec<String>,
+    brands: StreamPluginSpecBrandsV1,
+    budgets: StreamPluginSpecBudgetsV1,
+    cfg: StreamPluginSpecCfgV1,
+    limits: StreamPluginSpecLimitsV1,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct StreamPluginSpecAbiV1 {
+    native_backend_id: String,
+    abi_major: u32,
+    export_symbol: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct StreamPluginSpecBrandsV1 {
+    in_item_brand: String,
+    out_item_brand: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct StreamPluginSpecBudgetsV1 {
+    state_bytes: u32,
+    scratch_bytes: u32,
+    #[serde(default)]
+    max_expand_ratio: f64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct StreamPluginSpecCfgV1 {
+    max_bytes: u32,
+    canon_mode: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct StreamPluginSpecLimitsV1 {
+    max_out_bytes_per_step: u32,
+    max_out_items_per_step: u32,
+    max_out_buf_bytes: u32,
+}
+
+impl StreamPluginRegistryV1 {
+    fn load(arch_root: &std::path::Path) -> Result<Self, CompilerError> {
+        let index_path = arch_root
+            .join("arch")
+            .join("stream")
+            .join("plugins")
+            .join("index.x07sp.json");
+
+        let index_bytes = std::fs::read(&index_path).map_err(|e| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                format!(
+                    "E_PIPE_PLUGIN_INDEX_READ_FAILED: failed to read {}: {e}",
+                    index_path.display()
+                ),
+            )
+        })?;
+
+        let index: StreamPluginsIndexFileV1 =
+            serde_json::from_slice(&index_bytes).map_err(|e| {
+                CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_INDEX_INVALID: failed to parse {}: {e}",
+                        index_path.display()
+                    ),
+                )
+            })?;
+
+        if index.schema_version != x07_contracts::X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!(
+                    "E_PIPE_PLUGIN_INDEX_INVALID: expected schema_version {:?} got {:?} in {}",
+                    x07_contracts::X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION,
+                    index.schema_version,
+                    index_path.display()
+                ),
+            ));
+        }
+
+        let mut by_id: BTreeMap<String, StreamPluginResolvedV1> = BTreeMap::new();
+
+        for entry in &index.plugins {
+            validate::validate_symbol(&entry.plugin_id)
+                .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+            validate::validate_symbol(&entry.native_backend_id)
+                .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+            validate::validate_symbol(&entry.budget_profile_id)
+                .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+            validate::validate_local_name(&entry.export_symbol)
+                .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+            let spec_path = arch_root.join(&entry.plugin_spec_path);
+            let spec_bytes = std::fs::read(&spec_path).map_err(|e| {
+                CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_READ_FAILED: failed to read {}: {e}",
+                        spec_path.display()
+                    ),
+                )
+            })?;
+
+            let spec: StreamPluginSpecFileV1 =
+                serde_json::from_slice(&spec_bytes).map_err(|e| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "E_PIPE_PLUGIN_SPEC_INVALID: failed to parse {}: {e}",
+                            spec_path.display()
+                        ),
+                    )
+                })?;
+
+            if spec.schema_version != x07_contracts::X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_INVALID: expected schema_version {:?} got {:?} in {}",
+                        x07_contracts::X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION,
+                        spec.schema_version,
+                        spec_path.display()
+                    ),
+                ));
+            }
+
+            if spec.plugin_id != entry.plugin_id {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_MISMATCH: plugin_id mismatch: index has {:?} spec has {:?} (spec_path={})",
+                        entry.plugin_id,
+                        spec.plugin_id,
+                        spec_path.display()
+                    ),
+                ));
+            }
+
+            if spec.abi.native_backend_id != entry.native_backend_id
+                || spec.abi.abi_major != entry.abi_major
+                || spec.abi.export_symbol != entry.export_symbol
+            {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_MISMATCH: abi mismatch between index and spec (plugin_id={:?} spec_path={})",
+                        entry.plugin_id,
+                        spec_path.display()
+                    ),
+                ));
+            }
+
+            if spec.worlds_allowed != entry.worlds_allowed {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_MISMATCH: worlds_allowed mismatch between index and spec (plugin_id={:?} spec_path={})",
+                        entry.plugin_id,
+                        spec_path.display()
+                    ),
+                ));
+            }
+
+            if spec.determinism != entry.determinism {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_MISMATCH: determinism mismatch between index and spec (plugin_id={:?} spec_path={})",
+                        entry.plugin_id,
+                        spec_path.display()
+                    ),
+                ));
+            }
+
+            if spec.brands.in_item_brand != entry.in_item_brand
+                || spec.brands.out_item_brand != entry.out_item_brand
+            {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_MISMATCH: brands mismatch between index and spec (plugin_id={:?} spec_path={})",
+                        entry.plugin_id,
+                        spec_path.display()
+                    ),
+                ));
+            }
+
+            if spec.budgets.state_bytes != entry.state_bytes
+                || spec.budgets.scratch_bytes != entry.scratch_bytes
+            {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_MISMATCH: budgets mismatch between index and spec (plugin_id={:?} spec_path={})",
+                        entry.plugin_id,
+                        spec_path.display()
+                    ),
+                ));
+            }
+
+            let determinism = match spec.determinism.as_str() {
+                "deterministic_v1" => StreamPluginDeterminismV1::DeterministicV1,
+                "nondet_os_only_v1" => StreamPluginDeterminismV1::NondetOsOnlyV1,
+                other => {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "E_PIPE_PLUGIN_SPEC_INVALID: unknown determinism {:?} (plugin_id={:?} spec_path={})",
+                            other,
+                            entry.plugin_id,
+                            spec_path.display()
+                        ),
+                    ));
+                }
+            };
+
+            let canon_mode = match spec.cfg.canon_mode.as_str() {
+                "none_v1" => StreamPluginCfgCanonModeV1::NoneV1,
+                "canon_json_v1" => StreamPluginCfgCanonModeV1::CanonJsonV1,
+                other => {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "E_PIPE_PLUGIN_SPEC_INVALID: unknown cfg.canon_mode {:?} (plugin_id={:?} spec_path={})",
+                            other,
+                            entry.plugin_id,
+                            spec_path.display()
+                        ),
+                    ));
+                }
+            };
+
+            let in_item_brand = parse_item_brand_in(
+                &Expr::Ident {
+                    name: spec.brands.in_item_brand.clone(),
+                    ptr: "".to_string(),
+                },
+                "in_item_brand",
+            )?;
+            let out_item_brand = parse_item_brand_out(
+                &Expr::Ident {
+                    name: spec.brands.out_item_brand.clone(),
+                    ptr: "".to_string(),
+                },
+                "out_item_brand",
+            )?;
+
+            if spec.v == 0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_INVALID: v must be >= 1 (plugin_id={:?} spec_path={})",
+                        entry.plugin_id,
+                        spec_path.display()
+                    ),
+                ));
+            }
+            if !spec.budgets.max_expand_ratio.is_finite() || spec.budgets.max_expand_ratio < 0.0 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_SPEC_INVALID: budgets.max_expand_ratio must be >= 0 and finite (plugin_id={:?} spec_path={})",
+                        entry.plugin_id,
+                        spec_path.display()
+                    ),
+                ));
+            }
+
+            let resolved = StreamPluginResolvedV1 {
+                plugin_id: entry.plugin_id.clone(),
+                native_backend_id: spec.abi.native_backend_id,
+                abi_major: spec.abi.abi_major,
+                export_symbol: spec.abi.export_symbol,
+                budget_profile_id: entry.budget_profile_id.clone(),
+                determinism,
+                worlds_allowed: spec.worlds_allowed,
+                in_item_brand,
+                out_item_brand,
+                budgets: StreamPluginBudgetsV1 {
+                    state_bytes: spec.budgets.state_bytes,
+                    scratch_bytes: spec.budgets.scratch_bytes,
+                },
+                cfg: StreamPluginCfgV1 {
+                    max_bytes: spec.cfg.max_bytes,
+                    canon_mode,
+                },
+                limits: StreamPluginLimitsV1 {
+                    max_out_bytes_per_step: spec.limits.max_out_bytes_per_step,
+                    max_out_items_per_step: spec.limits.max_out_items_per_step,
+                    max_out_buf_bytes: spec.limits.max_out_buf_bytes,
+                },
+            };
+
+            if by_id.insert(entry.plugin_id.clone(), resolved).is_some() {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_DUPLICATE_ID: duplicate plugin_id {:?} in {}",
+                        entry.plugin_id,
+                        index_path.display()
+                    ),
+                ));
+            }
+        }
+
+        Ok(Self { by_id })
+    }
 }
 
 fn load_brand_registry_v1(
@@ -674,7 +1154,8 @@ fn infer_xf_req_in_v1(
         | PipeXfV1::FrameU32Le
         | PipeXfV1::MapInPlaceBufV1 { .. }
         | PipeXfV1::JsonCanonStreamV1 { .. }
-        | PipeXfV1::DeframeU32LeV1 { .. } => Ok(PipeItemBrandInV1::Any),
+        | PipeXfV1::DeframeU32LeV1 { .. }
+        | PipeXfV1::PluginV1 { .. } => Ok(PipeItemBrandInV1::Any),
     }
 }
 
@@ -694,7 +1175,8 @@ fn infer_xf_out_v1(
         | PipeXfV1::FrameU32Le
         | PipeXfV1::MapInPlaceBufV1 { .. }
         | PipeXfV1::JsonCanonStreamV1 { .. }
-        | PipeXfV1::DeframeU32LeV1 { .. } => Ok((PipeItemBrandOutV1::None, false)),
+        | PipeXfV1::DeframeU32LeV1 { .. }
+        | PipeXfV1::PluginV1 { .. } => Ok((PipeItemBrandOutV1::None, false)),
         PipeXfV1::MapBytes { fn_id } => {
             let out_brand = fn_sigs
                 .defn(fn_id)
@@ -955,6 +1437,13 @@ enum PipeXfV1 {
     },
     DeframeU32LeV1 {
         cfg: DeframeU32LeCfgV1,
+    },
+    PluginV1 {
+        plugin_id: String,
+        cfg_param: usize,
+        strict_brands: i32,
+        strict_cfg_canon: i32,
+        resolved: Option<StreamPluginResolvedV1>,
     },
     ParMapStreamV1 {
         cfg: ParMapStreamCfgV1,
@@ -1963,6 +2452,109 @@ fn parse_xf_v1(expr: &Expr, params: &mut Vec<PipeParam>) -> Result<PipeXfDescV1,
                 out_item_brand,
             )
         }
+        "std.stream.xf.plugin_v1" => {
+            let fields = parse_kv_fields(head, &items[1..])?;
+            for k in fields.keys() {
+                match k.as_str() {
+                    "id" | "cfg" | "opts_v1" => {}
+                    _ => {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} unknown field: {k}"),
+                        ));
+                    }
+                }
+            }
+
+            let id_expr = fields.get("id").ok_or_else(|| {
+                CompilerError::new(CompileErrorKind::Typing, format!("{head} missing id"))
+            })?;
+
+            let plugin_id = if let Expr::List { items: inner, .. } = id_expr {
+                if inner.first().and_then(Expr::as_ident) == Some("std.stream.expr_v1")
+                    && inner.len() == 2
+                {
+                    expect_bytes_lit_text(&inner[1], "id must be bytes.lit")?
+                } else {
+                    expect_bytes_lit_text(id_expr, "id must be bytes.lit")?
+                }
+            } else {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("{head} id must be bytes.lit"),
+                ));
+            };
+
+            validate::validate_symbol(&plugin_id)
+                .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
+
+            let cfg_expr = fields.get("cfg").ok_or_else(|| {
+                CompilerError::new(CompileErrorKind::Typing, format!("{head} missing cfg"))
+            })?;
+            let cfg_param = parse_expr_v1(params, Ty::Bytes, cfg_expr)?;
+
+            let mut strict_brands: i32 = 1;
+            let mut strict_cfg_canon: i32 = 1;
+            if let Some(opts) = fields.get("opts_v1") {
+                let Expr::List {
+                    items: opt_items, ..
+                } = opts
+                else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} opts_v1 must be a list"),
+                    ));
+                };
+                if opt_items.first().and_then(Expr::as_ident) != Some("opts_v1") {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} opts_v1 must start with opts_v1"),
+                    ));
+                }
+                let opt_fields = parse_kv_fields("opts_v1", &opt_items[1..])?;
+                for k in opt_fields.keys() {
+                    match k.as_str() {
+                        "strict_brands" | "strict_cfg_canon" => {}
+                        _ => {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} opts_v1 unknown field: {k}"),
+                            ));
+                        }
+                    }
+                }
+                if let Some(v) = opt_fields.get("strict_brands") {
+                    strict_brands = expect_i32(v, "strict_brands must be an integer")?;
+                    if strict_brands != 0 && strict_brands != 1 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} strict_brands must be 0 or 1"),
+                        ));
+                    }
+                }
+                if let Some(v) = opt_fields.get("strict_cfg_canon") {
+                    strict_cfg_canon = expect_i32(v, "strict_cfg_canon must be an integer")?;
+                    if strict_cfg_canon != 0 && strict_cfg_canon != 1 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} strict_cfg_canon must be 0 or 1"),
+                        ));
+                    }
+                }
+            }
+
+            (
+                PipeXfV1::PluginV1 {
+                    plugin_id,
+                    cfg_param,
+                    strict_brands,
+                    strict_cfg_canon,
+                    resolved: None,
+                },
+                None,
+                None,
+            )
+        }
         "std.stream.xf.par_map_stream_v1"
         | "std.stream.xf.par_map_stream_result_bytes_v1"
         | "std.stream.xf.par_map_stream_unordered_v1"
@@ -2705,7 +3297,7 @@ fn validate_pipe_world_caps(
 
 fn gen_pipe_helper_body(
     pipe: &PipeParsed,
-    _options: &CompileOptions,
+    options: &CompileOptions,
 ) -> Result<Expr, CompilerError> {
     let mut cfg = pipe.cfg.clone();
 
@@ -2783,12 +3375,83 @@ fn gen_pipe_helper_body(
         }
         _ => {}
     }
+    let mut stream_plugin_registry: Option<StreamPluginRegistryV1> = None;
+
+    let mut resolve_stream_plugin = |plugin_id: &str,
+                                     ptr: &str|
+     -> Result<StreamPluginResolvedV1, CompilerError> {
+        let Some(arch_root) = options.arch_root.as_ref() else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "E_PIPE_STREAM_PLUGINS_NEEDS_ARCH_ROOT: std.stream.pipe_v1 requires compile_options.arch_root for plugin-backed xfs"
+                    .to_string(),
+            ));
+        };
+
+        if stream_plugin_registry.is_none() {
+            stream_plugin_registry = Some(StreamPluginRegistryV1::load(arch_root)?);
+        }
+        let registry = stream_plugin_registry.as_ref().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Internal,
+                "internal error: missing stream plugin registry".to_string(),
+            )
+        })?;
+
+        let p = registry.by_id.get(plugin_id).ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Typing,
+                format!(
+                    "E_PIPE_PLUGIN_NOT_FOUND: stream plugin_id {plugin_id:?} is not declared in arch/stream/plugins/index.x07sp.json (ptr={ptr})",
+                ),
+            )
+        })?;
+
+        let world = options.world.as_str();
+        if !p.worlds_allowed.is_empty() && !p.worlds_allowed.iter().any(|w| w == world) {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!(
+                    "E_PIPE_PLUGIN_WORLD_VIOLATION: stream plugin_id {plugin_id:?} is not allowed in world {world} (ptr={ptr})",
+                ),
+            ));
+        }
+        if p.determinism == StreamPluginDeterminismV1::NondetOsOnlyV1
+            && !matches!(world, "run-os" | "run-os-sandboxed")
+        {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!(
+                    "E_PIPE_PLUGIN_WORLD_VIOLATION: OS-only stream plugin_id {plugin_id:?} is not allowed in solve worlds (ptr={ptr})",
+                ),
+            ));
+        }
+
+        Ok(p.clone())
+    };
+
+    let cfg_bytes_i32_le = |stage_idx: usize, words: Vec<Expr>| -> Expr {
+        let cfg_var = format!("xf_cfg_{stage_idx}");
+        let cap = i32::try_from(words.len().saturating_mul(4)).unwrap_or(i32::MAX);
+        let mut stmts = vec![expr_list(vec![
+            expr_ident("let"),
+            expr_ident(cfg_var.clone()),
+            expr_list(vec![expr_ident("vec_u8.with_capacity"), expr_int(cap)]),
+        ])];
+        for w in words {
+            stmts.push(extend_u32(&cfg_var, w));
+        }
+        stmts.push(expr_list(vec![
+            expr_ident("vec_u8.into_bytes"),
+            expr_ident(cfg_var),
+        ]));
+        expr_list(vec![expr_ident("begin")].into_iter().chain(stmts).collect())
+    };
+
     let mut take_states: Vec<TakeState> = Vec::new();
     let mut require_brand_states: Vec<RequireBrandState> = Vec::new();
     let mut map_in_place_states: Vec<MapInPlaceState> = Vec::new();
-    let mut split_states: Vec<SplitLinesState> = Vec::new();
-    let mut deframe_states: Vec<DeframeState> = Vec::new();
-    let mut json_canon_states: Vec<JsonCanonState> = Vec::new();
+    let mut plugin_states: Vec<PluginState> = Vec::new();
     let mut par_map_states: Vec<ParMapState> = Vec::new();
     for (idx, xf) in pipe.chain.iter().enumerate() {
         match &xf.kind {
@@ -2822,26 +3485,89 @@ fn gen_pipe_helper_body(
                 delim_param,
                 max_line_bytes_param,
             } => {
-                split_states.push(SplitLinesState {
+                let plugin = resolve_stream_plugin("xf.split_lines_v1", &xf.ptr)?;
+                let cfg_init_expr = cfg_bytes_i32_le(
+                    idx,
+                    vec![
+                        param_ident(*delim_param),
+                        param_ident(*max_line_bytes_param),
+                    ],
+                );
+
+                plugin_states.push(PluginState {
                     stage_idx: idx,
-                    delim_param: *delim_param,
-                    max_line_bytes_param: *max_line_bytes_param,
-                    carry_var: format!("split_carry_{idx}"),
+                    plugin,
+                    cfg_b_var: format!("xf_cfg_b_{idx}"),
+                    cfg_init_expr: Some(cfg_init_expr),
+                    strict_cfg_canon: 0,
+                    err_map: PluginErrMapV1::SplitLinesV1,
+                    state_b_var: format!("xf_plugin_state_{idx}"),
+                    scratch_b_var: format!("xf_plugin_scratch_{idx}"),
+                });
+            }
+            PipeXfV1::FrameU32Le => {
+                let plugin = resolve_stream_plugin("xf.frame_u32le_v1", &xf.ptr)?;
+                plugin_states.push(PluginState {
+                    stage_idx: idx,
+                    plugin,
+                    cfg_b_var: format!("xf_cfg_b_{idx}"),
+                    cfg_init_expr: Some(expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)])),
+                    strict_cfg_canon: 0,
+                    err_map: PluginErrMapV1::FrameU32LeV1,
+                    state_b_var: format!("xf_plugin_state_{idx}"),
+                    scratch_b_var: format!("xf_plugin_scratch_{idx}"),
                 });
             }
             PipeXfV1::DeframeU32LeV1 { cfg } => {
-                deframe_states.push(DeframeState {
+                let plugin = resolve_stream_plugin("xf.deframe_u32le_v1", &xf.ptr)?;
+                let on_truncated = match cfg.on_truncated {
+                    DeframeOnTruncatedV1::Err => 0,
+                    DeframeOnTruncatedV1::Drop => 1,
+                };
+                let cfg_init_expr = cfg_bytes_i32_le(
+                    idx,
+                    vec![
+                        expr_int(cfg.max_frame_bytes),
+                        expr_int(cfg.max_frames),
+                        expr_int(cfg.allow_empty),
+                        expr_int(on_truncated),
+                    ],
+                );
+                plugin_states.push(PluginState {
                     stage_idx: idx,
-                    cfg: cfg.clone(),
-                    hdr_var: format!("deframe_hdr_{idx}"),
-                    hdr_fill_var: format!("deframe_hdr_fill_{idx}"),
-                    need_var: format!("deframe_need_{idx}"),
-                    buf_var: format!("deframe_buf_{idx}"),
-                    buf_fill_var: format!("deframe_buf_fill_{idx}"),
-                    frames_var: format!("deframe_frames_{idx}"),
+                    plugin,
+                    cfg_b_var: format!("xf_cfg_b_{idx}"),
+                    cfg_init_expr: Some(cfg_init_expr),
+                    strict_cfg_canon: 0,
+                    err_map: PluginErrMapV1::DeframeU32LeV1,
+                    state_b_var: format!("xf_plugin_state_{idx}"),
+                    scratch_b_var: format!("xf_plugin_scratch_{idx}"),
                 });
             }
-            PipeXfV1::MapBytes { .. } | PipeXfV1::Filter { .. } | PipeXfV1::FrameU32Le => {}
+            PipeXfV1::PluginV1 {
+                cfg_param,
+                strict_cfg_canon,
+                resolved,
+                ..
+            } => {
+                let plugin = resolved.clone().ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Internal,
+                        "internal error: stream plugin stage not resolved".to_string(),
+                    )
+                })?;
+                plugin_states.push(PluginState {
+                    stage_idx: idx,
+                    plugin,
+                    cfg_b_var: format!("p{cfg_param}"),
+                    cfg_init_expr: None,
+                    strict_cfg_canon: *strict_cfg_canon,
+                    err_map: PluginErrMapV1::Generic,
+                    state_b_var: format!("xf_plugin_state_{idx}"),
+                    scratch_b_var: format!("xf_plugin_scratch_{idx}"),
+                });
+            }
+            PipeXfV1::MapBytes { .. } | PipeXfV1::Filter { .. } => {}
             PipeXfV1::ParMapStreamV1 { cfg: pcfg } => {
                 par_map_states.push(ParMapState {
                     stage_idx: idx,
@@ -2861,6 +3587,8 @@ fn gen_pipe_helper_body(
                 });
             }
             PipeXfV1::JsonCanonStreamV1 { cfg: jcfg } => {
+                let plugin = resolve_stream_plugin("xf.json_canon_stream_v1", &xf.ptr)?;
+
                 let max_depth = if jcfg.max_depth > 0 {
                     jcfg.max_depth
                 } else {
@@ -2899,16 +3627,26 @@ fn gen_pipe_helper_body(
                     ));
                 }
 
-                json_canon_states.push(JsonCanonState {
+                let cfg_init_expr = cfg_bytes_i32_le(
+                    idx,
+                    vec![
+                        expr_int(max_depth),
+                        expr_int(max_total_json_bytes),
+                        expr_int(max_object_members),
+                        expr_int(max_object_total_bytes),
+                        expr_int(emit_chunk_max_bytes),
+                    ],
+                );
+
+                plugin_states.push(PluginState {
                     stage_idx: idx,
-                    cfg: JsonCanonStreamCfgV1 {
-                        max_depth,
-                        max_total_json_bytes,
-                        max_object_members,
-                        max_object_total_bytes,
-                        emit_chunk_max_bytes,
-                    },
-                    buf_var: format!("json_buf_{idx}"),
+                    plugin,
+                    cfg_b_var: format!("xf_cfg_b_{idx}"),
+                    cfg_init_expr: Some(cfg_init_expr),
+                    strict_cfg_canon: 0,
+                    err_map: PluginErrMapV1::JsonCanonStreamV1,
+                    state_b_var: format!("xf_plugin_state_{idx}"),
+                    scratch_b_var: format!("xf_plugin_scratch_{idx}"),
                 });
             }
         }
@@ -2970,9 +3708,7 @@ fn gen_pipe_helper_body(
         require_brand_states,
         take_states,
         map_in_place_states,
-        split_states,
-        deframe_states,
-        json_canon_states,
+        plugin_states,
         par_map_states,
         sink_vec_var,
         hash_var,
@@ -3025,91 +3761,39 @@ fn gen_pipe_helper_body(
         ]));
     }
 
-    // Init split_lines carry buffers (and validate max_line_bytes).
-    for s in &cg.split_states {
+    // Init plugin stage state + scratch buffers.
+    for p in &cg.plugin_states {
+        let state_len = i32::try_from(p.plugin.budgets.state_bytes).unwrap_or(i32::MAX);
+        let scratch_len = i32::try_from(p.plugin.budgets.scratch_bytes).unwrap_or(i32::MAX);
         items.push(expr_list(vec![
-            expr_ident("if"),
+            expr_ident("let"),
+            expr_ident(p.state_b_var.clone()),
             expr_list(vec![
-                expr_ident("<="),
-                param_ident(s.max_line_bytes_param),
-                expr_int(0),
+                expr_ident("__internal.bytes.alloc_aligned_v1"),
+                expr_int(state_len),
+                expr_int(16),
             ]),
-            expr_list(vec![
-                expr_ident("return"),
-                err_doc_const(E_CFG_INVALID, "stream:split_lines_max_line_bytes"),
-            ]),
-            expr_int(0),
         ]));
         items.push(expr_list(vec![
             expr_ident("let"),
-            expr_ident(s.carry_var.clone()),
+            expr_ident(p.scratch_b_var.clone()),
             expr_list(vec![
-                expr_ident("vec_u8.with_capacity"),
-                param_ident(s.max_line_bytes_param),
+                expr_ident("__internal.bytes.alloc_aligned_v1"),
+                expr_int(scratch_len),
+                expr_int(16),
             ]),
         ]));
     }
 
-    // Init deframe_u32le state.
-    for d in &cg.deframe_states {
-        if d.cfg.max_frame_bytes <= 0 {
-            items.push(expr_list(vec![
-                expr_ident("return"),
-                err_doc_const(E_CFG_INVALID, "stream:deframe_max_frame_bytes"),
-            ]));
+    // Init plugin cfg bytes (if not provided via pipe params).
+    for p in &cg.plugin_states {
+        let Some(cfg_expr) = p.cfg_init_expr.clone() else {
             continue;
-        }
-
-        items.push(let_i32(&d.hdr_fill_var, 0));
-        items.push(let_i32(&d.need_var, 0));
-        items.push(let_i32(&d.buf_fill_var, 0));
-        items.push(let_i32(&d.frames_var, 0));
-
+        };
         items.push(expr_list(vec![
             expr_ident("let"),
-            expr_ident(d.hdr_var.clone()),
-            expr_list(vec![expr_ident("vec_u8.with_capacity"), expr_int(4)]),
-        ]));
-        items.push(expr_list(vec![
-            expr_ident("set"),
-            expr_ident(d.hdr_var.clone()),
-            expr_list(vec![
-                expr_ident("vec_u8.extend_zeroes"),
-                expr_ident(d.hdr_var.clone()),
-                expr_int(4),
-            ]),
-        ]));
-
-        items.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident(d.buf_var.clone()),
-            expr_list(vec![
-                expr_ident("vec_u8.with_capacity"),
-                expr_int(d.cfg.max_frame_bytes),
-            ]),
-        ]));
-        items.push(expr_list(vec![
-            expr_ident("set"),
-            expr_ident(d.buf_var.clone()),
-            expr_list(vec![
-                expr_ident("vec_u8.extend_zeroes"),
-                expr_ident(d.buf_var.clone()),
-                expr_int(d.cfg.max_frame_bytes),
-            ]),
-        ]));
-    }
-
-    // Init json_canon_stream buffers.
-    for j in &cg.json_canon_states {
-        let cap = j
-            .cfg
-            .max_total_json_bytes
-            .min(cg.cfg.chunk_max_bytes)
-            .max(1);
-        items.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident(j.buf_var.clone()),
-            expr_list(vec![expr_ident("vec_u8.with_capacity"), expr_int(cap)]),
+            expr_ident(p.cfg_b_var.clone()),
+            cfg_expr,
         ]));
     }
 
@@ -3449,6 +4133,11 @@ fn gen_pipe_helper_body(
         ]));
     }
 
+    // Init plugin stages (downstream -> upstream).
+    for p in cg.plugin_states.iter().rev() {
+        items.push(cg.gen_plugin_init(p.stage_idx)?);
+    }
+
     let main = match &pipe.src.kind {
         PipeSrcV1::Bytes { bytes_param } => cg.gen_run_bytes_source(*bytes_param)?,
         PipeSrcV1::FsOpenRead { path_param } => cg.gen_run_reader_source(
@@ -3540,6 +4229,17 @@ const E_DEFRAME_EMPTY_FORBIDDEN: i32 = 82;
 const E_DEFRAME_MAX_FRAMES: i32 = 83;
 const E_DEFRAME_TRUNCATED_TIMEOUT: i32 = 84;
 
+const E_XF_CFG_TOO_LARGE: i32 = 110;
+const E_XF_CFG_NON_CANON: i32 = 111;
+const E_XF_OUT_INVALID: i32 = 112;
+
+const E_XF_EMIT_BUF_TOO_LARGE: i32 = 113;
+const E_XF_EMIT_STEP_BYTES_EXCEEDED: i32 = 114;
+const E_XF_EMIT_STEP_ITEMS_EXCEEDED: i32 = 115;
+const E_XF_EMIT_LEN_GT_CAP: i32 = 116;
+
+const E_XF_PLUGIN_INVALID: i32 = 117;
+
 const FNV1A32_OFFSET_BASIS: i32 = -2128831035; // 0x811c9dc5
 const FNV1A32_PRIME: i32 = 16777619;
 
@@ -3565,31 +4265,32 @@ struct MapInPlaceState {
     scratch_var: String,
 }
 
-#[derive(Clone)]
-struct SplitLinesState {
-    stage_idx: usize,
-    delim_param: usize,
-    max_line_bytes_param: usize,
-    carry_var: String,
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PluginErrMapV1 {
+    Generic,
+    SplitLinesV1,
+    FrameU32LeV1,
+    DeframeU32LeV1,
+    JsonCanonStreamV1,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PluginCallKindV1 {
+    Init,
+    Step,
+    Flush,
 }
 
 #[derive(Clone)]
-struct DeframeState {
+struct PluginState {
     stage_idx: usize,
-    cfg: DeframeU32LeCfgV1,
-    hdr_var: String,
-    hdr_fill_var: String,
-    need_var: String,
-    buf_var: String,
-    buf_fill_var: String,
-    frames_var: String,
-}
-
-#[derive(Clone)]
-struct JsonCanonState {
-    stage_idx: usize,
-    cfg: JsonCanonStreamCfgV1,
-    buf_var: String,
+    plugin: StreamPluginResolvedV1,
+    cfg_b_var: String,
+    cfg_init_expr: Option<Expr>,
+    strict_cfg_canon: i32,
+    err_map: PluginErrMapV1,
+    state_b_var: String,
+    scratch_b_var: String,
 }
 
 #[derive(Clone)]
@@ -3745,9 +4446,7 @@ struct PipeCodegen<'a> {
     require_brand_states: Vec<RequireBrandState>,
     take_states: Vec<TakeState>,
     map_in_place_states: Vec<MapInPlaceState>,
-    split_states: Vec<SplitLinesState>,
-    deframe_states: Vec<DeframeState>,
-    json_canon_states: Vec<JsonCanonState>,
+    plugin_states: Vec<PluginState>,
     par_map_states: Vec<ParMapState>,
 
     sink_vec_var: Option<String>,
@@ -3756,10 +4455,7 @@ struct PipeCodegen<'a> {
 
 impl PipeCodegen<'_> {
     fn has_flush_stages(&self) -> bool {
-        !self.split_states.is_empty()
-            || !self.deframe_states.is_empty()
-            || !self.json_canon_states.is_empty()
-            || !self.par_map_states.is_empty()
+        !self.plugin_states.is_empty() || !self.par_map_states.is_empty()
     }
 
     fn apply_src_out_item_brand(&self, item: Expr) -> Expr {
@@ -3795,6 +4491,18 @@ impl PipeCodegen<'_> {
                 CompilerError::new(
                     CompileErrorKind::Internal,
                     "internal error: missing require_brand state".to_string(),
+                )
+            })
+    }
+
+    fn plugin_state(&self, stage_idx: usize) -> Result<&PluginState, CompilerError> {
+        self.plugin_states
+            .iter()
+            .find(|s| s.stage_idx == stage_idx)
+            .ok_or_else(|| {
+                CompilerError::new(
+                    CompileErrorKind::Internal,
+                    "internal error: missing plugin state".to_string(),
                 )
             })
     }
@@ -4249,7 +4957,7 @@ impl PipeCodegen<'_> {
 
         let end_ok_no_flush = {
             let mut end_stmts = Vec::new();
-            end_stmts.extend(cleanup_stmts);
+            end_stmts.extend(cleanup_stmts.clone());
             end_stmts.push(self.gen_return_ok()?);
             expr_list(
                 vec![expr_ident("begin")]
@@ -4260,36 +4968,126 @@ impl PipeCodegen<'_> {
         };
 
         let timeout_stop_if_clean_expr = if on_timeout == NetOnTimeoutV1::StopIfClean {
-            let Some(d0) = self.deframe_states.iter().find(|d| d.stage_idx == 0) else {
+            let p0 = self.plugin_state(0)?;
+            if p0.plugin.plugin_id != "xf.deframe_u32le_v1" {
                 return Err(CompilerError::new(
                     CompileErrorKind::Internal,
                     "internal error: on_timeout=stop_if_clean without deframe at stage 0"
                         .to_string(),
                 ));
+            }
+
+            let r_var = "net_timeout_r".to_string();
+            let out_b_var = "net_timeout_out_b".to_string();
+            let ec_var = "net_timeout_ec".to_string();
+
+            let abi_major = i32::try_from(p0.plugin.abi_major).unwrap_or(i32::MAX);
+            let max_out_bytes_per_step =
+                i32::try_from(p0.plugin.limits.max_out_bytes_per_step).unwrap_or(i32::MAX);
+            let max_out_items_per_step =
+                i32::try_from(p0.plugin.limits.max_out_items_per_step).unwrap_or(i32::MAX);
+            let max_out_buf_bytes =
+                i32::try_from(p0.plugin.limits.max_out_buf_bytes).unwrap_or(i32::MAX);
+
+            let budget_profile = expr_list(vec![
+                expr_ident("bytes.lit"),
+                expr_ident(p0.plugin.budget_profile_id.clone()),
+            ]);
+
+            let call = expr_list(vec![
+                expr_ident("__internal.stream_xf.plugin_flush_v1"),
+                expr_list(vec![
+                    expr_ident("bytes.lit"),
+                    expr_ident(p0.plugin.native_backend_id.clone()),
+                ]),
+                expr_int(abi_major),
+                expr_list(vec![
+                    expr_ident("bytes.lit"),
+                    expr_ident(p0.plugin.export_symbol.clone()),
+                ]),
+                expr_ident(p0.state_b_var.clone()),
+                expr_ident(p0.scratch_b_var.clone()),
+                expr_int(max_out_bytes_per_step),
+                expr_int(max_out_items_per_step),
+                expr_int(max_out_buf_bytes),
+            ]);
+
+            let end_ok = {
+                let mut end_stmts = vec![self.gen_flush_from(1)?];
+                end_stmts.extend(cleanup_stmts.clone());
+                end_stmts.push(self.gen_return_ok()?);
+                expr_list(
+                    vec![expr_ident("begin")]
+                        .into_iter()
+                        .chain(end_stmts)
+                        .collect(),
+                )
             };
+
             expr_list(vec![
-                expr_ident("if"),
+                expr_ident("begin"),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(r_var.clone()),
+                    expr_list(vec![
+                        expr_ident("budget.scope_from_arch_v1"),
+                        budget_profile,
+                        call,
+                    ]),
+                ]),
                 expr_list(vec![
                     expr_ident("if"),
                     expr_list(vec![
                         expr_ident("="),
-                        expr_ident(d0.hdr_fill_var.clone()),
-                        expr_int(0),
+                        expr_list(vec![
+                            expr_ident("result_bytes.is_ok"),
+                            expr_ident(r_var.clone()),
+                        ]),
+                        expr_int(1),
                     ]),
                     expr_list(vec![
-                        expr_ident("="),
-                        expr_ident(d0.buf_fill_var.clone()),
-                        expr_int(0),
+                        expr_ident("begin"),
+                        expr_list(vec![
+                            expr_ident("let"),
+                            expr_ident(out_b_var.clone()),
+                            expr_list(vec![
+                                expr_ident("__internal.result_bytes.unwrap_ok_v1"),
+                                expr_ident(r_var.clone()),
+                            ]),
+                        ]),
+                        self.gen_plugin_process_output_blob(0, &out_b_var)?,
+                        end_ok,
                     ]),
-                    expr_int(0),
-                ]),
-                end_ok_with_flush.clone(),
-                expr_list(vec![
-                    expr_ident("return"),
-                    err_doc_const(
-                        E_DEFRAME_TRUNCATED_TIMEOUT,
-                        "stream:deframe_truncated_timeout",
-                    ),
+                    expr_list(vec![
+                        expr_ident("begin"),
+                        expr_list(vec![
+                            expr_ident("let"),
+                            expr_ident(ec_var.clone()),
+                            expr_list(vec![
+                                expr_ident("result_bytes.err_code"),
+                                expr_ident(r_var.clone()),
+                            ]),
+                        ]),
+                        expr_list(vec![
+                            expr_ident("if"),
+                            expr_list(vec![
+                                expr_ident("="),
+                                expr_ident(ec_var),
+                                expr_int(E_DEFRAME_TRUNCATED),
+                            ]),
+                            expr_list(vec![
+                                expr_ident("return"),
+                                err_doc_const(
+                                    E_DEFRAME_TRUNCATED_TIMEOUT,
+                                    "stream:deframe_truncated_timeout",
+                                ),
+                            ]),
+                            expr_list(vec![
+                                expr_ident("return"),
+                                err_doc_const(E_STAGE_FAILED, "stream:stage_failed"),
+                            ]),
+                        ]),
+                    ]),
                 ]),
             ])
         } else {
@@ -4888,96 +5686,811 @@ impl PipeCodegen<'_> {
                     ]),
                 ]))
             }
-            PipeXfV1::FrameU32Le => {
-                let n_var = format!("frame_n_{stage_idx}");
-                let hdr_var = format!("frame_hdr_{stage_idx}");
-                let out_var = format!("frame_out_{stage_idx}");
-                let bytes_var = format!("frame_b_{stage_idx}");
-                let view_var = format!("frame_v_{stage_idx}");
-                Ok(expr_list(vec![
-                    expr_ident("begin"),
-                    expr_list(vec![
-                        expr_ident("let"),
-                        expr_ident(n_var.clone()),
-                        expr_list(vec![expr_ident("view.len"), item.clone()]),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("if"),
-                        expr_list(vec![
-                            expr_ident("<"),
-                            expr_ident(n_var.clone()),
-                            expr_int(0),
-                        ]),
-                        expr_list(vec![
-                            expr_ident("return"),
-                            err_doc_const(E_FRAME_TOO_LARGE, "stream:frame_too_large"),
-                        ]),
-                        expr_int(0),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("let"),
-                        expr_ident(hdr_var.clone()),
-                        expr_list(vec![
-                            expr_ident("codec.write_u32_le"),
-                            expr_ident(n_var.clone()),
-                        ]),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("let"),
-                        expr_ident(out_var.clone()),
-                        expr_list(vec![
-                            expr_ident("vec_u8.with_capacity"),
-                            expr_list(vec![
-                                expr_ident("+"),
-                                expr_int(4),
-                                expr_ident(n_var.clone()),
-                            ]),
-                        ]),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("set"),
-                        expr_ident(out_var.clone()),
-                        expr_list(vec![
-                            expr_ident("vec_u8.extend_bytes"),
-                            expr_ident(out_var.clone()),
-                            expr_ident(hdr_var.clone()),
-                        ]),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("set"),
-                        expr_ident(out_var.clone()),
-                        expr_list(vec![
-                            expr_ident("vec_u8.extend_bytes_range"),
-                            expr_ident(out_var.clone()),
-                            item,
-                            expr_int(0),
-                            expr_ident(n_var.clone()),
-                        ]),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("let"),
-                        expr_ident(bytes_var.clone()),
-                        expr_list(vec![expr_ident("vec_u8.into_bytes"), expr_ident(out_var)]),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("let"),
-                        expr_ident(view_var.clone()),
-                        expr_list(vec![expr_ident("bytes.view"), expr_ident(bytes_var)]),
-                    ]),
-                    self.gen_process_from(
-                        stage_idx + 1,
-                        self.apply_out_item_brand(stage_idx, expr_ident(view_var)),
-                    )?,
-                ]))
-            }
+            PipeXfV1::FrameU32Le => self.gen_plugin_step(stage_idx, item),
             PipeXfV1::MapInPlaceBufV1 { .. } => self.gen_map_in_place_buf(stage_idx, item),
             PipeXfV1::SplitLines { .. } => self.gen_split_lines(stage_idx, item),
             PipeXfV1::DeframeU32LeV1 { .. } => self.gen_deframe_u32le(stage_idx, item),
             PipeXfV1::JsonCanonStreamV1 { .. } => {
                 self.gen_json_canon_stream_process(stage_idx, item)
             }
+            PipeXfV1::PluginV1 { .. } => self.gen_plugin_step(stage_idx, item),
             PipeXfV1::ParMapStreamV1 { .. } => self.gen_par_map_stream_process(stage_idx, item),
         }
+    }
+
+    fn gen_plugin_init(&self, stage_idx: usize) -> Result<Expr, CompilerError> {
+        let p = self.plugin_state(stage_idx)?;
+
+        let canon_mode = match p.plugin.cfg.canon_mode {
+            StreamPluginCfgCanonModeV1::NoneV1 => 0,
+            StreamPluginCfgCanonModeV1::CanonJsonV1 => 1,
+        };
+
+        let abi_major = i32::try_from(p.plugin.abi_major).unwrap_or(i32::MAX);
+        let cfg_max_bytes = i32::try_from(p.plugin.cfg.max_bytes).unwrap_or(i32::MAX);
+        let max_out_bytes_per_step =
+            i32::try_from(p.plugin.limits.max_out_bytes_per_step).unwrap_or(i32::MAX);
+        let max_out_items_per_step =
+            i32::try_from(p.plugin.limits.max_out_items_per_step).unwrap_or(i32::MAX);
+        let max_out_buf_bytes =
+            i32::try_from(p.plugin.limits.max_out_buf_bytes).unwrap_or(i32::MAX);
+
+        let budget_profile = expr_list(vec![
+            expr_ident("bytes.lit"),
+            expr_ident(p.plugin.budget_profile_id.clone()),
+        ]);
+
+        let call = expr_list(vec![
+            expr_ident("__internal.stream_xf.plugin_init_v1"),
+            expr_list(vec![
+                expr_ident("bytes.lit"),
+                expr_ident(p.plugin.native_backend_id.clone()),
+            ]),
+            expr_int(abi_major),
+            expr_list(vec![
+                expr_ident("bytes.lit"),
+                expr_ident(p.plugin.export_symbol.clone()),
+            ]),
+            expr_ident(p.state_b_var.clone()),
+            expr_ident(p.scratch_b_var.clone()),
+            expr_ident(p.cfg_b_var.clone()),
+            expr_int(cfg_max_bytes),
+            expr_int(canon_mode),
+            expr_int(p.strict_cfg_canon),
+            expr_int(max_out_bytes_per_step),
+            expr_int(max_out_items_per_step),
+            expr_int(max_out_buf_bytes),
+        ]);
+
+        self.gen_plugin_call_and_process_outputs(p, PluginCallKindV1::Init, budget_profile, call)
+    }
+
+    fn gen_plugin_step(&self, stage_idx: usize, item: Expr) -> Result<Expr, CompilerError> {
+        let p = self.plugin_state(stage_idx)?;
+
+        let abi_major = i32::try_from(p.plugin.abi_major).unwrap_or(i32::MAX);
+        let max_out_bytes_per_step =
+            i32::try_from(p.plugin.limits.max_out_bytes_per_step).unwrap_or(i32::MAX);
+        let max_out_items_per_step =
+            i32::try_from(p.plugin.limits.max_out_items_per_step).unwrap_or(i32::MAX);
+        let max_out_buf_bytes =
+            i32::try_from(p.plugin.limits.max_out_buf_bytes).unwrap_or(i32::MAX);
+
+        let budget_profile = expr_list(vec![
+            expr_ident("bytes.lit"),
+            expr_ident(p.plugin.budget_profile_id.clone()),
+        ]);
+
+        let call = expr_list(vec![
+            expr_ident("__internal.stream_xf.plugin_step_v1"),
+            expr_list(vec![
+                expr_ident("bytes.lit"),
+                expr_ident(p.plugin.native_backend_id.clone()),
+            ]),
+            expr_int(abi_major),
+            expr_list(vec![
+                expr_ident("bytes.lit"),
+                expr_ident(p.plugin.export_symbol.clone()),
+            ]),
+            expr_ident(p.state_b_var.clone()),
+            expr_ident(p.scratch_b_var.clone()),
+            expr_int(max_out_bytes_per_step),
+            expr_int(max_out_items_per_step),
+            expr_int(max_out_buf_bytes),
+            item,
+        ]);
+
+        self.gen_plugin_call_and_process_outputs(p, PluginCallKindV1::Step, budget_profile, call)
+    }
+
+    fn gen_plugin_flush(&self, stage_idx: usize) -> Result<Expr, CompilerError> {
+        let p = self.plugin_state(stage_idx)?;
+
+        let abi_major = i32::try_from(p.plugin.abi_major).unwrap_or(i32::MAX);
+        let max_out_bytes_per_step =
+            i32::try_from(p.plugin.limits.max_out_bytes_per_step).unwrap_or(i32::MAX);
+        let max_out_items_per_step =
+            i32::try_from(p.plugin.limits.max_out_items_per_step).unwrap_or(i32::MAX);
+        let max_out_buf_bytes =
+            i32::try_from(p.plugin.limits.max_out_buf_bytes).unwrap_or(i32::MAX);
+
+        let budget_profile = expr_list(vec![
+            expr_ident("bytes.lit"),
+            expr_ident(p.plugin.budget_profile_id.clone()),
+        ]);
+
+        let call = expr_list(vec![
+            expr_ident("__internal.stream_xf.plugin_flush_v1"),
+            expr_list(vec![
+                expr_ident("bytes.lit"),
+                expr_ident(p.plugin.native_backend_id.clone()),
+            ]),
+            expr_int(abi_major),
+            expr_list(vec![
+                expr_ident("bytes.lit"),
+                expr_ident(p.plugin.export_symbol.clone()),
+            ]),
+            expr_ident(p.state_b_var.clone()),
+            expr_ident(p.scratch_b_var.clone()),
+            expr_int(max_out_bytes_per_step),
+            expr_int(max_out_items_per_step),
+            expr_int(max_out_buf_bytes),
+        ]);
+
+        let mut stmts: Vec<Expr> = vec![self.gen_plugin_call_and_process_outputs(
+            p,
+            PluginCallKindV1::Flush,
+            budget_profile,
+            call,
+        )?];
+        stmts.push(self.gen_flush_from(stage_idx + 1)?);
+        stmts.push(expr_int(0));
+        Ok(expr_list(
+            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
+        ))
+    }
+
+    fn gen_plugin_call_and_process_outputs(
+        &self,
+        p: &PluginState,
+        call_kind: PluginCallKindV1,
+        budget_profile: Expr,
+        call: Expr,
+    ) -> Result<Expr, CompilerError> {
+        let stage_idx = p.stage_idx;
+        let r_var = format!("xf_r_{stage_idx}");
+        let out_b_var = format!("xf_out_b_{stage_idx}");
+        let ec_var = format!("xf_ec_{stage_idx}");
+
+        let stage_idx_i32 = i32::try_from(stage_idx).unwrap_or(i32::MAX);
+
+        let payload = expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident("pl".to_string()),
+                expr_list(vec![expr_ident("vec_u8.with_capacity"), expr_int(16)]),
+            ]),
+            extend_u32("pl", expr_int(stage_idx_i32)),
+            extend_u32("pl", expr_ident(self.bytes_in_var.clone())),
+            extend_u32("pl", expr_ident(self.items_in_var.clone())),
+            extend_u32("pl", expr_ident(ec_var.clone())),
+            expr_list(vec![
+                expr_ident("vec_u8.into_bytes"),
+                expr_ident("pl".to_string()),
+            ]),
+        ]);
+
+        let fallback_doc = err_doc_with_payload(
+            expr_ident(ec_var.clone()),
+            "stream:xf_plugin_error",
+            payload.clone(),
+        );
+
+        let plugin_err_doc = match p.err_map {
+            PluginErrMapV1::Generic => fallback_doc.clone(),
+            PluginErrMapV1::SplitLinesV1 => match call_kind {
+                PluginCallKindV1::Init => expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("="),
+                        expr_ident(ec_var.clone()),
+                        expr_int(E_CFG_INVALID),
+                    ]),
+                    err_doc_const(E_CFG_INVALID, "stream:split_lines_max_line_bytes"),
+                    expr_list(vec![
+                        expr_ident("if"),
+                        expr_list(vec![
+                            expr_ident("="),
+                            expr_ident(ec_var.clone()),
+                            expr_int(E_LINE_TOO_LONG),
+                        ]),
+                        err_doc_const(E_LINE_TOO_LONG, "stream:line_too_long"),
+                        fallback_doc.clone(),
+                    ]),
+                ]),
+                PluginCallKindV1::Step | PluginCallKindV1::Flush => expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("="),
+                        expr_ident(ec_var.clone()),
+                        expr_int(E_LINE_TOO_LONG),
+                    ]),
+                    err_doc_const(E_LINE_TOO_LONG, "stream:line_too_long"),
+                    fallback_doc.clone(),
+                ]),
+            },
+            PluginErrMapV1::FrameU32LeV1 => expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_ident(ec_var.clone()),
+                    expr_int(E_FRAME_TOO_LARGE),
+                ]),
+                err_doc_const(E_FRAME_TOO_LARGE, "stream:frame_too_large"),
+                fallback_doc.clone(),
+            ]),
+            PluginErrMapV1::DeframeU32LeV1 => {
+                let base = expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("="),
+                        expr_ident(ec_var.clone()),
+                        expr_int(E_DEFRAME_FRAME_TOO_LARGE),
+                    ]),
+                    err_doc_const(E_DEFRAME_FRAME_TOO_LARGE, "stream:deframe_frame_too_large"),
+                    expr_list(vec![
+                        expr_ident("if"),
+                        expr_list(vec![
+                            expr_ident("="),
+                            expr_ident(ec_var.clone()),
+                            expr_int(E_DEFRAME_TRUNCATED),
+                        ]),
+                        err_doc_const(E_DEFRAME_TRUNCATED, "stream:deframe_truncated"),
+                        expr_list(vec![
+                            expr_ident("if"),
+                            expr_list(vec![
+                                expr_ident("="),
+                                expr_ident(ec_var.clone()),
+                                expr_int(E_DEFRAME_EMPTY_FORBIDDEN),
+                            ]),
+                            err_doc_const(
+                                E_DEFRAME_EMPTY_FORBIDDEN,
+                                "stream:deframe_empty_forbidden",
+                            ),
+                            expr_list(vec![
+                                expr_ident("if"),
+                                expr_list(vec![
+                                    expr_ident("="),
+                                    expr_ident(ec_var.clone()),
+                                    expr_int(E_DEFRAME_MAX_FRAMES),
+                                ]),
+                                err_doc_const(E_DEFRAME_MAX_FRAMES, "stream:deframe_max_frames"),
+                                fallback_doc.clone(),
+                            ]),
+                        ]),
+                    ]),
+                ]);
+
+                if call_kind == PluginCallKindV1::Init {
+                    expr_list(vec![
+                        expr_ident("if"),
+                        expr_list(vec![
+                            expr_ident("="),
+                            expr_ident(ec_var.clone()),
+                            expr_int(E_CFG_INVALID),
+                        ]),
+                        err_doc_const(E_CFG_INVALID, "stream:deframe_max_frame_bytes"),
+                        base,
+                    ])
+                } else {
+                    base
+                }
+            }
+            PluginErrMapV1::JsonCanonStreamV1 => match call_kind {
+                PluginCallKindV1::Init => expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("="),
+                        expr_ident(ec_var.clone()),
+                        expr_int(E_CFG_INVALID),
+                    ]),
+                    err_doc_const(E_CFG_INVALID, "stream:json_canon_cfg_invalid"),
+                    fallback_doc.clone(),
+                ]),
+                PluginCallKindV1::Step => {
+                    let st_v_var = format!("xf_json_state_v_{stage_idx}");
+                    let kind_var = format!("xf_json_err_kind_{stage_idx}");
+                    expr_list(vec![
+                        expr_ident("if"),
+                        expr_list(vec![
+                            expr_ident("="),
+                            expr_ident(ec_var.clone()),
+                            expr_int(E_BUDGET_IN_BYTES),
+                        ]),
+                        expr_list(vec![
+                            expr_ident("begin"),
+                            expr_list(vec![
+                                expr_ident("let"),
+                                expr_ident(st_v_var.clone()),
+                                expr_list(vec![
+                                    expr_ident("bytes.view"),
+                                    expr_ident(p.state_b_var.clone()),
+                                ]),
+                            ]),
+                            expr_list(vec![
+                                expr_ident("let"),
+                                expr_ident(kind_var.clone()),
+                                expr_list(vec![
+                                    expr_ident("codec.read_u32_le"),
+                                    expr_ident(st_v_var),
+                                    expr_int(20),
+                                ]),
+                            ]),
+                            expr_list(vec![
+                                expr_ident("if"),
+                                expr_list(vec![expr_ident("="), expr_ident(kind_var), expr_int(1)]),
+                                err_doc_const(E_BUDGET_IN_BYTES, "stream:json_input_too_large"),
+                                err_doc_const(
+                                    E_BUDGET_IN_BYTES,
+                                    "stream:json_max_total_json_bytes",
+                                ),
+                            ]),
+                        ]),
+                        fallback_doc.clone(),
+                    ])
+                }
+                PluginCallKindV1::Flush => {
+                    let st_v_var = format!("xf_json_state_v_{stage_idx}");
+                    let off_var = format!("xf_json_err_off_{stage_idx}");
+                    let pl_var = format!("xf_json_pl_{stage_idx}");
+                    let plb_var = format!("xf_json_plb_{stage_idx}");
+
+                    let mk_doc = |msg_id: &'static str, code: i32| -> Expr {
+                        expr_list(vec![
+                            expr_ident("begin"),
+                            expr_list(vec![
+                                expr_ident("let"),
+                                expr_ident(st_v_var.clone()),
+                                expr_list(vec![
+                                    expr_ident("bytes.view"),
+                                    expr_ident(p.state_b_var.clone()),
+                                ]),
+                            ]),
+                            expr_list(vec![
+                                expr_ident("let"),
+                                expr_ident(off_var.clone()),
+                                expr_list(vec![
+                                    expr_ident("codec.read_u32_le"),
+                                    expr_ident(st_v_var.clone()),
+                                    expr_int(24),
+                                ]),
+                            ]),
+                            expr_list(vec![
+                                expr_ident("let"),
+                                expr_ident(pl_var.clone()),
+                                expr_list(vec![expr_ident("vec_u8.with_capacity"), expr_int(8)]),
+                            ]),
+                            extend_u32(&pl_var, expr_ident(off_var.clone())),
+                            extend_u32(&pl_var, expr_int(stage_idx_i32)),
+                            expr_list(vec![
+                                expr_ident("let"),
+                                expr_ident(plb_var.clone()),
+                                expr_list(vec![
+                                    expr_ident("vec_u8.into_bytes"),
+                                    expr_ident(pl_var.clone()),
+                                ]),
+                            ]),
+                            err_doc_with_payload(
+                                expr_int(code),
+                                msg_id,
+                                expr_ident(plb_var.clone()),
+                            ),
+                        ])
+                    };
+
+                    expr_list(vec![
+                        expr_ident("if"),
+                        expr_list(vec![
+                            expr_ident("="),
+                            expr_ident(ec_var.clone()),
+                            expr_int(E_CFG_INVALID),
+                        ]),
+                        err_doc_const(E_CFG_INVALID, "stream:json_doc_invalid"),
+                        expr_list(vec![
+                            expr_ident("if"),
+                            expr_list(vec![
+                                expr_ident("="),
+                                expr_ident(ec_var.clone()),
+                                expr_int(E_JSON_SYNTAX),
+                            ]),
+                            mk_doc("stream:json_syntax", E_JSON_SYNTAX),
+                            expr_list(vec![
+                                expr_ident("if"),
+                                expr_list(vec![
+                                    expr_ident("="),
+                                    expr_ident(ec_var.clone()),
+                                    expr_int(E_JSON_NOT_IJSON),
+                                ]),
+                                mk_doc("stream:json_not_ijson", E_JSON_NOT_IJSON),
+                                expr_list(vec![
+                                    expr_ident("if"),
+                                    expr_list(vec![
+                                        expr_ident("="),
+                                        expr_ident(ec_var.clone()),
+                                        expr_int(E_JSON_TOO_DEEP),
+                                    ]),
+                                    mk_doc("stream:json_too_deep", E_JSON_TOO_DEEP),
+                                    expr_list(vec![
+                                        expr_ident("if"),
+                                        expr_list(vec![
+                                            expr_ident("="),
+                                            expr_ident(ec_var.clone()),
+                                            expr_int(E_JSON_OBJECT_TOO_LARGE),
+                                        ]),
+                                        mk_doc(
+                                            "stream:json_object_too_large",
+                                            E_JSON_OBJECT_TOO_LARGE,
+                                        ),
+                                        expr_list(vec![
+                                            expr_ident("if"),
+                                            expr_list(vec![
+                                                expr_ident("="),
+                                                expr_ident(ec_var.clone()),
+                                                expr_int(E_JSON_TRAILING_DATA),
+                                            ]),
+                                            mk_doc(
+                                                "stream:json_trailing_data",
+                                                E_JSON_TRAILING_DATA,
+                                            ),
+                                            fallback_doc.clone(),
+                                        ]),
+                                    ]),
+                                ]),
+                            ]),
+                        ]),
+                    ])
+                }
+            },
+        };
+
+        let err_doc = expr_list(vec![
+            expr_ident("if"),
+            expr_list(vec![
+                expr_ident("<"),
+                expr_ident(ec_var.clone()),
+                expr_int(0),
+            ]),
+            err_doc_with_payload(
+                expr_int(E_STAGE_FAILED),
+                "stream:xf_budget_scope_violation",
+                payload.clone(),
+            ),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_ident(ec_var.clone()),
+                    expr_int(E_XF_CFG_TOO_LARGE),
+                ]),
+                err_doc_with_payload(
+                    expr_int(E_XF_CFG_TOO_LARGE),
+                    "stream:xf_cfg_too_large",
+                    payload.clone(),
+                ),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("="),
+                        expr_ident(ec_var.clone()),
+                        expr_int(E_XF_CFG_NON_CANON),
+                    ]),
+                    err_doc_with_payload(
+                        expr_int(E_XF_CFG_NON_CANON),
+                        "stream:xf_cfg_non_canon",
+                        payload.clone(),
+                    ),
+                    expr_list(vec![
+                        expr_ident("if"),
+                        expr_list(vec![
+                            expr_ident("="),
+                            expr_ident(ec_var.clone()),
+                            expr_int(E_XF_OUT_INVALID),
+                        ]),
+                        err_doc_with_payload(
+                            expr_int(E_XF_OUT_INVALID),
+                            "stream:xf_out_invalid",
+                            payload.clone(),
+                        ),
+                        expr_list(vec![
+                            expr_ident("if"),
+                            expr_list(vec![
+                                expr_ident("="),
+                                expr_ident(ec_var.clone()),
+                                expr_int(E_XF_EMIT_BUF_TOO_LARGE),
+                            ]),
+                            err_doc_with_payload(
+                                expr_int(E_XF_EMIT_BUF_TOO_LARGE),
+                                "stream:xf_emit_buf_too_large",
+                                payload.clone(),
+                            ),
+                            expr_list(vec![
+                                expr_ident("if"),
+                                expr_list(vec![
+                                    expr_ident("="),
+                                    expr_ident(ec_var.clone()),
+                                    expr_int(E_XF_EMIT_STEP_BYTES_EXCEEDED),
+                                ]),
+                                err_doc_with_payload(
+                                    expr_int(E_XF_EMIT_STEP_BYTES_EXCEEDED),
+                                    "stream:xf_emit_step_bytes_exceeded",
+                                    payload.clone(),
+                                ),
+                                expr_list(vec![
+                                    expr_ident("if"),
+                                    expr_list(vec![
+                                        expr_ident("="),
+                                        expr_ident(ec_var.clone()),
+                                        expr_int(E_XF_EMIT_STEP_ITEMS_EXCEEDED),
+                                    ]),
+                                    err_doc_with_payload(
+                                        expr_int(E_XF_EMIT_STEP_ITEMS_EXCEEDED),
+                                        "stream:xf_emit_step_items_exceeded",
+                                        payload.clone(),
+                                    ),
+                                    expr_list(vec![
+                                        expr_ident("if"),
+                                        expr_list(vec![
+                                            expr_ident("="),
+                                            expr_ident(ec_var.clone()),
+                                            expr_int(E_XF_EMIT_LEN_GT_CAP),
+                                        ]),
+                                        err_doc_with_payload(
+                                            expr_int(E_XF_EMIT_LEN_GT_CAP),
+                                            "stream:xf_emit_len_gt_cap",
+                                            payload.clone(),
+                                        ),
+                                        expr_list(vec![
+                                            expr_ident("if"),
+                                            expr_list(vec![
+                                                expr_ident("="),
+                                                expr_ident(ec_var.clone()),
+                                                expr_int(E_XF_PLUGIN_INVALID),
+                                            ]),
+                                            err_doc_with_payload(
+                                                expr_int(E_XF_PLUGIN_INVALID),
+                                                "stream:xf_plugin_invalid",
+                                                payload.clone(),
+                                            ),
+                                            plugin_err_doc,
+                                        ]),
+                                    ]),
+                                ]),
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+        ]);
+
+        Ok(expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(r_var.clone()),
+                expr_list(vec![
+                    expr_ident("budget.scope_from_arch_v1"),
+                    budget_profile,
+                    call,
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_list(vec![
+                        expr_ident("result_bytes.is_ok"),
+                        expr_ident(r_var.clone()),
+                    ]),
+                    expr_int(1),
+                ]),
+                expr_list(vec![
+                    expr_ident("begin"),
+                    expr_list(vec![
+                        expr_ident("let"),
+                        expr_ident(out_b_var.clone()),
+                        expr_list(vec![
+                            expr_ident("__internal.result_bytes.unwrap_ok_v1"),
+                            expr_ident(r_var.clone()),
+                        ]),
+                    ]),
+                    self.gen_plugin_process_output_blob(stage_idx, &out_b_var)?,
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("begin"),
+                    expr_list(vec![
+                        expr_ident("let"),
+                        expr_ident(ec_var.clone()),
+                        expr_list(vec![
+                            expr_ident("result_bytes.err_code"),
+                            expr_ident(r_var.clone()),
+                        ]),
+                    ]),
+                    expr_list(vec![expr_ident("return"), err_doc]),
+                ]),
+            ]),
+        ]))
+    }
+
+    fn gen_plugin_process_output_blob(
+        &self,
+        stage_idx: usize,
+        out_b_var: &str,
+    ) -> Result<Expr, CompilerError> {
+        let out_v_var = format!("xf_out_v_{stage_idx}");
+        let out_len_var = format!("xf_out_len_{stage_idx}");
+        let count_var = format!("xf_out_count_{stage_idx}");
+        let pos_var = format!("xf_out_pos_{stage_idx}");
+        let item_len_var = format!("xf_out_item_len_{stage_idx}");
+        let item_var = format!("xf_out_item_{stage_idx}");
+        let loop_i_var = format!("xf_out_i_{stage_idx}");
+
+        let mut stmts: Vec<Expr> = vec![
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(out_v_var.clone()),
+                expr_list(vec![
+                    expr_ident("bytes.view"),
+                    expr_ident(out_b_var.to_string()),
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(out_len_var.clone()),
+                expr_list(vec![expr_ident("view.len"), expr_ident(out_v_var.clone())]),
+            ]),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("<"),
+                    expr_ident(out_len_var.clone()),
+                    expr_int(4),
+                ]),
+                expr_list(vec![
+                    expr_ident("return"),
+                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
+                ]),
+                expr_int(0),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(count_var.clone()),
+                expr_list(vec![
+                    expr_ident("codec.read_u32_le"),
+                    expr_ident(out_v_var.clone()),
+                    expr_int(0),
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("<"),
+                    expr_ident(count_var.clone()),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("return"),
+                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
+                ]),
+                expr_int(0),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(pos_var.clone()),
+                expr_int(4),
+            ]),
+        ];
+
+        let loop_body = expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("<"),
+                    expr_list(vec![
+                        expr_ident("-"),
+                        expr_ident(out_len_var.clone()),
+                        expr_ident(pos_var.clone()),
+                    ]),
+                    expr_int(4),
+                ]),
+                expr_list(vec![
+                    expr_ident("return"),
+                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
+                ]),
+                expr_int(0),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(item_len_var.clone()),
+                expr_list(vec![
+                    expr_ident("codec.read_u32_le"),
+                    expr_ident(out_v_var.clone()),
+                    expr_ident(pos_var.clone()),
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("<"),
+                    expr_ident(item_len_var.clone()),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("return"),
+                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
+                ]),
+                expr_int(0),
+            ]),
+            expr_list(vec![
+                expr_ident("set"),
+                expr_ident(pos_var.clone()),
+                expr_list(vec![
+                    expr_ident("+"),
+                    expr_ident(pos_var.clone()),
+                    expr_int(4),
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("<"),
+                    expr_list(vec![
+                        expr_ident("-"),
+                        expr_ident(out_len_var.clone()),
+                        expr_ident(pos_var.clone()),
+                    ]),
+                    expr_ident(item_len_var.clone()),
+                ]),
+                expr_list(vec![
+                    expr_ident("return"),
+                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
+                ]),
+                expr_int(0),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(item_var.clone()),
+                expr_list(vec![
+                    expr_ident("view.slice"),
+                    expr_ident(out_v_var.clone()),
+                    expr_ident(pos_var.clone()),
+                    expr_ident(item_len_var.clone()),
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("set"),
+                expr_ident(pos_var.clone()),
+                expr_list(vec![
+                    expr_ident("+"),
+                    expr_ident(pos_var.clone()),
+                    expr_ident(item_len_var.clone()),
+                ]),
+            ]),
+            self.gen_process_from(
+                stage_idx + 1,
+                self.apply_out_item_brand(stage_idx, expr_ident(item_var.clone())),
+            )?,
+            expr_int(0),
+        ]);
+
+        stmts.push(expr_list(vec![
+            expr_ident("for"),
+            expr_ident(loop_i_var),
+            expr_int(0),
+            expr_ident(count_var.clone()),
+            loop_body,
+        ]));
+
+        stmts.push(expr_list(vec![
+            expr_ident("if"),
+            expr_list(vec![
+                expr_ident("!="),
+                expr_ident(pos_var.clone()),
+                expr_ident(out_len_var.clone()),
+            ]),
+            expr_list(vec![
+                expr_ident("return"),
+                err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
+            ]),
+            expr_int(0),
+        ]));
+
+        stmts.push(expr_int(0));
+        Ok(expr_list(
+            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
+        ))
     }
 
     fn gen_require_brand_v1(
@@ -5303,443 +6816,11 @@ impl PipeCodegen<'_> {
     }
 
     fn gen_split_lines(&self, stage_idx: usize, chunk: Expr) -> Result<Expr, CompilerError> {
-        let s = self
-            .split_states
-            .iter()
-            .find(|s| s.stage_idx == stage_idx)
-            .ok_or_else(|| {
-                CompilerError::new(
-                    CompileErrorKind::Internal,
-                    "internal error: missing split_lines state".to_string(),
-                )
-            })?;
-
-        let delim = param_ident(s.delim_param);
-        let max_line = param_ident(s.max_line_bytes_param);
-        let carry = expr_ident(s.carry_var.clone());
-
-        let mut stmts = vec![expr_list(vec![
-            expr_ident("let"),
-            expr_ident("chunk_len".to_string()),
-            expr_list(vec![expr_ident("view.len"), chunk.clone()]),
-        ])];
-        stmts.push(let_i32("start", 0));
-
-        // Scan for delimiters.
-        stmts.push(expr_list(vec![
-            expr_ident("for"),
-            expr_ident("i".to_string()),
-            expr_int(0),
-            expr_ident("chunk_len".to_string()),
-            expr_list(vec![
-                expr_ident("begin"),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident("="),
-                        expr_list(vec![
-                            expr_ident("view.get_u8"),
-                            chunk.clone(),
-                            expr_ident("i".to_string()),
-                        ]),
-                        delim.clone(),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("begin"),
-                        expr_list(vec![
-                            expr_ident("let"),
-                            expr_ident("seg_len".to_string()),
-                            expr_list(vec![
-                                expr_ident("-"),
-                                expr_ident("i".to_string()),
-                                expr_ident("start".to_string()),
-                            ]),
-                        ]),
-                        // If carry_len + seg_len > max_line -> error.
-                        expr_list(vec![
-                            expr_ident("if"),
-                            expr_list(vec![
-                                expr_ident(">u"),
-                                expr_list(vec![
-                                    expr_ident("+"),
-                                    expr_list(vec![expr_ident("vec_u8.len"), carry.clone()]),
-                                    expr_ident("seg_len".to_string()),
-                                ]),
-                                max_line.clone(),
-                            ]),
-                            expr_list(vec![
-                                expr_ident("return"),
-                                err_doc_const(E_LINE_TOO_LONG, "stream:line_too_long"),
-                            ]),
-                            expr_int(0),
-                        ]),
-                        // If carry empty, emit view.slice directly; else extend carry and emit bytes.
-                        expr_list(vec![
-                            expr_ident("if"),
-                            expr_list(vec![
-                                expr_ident("="),
-                                expr_list(vec![expr_ident("vec_u8.len"), carry.clone()]),
-                                expr_int(0),
-                            ]),
-                            self.gen_process_from(
-                                stage_idx + 1,
-                                self.apply_out_item_brand(
-                                    stage_idx,
-                                    expr_list(vec![
-                                        expr_ident("view.slice"),
-                                        chunk.clone(),
-                                        expr_ident("start".to_string()),
-                                        expr_ident("seg_len".to_string()),
-                                    ]),
-                                ),
-                            )?,
-                            expr_list(vec![
-                                expr_ident("begin"),
-                                expr_list(vec![
-                                    expr_ident("set"),
-                                    carry.clone(),
-                                    expr_list(vec![
-                                        expr_ident("vec_u8.extend_bytes_range"),
-                                        carry.clone(),
-                                        chunk.clone(),
-                                        expr_ident("start".to_string()),
-                                        expr_ident("seg_len".to_string()),
-                                    ]),
-                                ]),
-                                expr_list(vec![
-                                    expr_ident("let"),
-                                    expr_ident("line_b".to_string()),
-                                    expr_list(vec![expr_ident("vec_u8.into_bytes"), carry.clone()]),
-                                ]),
-                                expr_list(vec![
-                                    expr_ident("let"),
-                                    expr_ident("line_v".to_string()),
-                                    expr_list(vec![
-                                        expr_ident("bytes.view"),
-                                        expr_ident("line_b".to_string()),
-                                    ]),
-                                ]),
-                                self.gen_process_from(
-                                    stage_idx + 1,
-                                    self.apply_out_item_brand(
-                                        stage_idx,
-                                        expr_ident("line_v".to_string()),
-                                    ),
-                                )?,
-                                expr_list(vec![
-                                    expr_ident("set"),
-                                    carry.clone(),
-                                    expr_list(vec![
-                                        expr_ident("vec_u8.with_capacity"),
-                                        max_line.clone(),
-                                    ]),
-                                ]),
-                                expr_int(0),
-                            ]),
-                        ]),
-                        expr_list(vec![
-                            expr_ident("set"),
-                            expr_ident("start".to_string()),
-                            expr_list(vec![
-                                expr_ident("+"),
-                                expr_ident("i".to_string()),
-                                expr_int(1),
-                            ]),
-                        ]),
-                        expr_int(0),
-                    ]),
-                    expr_int(0),
-                ]),
-            ]),
-        ]));
-
-        // Append tail bytes (after last delimiter) to carry.
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident("tail_len".to_string()),
-            expr_list(vec![
-                expr_ident("-"),
-                expr_ident("chunk_len".to_string()),
-                expr_ident("start".to_string()),
-            ]),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("if"),
-            expr_list(vec![
-                expr_ident(">u"),
-                expr_ident("tail_len".to_string()),
-                expr_int(0),
-            ]),
-            expr_list(vec![
-                expr_ident("begin"),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident(">u"),
-                        expr_list(vec![
-                            expr_ident("+"),
-                            expr_list(vec![expr_ident("vec_u8.len"), carry.clone()]),
-                            expr_ident("tail_len".to_string()),
-                        ]),
-                        max_line.clone(),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("return"),
-                        err_doc_const(E_LINE_TOO_LONG, "stream:line_too_long"),
-                    ]),
-                    expr_int(0),
-                ]),
-                expr_list(vec![
-                    expr_ident("set"),
-                    carry.clone(),
-                    expr_list(vec![
-                        expr_ident("vec_u8.extend_bytes_range"),
-                        carry.clone(),
-                        chunk,
-                        expr_ident("start".to_string()),
-                        expr_ident("tail_len".to_string()),
-                    ]),
-                ]),
-                expr_int(0),
-            ]),
-            expr_int(0),
-        ]));
-
-        Ok(expr_list(
-            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
-        ))
+        self.gen_plugin_step(stage_idx, chunk)
     }
 
     fn gen_deframe_u32le(&self, stage_idx: usize, chunk: Expr) -> Result<Expr, CompilerError> {
-        let d = self
-            .deframe_states
-            .iter()
-            .find(|d| d.stage_idx == stage_idx)
-            .ok_or_else(|| {
-                CompilerError::new(
-                    CompileErrorKind::Internal,
-                    "internal error: missing deframe state".to_string(),
-                )
-            })?;
-
-        let cfg = &d.cfg;
-        let max_frame_bytes = expr_int(cfg.max_frame_bytes);
-        let max_frames = cfg.max_frames;
-        let allow_empty = cfg.allow_empty != 0;
-
-        let hdr = expr_ident(d.hdr_var.clone());
-        let hdr_fill = expr_ident(d.hdr_fill_var.clone());
-        let need = expr_ident(d.need_var.clone());
-        let buf = expr_ident(d.buf_var.clone());
-        let buf_fill = expr_ident(d.buf_fill_var.clone());
-        let frames = expr_ident(d.frames_var.clone());
-
-        let chunk_len_var = format!("deframe_chunk_len_{stage_idx}");
-        let new_frames_var = format!("deframe_new_frames_{stage_idx}");
-
-        let mut stmts = Vec::new();
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident(chunk_len_var.clone()),
-            expr_list(vec![expr_ident("view.len"), chunk.clone()]),
-        ]));
-
-        // Process byte-by-byte to keep lowering small (avoids max-locals blowups).
-        let mut loop_body = Vec::new();
-        loop_body.push(expr_list(vec![
-            expr_ident("if"),
-            expr_list(vec![expr_ident("<"), hdr_fill.clone(), expr_int(4)]),
-            // READ_HDR
-            expr_list(vec![
-                expr_ident("begin"),
-                expr_list(vec![
-                    expr_ident("set"),
-                    hdr.clone(),
-                    expr_list(vec![
-                        expr_ident("vec_u8.set"),
-                        hdr.clone(),
-                        hdr_fill.clone(),
-                        expr_list(vec![
-                            expr_ident("view.get_u8"),
-                            chunk.clone(),
-                            expr_ident("i".to_string()),
-                        ]),
-                    ]),
-                ]),
-                expr_list(vec![
-                    expr_ident("set"),
-                    hdr_fill.clone(),
-                    expr_list(vec![expr_ident("+"), hdr_fill.clone(), expr_int(1)]),
-                ]),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![expr_ident("="), hdr_fill.clone(), expr_int(4)]),
-                    expr_list(vec![
-                        expr_ident("begin"),
-                        expr_list(vec![
-                            expr_ident("set"),
-                            need.clone(),
-                            expr_list(vec![
-                                expr_ident("codec.read_u32_le"),
-                                expr_list(vec![expr_ident("vec_u8.as_view"), hdr.clone()]),
-                                expr_int(0),
-                            ]),
-                        ]),
-                        expr_list(vec![
-                            expr_ident("if"),
-                            expr_list(vec![expr_ident("<"), need.clone(), expr_int(0)]),
-                            expr_list(vec![
-                                expr_ident("return"),
-                                err_doc_const(
-                                    E_DEFRAME_FRAME_TOO_LARGE,
-                                    "stream:deframe_frame_too_large",
-                                ),
-                            ]),
-                            expr_int(0),
-                        ]),
-                        expr_list(vec![
-                            expr_ident("if"),
-                            expr_list(vec![
-                                expr_ident(">u"),
-                                need.clone(),
-                                max_frame_bytes.clone(),
-                            ]),
-                            expr_list(vec![
-                                expr_ident("return"),
-                                err_doc_const(
-                                    E_DEFRAME_FRAME_TOO_LARGE,
-                                    "stream:deframe_frame_too_large",
-                                ),
-                            ]),
-                            expr_int(0),
-                        ]),
-                        expr_list(vec![
-                            expr_ident("if"),
-                            expr_list(vec![expr_ident("="), need.clone(), expr_int(0)]),
-                            if allow_empty {
-                                expr_list(vec![
-                                    expr_ident("begin"),
-                                    self.gen_deframe_emit_frame(
-                                        stage_idx,
-                                        expr_list(vec![
-                                            expr_ident("view.slice"),
-                                            chunk.clone(),
-                                            expr_ident("i".to_string()),
-                                            expr_int(0),
-                                        ]),
-                                        max_frames,
-                                        &new_frames_var,
-                                        &frames,
-                                    )?,
-                                    expr_list(vec![
-                                        expr_ident("set"),
-                                        hdr_fill.clone(),
-                                        expr_int(0),
-                                    ]),
-                                    expr_list(vec![expr_ident("set"), need.clone(), expr_int(0)]),
-                                    expr_list(vec![
-                                        expr_ident("set"),
-                                        buf_fill.clone(),
-                                        expr_int(0),
-                                    ]),
-                                    expr_int(0),
-                                ])
-                            } else {
-                                expr_list(vec![
-                                    expr_ident("return"),
-                                    err_doc_const(
-                                        E_DEFRAME_EMPTY_FORBIDDEN,
-                                        "stream:deframe_empty_forbidden",
-                                    ),
-                                ])
-                            },
-                            expr_int(0),
-                        ]),
-                        expr_list(vec![expr_ident("set"), buf_fill.clone(), expr_int(0)]),
-                        expr_int(0),
-                    ]),
-                    expr_int(0),
-                ]),
-                expr_int(0),
-            ]),
-            // READ_PAYLOAD
-            expr_list(vec![
-                expr_ident("begin"),
-                expr_list(vec![
-                    expr_ident("set"),
-                    buf.clone(),
-                    expr_list(vec![
-                        expr_ident("vec_u8.set"),
-                        buf.clone(),
-                        buf_fill.clone(),
-                        expr_list(vec![
-                            expr_ident("view.get_u8"),
-                            chunk.clone(),
-                            expr_ident("i".to_string()),
-                        ]),
-                    ]),
-                ]),
-                expr_list(vec![
-                    expr_ident("set"),
-                    buf_fill.clone(),
-                    expr_list(vec![expr_ident("+"), buf_fill.clone(), expr_int(1)]),
-                ]),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![expr_ident("="), buf_fill.clone(), need.clone()]),
-                    expr_list(vec![
-                        expr_ident("begin"),
-                        expr_list(vec![
-                            expr_ident("let"),
-                            expr_ident(format!("deframe_bv_{stage_idx}")),
-                            expr_list(vec![expr_ident("vec_u8.as_view"), buf.clone()]),
-                        ]),
-                        expr_list(vec![
-                            expr_ident("let"),
-                            expr_ident(format!("deframe_payload_{stage_idx}")),
-                            expr_list(vec![
-                                expr_ident("view.slice"),
-                                expr_ident(format!("deframe_bv_{stage_idx}")),
-                                expr_int(0),
-                                need.clone(),
-                            ]),
-                        ]),
-                        self.gen_deframe_emit_frame(
-                            stage_idx,
-                            expr_ident(format!("deframe_payload_{stage_idx}")),
-                            max_frames,
-                            &new_frames_var,
-                            &frames,
-                        )?,
-                        expr_list(vec![expr_ident("set"), hdr_fill.clone(), expr_int(0)]),
-                        expr_list(vec![expr_ident("set"), need.clone(), expr_int(0)]),
-                        expr_list(vec![expr_ident("set"), buf_fill.clone(), expr_int(0)]),
-                        expr_int(0),
-                    ]),
-                    expr_int(0),
-                ]),
-                expr_int(0),
-            ]),
-        ]));
-        loop_body.push(expr_int(0));
-
-        stmts.push(expr_list(vec![
-            expr_ident("for"),
-            expr_ident("i".to_string()),
-            expr_int(0),
-            expr_ident(chunk_len_var),
-            expr_list(
-                vec![expr_ident("begin")]
-                    .into_iter()
-                    .chain(loop_body)
-                    .collect(),
-            ),
-        ]));
-        stmts.push(expr_int(0));
-
-        Ok(expr_list(
-            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
-        ))
+        self.gen_plugin_step(stage_idx, chunk)
     }
 
     fn gen_json_canon_stream_process(
@@ -5747,411 +6828,11 @@ impl PipeCodegen<'_> {
         stage_idx: usize,
         item: Expr,
     ) -> Result<Expr, CompilerError> {
-        let j = self
-            .json_canon_states
-            .iter()
-            .find(|j| j.stage_idx == stage_idx)
-            .ok_or_else(|| {
-                CompilerError::new(
-                    CompileErrorKind::Internal,
-                    "internal error: missing json_canon_stream state".to_string(),
-                )
-            })?;
-
-        let buf = expr_ident(j.buf_var.clone());
-        let max_total = expr_int(j.cfg.max_total_json_bytes);
-
-        let mut stmts: Vec<Expr> = vec![expr_list(vec![
-            expr_ident("let"),
-            expr_ident("json_n".to_string()),
-            expr_list(vec![expr_ident("view.len"), item.clone()]),
-        ])];
-        stmts.push(expr_list(vec![
-            expr_ident("if"),
-            expr_list(vec![
-                expr_ident("<"),
-                expr_ident("json_n".to_string()),
-                expr_int(0),
-            ]),
-            expr_list(vec![
-                expr_ident("return"),
-                err_doc_const(E_BUDGET_IN_BYTES, "stream:json_input_too_large"),
-            ]),
-            expr_int(0),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident("json_new_len".to_string()),
-            expr_list(vec![
-                expr_ident("+"),
-                expr_list(vec![expr_ident("vec_u8.len"), buf.clone()]),
-                expr_ident("json_n".to_string()),
-            ]),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("if"),
-            expr_list(vec![
-                expr_ident(">u"),
-                expr_ident("json_new_len".to_string()),
-                max_total,
-            ]),
-            expr_list(vec![
-                expr_ident("return"),
-                err_doc_const(E_BUDGET_IN_BYTES, "stream:json_max_total_json_bytes"),
-            ]),
-            expr_int(0),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("set"),
-            buf.clone(),
-            expr_list(vec![
-                expr_ident("vec_u8.extend_bytes_range"),
-                buf.clone(),
-                item,
-                expr_int(0),
-                expr_ident("json_n".to_string()),
-            ]),
-        ]));
-        stmts.push(expr_int(0));
-        Ok(expr_list(
-            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
-        ))
+        self.gen_plugin_step(stage_idx, item)
     }
 
     fn gen_json_canon_stream_flush(&self, stage_idx: usize) -> Result<Expr, CompilerError> {
-        let j = self
-            .json_canon_states
-            .iter()
-            .find(|j| j.stage_idx == stage_idx)
-            .ok_or_else(|| {
-                CompilerError::new(
-                    CompileErrorKind::Internal,
-                    "internal error: missing json_canon_stream state".to_string(),
-                )
-            })?;
-
-        let buf = expr_ident(j.buf_var.clone());
-        let cfg_max_depth = expr_int(j.cfg.max_depth);
-        let cfg_max_object_members = expr_int(j.cfg.max_object_members);
-        let cfg_max_object_total_bytes = expr_int(j.cfg.max_object_total_bytes);
-        let cfg_emit_chunk_max_bytes = expr_int(j.cfg.emit_chunk_max_bytes);
-
-        let stage_idx_i32 = i32::try_from(stage_idx).unwrap_or(i32::MAX);
-
-        let mut stmts: Vec<Expr> = vec![expr_list(vec![
-            expr_ident("let"),
-            expr_ident("json_in".to_string()),
-            expr_list(vec![expr_ident("vec_u8.as_view"), buf.clone()]),
-        ])];
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident("json_doc".to_string()),
-            expr_list(vec![
-                expr_ident("json.jcs.canon_doc_v1"),
-                expr_ident("json_in".to_string()),
-                cfg_max_depth,
-                cfg_max_object_members,
-                cfg_max_object_total_bytes,
-            ]),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident("json_dv".to_string()),
-            expr_list(vec![
-                expr_ident("bytes.view"),
-                expr_ident("json_doc".to_string()),
-            ]),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident("json_dl".to_string()),
-            expr_list(vec![
-                expr_ident("view.len"),
-                expr_ident("json_dv".to_string()),
-            ]),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("if"),
-            expr_list(vec![
-                expr_ident("<"),
-                expr_ident("json_dl".to_string()),
-                expr_int(1),
-            ]),
-            expr_list(vec![
-                expr_ident("return"),
-                err_doc_const(E_CFG_INVALID, "stream:json_doc_invalid"),
-            ]),
-            expr_int(0),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident("json_tag".to_string()),
-            expr_list(vec![
-                expr_ident("view.get_u8"),
-                expr_ident("json_dv".to_string()),
-                expr_int(0),
-            ]),
-        ]));
-
-        stmts.push(expr_list(vec![
-            expr_ident("if"),
-            expr_list(vec![
-                expr_ident("="),
-                expr_ident("json_tag".to_string()),
-                expr_int(0),
-            ]),
-            expr_list(vec![
-                expr_ident("begin"),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident("<"),
-                        expr_ident("json_dl".to_string()),
-                        expr_int(9),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("return"),
-                        err_doc_const(E_CFG_INVALID, "stream:json_doc_invalid"),
-                    ]),
-                    expr_int(0),
-                ]),
-                expr_list(vec![
-                    expr_ident("let"),
-                    expr_ident("json_code".to_string()),
-                    expr_list(vec![
-                        expr_ident("codec.read_u32_le"),
-                        expr_ident("json_dv".to_string()),
-                        expr_int(1),
-                    ]),
-                ]),
-                expr_list(vec![
-                    expr_ident("let"),
-                    expr_ident("json_off".to_string()),
-                    expr_list(vec![
-                        expr_ident("codec.read_u32_le"),
-                        expr_ident("json_dv".to_string()),
-                        expr_int(5),
-                    ]),
-                ]),
-                expr_list(vec![
-                    expr_ident("let"),
-                    expr_ident("pl".to_string()),
-                    expr_list(vec![expr_ident("vec_u8.with_capacity"), expr_int(8)]),
-                ]),
-                extend_u32("pl", expr_ident("json_off".to_string())),
-                extend_u32("pl", expr_int(stage_idx_i32)),
-                expr_list(vec![
-                    expr_ident("let"),
-                    expr_ident("plb".to_string()),
-                    expr_list(vec![
-                        expr_ident("vec_u8.into_bytes"),
-                        expr_ident("pl".to_string()),
-                    ]),
-                ]),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident("="),
-                        expr_ident("json_code".to_string()),
-                        expr_int(E_JSON_SYNTAX),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("return"),
-                        err_doc_with_payload(
-                            expr_int(E_JSON_SYNTAX),
-                            "stream:json_syntax",
-                            expr_ident("plb".to_string()),
-                        ),
-                    ]),
-                    expr_int(0),
-                ]),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident("="),
-                        expr_ident("json_code".to_string()),
-                        expr_int(E_JSON_NOT_IJSON),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("return"),
-                        err_doc_with_payload(
-                            expr_int(E_JSON_NOT_IJSON),
-                            "stream:json_not_ijson",
-                            expr_ident("plb".to_string()),
-                        ),
-                    ]),
-                    expr_int(0),
-                ]),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident("="),
-                        expr_ident("json_code".to_string()),
-                        expr_int(E_JSON_TOO_DEEP),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("return"),
-                        err_doc_with_payload(
-                            expr_int(E_JSON_TOO_DEEP),
-                            "stream:json_too_deep",
-                            expr_ident("plb".to_string()),
-                        ),
-                    ]),
-                    expr_int(0),
-                ]),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident("="),
-                        expr_ident("json_code".to_string()),
-                        expr_int(E_JSON_OBJECT_TOO_LARGE),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("return"),
-                        err_doc_with_payload(
-                            expr_int(E_JSON_OBJECT_TOO_LARGE),
-                            "stream:json_object_too_large",
-                            expr_ident("plb".to_string()),
-                        ),
-                    ]),
-                    expr_int(0),
-                ]),
-                expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident("="),
-                        expr_ident("json_code".to_string()),
-                        expr_int(E_JSON_TRAILING_DATA),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("return"),
-                        err_doc_with_payload(
-                            expr_int(E_JSON_TRAILING_DATA),
-                            "stream:json_trailing_data",
-                            expr_ident("plb".to_string()),
-                        ),
-                    ]),
-                    expr_int(0),
-                ]),
-                expr_list(vec![
-                    expr_ident("return"),
-                    err_doc_const(E_CFG_INVALID, "stream:json_doc_invalid"),
-                ]),
-            ]),
-            expr_int(0),
-        ]));
-
-        stmts.push(expr_list(vec![
-            expr_ident("if"),
-            expr_list(vec![
-                expr_ident("!="),
-                expr_ident("json_tag".to_string()),
-                expr_int(1),
-            ]),
-            expr_list(vec![
-                expr_ident("return"),
-                err_doc_const(E_CFG_INVALID, "stream:json_doc_invalid"),
-            ]),
-            expr_int(0),
-        ]));
-
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident("canon_len".to_string()),
-            expr_list(vec![
-                expr_ident("-"),
-                expr_ident("json_dl".to_string()),
-                expr_int(1),
-            ]),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident("canon".to_string()),
-            expr_list(vec![
-                expr_ident("view.slice"),
-                expr_ident("json_dv".to_string()),
-                expr_int(1),
-                expr_ident("canon_len".to_string()),
-            ]),
-        ]));
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident("chunks".to_string()),
-            expr_list(vec![
-                expr_ident("/"),
-                expr_list(vec![
-                    expr_ident("+"),
-                    expr_ident("canon_len".to_string()),
-                    expr_list(vec![
-                        expr_ident("-"),
-                        cfg_emit_chunk_max_bytes.clone(),
-                        expr_int(1),
-                    ]),
-                ]),
-                cfg_emit_chunk_max_bytes.clone(),
-            ]),
-        ]));
-
-        stmts.push(expr_list(vec![
-            expr_ident("for"),
-            expr_ident("i".to_string()),
-            expr_int(0),
-            expr_ident("chunks".to_string()),
-            expr_list(vec![
-                expr_ident("begin"),
-                expr_list(vec![
-                    expr_ident("let"),
-                    expr_ident("pos".to_string()),
-                    expr_list(vec![
-                        expr_ident("*"),
-                        expr_ident("i".to_string()),
-                        cfg_emit_chunk_max_bytes.clone(),
-                    ]),
-                ]),
-                expr_list(vec![
-                    expr_ident("let"),
-                    expr_ident("remain".to_string()),
-                    expr_list(vec![
-                        expr_ident("-"),
-                        expr_ident("canon_len".to_string()),
-                        expr_ident("pos".to_string()),
-                    ]),
-                ]),
-                expr_list(vec![
-                    expr_ident("let"),
-                    expr_ident("take".to_string()),
-                    expr_list(vec![
-                        expr_ident("if"),
-                        expr_list(vec![
-                            expr_ident("<u"),
-                            expr_ident("remain".to_string()),
-                            cfg_emit_chunk_max_bytes.clone(),
-                        ]),
-                        expr_ident("remain".to_string()),
-                        cfg_emit_chunk_max_bytes.clone(),
-                    ]),
-                ]),
-                self.gen_process_from(
-                    stage_idx + 1,
-                    self.apply_out_item_brand(
-                        stage_idx,
-                        expr_list(vec![
-                            expr_ident("view.slice"),
-                            expr_ident("canon".to_string()),
-                            expr_ident("pos".to_string()),
-                            expr_ident("take".to_string()),
-                        ]),
-                    ),
-                )?,
-                expr_int(0),
-            ]),
-        ]));
-
-        stmts.push(self.gen_flush_from(stage_idx + 1)?);
-        stmts.push(expr_int(0));
-        Ok(expr_list(
-            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
-        ))
+        self.gen_plugin_flush(stage_idx)
     }
 
     fn par_map_state(&self, stage_idx: usize) -> Result<&ParMapState, CompilerError> {
@@ -7267,143 +7948,12 @@ impl PipeCodegen<'_> {
         match &self.chain[stage_idx].kind {
             PipeXfV1::JsonCanonStreamV1 { .. } => self.gen_json_canon_stream_flush(stage_idx),
             PipeXfV1::ParMapStreamV1 { .. } => self.gen_par_map_stream_flush(stage_idx),
-            PipeXfV1::SplitLines { .. } => {
-                let s = self
-                    .split_states
-                    .iter()
-                    .find(|s| s.stage_idx == stage_idx)
-                    .ok_or_else(|| {
-                        CompilerError::new(
-                            CompileErrorKind::Internal,
-                            "internal error: missing split_lines state".to_string(),
-                        )
-                    })?;
-                let carry = expr_ident(s.carry_var.clone());
-                let mut stmts = vec![expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident(">u"),
-                        expr_list(vec![expr_ident("vec_u8.len"), carry.clone()]),
-                        expr_int(0),
-                    ]),
-                    expr_list(vec![
-                        expr_ident("begin"),
-                        expr_list(vec![
-                            expr_ident("let"),
-                            expr_ident("line_b".to_string()),
-                            expr_list(vec![expr_ident("vec_u8.into_bytes"), carry.clone()]),
-                        ]),
-                        expr_list(vec![
-                            expr_ident("let"),
-                            expr_ident("line_v".to_string()),
-                            expr_list(vec![
-                                expr_ident("bytes.view"),
-                                expr_ident("line_b".to_string()),
-                            ]),
-                        ]),
-                        self.gen_process_from(
-                            stage_idx + 1,
-                            self.apply_out_item_brand(stage_idx, expr_ident("line_v".to_string())),
-                        )?,
-                        expr_int(0),
-                    ]),
-                    expr_int(0),
-                ])];
-                stmts.push(self.gen_flush_from(stage_idx + 1)?);
-                Ok(expr_list(
-                    vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
-                ))
-            }
-            PipeXfV1::DeframeU32LeV1 { .. } => {
-                let d = self
-                    .deframe_states
-                    .iter()
-                    .find(|d| d.stage_idx == stage_idx)
-                    .ok_or_else(|| {
-                        CompilerError::new(
-                            CompileErrorKind::Internal,
-                            "internal error: missing deframe state".to_string(),
-                        )
-                    })?;
-
-                let hdr_fill = expr_ident(d.hdr_fill_var.clone());
-                let need = expr_ident(d.need_var.clone());
-                let buf_fill = expr_ident(d.buf_fill_var.clone());
-
-                let mut stmts = vec![expr_list(vec![
-                    expr_ident("if"),
-                    expr_list(vec![
-                        expr_ident("if"),
-                        expr_list(vec![expr_ident("="), hdr_fill.clone(), expr_int(0)]),
-                        expr_list(vec![expr_ident("="), buf_fill.clone(), expr_int(0)]),
-                        expr_int(0),
-                    ]),
-                    expr_int(0),
-                    match d.cfg.on_truncated {
-                        DeframeOnTruncatedV1::Drop => expr_list(vec![
-                            expr_ident("begin"),
-                            expr_list(vec![expr_ident("set"), hdr_fill.clone(), expr_int(0)]),
-                            expr_list(vec![expr_ident("set"), need.clone(), expr_int(0)]),
-                            expr_list(vec![expr_ident("set"), buf_fill.clone(), expr_int(0)]),
-                            expr_int(0),
-                        ]),
-                        DeframeOnTruncatedV1::Err => expr_list(vec![
-                            expr_ident("return"),
-                            err_doc_const(E_DEFRAME_TRUNCATED, "stream:deframe_truncated"),
-                        ]),
-                    },
-                ])];
-
-                stmts.push(self.gen_flush_from(stage_idx + 1)?);
-                Ok(expr_list(
-                    vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
-                ))
+            PipeXfV1::PluginV1 { .. } => self.gen_plugin_flush(stage_idx),
+            PipeXfV1::SplitLines { .. } | PipeXfV1::DeframeU32LeV1 { .. } => {
+                self.gen_plugin_flush(stage_idx)
             }
             _ => self.gen_flush_from(stage_idx + 1),
         }
-    }
-
-    fn gen_deframe_emit_frame(
-        &self,
-        stage_idx: usize,
-        payload: Expr,
-        max_frames: i32,
-        new_frames_var: &str,
-        frames_var: &Expr,
-    ) -> Result<Expr, CompilerError> {
-        let mut stmts = Vec::new();
-        stmts.push(expr_list(vec![
-            expr_ident("let"),
-            expr_ident(new_frames_var.to_string()),
-            expr_list(vec![expr_ident("+"), frames_var.clone(), expr_int(1)]),
-        ]));
-        if max_frames > 0 {
-            stmts.push(expr_list(vec![
-                expr_ident("if"),
-                expr_list(vec![
-                    expr_ident(">u"),
-                    expr_ident(new_frames_var.to_string()),
-                    expr_int(max_frames),
-                ]),
-                expr_list(vec![
-                    expr_ident("return"),
-                    err_doc_const(E_DEFRAME_MAX_FRAMES, "stream:deframe_max_frames"),
-                ]),
-                expr_int(0),
-            ]));
-        }
-        stmts.push(expr_list(vec![
-            expr_ident("set"),
-            frames_var.clone(),
-            expr_ident(new_frames_var.to_string()),
-        ]));
-        stmts.push(
-            self.gen_process_from(stage_idx + 1, self.apply_out_item_brand(stage_idx, payload))?,
-        );
-        stmts.push(expr_int(0));
-        Ok(expr_list(
-            vec![expr_ident("begin")].into_iter().chain(stmts).collect(),
-        ))
     }
 
     fn gen_net_sink_return_err(&self, doc: Expr) -> Expr {
@@ -9225,6 +9775,7 @@ fn canon_stream_descriptor_pairs(v: &mut Value) {
                     | "std.stream.src.net_tcp_read_stream_handle_v1"
                     | "std.stream.xf.deframe_u32le_v1"
                     | "std.stream.xf.json_canon_stream_v1"
+                    | "std.stream.xf.plugin_v1"
                     | "std.stream.xf.require_brand_v1"
                     | "std.stream.xf.par_map_stream_v1"
                     | "std.stream.xf.par_map_stream_result_bytes_v1"

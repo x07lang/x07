@@ -157,6 +157,19 @@ fn compile_accepts_stream_pipe_helpers_that_use_internal_only_builtins() {
             ["std.stream.sink.collect_bytes_v1"]
         ]),
     );
-    compile_program_to_c(program.as_slice(), &CompileOptions::default())
-        .expect("program must compile");
+    let mut options = CompileOptions::default();
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("repo root")
+        .to_path_buf();
+    options.arch_root = Some(repo_root);
+    let compile_res = std::thread::Builder::new()
+        .name("internal_only_stream_pipe_compile".to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || compile_program_to_c(program.as_slice(), &options))
+        .expect("spawn compile thread")
+        .join()
+        .expect("join compile thread");
+    compile_res.expect("program must compile");
 }
