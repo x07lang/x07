@@ -56,6 +56,20 @@
       "out_item_brand": "none",
       "state_bytes": 32,
       "scratch_bytes": 1048576
+    },
+    {
+      "plugin_id": "xf.test_emit_limits_v1",
+      "plugin_spec_path": "arch/stream/plugins/specs/xf.test_emit_limits_v1.x07sp-plugin.json",
+      "budget_profile_id": "stream_xf_plugin_v1",
+      "native_backend_id": "x07.stream.xf",
+      "abi_major": 1,
+      "export_symbol": "x07_xf_test_emit_limits_v1",
+      "determinism": "deterministic_v1",
+      "worlds_allowed": ["solve-pure"],
+      "in_item_brand": "any",
+      "out_item_brand": "none",
+      "state_bytes": 32,
+      "scratch_bytes": 0
     }
   ]
 }

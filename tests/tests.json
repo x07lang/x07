@@ -194,6 +194,18 @@
       "entry": "smoke_full.full_fs_rr_kv_smoke",
       "fixture_root": "fixtures/full_smoke",
       "expect": "pass"
+    },
+    {
+      "id": "stream_plugins/abi_descriptor_sanity_v1",
+      "world": "solve-pure",
+      "entry": "std.stream.plugin.tests.test_descriptor_sanity_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "stream_plugins/emit_limits_enforced_v1",
+      "world": "solve-pure",
+      "entry": "std.stream.plugin.tests.test_emit_limits_enforced_v1",
+      "expect": "pass"
     }
   ]
 }

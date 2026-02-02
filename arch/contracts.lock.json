@@ -20,6 +20,9 @@
     },
     "arch/stream/plugins/specs/xf.split_lines_v1.x07sp-plugin.json": {
       "jcs_sha256_hex": "ab080b14a0a4a94485ebe54e0359c2bc2c203ebda4a1c1c9e119536363d23344"
+    },
+    "arch/stream/plugins/specs/xf.test_emit_limits_v1.x07sp-plugin.json": {
+      "jcs_sha256_hex": "eefb5efc71626eee8b29a3c84d0335b00d29482551ebccc2bb38198d6640cbce"
     }
   },
   "indexes": {
@@ -30,7 +33,7 @@
       "jcs_sha256_hex": "dc6b68d9c9a31fba1b13c25522fe8ef78649c8c2b466f2fbf07a84ed24875938"
     },
     "arch/stream/plugins/index.x07sp.json": {
-      "jcs_sha256_hex": "a612c269e7d878a481d635ae2250da6bcd5423a18804616c12f2e3939d9ad64f"
+      "jcs_sha256_hex": "8658fd3c1b79221e47e5606785f818226354e0e41255389d0c1de3e1213ff926"
     }
   },
   "schema_version": "x07.arch.contracts.lock@0.1.0"

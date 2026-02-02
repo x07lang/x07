@@ -50,6 +50,7 @@ pub struct x07_xf_emit_v1 {
     pub emit_ctx: *mut c_void,
     pub emit_alloc: Option<unsafe extern "C" fn(*mut c_void, u32, *mut x07_out_buf_v1) -> i32>,
     pub emit_commit: Option<unsafe extern "C" fn(*mut c_void, *const x07_out_buf_v1) -> i32>,
+    pub emit_view: Option<unsafe extern "C" fn(*mut c_void, *const u8, u32, u32) -> i32>,
 }
 
 #[repr(C)]
@@ -780,6 +781,162 @@ unsafe extern "C" fn xf_json_canon_stream_flush_v1(
     0
 }
 
+// --- xf.test_emit_limits_v1 ---
+
+#[repr(C)]
+struct TestEmitLimitsStateV1 {
+    mode: u32,
+    _pad: [u32; 7],
+}
+
+unsafe extern "C" fn xf_test_emit_limits_init_v1(
+    state: *mut c_void,
+    _scratch: *mut x07_scratch_v1,
+    cfg: x07_bytes_view_v1,
+    _emit: x07_xf_emit_v1,
+    _budget: x07_xf_budget_v1,
+) -> i32 {
+    if cfg.len != 1 {
+        return -E_CFG_INVALID;
+    }
+    let s = view_as_slice(cfg);
+    let st = &mut *(state as *mut TestEmitLimitsStateV1);
+    st.mode = s[0] as u32;
+    0
+}
+
+unsafe extern "C" fn xf_test_emit_limits_step_v1(
+    state: *mut c_void,
+    _scratch: *mut x07_scratch_v1,
+    _input: x07_bytes_view_v1,
+    emit: x07_xf_emit_v1,
+    budget: x07_xf_budget_v1,
+) -> i32 {
+    let st = &*(state as *const TestEmitLimitsStateV1);
+    let mode = st.mode as u8;
+
+    match mode {
+        b'A' => {
+            let out_buf = x07_out_buf_v1 {
+                ptr: core::ptr::null_mut(),
+                cap: 0,
+                len: 0,
+            };
+            emit_commit(emit, &out_buf as *const x07_out_buf_v1)
+        }
+        b'B' => {
+            let Some(cap) = budget.max_out_buf_bytes.checked_add(1) else {
+                ev_trap(TRAP_INTERNAL);
+            };
+            let mut out_buf = x07_out_buf_v1 {
+                ptr: core::ptr::null_mut(),
+                cap: 0,
+                len: 0,
+            };
+            emit_alloc(emit, cap, &mut out_buf as *mut x07_out_buf_v1)
+        }
+        b'C' => {
+            if budget.max_out_buf_bytes == 0 || budget.max_out_bytes_per_step == 0 {
+                ev_trap(TRAP_INTERNAL);
+            }
+
+            let mut out_buf = x07_out_buf_v1 {
+                ptr: core::ptr::null_mut(),
+                cap: 0,
+                len: 0,
+            };
+            let rc = emit_alloc(
+                emit,
+                budget.max_out_buf_bytes,
+                &mut out_buf as *mut x07_out_buf_v1,
+            );
+            if rc != 0 {
+                return rc;
+            }
+            if out_buf.cap != budget.max_out_buf_bytes {
+                ev_trap(TRAP_INTERNAL);
+            }
+            *out_buf.ptr = 0;
+            out_buf.len = budget.max_out_buf_bytes;
+            let rc = emit_commit(emit, &out_buf as *const x07_out_buf_v1);
+            if rc != 0 {
+                return rc;
+            }
+
+            let mut out_buf = x07_out_buf_v1 {
+                ptr: core::ptr::null_mut(),
+                cap: 0,
+                len: 0,
+            };
+            emit_alloc(
+                emit,
+                budget.max_out_buf_bytes,
+                &mut out_buf as *mut x07_out_buf_v1,
+            )
+        }
+        b'D' => {
+            if budget.max_out_items_per_step == 0 {
+                ev_trap(TRAP_INTERNAL);
+            }
+
+            for _ in 0..2 {
+                let mut out_buf = x07_out_buf_v1 {
+                    ptr: core::ptr::null_mut(),
+                    cap: 0,
+                    len: 0,
+                };
+                let rc = emit_alloc(emit, 1, &mut out_buf as *mut x07_out_buf_v1);
+                if rc != 0 {
+                    return rc;
+                }
+                if out_buf.cap != 1 {
+                    ev_trap(TRAP_INTERNAL);
+                }
+                *out_buf.ptr = 0;
+                out_buf.len = 1;
+                let rc = emit_commit(emit, &out_buf as *const x07_out_buf_v1);
+                if rc != 0 {
+                    return rc;
+                }
+            }
+
+            let mut out_buf = x07_out_buf_v1 {
+                ptr: core::ptr::null_mut(),
+                cap: 0,
+                len: 0,
+            };
+            emit_alloc(emit, 1, &mut out_buf as *mut x07_out_buf_v1)
+        }
+        b'E' => {
+            let mut out_buf = x07_out_buf_v1 {
+                ptr: core::ptr::null_mut(),
+                cap: 0,
+                len: 0,
+            };
+            let rc = emit_alloc(emit, 1, &mut out_buf as *mut x07_out_buf_v1);
+            if rc != 0 {
+                return rc;
+            }
+            if out_buf.cap != 1 {
+                ev_trap(TRAP_INTERNAL);
+            }
+            *out_buf.ptr = 0;
+            out_buf.len = 2;
+            emit_commit(emit, &out_buf as *const x07_out_buf_v1)
+        }
+        _ => 0,
+    }
+}
+
+unsafe extern "C" fn xf_test_emit_limits_flush_v1(
+    _state: *mut c_void,
+    _scratch: *mut x07_scratch_v1,
+    _emit: x07_xf_emit_v1,
+    _budget: x07_xf_budget_v1,
+) -> i32 {
+    0
+}
+
 // --- Exported descriptors ---
 
 #[no_mangle]
@@ -851,5 +1008,23 @@ pub static x07_xf_json_canon_stream_v1: x07_stream_xf_plugin_v1 = x07_stream_xf_
     init: Some(xf_json_canon_stream_init_v1),
     step: Some(xf_json_canon_stream_step_v1),
     flush: Some(xf_json_canon_stream_flush_v1),
+    drop: None,
+};
+
+#[no_mangle]
+pub static x07_xf_test_emit_limits_v1: x07_stream_xf_plugin_v1 = x07_stream_xf_plugin_v1 {
+    abi_tag: X07_XF_ABI_TAG_X7XF,
+    abi_version: X07_XF_ABI_VERSION,
+    plugin_id: c"xf.test_emit_limits_v1".as_ptr(),
+    flags: X07_XF_FLAG_DETERMINISTIC_ONLY,
+    in_item_brand: c"any".as_ptr(),
+    out_item_brand: c"none".as_ptr(),
+    state_size: 32,
+    state_align: 8,
+    scratch_hint: 0,
+    scratch_max: 0,
+    init: Some(xf_test_emit_limits_init_v1),
+    step: Some(xf_test_emit_limits_step_v1),
+    flush: Some(xf_test_emit_limits_flush_v1),
     drop: None,
 };

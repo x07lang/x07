@@ -339,6 +339,7 @@ Notes:
 - `115`: stream plugin exceeded per-step output items cap
 - `116`: stream plugin committed `len > cap` (`emit_commit`)
 - `117`: stream plugin descriptor invalid / ABI mismatch
+- `118`: stream plugin `emit_view` not allowed
 
 For `71`, the `ERR` doc payload is:
 

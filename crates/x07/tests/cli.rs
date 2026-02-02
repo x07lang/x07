@@ -90,13 +90,13 @@ fn x07_test_smoke_suite() {
     );
     let v = parse_json_stdout(&out);
     assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
-    assert_eq!(v["summary"]["passed"], 30);
+    assert_eq!(v["summary"]["passed"], 32);
     assert_eq!(v["summary"]["failed"], 0);
     assert_eq!(v["summary"]["errors"], 0);
     assert_eq!(v["summary"]["xfail_failed"], 1);
 
     let tests = v["tests"].as_array().expect("tests[]");
-    assert_eq!(tests.len(), 31);
+    assert_eq!(tests.len(), 33);
     let ids: Vec<&str> = tests
         .iter()
         .map(|t| t["id"].as_str().expect("test.id"))
@@ -134,7 +134,9 @@ fn x07_test_smoke_suite() {
             "smoke/stream_pipe_deframe_truncated_drop_ok",
             "smoke/stream_pipe_deframe_truncated_err",
             "smoke/stream_pipe_fs_open_read_collect",
-            "smoke/stream_pipe_rr_send_collect"
+            "smoke/stream_pipe_rr_send_collect",
+            "stream_plugins/abi_descriptor_sanity_v1",
+            "stream_plugins/emit_limits_enforced_v1"
         ]
     );
 

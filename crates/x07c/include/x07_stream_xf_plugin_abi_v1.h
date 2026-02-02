@@ -56,6 +56,7 @@ typedef struct x07_xf_emit_v1 {
   void* emit_ctx;
   int32_t (*emit_alloc)(void* emit_ctx, uint32_t cap, x07_out_buf_v1* out);
   int32_t (*emit_commit)(void* emit_ctx, const x07_out_buf_v1* out);
+  int32_t (*emit_view)(void* emit_ctx, const uint8_t* ptr, uint32_t len, uint32_t view_kind);
 } x07_xf_emit_v1;
 
 // --- Plugin descriptor (v1) ---
@@ -111,4 +112,3 @@ typedef struct x07_stream_xf_plugin_v1 {
 #endif
 
 #endif // X07_STREAM_XF_PLUGIN_ABI_V1_H
-

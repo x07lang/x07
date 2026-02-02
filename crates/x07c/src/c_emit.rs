@@ -35677,6 +35677,7 @@ static bytes_t rt_json_jcs_canon_doc_v1(
 #define RT_XF_E_EMIT_STEP_ITEMS_EXCEEDED UINT32_C(115)
 #define RT_XF_E_EMIT_LEN_GT_CAP UINT32_C(116)
 #define RT_XF_E_PLUGIN_INVALID UINT32_C(117)
+#define RT_XF_E_VIEW_NOT_ALLOWED UINT32_C(118)
 
 typedef bytes_t ev_bytes;
 
@@ -35710,6 +35711,7 @@ typedef struct x07_xf_emit_v1 {
   void* emit_ctx;
   int32_t (*emit_alloc)(void* emit_ctx, uint32_t cap, x07_out_buf_v1* out);
   int32_t (*emit_commit)(void* emit_ctx, const x07_out_buf_v1* out);
+  int32_t (*emit_view)(void* emit_ctx, const uint8_t* ptr, uint32_t len, uint32_t view_kind);
 } x07_xf_emit_v1;
 
 typedef struct {
@@ -35871,6 +35873,14 @@ static int32_t rt_stream_xf_emit_commit_v1(void* emit_ctx, const x07_out_buf_v1*
   return 0;
 }
 
+static int32_t rt_stream_xf_emit_view_v1(void* emit_ctx, const uint8_t* ptr, uint32_t len, uint32_t view_kind) {
+  (void)emit_ctx;
+  (void)ptr;
+  (void)len;
+  (void)view_kind;
+  return (int32_t)RT_XF_E_VIEW_NOT_ALLOWED;
+}
+
 static uint32_t rt_stream_xf_norm_err_code(int32_t rc) {
   if (rc == 0) return 0;
   if (rc == INT32_MIN) return RT_XF_E_PLUGIN_INVALID;
@@ -35999,6 +36009,7 @@ static result_bytes_t rt_stream_xf_plugin_init_v1(
   emit.emit_ctx = (void*)&emit_ctx;
   emit.emit_alloc = rt_stream_xf_emit_alloc_v1;
   emit.emit_commit = rt_stream_xf_emit_commit_v1;
+  emit.emit_view = rt_stream_xf_emit_view_v1;
 
   x07_scratch_v1 scratch;
   scratch.ptr = scratch_b.ptr;
@@ -36061,6 +36072,7 @@ static result_bytes_t rt_stream_xf_plugin_step_v1(
   emit.emit_ctx = (void*)&emit_ctx;
   emit.emit_alloc = rt_stream_xf_emit_alloc_v1;
   emit.emit_commit = rt_stream_xf_emit_commit_v1;
+  emit.emit_view = rt_stream_xf_emit_view_v1;
 
   x07_scratch_v1 scratch;
   scratch.ptr = scratch_b.ptr;
@@ -36122,6 +36134,7 @@ static result_bytes_t rt_stream_xf_plugin_flush_v1(
   emit.emit_ctx = (void*)&emit_ctx;
   emit.emit_alloc = rt_stream_xf_emit_alloc_v1;
   emit.emit_commit = rt_stream_xf_emit_commit_v1;
+  emit.emit_view = rt_stream_xf_emit_view_v1;
 
   x07_scratch_v1 scratch;
   scratch.ptr = scratch_b.ptr;
