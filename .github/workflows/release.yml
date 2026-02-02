@@ -103,6 +103,7 @@ jobs:
           ./scripts/build_ext_regex.sh
           ./scripts/build_ext_fs.sh
           ./scripts/build_ext_math.sh
+          ./scripts/build_ext_stream_xf.sh
           ./scripts/build_ext_time.sh
           ./scripts/build_ext_db_sqlite.sh
           ./scripts/build_ext_db_pg.sh
@@ -175,6 +176,7 @@ jobs:
           ./scripts/build_ext_regex.sh
           ./scripts/build_ext_fs.sh
           ./scripts/build_ext_math.sh
+          ./scripts/build_ext_stream_xf.sh
           ./scripts/build_ext_time.sh
           ./scripts/build_ext_db_sqlite.sh
           ./scripts/build_ext_db_pg.sh

@@ -47,6 +47,20 @@ is_linux() {
 
 python_bin="$(pick_python)"
 
+docker_image="${X07_BUNDLE_SMOKE_DOCKER_IMAGE:-}"
+if [[ -z "$docker_image" ]] && is_linux && [[ -f "/etc/os-release" ]]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  if [[ "${ID:-}" == "ubuntu" && "${VERSION_ID:-}" == "24.04" ]]; then
+    docker_image="ubuntu:24.04"
+  else
+    docker_image="debian:bookworm-slim"
+  fi
+fi
+if [[ -z "$docker_image" ]]; then
+  docker_image="debian:bookworm-slim"
+fi
+
 x07_bin="${X07_BIN:-}"
 if [[ -z "${x07_bin}" ]]; then
   x07_bin="$(./scripts/ci/find_x07.sh)"
@@ -102,13 +116,20 @@ run_and_capture_stdout_bin() {
       fi
       echo "[bundle-smoke] WARN: docker not found; falling back to local execution"
     else
-      # Strong guarantee: run inside a minimal Debian container (no x07 installed).
-      docker run --rm \
+      # Strong guarantee: run inside a minimal container (no x07 installed).
+      if ! docker run --rm \
         -v "$outdir:/work:ro" \
         -w /work \
-        debian:bookworm-slim \
+        "$docker_image" \
         "./$bin_name" --alpha A --beta B \
-        >"$stdout_bin" 2>"$stderr_txt"
+        >"$stdout_bin" 2>"$stderr_txt"; then
+        echo "ERROR: bundle-smoke docker run failed (image=$docker_image, bin=$bin_name)" >&2
+        if [[ -f "$stderr_txt" ]]; then
+          echo "stderr:" >&2
+          cat "$stderr_txt" >&2 || true
+        fi
+        return 1
+      fi
       return 0
     fi
   fi

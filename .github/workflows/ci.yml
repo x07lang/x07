@@ -45,6 +45,9 @@ jobs:
       - name: Stage native math backend
         shell: bash
         run: ./scripts/ci/ensure_math_backend.sh
+      - name: Stage native stream-xf backend
+        shell: bash
+        run: ./scripts/ci/ensure_stream_xf_backend.sh
       - name: Build runner binaries (needed by x07 run tests)
         run: cargo build -p x07-host-runner -p x07-os-runner
       - name: cargo test

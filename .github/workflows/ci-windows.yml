@@ -20,10 +20,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up WSL2 (Ubuntu-22.04)
+      - name: Set up WSL2 (Ubuntu-24.04)
         uses: Vampire/setup-wsl@v6
         with:
-          distribution: Ubuntu-22.04
+          distribution: Ubuntu-24.04
           update: "true"
           additional-packages: >-
             bash
@@ -53,7 +53,7 @@ jobs:
           . "$HOME/.cargo/env"
           rustup component add rustfmt clippy
 
-      - name: CI gate (WSL2 Ubuntu-22.04)
+      - name: CI gate (WSL2 Ubuntu-24.04)
         run: |
           set -euo pipefail
 
