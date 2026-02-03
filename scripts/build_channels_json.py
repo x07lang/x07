@@ -22,7 +22,7 @@ def iso_utc_now() -> str:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tag", required=True, help="Release tag (for example: v0.0.82)")
+    ap.add_argument("--tag", required=True, help="Release tag (for example: v0.0.83)")
     ap.add_argument("--dist", type=Path, default=Path("dist"), help="Artifacts directory (default: dist)")
     ap.add_argument(
         "--base-url",

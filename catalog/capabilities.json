@@ -402,7 +402,7 @@
       "summary": "SQLite client for OS worlds.",
       "canonical": {
         "name": "ext-db-sqlite",
-        "version": "0.1.7"
+        "version": "0.1.8"
       },
       "worlds": [
         "run-os",

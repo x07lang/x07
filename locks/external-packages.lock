@@ -134,8 +134,8 @@
         {
           "module_id": "std.archive.tar",
           "path": "packages/ext/x07-ext-archive-c/0.1.0/modules/std/archive/tar.x07.json",
-          "sha256": "a147b2e698fc79aba273519aedf0946a8dd61bb5f2b2ffbfd9a2d164afeddd75",
-          "size_bytes": 22704
+          "sha256": "5dabdadd7f90cd512af89ba8f8f18f8db9053ca1116215ba7c544e24692c041d",
+          "size_bytes": 23104
         },
         {
           "module_id": "std.archive.tests",
@@ -146,8 +146,8 @@
         {
           "module_id": "std.archive.tgz",
           "path": "packages/ext/x07-ext-archive-c/0.1.0/modules/std/archive/tgz.x07.json",
-          "sha256": "e0764cd76ec636ae53d1e65b7b12ce25a65e8060278ef07fc586f5c386506aaf",
-          "size_bytes": 4714
+          "sha256": "eafbaf53ecf9ed90f573cf58b9fa87b37642b0af58f7425ee7e9300dadfd186c",
+          "size_bytes": 5114
         },
         {
           "module_id": "std.archive",
@@ -2812,7 +2812,7 @@
         }
       ],
       "name": "ext-db-migrate",
-      "package_manifest_sha256": "fe58c09b1b6ed9803e36c2e6d2574d50d5a7cf595b4a7a7a964562f413c4ae09",
+      "package_manifest_sha256": "fcc380832fb05634fb24fbd1e732ad09b48bee7136af90ba1e26fd4c4a68a42d",
       "path": "packages/ext/x07-ext-db-migrate/0.1.0",
       "version": "0.1.0"
     },
@@ -3515,6 +3515,34 @@
       "package_manifest_sha256": "bdb7edc1b34766adf7801ef250e5652d869e4c6e10b242a0ff9aedac12b1f5d2",
       "path": "packages/ext/x07-ext-db-sqlite/0.1.7",
       "version": "0.1.7"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.db.sqlite.pool",
+          "path": "packages/ext/x07-ext-db-sqlite/0.1.8/modules/std/db/sqlite/pool.x07.json",
+          "sha256": "e2d5f6674a5777b5a127ca79e78c14beaa961ee7f3a8fe1338e74b0a4f2409f9",
+          "size_bytes": 3458
+        },
+        {
+          "module_id": "std.db.sqlite.spec",
+          "path": "packages/ext/x07-ext-db-sqlite/0.1.8/modules/std/db/sqlite/spec.x07.json",
+          "sha256": "38f33c696a22184ae7f9396be5e7c6ce359855ddb9de8bb881795f7e4db11c66",
+          "size_bytes": 5593
+        },
+        {
+          "module_id": "std.db.sqlite",
+          "path": "packages/ext/x07-ext-db-sqlite/0.1.8/modules/std/db/sqlite.x07.json",
+          "sha256": "2850c6117f50825effa7247f043d37206db89c2041c19bceb3cc4787ff798cb5",
+          "size_bytes": 2655
+        }
+      ],
+      "name": "ext-db-sqlite",
+      "package_manifest_sha256": "b4967c54a769063d43c6be982394aa1bcfe749913da0af62b77e5910524c264e",
+      "path": "packages/ext/x07-ext-db-sqlite/0.1.8",
+      "version": "0.1.8"
     },
     {
       "determinism_tier": "pure",
@@ -9382,6 +9410,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "621794c501254fa5cd6441840aac326859e2e8d3e530e1519669ff66159b4045",
+  "packages_hash": "75a1e27cbc4d84a9f8f6244bf4aa16e626a22c88ffa680f22487a88b87bf7cc3",
   "packages_root": "packages/ext"
 }

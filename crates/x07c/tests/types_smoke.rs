@@ -91,7 +91,11 @@ fn compile_rejects_move_while_borrowed_result_bytes_view() {
                 "moved"
             ]),
         )],
-        json!(["bytes.alloc", 0]),
+        json!([
+            "begin",
+            ["main.bad", ["bytes.alloc", 1]],
+            ["bytes.alloc", 0]
+        ]),
     );
     let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
         .expect_err("must reject move while borrowed");
@@ -124,7 +128,7 @@ fn compile_rejects_option_bytes_view_unwrap_or_borrow_mismatch() {
                 ["bytes.len", ["option_bytes_view.unwrap_or", "opt", "def"]]
             ]),
         )],
-        json!(["bytes.alloc", 0]),
+        json!(["begin", ["main.bad"], ["bytes.alloc", 0]]),
     );
     let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
         .expect_err("must reject borrow mismatch");
@@ -146,7 +150,11 @@ fn compile_rejects_use_after_move_bytes() {
             "bytes",
             json!(["begin", ["let", "moved", "b"], "b", ["bytes.alloc", 0]]),
         )],
-        json!(["bytes.alloc", 0]),
+        json!([
+            "begin",
+            ["main.bad", ["bytes.alloc", 1]],
+            ["bytes.alloc", 0]
+        ]),
     );
     let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
         .expect_err("must reject use-after-move");
@@ -184,7 +192,7 @@ fn compile_rejects_set_while_borrowed_includes_borrowed_ptr() {
                 "b"
             ]),
         )],
-        json!(["bytes.alloc", 0]),
+        json!(["begin", ["main.bad"], ["bytes.alloc", 0]]),
     );
     let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
         .expect_err("must reject set while borrowed");
@@ -220,7 +228,11 @@ fn compile_rejects_bytes_view_of_temporary_includes_hint_and_ptr() {
                 ["bytes.view", ["bytes.alloc", 0]]
             ]),
         )],
-        json!(["bytes.alloc", 0]),
+        json!([
+            "begin",
+            ["main.bad", ["bytes.alloc", 1]],
+            ["bytes.alloc", 0]
+        ]),
     );
     let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
         .expect_err("must reject bytes.view of temporary");

@@ -13,7 +13,7 @@
       "ext-crypto-rs@0.1.0",
       "ext-data-model@0.1.7",
       "ext-db-core@0.1.8",
-      "ext-db-sqlite@0.1.7",
+      "ext-db-sqlite@0.1.8",
       "ext-hex-rs@0.1.0",
       "ext-json-rs@0.1.4"
     ],

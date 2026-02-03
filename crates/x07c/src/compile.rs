@@ -232,9 +232,9 @@ pub fn compile_program_to_c_with_meta(
         .extern_functions
         .sort_by(|a, b| a.name.cmp(&b.name));
 
+    dead_code_eliminate(&mut parsed_program);
     validate_program_world_caps(&parsed_program, options)?;
     c_emit::check_c_program(&parsed_program, options)?;
-    dead_code_eliminate(&mut parsed_program);
 
     // Optimize solve expression.
     parsed_program.solve = optimize::optimize_expr(parsed_program.solve);

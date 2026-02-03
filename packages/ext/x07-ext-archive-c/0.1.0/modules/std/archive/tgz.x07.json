@@ -133,7 +133,7 @@
         { "name": "profile_id", "ty": "bytes_view" },
         { "name": "tgz", "ty": "bytes_view" }
       ],
-      "result": "bytes",
+      "result": "result_bytes",
       "body": [
         "budget.scope_from_arch_v1",
         ["bytes.lit", "archive_extract_safe_v1"],
@@ -143,8 +143,19 @@
           [
             "if",
             ["view.eq", "profile_id", ["bytes.view", "k"]],
-            ["std.archive.tgz.extract_tree_v1", "tgz"],
-            ["std.archive.tgz._make_err", 10]
+            [
+              "begin",
+              ["let", "doc", ["std.archive.tgz.extract_tree_v1", "tgz"]],
+              ["let", "dv", ["bytes.view", "doc"]],
+              [
+                "if",
+                ["std.archive.tgz.is_err", "dv"],
+                ["return", ["result_bytes.err", ["std.archive.tgz.err_code", "dv"]]],
+                0
+              ],
+              ["result_bytes.ok", ["std.archive.tgz.get_bytes", "dv"]]
+            ],
+            ["result_bytes.err", 10]
           ]
         ]
       ]

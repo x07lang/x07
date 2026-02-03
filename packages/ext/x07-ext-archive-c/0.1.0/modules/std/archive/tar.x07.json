@@ -588,7 +588,7 @@
         { "name": "profile_id", "ty": "bytes_view" },
         { "name": "tar", "ty": "bytes_view" }
       ],
-      "result": "bytes",
+      "result": "result_bytes",
       "body": [
         "budget.scope_from_arch_v1",
         ["bytes.lit", "archive_extract_safe_v1"],
@@ -598,8 +598,19 @@
           [
             "if",
             ["view.eq", "profile_id", ["bytes.view", "k"]],
-            ["std.archive.tar.extract_tree_v1", "tar"],
-            ["std.archive.tar._make_err", 10]
+            [
+              "begin",
+              ["let", "doc", ["std.archive.tar.extract_tree_v1", "tar"]],
+              ["let", "dv", ["bytes.view", "doc"]],
+              [
+                "if",
+                ["std.archive.tar.is_err", "dv"],
+                ["return", ["result_bytes.err", ["std.archive.tar.err_code", "dv"]]],
+                0
+              ],
+              ["result_bytes.ok", ["std.archive.tar.get_bytes", "dv"]]
+            ],
+            ["result_bytes.err", 10]
           ]
         ]
       ]

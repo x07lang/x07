@@ -358,10 +358,16 @@ fn debug_borrow_checks_detect_stale_output_bytes() {
 }
 
 #[test]
-fn importing_fs_module_in_solve_pure_fails() {
+fn using_fs_module_in_solve_pure_fails() {
     let cfg = config();
 
-    let program = x07_program::entry(&["std.fs"], json!(["bytes.alloc", 0]));
+    let program = x07_program::entry(
+        &["std.fs"],
+        json!([
+            "std.fs.read",
+            ["bytes.view", ["bytes.lit", "fixtures/bytes/hello.txt"]]
+        ]),
+    );
 
     let compile = compile_program(program.as_slice(), &cfg, None).expect("compile ok");
     assert!(!compile.ok);

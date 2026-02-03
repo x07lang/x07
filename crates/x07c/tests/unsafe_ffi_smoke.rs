@@ -21,7 +21,7 @@ fn compile_rejects_extern_decls_in_solve_world() {
             &[("a", "i32"), ("b", "i32")],
             "i32",
         )],
-        json!(["bytes.alloc", 0]),
+        json!(["begin", ["main.ext_add", 1, 2], ["bytes.alloc", 0]]),
     );
     let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
         .expect_err("extern decl must be rejected in solve world");
@@ -43,7 +43,7 @@ fn compile_rejects_raw_pointer_types_in_solve_world_signatures() {
             "i32",
             json!(0),
         )],
-        json!(["bytes.alloc", 0]),
+        json!(["begin", ["main.f", 0], ["bytes.alloc", 0]]),
     );
     let err = compile_program_to_c(program.as_slice(), &CompileOptions::default())
         .expect_err("raw pointer types must be rejected in solve world signatures");
