@@ -5141,8 +5141,8 @@
         {
           "module_id": "std.msg.amqp.tests",
           "path": "packages/ext/x07-ext-msg-amqp-c/0.1.0/modules/std/msg/amqp/tests.x07.json",
-          "sha256": "d109aedd91ffca0d8adfc0d0c60c1b959fe6cf13f96fcdc4fba03a4e30a3ae71",
-          "size_bytes": 4936
+          "sha256": "4e97c5787043fad13d69b4954557468bc0d135d0fb50ebf9ddcf02a620caaf35",
+          "size_bytes": 5094
         },
         {
           "module_id": "std.msg.amqp.topology",
@@ -9162,8 +9162,8 @@
         {
           "module_id": "std.crawl.urlnorm",
           "path": "packages/ext/x07-ext-web-crawl/0.1.0/modules/std/crawl/urlnorm.x07.json",
-          "sha256": "77b0ba182f34cdc88daff9dc9dbed53e386939e46acb06cb047e0b9417441dde",
-          "size_bytes": 4132
+          "sha256": "fc760e7d21133b1eb0a177123f455bdb1146bd960da29e71d63ca02e01cba009",
+          "size_bytes": 4472
         }
       ],
       "name": "ext-web-crawl",
@@ -9178,8 +9178,8 @@
         {
           "module_id": "std.web.core",
           "path": "packages/ext/x07-ext-web-kit/0.1.0/modules/std/web/core.x07.json",
-          "sha256": "7fa389c4fa4b13a3276af7066be4082861b719fa606ad05a29115a9a68f646e5",
-          "size_bytes": 3475
+          "sha256": "4493743d1127b9f23c5058263599b224650f9abd60df5f44577583b04154c69f",
+          "size_bytes": 3571
         },
         {
           "module_id": "std.web.errors",
@@ -9678,6 +9678,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "54da9f12a2395ae18052e431394527dbd0e46f25238724e9caa6c5545dd6be09",
+  "packages_hash": "8e9ee3c57005a47ead166a1a96c1f303ed6ccf63ac9debdaf501792e89da341e",
   "packages_root": "packages/ext"
 }

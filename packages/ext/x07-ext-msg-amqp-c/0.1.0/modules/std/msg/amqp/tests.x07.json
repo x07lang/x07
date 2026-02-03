@@ -5,7 +5,6 @@
   "imports": [
     "ext.data_model",
     "ext.json.data_model",
-    "std.fs",
     "std.msg.amqp",
     "std.msg.amqp.rr",
     "std.msg.amqp.topology",
@@ -48,8 +47,7 @@
       "result": "result_i32",
       "body": [
         "begin",
-        ["let", "path", ["bytes.lit", "arch/msg/amqp/topology/app_v1.topology.json"]],
-        ["let", "raw", ["std.fs.read", ["bytes.view", "path"]]],
+        ["let", "raw", ["bytes.lit", "{\"schema_version\":\"x07.arch.msg.amqp.topology@0.1.0\",\"id\":\"app_v1\",\"v\":1,\"exchanges\":[{\"name\":\"x07\",\"type\":\"topic\",\"durable\":true}],\"queues\":[{\"name\":\"x07\",\"durable\":true}],\"bindings\":[{\"exchange\":\"x07\",\"queue\":\"x07\",\"routing_key\":\"#\"}]}"]],
         ["let", "doc", ["ext.json.data_model.parse", ["bytes.view", "raw"]]],
         ["let", "dv", ["bytes.view", "doc"]],
         ["try", ["std.test.assert_i32_eq", ["ext.data_model.doc_is_err", "dv"], 0, ["std.test.code_assert_i32_eq"]]],
