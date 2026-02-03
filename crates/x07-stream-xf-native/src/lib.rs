@@ -159,6 +159,14 @@ unsafe fn emit_commit(emit: x07_xf_emit_v1, out: *const x07_out_buf_v1) -> i32 {
 }
 
 #[inline]
+unsafe fn emit_view(emit: x07_xf_emit_v1, ptr: *const u8, len: u32, view_kind: u32) -> i32 {
+    match emit.emit_view {
+        Some(f) => f(emit.emit_ctx, ptr, len, view_kind),
+        None => ev_trap(TRAP_INTERNAL),
+    }
+}
+
+#[inline]
 unsafe fn view_as_slice<'a>(v: x07_bytes_view_v1) -> &'a [u8] {
     core::slice::from_raw_parts(v.ptr, v.len as usize)
 }
@@ -808,7 +816,7 @@ unsafe extern "C" fn xf_test_emit_limits_init_v1(
 unsafe extern "C" fn xf_test_emit_limits_step_v1(
     state: *mut c_void,
     _scratch: *mut x07_scratch_v1,
-    _input: x07_bytes_view_v1,
+    input: x07_bytes_view_v1,
     emit: x07_xf_emit_v1,
     budget: x07_xf_budget_v1,
 ) -> i32 {
@@ -924,6 +932,7 @@ unsafe extern "C" fn xf_test_emit_limits_step_v1(
             out_buf.len = 2;
             emit_commit(emit, &out_buf as *const x07_out_buf_v1)
         }
+        b'V' => emit_view(emit, input.ptr, input.len, 1),
         _ => 0,
     }
 }

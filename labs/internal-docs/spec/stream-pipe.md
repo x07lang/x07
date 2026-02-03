@@ -35,6 +35,7 @@ Concurrency notes:
   - `__internal.stream_xf.plugin_flush_v1`
 - Plugin ids are resolved deterministically at compile time from the toolchain registry under `arch/stream/plugins/index.x07sp.json`, and the lowering emits `native_requires` entries for the owning native backend (currently `x07.stream.xf`).
 - JSON canonicalization (`std.stream.xf.json_canon_stream_v1`) is implemented as a stream plugin (`xf.json_canon_stream_v1`) in the `x07.stream.xf` native backend, and uses the built-in C JSON JCS runtime section emitted by `crates/x07c/src/c_emit.rs`.
+- Stream plugin emit APIs include `emit_view` (borrowed view output). The runtime may reject view emission with error `118` and plugins should fall back to `emit_alloc` + `emit_commit`.
 
 Runtime errors:
 

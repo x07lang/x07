@@ -3208,6 +3208,12 @@ impl<'a> Emitter<'a> {
                     "budget.scope_from_arch_v1" => {
                         return self.emit_budget_scope_from_arch_v1(state, args, dest, cont)
                     }
+                    "std.rr.with_policy_v1" => {
+                        return self.emit_std_rr_with_policy_v1(state, args, dest, cont)
+                    }
+                    "rr.next_v1" | "std.rr.next_v1" => {
+                        return self.emit_rr_next_v1(state, args, dest, cont)
+                    }
                     "task.scope_v1" => return self.emit_task_scope_v1(state, args, dest, cont),
                     "task.scope.wait_all_v1" => {
                         return self.emit_task_scope_wait_all_v1(state, args, dest, cont)
@@ -4145,38 +4151,127 @@ impl<'a> Emitter<'a> {
                 }
 
                 let mut arg_vars: Vec<AsyncVarRef> = Vec::with_capacity(args.len());
-                let mut arg_states: Vec<usize> = Vec::with_capacity(args.len());
+                let mut arg_pre_states: Vec<usize> = Vec::with_capacity(args.len());
+                let mut arg_eval_states: Vec<usize> = Vec::with_capacity(args.len());
                 for (i, arg_expr) in args.iter().enumerate() {
-                    let ty = match &want_params {
+                    let inferred = self.infer_expr(arg_expr)?.ty;
+                    let mut ty = match &want_params {
                         Some(want) => want[i],
-                        None => self.infer_expr(arg_expr)?.ty,
+                        None => inferred,
                     };
+
+                    // Builtin calls default to evaluating args at their inferred type. For certain
+                    // builtins that accept `bytes_view` (and allow `bytes` as a call-arg), prefer
+                    // borrowing from identifier `bytes` to avoid incorrect moves in async codegen.
+                    if want_params.is_none()
+                        && matches!(
+                            (head, i, inferred, arg_expr),
+                            ("vec_u8.extend_bytes", 1, Ty::Bytes, Expr::Ident { .. })
+                                | (
+                                    "vec_u8.extend_bytes_range",
+                                    1,
+                                    Ty::Bytes,
+                                    Expr::Ident { .. }
+                                )
+                        )
+                    {
+                        ty = Ty::BytesView;
+                    }
                     let storage_ty = match ty {
                         Ty::Never => Ty::I32,
                         other => other,
                     };
                     let tmp = self.alloc_local("t_arg_", storage_ty)?;
                     arg_vars.push(tmp);
-                    arg_states.push(self.new_state());
+                    arg_pre_states.push(self.new_state());
+                    arg_eval_states.push(self.new_state());
                 }
 
                 let apply_state = self.new_state();
-                if let Some(first) = arg_states.first().copied() {
+                if let Some(first) = arg_pre_states.first().copied() {
                     self.line(state, format!("goto st_{first};"));
                 } else {
                     self.line(state, format!("goto st_{apply_state};"));
                 }
 
-                for i in 0..arg_states.len() {
-                    let next = if i + 1 < arg_states.len() {
-                        arg_states[i + 1]
+                for i in 0..arg_pre_states.len() {
+                    let eval_state = arg_eval_states[i];
+                    let pre_state = arg_pre_states[i];
+                    let next = if i + 1 < arg_pre_states.len() {
+                        arg_pre_states[i + 1]
                     } else {
                         apply_state
                     };
-                    let s = arg_states[i];
                     let expr = &args[i];
                     let tmp = arg_vars[i].clone();
-                    self.emit_expr_entry(s, expr, tmp, next)?;
+
+                    // Arg temps are fields on the async future and may be reused across loop
+                    // iterations. Drop any previous owned value before overwriting to avoid leaks.
+                    if is_owned_ty(tmp.ty) {
+                        match tmp.ty {
+                            Ty::Bytes => self
+                                .line(pre_state, format!("rt_bytes_drop(ctx, &{});", tmp.c_name)),
+                            Ty::VecU8 => self
+                                .line(pre_state, format!("rt_vec_u8_drop(ctx, &{});", tmp.c_name)),
+                            Ty::OptionBytes => {
+                                self.line(pre_state, format!("if ({}.tag) {{", tmp.c_name));
+                                self.line(
+                                    pre_state,
+                                    format!("  rt_bytes_drop(ctx, &{}.payload);", tmp.c_name),
+                                );
+                                self.line(pre_state, "}");
+                                self.line(pre_state, format!("{}.tag = UINT32_C(0);", tmp.c_name));
+                            }
+                            Ty::ResultBytes => {
+                                self.line(pre_state, format!("if ({}.tag) {{", tmp.c_name));
+                                self.line(
+                                    pre_state,
+                                    format!("  rt_bytes_drop(ctx, &{}.payload.ok);", tmp.c_name),
+                                );
+                                self.line(pre_state, "}");
+                                self.line(pre_state, format!("{}.tag = UINT32_C(0);", tmp.c_name));
+                                self.line(
+                                    pre_state,
+                                    format!("{}.payload.err = UINT32_C(0);", tmp.c_name),
+                                );
+                            }
+                            Ty::ResultResultBytes => {
+                                self.line(pre_state, format!("if ({}.tag) {{", tmp.c_name));
+                                self.line(
+                                    pre_state,
+                                    format!("  if ({}.payload.ok.tag) {{", tmp.c_name),
+                                );
+                                self.line(
+                                    pre_state,
+                                    format!(
+                                        "    rt_bytes_drop(ctx, &{}.payload.ok.payload.ok);",
+                                        tmp.c_name
+                                    ),
+                                );
+                                self.line(pre_state, "  }");
+                                self.line(
+                                    pre_state,
+                                    format!("  {}.payload.ok.tag = UINT32_C(0);", tmp.c_name),
+                                );
+                                self.line(
+                                    pre_state,
+                                    format!(
+                                        "  {}.payload.ok.payload.err = UINT32_C(0);",
+                                        tmp.c_name
+                                    ),
+                                );
+                                self.line(pre_state, "}");
+                                self.line(pre_state, format!("{}.tag = UINT32_C(0);", tmp.c_name));
+                                self.line(
+                                    pre_state,
+                                    format!("{}.payload.err = UINT32_C(0);", tmp.c_name),
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                    self.line(pre_state, format!("goto st_{eval_state};"));
+                    self.emit_expr_entry(eval_state, expr, tmp, next)?;
                 }
 
                 self.emit_apply_call(apply_state, head, &arg_vars, dest, cont)
@@ -5635,6 +5730,7 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, args[0].c_name
                             ),
                         );
+                        self.line(state, format!("{} = UINT32_C(0);", args[0].c_name));
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -5653,6 +5749,7 @@ impl<'a> Emitter<'a> {
                             state,
                             format!("rt_select_evt_drop(ctx, {});", args[0].c_name),
                         );
+                        self.line(state, format!("{} = UINT32_C(0);", args[0].c_name));
                         self.line(state, format!("{} = UINT32_C(1);", dest.c_name));
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
@@ -8543,7 +8640,7 @@ impl<'a> Emitter<'a> {
                             || dest.ty != Ty::I32
                             || args[0].ty != Ty::I32
                             || args[1].ty != Ty::I32
-                            || args[2].ty != Ty::I32
+                            || !(args[2].ty == Ty::I32 || is_task_handle_ty(args[2].ty))
                         {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
@@ -9058,6 +9155,71 @@ impl<'a> Emitter<'a> {
                 self.line(state, "rt_fuel(ctx, 1);");
                 let storage_ty = Self::storage_ty_for(expr_ty.ty);
                 let binding = self.alloc_local("v_", storage_ty)?;
+                if is_owned_ty(storage_ty) {
+                    match storage_ty {
+                        Ty::Bytes => {
+                            self.line(state, format!("rt_bytes_drop(ctx, &{});", binding.c_name))
+                        }
+                        Ty::VecU8 => {
+                            self.line(state, format!("rt_vec_u8_drop(ctx, &{});", binding.c_name))
+                        }
+                        Ty::OptionBytes => {
+                            self.line(state, format!("if ({}.tag) {{", binding.c_name));
+                            self.line(
+                                state,
+                                format!("  rt_bytes_drop(ctx, &{}.payload);", binding.c_name),
+                            );
+                            self.line(state, "}");
+                            self.line(state, format!("{}.tag = UINT32_C(0);", binding.c_name));
+                        }
+                        Ty::ResultBytes => {
+                            self.line(state, format!("if ({}.tag) {{", binding.c_name));
+                            self.line(
+                                state,
+                                format!("  rt_bytes_drop(ctx, &{}.payload.ok);", binding.c_name),
+                            );
+                            self.line(state, "}");
+                            self.line(state, format!("{}.tag = UINT32_C(0);", binding.c_name));
+                            self.line(
+                                state,
+                                format!("{}.payload.err = UINT32_C(0);", binding.c_name),
+                            );
+                        }
+                        Ty::ResultResultBytes => {
+                            self.line(state, format!("if ({}.tag) {{", binding.c_name));
+                            self.line(
+                                state,
+                                format!("  if ({}.payload.ok.tag) {{", binding.c_name),
+                            );
+                            self.line(
+                                state,
+                                format!(
+                                    "    rt_bytes_drop(ctx, &{}.payload.ok.payload.ok);",
+                                    binding.c_name
+                                ),
+                            );
+                            self.line(state, "  }");
+                            self.line(
+                                state,
+                                format!("  {}.payload.ok.tag = UINT32_C(0);", binding.c_name),
+                            );
+                            self.line(
+                                state,
+                                format!(
+                                    "  {}.payload.ok.payload.err = UINT32_C(0);",
+                                    binding.c_name
+                                ),
+                            );
+                            self.line(state, "}");
+                            self.line(state, format!("{}.tag = UINT32_C(0);", binding.c_name));
+                            self.line(
+                                state,
+                                format!("{}.payload.err = UINT32_C(0);", binding.c_name),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
 
                 let expr_state = self.new_state();
                 let after = self.new_state();
@@ -9118,7 +9280,12 @@ impl<'a> Emitter<'a> {
                     ));
                 }
                 let expr_ty = self.infer_expr(&args[1])?;
-                if expr_ty != var.ty && expr_ty != Ty::Never {
+                let want = TyInfo {
+                    ty: var.ty,
+                    brand: var.brand.clone(),
+                    view_full: false,
+                };
+                if expr_ty != Ty::Never && !tyinfo_compat_assign(&expr_ty, &want) {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
                         format!("type mismatch in set for variable {name:?}"),
@@ -9654,6 +9821,444 @@ impl<'a> Emitter<'a> {
                 Ok(())
             }
 
+            fn emit_std_rr_with_policy_v1(
+                &mut self,
+                state: usize,
+                args: &[Expr],
+                dest: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                if !self.options.enable_rr {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Unsupported,
+                        "std.rr.with_policy_v1 is disabled in this world".to_string(),
+                    ));
+                }
+                if args.len() != 4 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "std.rr.with_policy_v1 expects 4 args".to_string(),
+                    ));
+                }
+                if self.fn_ret_ty != Ty::ResultBytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "std.rr.with_policy_v1 requires function return type result_bytes (open failure propagation)".to_string(),
+                    ));
+                }
+
+                let body_ty = self.infer_expr(&args[3])?;
+                if body_ty.ty != dest.ty && body_ty.ty != Ty::Never {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "std.rr.with_policy_v1 body must evaluate to {:?} (or return)",
+                            dest.ty
+                        ),
+                    ));
+                }
+
+                let policy_id = parse_bytes_lit_ascii(&args[0], "std.rr.with_policy_v1 policy_id")?;
+                let cassette_path =
+                    parse_bytes_lit_ascii(&args[1], "std.rr.with_policy_v1 cassette_path")?;
+                let mode_i32 = parse_i32_lit(&args[2], "std.rr.with_policy_v1 mode")?;
+
+                let cfg = load_rr_cfg_v1_from_arch_v1(
+                    &self.options,
+                    &policy_id,
+                    &cassette_path,
+                    mode_i32,
+                )?;
+
+                self.line(state, "rt_fuel(ctx, 1);");
+
+                self.tmp_counter += 1;
+                let cfg_name = format!("rr_cfg_{}", self.tmp_counter);
+                let escaped = c_escape_string(cfg.as_slice());
+                self.line(
+                    state,
+                    format!("static const char {cfg_name}[] = \"{escaped}\";"),
+                );
+
+                let cfg_bytes = self.alloc_local("t_rr_cfg_bytes_", Ty::Bytes)?;
+                let cfg_view = self.alloc_local("t_rr_cfg_view_", Ty::BytesView)?;
+                let open_res = self.alloc_local("t_rr_open_", Ty::ResultI32)?;
+
+                self.line(
+                    state,
+                    format!(
+                        "{} = rt_bytes_from_literal(ctx, (const uint8_t*){cfg_name}, UINT32_C({}));",
+                        cfg_bytes.c_name,
+                        cfg.len()
+                    ),
+                );
+                self.line(
+                    state,
+                    format!(
+                        "{} = rt_bytes_view(ctx, {});",
+                        cfg_view.c_name, cfg_bytes.c_name
+                    ),
+                );
+                self.line(
+                    state,
+                    format!(
+                        "{} = rt_rr_open_v1(ctx, {});",
+                        open_res.c_name, cfg_view.c_name
+                    ),
+                );
+                self.line(state, format!("rt_bytes_drop(ctx, &{});", cfg_bytes.c_name));
+                self.line(
+                    state,
+                    format!("{} = rt_bytes_empty(ctx);", cfg_bytes.c_name),
+                );
+
+                let fail_state = self.new_state();
+                let ok_state = self.new_state();
+                self.line(
+                    state,
+                    format!(
+                        "if ({}.tag == UINT32_C(0)) goto st_{fail_state};",
+                        open_res.c_name
+                    ),
+                );
+                self.line(state, format!("goto st_{ok_state};"));
+
+                let scopes_snapshot = self.scopes.clone();
+                let task_scopes_snapshot = self.task_scopes.clone();
+                let cleanup_scopes_snapshot = self.cleanup_scopes.clone();
+
+                self.line(
+                    fail_state,
+                    format!(
+                        "f->ret = (result_bytes_t){{ .tag = UINT32_C(0), .payload.err = {}.payload.err }};",
+                        open_res.c_name
+                    ),
+                );
+
+                let mut next = self.ret_state;
+                for scope in cleanup_scopes_snapshot.iter() {
+                    let st = self.new_state();
+                    let resume = st;
+                    match scope {
+                        CleanupScope::Task { c_name } => {
+                            self.line(
+                                st,
+                                format!("if (rt_scope_exit_poll(ctx, &{c_name})) goto st_{next};"),
+                            );
+                        }
+                        CleanupScope::Budget { c_name } => {
+                            self.line(
+                                st,
+                                format!("if (rt_budget_scope_exit_poll(ctx, &{c_name})) {{"),
+                            );
+                            self.line(st, format!("  goto st_{next};"));
+                            self.line(st, "}");
+                        }
+                        CleanupScope::Rr {
+                            handle_c_name,
+                            prev_c_name,
+                        } => {
+                            self.line(st, format!("ctx->rr_current = {prev_c_name};"));
+                            self.line(st, format!("rt_rr_close_v1(ctx, {handle_c_name});"));
+                            self.line(st, format!("goto st_{next};"));
+                        }
+                    }
+                    self.line(st, format!("f->state = UINT32_C({resume});"));
+                    self.line(st, "return UINT32_C(0);");
+                    next = st;
+                }
+                self.line(fail_state, format!("goto st_{next};"));
+
+                self.scopes = scopes_snapshot;
+                self.task_scopes = task_scopes_snapshot;
+                self.cleanup_scopes = cleanup_scopes_snapshot;
+
+                let body_state = self.new_state();
+                let exit_state = self.new_state();
+
+                let handle_name = self.alloc_local("t_rr_h_", Ty::I32)?;
+                let prev_name = self.alloc_local("t_rr_prev_", Ty::I32)?;
+
+                self.line(
+                    ok_state,
+                    format!(
+                        "{} = (int32_t){}.payload.ok;",
+                        handle_name.c_name, open_res.c_name
+                    ),
+                );
+                self.line(ok_state, format!("{} = ctx->rr_current;", prev_name.c_name));
+                self.line(
+                    ok_state,
+                    format!("ctx->rr_current = {};", handle_name.c_name),
+                );
+                self.line(ok_state, format!("goto st_{body_state};"));
+
+                self.cleanup_scopes.push(CleanupScope::Rr {
+                    handle_c_name: handle_name.c_name.clone(),
+                    prev_c_name: prev_name.c_name.clone(),
+                });
+                self.emit_expr_entry(body_state, &args[3], dest, exit_state)?;
+                let popped_cleanup = self.cleanup_scopes.pop();
+                debug_assert!(matches!(popped_cleanup, Some(CleanupScope::Rr { .. })));
+
+                self.line(exit_state, "rt_fuel(ctx, 1);");
+                self.line(
+                    exit_state,
+                    format!("ctx->rr_current = {};", prev_name.c_name),
+                );
+                self.line(
+                    exit_state,
+                    format!("rt_rr_close_v1(ctx, {});", handle_name.c_name),
+                );
+                self.line(exit_state, format!("goto st_{cont};"));
+                Ok(())
+            }
+
+            fn emit_expr_as_bytes_view_entry(
+                &mut self,
+                state: usize,
+                head: &str,
+                expr: &Expr,
+                dest_view: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                if dest_view.ty != Ty::BytesView {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Internal,
+                        "emit_expr_as_bytes_view_entry expects bytes_view dest".to_string(),
+                    ));
+                }
+                let ty = self.infer_expr(expr)?;
+                match ty.ty {
+                    Ty::BytesView => self.emit_expr_entry(state, expr, dest_view, cont),
+                    Ty::Bytes => match expr {
+                        Expr::Ident { name, ptr: use_ptr } if name != "input" => {
+                            self.line(state, "rt_fuel(ctx, 1);");
+                            let Some(v) = self.lookup(name) else {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    format!("unknown identifier: {name:?}"),
+                                ));
+                            };
+                            if v.moved {
+                                let moved_ptr = v
+                                    .moved_ptr
+                                    .as_deref()
+                                    .filter(|p| !p.is_empty())
+                                    .unwrap_or("<unknown>");
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    format!(
+                                        "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                    ),
+                                ));
+                            }
+                            if v.ty != Ty::Bytes {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    format!("{head} expects bytes_view"),
+                                ));
+                            }
+                            self.line(
+                                state,
+                                format!("{} = rt_bytes_view(ctx, {});", dest_view.c_name, v.c_name),
+                            );
+                            self.line(state, format!("goto st_{cont};"));
+                            Ok(())
+                        }
+                        _ => {
+                            let owner = self.alloc_local("t_view_owner_", Ty::Bytes)?;
+                            let view_state = self.new_state();
+                            self.emit_expr_entry(state, expr, owner.clone(), view_state)?;
+                            self.line(view_state, "rt_fuel(ctx, 1);");
+                            self.line(
+                                view_state,
+                                format!(
+                                    "{} = rt_bytes_view(ctx, {});",
+                                    dest_view.c_name, owner.c_name
+                                ),
+                            );
+                            self.line(view_state, format!("goto st_{cont};"));
+                            Ok(())
+                        }
+                    },
+                    Ty::VecU8 => match expr {
+                        Expr::Ident { name, ptr: use_ptr } => {
+                            self.line(state, "rt_fuel(ctx, 1);");
+                            let Some(v) = self.lookup(name) else {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    format!("unknown identifier: {name:?}"),
+                                ));
+                            };
+                            if v.moved {
+                                let moved_ptr = v
+                                    .moved_ptr
+                                    .as_deref()
+                                    .filter(|p| !p.is_empty())
+                                    .unwrap_or("<unknown>");
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    format!(
+                                        "use after move: {name:?} ptr={use_ptr} moved_ptr={moved_ptr}"
+                                    ),
+                                ));
+                            }
+                            if v.ty != Ty::VecU8 {
+                                return Err(CompilerError::new(
+                                    CompileErrorKind::Typing,
+                                    format!("{head} expects bytes_view"),
+                                ));
+                            }
+                            self.line(
+                                state,
+                                format!(
+                                    "{} = rt_vec_u8_as_view(ctx, {});",
+                                    dest_view.c_name, v.c_name
+                                ),
+                            );
+                            self.line(state, format!("goto st_{cont};"));
+                            Ok(())
+                        }
+                        _ => {
+                            let owner = self.alloc_local("t_view_owner_", Ty::VecU8)?;
+                            let view_state = self.new_state();
+                            self.emit_expr_entry(state, expr, owner.clone(), view_state)?;
+                            self.line(view_state, "rt_fuel(ctx, 1);");
+                            self.line(
+                                view_state,
+                                format!(
+                                    "{} = rt_vec_u8_as_view(ctx, {});",
+                                    dest_view.c_name, owner.c_name
+                                ),
+                            );
+                            self.line(view_state, format!("goto st_{cont};"));
+                            Ok(())
+                        }
+                    },
+                    _ => Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects bytes_view"),
+                    )),
+                }
+            }
+
+            fn emit_rr_next_v1(
+                &mut self,
+                state: usize,
+                args: &[Expr],
+                dest: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                if !self.options.enable_rr {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Unsupported,
+                        "rr.next_v1 is disabled in this world".to_string(),
+                    ));
+                }
+                if args.len() != 4 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "rr.next_v1 expects 4 args".to_string(),
+                    ));
+                }
+                if dest.ty != Ty::ResultBytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "rr.next_v1 returns result_bytes".to_string(),
+                    ));
+                }
+
+                let h_ty = self.infer_expr(&args[0])?;
+                if h_ty.ty != Ty::I32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "rr.next_v1 expects (i32 rr_handle_v1, bytes_view kind, bytes_view op, bytes_view key)"
+                            .to_string(),
+                    ));
+                }
+
+                let h_tmp = self.alloc_local("t_rr_h_", Ty::I32)?;
+                let kind_view = self.alloc_local("t_rr_kind_", Ty::BytesView)?;
+                let op_view = self.alloc_local("t_rr_op_", Ty::BytesView)?;
+                let key_view = self.alloc_local("t_rr_key_", Ty::BytesView)?;
+                let latency = self.alloc_local("t_rr_latency_", Ty::I32)?;
+
+                self.line(state, "rt_fuel(ctx, 1);");
+                let h_state = self.new_state();
+                self.line(state, format!("goto st_{h_state};"));
+
+                let kind_state = self.new_state();
+                self.emit_expr_entry(h_state, &args[0], h_tmp.clone(), kind_state)?;
+
+                let op_state = self.new_state();
+                self.emit_expr_as_bytes_view_entry(
+                    kind_state,
+                    "rr.next_v1",
+                    &args[1],
+                    kind_view.clone(),
+                    op_state,
+                )?;
+
+                let key_state = self.new_state();
+                self.emit_expr_as_bytes_view_entry(
+                    op_state,
+                    "rr.next_v1",
+                    &args[2],
+                    op_view.clone(),
+                    key_state,
+                )?;
+
+                let apply_state = self.new_state();
+                self.emit_expr_as_bytes_view_entry(
+                    key_state,
+                    "rr.next_v1",
+                    &args[3],
+                    key_view.clone(),
+                    apply_state,
+                )?;
+
+                let resume_state = self.new_state();
+
+                self.line(apply_state, "rt_fuel(ctx, 1);");
+                self.line(apply_state, format!("{} = UINT32_C(0);", latency.c_name));
+                self.line(
+                    apply_state,
+                    format!(
+                        "{} = rt_rr_next_v1(ctx, {}, {}, {}, {}, &{}, UINT32_C(0));",
+                        dest.c_name,
+                        h_tmp.c_name,
+                        kind_view.c_name,
+                        op_view.c_name,
+                        key_view.c_name,
+                        latency.c_name
+                    ),
+                );
+                self.line(
+                    apply_state,
+                    format!("if ({}.tag == UINT32_C(0)) goto st_{cont};", dest.c_name),
+                );
+                self.line(
+                    apply_state,
+                    format!("if ({} != UINT32_C(0)) {{", latency.c_name),
+                );
+                self.line(
+                    apply_state,
+                    format!("  rt_task_sleep(ctx, {});", latency.c_name),
+                );
+                self.line(
+                    apply_state,
+                    format!("  f->state = UINT32_C({resume_state});"),
+                );
+                self.line(apply_state, "  return UINT32_C(0);");
+                self.line(apply_state, "}");
+                self.line(apply_state, format!("goto st_{cont};"));
+
+                self.line(resume_state, "rt_fuel(ctx, 1);");
+                self.line(resume_state, format!("goto st_{cont};"));
+                Ok(())
+            }
+
             fn emit_task_scope_v1(
                 &mut self,
                 state: usize,
@@ -9925,6 +10530,7 @@ impl<'a> Emitter<'a> {
                             skip.replace("{NEXT}", &format!("st_{next_state}")),
                         );
                     }
+                    let res_var = format!("t_select_r_{check_state}");
                     match case {
                         TaskSelectCaseV1::SlotBytes { slot } => {
                             this.emit_expr_entry(eval_state, slot, slot_tmp.clone(), check_state)?;
@@ -9941,16 +10547,16 @@ impl<'a> Emitter<'a> {
                             this.line(
                                 check_state,
                                 format!(
-                                    "result_bytes_t r = rt_scope_try_await_slot_bytes(ctx, &{}, {});",
+                                    "result_bytes_t {res_var} = rt_scope_try_await_slot_bytes(ctx, &{}, {});",
                                     scope.c_name, slot_tmp.c_name
                                 ),
                             );
-                            this.line(check_state, "if (r.tag) {");
+                            this.line(check_state, format!("if ({res_var}.tag) {{"));
                             this.line(
                                 check_state,
                                 if dest.ty == Ty::OptionTaskSelectEvtV1 {
                                     format!(
-                                        "  {}.tag = UINT32_C(1); {}.payload = rt_select_evt_new(ctx, {}.key, UINT32_C(1), UINT32_C({}), {}, r.payload.ok);",
+                                        "  {}.tag = UINT32_C(1); {}.payload = rt_select_evt_new(ctx, {}.key, UINT32_C(1), UINT32_C({}), {}, {res_var}.payload.ok);",
                                         dest.c_name,
                                         dest.c_name,
                                         scope.c_name,
@@ -9959,7 +10565,7 @@ impl<'a> Emitter<'a> {
                                     )
                                 } else {
                                     format!(
-                                        "  {} = rt_select_evt_new(ctx, {}.key, UINT32_C(1), UINT32_C({}), {}, r.payload.ok);",
+                                        "  {} = rt_select_evt_new(ctx, {}.key, UINT32_C(1), UINT32_C({}), {}, {res_var}.payload.ok);",
                                         dest.c_name,
                                         scope.c_name,
                                         case_idx,
@@ -9979,7 +10585,10 @@ impl<'a> Emitter<'a> {
                             }
                             this.line(check_state, format!("  goto st_{cont};"));
                             this.line(check_state, "}");
-                            this.line(check_state, "if (r.payload.err == UINT32_C(2)) {");
+                            this.line(
+                                check_state,
+                                format!("if ({res_var}.payload.err == UINT32_C(2)) {{"),
+                            );
                             this.line(
                                 check_state,
                                 if dest.ty == Ty::OptionTaskSelectEvtV1 {
@@ -10030,16 +10639,16 @@ impl<'a> Emitter<'a> {
                             this.line(
                                 check_state,
                                 format!(
-                                    "result_bytes_t r = rt_chan_bytes_try_recv(ctx, {});",
+                                    "result_bytes_t {res_var} = rt_chan_bytes_try_recv(ctx, {});",
                                     chan_tmp.c_name
                                 ),
                             );
-                            this.line(check_state, "if (r.tag) {");
+                            this.line(check_state, format!("if ({res_var}.tag) {{"));
                             this.line(
                                 check_state,
                                 if dest.ty == Ty::OptionTaskSelectEvtV1 {
                                     format!(
-                                        "  {}.tag = UINT32_C(1); {}.payload = rt_select_evt_new(ctx, {}.key, UINT32_C(3), UINT32_C({}), {}, r.payload.ok);",
+                                        "  {}.tag = UINT32_C(1); {}.payload = rt_select_evt_new(ctx, {}.key, UINT32_C(3), UINT32_C({}), {}, {res_var}.payload.ok);",
                                         dest.c_name,
                                         dest.c_name,
                                         scope.c_name,
@@ -10048,7 +10657,7 @@ impl<'a> Emitter<'a> {
                                     )
                                 } else {
                                     format!(
-                                        "  {} = rt_select_evt_new(ctx, {}.key, UINT32_C(3), UINT32_C({}), {}, r.payload.ok);",
+                                        "  {} = rt_select_evt_new(ctx, {}.key, UINT32_C(3), UINT32_C({}), {}, {res_var}.payload.ok);",
                                         dest.c_name,
                                         scope.c_name,
                                         case_idx,
@@ -10068,7 +10677,10 @@ impl<'a> Emitter<'a> {
                             }
                             this.line(check_state, format!("  goto st_{cont};"));
                             this.line(check_state, "}");
-                            this.line(check_state, "if (r.payload.err == UINT32_C(2)) {");
+                            this.line(
+                                check_state,
+                                format!("if ({res_var}.payload.err == UINT32_C(2)) {{"),
+                            );
                             this.line(
                                 check_state,
                                 if dest.ty == Ty::OptionTaskSelectEvtV1 {
@@ -10349,6 +10961,17 @@ impl<'a> Emitter<'a> {
             fn_name: f.name.clone(),
             fn_ret_ty: f.ret_ty,
         };
+
+        machine.bind(
+            "input".to_string(),
+            AsyncVarRef {
+                ty: Ty::BytesView,
+                brand: TyBrand::None,
+                c_name: "f->input".to_string(),
+                moved: false,
+                moved_ptr: None,
+            },
+        );
 
         for (i, p) in f.params.iter().enumerate() {
             machine.bind(
@@ -14916,7 +15539,8 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         }
         let cfg = parse_task_scope_cfg_v1(&args[0])?;
 
-        let body_ty = self.infer_expr_in_new_scope(&args[1])?;
+        let body_ty = self
+            .infer_expr_in_new_scope_with_task_scope_depth(&args[1], self.task_scopes.len() + 1)?;
         if body_ty != dest_ty && body_ty != Ty::Never {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
@@ -18307,7 +18931,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         self.line(&format!(
-            "{dest} = rt_rr_next_v1(ctx, {}, {}, {}, {});",
+            "{dest} = rt_rr_next_v1(ctx, {}, {}, {}, {}, NULL, UINT32_C(1));",
             h.c_name, kind.c_name, op.c_name, key.c_name
         ));
         self.release_temp_view_borrow(&kind)?;
@@ -22425,7 +23049,8 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         let h = self.emit_expr(&args[0])?;
         let key = self.emit_expr(&args[1])?;
         let val = self.emit_expr(&args[2])?;
-        if h.ty != Ty::I32 || key.ty != Ty::I32 || val.ty != Ty::I32 {
+        if h.ty != Ty::I32 || key.ty != Ty::I32 || (val.ty != Ty::I32 && !is_task_handle_ty(val.ty))
+        {
             return Err(CompilerError::new(
                 CompileErrorKind::Typing,
                 "map_u32.set expects (handle, key, val) all i32".to_string(),
@@ -22602,6 +23227,14 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
     }
 
     fn infer_expr_in_new_scope(&self, expr: &Expr) -> Result<TyInfo, CompilerError> {
+        self.infer_expr_in_new_scope_with_task_scope_depth(expr, self.task_scopes.len())
+    }
+
+    fn infer_expr_in_new_scope_with_task_scope_depth(
+        &self,
+        expr: &Expr,
+        task_scope_depth: usize,
+    ) -> Result<TyInfo, CompilerError> {
         let mut functions: BTreeMap<String, FnSig> = BTreeMap::new();
         for f in &self.program.functions {
             functions.insert(
@@ -22664,7 +23297,7 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             fn_ret_ty: TyInfo::unbranded(self.fn_ret_ty),
             allow_async_ops: self.allow_async_ops,
             unsafe_depth: self.unsafe_depth,
-            task_scope_depth: 0,
+            task_scope_depth,
             scopes: self
                 .scopes
                 .iter()
@@ -23935,7 +24568,7 @@ impl InferCtx {
                                 format!("type mismatch in set for variable {name:?}"),
                             ));
                         }
-                        Ok(ty)
+                        Ok(prev)
                     }
                     "if" => {
                         if args.len() != 3 {
@@ -28566,10 +29199,14 @@ impl InferCtx {
                                 "map_u32.set expects 3 args".to_string(),
                             ));
                         }
-                        if self.infer(&args[0])? != Ty::I32
-                            || self.infer(&args[1])? != Ty::I32
-                            || self.infer(&args[2])? != Ty::I32
-                        {
+                        if self.infer(&args[0])? != Ty::I32 || self.infer(&args[1])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "map_u32.set expects (handle, key, val) all i32".to_string(),
+                            ));
+                        }
+                        let v = self.infer(&args[2])?;
+                        if v != Ty::I32 && !is_task_handle_ty(v.ty) {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
                                 "map_u32.set expects (handle, key, val) all i32".to_string(),
@@ -29855,6 +30492,16 @@ static void rt_mem_on_memcpy(ctx_t* ctx, uint32_t size) {
   ctx->mem_stats.memcpy_bytes += (uint64_t)size;
 }
 
+static uint32_t rt_mem_epoch_pause(ctx_t* ctx) {
+  uint32_t saved = ctx->mem_epoch_id;
+  ctx->mem_epoch_id = 0;
+  return saved;
+}
+
+static void rt_mem_epoch_resume(ctx_t* ctx, uint32_t saved) {
+  ctx->mem_epoch_id = saved;
+}
+
 static void* rt_alloc_raw(ctx_t* ctx, uint32_t size, uint32_t align) {
   void* ptr = rt_heap_alloc(ctx, size, align);
   if (!ptr && size) rt_trap("out of memory");
@@ -30621,6 +31268,7 @@ struct rt_bufread_s {
   uint32_t alive;
   iface_t reader;
   uint32_t eof;
+  uint32_t direct_bytes;
 
   bytes_t buf;
   uint32_t start;
@@ -32507,6 +33155,7 @@ static uint32_t rt_bufread_new(ctx_t* ctx, iface_t reader, uint32_t cap) {
   br->alive = 1;
   br->reader = reader;
   br->eof = 0;
+  br->direct_bytes = 0;
   br->buf = rt_bytes_alloc(ctx, cap);
   br->start = 0;
   br->end = 0;
@@ -32519,7 +33168,17 @@ static uint32_t rt_bufread_fill_poll(ctx_t* ctx, uint32_t br_id, bytes_view_t* o
   if (br->start > br->end) rt_trap("bufread corrupt");
   uint32_t avail = br->end - br->start;
   if (avail != 0) {
-    if (out) *out = rt_bytes_subview(ctx, br->buf, br->start, avail);
+    if (out) {
+      if (br->direct_bytes) {
+        iface_t reader = br->reader;
+        if (reader.vtable != RT_IFACE_VTABLE_IO_READER) rt_trap("bufread corrupt");
+        rt_io_reader_t* r = rt_io_reader_ptr(ctx, reader.data);
+        if (r->kind != RT_IO_READER_KIND_BYTES) rt_trap("bufread corrupt");
+        *out = rt_bytes_subview(ctx, r->bytes, br->start, avail);
+      } else {
+        *out = rt_bytes_subview(ctx, br->buf, br->start, avail);
+      }
+    }
     return UINT32_C(1);
   }
   if (br->eof) {
@@ -32531,6 +33190,7 @@ static uint32_t rt_bufread_fill_poll(ctx_t* ctx, uint32_t br_id, bytes_view_t* o
   if (reader.vtable != RT_IFACE_VTABLE_IO_READER) {
     uint32_t cap = br->buf.len;
     uint32_t got = rt_ext_io_reader_read_into(reader.vtable, reader.data, br->buf.ptr, cap);
+    br->direct_bytes = 0;
     br->start = 0;
     br->end = got;
     if (got == 0) {
@@ -32564,9 +33224,12 @@ static uint32_t rt_bufread_fill_poll(ctx_t* ctx, uint32_t br_id, bytes_view_t* o
     uint32_t rem = b.len - pos;
     got = (rem < cap) ? rem : cap;
     if (got) {
-      memcpy(br->buf.ptr, b.ptr + pos, got);
-      rt_mem_on_memcpy(ctx, got);
+      br->direct_bytes = 1;
+      br->start = pos;
+      br->end = pos + got;
       r->pos = pos + got;
+      if (out) *out = rt_bytes_subview(ctx, b, br->start, got);
+      return UINT32_C(1);
     } else {
       r->eof = 1;
     }
@@ -32597,6 +33260,7 @@ static uint32_t rt_bufread_fill_poll(ctx_t* ctx, uint32_t br_id, bytes_view_t* o
     rt_trap("bufread bad reader kind");
   }
 
+  br->direct_bytes = 0;
   br->start = 0;
   br->end = got;
   if (got == 0) {
@@ -32614,13 +33278,23 @@ static bytes_view_t rt_bufread_fill_block(ctx_t* ctx, uint32_t br_id) {
   for (;;) {
     if (br->start > br->end) rt_trap("bufread corrupt");
     uint32_t avail = br->end - br->start;
-    if (avail != 0) return rt_bytes_subview(ctx, br->buf, br->start, avail);
+    if (avail != 0) {
+      if (br->direct_bytes) {
+        iface_t reader = br->reader;
+        if (reader.vtable != RT_IFACE_VTABLE_IO_READER) rt_trap("bufread corrupt");
+        rt_io_reader_t* r = rt_io_reader_ptr(ctx, reader.data);
+        if (r->kind != RT_IO_READER_KIND_BYTES) rt_trap("bufread corrupt");
+        return rt_bytes_subview(ctx, r->bytes, br->start, avail);
+      }
+      return rt_bytes_subview(ctx, br->buf, br->start, avail);
+    }
     if (br->eof) return rt_view_empty(ctx);
 
     iface_t reader = br->reader;
     if (reader.vtable != RT_IFACE_VTABLE_IO_READER) {
       uint32_t cap = br->buf.len;
       uint32_t got = rt_ext_io_reader_read_into(reader.vtable, reader.data, br->buf.ptr, cap);
+      br->direct_bytes = 0;
       br->start = 0;
       br->end = got;
       if (got == 0) {
@@ -32651,9 +33325,11 @@ static bytes_view_t rt_bufread_fill_block(ctx_t* ctx, uint32_t br_id) {
       uint32_t rem = b.len - pos;
       got = (rem < cap) ? rem : cap;
       if (got) {
-        memcpy(br->buf.ptr, b.ptr + pos, got);
-        rt_mem_on_memcpy(ctx, got);
+        br->direct_bytes = 1;
+        br->start = pos;
+        br->end = pos + got;
         r->pos = pos + got;
+        return rt_bytes_subview(ctx, b, br->start, got);
       } else {
         r->eof = 1;
       }
@@ -32684,6 +33360,7 @@ static bytes_view_t rt_bufread_fill_block(ctx_t* ctx, uint32_t br_id) {
       rt_trap("bufread bad reader kind");
     }
 
+    br->direct_bytes = 0;
     br->start = 0;
     br->end = got;
     if (got == 0) {
@@ -32704,6 +33381,7 @@ static uint32_t rt_bufread_consume(ctx_t* ctx, uint32_t br_id, uint32_t n) {
   if (br->start == br->end) {
     br->start = 0;
     br->end = 0;
+    br->direct_bytes = 0;
   }
   return UINT32_C(0);
 }
@@ -33506,8 +34184,11 @@ static result_i32_t rt_rr_open_v1(ctx_t* ctx, bytes_view_t cfg) {
 
   // Replay modes load entries from the cassette file.
   if (mode == RT_RR_MODE_REPLAY_V1 || mode == RT_RR_MODE_RECORD_MISSING_V1) {
+    uint32_t saved_epoch = rt_mem_epoch_pause(ctx);
+
     const uint32_t prefix_len = 8; // ".x07_rr/"
     if (cassette_path.len > UINT32_MAX - prefix_len) {
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_CFG_INVALID };
     }
     uint32_t total = prefix_len + cassette_path.len;
@@ -33522,33 +34203,40 @@ static result_i32_t rt_rr_open_v1(ctx_t* ctx, bytes_view_t cfg) {
     if (!f) {
       rt_free(ctx, path, total + 1, 1);
       if (mode == RT_RR_MODE_REPLAY_V1) {
+        rt_mem_epoch_resume(ctx, saved_epoch);
         return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
       }
       // record_missing: allow empty cassette when missing.
       ctx->rr_handles_len += 1;
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return (result_i32_t){ .tag = UINT32_C(1), .payload.ok = handle_id };
     }
     rt_free(ctx, path, total + 1, 1);
 
     if (fseek(f, 0, SEEK_END) != 0) {
       fclose(f);
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
     }
     long end = ftell(f);
     if (end < 0) {
       fclose(f);
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
     }
     if ((uint64_t)end > max_cassette_bytes) {
       fclose(f);
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_BUDGET_CASSETTE_BYTES };
     }
     if ((uint64_t)end > (uint64_t)UINT32_MAX) {
       fclose(f);
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
     }
     if (fseek(f, 0, SEEK_SET) != 0) {
       fclose(f);
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
     }
 
@@ -33558,6 +34246,7 @@ static result_i32_t rt_rr_open_v1(ctx_t* ctx, bytes_view_t cfg) {
       if (got != blob.len) {
         fclose(f);
         rt_bytes_drop(ctx, &blob);
+        rt_mem_epoch_resume(ctx, saved_epoch);
         return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OPEN_FAILED };
       }
     }
@@ -33580,6 +34269,7 @@ static result_i32_t rt_rr_open_v1(ctx_t* ctx, bytes_view_t cfg) {
       pos += plen;
 
       if (c->entries_len + 1 > max_entries) {
+        rt_mem_epoch_resume(ctx, saved_epoch);
         return (result_i32_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_BUDGET_ENTRIES };
       }
       rt_rr_entries_ensure_cap(ctx, c, c->entries_len + 1);
@@ -33589,10 +34279,13 @@ static result_i32_t rt_rr_open_v1(ctx_t* ctx, bytes_view_t cfg) {
       e->payload_len = plen;
       uint32_t err = rt_rr_parse_entry_v1(ctx, h, blob.ptr + payload_off, plen, payload_off, e);
       if (err != 0) {
+        rt_mem_epoch_resume(ctx, saved_epoch);
         return (result_i32_t){ .tag = UINT32_C(0), .payload.err = err };
       }
       c->entries_len += 1;
     }
+
+    rt_mem_epoch_resume(ctx, saved_epoch);
   }
 
   ctx->rr_handles_len += 1;
@@ -33688,7 +34381,7 @@ static bytes_t rt_rr_stats_v1(ctx_t* ctx, int32_t handle_i32) {
   return rt_bytes_from_literal(ctx, (const uint8_t*)buf, (uint32_t)n);
 }
 
-static result_bytes_t rt_rr_next_v1(ctx_t* ctx, int32_t handle_i32, bytes_view_t kind, bytes_view_t op, bytes_view_t key) {
+static result_bytes_t rt_rr_next_v1(ctx_t* ctx, int32_t handle_i32, bytes_view_t kind, bytes_view_t op, bytes_view_t key, uint32_t* out_latency_ticks, uint32_t do_sleep) {
   if (!X07_ENABLE_RR) rt_trap("rr disabled");
   ctx->rr_next_calls += 1;
 
@@ -33697,6 +34390,8 @@ static result_bytes_t rt_rr_next_v1(ctx_t* ctx, int32_t handle_i32, bytes_view_t
   if (op.len != 0 && !rt_dbg_borrow_check(ctx, op.bid, op.off_bytes, op.len)) return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_ENTRY_INVALID };
   if (key.len != 0 && !rt_dbg_borrow_check(ctx, key.bid, key.off_bytes, key.len)) return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_ENTRY_INVALID };
 #endif
+
+  if (out_latency_ticks) *out_latency_ticks = UINT32_C(0);
 
   rr_handle_t* h = rt_rr_handle_ptr(ctx, handle_i32);
 
@@ -33736,15 +34431,18 @@ static result_bytes_t rt_rr_next_v1(ctx_t* ctx, int32_t handle_i32, bytes_view_t
         return (result_bytes_t){ .tag = UINT32_C(0), .payload.err = RT_RR_ERR_OP_MISMATCH };
       }
 
-      if (e->latency_ticks != 0) {
+      if (out_latency_ticks) *out_latency_ticks = e->latency_ticks;
+      if (do_sleep && e->latency_ticks != 0) {
         rt_task_sleep_block(ctx, e->latency_ticks);
       }
 
+      uint32_t saved_epoch = rt_mem_epoch_pause(ctx);
       bytes_t out = rt_bytes_alloc(ctx, e->payload_len);
       if (e->payload_len) {
         memcpy(out.ptr, c->blob.ptr + e->payload_off, e->payload_len);
         rt_mem_on_memcpy(ctx, e->payload_len);
       }
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return (result_bytes_t){ .tag = UINT32_C(1), .payload.ok = out };
     }
   }
@@ -33768,14 +34466,18 @@ static result_bytes_t rt_rr_next_v1(ctx_t* ctx, int32_t handle_i32, bytes_view_t
     if (best != UINT32_MAX) {
       rr_entry_desc_t* e = &c->entries[best];
       e->used = 1;
-      if (e->latency_ticks != 0) {
+      if (out_latency_ticks) *out_latency_ticks = e->latency_ticks;
+      if (do_sleep && e->latency_ticks != 0) {
         rt_task_sleep_block(ctx, e->latency_ticks);
       }
+
+      uint32_t saved_epoch = rt_mem_epoch_pause(ctx);
       bytes_t out = rt_bytes_alloc(ctx, e->payload_len);
       if (e->payload_len) {
         memcpy(out.ptr, c->blob.ptr + e->payload_off, e->payload_len);
         rt_mem_on_memcpy(ctx, e->payload_len);
       }
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return (result_bytes_t){ .tag = UINT32_C(1), .payload.ok = out };
     }
   }
@@ -33833,11 +34535,14 @@ static bytes_t rt_rr_entry_resp_v1(ctx_t* ctx, bytes_view_t entry) {
       uint32_t start = 0;
       uint32_t len = 0;
       if (!rt_dm_get_string_range(entry.ptr, entry.len, v_off, &start, &len)) rt_trap("rr.entry_resp_v1 invalid entry");
+
+      uint32_t saved_epoch = rt_mem_epoch_pause(ctx);
       bytes_t out = rt_bytes_alloc(ctx, len);
       if (len) {
         memcpy(out.ptr, entry.ptr + start, len);
         rt_mem_on_memcpy(ctx, len);
       }
+      rt_mem_epoch_resume(ctx, saved_epoch);
       return out;
     }
     pos = v_end;
@@ -35773,6 +36478,11 @@ typedef struct {
   uint32_t max_out_buf_bytes;
   uint32_t pending_active;
   bytes_t pending;
+  const uint8_t* in_ptr;
+  uint32_t in_len;
+  const uint8_t* scratch_ptr;
+  uint32_t scratch_len;
+  uint32_t allow_emit_view;
 } rt_stream_xf_emit_ctx_v1;
 
 static void rt_stream_xf_emit_ctx_init(
@@ -35853,10 +36563,11 @@ static int32_t rt_stream_xf_emit_commit_v1(void* emit_ctx, const x07_out_buf_v1*
   if (out->len > out->cap) return (int32_t)RT_XF_E_EMIT_LEN_GT_CAP;
   if (out->len > (uint32_t)INT32_MAX) return (int32_t)RT_XF_E_OUT_INVALID;
 
-  // Append: u32 len, then payload bytes.
-  uint32_t len_off = e->out.len;
-  e->out = rt_vec_u8_extend_zeroes(e->ctx, e->out, 4);
-  rt_write_u32_le(e->out.data + len_off, out->len);
+  // Append: u32 tag(0=inline), u32 len, then payload bytes.
+  uint32_t hdr_off = e->out.len;
+  e->out = rt_vec_u8_extend_zeroes(e->ctx, e->out, 8);
+  rt_write_u32_le(e->out.data + hdr_off, 0);
+  rt_write_u32_le(e->out.data + hdr_off + 4, out->len);
 
   if (out->len != 0) {
     uint32_t pos = e->out.len;
@@ -35874,11 +36585,73 @@ static int32_t rt_stream_xf_emit_commit_v1(void* emit_ctx, const x07_out_buf_v1*
 }
 
 static int32_t rt_stream_xf_emit_view_v1(void* emit_ctx, const uint8_t* ptr, uint32_t len, uint32_t view_kind) {
-  (void)emit_ctx;
-  (void)ptr;
-  (void)len;
-  (void)view_kind;
-  return (int32_t)RT_XF_E_VIEW_NOT_ALLOWED;
+  if (!emit_ctx) return (int32_t)RT_XF_E_OUT_INVALID;
+  rt_stream_xf_emit_ctx_v1* e = (rt_stream_xf_emit_ctx_v1*)emit_ctx;
+  if (!e->ctx) return (int32_t)RT_XF_E_OUT_INVALID;
+  if (e->pending_active) return (int32_t)RT_XF_E_OUT_INVALID;
+  if (!e->allow_emit_view) return (int32_t)RT_XF_E_VIEW_NOT_ALLOWED;
+
+  if (view_kind != 1 && view_kind != 2) return (int32_t)RT_XF_E_OUT_INVALID;
+
+  if (e->max_out_buf_bytes != 0 && len > e->max_out_buf_bytes) {
+    return (int32_t)RT_XF_E_EMIT_BUF_TOO_LARGE;
+  }
+
+  if (e->max_out_items_per_step != 0) {
+    uint32_t next_items = e->emit_items + 1;
+    if (next_items < e->emit_items || next_items > e->max_out_items_per_step) {
+      return (int32_t)RT_XF_E_EMIT_STEP_ITEMS_EXCEEDED;
+    }
+  }
+
+  if (e->max_out_bytes_per_step != 0) {
+    if (len > UINT32_MAX - e->emit_bytes) {
+      return (int32_t)RT_XF_E_EMIT_STEP_BYTES_EXCEEDED;
+    }
+    uint32_t next_bytes = e->emit_bytes + len;
+    if (next_bytes > e->max_out_bytes_per_step) {
+      return (int32_t)RT_XF_E_EMIT_STEP_BYTES_EXCEEDED;
+    }
+  }
+
+  const uint8_t* base = NULL;
+  uint32_t base_len = 0;
+  if (view_kind == 1) {
+    if (!e->in_ptr && e->in_len == 0) return (int32_t)RT_XF_E_VIEW_NOT_ALLOWED;
+    base = e->in_ptr;
+    base_len = e->in_len;
+  } else {
+    base = e->scratch_ptr;
+    base_len = e->scratch_len;
+  }
+
+  uint32_t off = 0;
+  if (len != 0) {
+    if (!base || base_len == 0) return (int32_t)RT_XF_E_VIEW_NOT_ALLOWED;
+
+    uintptr_t bp = (uintptr_t)base;
+    uintptr_t ep = bp + (uintptr_t)base_len;
+    uintptr_t p = (uintptr_t)ptr;
+    uintptr_t pe = p + (uintptr_t)len;
+    if (p < bp || p > ep) return (int32_t)RT_XF_E_OUT_INVALID;
+    if (pe < p || pe > ep) return (int32_t)RT_XF_E_OUT_INVALID;
+    uintptr_t d = p - bp;
+    if (d > UINT32_MAX) return (int32_t)RT_XF_E_OUT_INVALID;
+    off = (uint32_t)d;
+  }
+
+  uint32_t hdr_off = e->out.len;
+  e->out = rt_vec_u8_extend_zeroes(e->ctx, e->out, 12);
+  rt_write_u32_le(e->out.data + hdr_off, view_kind);
+  rt_write_u32_le(e->out.data + hdr_off + 4, off);
+  rt_write_u32_le(e->out.data + hdr_off + 8, len);
+
+  e->out_count += 1;
+  if (e->out_count > (uint32_t)INT32_MAX) return (int32_t)RT_XF_E_OUT_INVALID;
+
+  e->emit_items += 1;
+  e->emit_bytes += len;
+  return 0;
 }
 
 static uint32_t rt_stream_xf_norm_err_code(int32_t rc) {
@@ -36005,6 +36778,11 @@ static result_bytes_t rt_stream_xf_plugin_init_v1(
 
   rt_stream_xf_emit_ctx_v1 emit_ctx;
   rt_stream_xf_emit_ctx_init(ctx, &emit_ctx, max_out_bytes_per_step, max_out_items_per_step, max_out_buf_bytes);
+  emit_ctx.in_ptr = NULL;
+  emit_ctx.in_len = 0;
+  emit_ctx.scratch_ptr = scratch_b.ptr;
+  emit_ctx.scratch_len = scratch_b.len;
+  emit_ctx.allow_emit_view = 1;
   x07_xf_emit_v1 emit;
   emit.emit_ctx = (void*)&emit_ctx;
   emit.emit_alloc = rt_stream_xf_emit_alloc_v1;
@@ -36068,6 +36846,11 @@ static result_bytes_t rt_stream_xf_plugin_step_v1(
 
   rt_stream_xf_emit_ctx_v1 emit_ctx;
   rt_stream_xf_emit_ctx_init(ctx, &emit_ctx, max_out_bytes_per_step, max_out_items_per_step, max_out_buf_bytes);
+  emit_ctx.in_ptr = input.ptr;
+  emit_ctx.in_len = input.len;
+  emit_ctx.scratch_ptr = scratch_b.ptr;
+  emit_ctx.scratch_len = scratch_b.len;
+  emit_ctx.allow_emit_view = 1;
   x07_xf_emit_v1 emit;
   emit.emit_ctx = (void*)&emit_ctx;
   emit.emit_alloc = rt_stream_xf_emit_alloc_v1;
@@ -36130,6 +36913,11 @@ static result_bytes_t rt_stream_xf_plugin_flush_v1(
 
   rt_stream_xf_emit_ctx_v1 emit_ctx;
   rt_stream_xf_emit_ctx_init(ctx, &emit_ctx, max_out_bytes_per_step, max_out_items_per_step, max_out_buf_bytes);
+  emit_ctx.in_ptr = NULL;
+  emit_ctx.in_len = 0;
+  emit_ctx.scratch_ptr = scratch_b.ptr;
+  emit_ctx.scratch_len = scratch_b.len;
+  emit_ctx.allow_emit_view = 1;
   x07_xf_emit_v1 emit;
   emit.emit_ctx = (void*)&emit_ctx;
   emit.emit_alloc = rt_stream_xf_emit_alloc_v1;

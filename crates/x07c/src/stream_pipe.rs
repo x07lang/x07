@@ -5055,7 +5055,7 @@ impl PipeCodegen<'_> {
                                 expr_ident(r_var.clone()),
                             ]),
                         ]),
-                        self.gen_plugin_process_output_blob(0, &out_b_var)?,
+                        self.gen_plugin_process_output_blob(0, &out_b_var, None)?,
                         end_ok,
                     ]),
                     expr_list(vec![
@@ -5742,11 +5742,18 @@ impl PipeCodegen<'_> {
             expr_int(max_out_buf_bytes),
         ]);
 
-        self.gen_plugin_call_and_process_outputs(p, PluginCallKindV1::Init, budget_profile, call)
+        self.gen_plugin_call_and_process_outputs(
+            p,
+            PluginCallKindV1::Init,
+            budget_profile,
+            call,
+            None,
+        )
     }
 
     fn gen_plugin_step(&self, stage_idx: usize, item: Expr) -> Result<Expr, CompilerError> {
         let p = self.plugin_state(stage_idx)?;
+        let in_item_var = format!("xf_in_{stage_idx}");
 
         let abi_major = i32::try_from(p.plugin.abi_major).unwrap_or(i32::MAX);
         let max_out_bytes_per_step =
@@ -5777,10 +5784,24 @@ impl PipeCodegen<'_> {
             expr_int(max_out_bytes_per_step),
             expr_int(max_out_items_per_step),
             expr_int(max_out_buf_bytes),
-            item,
+            expr_ident(in_item_var.clone()),
         ]);
 
-        self.gen_plugin_call_and_process_outputs(p, PluginCallKindV1::Step, budget_profile, call)
+        Ok(expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(in_item_var.clone()),
+                item,
+            ]),
+            self.gen_plugin_call_and_process_outputs(
+                p,
+                PluginCallKindV1::Step,
+                budget_profile,
+                call,
+                Some(in_item_var.as_str()),
+            )?,
+        ]))
     }
 
     fn gen_plugin_flush(&self, stage_idx: usize) -> Result<Expr, CompilerError> {
@@ -5822,6 +5843,7 @@ impl PipeCodegen<'_> {
             PluginCallKindV1::Flush,
             budget_profile,
             call,
+            None,
         )?];
         stmts.push(self.gen_flush_from(stage_idx + 1)?);
         stmts.push(expr_int(0));
@@ -5836,6 +5858,7 @@ impl PipeCodegen<'_> {
         call_kind: PluginCallKindV1,
         budget_profile: Expr,
         call: Expr,
+        in_item_var: Option<&str>,
     ) -> Result<Expr, CompilerError> {
         let stage_idx = p.stage_idx;
         let r_var = format!("xf_r_{stage_idx}");
@@ -6284,7 +6307,7 @@ impl PipeCodegen<'_> {
                             expr_ident(r_var.clone()),
                         ]),
                     ]),
-                    self.gen_plugin_process_output_blob(stage_idx, &out_b_var)?,
+                    self.gen_plugin_process_output_blob(stage_idx, &out_b_var, in_item_var)?,
                     expr_int(0),
                 ]),
                 expr_list(vec![
@@ -6307,14 +6330,24 @@ impl PipeCodegen<'_> {
         &self,
         stage_idx: usize,
         out_b_var: &str,
+        in_item_var: Option<&str>,
     ) -> Result<Expr, CompilerError> {
+        let p = self.plugin_state(stage_idx)?;
+
         let out_v_var = format!("xf_out_v_{stage_idx}");
         let out_len_var = format!("xf_out_len_{stage_idx}");
         let count_var = format!("xf_out_count_{stage_idx}");
         let pos_var = format!("xf_out_pos_{stage_idx}");
+        let tag_var = format!("xf_out_tag_{stage_idx}");
+        let view_off_var = format!("xf_out_view_off_{stage_idx}");
         let item_len_var = format!("xf_out_item_len_{stage_idx}");
         let item_var = format!("xf_out_item_{stage_idx}");
         let loop_i_var = format!("xf_out_i_{stage_idx}");
+        let scratch_v_var = format!("xf_out_scratch_v_{stage_idx}");
+        let scratch_len_var = format!("xf_out_scratch_len_{stage_idx}");
+        let in_len_var = format!("xf_out_in_len_{stage_idx}");
+
+        let err_out_invalid = || err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid");
 
         let mut stmts: Vec<Expr> = vec![
             expr_list(vec![
@@ -6337,10 +6370,7 @@ impl PipeCodegen<'_> {
                     expr_ident(out_len_var.clone()),
                     expr_int(4),
                 ]),
-                expr_list(vec![
-                    expr_ident("return"),
-                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
-                ]),
+                expr_list(vec![expr_ident("return"), err_out_invalid()]),
                 expr_int(0),
             ]),
             expr_list(vec![
@@ -6359,10 +6389,7 @@ impl PipeCodegen<'_> {
                     expr_ident(count_var.clone()),
                     expr_int(0),
                 ]),
-                expr_list(vec![
-                    expr_ident("return"),
-                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
-                ]),
+                expr_list(vec![expr_ident("return"), err_out_invalid()]),
                 expr_int(0),
             ]),
             expr_list(vec![
@@ -6370,7 +6397,265 @@ impl PipeCodegen<'_> {
                 expr_ident(pos_var.clone()),
                 expr_int(4),
             ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(scratch_v_var.clone()),
+                expr_list(vec![
+                    expr_ident("bytes.view"),
+                    expr_ident(p.scratch_b_var.clone()),
+                ]),
+            ]),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident(scratch_len_var.clone()),
+                expr_list(vec![
+                    expr_ident("view.len"),
+                    expr_ident(scratch_v_var.clone()),
+                ]),
+            ]),
         ];
+        if let Some(in_item_var) = in_item_var {
+            stmts.push(expr_list(vec![
+                expr_ident("let"),
+                expr_ident(in_len_var.clone()),
+                expr_list(vec![
+                    expr_ident("view.len"),
+                    expr_ident(in_item_var.to_string()),
+                ]),
+            ]));
+        }
+
+        let emit_inline = || -> Result<Expr, CompilerError> {
+            Ok(expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("<"),
+                        expr_list(vec![
+                            expr_ident("-"),
+                            expr_ident(out_len_var.clone()),
+                            expr_ident(pos_var.clone()),
+                        ]),
+                        expr_int(4),
+                    ]),
+                    expr_list(vec![expr_ident("return"), err_out_invalid()]),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(item_len_var.clone()),
+                    expr_list(vec![
+                        expr_ident("codec.read_u32_le"),
+                        expr_ident(out_v_var.clone()),
+                        expr_ident(pos_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("<"),
+                        expr_ident(item_len_var.clone()),
+                        expr_int(0),
+                    ]),
+                    expr_list(vec![expr_ident("return"), err_out_invalid()]),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("set"),
+                    expr_ident(pos_var.clone()),
+                    expr_list(vec![
+                        expr_ident("+"),
+                        expr_ident(pos_var.clone()),
+                        expr_int(4),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("<"),
+                        expr_list(vec![
+                            expr_ident("-"),
+                            expr_ident(out_len_var.clone()),
+                            expr_ident(pos_var.clone()),
+                        ]),
+                        expr_ident(item_len_var.clone()),
+                    ]),
+                    expr_list(vec![expr_ident("return"), err_out_invalid()]),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(item_var.clone()),
+                    expr_list(vec![
+                        expr_ident("view.slice"),
+                        expr_ident(out_v_var.clone()),
+                        expr_ident(pos_var.clone()),
+                        expr_ident(item_len_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("set"),
+                    expr_ident(pos_var.clone()),
+                    expr_list(vec![
+                        expr_ident("+"),
+                        expr_ident(pos_var.clone()),
+                        expr_ident(item_len_var.clone()),
+                    ]),
+                ]),
+                self.gen_process_from(
+                    stage_idx + 1,
+                    self.apply_out_item_brand(stage_idx, expr_ident(item_var.clone())),
+                )?,
+                expr_int(0),
+            ]))
+        };
+
+        let emit_view = |base_v: Expr, base_len: Expr| -> Result<Expr, CompilerError> {
+            Ok(expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("<"),
+                        expr_list(vec![
+                            expr_ident("-"),
+                            expr_ident(out_len_var.clone()),
+                            expr_ident(pos_var.clone()),
+                        ]),
+                        expr_int(8),
+                    ]),
+                    expr_list(vec![expr_ident("return"), err_out_invalid()]),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(view_off_var.clone()),
+                    expr_list(vec![
+                        expr_ident("codec.read_u32_le"),
+                        expr_ident(out_v_var.clone()),
+                        expr_ident(pos_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("set"),
+                    expr_ident(pos_var.clone()),
+                    expr_list(vec![
+                        expr_ident("+"),
+                        expr_ident(pos_var.clone()),
+                        expr_int(4),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(item_len_var.clone()),
+                    expr_list(vec![
+                        expr_ident("codec.read_u32_le"),
+                        expr_ident(out_v_var.clone()),
+                        expr_ident(pos_var.clone()),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("set"),
+                    expr_ident(pos_var.clone()),
+                    expr_list(vec![
+                        expr_ident("+"),
+                        expr_ident(pos_var.clone()),
+                        expr_int(4),
+                    ]),
+                ]),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("if"),
+                        expr_list(vec![
+                            expr_ident("<"),
+                            expr_ident(view_off_var.clone()),
+                            expr_int(0),
+                        ]),
+                        expr_int(1),
+                        expr_list(vec![
+                            expr_ident("<"),
+                            expr_ident(item_len_var.clone()),
+                            expr_int(0),
+                        ]),
+                    ]),
+                    expr_list(vec![expr_ident("return"), err_out_invalid()]),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("<"),
+                        expr_list(vec![
+                            expr_ident("-"),
+                            base_len,
+                            expr_ident(view_off_var.clone()),
+                        ]),
+                        expr_ident(item_len_var.clone()),
+                    ]),
+                    expr_list(vec![expr_ident("return"), err_out_invalid()]),
+                    expr_int(0),
+                ]),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident(item_var.clone()),
+                    expr_list(vec![
+                        expr_ident("view.slice"),
+                        base_v,
+                        expr_ident(view_off_var.clone()),
+                        expr_ident(item_len_var.clone()),
+                    ]),
+                ]),
+                self.gen_process_from(
+                    stage_idx + 1,
+                    self.apply_out_item_brand(stage_idx, expr_ident(item_var.clone())),
+                )?,
+                expr_int(0),
+            ]))
+        };
+
+        let view_branch = if let Some(in_item_var) = in_item_var {
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_ident(tag_var.clone()),
+                    expr_int(1),
+                ]),
+                emit_view(
+                    expr_ident(in_item_var.to_string()),
+                    expr_ident(in_len_var.clone()),
+                )?,
+                expr_list(vec![
+                    expr_ident("if"),
+                    expr_list(vec![
+                        expr_ident("="),
+                        expr_ident(tag_var.clone()),
+                        expr_int(2),
+                    ]),
+                    emit_view(
+                        expr_ident(scratch_v_var.clone()),
+                        expr_ident(scratch_len_var.clone()),
+                    )?,
+                    expr_list(vec![expr_ident("return"), err_out_invalid()]),
+                ]),
+            ])
+        } else {
+            expr_list(vec![
+                expr_ident("if"),
+                expr_list(vec![
+                    expr_ident("="),
+                    expr_ident(tag_var.clone()),
+                    expr_int(2),
+                ]),
+                emit_view(
+                    expr_ident(scratch_v_var.clone()),
+                    expr_ident(scratch_len_var.clone()),
+                )?,
+                expr_list(vec![expr_ident("return"), err_out_invalid()]),
+            ])
+        };
 
         let loop_body = expr_list(vec![
             expr_ident("begin"),
@@ -6383,17 +6668,14 @@ impl PipeCodegen<'_> {
                         expr_ident(out_len_var.clone()),
                         expr_ident(pos_var.clone()),
                     ]),
-                    expr_int(4),
+                    expr_int(8),
                 ]),
-                expr_list(vec![
-                    expr_ident("return"),
-                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
-                ]),
+                expr_list(vec![expr_ident("return"), err_out_invalid()]),
                 expr_int(0),
             ]),
             expr_list(vec![
                 expr_ident("let"),
-                expr_ident(item_len_var.clone()),
+                expr_ident(tag_var.clone()),
                 expr_list(vec![
                     expr_ident("codec.read_u32_le"),
                     expr_ident(out_v_var.clone()),
@@ -6404,13 +6686,10 @@ impl PipeCodegen<'_> {
                 expr_ident("if"),
                 expr_list(vec![
                     expr_ident("<"),
-                    expr_ident(item_len_var.clone()),
+                    expr_ident(tag_var.clone()),
                     expr_int(0),
                 ]),
-                expr_list(vec![
-                    expr_ident("return"),
-                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
-                ]),
+                expr_list(vec![expr_ident("return"), err_out_invalid()]),
                 expr_int(0),
             ]),
             expr_list(vec![
@@ -6425,43 +6704,13 @@ impl PipeCodegen<'_> {
             expr_list(vec![
                 expr_ident("if"),
                 expr_list(vec![
-                    expr_ident("<"),
-                    expr_list(vec![
-                        expr_ident("-"),
-                        expr_ident(out_len_var.clone()),
-                        expr_ident(pos_var.clone()),
-                    ]),
-                    expr_ident(item_len_var.clone()),
+                    expr_ident("="),
+                    expr_ident(tag_var.clone()),
+                    expr_int(0),
                 ]),
-                expr_list(vec![
-                    expr_ident("return"),
-                    err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
-                ]),
-                expr_int(0),
+                emit_inline()?,
+                view_branch,
             ]),
-            expr_list(vec![
-                expr_ident("let"),
-                expr_ident(item_var.clone()),
-                expr_list(vec![
-                    expr_ident("view.slice"),
-                    expr_ident(out_v_var.clone()),
-                    expr_ident(pos_var.clone()),
-                    expr_ident(item_len_var.clone()),
-                ]),
-            ]),
-            expr_list(vec![
-                expr_ident("set"),
-                expr_ident(pos_var.clone()),
-                expr_list(vec![
-                    expr_ident("+"),
-                    expr_ident(pos_var.clone()),
-                    expr_ident(item_len_var.clone()),
-                ]),
-            ]),
-            self.gen_process_from(
-                stage_idx + 1,
-                self.apply_out_item_brand(stage_idx, expr_ident(item_var.clone())),
-            )?,
             expr_int(0),
         ]);
 
@@ -6472,7 +6721,6 @@ impl PipeCodegen<'_> {
             expr_ident(count_var.clone()),
             loop_body,
         ]));
-
         stmts.push(expr_list(vec![
             expr_ident("if"),
             expr_list(vec![
@@ -6480,13 +6728,9 @@ impl PipeCodegen<'_> {
                 expr_ident(pos_var.clone()),
                 expr_ident(out_len_var.clone()),
             ]),
-            expr_list(vec![
-                expr_ident("return"),
-                err_doc_const(E_XF_OUT_INVALID, "stream:xf_out_invalid"),
-            ]),
+            expr_list(vec![expr_ident("return"), err_out_invalid()]),
             expr_int(0),
         ]));
-
         stmts.push(expr_int(0));
         Ok(expr_list(
             vec![expr_ident("begin")].into_iter().chain(stmts).collect(),

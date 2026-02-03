@@ -263,6 +263,9 @@ Notes:
 - `id` MUST be a `bytes.lit` so the compiler can resolve the plugin deterministically and `x07 arch check` can verify it against the pinned registry.
 - Plugin ids are resolved from toolchain contracts under `arch/stream/plugins/index.x07sp.json`.
 - Some built-in stages (for example `split_lines_v1`, `frame_u32le_v1`, `deframe_u32le_v1`, `json_canon_stream_v1`) are implemented via the same plugin mechanism internally, without requiring `.x07.json` rewrites.
+- Plugin emit APIs:
+  - `emit_alloc` + `emit_commit`: copy/write output buffers.
+  - `emit_view`: borrowed-view output (view_kind `1`=current input, `2`=scratch). Returns error code `118` when view output is not allowed; plugins should fall back to `emit_alloc`.
 
 ### Parallel map (`par_map_stream_*_v1`)
 

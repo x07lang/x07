@@ -206,6 +206,12 @@
       "world": "solve-pure",
       "entry": "std.stream.plugin.tests.test_emit_limits_enforced_v1",
       "expect": "pass"
+    },
+    {
+      "id": "stream_plugins/emit_view_v1",
+      "world": "solve-pure",
+      "entry": "std.stream.plugin.tests.test_emit_view_v1",
+      "expect": "pass"
     }
   ]
 }
