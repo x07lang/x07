@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.web.api.schema.json",
+  "title": "x07.arch.web.api@0.1.0",
+  "description": "Pinned API catalog for router + OpenAPI generation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "endpoints", "errors"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.web.api@0.1.0" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "v": { "type": "integer", "minimum": 1 },
+    "endpoints": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/endpoint" } },
+    "errors": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/error_space" } }
+  },
+  "$defs": {
+    "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+    "brand": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "method", "path", "req_brand", "resp_brand", "error_space"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "method": { "$ref": "#/$defs/method" },
+        "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "req_brand": { "$ref": "#/$defs/brand" },
+        "resp_brand": { "$ref": "#/$defs/brand" },
+        "error_space": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "streaming_body": { "type": "boolean", "default": false }
+      }
+    },
+    "error_space": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["space", "codes"],
+      "properties": {
+        "space": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "codes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/error_code" } }
+      }
+    },
+    "error_code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "http_status", "stable_id"],
+      "properties": {
+        "code": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "http_status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "stable_id": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    }
+  }
+}

@@ -36,6 +36,23 @@ pub const X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION: &str = "x07.arch.stream.plugin@
 pub const X07_BUDGET_PROFILE_SCHEMA_VERSION: &str = "x07.budget.profile@0.1.0";
 pub const X07_SM_SPEC_SCHEMA_VERSION: &str = "x07.sm.spec@0.1.0";
 
+pub const X07_ARCH_WEB_INDEX_SCHEMA_VERSION: &str = "x07.arch.web.index@0.1.0";
+pub const X07_ARCH_WEB_API_SCHEMA_VERSION: &str = "x07.arch.web.api@0.1.0";
+pub const X07_ARCH_WEB_OPENAPI_PROFILE_SCHEMA_VERSION: &str = "x07.arch.web.openapi_profile@0.1.0";
+
+pub const X07_ARCH_CRAWL_INDEX_SCHEMA_VERSION: &str = "x07.arch.crawl.index@0.1.0";
+pub const X07_ARCH_CRAWL_POLICY_SCHEMA_VERSION: &str = "x07.arch.crawl.policy@0.1.0";
+
+pub const X07_ARCH_MSG_INDEX_SCHEMA_VERSION: &str = "x07.arch.msg.index@0.1.0";
+pub const X07_ARCH_MSG_KAFKA_INDEX_SCHEMA_VERSION: &str = "x07.arch.msg.kafka.index@0.1.0";
+pub const X07_ARCH_MSG_KAFKA_PROFILE_SCHEMA_VERSION: &str = "x07.arch.msg.kafka.profile@0.1.0";
+pub const X07_ARCH_MSG_AMQP_INDEX_SCHEMA_VERSION: &str = "x07.arch.msg.amqp.index@0.1.0";
+pub const X07_ARCH_MSG_AMQP_PROFILE_SCHEMA_VERSION: &str = "x07.arch.msg.amqp.profile@0.1.0";
+pub const X07_ARCH_MSG_AMQP_TOPOLOGY_SCHEMA_VERSION: &str = "x07.arch.msg.amqp.topology@0.1.0";
+
+pub const X07_ARCH_CLI_INDEX_SCHEMA_VERSION: &str = "x07.arch.cli.index@0.1.0";
+pub const X07_ARCH_CLI_PROFILE_SCHEMA_VERSION: &str = "x07.arch.cli.profile@0.1.0";
+
 pub const X07_ARCH_ARCHIVE_INDEX_SCHEMA_VERSION: &str = "x07.arch.archive.index@0.1.0";
 pub const X07_ARCH_ARCHIVE_PROFILE_SCHEMA_VERSION: &str = "x07.arch.archive.profile@0.1.0";
 pub const X07_ARCH_DB_INDEX_SCHEMA_VERSION: &str = "x07.arch.db.index@0.1.0";

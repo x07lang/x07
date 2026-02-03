@@ -1,0 +1,205 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.crawl.tests",
+  "imports": [
+    "ext.data_model",
+    "ext.json.data_model",
+    "std.bytes",
+    "std.crawl.fetch",
+    "std.crawl.robots",
+    "std.crawl.schedule",
+    "std.crawl.sitemap",
+    "std.fs",
+    "std.parse",
+    "std.test",
+    "std.u32",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.crawl.tests.test_fetch_replay_rr_v1",
+        "std.crawl.tests.test_robots_rfc9309_v1",
+        "std.crawl.tests.test_schedule_determinism_v1",
+        "std.crawl.tests.test_sitemap_parse_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.crawl.tests._assert_seq_strings_eq_v1",
+      "params": [
+        { "name": "doc_a", "ty": "bytes_view" },
+        { "name": "seq_a", "ty": "i32" },
+        { "name": "doc_b", "ty": "bytes_view" },
+        { "name": "seq_b", "ty": "i32" }
+      ],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "na", ["ext.data_model.seq_len", "doc_a", "seq_a"]],
+        ["let", "nb", ["ext.data_model.seq_len", "doc_b", "seq_b"]],
+        ["try", ["std.test.assert_i32_eq", "na", "nb", ["std.test.code_assert_i32_eq"]]],
+        [
+          "for",
+          "i",
+          0,
+          "na",
+          [
+            "begin",
+            ["let", "ao", ["ext.data_model.seq_get", "doc_a", "seq_a", "i"]],
+            ["let", "bo", ["ext.data_model.seq_get", "doc_b", "seq_b", "i"]],
+            ["let", "ab", ["ext.data_model.string_get", "doc_a", "ao"]],
+            ["let", "bb", ["ext.data_model.string_get", "doc_b", "bo"]],
+            ["try", ["std.test.assert_bytes_eq", "ab", "bb", ["std.test.code_assert_bytes_eq"]]],
+            0
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.crawl.tests.test_robots_rfc9309_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "robots_path", ["bytes.lit", "robots/basic_allow_disallow.robots.txt"]],
+        ["let", "robots_txt", ["std.fs.read", ["bytes.view", "robots_path"]]],
+        ["let", "rules", ["std.crawl.robots.parse_v1", ["bytes.view", "robots_txt"]]],
+        ["let", "matrix_path", ["bytes.lit", "robots/golden_allow_matrix.json"]],
+        ["let", "matrix_raw", ["std.fs.read", ["bytes.view", "matrix_path"]]],
+        ["let", "matrix_b", ["ext.json.data_model.parse", ["bytes.view", "matrix_raw"]]],
+        ["let", "matrix", ["bytes.view", "matrix_b"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "matrix"], 1], ["return", ["std.test.fail", 1]], 0],
+        ["let", "root", ["ext.data_model.root_offset", "matrix"]],
+        ["let", "k_ua", ["bytes.lit", "ua"]],
+        ["let", "k_cases", ["bytes.lit", "cases"]],
+        ["let", "k_path", ["bytes.lit", "path"]],
+        ["let", "k_allowed", ["bytes.lit", "allowed"]],
+        ["let", "ua_off", ["ext.data_model.map_find", "matrix", "root", ["bytes.view", "k_ua"]]],
+        ["let", "cases_off", ["ext.data_model.map_find", "matrix", "root", ["bytes.view", "k_cases"]]],
+        ["if", ["if", ["<", "ua_off", 0], 1, ["<", "cases_off", 0]], ["return", ["std.test.fail", 2]], 0],
+        ["let", "ua", ["ext.data_model.string_get", "matrix", "ua_off"]],
+        ["let", "n", ["ext.data_model.seq_len", "matrix", "cases_off"]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "case_off", ["ext.data_model.seq_get", "matrix", "cases_off", "i"]],
+            ["let", "path_off", ["ext.data_model.map_find", "matrix", "case_off", ["bytes.view", "k_path"]]],
+            ["let", "allowed_off", ["ext.data_model.map_find", "matrix", "case_off", ["bytes.view", "k_allowed"]]],
+            ["if", ["if", ["<", "path_off", 0], 1, ["<", "allowed_off", 0]], ["return", ["std.test.fail", 3]], 0],
+            ["let", "path", ["ext.data_model.string_get", "matrix", "path_off"]],
+            ["let", "allowed_b", ["ext.data_model.number_get", "matrix", "allowed_off"]],
+            ["let", "expected", ["std.parse.u32_dec", ["bytes.view", "allowed_b"]]],
+            ["let", "got", ["std.crawl.robots.allowed_v1", ["bytes.view", "rules"], ["bytes.view", "ua"], ["bytes.view", "path"]]],
+            ["try", ["std.test.assert_i32_eq", "got", "expected", ["std.test.code_assert_i32_eq"]]],
+            0
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.crawl.tests.test_sitemap_parse_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "simple_path", ["bytes.lit", "sitemap/simple.xml"]],
+        ["let", "index_path", ["bytes.lit", "sitemap/index.xml"]],
+        ["let", "simple_xml", ["std.fs.read", ["bytes.view", "simple_path"]]],
+        ["let", "index_xml", ["std.fs.read", ["bytes.view", "index_path"]]],
+        ["let", "got_simple", ["std.crawl.sitemap.parse_urls_v1", ["bytes.view", "simple_xml"]]],
+        ["let", "got_index", ["std.crawl.sitemap.parse_urls_v1", ["bytes.view", "index_xml"]]],
+        ["let", "golden_path", ["bytes.lit", "sitemap/golden_urls.json"]],
+        ["let", "golden_raw", ["std.fs.read", ["bytes.view", "golden_path"]]],
+        ["let", "golden_b", ["ext.json.data_model.parse", ["bytes.view", "golden_raw"]]],
+        ["let", "golden", ["bytes.view", "golden_b"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "golden"], 1], ["return", ["std.test.fail", 10]], 0],
+        ["let", "groot", ["ext.data_model.root_offset", "golden"]],
+        ["let", "k_simple", ["bytes.lit", "simple"]],
+        ["let", "k_index", ["bytes.lit", "index"]],
+        ["let", "exp_simple_off", ["ext.data_model.map_find", "golden", "groot", ["bytes.view", "k_simple"]]],
+        ["let", "exp_index_off", ["ext.data_model.map_find", "golden", "groot", ["bytes.view", "k_index"]]],
+        ["if", ["if", ["<", "exp_simple_off", 0], 1, ["<", "exp_index_off", 0]], ["return", ["std.test.fail", 11]], 0],
+        ["let", "gs", ["bytes.view", "got_simple"]],
+        ["let", "gi", ["bytes.view", "got_index"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "gs"], 1], ["return", ["std.test.fail", 12]], 0],
+        ["if", ["=", ["ext.data_model.doc_is_err", "gi"], 1], ["return", ["std.test.fail", 13]], 0],
+        ["let", "gs_root", ["ext.data_model.root_offset", "gs"]],
+        ["let", "gi_root", ["ext.data_model.root_offset", "gi"]],
+        ["try", ["std.crawl.tests._assert_seq_strings_eq_v1", "gs", "gs_root", "golden", "exp_simple_off"]],
+        ["try", ["std.crawl.tests._assert_seq_strings_eq_v1", "gi", "gi_root", "golden", "exp_index_off"]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.crawl.tests.test_schedule_determinism_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "seeds_path", ["bytes.lit", "schedule/seeds.json"]],
+        ["let", "seeds_raw", ["std.fs.read", ["bytes.view", "seeds_path"]]],
+        ["let", "seeds_b", ["ext.json.data_model.parse", ["bytes.view", "seeds_raw"]]],
+        ["let", "seeds", ["bytes.view", "seeds_b"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "seeds"], 1], ["return", ["std.test.fail", 20]], 0],
+        ["let", "pid", ["bytes.lit", "default_v1"]],
+        ["let", "plan_r", ["std.crawl.schedule.plan_v1", ["bytes.view", "pid"], "seeds"]],
+        ["if", ["!=", ["result_bytes.err_code", "plan_r"], 0], ["return", ["std.test.fail", 21]], 0],
+        ["let", "plan", ["result_bytes.unwrap_or", "plan_r", ["bytes.alloc", 0]]],
+        ["let", "planv", ["bytes.view", "plan"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "planv"], 1], ["return", ["std.test.fail", 22]], 0],
+        ["let", "golden_path", ["bytes.lit", "schedule/golden_plan.json"]],
+        ["let", "golden_raw", ["std.fs.read", ["bytes.view", "golden_path"]]],
+        ["let", "golden_b", ["ext.json.data_model.parse", ["bytes.view", "golden_raw"]]],
+        ["let", "golden", ["bytes.view", "golden_b"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "golden"], 1], ["return", ["std.test.fail", 23]], 0],
+        ["let", "proot", ["ext.data_model.root_offset", "planv"]],
+        ["let", "groot", ["ext.data_model.root_offset", "golden"]],
+        ["try", ["std.crawl.tests._assert_seq_strings_eq_v1", "planv", "proot", "golden", "groot"]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.crawl.tests.test_fetch_replay_rr_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "url", ["bytes.lit", "https://example.com/"]],
+        ["let", "body", ["bytes.lit", "BODY"]],
+        ["let", "v_url", ["ext.data_model.value_string", ["bytes.view", "url"]]],
+        ["if", ["=", ["bytes.len", "v_url"], 0], ["return", ["std.test.fail", 30]], 0],
+        ["let", "elems", ["std.vec.with_capacity", 64]],
+        ["set", "elems", ["std.u32.push_le", "elems", 1]],
+        ["set", "elems", ["std.u32.push_le", "elems", ["bytes.len", "v_url"]]],
+        ["set", "elems", ["std.vec.extend_bytes", "elems", ["bytes.view", "v_url"]]],
+        ["let", "elems_b", ["std.vec.as_bytes", "elems"]],
+        ["let", "seq_val", ["ext.data_model.value_seq_from_elems", ["bytes.view", "elems_b"]]],
+        ["if", ["=", ["bytes.len", "seq_val"], 0], ["return", ["std.test.fail", 31]], 0],
+        ["let", "plan_doc", ["ext.data_model.doc_ok", ["bytes.view", "seq_val"]]],
+        ["let", "plan", ["bytes.view", "plan_doc"]],
+        ["let", "res", ["std.crawl.fetch.replay_rr_v1", "plan"]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "got", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+        ["let", "exp", ["std.vec.with_capacity", 64]],
+        ["set", "exp", ["std.u32.push_le", "exp", ["bytes.len", "body"]]],
+        ["set", "exp", ["std.vec.extend_bytes", "exp", ["bytes.view", "body"]]],
+        ["let", "expected", ["std.vec.as_bytes", "exp"]],
+        ["try", ["std.test.assert_bytes_eq", "got", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

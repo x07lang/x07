@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.web.index.schema.json",
+  "title": "x07.arch.web.index@0.1.0",
+  "description": "Pinned web API catalogs + OpenAPI profiles (contracts-as-data).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "apis"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.web.index@0.1.0" },
+    "apis": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/api_ref" } }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "api_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "api_path", "openapi_profile_path", "budget_profile_id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "api_path": { "$ref": "#/$defs/rel_path" },
+        "openapi_profile_path": { "$ref": "#/$defs/rel_path" },
+        "budget_profile_id": { "$ref": "#/$defs/id" }
+      }
+    }
+  }
+}

@@ -2,8 +2,8 @@
 
 X07 supports agent-built web services through:
 
-- `std.web` core (pure routing + request/response model)
-- `ext-net` / OS HTTPS adapters for real networking
+- `ext-web-kit` (router + middleware + canonical errors + OpenAPI 3.1; pinned by `arch/web/`, pure worlds)
+- `ext-net` / OS adapters for real networking (HTTP servers, TLS, sockets)
 - `ext-auth-jwt` for JWT issuance/verification (pinned by `arch/crypto/`, OS worlds only)
 - `ext-obs` for metrics snapshot + OpenMetrics/OTLP export (pinned by `arch/obs/`, export is OS worlds only)
 
@@ -23,9 +23,10 @@ x07 run --profile sandbox
 
 For agent-built services, keep the core pure and isolate OS I/O behind a thin adapter:
 
-1. Write request handling using **pure** router logic (no OS calls).
-2. Unit-test routing + request/response encoding with `x07 test`.
-3. Bind the router to a real server adapter and smoke-test via `x07 run --profile sandbox`.
+1. Define your API contract under `arch/web/` and generate a router/OpenAPI surface with `ext-web-kit` (pure).
+2. Write request handling using **pure** router/middleware logic (no OS calls).
+3. Unit-test routing + request/response encoding with `x07 test`.
+4. Bind the router to a real server adapter and smoke-test via `x07 run --profile sandbox`.
 
 ## Why this works for agents
 

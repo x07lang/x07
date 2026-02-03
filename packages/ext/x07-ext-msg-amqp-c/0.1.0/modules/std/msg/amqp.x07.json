@@ -1,0 +1,212 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.msg.amqp",
+  "imports": [
+    "ext.data_model",
+    "ext.json.data_model",
+    "std.bytes",
+    "std.fs",
+    "std.msg.amqp.rr",
+    "std.msg.amqp.topology",
+    "std.msg.driver",
+    "std.parse"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.msg.amqp.connect_from_arch_v1",
+        "std.msg.amqp.consume_env_v1",
+        "std.msg.amqp.ensure_topology_from_arch_v1",
+        "std.msg.amqp.publish_env_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp._read_index_doc_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "path", ["bytes.lit", "arch/msg/amqp/index.x07amqp.json"]],
+        ["let", "raw", ["std.fs.read", ["bytes.view", "path"]]],
+        ["ext.json.data_model.parse", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp._find_ref_field_v1",
+      "params": [
+        { "name": "index_doc", "ty": "bytes_view" },
+        { "name": "arr_field", "ty": "bytes_view" },
+        { "name": "ref_id", "ty": "bytes_view" },
+        { "name": "field", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "root", ["ext.data_model.root_offset", "index_doc"]],
+        ["let", "arr_off", ["ext.data_model.map_find", "index_doc", "root", "arr_field"]],
+        ["if", ["<", "arr_off", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "count", ["ext.data_model.seq_len", "index_doc", "arr_off"]],
+        ["if", ["<", "count", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "k_id", ["bytes.lit", "id"]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "ref_off", ["ext.data_model.seq_get", "index_doc", "arr_off", "i"]],
+            ["if", ["<", "ref_off", 0], 0, [
+              "begin",
+              ["let", "id_off", ["ext.data_model.map_find", "index_doc", "ref_off", ["bytes.view", "k_id"]]],
+              ["if", ["<", "id_off", 0], 0, [
+                "begin",
+                ["let", "id_b", ["ext.data_model.string_get", "index_doc", "id_off"]],
+                ["if", ["=", ["std.bytes.eq", ["bytes.view", "id_b"], "ref_id"], 1],
+                  ["begin",
+                    ["let", "val_off", ["ext.data_model.map_find", "index_doc", "ref_off", "field"]],
+                    ["if", ["<", "val_off", 0], ["return", ["bytes.alloc", 0]], 0],
+                    ["return", ["ext.data_model.string_get", "index_doc", "val_off"]]
+                  ],
+                  0
+                ]
+              ]]
+            ]],
+            0
+          ]
+        ],
+        ["bytes.alloc", 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp._get_u32_field_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" },
+        { "name": "root", "ty": "i32" },
+        { "name": "k", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "off", ["ext.data_model.map_find", "doc", "root", "k"]],
+        ["if", ["<", "off", 0], ["return", -1], 0],
+        ["let", "num", ["ext.data_model.number_get", "doc", "off"]],
+        ["std.parse.u32_dec", ["bytes.view", "num"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp.connect_from_arch_v1",
+      "params": [
+        { "name": "profile_id", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "msg_amqp_v1"],
+        [
+          "begin",
+          ["let", "index_doc", ["std.msg.amqp._read_index_doc_v1"]],
+          ["let", "idxv", ["bytes.view", "index_doc"]],
+          ["if", ["=", ["ext.data_model.doc_is_err", "idxv"], 1], ["return", ["result_bytes.err", 9801]], 0],
+          ["let", "k_profiles", ["bytes.lit", "profiles"]],
+          ["let", "k_path", ["bytes.lit", "path"]],
+          ["let", "profile_path", ["std.msg.amqp._find_ref_field_v1", "idxv", ["bytes.view", "k_profiles"], "profile_id", ["bytes.view", "k_path"]]],
+          ["if", ["=", ["bytes.len", "profile_path"], 0], ["return", ["result_bytes.err", 9802]], 0],
+          ["let", "raw_profile", ["std.fs.read", ["bytes.view", "profile_path"]]],
+          ["let", "profile_doc", ["ext.json.data_model.parse", ["bytes.view", "raw_profile"]]],
+          ["let", "pv", ["bytes.view", "profile_doc"]],
+          ["if", ["=", ["ext.data_model.doc_is_err", "pv"], 1], ["return", ["result_bytes.err", 9803]], 0],
+          ["let", "pr", ["ext.data_model.root_offset", "pv"]],
+          ["let", "k_limits", ["bytes.lit", "limits"]],
+          ["let", "limits_off", ["ext.data_model.map_find", "pv", "pr", ["bytes.view", "k_limits"]]],
+          ["if", ["<", "limits_off", 0], ["return", ["result_bytes.err", 9804]], 0],
+          ["let", "k_max_body_bytes", ["bytes.lit", "max_body_bytes"]],
+          ["let", "k_prefetch_count", ["bytes.lit", "prefetch_count"]],
+          ["let", "k_max_poll_items", ["bytes.lit", "max_poll_items"]],
+          ["let", "max_body_bytes", ["std.msg.amqp._get_u32_field_v1", "pv", "limits_off", ["bytes.view", "k_max_body_bytes"]]],
+          ["let", "prefetch_count", ["std.msg.amqp._get_u32_field_v1", "pv", "limits_off", ["bytes.view", "k_prefetch_count"]]],
+          ["let", "max_poll_items", ["std.msg.amqp._get_u32_field_v1", "pv", "limits_off", ["bytes.view", "k_max_poll_items"]]],
+          ["if", ["if", ["<", "max_body_bytes", 0], 1, ["if", ["<", "prefetch_count", 0], 1, ["<", "max_poll_items", 0]]], ["return", ["result_bytes.err", 9805]], 0],
+          ["let", "handle", ["std.msg.amqp.rr.handle_doc_v1", "profile_id", "max_body_bytes", "prefetch_count", "max_poll_items"]],
+          ["if", ["=", ["bytes.len", "handle"], 0], ["return", ["result_bytes.err", 9806]], 0],
+          ["result_bytes.ok", "handle"]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp.ensure_topology_from_arch_v1",
+      "params": [
+        { "name": "handle_doc", "ty": "bytes_view" },
+        { "name": "topology_id", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "msg_amqp_v1"],
+        [
+          "begin",
+          ["let", "topo_res", ["std.msg.amqp.topology.read_from_arch_v1", "topology_id"]],
+          ["if", ["!=", ["result_bytes.err_code", "topo_res"], 0], ["return", "topo_res"], 0],
+          ["let", "topo_doc", ["result_bytes.unwrap_or", "topo_res", ["bytes.alloc", 0]]],
+          ["let", "_plan", ["std.msg.amqp.topology.declare_plan_v1", ["bytes.view", "topo_doc"]]],
+          ["let", "_h", "handle_doc"],
+          ["result_bytes.ok", ["bytes.lit", "OK"]]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp.publish_env_v1",
+      "params": [
+        { "name": "handle_doc", "ty": "bytes_view" },
+        { "name": "exchange", "ty": "bytes_view" },
+        { "name": "routing_key", "ty": "bytes_view" },
+        { "name": "env", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "msg_amqp_v1"],
+        [
+          "begin",
+          ["let", "max_body_bytes", ["std.msg.amqp.rr.max_body_bytes_v1", "handle_doc"]],
+          ["if", ["<", "max_body_bytes", 0], ["return", ["result_bytes.err", 9810]], 0],
+          ["if", [">", ["view.len", "env"], "max_body_bytes"], ["return", ["result_bytes.err", 9811]], 0],
+          ["let", "_e", "exchange"],
+          ["let", "_rk", "routing_key"],
+          ["std.msg.driver.publish_v1", "handle_doc", "env"]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp.consume_env_v1",
+      "params": [
+        { "name": "handle_doc", "ty": "bytes_view" },
+        { "name": "queue", "ty": "bytes_view" },
+        { "name": "max_items", "ty": "i32" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "msg_amqp_v1"],
+        [
+          "begin",
+          ["let", "cap", ["std.msg.amqp.rr.max_poll_items_v1", "handle_doc"]],
+          ["if", ["<", "cap", 0], ["return", ["result_bytes.err", 9820]], 0],
+          ["let", "n", ["if", ["<", "max_items", 0], 0, "max_items"]],
+          ["let", "n2", ["if", [">", "n", "cap"], "cap", "n"]],
+          ["let", "_q", "queue"],
+          ["std.msg.driver.poll_v1", "handle_doc", "n2"]
+        ]
+      ]
+    }
+  ]
+}

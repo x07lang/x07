@@ -70,6 +70,22 @@ This eliminates the need to manually construct `--input` bytes for normal runs. 
 
 See also: `examples/agent-gate/cli-ext-cli` in the `x07` repo (CI-gated reference project).
 
+## Using `ext-cli-ux`
+
+`ext-cli-ux` provides deterministic CLI output helpers pinned by `arch/cli/`:
+
+- `std.cli.profile.from_arch_v1(profile_id)` (profile config)
+- `std.cli.progress.render_v1(profile, done, total)` (pure progress line)
+- `std.cli.table.render_v1(profile, rows_doc)` (pure table rendering)
+- `std.cli.jsonl.encode_v1(doc)` (pure JSONL encoding; canonical JSON per line)
+
+For most projects, add the canonical package via the capability map (`cli.ux`) and sync the lockfile:
+
+```bash
+# Pick NAME@VERSION from /agent/latest/catalog/capabilities.json.
+x07 pkg add NAME@VERSION --sync
+```
+
 ## Recommended layout
 
 - `myapp.cli` — CLI spec + parsing

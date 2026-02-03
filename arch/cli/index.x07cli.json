@@ -1,0 +1,5 @@
+{
+  "schema_version": "x07.arch.cli.index@0.1.0",
+  "profiles": [{ "id": "default_v1", "path": "arch/cli/profiles/default_v1.cli_profile.json" }],
+  "defaults": { "default_profile_id": "default_v1" }
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-msg-core",
+  "version": "0.1.0",
+  "description": "Messaging core: canonical msg.envelope_v1 + msg.rr.entry_v1 + driver interface (pinned via arch/msg).",
+  "docs": "Messaging core: canonical msg.envelope_v1 + msg.rr.entry_v1 + driver interface (pinned via arch/msg).\n\nModules:\n- std.msg.spec\n- std.msg.envelope\n- std.msg.rr\n- std.msg.driver\n- std.msg.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-msg-core@0.1.0\n- Pin topics in arch/msg/index.x07msg.json.\n- Encode envelopes with std.msg.envelope.encode_v1.\n- Decode envelopes with std.msg.envelope.decode_v1.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.msg.spec",
+    "std.msg.envelope",
+    "std.msg.rr",
+    "std.msg.driver",
+    "std.msg.tests"
+  ],
+  "meta": {
+    "determinism_tier": "mixed",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-data-model@0.1.7",
+      "ext-json-rs@0.1.4",
+      "ext-unicode-rs@0.1.5"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

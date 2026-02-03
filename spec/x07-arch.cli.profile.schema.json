@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.cli.profile.schema.json",
+  "title": "x07.arch.cli.profile@0.1.0",
+  "description": "Pinned CLI UX rendering profile (contracts-as-data).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "render"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.cli.profile@0.1.0" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "v": { "type": "integer", "minimum": 1 },
+    "render": { "$ref": "#/$defs/render" }
+  },
+  "$defs": {
+    "render": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["plain_v1", "ansi_v1"] },
+        "max_line_bytes": { "type": "integer", "minimum": 16, "maximum": 1048576, "default": 16384 }
+      }
+    }
+  }
+}

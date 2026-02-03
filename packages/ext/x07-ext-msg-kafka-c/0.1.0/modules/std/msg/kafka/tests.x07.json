@@ -1,0 +1,97 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.msg.kafka.tests",
+  "imports": [
+    "ext.data_model",
+    "std.msg.kafka",
+    "std.msg.kafka.rr",
+    "std.rr",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.msg.kafka.tests.test_connect_from_arch_v1",
+        "std.msg.kafka.tests.test_rr_replay_poll_v1",
+        "std.msg.kafka.tests.test_rr_replay_publish_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.kafka.tests.test_connect_from_arch_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "pid", ["bytes.lit", "local_dev_v1"]],
+        ["let", "role", ["bytes.lit", "producer"]],
+        ["let", "res", ["std.msg.kafka.connect_from_arch_v1", ["bytes.view", "pid"], ["bytes.view", "role"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "handle", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+        ["let", "hv", ["bytes.view", "handle"]],
+        ["let", "mm", ["std.msg.kafka.rr.max_message_bytes_v1", "hv"]],
+        ["let", "mpi", ["std.msg.kafka.rr.max_poll_items_v1", "hv"]],
+        ["let", "mpw", ["std.msg.kafka.rr.max_poll_wait_ms_v1", "hv"]],
+        ["try", ["std.test.assert_i32_eq", "mm", 1048576, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", "mpi", 100, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", "mpw", 1000, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.kafka.tests.test_rr_replay_publish_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "std.rr.with_policy_v1",
+        ["bytes.lit", "msg_rr_v1"],
+        ["bytes.lit", "kafka_publish_poll_v1.x07rr.bin"],
+        ["i32.lit", 2],
+        [
+          "begin",
+          ["let", "endpoint", ["bytes.lit", "local_dev_v1"]],
+          ["let", "handle", ["std.msg.kafka.rr.replay_driver_v1", ["bytes.view", "endpoint"]]],
+          ["let", "env", ["bytes.lit", "ENV"]],
+          ["let", "res", ["std.msg.kafka.publish_env_v1", ["bytes.view", "handle"], ["bytes.view", "env"]]],
+          ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "res"], 0, ["std.test.code_assert_i32_eq"]]],
+          ["let", "ack", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+          ["try", ["std.test.assert_bytes_eq", "ack", ["bytes.lit", "OK"], ["std.test.code_assert_bytes_eq"]]],
+          ["std.test.pass"]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.kafka.tests.test_rr_replay_poll_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "std.rr.with_policy_v1",
+        ["bytes.lit", "msg_rr_v1"],
+        ["bytes.lit", "kafka_publish_poll_v1.x07rr.bin"],
+        ["i32.lit", 2],
+        [
+          "begin",
+          ["let", "endpoint", ["bytes.lit", "local_dev_v1"]],
+          ["let", "handle", ["std.msg.kafka.rr.replay_driver_v1", ["bytes.view", "endpoint"]]],
+          ["let", "res", ["std.msg.kafka.poll_env_v1", ["bytes.view", "handle"], 10]],
+          ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "res"], 0, ["std.test.code_assert_i32_eq"]]],
+          ["let", "doc", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+          ["let", "dv", ["bytes.view", "doc"]],
+          ["try", ["std.test.assert_i32_eq", ["ext.data_model.doc_is_err", "dv"], 0, ["std.test.code_assert_i32_eq"]]],
+          ["let", "root", ["ext.data_model.root_offset", "dv"]],
+          ["let", "count", ["ext.data_model.seq_len", "dv", "root"]],
+          ["try", ["std.test.assert_i32_eq", "count", 1, ["std.test.code_assert_i32_eq"]]],
+          ["let", "off", ["ext.data_model.seq_get", "dv", "root", 0]],
+          ["try", ["std.test.assert_true", [">=", "off", 0], ["std.test.code_assert_true"]]],
+          ["let", "got", ["ext.data_model.string_get", "dv", "off"]],
+          ["try", ["std.test.assert_bytes_eq", "got", ["bytes.lit", "ENV"], ["std.test.code_assert_bytes_eq"]]],
+          ["std.test.pass"]
+        ]
+      ]
+    }
+  ]
+}

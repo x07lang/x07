@@ -33,16 +33,20 @@ Examples include:
 - compression helpers: zstd framing (`ext-compress-rs`)
 - archives (tar/tgz) + pinned extraction policies (`ext-archive-c`)
 - OS-world glob + walk + ignore (`ext-path-glob-rs`)
+- web routing + middleware + OpenAPI 3.1 (`ext-web-kit`)
+- web crawling helpers (robots/sitemaps/urlnorm/scheduling + RR-friendly fetch) (`ext-web-crawl`)
 - networking (HTTP/TLS, servers, client)
 - modern protocol helpers (HTTP/2, WebSockets, gRPC) (`ext-net-protos-c`)
 - databases (sqlite/pg/mysql/redis)
 - deterministic migration plans (`ext-db-migrate`)
 - filesystem utilities
+- messaging core + RR format (`ext-msg-core`) and drivers (Kafka: `ext-msg-kafka-c`, AMQP: `ext-msg-amqp-c`)
 - time + tzdb
 - math (f64)
 - regex (native implementation)
 - observability (metrics snapshot + OpenMetrics + OTLP export) (`ext-obs`)
 - auth helpers (Ed25519 + JWT) (`ext-auth-jwt`)
+- CLI UX primitives (progress, tables, JSONL) (`ext-cli-ux`)
 
 ## Principle: one canonical binding per domain
 

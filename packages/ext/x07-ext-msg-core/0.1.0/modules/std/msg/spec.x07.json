@@ -1,0 +1,132 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.msg.spec",
+  "imports": [
+    "ext.data_model",
+    "ext.json.data_model",
+    "std.bytes",
+    "std.fs",
+    "std.parse"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.msg.spec.rr_policy_id_from_arch_v1",
+        "std.msg.spec.topic_is_known_from_arch_v1",
+        "std.msg.spec.topic_max_value_bytes_from_arch_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.spec._read_index_doc_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "path", ["bytes.lit", "arch/msg/index.x07msg.json"]],
+        ["let", "raw", ["std.fs.read", ["bytes.view", "path"]]],
+        ["ext.json.data_model.parse", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.spec._find_topic_off_v1",
+      "params": [
+        { "name": "index_doc", "ty": "bytes_view" },
+        { "name": "topic_id", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["!=", ["ext.data_model.root_kind", "index_doc"], 5], ["return", -1], 0],
+        ["let", "root", ["ext.data_model.root_offset", "index_doc"]],
+        ["let", "k_topics", ["bytes.lit", "topics"]],
+        ["let", "topics_off", ["ext.data_model.map_find", "index_doc", "root", ["bytes.view", "k_topics"]]],
+        ["if", ["<", "topics_off", 0], ["return", -1], 0],
+        ["let", "count", ["ext.data_model.seq_len", "index_doc", "topics_off"]],
+        ["if", ["<", "count", 0], ["return", -1], 0],
+        ["let", "k_id", ["bytes.lit", "id"]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "t_off", ["ext.data_model.seq_get", "index_doc", "topics_off", "i"]],
+            ["if", ["<", "t_off", 0], 0, [
+              "begin",
+              ["let", "id_off", ["ext.data_model.map_find", "index_doc", "t_off", ["bytes.view", "k_id"]]],
+              ["if", ["<", "id_off", 0], 0, [
+                "begin",
+                ["let", "id_b", ["ext.data_model.string_get", "index_doc", "id_off"]],
+                ["if", ["=", ["std.bytes.eq", ["bytes.view", "id_b"], "topic_id"], 1], ["return", "t_off"], 0],
+                0
+              ]],
+              0
+            ]],
+            0
+          ]
+        ],
+        -1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.spec.topic_is_known_from_arch_v1",
+      "params": [
+        { "name": "topic_id", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "idx_b", ["std.msg.spec._read_index_doc_v1"]],
+        ["let", "idxv", ["bytes.view", "idx_b"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "idxv"], 1], ["return", 0], 0],
+        ["let", "t_off", ["std.msg.spec._find_topic_off_v1", "idxv", "topic_id"]],
+        ["if", ["<", "t_off", 0], 0, 1]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.spec.topic_max_value_bytes_from_arch_v1",
+      "params": [
+        { "name": "topic_id", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "idx_b", ["std.msg.spec._read_index_doc_v1"]],
+        ["let", "idxv", ["bytes.view", "idx_b"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "idxv"], 1], ["return", -1], 0],
+        ["let", "t_off", ["std.msg.spec._find_topic_off_v1", "idxv", "topic_id"]],
+        ["if", ["<", "t_off", 0], ["return", -1], 0],
+        ["let", "k_max_value_bytes", ["bytes.lit", "max_value_bytes"]],
+        ["let", "mv_off", ["ext.data_model.map_find", "idxv", "t_off", ["bytes.view", "k_max_value_bytes"]]],
+        ["if", ["<", "mv_off", 0], ["return", -1], 0],
+        ["let", "n_b", ["ext.data_model.number_get", "idxv", "mv_off"]],
+        ["std.parse.u32_dec", ["bytes.view", "n_b"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.spec.rr_policy_id_from_arch_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "idx_b", ["std.msg.spec._read_index_doc_v1"]],
+        ["let", "idxv", ["bytes.view", "idx_b"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "idxv"], 1], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["!=", ["ext.data_model.root_kind", "idxv"], 5], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "root", ["ext.data_model.root_offset", "idxv"]],
+        ["let", "k_rr_policy_id", ["bytes.lit", "rr_policy_id"]],
+        ["let", "off", ["ext.data_model.map_find", "idxv", "root", ["bytes.view", "k_rr_policy_id"]]],
+        ["if", ["<", "off", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["ext.data_model.string_get", "idxv", "off"]
+      ]
+    }
+  ]
+}

@@ -20,6 +20,30 @@
     "contracts_budgets": { "max_contract_files": 2000, "max_contract_bytes": 67108864 }
   },
   "contracts_v1": {
+    "web": {
+      "index_path": "arch/web/index.x07web.json",
+      "enforce": "error"
+    },
+    "crawl": {
+      "index_path": "arch/crawl/index.x07crawl.json",
+      "enforce": "error"
+    },
+    "msg": {
+      "index_path": "arch/msg/index.x07msg.json",
+      "enforce": "error"
+    },
+    "msg_kafka": {
+      "index_path": "arch/msg/kafka/index.x07kafka.json",
+      "enforce": "error"
+    },
+    "msg_amqp": {
+      "index_path": "arch/msg/amqp/index.x07amqp.json",
+      "enforce": "error"
+    },
+    "cli": {
+      "index_path": "arch/cli/index.x07cli.json",
+      "enforce": "error"
+    },
     "archive": {
       "index_path": "arch/archive/index.x07archive.json",
       "enforce": "error"

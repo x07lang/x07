@@ -261,6 +261,12 @@
       "additionalProperties": false,
       "required": ["canonical_json"],
       "properties": {
+        "web": { "$ref": "#/$defs/contracts_index_v1" },
+        "crawl": { "$ref": "#/$defs/contracts_index_v1" },
+        "msg": { "$ref": "#/$defs/contracts_index_v1" },
+        "msg_kafka": { "$ref": "#/$defs/contracts_index_v1" },
+        "msg_amqp": { "$ref": "#/$defs/contracts_index_v1" },
+        "cli": { "$ref": "#/$defs/contracts_index_v1" },
         "archive": { "$ref": "#/$defs/contracts_index_v1" },
         "crypto": { "$ref": "#/$defs/contracts_index_v1" },
         "db": { "$ref": "#/$defs/contracts_index_v1" },

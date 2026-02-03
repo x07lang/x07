@@ -2,6 +2,40 @@
   "schema_version": "x07.arch.budgets.index@0.1.0",
   "profiles": [
     {
+      "id": "cli_ux_v1",
+      "profile_path": "arch/budgets/profiles/cli_ux_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "std.cli.profile", "fn": "from_arch_v1" }
+      ],
+      "worlds_allowed": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    {
+      "id": "crawl_default_v1",
+      "profile_path": "arch/budgets/profiles/crawl_default_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "std.crawl.schedule", "fn": "plan_v1" }
+      ],
+      "worlds_allowed": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    {
       "id": "archive_extract_safe_v1",
       "profile_path": "arch/budgets/profiles/archive_extract_safe_v1.budget.json",
       "enforce": "error",
@@ -56,6 +90,56 @@
       ]
     },
     {
+      "id": "msg_amqp_v1",
+      "profile_path": "arch/budgets/profiles/msg_amqp_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "std.msg.amqp", "fn": "connect_from_arch_v1" },
+        { "module_prefix": "std.msg.amqp", "fn": "ensure_topology_from_arch_v1" }
+      ],
+      "worlds_allowed": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    {
+      "id": "msg_core_v1",
+      "profile_path": "arch/budgets/profiles/msg_core_v1.budget.json",
+      "enforce": "error",
+      "selectors": [],
+      "worlds_allowed": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    {
+      "id": "msg_kafka_v1",
+      "profile_path": "arch/budgets/profiles/msg_kafka_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "std.msg.kafka", "fn": "connect_from_arch_v1" }
+      ],
+      "worlds_allowed": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    {
       "id": "net_proto_v1",
       "profile_path": "arch/budgets/profiles/net_proto_v1.budget.json",
       "enforce": "error",
@@ -94,6 +178,24 @@
       "profile_path": "arch/budgets/profiles/stream_xf_plugin_v1.budget.json",
       "enforce": "error",
       "selectors": [],
+      "worlds_allowed": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    {
+      "id": "web_core_v1",
+      "profile_path": "arch/budgets/profiles/web_core_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "std.web.router", "fn": "compile_from_arch_v1" },
+        { "module_prefix": "std.web.openapi", "fn": "render_v1" }
+      ],
       "worlds_allowed": [
         "solve-pure",
         "solve-fs",

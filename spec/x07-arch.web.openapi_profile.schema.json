@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.web.openapi_profile.schema.json",
+  "title": "x07.arch.web.openapi_profile@0.1.0",
+  "description": "OpenAPI (3.1) rendering profile for pinned web APIs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "oas", "title", "version", "json_schema_dialect"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.web.openapi_profile@0.1.0" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "v": { "type": "integer", "minimum": 1 },
+    "oas": { "const": "3.1.0" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "json_schema_dialect": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "server_urls": {
+      "type": "array",
+      "default": [],
+      "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
+    }
+  }
+}

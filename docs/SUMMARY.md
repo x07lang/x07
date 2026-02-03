@@ -98,6 +98,8 @@
 ## Guides
 - [CLI apps](guides/cli-apps.md)
 - [Web services](guides/web-apps.md)
+- [Crawling](guides/crawling.md)
+- [Messaging](guides/messaging.md)
 - [Networking](guides/networking.md)
 - [Databases](guides/databases.md)
 

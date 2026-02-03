@@ -1,0 +1,125 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.crawl.urlnorm",
+  "imports": [
+    "ext.url.parse",
+    "std.bytes",
+    "std.text.ascii",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.crawl.urlnorm.canon_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.crawl.urlnorm._ascii_lower_bytes_v1",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["let", "out", ["std.vec.with_capacity", "n"]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "c", ["view.get_u8", "b", "i"]],
+            ["set", "out", ["std.vec.push", "out", ["std.text.ascii.to_lower_u8", "c"]]],
+            0
+          ]
+        ],
+        ["std.vec.as_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.crawl.urlnorm.canon_v1",
+      "params": [{ "name": "url", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "parsed", ["ext.url.parse.url_parse", "url"]],
+        ["let", "pv", ["bytes.view", "parsed"]],
+        ["let", "scheme", ["ext.url.parse.url_scheme", "pv", "url"]],
+        ["let", "host", ["ext.url.parse.url_host", "pv", "url"]],
+        ["let", "port", ["ext.url.parse.url_port", "pv", "url"]],
+        ["let", "path", ["ext.url.parse.url_path", "pv", "url"]],
+        ["let", "query", ["ext.url.parse.url_query", "pv", "url"]],
+        ["if", ["if", ["=", ["bytes.len", "scheme"], 0], 1, ["=", ["bytes.len", "host"], 0]], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "scheme_l", ["std.crawl.urlnorm._ascii_lower_bytes_v1", ["bytes.view", "scheme"]]],
+        ["let", "host_l", ["std.crawl.urlnorm._ascii_lower_bytes_v1", ["bytes.view", "host"]]],
+        ["let", "keep_port", 0],
+        [
+          "if",
+          ["=", ["bytes.len", "port"], 0],
+          0,
+          [
+            "begin",
+            ["let", "k_http", ["bytes.lit", "http"]],
+            ["let", "k_https", ["bytes.lit", "https"]],
+            ["let", "k_80", ["bytes.lit", "80"]],
+            ["let", "k_443", ["bytes.lit", "443"]],
+            [
+              "if",
+              ["if", ["=", ["std.bytes.eq", ["bytes.view", "scheme_l"], ["bytes.view", "k_http"]], 1], ["=", ["std.bytes.eq", ["bytes.view", "port"], ["bytes.view", "k_80"]], 1], 0],
+              0,
+              [
+                "if",
+                ["if", ["=", ["std.bytes.eq", ["bytes.view", "scheme_l"], ["bytes.view", "k_https"]], 1], ["=", ["std.bytes.eq", ["bytes.view", "port"], ["bytes.view", "k_443"]], 1], 0],
+                0,
+                ["set", "keep_port", 1]
+              ]
+            ],
+            0
+          ]
+        ],
+        ["let", "out", ["std.vec.with_capacity", ["+", ["bytes.len", "url"], 8]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "scheme_l"]]],
+        ["let", "sep", ["bytes.lit", "://"]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "sep"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "host_l"]]],
+        [
+          "if",
+          ["=", "keep_port", 1],
+          [
+            "begin",
+            ["set", "out", ["std.vec.push", "out", 58]],
+            ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "port"]]],
+            0
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", ["bytes.len", "path"], 0],
+          [
+            "begin",
+            ["set", "out", ["std.vec.push", "out", 47]],
+            0
+          ],
+          ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "path"]]]
+        ],
+        [
+          "if",
+          ["=", ["bytes.len", "query"], 0],
+          0,
+          [
+            "begin",
+            ["set", "out", ["std.vec.push", "out", 63]],
+            ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "query"]]],
+            0
+          ]
+        ],
+        ["std.vec.as_bytes", "out"]
+      ]
+    }
+  ]
+}

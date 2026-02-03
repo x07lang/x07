@@ -11,7 +11,11 @@ Pinned schema versions:
 - `x07.arch.report@0.1.0` (`spec/x07-arch.report.schema.json`)
 - `x07.arch.patchset@0.1.0` (`spec/x07-arch.patchset.schema.json`)
 - Contracts-as-data groups used by `manifest.contracts_v1`:
-  - Budgets index/profile: `spec/x07-budgets.index.schema.json`, `spec/x07-budgets.profile.schema.json`
+  - Web index/catalog: `spec/x07-arch.web.index.schema.json`, `spec/x07-arch.web.api.schema.json`, `spec/x07-arch.web.openapi_profile.schema.json`
+  - Crawl index/policies: `spec/x07-arch.crawl.index.schema.json`, `spec/x07-arch.crawl.policy.schema.json`
+  - Messaging index/drivers: `spec/x07-arch.msg.index.schema.json`, `spec/x07-arch.msg.kafka.index.schema.json`, `spec/x07-arch.msg.kafka.profile.schema.json`, `spec/x07-arch.msg.amqp.index.schema.json`, `spec/x07-arch.msg.amqp.profile.schema.json`, `spec/x07-arch.msg.amqp.topology.schema.json`
+  - CLI UX index/profiles: `spec/x07-arch.cli.index.schema.json`, `spec/x07-arch.cli.profile.schema.json`
+  - Budgets index/profile: `spec/x07-arch.budgets.index.schema.json`, `spec/x07-budget.profile.schema.json`
   - Archive index/profile: `spec/x07-arch.archive.index.schema.json`, `spec/x07-arch.archive.profile.schema.json`
   - DB index/plan/queries: `spec/x07-arch.db.index.schema.json`, `spec/x07-db.migrate.plan.schema.json`, `spec/x07-arch.db.queries.schema.json`
   - Obs index/registry/exporters: `spec/x07-arch.obs.index.schema.json`, `spec/x07-obs.metrics.registry.schema.json`, `spec/x07-obs.exporter.profile.schema.json`

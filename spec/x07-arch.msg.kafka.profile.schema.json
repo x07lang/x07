@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.msg.kafka.profile.schema.json",
+  "title": "x07.arch.msg.kafka.profile@0.1.0",
+  "description": "Pinned Kafka connection profile (contracts-as-data).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "bootstrap", "limits"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.msg.kafka.profile@0.1.0" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "v": { "type": "integer", "minimum": 1 },
+    "bootstrap": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sasl_mode": { "type": "string", "enum": ["none_v1", "plain_v1", "scram_v1"], "default": "none_v1" },
+        "tls": { "type": "boolean", "default": true },
+        "username_secret_id": { "type": "string", "default": "" },
+        "password_secret_id": { "type": "string", "default": "" }
+      },
+      "default": {}
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_message_bytes", "max_poll_items", "max_poll_wait_ms"],
+      "properties": {
+        "max_message_bytes": { "type": "integer", "minimum": 1, "maximum": 1073741824 },
+        "max_poll_items": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "max_poll_wait_ms": { "type": "integer", "minimum": 0, "maximum": 60000 }
+      }
+    }
+  }
+}

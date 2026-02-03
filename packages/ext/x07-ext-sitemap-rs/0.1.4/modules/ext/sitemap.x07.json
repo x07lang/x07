@@ -1,0 +1,168 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.sitemap",
+  "imports": [
+    "ext.xml",
+    "std.bytes",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.sitemap.urls_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.sitemap._urls_from_events_v1",
+      "params": [
+        { "name": "xml_bytes", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "ev_b", ["ext.xml.xml_events_parse", "xml_bytes"]],
+        ["let", "ev", ["bytes.view", "ev_b"]],
+        ["if", ["=", ["ext.xml.xml_events_is_err", "ev"], 1], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "n", ["ext.xml.xml_events_len", "ev"]],
+        ["if", ["<", "n", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "loc_b", ["bytes.lit", "loc"]],
+        ["let", "loc_v", ["bytes.view", "loc_b"]],
+        ["let", "out", ["std.vec.with_capacity", 256]],
+        ["let", "in_loc", 0],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "kind", ["ext.xml.xml_events_kind", "ev", "i"]],
+            [
+              "if",
+              ["=", "kind", 1],
+              [
+                "begin",
+                ["let", "name", ["ext.xml.xml_events_name", "ev", "i"]],
+                ["if", ["=", ["std.bytes.eq", ["bytes.view", "name"], "loc_v"], 1], ["set", "in_loc", 1], 0],
+                0
+              ],
+              [
+                "if",
+                ["=", "kind", 2],
+                [
+                  "begin",
+                  ["let", "name", ["ext.xml.xml_events_name", "ev", "i"]],
+                  ["if", ["=", ["std.bytes.eq", ["bytes.view", "name"], "loc_v"], 1], ["set", "in_loc", 0], 0],
+                  0
+                ],
+                [
+                  "if",
+                  ["if", ["=", "kind", 3], ["=", "in_loc", 1], 0],
+                  [
+                    "begin",
+                    ["let", "t", ["ext.xml.xml_events_text", "ev", "i"]],
+                    ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "t"]]],
+                    ["set", "out", ["std.vec.push", "out", 10]],
+                    0
+                  ],
+                  0
+                ]
+              ]
+            ],
+            0
+          ]
+        ],
+        ["std.vec.as_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.sitemap._collect_loc_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" },
+        { "name": "node", "ty": "i32" },
+        { "name": "out", "ty": "vec_u8" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["let", "kind", ["ext.xml.xml_tree_node_kind", "doc", "node"]],
+        [
+          "if",
+          ["!=", "kind", 1],
+          ["return", "out"],
+          0
+        ],
+        ["let", "name", ["ext.xml.xml_tree_node_name", "doc", "node"]],
+        ["let", "loc_b", ["bytes.lit", "loc"]],
+        ["let", "loc_v", ["bytes.view", "loc_b"]],
+        [
+          "if",
+          ["=", ["std.bytes.eq", ["bytes.view", "name"], "loc_v"], 1],
+          [
+            "begin",
+            ["let", "cc", ["ext.xml.xml_tree_child_count", "doc", "node"]],
+            [
+              "for",
+              "i",
+              0,
+              "cc",
+              [
+                "begin",
+                ["let", "child", ["ext.xml.xml_tree_child_at", "doc", "node", "i"]],
+                [
+                  "if",
+                  ["=", ["ext.xml.xml_tree_node_kind", "doc", "child"], 2],
+                  [
+                    "begin",
+                    ["let", "t", ["ext.xml.xml_tree_node_text", "doc", "child"]],
+                    ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "t"]]],
+                    ["set", "out", ["std.vec.push", "out", 10]],
+                    0
+                  ],
+                  0
+                ],
+                0
+              ]
+            ]
+          ],
+          0
+        ],
+        ["let", "cc2", ["ext.xml.xml_tree_child_count", "doc", "node"]],
+        [
+          "for",
+          "i",
+          0,
+          "cc2",
+          [
+            "begin",
+            ["let", "child", ["ext.xml.xml_tree_child_at", "doc", "node", "i"]],
+            [
+              "if",
+              ["=", ["ext.xml.xml_tree_node_kind", "doc", "child"], 1],
+              ["set", "out", ["ext.sitemap._collect_loc_v1", "doc", "child", "out"]],
+              0
+            ],
+            0
+          ]
+        ],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.sitemap.urls_v1",
+      "params": [
+        { "name": "xml_bytes", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "ext.sitemap._urls_from_events_v1",
+        "xml_bytes"
+      ]
+    }
+  ]
+}

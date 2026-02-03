@@ -1,0 +1,139 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.cli.profile",
+  "imports": [
+    "ext.data_model",
+    "ext.json.data_model",
+    "std.bytes",
+    "std.fs",
+    "std.parse"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.cli.profile.from_arch_v1",
+        "std.cli.profile.max_line_bytes_v1",
+        "std.cli.profile.mode_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.cli.profile._read_index_doc_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "path", ["bytes.lit", "arch/cli/index.x07cli.json"]],
+        ["let", "raw", ["std.fs.read", ["bytes.view", "path"]]],
+        ["ext.json.data_model.parse", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.cli.profile._find_profile_path_v1",
+      "params": [
+        { "name": "index_doc", "ty": "bytes_view" },
+        { "name": "profile_id", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "root", ["ext.data_model.root_offset", "index_doc"]],
+        ["let", "k_profiles", ["bytes.lit", "profiles"]],
+        ["let", "profiles_off", ["ext.data_model.map_find", "index_doc", "root", ["bytes.view", "k_profiles"]]],
+        ["if", ["<", "profiles_off", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "count", ["ext.data_model.seq_len", "index_doc", "profiles_off"]],
+        ["if", ["<", "count", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "k_id", ["bytes.lit", "id"]],
+        ["let", "k_path", ["bytes.lit", "path"]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "ref_off", ["ext.data_model.seq_get", "index_doc", "profiles_off", "i"]],
+            ["if", ["<", "ref_off", 0], 0, ["begin",
+              ["let", "id_off", ["ext.data_model.map_find", "index_doc", "ref_off", ["bytes.view", "k_id"]]],
+              ["let", "path_off", ["ext.data_model.map_find", "index_doc", "ref_off", ["bytes.view", "k_path"]]],
+              ["if", ["if", ["<", "id_off", 0], 1, ["<", "path_off", 0]], 0, ["begin",
+                ["let", "id_b", ["ext.data_model.string_get", "index_doc", "id_off"]],
+                ["if", ["=", ["std.bytes.eq", ["bytes.view", "id_b"], "profile_id"], 1],
+                  ["return", ["ext.data_model.string_get", "index_doc", "path_off"]],
+                  0
+                ]
+              ]],
+              0
+            ]],
+            0
+          ]
+        ],
+        ["bytes.alloc", 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.cli.profile.from_arch_v1",
+      "params": [
+        { "name": "profile_id", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "cli_ux_v1"],
+        [
+          "begin",
+          ["let", "index_doc", ["std.cli.profile._read_index_doc_v1"]],
+          ["let", "idxv", ["bytes.view", "index_doc"]],
+          ["if", ["=", ["ext.data_model.doc_is_err", "idxv"], 1], ["return", ["result_bytes.err", 9201]], 0],
+          ["let", "path", ["std.cli.profile._find_profile_path_v1", "idxv", "profile_id"]],
+          ["if", ["=", ["bytes.len", "path"], 0], ["return", ["result_bytes.err", 9202]], 0],
+          ["let", "raw", ["std.fs.read", ["bytes.view", "path"]]],
+          ["let", "doc", ["ext.json.data_model.parse", ["bytes.view", "raw"]]],
+          ["if", ["=", ["ext.data_model.doc_is_err", ["bytes.view", "doc"]], 1], ["return", ["result_bytes.err", 9203]], 0],
+          ["result_bytes.ok", "doc"]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.cli.profile.mode_v1",
+      "params": [{ "name": "profile_doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["=", ["ext.data_model.doc_is_err", "profile_doc"], 1], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "root", ["ext.data_model.root_offset", "profile_doc"]],
+        ["let", "k_render", ["bytes.lit", "render"]],
+        ["let", "render_off", ["ext.data_model.map_find", "profile_doc", "root", ["bytes.view", "k_render"]]],
+        ["if", ["<", "render_off", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "k_mode", ["bytes.lit", "mode"]],
+        ["let", "mode_off", ["ext.data_model.map_find", "profile_doc", "render_off", ["bytes.view", "k_mode"]]],
+        ["if", ["<", "mode_off", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["ext.data_model.string_get", "profile_doc", "mode_off"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.cli.profile.max_line_bytes_v1",
+      "params": [{ "name": "profile_doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["=", ["ext.data_model.doc_is_err", "profile_doc"], 1], ["return", 0], 0],
+        ["let", "root", ["ext.data_model.root_offset", "profile_doc"]],
+        ["let", "k_render", ["bytes.lit", "render"]],
+        ["let", "render_off", ["ext.data_model.map_find", "profile_doc", "root", ["bytes.view", "k_render"]]],
+        ["if", ["<", "render_off", 0], ["return", 0], 0],
+        ["let", "k_mlb", ["bytes.lit", "max_line_bytes"]],
+        ["let", "mlb_off", ["ext.data_model.map_find", "profile_doc", "render_off", ["bytes.view", "k_mlb"]]],
+        ["if", ["<", "mlb_off", 0], ["return", 0], 0],
+        ["let", "n_b", ["ext.data_model.number_get", "profile_doc", "mlb_off"]],
+        ["std.parse.u32_dec", ["bytes.view", "n_b"]]
+      ]
+    }
+  ]
+}

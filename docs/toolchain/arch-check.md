@@ -166,9 +166,28 @@ If `manifest.contracts_v1` is present, `x07 arch check` can also validate repo-l
 - `contracts_v1.net` (network protocol contracts)
   - validates `arch/net/index.x07net.json` and referenced gRPC services catalog
   - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.web` (web API + OpenAPI contracts)
+  - validates `arch/web/index.x07web.json`, referenced API catalogs, and OpenAPI profiles
+  - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.crawl` (crawl policies contracts)
+  - validates `arch/crawl/index.x07crawl.json` and referenced crawl policy files
+  - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.msg` (messaging core contracts)
+  - validates `arch/msg/index.x07msg.json` and referenced messaging driver catalogs
+  - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.msg_kafka` (Kafka driver contracts)
+  - validates `arch/msg/kafka/index.x07kafka.json` and referenced profile files
+  - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.msg_amqp` (AMQP 0-9-1 driver contracts)
+  - validates `arch/msg/amqp/index.x07amqp.json` and referenced profile/topology files
+  - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.cli` (CLI UX contracts)
+  - validates `arch/cli/index.x07cli.json` and referenced profile files
 - `contracts_v1.crypto` (crypto/auth contracts)
   - validates `arch/crypto/index.x07crypto.json` and referenced key material files
   - validates referenced JWT profiles (when declared under the crypto contract group)
+- `contracts_v1.canonical_json` (canonical JSON enforcement)
+  - enforces canonical JSON at contract file boundaries (for example, JCS / RFC 8785)
 
 ## Output
 

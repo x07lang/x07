@@ -11,6 +11,15 @@
       "status": "stable"
     },
     {
+      "id": "cli.ux",
+      "summary": "CLI UX primitives: deterministic progress, tables, and JSONL output.",
+      "canonical": {
+        "name": "ext-cli-ux",
+        "version": "0.1.0"
+      },
+      "status": "experimental"
+    },
+    {
       "id": "fs.io",
       "summary": "OS filesystem API (run-os*).",
       "canonical": {
@@ -154,8 +163,63 @@
       "summary": "Parse sitemap XML and extract <loc> URLs.",
       "canonical": {
         "name": "ext-sitemap-rs",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
+      "status": "experimental"
+    },
+    {
+      "id": "web.kit",
+      "summary": "Web service kit: router + canonical errors + OpenAPI 3.1 generation.",
+      "canonical": {
+        "name": "ext-web-kit",
+        "version": "0.1.0"
+      },
+      "status": "experimental"
+    },
+    {
+      "id": "web.crawl",
+      "summary": "Crawling helpers: robots/sitemaps/url normalization/scheduling + RR fetch helpers.",
+      "canonical": {
+        "name": "ext-web-crawl",
+        "version": "0.1.0"
+      },
+      "status": "experimental"
+    },
+    {
+      "id": "msg.core",
+      "summary": "Messaging core: envelope encoding + RR entry format + driver interface.",
+      "canonical": {
+        "name": "ext-msg-core",
+        "version": "0.1.0"
+      },
+      "status": "experimental"
+    },
+    {
+      "id": "msg.kafka",
+      "summary": "Kafka driver with RR replay interface (librdkafka).",
+      "canonical": {
+        "name": "ext-msg-kafka-c",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed",
+        "solve-rr"
+      ],
+      "status": "experimental"
+    },
+    {
+      "id": "msg.amqp",
+      "summary": "AMQP 0-9-1 driver with RR replay interface (rabbitmq-c).",
+      "canonical": {
+        "name": "ext-msg-amqp-c",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed",
+        "solve-rr"
+      ],
       "status": "experimental"
     },
     {
@@ -487,11 +551,18 @@
   ],
   "aliases": {
     "http-client": "net.http",
-    "crawler": "net.http",
+    "crawler": "web.crawl",
+    "crawl": "web.crawl",
     "html": "web.html",
     "robots": "web.robots",
     "sitemap": "web.sitemap",
     "cli": "cli.args",
+    "cli-ux": "cli.ux",
+    "progress": "cli.ux",
+    "jsonl": "cli.ux",
+    "openapi": "web.kit",
+    "router": "web.kit",
+    "web-kit": "web.kit",
     "data-model": "data.model",
     "filesystem": "fs.io",
     "glob": "fs.glob",
@@ -518,6 +589,12 @@
     "websocket": "net.ws",
     "grpc": "net.grpc",
     "jwt": "auth.jwt",
+    "msg": "msg.core",
+    "message": "msg.core",
+    "messaging": "msg.core",
+    "queue": "msg.core",
+    "kafka": "msg.kafka",
+    "amqp": "msg.amqp",
     "metrics": "obs.metrics",
     "otel": "obs.metrics",
     "migrate": "db.migrate",
