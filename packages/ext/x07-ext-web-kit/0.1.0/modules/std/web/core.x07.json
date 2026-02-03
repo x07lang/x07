@@ -84,8 +84,10 @@
         ["let", "msg_len", ["view.len", "msg"]],
         ["let", "out", ["std.vec.with_capacity", ["+", 9, "msg_len"]]],
         ["set", "out", ["std.vec.push", "out", 0]],
-        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", ["std.codec.write_u32_le", "code"]]]],
-        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", ["std.codec.write_u32_le", "msg_len"]]]],
+        ["let", "code_u32le", ["std.codec.write_u32_le", "code"]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "code_u32le"]]],
+        ["let", "msg_len_u32le", ["std.codec.write_u32_le", "msg_len"]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "msg_len_u32le"]]],
         ["set", "out", ["std.vec.extend_bytes", "out", "msg"]],
         ["std.vec.as_bytes", "out"]
       ]

@@ -67,13 +67,17 @@
             ["let", "k_https", ["bytes.lit", "https"]],
             ["let", "k_80", ["bytes.lit", "80"]],
             ["let", "k_443", ["bytes.lit", "443"]],
+            ["let", "scheme_http", ["view.to_bytes", ["bytes.view", "scheme_l"]]],
+            ["let", "scheme_https", ["view.to_bytes", ["bytes.view", "scheme_l"]]],
+            ["let", "port_http", ["view.to_bytes", ["bytes.view", "port"]]],
+            ["let", "port_https", ["view.to_bytes", ["bytes.view", "port"]]],
             [
               "if",
-              ["if", ["=", ["std.bytes.eq", ["bytes.view", "scheme_l"], ["bytes.view", "k_http"]], 1], ["=", ["std.bytes.eq", ["bytes.view", "port"], ["bytes.view", "k_80"]], 1], 0],
+              ["if", ["=", ["std.bytes.eq", ["bytes.view", "scheme_http"], ["bytes.view", "k_http"]], 1], ["=", ["std.bytes.eq", ["bytes.view", "port_http"], ["bytes.view", "k_80"]], 1], 0],
               0,
               [
                 "if",
-                ["if", ["=", ["std.bytes.eq", ["bytes.view", "scheme_l"], ["bytes.view", "k_https"]], 1], ["=", ["std.bytes.eq", ["bytes.view", "port"], ["bytes.view", "k_443"]], 1], 0],
+                ["if", ["=", ["std.bytes.eq", ["bytes.view", "scheme_https"], ["bytes.view", "k_https"]], 1], ["=", ["std.bytes.eq", ["bytes.view", "port_https"], ["bytes.view", "k_443"]], 1], 0],
                 0,
                 ["set", "keep_port", 1]
               ]
