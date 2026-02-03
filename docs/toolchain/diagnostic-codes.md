@@ -115,3 +115,40 @@ Stream plugins contracts (`contracts_v1.stream_plugins`):
 - `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`: spec `worlds_allowed` does not match the index entry.
 - `E_ARCH_STREAM_PLUGIN_NOT_FOUND`: a module references a `std.stream.xf.plugin_v1` id that is not declared.
 - `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`: plugin usage is forbidden in the module’s world.
+
+Archive contracts (`contracts_v1.archive`):
+
+- `E_ARCH_ARCHIVE_INDEX_MISSING`: archive index file is missing.
+- `E_ARCH_ARCHIVE_PROFILE_MISSING`: archive profile file referenced by the index is missing.
+- `E_ARCH_ARCHIVE_SCHEMA_INVALID`: archive index/profile JSON does not match the pinned schema.
+- `E_ARCH_ARCHIVE_OP_UNKNOWN`: archive profile references an unknown `module.symbol` operation.
+- `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`: archive profile references a missing budget profile id.
+
+DB contracts (`contracts_v1.db`):
+
+- `E_ARCH_DB_INDEX_MISSING`: DB index file is missing.
+- `E_ARCH_DB_MIGRATE_PLAN_MISSING`: referenced migration plan file is missing.
+- `E_ARCH_DB_SQL_MISSING`: migration SQL file referenced by a plan is missing.
+- `E_ARCH_DB_SQL_HASH_MISMATCH`: migration SQL file hash does not match the plan.
+- `E_ARCH_DB_QUERY_CATALOG_INVALID`: referenced query catalog file is missing or schema-invalid.
+- `E_ARCH_DB_BUDGET_PROFILE_MISSING`: DB plan references a missing budget profile id.
+
+Observability contracts (`contracts_v1.obs`):
+
+- `E_ARCH_OBS_INDEX_MISSING`: observability index file is missing.
+- `E_ARCH_OBS_REGISTRY_MISSING`: metrics registry file is missing.
+- `E_ARCH_OBS_EXPORTER_PROFILE_INVALID`: exporter profile file is missing or schema-invalid.
+- `E_ARCH_OBS_BUDGET_PROFILE_MISSING`: exporter profile references a missing budget profile id.
+
+Network protocol contracts (`contracts_v1.net`):
+
+- `E_ARCH_NET_INDEX_MISSING`: network index file is missing.
+- `E_ARCH_NET_GRPC_SERVICES_INVALID`: gRPC services catalog is missing or schema-invalid.
+- `E_ARCH_NET_LIMITS_EXCESSIVE`: configured protocol limits exceed hard-coded safety bounds.
+- `E_ARCH_NET_BUDGET_PROFILE_MISSING`: net config references a missing budget profile id.
+
+Crypto/auth contracts (`contracts_v1.crypto`):
+
+- `E_ARCH_CRYPTO_INDEX_MISSING`: crypto index file is missing.
+- `E_ARCH_CRYPTO_KEY_MISSING`: crypto key material file referenced by the index is missing.
+- `E_ARCH_CRYPTO_JWT_PROFILE_INVALID`: JWT profiles file is missing or schema-invalid.

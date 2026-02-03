@@ -46,6 +46,10 @@ To discover available packages and versions, use the registry catalog:
 
 - https://registry.x07.io/index/catalog.json
 
+Modern protocols:
+
+- `ext-net-protos-c` provides HTTP/2, WebSockets, and gRPC helpers (`std.net.http2`, `std.net.ws`, `std.net.grpc`) and is pinned by repo-local contracts under `arch/net/`.
+
 ## Canonical approach
 
 - Always construct requests through pack/unpack helpers:

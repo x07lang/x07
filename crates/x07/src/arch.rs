@@ -9,13 +9,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use walkdir::WalkDir;
 use x07_contracts::{
+    X07_ARCH_ARCHIVE_INDEX_SCHEMA_VERSION, X07_ARCH_ARCHIVE_PROFILE_SCHEMA_VERSION,
     X07_ARCH_BUDGETS_INDEX_SCHEMA_VERSION, X07_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION,
+    X07_ARCH_CRYPTO_INDEX_SCHEMA_VERSION, X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_VERSION,
+    X07_ARCH_DB_INDEX_SCHEMA_VERSION, X07_ARCH_DB_QUERIES_SCHEMA_VERSION,
     X07_ARCH_MANIFEST_LOCK_SCHEMA_VERSION, X07_ARCH_MANIFEST_SCHEMA_VERSION,
-    X07_ARCH_PATCHSET_SCHEMA_VERSION, X07_ARCH_REPORT_SCHEMA_VERSION,
-    X07_ARCH_RR_INDEX_SCHEMA_VERSION, X07_ARCH_RR_POLICY_SCHEMA_VERSION,
-    X07_ARCH_RR_SANITIZE_SCHEMA_VERSION, X07_ARCH_SM_INDEX_SCHEMA_VERSION,
-    X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION, X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION,
-    X07_BUDGET_PROFILE_SCHEMA_VERSION, X07_SM_SPEC_SCHEMA_VERSION,
+    X07_ARCH_NET_GRPC_SERVICES_SCHEMA_VERSION, X07_ARCH_NET_INDEX_SCHEMA_VERSION,
+    X07_ARCH_OBS_INDEX_SCHEMA_VERSION, X07_ARCH_PATCHSET_SCHEMA_VERSION,
+    X07_ARCH_REPORT_SCHEMA_VERSION, X07_ARCH_RR_INDEX_SCHEMA_VERSION,
+    X07_ARCH_RR_POLICY_SCHEMA_VERSION, X07_ARCH_RR_SANITIZE_SCHEMA_VERSION,
+    X07_ARCH_SM_INDEX_SCHEMA_VERSION, X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION,
+    X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION, X07_BUDGET_PROFILE_SCHEMA_VERSION,
+    X07_DB_MIGRATE_PLAN_SCHEMA_VERSION, X07_OBS_EXPORTER_PROFILE_SCHEMA_VERSION,
+    X07_OBS_METRICS_REGISTRY_SCHEMA_VERSION, X07_SM_SPEC_SCHEMA_VERSION,
 };
 use x07_worlds::WorldId;
 use x07c::diagnostics;
@@ -46,6 +52,30 @@ const X07_ARCH_STREAM_PLUGIN_SCHEMA_BYTES: &[u8] =
 const X07_BUDGET_PROFILE_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-budget.profile.schema.json");
 const X07_SM_SPEC_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07-sm.spec.schema.json");
+const X07_ARCH_ARCHIVE_INDEX_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.archive.index.schema.json");
+const X07_ARCH_ARCHIVE_PROFILE_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.archive.profile.schema.json");
+const X07_ARCH_DB_INDEX_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.db.index.schema.json");
+const X07_DB_MIGRATE_PLAN_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-db.migrate.plan.schema.json");
+const X07_ARCH_DB_QUERIES_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.db.queries.schema.json");
+const X07_ARCH_OBS_INDEX_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.obs.index.schema.json");
+const X07_OBS_METRICS_REGISTRY_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-obs.metrics.registry.schema.json");
+const X07_OBS_EXPORTER_PROFILE_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-obs.exporter.profile.schema.json");
+const X07_ARCH_NET_INDEX_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.net.index.schema.json");
+const X07_ARCH_NET_GRPC_SERVICES_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.net.grpc.services.schema.json");
+const X07_ARCH_CRYPTO_INDEX_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.crypto.index.schema.json");
+const X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.crypto.jwt_profiles.schema.json");
 
 const DEFAULT_MODULE_SCAN_INCLUDE: &[&str] = &["**/*.x07.json"];
 const DEFAULT_MODULE_SCAN_EXCLUDE: &[&str] = &[
@@ -286,7 +316,41 @@ struct ArchContractsV1 {
     sm: Option<ArchContractsSmV1>,
     budgets: Option<ArchContractsBudgetsV1>,
     stream_plugins: Option<ArchContractsStreamPluginsV1>,
+    #[serde(default)]
+    archive: Option<ArchContractsIndexV1>,
+    #[serde(default)]
+    db: Option<ArchContractsIndexV1>,
+    #[serde(default)]
+    obs: Option<ArchContractsIndexV1>,
+    #[serde(default)]
+    net: Option<ArchContractsIndexV1>,
+    #[serde(default)]
+    crypto: Option<ArchContractsIndexV1>,
     canonical_json: ArchContractsCanonicalJsonV1,
+}
+
+fn default_contracts_enforce() -> String {
+    "error".to_string()
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_u32_255() -> u32 {
+    255
+}
+
+fn default_u32_4096() -> u32 {
+    4096
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchContractsIndexV1 {
+    index_path: String,
+    #[serde(default = "default_contracts_enforce")]
+    enforce: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -528,6 +592,407 @@ struct ArchBudgetsIndexSelector {
     module_prefix: String,
     #[serde(rename = "fn")]
     fn_name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchArchiveIndex {
+    schema_version: String,
+    profiles: Vec<ArchArchiveIndexProfileRef>,
+    #[serde(default)]
+    defaults: ArchArchiveIndexDefaults,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchArchiveIndexDefaults {
+    #[serde(default)]
+    default_profile_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchArchiveIndexProfileRef {
+    id: String,
+    profile_path: String,
+    worlds_allowed: Vec<String>,
+    kinds_allowed: Vec<String>,
+    ops_allowed: Vec<String>,
+    budget_profile_id: String,
+    #[serde(default)]
+    description: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchArchiveProfile {
+    schema_version: String,
+    id: String,
+    v: u32,
+    kind: String,
+    path_policy: ArchArchiveProfilePathPolicy,
+    limits: ArchArchiveProfileLimits,
+    #[serde(default)]
+    format_opts: ArchArchiveProfileFormatOpts,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchArchiveProfilePathPolicy {
+    mode: String,
+    reject_non_utf8: bool,
+    reject_absolute: bool,
+    reject_parent: bool,
+    reject_backslash: bool,
+    #[serde(default = "default_u32_4096")]
+    max_path_bytes: u32,
+    #[serde(default = "default_u32_255")]
+    max_segment_bytes: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchArchiveProfileLimits {
+    max_entries: u32,
+    max_total_out_bytes: u64,
+    max_file_bytes: u64,
+    #[serde(default = "default_u32_4096")]
+    max_link_bytes: u32,
+    #[serde(default)]
+    max_inflate_out_bytes: u64,
+    #[serde(default)]
+    max_inflate_ratio_x100: u32,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchArchiveProfileFormatOpts {
+    #[serde(default = "default_true")]
+    tar_allow_pax: bool,
+    #[serde(default = "default_true")]
+    tar_allow_gnu_longname: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchDbIndex {
+    schema_version: String,
+    drivers: Vec<ArchDbDriver>,
+    #[serde(default)]
+    migrate_plans: Vec<ArchDbMigratePlanRef>,
+    #[serde(default)]
+    query_catalogs: Vec<ArchDbQueryCatalogRef>,
+    #[serde(default)]
+    defaults: ArchDbIndexDefaults,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchDbIndexDefaults {
+    #[serde(default)]
+    default_driver_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchDbDriver {
+    id: String,
+    kind: String,
+    module: String,
+    worlds_allowed: Vec<String>,
+    #[serde(default)]
+    description: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchDbMigratePlanRef {
+    id: String,
+    plan_path: String,
+    driver_id: String,
+    budget_profile_id: String,
+    #[serde(default)]
+    rr_policy_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchDbQueryCatalogRef {
+    id: String,
+    catalog_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct DbMigratePlan {
+    schema_version: String,
+    id: String,
+    v: u32,
+    #[serde(default)]
+    lock_table: String,
+    steps: Vec<DbMigratePlanStep>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct DbMigratePlanStep {
+    id: String,
+    up_sql_path: String,
+    up_sha256_hex: String,
+    #[serde(default)]
+    down_sql_path: String,
+    #[serde(default)]
+    down_sha256_hex: String,
+    #[serde(default)]
+    description: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchDbQueries {
+    schema_version: String,
+    id: String,
+    v: u32,
+    queries: Vec<ArchDbQuery>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchDbQuery {
+    id: String,
+    op: String,
+    sql: String,
+    #[serde(default)]
+    params_brand: String,
+    #[serde(default)]
+    row_brand: String,
+    max_rows: u32,
+    max_resp_bytes: u32,
+    #[serde(default)]
+    timeout_ms: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchObsIndex {
+    schema_version: String,
+    metrics_registry_path: String,
+    #[serde(default)]
+    exporters: Vec<ArchObsExporterRef>,
+    #[serde(default)]
+    defaults: ArchObsIndexDefaults,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchObsIndexDefaults {
+    #[serde(default)]
+    default_exporter_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchObsExporterRef {
+    id: String,
+    profile_path: String,
+    budget_profile_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ObsMetricsRegistry {
+    schema_version: String,
+    id: String,
+    v: u32,
+    metrics: Vec<ObsMetricSpec>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ObsMetricSpec {
+    id: String,
+    #[serde(rename = "type")]
+    metric_type: String,
+    help: String,
+    #[serde(default)]
+    unit: String,
+    #[serde(default)]
+    labels: Vec<String>,
+    #[serde(default)]
+    histogram_buckets: Vec<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ObsExporterProfile {
+    schema_version: String,
+    id: String,
+    v: u32,
+    kind: String,
+    cfg: ObsOtlpHttpCfg,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ObsOtlpHttpCfg {
+    endpoint: String,
+    timeout_ms: u32,
+    max_body_bytes: u32,
+    #[serde(default)]
+    headers: Vec<ObsHeaderKv>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ObsHeaderKv {
+    k: String,
+    v: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchNetIndex {
+    schema_version: String,
+    http2: ArchNetHttp2Cfg,
+    ws: ArchNetWsCfg,
+    grpc: ArchNetGrpcCfg,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchNetHttp2Cfg {
+    enabled: bool,
+    max_frame_size: u32,
+    max_header_list_bytes: u32,
+    max_concurrent_streams: u32,
+    budget_profile_id: String,
+    #[serde(default)]
+    rr_policy_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchNetWsCfg {
+    enabled: bool,
+    max_message_bytes: u32,
+    budget_profile_id: String,
+    #[serde(default)]
+    rr_policy_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchNetGrpcCfg {
+    enabled: bool,
+    services_path: String,
+    max_message_bytes: u32,
+    budget_profile_id: String,
+    #[serde(default)]
+    rr_policy_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchNetGrpcServices {
+    schema_version: String,
+    id: String,
+    v: u32,
+    protos: Vec<ArchNetGrpcProto>,
+    methods: Vec<ArchNetGrpcMethod>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchNetGrpcProto {
+    path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchNetGrpcMethod {
+    service: String,
+    method: String,
+    path: String,
+    req_brand: String,
+    resp_brand: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchCryptoIndex {
+    schema_version: String,
+    keys: Vec<ArchCryptoKey>,
+    algorithms: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchCryptoKey {
+    id: String,
+    kind: String,
+    material_path: String,
+    #[serde(default)]
+    description: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchCryptoJwtProfiles {
+    schema_version: String,
+    id: String,
+    v: u32,
+    profiles: Vec<ArchCryptoJwtProfile>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct ArchCryptoJwtProfile {
+    id: String,
+    issuer: String,
+    audience: String,
+    alg: String,
+    key_id: String,
+    max_ttl_secs: u32,
+    clock_skew_secs: u32,
+    #[serde(default)]
+    required_claims: Vec<String>,
+    #[serde(default = "default_true")]
+    jcs_payload: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -2433,6 +2898,94 @@ fn check_contracts_v1(
         })
     }
 
+    fn push_contract_diag(diags: &mut DiagSink, enforce: &str, mut d: diagnostics::Diagnostic) {
+        match enforce.trim() {
+            "off" => return,
+            "warn" => d.severity = diagnostics::Severity::Warning,
+            "error" => {}
+            _ => {}
+        }
+        diags.push(d);
+    }
+
+    fn load_contract_json_enforced(
+        repo_root: &Path,
+        budgets: &ArchBudgets,
+        state: &mut ContractBudgetState,
+        diags: &mut DiagSink,
+        enforce: &str,
+        rel_path: &str,
+        missing_code: &str,
+        parse_code: &str,
+    ) -> Result<Option<(PathBuf, String, Value)>> {
+        let path = resolve_path_under_root(repo_root, Path::new(rel_path));
+        let rel = display_relpath(repo_root, &path);
+        let bytes = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                let mut data = BTreeMap::new();
+                data.insert("path".to_string(), Value::String(rel));
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_lint_error(
+                        missing_code,
+                        "contract file is missing",
+                        Some(rel_path),
+                        data,
+                    ),
+                );
+                return Ok(None);
+            }
+            Err(err) => {
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_parse_error(
+                        parse_code,
+                        &format!("read contract file: {err}"),
+                        Some(&rel),
+                    ),
+                );
+                return Ok(None);
+            }
+        };
+
+        if !bump_contract_budget(budgets, state, diags, bytes.len()) {
+            return Ok(None);
+        }
+
+        let doc: Value = match serde_json::from_slice(&bytes) {
+            Ok(v) => v,
+            Err(err) => {
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_parse_error(
+                        parse_code,
+                        &format!("parse contract JSON: {err}"),
+                        Some(&rel),
+                    ),
+                );
+                return Ok(None);
+            }
+        };
+        Ok(Some((path, rel, doc)))
+    }
+
+    fn validate_schema_enforced(
+        enforce: &str,
+        code: &str,
+        schema_bytes: &[u8],
+        doc: &Value,
+        diags: &mut DiagSink,
+    ) -> Result<()> {
+        for d in validate_schema(code, schema_bytes, doc)? {
+            push_contract_diag(diags, enforce, d);
+        }
+        Ok(())
+    }
+
     fn rr_kind_for_op(op: &str) -> Option<&'static str> {
         if op.starts_with("std.rr.") || op == "std.stream.src.rr_send_v1" {
             return Some("rr");
@@ -3436,6 +3989,1035 @@ fn check_contracts_v1(
                             solve,
                             diags,
                         );
+                    }
+                }
+            }
+        }
+    }
+
+    // archive contracts
+    if let Some(archive_cfg) = &contracts.archive {
+        let enforce = archive_cfg.enforce.as_str();
+        if let Some((index_path, index_rel, index_doc)) = load_contract_json_enforced(
+            repo_root,
+            budgets,
+            &mut budget_state,
+            diags,
+            enforce,
+            &archive_cfg.index_path,
+            "E_ARCH_ARCHIVE_INDEX_MISSING",
+            "E_ARCH_ARCHIVE_SCHEMA_INVALID",
+        )? {
+            if index_doc.get("schema_version").and_then(Value::as_str)
+                != Some(X07_ARCH_ARCHIVE_INDEX_SCHEMA_VERSION)
+            {
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_parse_error(
+                        "E_ARCH_ARCHIVE_SCHEMA_INVALID",
+                        "schema_version mismatch for archive index",
+                        Some(&index_rel),
+                    ),
+                );
+            } else {
+                validate_schema_enforced(
+                    enforce,
+                    "E_ARCH_ARCHIVE_SCHEMA_INVALID",
+                    X07_ARCH_ARCHIVE_INDEX_SCHEMA_BYTES,
+                    &index_doc,
+                    diags,
+                )?;
+            }
+
+            indexes.insert(index_rel.clone(), lock_entry_for_doc(&index_doc)?);
+
+            if let Ok(index_obj) = serde_json::from_value::<ArchArchiveIndex>(index_doc.clone()) {
+                let mut profile_ids: BTreeSet<String> = BTreeSet::new();
+                for p in &index_obj.profiles {
+                    profile_ids.insert(p.id.clone());
+                }
+
+                if !index_obj.defaults.default_profile_id.is_empty()
+                    && !profile_ids.contains(&index_obj.defaults.default_profile_id)
+                {
+                    let mut data = BTreeMap::new();
+                    data.insert(
+                        "default_profile_id".to_string(),
+                        Value::String(index_obj.defaults.default_profile_id.clone()),
+                    );
+                    push_contract_diag(
+                        diags,
+                        enforce,
+                        diag_lint_error(
+                            "E_ARCH_ARCHIVE_SCHEMA_INVALID",
+                            "defaults.default_profile_id does not exist in profiles[]",
+                            Some(&display_relpath(repo_root, &index_path)),
+                            data,
+                        ),
+                    );
+                }
+
+                fn op_exists(modules_by_id: &BTreeMap<String, ModuleInfo>, op: &str) -> bool {
+                    let Some((module_id, fn_name)) = op.rsplit_once('.') else {
+                        return false;
+                    };
+                    let Some(m) = modules_by_id.get(module_id) else {
+                        return false;
+                    };
+                    m.parsed
+                        .functions
+                        .iter()
+                        .any(|f| f.name == op || f.name == fn_name)
+                        || m.parsed
+                            .async_functions
+                            .iter()
+                            .any(|f| f.name == op || f.name == fn_name)
+                }
+
+                for p in &index_obj.profiles {
+                    if !budgets_profiles_by_id.contains_key(&p.budget_profile_id) {
+                        let mut data = BTreeMap::new();
+                        data.insert("profile_id".to_string(), Value::String(p.id.clone()));
+                        data.insert(
+                            "budget_profile_id".to_string(),
+                            Value::String(p.budget_profile_id.clone()),
+                        );
+                        push_contract_diag(
+                            diags,
+                            enforce,
+                            diag_lint_error(
+                                "E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING",
+                                "archive profile references missing budget_profile_id",
+                                Some(&display_relpath(repo_root, &index_path)),
+                                data,
+                            ),
+                        );
+                    }
+
+                    for op in &p.ops_allowed {
+                        if x07c::validate::validate_symbol(op).is_err()
+                            || !op_exists(modules_by_id, op)
+                        {
+                            let mut data = BTreeMap::new();
+                            data.insert("profile_id".to_string(), Value::String(p.id.clone()));
+                            data.insert("op".to_string(), Value::String(op.clone()));
+                            push_contract_diag(
+                                diags,
+                                enforce,
+                                diag_lint_error(
+                                    "E_ARCH_ARCHIVE_OP_UNKNOWN",
+                                    "archive profile ops_allowed contains unknown symbol",
+                                    Some(&display_relpath(repo_root, &index_path)),
+                                    data,
+                                ),
+                            );
+                        }
+                    }
+
+                    if let Some((profile_path, profile_rel, profile_doc)) =
+                        load_contract_json_enforced(
+                            repo_root,
+                            budgets,
+                            &mut budget_state,
+                            diags,
+                            enforce,
+                            &p.profile_path,
+                            "E_ARCH_ARCHIVE_PROFILE_MISSING",
+                            "E_ARCH_ARCHIVE_SCHEMA_INVALID",
+                        )?
+                    {
+                        if profile_doc.get("schema_version").and_then(Value::as_str)
+                            != Some(X07_ARCH_ARCHIVE_PROFILE_SCHEMA_VERSION)
+                        {
+                            push_contract_diag(
+                                diags,
+                                enforce,
+                                diag_parse_error(
+                                    "E_ARCH_ARCHIVE_SCHEMA_INVALID",
+                                    "schema_version mismatch for archive profile",
+                                    Some(&profile_rel),
+                                ),
+                            );
+                        } else {
+                            validate_schema_enforced(
+                                enforce,
+                                "E_ARCH_ARCHIVE_SCHEMA_INVALID",
+                                X07_ARCH_ARCHIVE_PROFILE_SCHEMA_BYTES,
+                                &profile_doc,
+                                diags,
+                            )?;
+                        }
+                        files.insert(profile_rel, lock_entry_for_doc(&profile_doc)?);
+
+                        if let Ok(profile_obj) =
+                            serde_json::from_value::<ArchArchiveProfile>(profile_doc.clone())
+                        {
+                            if profile_obj.id != p.id {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "index_profile_id".to_string(),
+                                    Value::String(p.id.clone()),
+                                );
+                                data.insert(
+                                    "profile_id".to_string(),
+                                    Value::String(profile_obj.id.clone()),
+                                );
+                                push_contract_diag(
+                                    diags,
+                                    enforce,
+                                    diag_lint_error(
+                                        "E_ARCH_ARCHIVE_SCHEMA_INVALID",
+                                        "archive profile id must match index entry id",
+                                        Some(&display_relpath(repo_root, &profile_path)),
+                                        data,
+                                    ),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // DB contracts
+    if let Some(db_cfg) = &contracts.db {
+        let enforce = db_cfg.enforce.as_str();
+        if let Some((index_path, index_rel, index_doc)) = load_contract_json_enforced(
+            repo_root,
+            budgets,
+            &mut budget_state,
+            diags,
+            enforce,
+            &db_cfg.index_path,
+            "E_ARCH_DB_INDEX_MISSING",
+            "E_ARCH_DB_INDEX_MISSING",
+        )? {
+            if index_doc.get("schema_version").and_then(Value::as_str)
+                != Some(X07_ARCH_DB_INDEX_SCHEMA_VERSION)
+            {
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_parse_error(
+                        "E_ARCH_DB_INDEX_MISSING",
+                        "schema_version mismatch for DB index",
+                        Some(&index_rel),
+                    ),
+                );
+            } else {
+                validate_schema_enforced(
+                    enforce,
+                    "E_ARCH_DB_INDEX_MISSING",
+                    X07_ARCH_DB_INDEX_SCHEMA_BYTES,
+                    &index_doc,
+                    diags,
+                )?;
+            }
+
+            indexes.insert(index_rel.clone(), lock_entry_for_doc(&index_doc)?);
+
+            if let Ok(index_obj) = serde_json::from_value::<ArchDbIndex>(index_doc.clone()) {
+                let mut drivers_by_id: BTreeMap<String, ArchDbDriver> = BTreeMap::new();
+                for d in &index_obj.drivers {
+                    drivers_by_id.insert(d.id.clone(), d.clone());
+                }
+
+                if !index_obj.defaults.default_driver_id.is_empty()
+                    && !drivers_by_id.contains_key(&index_obj.defaults.default_driver_id)
+                {
+                    let mut data = BTreeMap::new();
+                    data.insert(
+                        "default_driver_id".to_string(),
+                        Value::String(index_obj.defaults.default_driver_id.clone()),
+                    );
+                    push_contract_diag(
+                        diags,
+                        enforce,
+                        diag_lint_error(
+                            "E_ARCH_DB_INDEX_MISSING",
+                            "defaults.default_driver_id does not exist in drivers[]",
+                            Some(&display_relpath(repo_root, &index_path)),
+                            data,
+                        ),
+                    );
+                }
+
+                for mp in &index_obj.migrate_plans {
+                    if !drivers_by_id.contains_key(&mp.driver_id) {
+                        let mut data = BTreeMap::new();
+                        data.insert("plan_id".to_string(), Value::String(mp.id.clone()));
+                        data.insert("driver_id".to_string(), Value::String(mp.driver_id.clone()));
+                        push_contract_diag(
+                            diags,
+                            enforce,
+                            diag_lint_error(
+                                "E_ARCH_DB_INDEX_MISSING",
+                                "migrate plan references missing driver_id",
+                                Some(&display_relpath(repo_root, &index_path)),
+                                data,
+                            ),
+                        );
+                    }
+
+                    if !mp.rr_policy_id.is_empty()
+                        && !rr_policies_by_id.contains_key(&mp.rr_policy_id)
+                    {
+                        let mut data = BTreeMap::new();
+                        data.insert("plan_id".to_string(), Value::String(mp.id.clone()));
+                        data.insert(
+                            "rr_policy_id".to_string(),
+                            Value::String(mp.rr_policy_id.clone()),
+                        );
+                        diags.push(diag_lint_error(
+                            "E_ARCH_RR_POLICY_NOT_FOUND",
+                            "rr_policy_id not found in RR index",
+                            Some(&display_relpath(repo_root, &index_path)),
+                            data,
+                        ));
+                    }
+
+                    if !budgets_profiles_by_id.contains_key(&mp.budget_profile_id) {
+                        let mut data = BTreeMap::new();
+                        data.insert("plan_id".to_string(), Value::String(mp.id.clone()));
+                        data.insert(
+                            "budget_profile_id".to_string(),
+                            Value::String(mp.budget_profile_id.clone()),
+                        );
+                        push_contract_diag(
+                            diags,
+                            enforce,
+                            diag_lint_error(
+                                "E_ARCH_DB_BUDGET_PROFILE_MISSING",
+                                "migrate plan references missing budget_profile_id",
+                                Some(&display_relpath(repo_root, &index_path)),
+                                data,
+                            ),
+                        );
+                    }
+
+                    if let Some((_plan_path, plan_rel, plan_doc)) = load_contract_json_enforced(
+                        repo_root,
+                        budgets,
+                        &mut budget_state,
+                        diags,
+                        enforce,
+                        &mp.plan_path,
+                        "E_ARCH_DB_MIGRATE_PLAN_MISSING",
+                        "E_ARCH_DB_MIGRATE_PLAN_MISSING",
+                    )? {
+                        if plan_doc.get("schema_version").and_then(Value::as_str)
+                            != Some(X07_DB_MIGRATE_PLAN_SCHEMA_VERSION)
+                        {
+                            push_contract_diag(
+                                diags,
+                                enforce,
+                                diag_parse_error(
+                                    "E_ARCH_DB_MIGRATE_PLAN_MISSING",
+                                    "schema_version mismatch for migrate plan",
+                                    Some(&plan_rel),
+                                ),
+                            );
+                        } else {
+                            validate_schema_enforced(
+                                enforce,
+                                "E_ARCH_DB_MIGRATE_PLAN_MISSING",
+                                X07_DB_MIGRATE_PLAN_SCHEMA_BYTES,
+                                &plan_doc,
+                                diags,
+                            )?;
+                        }
+
+                        files.insert(plan_rel.clone(), lock_entry_for_doc(&plan_doc)?);
+
+                        if let Ok(plan_obj) =
+                            serde_json::from_value::<DbMigratePlan>(plan_doc.clone())
+                        {
+                            for step in &plan_obj.steps {
+                                let sql_path = resolve_path_under_root(
+                                    repo_root,
+                                    Path::new(&step.up_sql_path),
+                                );
+                                let sql_rel = display_relpath(repo_root, &sql_path);
+                                let sql_bytes = match std::fs::read(&sql_path) {
+                                    Ok(b) => b,
+                                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                                        let mut data = BTreeMap::new();
+                                        data.insert(
+                                            "path".to_string(),
+                                            Value::String(sql_rel.clone()),
+                                        );
+                                        data.insert(
+                                            "step_id".to_string(),
+                                            Value::String(step.id.clone()),
+                                        );
+                                        push_contract_diag(
+                                            diags,
+                                            enforce,
+                                            diag_lint_error(
+                                                "E_ARCH_DB_SQL_MISSING",
+                                                "SQL file is missing",
+                                                Some(&step.up_sql_path),
+                                                data,
+                                            ),
+                                        );
+                                        continue;
+                                    }
+                                    Err(err) => {
+                                        push_contract_diag(
+                                            diags,
+                                            enforce,
+                                            diag_parse_error(
+                                                "E_ARCH_DB_SQL_MISSING",
+                                                &format!("read SQL file: {err}"),
+                                                Some(&sql_rel),
+                                            ),
+                                        );
+                                        continue;
+                                    }
+                                };
+
+                                if !bump_contract_budget(
+                                    budgets,
+                                    &mut budget_state,
+                                    diags,
+                                    sql_bytes.len(),
+                                ) {
+                                    return Ok(None);
+                                }
+
+                                let got = util::sha256_hex(&sql_bytes);
+                                if got != step.up_sha256_hex {
+                                    let mut data = BTreeMap::new();
+                                    data.insert("path".to_string(), Value::String(sql_rel.clone()));
+                                    data.insert(
+                                        "expected_sha256_hex".to_string(),
+                                        Value::String(step.up_sha256_hex.clone()),
+                                    );
+                                    data.insert("got_sha256_hex".to_string(), Value::String(got));
+                                    data.insert(
+                                        "step_id".to_string(),
+                                        Value::String(step.id.clone()),
+                                    );
+                                    push_contract_diag(
+                                        diags,
+                                        enforce,
+                                        diag_lint_error(
+                                            "E_ARCH_DB_SQL_HASH_MISMATCH",
+                                            "SQL sha256 mismatch",
+                                            Some(&step.up_sql_path),
+                                            data,
+                                        ),
+                                    );
+                                }
+
+                                if !step.down_sql_path.is_empty() {
+                                    let down_path = resolve_path_under_root(
+                                        repo_root,
+                                        Path::new(&step.down_sql_path),
+                                    );
+                                    let down_rel = display_relpath(repo_root, &down_path);
+                                    let down_bytes = match std::fs::read(&down_path) {
+                                        Ok(b) => b,
+                                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                                            let mut data = BTreeMap::new();
+                                            data.insert(
+                                                "path".to_string(),
+                                                Value::String(down_rel.clone()),
+                                            );
+                                            data.insert(
+                                                "step_id".to_string(),
+                                                Value::String(step.id.clone()),
+                                            );
+                                            push_contract_diag(
+                                                diags,
+                                                enforce,
+                                                diag_lint_error(
+                                                    "E_ARCH_DB_SQL_MISSING",
+                                                    "SQL file is missing",
+                                                    Some(&step.down_sql_path),
+                                                    data,
+                                                ),
+                                            );
+                                            continue;
+                                        }
+                                        Err(err) => {
+                                            push_contract_diag(
+                                                diags,
+                                                enforce,
+                                                diag_parse_error(
+                                                    "E_ARCH_DB_SQL_MISSING",
+                                                    &format!("read SQL file: {err}"),
+                                                    Some(&down_rel),
+                                                ),
+                                            );
+                                            continue;
+                                        }
+                                    };
+                                    if !bump_contract_budget(
+                                        budgets,
+                                        &mut budget_state,
+                                        diags,
+                                        down_bytes.len(),
+                                    ) {
+                                        return Ok(None);
+                                    }
+                                    if !step.down_sha256_hex.is_empty() {
+                                        let got = util::sha256_hex(&down_bytes);
+                                        if got != step.down_sha256_hex {
+                                            let mut data = BTreeMap::new();
+                                            data.insert(
+                                                "path".to_string(),
+                                                Value::String(down_rel.clone()),
+                                            );
+                                            data.insert(
+                                                "expected_sha256_hex".to_string(),
+                                                Value::String(step.down_sha256_hex.clone()),
+                                            );
+                                            data.insert(
+                                                "got_sha256_hex".to_string(),
+                                                Value::String(got),
+                                            );
+                                            data.insert(
+                                                "step_id".to_string(),
+                                                Value::String(step.id.clone()),
+                                            );
+                                            push_contract_diag(
+                                                diags,
+                                                enforce,
+                                                diag_lint_error(
+                                                    "E_ARCH_DB_SQL_HASH_MISMATCH",
+                                                    "SQL sha256 mismatch",
+                                                    Some(&step.down_sql_path),
+                                                    data,
+                                                ),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for qc in &index_obj.query_catalogs {
+                    if let Some((_cat_path, cat_rel, cat_doc)) = load_contract_json_enforced(
+                        repo_root,
+                        budgets,
+                        &mut budget_state,
+                        diags,
+                        enforce,
+                        &qc.catalog_path,
+                        "E_ARCH_DB_QUERY_CATALOG_INVALID",
+                        "E_ARCH_DB_QUERY_CATALOG_INVALID",
+                    )? {
+                        if cat_doc.get("schema_version").and_then(Value::as_str)
+                            != Some(X07_ARCH_DB_QUERIES_SCHEMA_VERSION)
+                        {
+                            push_contract_diag(
+                                diags,
+                                enforce,
+                                diag_parse_error(
+                                    "E_ARCH_DB_QUERY_CATALOG_INVALID",
+                                    "schema_version mismatch for DB query catalog",
+                                    Some(&cat_rel),
+                                ),
+                            );
+                        } else {
+                            validate_schema_enforced(
+                                enforce,
+                                "E_ARCH_DB_QUERY_CATALOG_INVALID",
+                                X07_ARCH_DB_QUERIES_SCHEMA_BYTES,
+                                &cat_doc,
+                                diags,
+                            )?;
+                        }
+
+                        files.insert(cat_rel, lock_entry_for_doc(&cat_doc)?);
+                    }
+                }
+            }
+        }
+    }
+
+    // obs contracts
+    if let Some(obs_cfg) = &contracts.obs {
+        let enforce = obs_cfg.enforce.as_str();
+        if let Some((index_path, index_rel, index_doc)) = load_contract_json_enforced(
+            repo_root,
+            budgets,
+            &mut budget_state,
+            diags,
+            enforce,
+            &obs_cfg.index_path,
+            "E_ARCH_OBS_INDEX_MISSING",
+            "E_ARCH_OBS_INDEX_MISSING",
+        )? {
+            if index_doc.get("schema_version").and_then(Value::as_str)
+                != Some(X07_ARCH_OBS_INDEX_SCHEMA_VERSION)
+            {
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_parse_error(
+                        "E_ARCH_OBS_INDEX_MISSING",
+                        "schema_version mismatch for obs index",
+                        Some(&index_rel),
+                    ),
+                );
+            } else {
+                validate_schema_enforced(
+                    enforce,
+                    "E_ARCH_OBS_INDEX_MISSING",
+                    X07_ARCH_OBS_INDEX_SCHEMA_BYTES,
+                    &index_doc,
+                    diags,
+                )?;
+            }
+
+            indexes.insert(index_rel.clone(), lock_entry_for_doc(&index_doc)?);
+
+            if let Ok(index_obj) = serde_json::from_value::<ArchObsIndex>(index_doc.clone()) {
+                if let Some((_reg_path, reg_rel, reg_doc)) = load_contract_json_enforced(
+                    repo_root,
+                    budgets,
+                    &mut budget_state,
+                    diags,
+                    enforce,
+                    &index_obj.metrics_registry_path,
+                    "E_ARCH_OBS_REGISTRY_MISSING",
+                    "E_ARCH_OBS_REGISTRY_MISSING",
+                )? {
+                    if reg_doc.get("schema_version").and_then(Value::as_str)
+                        != Some(X07_OBS_METRICS_REGISTRY_SCHEMA_VERSION)
+                    {
+                        push_contract_diag(
+                            diags,
+                            enforce,
+                            diag_parse_error(
+                                "E_ARCH_OBS_REGISTRY_MISSING",
+                                "schema_version mismatch for metrics registry",
+                                Some(&reg_rel),
+                            ),
+                        );
+                    } else {
+                        validate_schema_enforced(
+                            enforce,
+                            "E_ARCH_OBS_REGISTRY_MISSING",
+                            X07_OBS_METRICS_REGISTRY_SCHEMA_BYTES,
+                            &reg_doc,
+                            diags,
+                        )?;
+                    }
+                    files.insert(reg_rel, lock_entry_for_doc(&reg_doc)?);
+                }
+
+                for ex in &index_obj.exporters {
+                    if !budgets_profiles_by_id.contains_key(&ex.budget_profile_id) {
+                        let mut data = BTreeMap::new();
+                        data.insert("exporter_id".to_string(), Value::String(ex.id.clone()));
+                        data.insert(
+                            "budget_profile_id".to_string(),
+                            Value::String(ex.budget_profile_id.clone()),
+                        );
+                        push_contract_diag(
+                            diags,
+                            enforce,
+                            diag_lint_error(
+                                "E_ARCH_OBS_BUDGET_PROFILE_MISSING",
+                                "exporter references missing budget_profile_id",
+                                Some(&display_relpath(repo_root, &index_path)),
+                                data,
+                            ),
+                        );
+                    }
+
+                    if let Some((_profile_path, profile_rel, profile_doc)) =
+                        load_contract_json_enforced(
+                            repo_root,
+                            budgets,
+                            &mut budget_state,
+                            diags,
+                            enforce,
+                            &ex.profile_path,
+                            "E_ARCH_OBS_EXPORTER_PROFILE_INVALID",
+                            "E_ARCH_OBS_EXPORTER_PROFILE_INVALID",
+                        )?
+                    {
+                        if profile_doc.get("schema_version").and_then(Value::as_str)
+                            != Some(X07_OBS_EXPORTER_PROFILE_SCHEMA_VERSION)
+                        {
+                            push_contract_diag(
+                                diags,
+                                enforce,
+                                diag_parse_error(
+                                    "E_ARCH_OBS_EXPORTER_PROFILE_INVALID",
+                                    "schema_version mismatch for exporter profile",
+                                    Some(&profile_rel),
+                                ),
+                            );
+                        } else {
+                            validate_schema_enforced(
+                                enforce,
+                                "E_ARCH_OBS_EXPORTER_PROFILE_INVALID",
+                                X07_OBS_EXPORTER_PROFILE_SCHEMA_BYTES,
+                                &profile_doc,
+                                diags,
+                            )?;
+                        }
+                        files.insert(profile_rel, lock_entry_for_doc(&profile_doc)?);
+                    }
+                }
+            }
+        }
+    }
+
+    // net contracts
+    if let Some(net_cfg) = &contracts.net {
+        let enforce = net_cfg.enforce.as_str();
+        if let Some((index_path, index_rel, index_doc)) = load_contract_json_enforced(
+            repo_root,
+            budgets,
+            &mut budget_state,
+            diags,
+            enforce,
+            &net_cfg.index_path,
+            "E_ARCH_NET_INDEX_MISSING",
+            "E_ARCH_NET_INDEX_MISSING",
+        )? {
+            if index_doc.get("schema_version").and_then(Value::as_str)
+                != Some(X07_ARCH_NET_INDEX_SCHEMA_VERSION)
+            {
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_parse_error(
+                        "E_ARCH_NET_INDEX_MISSING",
+                        "schema_version mismatch for net index",
+                        Some(&index_rel),
+                    ),
+                );
+            } else {
+                validate_schema_enforced(
+                    enforce,
+                    "E_ARCH_NET_INDEX_MISSING",
+                    X07_ARCH_NET_INDEX_SCHEMA_BYTES,
+                    &index_doc,
+                    diags,
+                )?;
+            }
+
+            indexes.insert(index_rel.clone(), lock_entry_for_doc(&index_doc)?);
+
+            if let Ok(index_obj) = serde_json::from_value::<ArchNetIndex>(index_doc.clone()) {
+                for (name, budget_profile_id) in [
+                    ("http2", &index_obj.http2.budget_profile_id),
+                    ("ws", &index_obj.ws.budget_profile_id),
+                    ("grpc", &index_obj.grpc.budget_profile_id),
+                ] {
+                    if !budgets_profiles_by_id.contains_key(budget_profile_id) {
+                        let mut data = BTreeMap::new();
+                        data.insert("subsystem".to_string(), Value::String(name.to_string()));
+                        data.insert(
+                            "budget_profile_id".to_string(),
+                            Value::String(budget_profile_id.clone()),
+                        );
+                        push_contract_diag(
+                            diags,
+                            enforce,
+                            diag_lint_error(
+                                "E_ARCH_NET_BUDGET_PROFILE_MISSING",
+                                "net subsystem references missing budget_profile_id",
+                                Some(&display_relpath(repo_root, &index_path)),
+                                data,
+                            ),
+                        );
+                    }
+                }
+
+                for (name, rr_policy_id) in [
+                    ("http2", &index_obj.http2.rr_policy_id),
+                    ("ws", &index_obj.ws.rr_policy_id),
+                    ("grpc", &index_obj.grpc.rr_policy_id),
+                ] {
+                    if !rr_policy_id.is_empty() && !rr_policies_by_id.contains_key(rr_policy_id) {
+                        let mut data = BTreeMap::new();
+                        data.insert("subsystem".to_string(), Value::String(name.to_string()));
+                        data.insert(
+                            "rr_policy_id".to_string(),
+                            Value::String(rr_policy_id.clone()),
+                        );
+                        diags.push(diag_lint_error(
+                            "E_ARCH_RR_POLICY_NOT_FOUND",
+                            "rr_policy_id not found in RR index",
+                            Some(&display_relpath(repo_root, &index_path)),
+                            data,
+                        ));
+                    }
+                }
+
+                let max_msg = index_obj
+                    .grpc
+                    .max_message_bytes
+                    .max(index_obj.ws.max_message_bytes);
+                if max_msg > 64 * 1024 * 1024 {
+                    let mut data = BTreeMap::new();
+                    data.insert(
+                        "max_message_bytes".to_string(),
+                        Value::Number((max_msg as u64).into()),
+                    );
+                    push_contract_diag(
+                        diags,
+                        enforce,
+                        diag_lint_error(
+                            "E_ARCH_NET_LIMITS_EXCESSIVE",
+                            "net limits are excessive",
+                            Some(&display_relpath(repo_root, &index_path)),
+                            data,
+                        ),
+                    );
+                }
+
+                if let Some((_svc_path, svc_rel, svc_doc)) = load_contract_json_enforced(
+                    repo_root,
+                    budgets,
+                    &mut budget_state,
+                    diags,
+                    enforce,
+                    &index_obj.grpc.services_path,
+                    "E_ARCH_NET_GRPC_SERVICES_INVALID",
+                    "E_ARCH_NET_GRPC_SERVICES_INVALID",
+                )? {
+                    if svc_doc.get("schema_version").and_then(Value::as_str)
+                        != Some(X07_ARCH_NET_GRPC_SERVICES_SCHEMA_VERSION)
+                    {
+                        push_contract_diag(
+                            diags,
+                            enforce,
+                            diag_parse_error(
+                                "E_ARCH_NET_GRPC_SERVICES_INVALID",
+                                "schema_version mismatch for gRPC services catalog",
+                                Some(&svc_rel),
+                            ),
+                        );
+                    } else {
+                        validate_schema_enforced(
+                            enforce,
+                            "E_ARCH_NET_GRPC_SERVICES_INVALID",
+                            X07_ARCH_NET_GRPC_SERVICES_SCHEMA_BYTES,
+                            &svc_doc,
+                            diags,
+                        )?;
+                    }
+
+                    files.insert(svc_rel.clone(), lock_entry_for_doc(&svc_doc)?);
+
+                    if let Ok(svc_obj) =
+                        serde_json::from_value::<ArchNetGrpcServices>(svc_doc.clone())
+                    {
+                        for p in &svc_obj.protos {
+                            let proto_path = resolve_path_under_root(repo_root, Path::new(&p.path));
+                            let proto_rel = display_relpath(repo_root, &proto_path);
+                            let proto_bytes = match std::fs::read(&proto_path) {
+                                Ok(b) => b,
+                                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                                    let mut data = BTreeMap::new();
+                                    data.insert("path".to_string(), Value::String(proto_rel));
+                                    push_contract_diag(
+                                        diags,
+                                        enforce,
+                                        diag_lint_error(
+                                            "E_ARCH_NET_GRPC_SERVICES_INVALID",
+                                            "proto file is missing",
+                                            Some(&p.path),
+                                            data,
+                                        ),
+                                    );
+                                    continue;
+                                }
+                                Err(err) => {
+                                    push_contract_diag(
+                                        diags,
+                                        enforce,
+                                        diag_parse_error(
+                                            "E_ARCH_NET_GRPC_SERVICES_INVALID",
+                                            &format!("read proto file: {err}"),
+                                            Some(&proto_rel),
+                                        ),
+                                    );
+                                    continue;
+                                }
+                            };
+
+                            if !bump_contract_budget(
+                                budgets,
+                                &mut budget_state,
+                                diags,
+                                proto_bytes.len(),
+                            ) {
+                                return Ok(None);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // crypto contracts
+    if let Some(crypto_cfg) = &contracts.crypto {
+        let enforce = crypto_cfg.enforce.as_str();
+        if let Some((_index_path, index_rel, index_doc)) = load_contract_json_enforced(
+            repo_root,
+            budgets,
+            &mut budget_state,
+            diags,
+            enforce,
+            &crypto_cfg.index_path,
+            "E_ARCH_CRYPTO_INDEX_MISSING",
+            "E_ARCH_CRYPTO_INDEX_MISSING",
+        )? {
+            if index_doc.get("schema_version").and_then(Value::as_str)
+                != Some(X07_ARCH_CRYPTO_INDEX_SCHEMA_VERSION)
+            {
+                push_contract_diag(
+                    diags,
+                    enforce,
+                    diag_parse_error(
+                        "E_ARCH_CRYPTO_INDEX_MISSING",
+                        "schema_version mismatch for crypto index",
+                        Some(&index_rel),
+                    ),
+                );
+            } else {
+                validate_schema_enforced(
+                    enforce,
+                    "E_ARCH_CRYPTO_INDEX_MISSING",
+                    X07_ARCH_CRYPTO_INDEX_SCHEMA_BYTES,
+                    &index_doc,
+                    diags,
+                )?;
+            }
+
+            indexes.insert(index_rel.clone(), lock_entry_for_doc(&index_doc)?);
+
+            if let Ok(index_obj) = serde_json::from_value::<ArchCryptoIndex>(index_doc.clone()) {
+                let mut keys_by_id: BTreeMap<String, ArchCryptoKey> = BTreeMap::new();
+                for k in &index_obj.keys {
+                    keys_by_id.insert(k.id.clone(), k.clone());
+
+                    let key_path = resolve_path_under_root(repo_root, Path::new(&k.material_path));
+                    let key_rel = display_relpath(repo_root, &key_path);
+                    let key_bytes = match std::fs::read(&key_path) {
+                        Ok(b) => b,
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                            let mut data = BTreeMap::new();
+                            data.insert("key_id".to_string(), Value::String(k.id.clone()));
+                            data.insert("path".to_string(), Value::String(key_rel));
+                            push_contract_diag(
+                                diags,
+                                enforce,
+                                diag_lint_error(
+                                    "E_ARCH_CRYPTO_KEY_MISSING",
+                                    "crypto key material file is missing",
+                                    Some(&k.material_path),
+                                    data,
+                                ),
+                            );
+                            continue;
+                        }
+                        Err(err) => {
+                            push_contract_diag(
+                                diags,
+                                enforce,
+                                diag_parse_error(
+                                    "E_ARCH_CRYPTO_KEY_MISSING",
+                                    &format!("read key material file: {err}"),
+                                    Some(&key_rel),
+                                ),
+                            );
+                            continue;
+                        }
+                    };
+                    if !bump_contract_budget(budgets, &mut budget_state, diags, key_bytes.len()) {
+                        return Ok(None);
+                    }
+                }
+
+                let jwt_profiles_path = "arch/crypto/jwt_profiles.x07jwt.json";
+                if let Some((_jp_path, jp_rel, jp_doc)) = load_contract_json_enforced(
+                    repo_root,
+                    budgets,
+                    &mut budget_state,
+                    diags,
+                    enforce,
+                    jwt_profiles_path,
+                    "E_ARCH_CRYPTO_JWT_PROFILE_INVALID",
+                    "E_ARCH_CRYPTO_JWT_PROFILE_INVALID",
+                )? {
+                    if jp_doc.get("schema_version").and_then(Value::as_str)
+                        != Some(X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_VERSION)
+                    {
+                        push_contract_diag(
+                            diags,
+                            enforce,
+                            diag_parse_error(
+                                "E_ARCH_CRYPTO_JWT_PROFILE_INVALID",
+                                "schema_version mismatch for jwt profiles",
+                                Some(&jp_rel),
+                            ),
+                        );
+                    } else {
+                        validate_schema_enforced(
+                            enforce,
+                            "E_ARCH_CRYPTO_JWT_PROFILE_INVALID",
+                            X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_BYTES,
+                            &jp_doc,
+                            diags,
+                        )?;
+                    }
+
+                    files.insert(jp_rel, lock_entry_for_doc(&jp_doc)?);
+
+                    if let Ok(jp_obj) =
+                        serde_json::from_value::<ArchCryptoJwtProfiles>(jp_doc.clone())
+                    {
+                        for p in &jp_obj.profiles {
+                            let Some(k) = keys_by_id.get(&p.key_id) else {
+                                let mut data = BTreeMap::new();
+                                data.insert("profile_id".to_string(), Value::String(p.id.clone()));
+                                data.insert("key_id".to_string(), Value::String(p.key_id.clone()));
+                                push_contract_diag(
+                                    diags,
+                                    enforce,
+                                    diag_lint_error(
+                                        "E_ARCH_CRYPTO_JWT_PROFILE_INVALID",
+                                        "jwt profile references missing key_id",
+                                        Some(jwt_profiles_path),
+                                        data,
+                                    ),
+                                );
+                                continue;
+                            };
+
+                            if k.kind != "ed25519_priv_v1" {
+                                let mut data = BTreeMap::new();
+                                data.insert("profile_id".to_string(), Value::String(p.id.clone()));
+                                data.insert("key_id".to_string(), Value::String(p.key_id.clone()));
+                                data.insert("key_kind".to_string(), Value::String(k.kind.clone()));
+                                push_contract_diag(
+                                    diags,
+                                    enforce,
+                                    diag_lint_error(
+                                        "E_ARCH_CRYPTO_JWT_PROFILE_INVALID",
+                                        "jwt profile key_id must refer to ed25519_priv_v1 key",
+                                        Some(jwt_profiles_path),
+                                        data,
+                                    ),
+                                );
+                            }
+                        }
                     }
                 }
             }

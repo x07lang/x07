@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "obs_export_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "result_err_v1",
+    "label": "obs.export.v1",
+    "alloc_bytes": 134217728,
+    "alloc_calls": 300000,
+    "realloc_calls": 80000,
+    "memcpy_bytes": 536870912,
+    "sched_ticks": 3000000,
+    "fuel": 0
+  }
+}

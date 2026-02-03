@@ -1,0 +1,21 @@
+{
+  "schema_version": "x07.arch.net.index@0.1.0",
+  "http2": {
+    "enabled": true,
+    "max_frame_size": 16384,
+    "max_header_list_bytes": 65536,
+    "max_concurrent_streams": 100,
+    "budget_profile_id": "net_proto_v1"
+  },
+  "ws": {
+    "enabled": true,
+    "max_message_bytes": 1048576,
+    "budget_profile_id": "net_proto_v1"
+  },
+  "grpc": {
+    "enabled": true,
+    "services_path": "arch/net/grpc/services_v1.x07grpc.json",
+    "max_message_bytes": 4194304,
+    "budget_profile_id": "net_proto_v1"
+  }
+}

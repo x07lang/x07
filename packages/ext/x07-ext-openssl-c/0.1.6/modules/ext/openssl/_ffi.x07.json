@@ -1,0 +1,187 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "module_id": "ext.openssl._ffi",
+  "kind": "module",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.openssl._ffi.EVP_sha256",
+        "ext.openssl._ffi.EVP_sha512",
+        "ext.openssl._ffi.HMAC",
+        "ext.openssl._ffi.SHA256",
+        "ext.openssl._ffi.SHA512",
+        "ext.openssl._ffi.buf_free",
+        "ext.openssl._ffi.buf_len",
+        "ext.openssl._ffi.buf_ptr",
+        "ext.openssl._ffi.ed25519_sign",
+        "ext.openssl._ffi.ed25519_sign_alloc",
+        "ext.openssl._ffi.ed25519_verify",
+        "ext.openssl._ffi.ed25519_verify_sk",
+        "ext.openssl._ffi.rand_bytes",
+        "ext.openssl._ffi.rand_bytes_alloc"
+      ]
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.EVP_sha256",
+      "link_name": "EVP_sha256",
+      "params": [],
+      "result": "ptr_const_void"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.EVP_sha512",
+      "link_name": "EVP_sha512",
+      "params": [],
+      "result": "ptr_const_void"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.HMAC",
+      "link_name": "x07_ext_openssl_hmac",
+      "params": [
+        { "name": "evp_md", "ty": "ptr_const_void" },
+        { "name": "key", "ty": "ptr_const_void" },
+        { "name": "key_len", "ty": "i32" },
+        { "name": "data", "ty": "ptr_const_u8" },
+        { "name": "data_len", "ty": "i32" },
+        { "name": "md", "ty": "ptr_mut_u8" },
+        { "name": "md_len", "ty": "ptr_mut_i32" }
+      ],
+      "result": "ptr_mut_u8"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.SHA256",
+      "link_name": "x07_ext_openssl_sha256",
+      "params": [
+        { "name": "data", "ty": "ptr_const_u8" },
+        { "name": "len", "ty": "i32" },
+        { "name": "md", "ty": "ptr_mut_u8" }
+      ],
+      "result": "ptr_mut_u8"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.SHA512",
+      "link_name": "x07_ext_openssl_sha512",
+      "params": [
+        { "name": "data", "ty": "ptr_const_u8" },
+        { "name": "len", "ty": "i32" },
+        { "name": "md", "ty": "ptr_mut_u8" }
+      ],
+      "result": "ptr_mut_u8"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.buf_free",
+      "link_name": "x07_ext_openssl_buf_free",
+      "params": [{ "name": "handle", "ty": "i32" }],
+      "result": "void"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.buf_len",
+      "link_name": "x07_ext_openssl_buf_len",
+      "params": [{ "name": "handle", "ty": "i32" }],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.buf_ptr",
+      "link_name": "x07_ext_openssl_buf_ptr",
+      "params": [{ "name": "handle", "ty": "i32" }],
+      "result": "ptr_const_u8"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.ed25519_sign",
+      "link_name": "x07_ext_openssl_ed25519_sign",
+      "params": [
+        { "name": "sk", "ty": "ptr_const_u8" },
+        { "name": "sk_len", "ty": "i32" },
+        { "name": "msg", "ty": "ptr_const_u8" },
+        { "name": "msg_len", "ty": "i32" },
+        { "name": "out_sig", "ty": "ptr_mut_u8" },
+        { "name": "out_sig_len", "ty": "i32" }
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.ed25519_sign_alloc",
+      "link_name": "x07_ext_openssl_ed25519_sign_alloc",
+      "params": [
+        { "name": "sk", "ty": "ptr_const_u8" },
+        { "name": "sk_len", "ty": "i32" },
+        { "name": "msg", "ty": "ptr_const_u8" },
+        { "name": "msg_len", "ty": "i32" }
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.ed25519_verify",
+      "link_name": "x07_ext_openssl_ed25519_verify",
+      "params": [
+        { "name": "pk", "ty": "ptr_const_u8" },
+        { "name": "pk_len", "ty": "i32" },
+        { "name": "msg", "ty": "ptr_const_u8" },
+        { "name": "msg_len", "ty": "i32" },
+        { "name": "sig", "ty": "ptr_const_u8" },
+        { "name": "sig_len", "ty": "i32" }
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.ed25519_verify_sk",
+      "link_name": "x07_ext_openssl_ed25519_verify_sk",
+      "params": [
+        { "name": "sk", "ty": "ptr_const_u8" },
+        { "name": "sk_len", "ty": "i32" },
+        { "name": "msg", "ty": "ptr_const_u8" },
+        { "name": "msg_len", "ty": "i32" },
+        { "name": "sig", "ty": "ptr_const_u8" },
+        { "name": "sig_len", "ty": "i32" }
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.rand_bytes",
+      "link_name": "x07_ext_openssl_rand_bytes",
+      "params": [
+        { "name": "out", "ty": "ptr_mut_u8" },
+        { "name": "len", "ty": "i32" }
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.openssl._ffi.rand_bytes_alloc",
+      "link_name": "x07_ext_openssl_rand_bytes_alloc",
+      "params": [
+        { "name": "len", "ty": "i32" },
+        { "name": "out_handle", "ty": "ptr_mut_i32" }
+      ],
+      "result": "i32"
+    }
+  ]
+}

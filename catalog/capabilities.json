@@ -44,6 +44,58 @@
       "notes": "Prefer ext-net unless you need raw curl bindings."
     },
     {
+      "id": "net.http2",
+      "summary": "HTTP/2 protocol helpers for OS worlds (run-os*).",
+      "canonical": {
+        "name": "ext-net-protos-c",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental"
+    },
+    {
+      "id": "net.ws",
+      "summary": "WebSocket framing helpers for OS worlds (run-os*).",
+      "canonical": {
+        "name": "ext-net-protos-c",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental"
+    },
+    {
+      "id": "net.grpc",
+      "summary": "gRPC framing/unary helpers over HTTP/2 for OS worlds (run-os*).",
+      "canonical": {
+        "name": "ext-net-protos-c",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental"
+    },
+    {
+      "id": "auth.jwt",
+      "summary": "JWT (Ed25519) encode/verify pinned by arch/crypto profiles (run-os*).",
+      "canonical": {
+        "name": "ext-auth-jwt",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental"
+    },
+    {
       "id": "net.curl",
       "summary": "libcurl bindings (advanced; required by ext-net HTTP client backend).",
       "canonical": {
@@ -251,6 +303,15 @@
       "status": "experimental"
     },
     {
+      "id": "archive.tar",
+      "summary": "Tar/tgz parsing and safe extraction helpers pinned by arch/archive contracts.",
+      "canonical": {
+        "name": "ext-archive-c",
+        "version": "0.1.0"
+      },
+      "status": "experimental"
+    },
+    {
       "id": "text.regex",
       "summary": "Regex match/search.",
       "canonical": {
@@ -287,6 +348,20 @@
       "notes": "Prefer ext-log for most apps; ext-tracing if you need spans/events."
     },
     {
+      "id": "obs.metrics",
+      "summary": "Metrics snapshot + OpenMetrics rendering + OTLP encoding/export.",
+      "canonical": {
+        "name": "ext-obs",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental",
+      "notes": "Rendering/encoding are pure; export requires OS worlds."
+    },
+    {
       "id": "time",
       "summary": "Time utilities (encoding/format).",
       "canonical": {
@@ -307,6 +382,20 @@
         "run-os-sandboxed"
       ],
       "status": "experimental"
+    },
+    {
+      "id": "db.migrate",
+      "summary": "Deterministic DB migration plans and apply helpers (run-os*).",
+      "canonical": {
+        "name": "ext-db-migrate",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental",
+      "notes": "Plan parsing and RR helpers are pure; apply requires OS worlds."
     },
     {
       "id": "db.sqlite",
@@ -421,6 +510,17 @@
     "diff": "diff.patch",
     "patch": "diff.patch",
     "zstd": "compress.zstd",
+    "archive": "archive.tar",
+    "tar": "archive.tar",
+    "tgz": "archive.tar",
+    "http2": "net.http2",
+    "ws": "net.ws",
+    "websocket": "net.ws",
+    "grpc": "net.grpc",
+    "jwt": "auth.jwt",
+    "metrics": "obs.metrics",
+    "otel": "obs.metrics",
+    "migrate": "db.migrate",
     "sqlite": "db.sqlite",
     "postgres": "db.postgres",
     "postgres-client": "db.postgres"

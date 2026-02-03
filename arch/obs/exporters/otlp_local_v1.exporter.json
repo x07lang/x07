@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.obs.exporter.profile@0.1.0",
+  "id": "otlp_local_v1",
+  "v": 1,
+  "kind": "otlp_http_protobuf_v1",
+  "cfg": {
+    "endpoint": "http://127.0.0.1:4318/v1/metrics",
+    "timeout_ms": 5000,
+    "max_body_bytes": 1048576,
+    "headers": []
+  }
+}

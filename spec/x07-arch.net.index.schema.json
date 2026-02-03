@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.net.index.schema.json",
+  "title": "x07.arch.net.index@0.1.0",
+  "description": "Pinned network protocol config (http2/ws/grpc) + budgets + RR policy ids for deterministic cassettes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "http2", "ws", "grpc"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.net.index@0.1.0" },
+    "http2": { "$ref": "#/$defs/http2_cfg" },
+    "ws": { "$ref": "#/$defs/ws_cfg" },
+    "grpc": { "$ref": "#/$defs/grpc_cfg" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "u32": { "type": "integer", "minimum": 0 },
+    "http2_cfg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "max_frame_size",
+        "max_header_list_bytes",
+        "max_concurrent_streams",
+        "budget_profile_id"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "max_frame_size": { "$ref": "#/$defs/u32" },
+        "max_header_list_bytes": { "$ref": "#/$defs/u32" },
+        "max_concurrent_streams": { "$ref": "#/$defs/u32" },
+        "budget_profile_id": { "$ref": "#/$defs/id" },
+        "rr_policy_id": { "$ref": "#/$defs/id", "default": "" }
+      }
+    },
+    "ws_cfg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "max_message_bytes", "budget_profile_id"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "max_message_bytes": { "$ref": "#/$defs/u32" },
+        "budget_profile_id": { "$ref": "#/$defs/id" },
+        "rr_policy_id": { "$ref": "#/$defs/id", "default": "" }
+      }
+    },
+    "grpc_cfg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "services_path", "max_message_bytes", "budget_profile_id"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "services_path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "max_message_bytes": { "$ref": "#/$defs/u32" },
+        "budget_profile_id": { "$ref": "#/$defs/id" },
+        "rr_policy_id": { "$ref": "#/$defs/id", "default": "" }
+      }
+    }
+  }
+}

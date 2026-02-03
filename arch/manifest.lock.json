@@ -1,5 +1,5 @@
 {
-  "jcs_sha256_hex": "c81180e69799e2b81d8703061cb7095d9753c4c9861e2b32a86ea10c75072bfc",
+  "jcs_sha256_hex": "3a4a6e0ee9d805511155e8386118f5ae3a19cbbecca1310520d86fc07f831b4e",
   "manifest_path": "arch/manifest.x07arch.json",
   "module_scan": {
     "exclude_globs": [
@@ -11,6 +11,7 @@
       "**/tmp/**"
     ],
     "include_globs": [
+      "packages/ext/x07-ext-archive-c/0.1.0/modules/**/*.x07.json",
       "tests/smoke_*.x07.json"
     ]
   },

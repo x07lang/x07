@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.arch.obs.index@0.1.0",
+  "metrics_registry_path": "arch/obs/metrics/registry.x07metrics.json",
+  "exporters": [
+    {
+      "id": "otlp_local_v1",
+      "profile_path": "arch/obs/exporters/otlp_local_v1.exporter.json",
+      "budget_profile_id": "obs_export_v1"
+    }
+  ],
+  "defaults": { "default_exporter_id": "otlp_local_v1" }
+}

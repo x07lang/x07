@@ -1,0 +1,106 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.db.migrate.tests",
+  "imports": [
+    "ext.data_model",
+    "std.db.migrate",
+    "std.db.rr",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.db.migrate.tests.test_plan_parse_v1",
+        "std.db.migrate.tests.test_rr_key_stability_v1",
+        "std.db.migrate.tests.test_sqlite_apply_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate.tests.test_plan_parse_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "plan_json",
+          [
+            "bytes.lit",
+            "{\n  \"schema_version\": \"x07.db.migrate.plan@0.1.0\",\n  \"id\": \"t\",\n  \"v\": 1,\n  \"lock_table\": \"__x07_migrations\",\n  \"steps\": [\n    {\"id\":\"0001_init\",\"up_sql_path\":\"arch/db/migrations/sql/0001_init.sql\",\"up_sha256_hex\":\"855f077aedd289482a91702cc0ed8978bcad9c61114cd51038596220ce714d85\"}\n  ]\n}\n"
+          ]
+        ],
+        ["let", "doc", ["std.db.migrate.plan_parse_v1", ["bytes.view", "plan_json"]]],
+        ["let", "dv", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_true",
+            ["=", ["ext.data_model.doc_is_err", "dv"], 0],
+            ["std.test.code_assert_true"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate.tests.test_rr_key_stability_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "dsn_hash", ["bytes.lit", "abcd"]],
+        ["let", "sql", ["bytes.lit", "SELECT 1;"]],
+        ["let", "params", ["bytes.lit", "[]"]],
+        [
+          "let",
+          "k1",
+          [
+            "std.db.rr.key_sha256_hex_v1",
+            1,
+            ["bytes.view", "dsn_hash"],
+            ["bytes.view", "sql"],
+            ["bytes.view", "params"]
+          ]
+        ],
+        [
+          "let",
+          "expected",
+          [
+            "bytes.lit",
+            "25a903cbf6ee4cbf8fdf9101ab7babf08a8c486c8cc28e934b6fd8592c12b88b"
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_bytes_eq",
+            "k1",
+            "expected",
+            ["std.test.code_assert_bytes_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate.tests.test_sqlite_apply_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "pid", ["bytes.lit", "app_v1"]],
+        ["let", "path", ["bytes.lit", ":memory:"]],
+        ["let", "val", ["ext.data_model.value_string", ["bytes.view", "path"]]],
+        ["let", "dsn_doc", ["ext.data_model.doc_ok", ["bytes.view", "val"]]],
+        ["let", "res", ["std.db.migrate.apply_from_arch_v1", ["bytes.view", "pid"], ["bytes.view", "dsn_doc"]]],
+        ["if", ["=", ["result_i32.is_ok", "res"], 1], 0, ["return", "res"]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

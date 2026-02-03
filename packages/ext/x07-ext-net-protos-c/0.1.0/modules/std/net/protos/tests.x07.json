@@ -1,0 +1,56 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.net.protos.tests",
+  "imports": ["std.net.grpc", "std.net.ws", "std.test"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.net.protos.tests.test_grpc_msg_prefix_v1",
+        "std.net.protos.tests.test_ws_frame_roundtrip_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.protos.tests.test_ws_frame_roundtrip_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "payload", ["bytes.lit", "hello"]],
+        ["let", "f_res", ["std.net.ws.frame_v1", 1, 1, ["bytes.view", "payload"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "f_res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "frame", ["result_bytes.unwrap_or", "f_res", ["bytes.alloc", 0]]],
+        ["let", "fv", ["bytes.view", "frame"]],
+        ["try", ["std.test.assert_i32_eq", ["std.net.ws.frame_is_valid_v1", "fv"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["std.net.ws.frame_opcode_v1", "fv"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["std.net.ws.frame_fin_v1", "fv"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["let", "pl", ["std.net.ws.frame_payload_v1", "fv"]],
+        ["try", ["std.test.assert_i32_eq", ["bytes.eq", "pl", "payload"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.protos.tests.test_grpc_msg_prefix_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "msg", ["bytes.lit", "hello"]],
+        ["let", "f_res", ["std.net.grpc.msg_prefix_v1", 0, ["bytes.view", "msg"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "f_res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "frame", ["result_bytes.unwrap_or", "f_res", ["bytes.alloc", 0]]],
+        ["let", "fv", ["bytes.view", "frame"]],
+        ["try", ["std.test.assert_i32_eq", ["std.net.grpc.msg_compressed_flag_v1", "fv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["std.net.grpc.msg_len_v1", "fv"], ["bytes.len", "msg"], ["std.test.code_assert_i32_eq"]]],
+        ["let", "u_res", ["std.net.grpc.msg_unprefix_v1", "fv"]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "u_res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "out", ["result_bytes.unwrap_or", "u_res", ["bytes.alloc", 0]]],
+        ["try", ["std.test.assert_i32_eq", ["bytes.eq", "out", "msg"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

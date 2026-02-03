@@ -1,0 +1,23 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-db-migrate",
+  "version": "0.1.0",
+  "description": "DB migrations + RR-backed DB fixture adapter (contracts-as-data under arch/db).",
+  "docs": "Deterministic DB migration plans + RR cassette helpers pinned by arch/db contracts.\n\nModules:\n- std.db.migrate\n- std.db.rr\n- std.db.migrate.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-db-migrate@0.1.0\n- Use std.db.migrate.apply_from_arch_v1 with plans under arch/db.\n",
+  "module_root": "modules",
+  "modules": ["std.db.migrate", "std.db.rr", "std.db.migrate.tests"],
+  "meta": {
+    "determinism_tier": "mixed",
+    "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"],
+    "requires_packages": [
+      "ext-crypto-rs@0.1.0",
+      "ext-data-model@0.1.7",
+      "ext-db-core@0.1.8",
+      "ext-db-sqlite@0.1.7",
+      "ext-hex-rs@0.1.0",
+      "ext-json-rs@0.1.4"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

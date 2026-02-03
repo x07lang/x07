@@ -1,0 +1,30 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-openssl-c",
+  "description": "OpenSSL bindings: hashes, RNG, and Ed25519 (run-os only).",
+  "docs": "OpenSSL bindings: hashes, RNG, and Ed25519 (run-os only).\n\nModules:\n- ext.openssl._ffi\n- ext.openssl.ed25519\n- ext.openssl.rand\n- ext.openssl.hash\n\nFFI libs:\n- ssl\n- crypto\n\nUsage:\n- Add dependency: x07 pkg add ext-openssl-c@0.1.6\n- Import the modules listed above.\n",
+  "version": "0.1.6",
+  "module_root": "modules",
+  "modules": [
+    "ext.openssl._ffi",
+    "ext.openssl.ed25519",
+    "ext.openssl.rand",
+    "ext.openssl.hash"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "ffi",
+    "ffi_libs": [
+      "ssl",
+      "crypto"
+    ],
+    "capabilities": [
+      "ffi",
+      "unsafe"
+    ]
+  }
+}

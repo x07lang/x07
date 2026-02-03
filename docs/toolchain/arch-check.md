@@ -153,6 +153,22 @@ If `manifest.contracts_v1` is present, `x07 arch check` can also validate repo-l
   - validates the stream plugins index and referenced plugin spec files
   - locks the registry into `arch/contracts.lock.json`
   - verifies `std.stream.xf.plugin_v1` usage references declared plugins (and is allowed in the module’s world)
+- `contracts_v1.archive` (archive policy contracts)
+  - validates `arch/archive/index.x07archive.json` and referenced profile files under `arch/archive/profiles/`
+  - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.db` (database contracts)
+  - validates `arch/db/index.x07db.json`, referenced migration plans, and referenced SQL file hashes
+  - validates referenced DB query catalogs under `arch/db/queries/`
+  - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.obs` (observability contracts)
+  - validates `arch/obs/index.x07obs.json`, referenced metrics registry, and exporter profiles
+  - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.net` (network protocol contracts)
+  - validates `arch/net/index.x07net.json` and referenced gRPC services catalog
+  - verifies referenced budget profiles exist under `arch/budgets/`
+- `contracts_v1.crypto` (crypto/auth contracts)
+  - validates `arch/crypto/index.x07crypto.json` and referenced key material files
+  - validates referenced JWT profiles (when declared under the crypto contract group)
 
 ## Output
 

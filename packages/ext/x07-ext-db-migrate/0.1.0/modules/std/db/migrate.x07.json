@@ -1,0 +1,525 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.db.migrate",
+  "imports": [
+    "ext.crypto",
+    "ext.data_model",
+    "ext.hex",
+    "ext.json.data_model",
+    "std.bytes",
+    "std.codec",
+    "std.db.dm",
+    "std.db.params",
+    "std.db.spec",
+    "std.db.sqlite",
+    "std.db.sqlite.spec",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.db.migrate.apply_from_arch_v1",
+        "std.db.migrate.plan_parse_v1",
+        "std.db.migrate.verify_from_arch_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._doc_err_msg_v1",
+      "params": [{ "name": "msg", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["ext.data_model.doc_err_from_msg", "msg"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._map_string_or_empty_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" },
+        { "name": "map_off", "ty": "i32" },
+        { "name": "key", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "off", ["ext.data_model.map_find", "doc", "map_off", "key"]],
+        ["if", ["<", "off", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["!=", ["ext.data_model.kind_at", "doc", "off"], 3], ["return", ["bytes.alloc", 0]], 0],
+        ["ext.data_model.string_get", "doc", "off"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._map_seq_off_or_neg1_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" },
+        { "name": "map_off", "ty": "i32" },
+        { "name": "key", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "off", ["ext.data_model.map_find", "doc", "map_off", "key"]],
+        ["if", ["<", "off", 0], ["return", -1], 0],
+        ["if", ["!=", ["ext.data_model.kind_at", "doc", "off"], 4], ["return", -1], 0],
+        "off"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._bytes_is_hex_64_v1",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["!=", ["view.len", "b"], 64], ["return", 0], 0],
+        ["let", "ok", 1],
+        [
+          "for",
+          "i",
+          0,
+          64,
+          [
+            "if",
+            ["=", "ok", 1],
+            [
+              "begin",
+              ["let", "c", ["view.get_u8", "b", "i"]],
+              [
+                "if",
+                [
+                  "if",
+                  ["if", [">=u", "c", 48], ["<u", "c", 58], 0],
+                  1,
+                  ["if", [">=u", "c", 97], ["<u", "c", 103], 0]
+                ],
+                0,
+                ["set", "ok", 0]
+              ]
+            ],
+            0
+          ]
+        ],
+        "ok"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate.plan_parse_v1",
+      "params": [{ "name": "plan_json", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "doc", ["ext.json.data_model.parse", "plan_json"]],
+        ["let", "dv", ["bytes.view", "doc"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "dv"], 1], ["return", ["view.to_bytes", "dv"]], 0],
+        ["let", "root", ["ext.data_model.root_offset", "dv"]],
+        ["if", ["<", "root", 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:bad_doc"]]], 0],
+        ["if", ["!=", ["ext.data_model.kind_at", "dv", "root"], 5], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:expected_map"]]], 0],
+        ["let", "k_schema", ["bytes.lit", "schema_version"]],
+        ["let", "sv", ["std.db.migrate._map_string_or_empty_v1", "dv", "root", ["bytes.view", "k_schema"]]],
+        ["if", ["=", ["bytes.len", "sv"], 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:schema_version_missing"]]], 0],
+        ["if", ["=", ["bytes.eq", "sv", ["bytes.lit", "x07.db.migrate.plan@0.1.0"]], 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:schema_version_mismatch"]]], 0],
+        ["let", "k_id", ["bytes.lit", "id"]],
+        ["let", "id", ["std.db.migrate._map_string_or_empty_v1", "dv", "root", ["bytes.view", "k_id"]]],
+        ["if", ["=", ["bytes.len", "id"], 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:id_missing"]]], 0],
+        ["let", "k_steps", ["bytes.lit", "steps"]],
+        ["let", "steps_off", ["std.db.migrate._map_seq_off_or_neg1_v1", "dv", "root", ["bytes.view", "k_steps"]]],
+        ["if", ["<", "steps_off", 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:steps_missing"]]], 0],
+        ["let", "steps_n", ["ext.data_model.seq_len", "dv", "steps_off"]],
+        ["if", ["<=", "steps_n", 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:steps_empty"]]], 0],
+        [
+          "for",
+          "i",
+          0,
+          "steps_n",
+          [
+            "begin",
+            ["let", "step_off", ["ext.data_model.seq_get", "dv", "steps_off", "i"]],
+            ["if", ["<", "step_off", 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:bad_step_off"]]], 0],
+            ["if", ["!=", ["ext.data_model.kind_at", "dv", "step_off"], 5], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:step_not_map"]]], 0],
+            ["let", "k_step_id", ["bytes.lit", "id"]],
+            ["let", "sid", ["std.db.migrate._map_string_or_empty_v1", "dv", "step_off", ["bytes.view", "k_step_id"]]],
+            ["if", ["=", ["bytes.len", "sid"], 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:step_id_missing"]]], 0],
+            ["let", "k_up_path", ["bytes.lit", "up_sql_path"]],
+            ["let", "up_path", ["std.db.migrate._map_string_or_empty_v1", "dv", "step_off", ["bytes.view", "k_up_path"]]],
+            ["if", ["=", ["bytes.len", "up_path"], 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:up_sql_path_missing"]]], 0],
+            ["let", "k_up_hash", ["bytes.lit", "up_sha256_hex"]],
+            ["let", "up_hash", ["std.db.migrate._map_string_or_empty_v1", "dv", "step_off", ["bytes.view", "k_up_hash"]]],
+            ["if", ["=", ["bytes.len", "up_hash"], 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:up_sha256_hex_missing"]]], 0],
+            ["if", ["=", ["std.db.migrate._bytes_is_hex_64_v1", ["bytes.view", "up_hash"]], 0], ["return", ["std.db.migrate._doc_err_msg_v1", ["bytes.lit", "db.migrate:up_sha256_hex_invalid"]]], 0],
+            0
+          ]
+        ],
+        ["view.to_bytes", "dv"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._find_plan_path_in_index_v1",
+      "params": [
+        { "name": "index_doc", "ty": "bytes_view" },
+        { "name": "plan_id", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["=", ["ext.data_model.doc_is_err", "index_doc"], 1], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "root", ["ext.data_model.root_offset", "index_doc"]],
+        ["if", ["<", "root", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["!=", ["ext.data_model.kind_at", "index_doc", "root"], 5], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "k_plans", ["bytes.lit", "migrate_plans"]],
+        ["let", "plans_off", ["std.db.migrate._map_seq_off_or_neg1_v1", "index_doc", "root", ["bytes.view", "k_plans"]]],
+        ["if", ["<", "plans_off", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "n", ["ext.data_model.seq_len", "index_doc", "plans_off"]],
+        ["if", ["<", "n", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "found", ["bytes.alloc", 0]],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          0,
+          "n",
+          [
+            "if",
+            ["=", "done", 0],
+            [
+              "begin",
+              ["let", "e_off", ["ext.data_model.seq_get", "index_doc", "plans_off", "_"]],
+              ["if", ["<", "e_off", 0], ["set", "done", 1], 0],
+              [
+                "if",
+                ["if", ["=", "done", 0], ["!=", ["ext.data_model.kind_at", "index_doc", "e_off"], 5], 0],
+                ["set", "done", 1],
+                0
+              ],
+              [
+                "if",
+                ["=", "done", 0],
+                [
+                  "begin",
+                  ["let", "k_id", ["bytes.lit", "id"]],
+                  ["let", "id", ["std.db.migrate._map_string_or_empty_v1", "index_doc", "e_off", ["bytes.view", "k_id"]]],
+                  [
+                    "if",
+                    [
+                      "if",
+                      ["=", ["bytes.len", "id"], 0],
+                      0,
+                      ["bytes.eq", "id", ["view.to_bytes", "plan_id"]]
+                    ],
+                    [
+                      "begin",
+                      ["let", "k_path", ["bytes.lit", "plan_path"]],
+                      ["set", "found", ["std.db.migrate._map_string_or_empty_v1", "index_doc", "e_off", ["bytes.view", "k_path"]]],
+                      ["set", "done", 1]
+                    ],
+                    0
+                  ]
+                ],
+                0
+              ],
+              0
+            ],
+            0
+          ]
+        ],
+        "found"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._verify_sql_hash_v1",
+      "params": [
+        { "name": "sql_bytes", "ty": "bytes_view" },
+        { "name": "expected_hex", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "digest", ["ext.crypto.sha256", "sql_bytes"]],
+        ["let", "hex", ["ext.hex.hex_encode", ["bytes.view", "digest"]]],
+        ["bytes.eq", "hex", ["view.to_bytes", "expected_hex"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate.verify_from_arch_v1",
+      "params": [{ "name": "plan_id", "ty": "bytes_view" }],
+      "result": "result_i32",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "db_migrate_v1"],
+        [
+          "begin",
+          ["let", "index_bytes", ["os.fs.read_file", ["bytes.lit", "arch/db/index.x07db.json"]]],
+          ["let", "index_doc", ["ext.json.data_model.parse", ["bytes.view", "index_bytes"]]],
+          ["let", "indexv", ["bytes.view", "index_doc"]],
+          [
+            "if",
+            ["=", ["ext.data_model.doc_is_err", "indexv"], 1],
+            ["return", ["result_i32.err", 3101]],
+            0
+          ],
+          ["let", "plan_path", ["std.db.migrate._find_plan_path_in_index_v1", "indexv", "plan_id"]],
+          ["if", ["=", ["bytes.len", "plan_path"], 0], ["return", ["result_i32.err", 3102]], 0],
+          ["let", "plan_bytes", ["os.fs.read_file", "plan_path"]],
+          ["let", "plan_doc", ["std.db.migrate.plan_parse_v1", ["bytes.view", "plan_bytes"]]],
+          ["let", "plv", ["bytes.view", "plan_doc"]],
+          ["if", ["=", ["ext.data_model.doc_is_err", "plv"], 1], ["return", ["result_i32.err", 3103]], 0],
+          ["let", "root", ["ext.data_model.root_offset", "plv"]],
+          ["let", "k_steps", ["bytes.lit", "steps"]],
+          ["let", "steps_off", ["std.db.migrate._map_seq_off_or_neg1_v1", "plv", "root", ["bytes.view", "k_steps"]]],
+          ["if", ["<", "steps_off", 0], ["return", ["result_i32.err", 3104]], 0],
+          ["let", "steps_n", ["ext.data_model.seq_len", "plv", "steps_off"]],
+          ["if", ["<", "steps_n", 0], ["return", ["result_i32.err", 3105]], 0],
+          [
+            "for",
+            "i",
+            0,
+            "steps_n",
+            [
+              "begin",
+              ["let", "step_off", ["ext.data_model.seq_get", "plv", "steps_off", "i"]],
+              ["let", "k_up_path", ["bytes.lit", "up_sql_path"]],
+              ["let", "k_up_hash", ["bytes.lit", "up_sha256_hex"]],
+              ["let", "up_path", ["std.db.migrate._map_string_or_empty_v1", "plv", "step_off", ["bytes.view", "k_up_path"]]],
+              ["let", "up_hash", ["std.db.migrate._map_string_or_empty_v1", "plv", "step_off", ["bytes.view", "k_up_hash"]]],
+              ["if", ["=", ["bytes.len", "up_path"], 0], ["return", ["result_i32.err", 3106]], 0],
+              ["if", ["=", ["bytes.len", "up_hash"], 0], ["return", ["result_i32.err", 3107]], 0],
+              ["let", "sql", ["os.fs.read_file", "up_path"]],
+              [
+                "if",
+                ["=", ["std.db.migrate._verify_sql_hash_v1", ["bytes.view", "sql"], ["bytes.view", "up_hash"]], 0],
+                ["return", ["result_i32.err", 3108]],
+                0
+              ],
+              0
+            ]
+          ],
+          ["result_i32.ok", 0]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._table_name_is_safe_v1",
+      "params": [{ "name": "name", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "name"]],
+        ["if", ["=", "n", 0], ["return", 0], 0],
+        ["if", [">", "n", 128], ["return", 0], 0],
+        ["let", "ok", 1],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "if",
+            ["=", "ok", 1],
+            [
+              "begin",
+              ["let", "c", ["view.get_u8", "name", "i"]],
+              [
+                "if",
+                [
+                  "if",
+                  ["if", [">=u", "c", 48], ["<u", "c", 58], 0],
+                  1,
+                  [
+                    "if",
+                    ["if", [">=u", "c", 65], ["<u", "c", 91], 0],
+                    1,
+                    ["if", ["if", [">=u", "c", 97], ["<u", "c", 123], 0], 1, ["=", "c", 95]]
+                  ]
+                ],
+                0,
+                ["set", "ok", 0]
+              ]
+            ],
+            0
+          ]
+        ],
+        "ok"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._sqlite_exec_or_err_v1",
+      "params": [
+        { "name": "conn", "ty": "i32" },
+        { "name": "sql", "ty": "bytes" },
+        { "name": "params_doc", "ty": "bytes" },
+        { "name": "caps", "ty": "bytes_view" }
+      ],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "resp", ["std.db.sqlite.exec_v1", "conn", "sql", "params_doc", 0, "caps"]],
+        ["let", "rv", ["bytes.view", "resp"]],
+        [
+          "if",
+          ["=", ["std.db.spec.resp_is_ok_v1", "rv"], 1],
+          ["result_i32.ok", 0],
+          ["result_i32.err", 3201]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._sqlite_query_rows_count_or_neg1_v1",
+      "params": [
+        { "name": "conn", "ty": "i32" },
+        { "name": "sql", "ty": "bytes" },
+        { "name": "params_doc", "ty": "bytes" },
+        { "name": "caps", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "resp", ["std.db.sqlite.query_v1", "conn", "sql", "params_doc", 0, "caps"]],
+        ["let", "rv", ["bytes.view", "resp"]],
+        ["if", ["=", ["std.db.spec.resp_is_ok_v1", "rv"], 0], ["return", -1], 0],
+        ["let", "pl", ["std.db.spec.resp_ok_payload_v1", "rv"]],
+        ["let", "rows_val", ["std.db.dm.rows_doc_rows_value_v1", ["bytes.view", "pl"]]],
+        ["if", ["=", ["bytes.len", "rows_val"], 0], ["return", -1], 0],
+        ["ext.data_model.seq_len", ["bytes.view", "rows_val"], 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate._sqlite_open_or_err_v1",
+      "params": [
+        { "name": "path", "ty": "bytes" },
+        { "name": "caps", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": ["std.db.sqlite.open_v1", "path", ["std.db.sqlite.spec.open_flag_create_v1"], "caps"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.db.migrate.apply_from_arch_v1",
+      "params": [
+        { "name": "plan_id", "ty": "bytes_view" },
+        { "name": "dsn_doc", "ty": "bytes_view" }
+      ],
+      "result": "result_i32",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "db_migrate_v1"],
+        [
+          "begin",
+        ["let", "vres", ["std.db.migrate.verify_from_arch_v1", "plan_id"]],
+        ["if", ["=", ["result_i32.is_ok", "vres"], 0], ["return", "vres"], 0],
+        ["let", "dv", "dsn_doc"],
+        ["if", ["=", ["ext.data_model.doc_is_err", "dv"], 1], ["return", ["result_i32.err", 3301]], 0],
+        ["let", "dsn_root", ["ext.data_model.root_offset", "dv"]],
+        ["if", ["<", "dsn_root", 0], ["return", ["result_i32.err", 3302]], 0],
+        ["if", ["!=", ["ext.data_model.kind_at", "dv", "dsn_root"], 3], ["return", ["result_i32.err", 3303]], 0],
+        ["let", "sqlite_path", ["ext.data_model.string_get", "dv", "dsn_root"]],
+        ["if", ["=", ["bytes.len", "sqlite_path"], 0], ["return", ["result_i32.err", 3304]], 0],
+        ["let", "caps_b", ["std.db.sqlite.caps_default_v1"]],
+        ["let", "caps", ["bytes.view", "caps_b"]],
+        ["let", "open_resp", ["std.db.migrate._sqlite_open_or_err_v1", "sqlite_path", "caps"]],
+        ["let", "orv", ["bytes.view", "open_resp"]],
+        ["if", ["=", ["std.db.spec.resp_is_ok_v1", "orv"], 0], ["return", ["result_i32.err", 3305]], 0],
+        ["let", "conn_pl", ["std.db.spec.resp_ok_payload_v1", "orv"]],
+        ["let", "conn", ["std.codec.read_u32_le", ["bytes.view", "conn_pl"], 0]],
+        ["let", "index_bytes", ["os.fs.read_file", ["bytes.lit", "arch/db/index.x07db.json"]]],
+        ["let", "index_doc", ["ext.json.data_model.parse", ["bytes.view", "index_bytes"]]],
+        ["let", "indexv", ["bytes.view", "index_doc"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "indexv"], 1], ["return", ["result_i32.err", 3306]], 0],
+        ["let", "plan_path", ["std.db.migrate._find_plan_path_in_index_v1", "indexv", "plan_id"]],
+        ["if", ["=", ["bytes.len", "plan_path"], 0], ["return", ["result_i32.err", 3307]], 0],
+        ["let", "plan_bytes", ["os.fs.read_file", "plan_path"]],
+        ["let", "plan_doc", ["std.db.migrate.plan_parse_v1", ["bytes.view", "plan_bytes"]]],
+        ["let", "plv", ["bytes.view", "plan_doc"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "plv"], 1], ["return", ["result_i32.err", 3308]], 0],
+        ["let", "root", ["ext.data_model.root_offset", "plv"]],
+        ["let", "k_lock", ["bytes.lit", "lock_table"]],
+        ["let", "lock_table", ["std.db.migrate._map_string_or_empty_v1", "plv", "root", ["bytes.view", "k_lock"]]],
+        ["let", "lock_name", ["if", ["=", ["bytes.len", "lock_table"], 0], ["bytes.lit", "__x07_migrations"], "lock_table"]],
+        [
+          "if",
+          ["=", ["std.db.migrate._table_name_is_safe_v1", ["bytes.view", "lock_name"]], 0],
+          ["return", ["result_i32.err", 3309]],
+          0
+        ],
+        ["let", "sql_create_prefix", ["bytes.lit", "CREATE TABLE IF NOT EXISTS "]],
+        ["let", "sql_create_suffix", ["bytes.lit", "(id TEXT PRIMARY KEY);"]],
+        ["let", "sql_select_prefix", ["bytes.lit", "SELECT id FROM "]],
+        ["let", "sql_check_suffix", ["bytes.lit", " WHERE id = ? LIMIT 1;"]],
+        ["let", "sql_insert_prefix", ["bytes.lit", "INSERT INTO "]],
+        ["let", "sql_insert_suffix", ["bytes.lit", "(id) VALUES(?);"]],
+        ["let", "sql_order_suffix", ["bytes.lit", " ORDER BY id;"]],
+        ["let", "create_sql0", ["std.bytes.concat", ["bytes.view", "sql_create_prefix"], ["bytes.view", "lock_name"]]],
+        ["let", "create_sql", ["std.bytes.concat", ["bytes.view", "create_sql0"], ["bytes.view", "sql_create_suffix"]]],
+        ["let", "cres", ["std.db.migrate._sqlite_exec_or_err_v1", "conn", "create_sql", ["std.db.params.empty_v1"], "caps"]],
+        ["if", ["=", ["result_i32.is_ok", "cres"], 0], ["return", "cres"], 0],
+        ["let", "k_steps", ["bytes.lit", "steps"]],
+        ["let", "steps_off", ["std.db.migrate._map_seq_off_or_neg1_v1", "plv", "root", ["bytes.view", "k_steps"]]],
+        ["if", ["<", "steps_off", 0], ["return", ["result_i32.err", 3310]], 0],
+        ["let", "steps_n", ["ext.data_model.seq_len", "plv", "steps_off"]],
+        ["if", ["<", "steps_n", 0], ["return", ["result_i32.err", 3311]], 0],
+        [
+          "for",
+          "i",
+          0,
+          "steps_n",
+          [
+            "begin",
+            ["let", "step_off", ["ext.data_model.seq_get", "plv", "steps_off", "i"]],
+            ["let", "k_id", ["bytes.lit", "id"]],
+            ["let", "k_up_path", ["bytes.lit", "up_sql_path"]],
+            ["let", "k_up_hash", ["bytes.lit", "up_sha256_hex"]],
+            ["let", "sid", ["std.db.migrate._map_string_or_empty_v1", "plv", "step_off", ["bytes.view", "k_id"]]],
+            ["let", "up_path", ["std.db.migrate._map_string_or_empty_v1", "plv", "step_off", ["bytes.view", "k_up_path"]]],
+            ["let", "up_hash", ["std.db.migrate._map_string_or_empty_v1", "plv", "step_off", ["bytes.view", "k_up_hash"]]],
+            ["if", ["=", ["bytes.len", "sid"], 0], ["return", ["result_i32.err", 3312]], 0],
+            ["if", ["=", ["bytes.len", "up_path"], 0], ["return", ["result_i32.err", 3313]], 0],
+            ["if", ["=", ["bytes.len", "up_hash"], 0], ["return", ["result_i32.err", 3314]], 0],
+            ["let", "q_check0", ["std.bytes.concat", ["bytes.view", "sql_select_prefix"], ["bytes.view", "lock_name"]]],
+            ["let", "q_check", ["std.bytes.concat", ["bytes.view", "q_check0"], ["bytes.view", "sql_check_suffix"]]],
+            ["let", "p_check", ["std.db.params.one_string_v1", ["view.to_bytes", ["bytes.view", "sid"]]]],
+            ["let", "applied_n", ["std.db.migrate._sqlite_query_rows_count_or_neg1_v1", "conn", "q_check", "p_check", "caps"]],
+            [
+              "if",
+              [">", "applied_n", 0],
+              0,
+              [
+                "begin",
+                ["let", "sql_bytes", ["os.fs.read_file", "up_path"]],
+                [
+                  "if",
+                  ["=", ["std.db.migrate._verify_sql_hash_v1", ["bytes.view", "sql_bytes"], ["bytes.view", "up_hash"]], 0],
+                  ["return", ["result_i32.err", 3315]],
+                  0
+                ],
+                ["let", "eres", ["std.db.migrate._sqlite_exec_or_err_v1", "conn", "sql_bytes", ["std.db.params.empty_v1"], "caps"]],
+                ["if", ["=", ["result_i32.is_ok", "eres"], 0], ["return", "eres"], 0],
+                ["let", "q_ins0", ["std.bytes.concat", ["bytes.view", "sql_insert_prefix"], ["bytes.view", "lock_name"]]],
+                ["let", "q_ins", ["std.bytes.concat", ["bytes.view", "q_ins0"], ["bytes.view", "sql_insert_suffix"]]],
+                ["let", "p_ins", ["std.db.params.one_string_v1", ["view.to_bytes", ["bytes.view", "sid"]]]],
+                ["let", "ires", ["std.db.migrate._sqlite_exec_or_err_v1", "conn", "q_ins", "p_ins", "caps"]],
+                ["if", ["=", ["result_i32.is_ok", "ires"], 0], ["return", "ires"], 0],
+                0
+              ]
+            ],
+            0
+          ]
+        ],
+        ["let", "q_all0", ["std.bytes.concat", ["bytes.view", "sql_select_prefix"], ["bytes.view", "lock_name"]]],
+        ["let", "q_all", ["std.bytes.concat", ["bytes.view", "q_all0"], ["bytes.view", "sql_order_suffix"]]],
+        ["let", "applied_total", ["std.db.migrate._sqlite_query_rows_count_or_neg1_v1", "conn", "q_all", ["std.db.params.empty_v1"], "caps"]],
+        ["if", ["!=", "applied_total", "steps_n"], ["return", ["result_i32.err", 3316]], 0],
+        ["let", "_close", ["std.db.sqlite.close_v1", "conn", "caps"]],
+        ["result_i32.ok", 0]
+        ]
+      ]
+    }
+  ]
+}

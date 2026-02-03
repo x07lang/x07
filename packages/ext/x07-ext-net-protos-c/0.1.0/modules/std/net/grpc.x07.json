@@ -1,0 +1,116 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.net.grpc",
+  "imports": ["ext.byteorder", "ext.data_model", "ext.json.data_model"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.net.grpc.msg_compressed_flag_v1",
+        "std.net.grpc.msg_len_v1",
+        "std.net.grpc.msg_prefix_v1",
+        "std.net.grpc.msg_unprefix_v1",
+        "std.net.grpc.unary_from_arch_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.grpc._read_index_doc_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "raw", ["os.fs.read_file", ["bytes.lit", "arch/net/index.x07net.json"]]],
+        ["ext.json.data_model.parse", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.grpc.unary_from_arch_v1",
+      "params": [
+        { "name": "method_path", "ty": "bytes_view" },
+        { "name": "req_msg", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "net_proto_v1"],
+        [
+          "begin",
+          ["let", "doc", ["std.net.grpc._read_index_doc_v1"]],
+          ["let", "dv", ["bytes.view", "doc"]],
+          ["if", ["=", ["ext.data_model.doc_is_err", "dv"], 1], ["return", ["result_bytes.err", 8301]], 0],
+          ["if", ["!=", ["ext.data_model.root_kind", "dv"], 5], ["return", ["result_bytes.err", 8302]], 0],
+          ["let", "root", ["ext.data_model.root_offset", "dv"]],
+          ["let", "k_grpc", ["bytes.lit", "grpc"]],
+          ["let", "grpc_off", ["ext.data_model.map_find", "dv", "root", ["bytes.view", "k_grpc"]]],
+          ["if", ["<", "grpc_off", 0], ["return", ["result_bytes.err", 8303]], 0],
+          ["let", "k_enabled", ["bytes.lit", "enabled"]],
+          ["let", "en_off", ["ext.data_model.map_find", "dv", "grpc_off", ["bytes.view", "k_enabled"]]],
+          ["if", ["<", "en_off", 0], ["return", ["result_bytes.err", 8304]], 0],
+          ["if", ["=", ["ext.data_model.bool_get", "dv", "en_off"], 0], ["return", ["result_bytes.err", 8305]], 0],
+          ["result_bytes.err", 8399]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.grpc.msg_prefix_v1",
+      "params": [
+        { "name": "compressed_flag", "ty": "i32" },
+        { "name": "msg", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "begin",
+        ["if", ["if", ["!=", "compressed_flag", 0], ["!=", "compressed_flag", 1], 0], ["return", ["result_bytes.err", 8401]], 0],
+        ["let", "n", ["view.len", "msg"]],
+        ["if", ["<", "n", 0], ["return", ["result_bytes.err", 8402]], 0],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 5, "n"]]],
+        ["set", "out", ["vec_u8.push", "out", "compressed_flag"]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["ext.byteorder.byteorder_write_u32_be", "n"]]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "msg", 0, "n"]],
+        ["result_bytes.ok", ["vec_u8.into_bytes", "out"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.grpc.msg_compressed_flag_v1",
+      "params": [{ "name": "frame", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["<", ["view.len", "frame"], 1], ["return", ["-", 0, 1]], 0],
+        ["let", "c", ["view.get_u8", "frame", 0]],
+        ["if", ["if", ["=", "c", 0], 1, ["=", "c", 1]], "c", ["-", 0, 1]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.grpc.msg_len_v1",
+      "params": [{ "name": "frame", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["<", ["view.len", "frame"], 5], ["return", ["-", 0, 1]], 0],
+        ["ext.byteorder.byteorder_read_u32_be_or", "frame", 1, ["-", 0, 1]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.grpc.msg_unprefix_v1",
+      "params": [{ "name": "frame", "ty": "bytes_view" }],
+      "result": "result_bytes",
+      "body": [
+        "begin",
+        ["if", ["<", ["view.len", "frame"], 5], ["return", ["result_bytes.err", 8501]], 0],
+        ["if", ["<", ["std.net.grpc.msg_compressed_flag_v1", "frame"], 0], ["return", ["result_bytes.err", 8502]], 0],
+        ["let", "n", ["std.net.grpc.msg_len_v1", "frame"]],
+        ["if", ["<", "n", 0], ["return", ["result_bytes.err", 8503]], 0],
+        ["if", ["!=", ["view.len", "frame"], ["+", 5, "n"]], ["return", ["result_bytes.err", 8504]], 0],
+        ["result_bytes.ok", ["view.to_bytes", ["view.slice", "frame", 5, "n"]]]
+      ]
+    }
+  ]
+}

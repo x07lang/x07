@@ -20,6 +20,26 @@
     "contracts_budgets": { "max_contract_files": 2000, "max_contract_bytes": 67108864 }
   },
   "contracts_v1": {
+    "archive": {
+      "index_path": "arch/archive/index.x07archive.json",
+      "enforce": "error"
+    },
+    "crypto": {
+      "index_path": "arch/crypto/index.x07crypto.json",
+      "enforce": "error"
+    },
+    "db": {
+      "index_path": "arch/db/index.x07db.json",
+      "enforce": "error"
+    },
+    "net": {
+      "index_path": "arch/net/index.x07net.json",
+      "enforce": "error"
+    },
+    "obs": {
+      "index_path": "arch/obs/index.x07obs.json",
+      "enforce": "error"
+    },
     "rr": {
       "index_path": "arch/rr/index.x07rr.json",
       "gen_dir": "arch/rr",

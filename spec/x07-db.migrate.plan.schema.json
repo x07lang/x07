@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-db.migrate.plan.schema.json",
+  "title": "x07.db.migrate.plan@0.1.0",
+  "description": "A deterministic migration plan: ordered steps referencing SQL files, with pinned checksums.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "steps"],
+  "properties": {
+    "schema_version": { "const": "x07.db.migrate.plan@0.1.0" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "v": { "type": "integer", "minimum": 1 },
+    "lock_table": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "default": "__x07_migrations"
+    },
+    "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } }
+  },
+  "$defs": {
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "up_sql_path", "up_sha256_hex"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "up_sql_path": { "$ref": "#/$defs/rel_path" },
+        "up_sha256_hex": { "$ref": "#/$defs/sha256_hex" },
+        "down_sql_path": { "$ref": "#/$defs/rel_path", "default": "" },
+        "down_sha256_hex": { "$ref": "#/$defs/sha256_hex", "default": "" },
+        "description": { "type": "string", "maxLength": 512, "default": "" }
+      }
+    }
+  }
+}

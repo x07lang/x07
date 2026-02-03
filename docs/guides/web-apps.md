@@ -4,6 +4,8 @@ X07 supports agent-built web services through:
 
 - `std.web` core (pure routing + request/response model)
 - `ext-net` / OS HTTPS adapters for real networking
+- `ext-auth-jwt` for JWT issuance/verification (pinned by `arch/crypto/`, OS worlds only)
+- `ext-obs` for metrics snapshot + OpenMetrics/OTLP export (pinned by `arch/obs/`, export is OS worlds only)
 
 ## Canonical (template + x07 run)
 

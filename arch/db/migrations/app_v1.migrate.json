@@ -1,0 +1,20 @@
+{
+  "schema_version": "x07.db.migrate.plan@0.1.0",
+  "id": "app_v1",
+  "v": 1,
+  "lock_table": "__x07_migrations",
+  "steps": [
+    {
+      "id": "0001_init",
+      "up_sql_path": "arch/db/migrations/sql/0001_init.sql",
+      "up_sha256_hex": "855f077aedd289482a91702cc0ed8978bcad9c61114cd51038596220ce714d85",
+      "description": "Initial schema."
+    },
+    {
+      "id": "0002_add_user_email",
+      "up_sql_path": "arch/db/migrations/sql/0002_add_user_email.sql",
+      "up_sha256_hex": "18b840d1ca59797187866784a3529467869ed3832bee8013fe24d4a29acff52e",
+      "description": "Add users.email column."
+    }
+  ]
+}

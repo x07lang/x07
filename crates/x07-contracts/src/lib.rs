@@ -36,6 +36,19 @@ pub const X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION: &str = "x07.arch.stream.plugin@
 pub const X07_BUDGET_PROFILE_SCHEMA_VERSION: &str = "x07.budget.profile@0.1.0";
 pub const X07_SM_SPEC_SCHEMA_VERSION: &str = "x07.sm.spec@0.1.0";
 
+pub const X07_ARCH_ARCHIVE_INDEX_SCHEMA_VERSION: &str = "x07.arch.archive.index@0.1.0";
+pub const X07_ARCH_ARCHIVE_PROFILE_SCHEMA_VERSION: &str = "x07.arch.archive.profile@0.1.0";
+pub const X07_ARCH_DB_INDEX_SCHEMA_VERSION: &str = "x07.arch.db.index@0.1.0";
+pub const X07_DB_MIGRATE_PLAN_SCHEMA_VERSION: &str = "x07.db.migrate.plan@0.1.0";
+pub const X07_ARCH_DB_QUERIES_SCHEMA_VERSION: &str = "x07.arch.db.queries@0.1.0";
+pub const X07_ARCH_OBS_INDEX_SCHEMA_VERSION: &str = "x07.arch.obs.index@0.1.0";
+pub const X07_OBS_METRICS_REGISTRY_SCHEMA_VERSION: &str = "x07.obs.metrics.registry@0.1.0";
+pub const X07_OBS_EXPORTER_PROFILE_SCHEMA_VERSION: &str = "x07.obs.exporter.profile@0.1.0";
+pub const X07_ARCH_NET_INDEX_SCHEMA_VERSION: &str = "x07.arch.net.index@0.1.0";
+pub const X07_ARCH_NET_GRPC_SERVICES_SCHEMA_VERSION: &str = "x07.arch.net.grpc.services@0.1.0";
+pub const X07_ARCH_CRYPTO_INDEX_SCHEMA_VERSION: &str = "x07.arch.crypto.index@0.1.0";
+pub const X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_VERSION: &str = "x07.arch.crypto.jwt_profiles@0.1.0";
+
 pub const PROJECT_MANIFEST_SCHEMA_VERSION: &str = "x07.project@0.2.0";
 pub const PACKAGE_MANIFEST_SCHEMA_VERSION: &str = "x07.package@0.1.0";
 pub const PROJECT_LOCKFILE_SCHEMA_VERSION: &str = "x07.lock@0.2.0";

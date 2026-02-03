@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-obs.exporter.profile.schema.json",
+  "title": "x07.obs.exporter.profile@0.1.0",
+  "description": "Pinned exporter configuration (OTLP/HTTP v1).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "kind", "cfg"],
+  "properties": {
+    "schema_version": { "const": "x07.obs.exporter.profile@0.1.0" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "v": { "type": "integer", "minimum": 1 },
+    "kind": { "type": "string", "enum": ["otlp_http_protobuf_v1"] },
+    "cfg": { "$ref": "#/$defs/otlp_http_cfg" }
+  },
+  "$defs": {
+    "u32": { "type": "integer", "minimum": 0 },
+    "otlp_http_cfg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint", "timeout_ms", "max_body_bytes"],
+      "properties": {
+        "endpoint": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "timeout_ms": { "$ref": "#/$defs/u32" },
+        "max_body_bytes": { "$ref": "#/$defs/u32" },
+        "headers": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["k", "v"],
+            "properties": {
+              "k": { "type": "string", "minLength": 1, "maxLength": 256 },
+              "v": { "type": "string", "minLength": 0, "maxLength": 2048 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": "x07.obs.metrics.registry@0.1.0",
+  "id": "x07_default_v1",
+  "v": 1,
+  "metrics": [
+    {
+      "id": "app_requests_total",
+      "type": "counter_u64_v1",
+      "help": "Total requests processed.",
+      "unit": "1",
+      "labels": ["method", "status"]
+    },
+    {
+      "id": "app_request_duration_seconds",
+      "type": "histogram_f64_v1",
+      "help": "Request duration in seconds.",
+      "unit": "s",
+      "labels": ["method"],
+      "histogram_buckets": [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+    }
+  ]
+}

@@ -261,11 +261,29 @@
       "additionalProperties": false,
       "required": ["canonical_json"],
       "properties": {
+        "archive": { "$ref": "#/$defs/contracts_index_v1" },
+        "crypto": { "$ref": "#/$defs/contracts_index_v1" },
+        "db": { "$ref": "#/$defs/contracts_index_v1" },
+        "net": { "$ref": "#/$defs/contracts_index_v1" },
+        "obs": { "$ref": "#/$defs/contracts_index_v1" },
         "rr": { "$ref": "#/$defs/contracts_rr_v1" },
         "sm": { "$ref": "#/$defs/contracts_sm_v1" },
         "budgets": { "$ref": "#/$defs/contracts_budgets_v1" },
         "stream_plugins": { "$ref": "#/$defs/contracts_stream_plugins_v1" },
         "canonical_json": { "$ref": "#/$defs/contracts_canonical_json_v1" }
+      }
+    },
+    "contracts_index_v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index_path", "enforce"],
+      "properties": {
+        "index_path": { "$ref": "#/$defs/rel_path" },
+        "enforce": {
+          "type": "string",
+          "enum": ["error", "warn", "off"],
+          "default": "error"
+        }
       }
     },
     "contracts_canonical_json_v1": {

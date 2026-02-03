@@ -10,6 +10,13 @@ Pinned schema versions:
 - `x07.arch.manifest.lock@0.1.0` (`spec/x07-arch.manifest.lock.schema.json`)
 - `x07.arch.report@0.1.0` (`spec/x07-arch.report.schema.json`)
 - `x07.arch.patchset@0.1.0` (`spec/x07-arch.patchset.schema.json`)
+- Contracts-as-data groups used by `manifest.contracts_v1`:
+  - Budgets index/profile: `spec/x07-budgets.index.schema.json`, `spec/x07-budgets.profile.schema.json`
+  - Archive index/profile: `spec/x07-arch.archive.index.schema.json`, `spec/x07-arch.archive.profile.schema.json`
+  - DB index/plan/queries: `spec/x07-arch.db.index.schema.json`, `spec/x07-db.migrate.plan.schema.json`, `spec/x07-arch.db.queries.schema.json`
+  - Obs index/registry/exporters: `spec/x07-arch.obs.index.schema.json`, `spec/x07-obs.metrics.registry.schema.json`, `spec/x07-obs.exporter.profile.schema.json`
+  - Net index/gRPC services: `spec/x07-arch.net.index.schema.json`, `spec/x07-arch.net.grpc.services.schema.json`
+  - Crypto index/JWT profiles: `spec/x07-arch.crypto.index.schema.json`, `spec/x07-arch.crypto.jwt_profiles.schema.json`
 
 Rust constants live in `crates/x07-contracts/src/lib.rs`.
 

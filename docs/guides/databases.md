@@ -33,6 +33,10 @@ Drivers (pick the ones you need):
 - `ext-db-mysql` (`std.db.mysql`, `std.db.mysql.pool`)
 - `ext-db-redis` (`std.db.redis`, `std.db.redis.pool`)
 
+Migrations + RR helpers:
+
+- `ext-db-migrate` (`std.db.migrate`, `std.db.rr`) uses pinned repo-local plans under `arch/db/`.
+
 To discover available packages and versions, use the registry catalog:
 
 - https://registry.x07.io/index/catalog.json

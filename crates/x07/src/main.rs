@@ -123,6 +123,7 @@ struct TestDecl {
     expect: Expect,
     returns: TestReturns,
     fixture_root: Option<PathBuf>,
+    policy_json: Option<PathBuf>,
     timeout_ms: Option<u64>,
 }
 
@@ -841,6 +842,13 @@ fn run_one_test_os(
     cmd.arg("--world").arg(test.world.as_str());
     cmd.arg("--program").arg(&driver_path);
     cmd.arg("--compiled-out").arg(&exe_out_path);
+    cmd.arg("--auto-ffi");
+    if test.world == WorldId::RunOsSandboxed {
+        let Some(policy) = &test.policy_json else {
+            anyhow::bail!("internal error: run-os-sandboxed test missing policy_json");
+        };
+        cmd.arg("--policy").arg(policy);
+    }
     for root in module_roots {
         cmd.arg("--module-root").arg(root);
     }
@@ -1174,6 +1182,8 @@ struct TestRaw {
     #[serde(default)]
     fixture_root: Option<String>,
     #[serde(default)]
+    policy_json: Option<String>,
+    #[serde(default)]
     timeout_ms: Option<u64>,
 }
 
@@ -1450,6 +1460,68 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
             }
         };
 
+        let policy_json = match world {
+            WorldId::RunOsSandboxed => {
+                let Some(pol) = t.policy_json.as_deref() else {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_POLICY_REQUIRED",
+                        message: "policy_json is required for run-os-sandboxed".to_string(),
+                        path: format!("{base}/policy_json"),
+                    });
+                    continue;
+                };
+                if pol.contains('\\') {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_POLICY_UNSAFE_PATH",
+                        message: format!("policy_json must not contain '\\\\': {pol}"),
+                        path: format!("{base}/policy_json"),
+                    });
+                    continue;
+                }
+                let rel = Path::new(pol);
+                if let Err(err) = x07_host_runner::ensure_safe_rel_path(rel) {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_POLICY_UNSAFE_PATH",
+                        message: format!("unsafe policy_json path: {err}"),
+                        path: format!("{base}/policy_json"),
+                    });
+                    continue;
+                }
+                let abs = manifest_dir.join(rel);
+                if !abs.is_file() {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_POLICY_MISSING",
+                        message: format!("policy_json must be an existing file: {pol}"),
+                        path: format!("{base}/policy_json"),
+                    });
+                    continue;
+                }
+                Some(abs)
+            }
+            WorldId::RunOs => {
+                if t.policy_json.is_some() {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_POLICY_FORBIDDEN",
+                        message: "policy_json is only valid for run-os-sandboxed".to_string(),
+                        path: format!("{base}/policy_json"),
+                    });
+                    continue;
+                }
+                None
+            }
+            _ => {
+                if t.policy_json.is_some() {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_POLICY_FORBIDDEN",
+                        message: "policy_json is only valid for run-os-sandboxed".to_string(),
+                        path: format!("{base}/policy_json"),
+                    });
+                    continue;
+                }
+                None
+            }
+        };
+
         out.push(TestDecl {
             id: t.id.clone(),
             world,
@@ -1457,6 +1529,7 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
             expect,
             returns,
             fixture_root,
+            policy_json,
             timeout_ms: t.timeout_ms,
         });
     }

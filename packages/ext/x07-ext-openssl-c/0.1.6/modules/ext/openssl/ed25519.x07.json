@@ -1,0 +1,131 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "module_id": "ext.openssl.ed25519",
+  "kind": "module",
+  "imports": ["ext.openssl._ffi"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.openssl.ed25519.sign_seed_v1",
+        "ext.openssl.ed25519.verify_seed_v1",
+        "ext.openssl.ed25519.verify_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.openssl.ed25519.sign_seed_v1",
+      "params": [
+        { "name": "sk_seed", "ty": "bytes_view" },
+        { "name": "msg", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["!=", ["view.len", "sk_seed"], 32], ["return", ["bytes.alloc", 0]], 0],
+        [
+          "let",
+          "h",
+          [
+            "unsafe",
+            [
+              "ext.openssl._ffi.ed25519_sign_alloc",
+              ["view.as_ptr", "sk_seed"],
+              ["view.len", "sk_seed"],
+              ["view.as_ptr", "msg"],
+              ["view.len", "msg"]
+            ]
+          ]
+        ],
+        ["if", ["=", "h", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "len", ["unsafe", ["ext.openssl._ffi.buf_len", "h"]]],
+        ["if", ["!=", "len", 64], ["let", "_", ["unsafe", ["ext.openssl._ffi.buf_free", "h"]]], 0],
+        ["if", ["!=", "len", 64], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "ptr", ["unsafe", ["ext.openssl._ffi.buf_ptr", "h"]]],
+        ["let", "out", ["vec_u8.with_capacity", "len"]],
+        [
+          "for",
+          "i",
+          0,
+          "len",
+          [
+            "set",
+            "out",
+            [
+              "vec_u8.push",
+              "out",
+              ["unsafe", ["ptr.read_u8", ["ptr.add", "ptr", "i"]]]
+            ]
+          ]
+        ],
+        ["let", "sig", ["vec_u8.into_bytes", "out"]],
+        ["let", "_", ["unsafe", ["ext.openssl._ffi.buf_free", "h"]]],
+        "sig"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.openssl.ed25519.verify_seed_v1",
+      "params": [
+        { "name": "sk_seed", "ty": "bytes_view" },
+        { "name": "msg", "ty": "bytes_view" },
+        { "name": "sig", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["!=", ["view.len", "sk_seed"], 32], ["return", 0], 0],
+        ["if", ["!=", ["view.len", "sig"], 64], ["return", 0], 0],
+        [
+          "let",
+          "rc",
+          [
+            "unsafe",
+            [
+              "ext.openssl._ffi.ed25519_verify_sk",
+              ["view.as_ptr", "sk_seed"],
+              ["view.len", "sk_seed"],
+              ["view.as_ptr", "msg"],
+              ["view.len", "msg"],
+              ["view.as_ptr", "sig"],
+              ["view.len", "sig"]
+            ]
+          ]
+        ],
+        ["if", ["=", "rc", 1], 1, 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.openssl.ed25519.verify_v1",
+      "params": [
+        { "name": "pk", "ty": "bytes_view" },
+        { "name": "msg", "ty": "bytes_view" },
+        { "name": "sig", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["!=", ["view.len", "pk"], 32], ["return", 0], 0],
+        ["if", ["!=", ["view.len", "sig"], 64], ["return", 0], 0],
+        [
+          "let",
+          "rc",
+          [
+            "unsafe",
+            [
+              "ext.openssl._ffi.ed25519_verify",
+              ["view.as_ptr", "pk"],
+              ["view.len", "pk"],
+              ["view.as_ptr", "msg"],
+              ["view.len", "msg"],
+              ["view.as_ptr", "sig"],
+              ["view.len", "sig"]
+            ]
+          ]
+        ],
+        ["if", ["=", "rc", 1], 1, 0]
+      ]
+    }
+  ]
+}

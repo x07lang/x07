@@ -31,13 +31,18 @@ Examples include:
 - fast checksums: CRC32C / xxhash64 (`ext-checksum-rs`)
 - deterministic diff + patch (`ext-diff-rs`)
 - compression helpers: zstd framing (`ext-compress-rs`)
+- archives (tar/tgz) + pinned extraction policies (`ext-archive-c`)
 - OS-world glob + walk + ignore (`ext-path-glob-rs`)
 - networking (HTTP/TLS, servers, client)
+- modern protocol helpers (HTTP/2, WebSockets, gRPC) (`ext-net-protos-c`)
 - databases (sqlite/pg/mysql/redis)
+- deterministic migration plans (`ext-db-migrate`)
 - filesystem utilities
 - time + tzdb
 - math (f64)
 - regex (native implementation)
+- observability (metrics snapshot + OpenMetrics + OTLP export) (`ext-obs`)
+- auth helpers (Ed25519 + JWT) (`ext-auth-jwt`)
 
 ## Principle: one canonical binding per domain
 
