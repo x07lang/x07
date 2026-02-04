@@ -855,8 +855,10 @@ fn run_one_test_os(
     let exe_out_path = out_dir.join("solver");
 
     let mut cmd = std::process::Command::new(crate::util::resolve_sibling_or_path("x07-os-runner"));
-    if let Some(manifest_dir) = args.manifest.parent() {
-        cmd.current_dir(manifest_dir);
+    let manifest_dir = args.manifest.parent();
+    let arch_root = infer_arch_root_from_manifest(&args.manifest);
+    if let Some(root) = arch_root.as_deref().or(manifest_dir) {
+        cmd.current_dir(root);
     }
     cmd.arg("--world").arg(test.world.as_str());
     cmd.arg("--program").arg(&driver_path);
@@ -866,7 +868,14 @@ fn run_one_test_os(
         let Some(policy) = &test.policy_json else {
             anyhow::bail!("internal error: run-os-sandboxed test missing policy_json");
         };
-        cmd.arg("--policy").arg(policy);
+        let policy_path = if policy.is_absolute() {
+            policy.clone()
+        } else if let Some(dir) = manifest_dir {
+            dir.join(policy)
+        } else {
+            policy.clone()
+        };
+        cmd.arg("--policy").arg(policy_path);
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     for root in module_roots {
