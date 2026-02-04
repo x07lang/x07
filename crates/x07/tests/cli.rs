@@ -1485,6 +1485,72 @@ fn x07_init_package_rejects_template() {
 }
 
 #[test]
+fn x07_init_template_lock_failure_has_next_steps() {
+    let root = repo_root();
+    let parent = fresh_tmp_dir(&root, "tmp_x07_init_template_lock_failure");
+    if parent.exists() {
+        std::fs::remove_dir_all(&parent).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&parent).expect("create tmp dir");
+
+    // Ensure init cannot copy "official" packages from this workspace (which would mask registry issues).
+    let fake_repo_root = parent.join("fake_repo_root");
+    std::fs::create_dir_all(fake_repo_root.join("packages").join("ext"))
+        .expect("create fake repo packages/ext");
+
+    // Point init's internal pkg lock to an empty local index, so it fails deterministically.
+    let index_dir = parent.join("fake_index");
+    std::fs::create_dir_all(index_dir.join("dl")).expect("create dl dir");
+    std::fs::create_dir_all(index_dir.join("api")).expect("create api dir");
+    let index_url = file_url_for_dir(&index_dir);
+    let cfg = serde_json::json!({
+        "dl": format!("{index_url}dl/"),
+        "api": format!("{index_url}api/"),
+        "auth-required": false,
+    });
+    write_bytes(
+        &index_dir.join("config.json"),
+        serde_json::to_vec_pretty(&cfg).unwrap().as_slice(),
+    );
+
+    let out = Command::new(env!("CARGO_BIN_EXE_x07"))
+        .current_dir(&parent)
+        .env("X07_PKG_INDEX_URL", index_url.as_str())
+        .env(
+            "X07_REPO_ROOT",
+            fake_repo_root.to_str().expect("fake repo root utf-8"),
+        )
+        .args(["init", "--template", "sqlite-app"])
+        .output()
+        .expect("run x07 init");
+
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["command"], "init");
+    assert_eq!(v["error"]["code"], "X07INIT_PKG_LOCK");
+    assert!(
+        v["next_steps"]
+            .as_array()
+            .expect("next_steps[]")
+            .iter()
+            .any(|s| {
+                s.as_str()
+                    .unwrap_or("")
+                    .contains("x07 pkg lock --project x07.json")
+            }),
+        "expected next_steps to include `x07 pkg lock --project x07.json`, got: {}",
+        v["next_steps"]
+    );
+}
+
+#[test]
 fn x07_pkg_add_updates_project_manifest() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_add");
@@ -1516,10 +1582,68 @@ fn x07_pkg_add_updates_project_manifest() {
     assert_eq!(deps[0]["path"], ".x07/deps/ext-hex-rs/0.1.3");
 
     let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.3"]);
-    assert_eq!(out.status.code(), Some(20));
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "pkg.add");
+
+    let doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    let deps = doc["dependencies"].as_array().expect("dependencies[]");
+    assert_eq!(deps.len(), 1);
+    assert_eq!(deps[0]["name"], "ext-hex-rs");
+    assert_eq!(deps[0]["version"], "0.1.3");
+    assert_eq!(deps[0]["path"], ".x07/deps/ext-hex-rs/0.1.3");
+}
+
+#[test]
+fn x07_pkg_add_rejects_existing_dep_with_different_version() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_add_dep_exists_different_version");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.3"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let before = std::fs::read(dir.join("x07.json")).expect("read x07.json");
+
+    let out = run_x07_in_dir(&dir, &["pkg", "add", "ext-hex-rs@0.1.4"]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
+    assert_eq!(v["command"], "pkg.add");
     assert_eq!(v["error"]["code"], "X07PKG_DEP_EXISTS");
+    assert!(v["error"]["message"]
+        .as_str()
+        .unwrap_or("")
+        .contains("requested ext-hex-rs@0.1.4"));
+
+    let after = std::fs::read(dir.join("x07.json")).expect("read x07.json");
+    assert_eq!(
+        after, before,
+        "x07.json changed despite dep-exists-different-version"
+    );
 }
 
 #[test]
@@ -1764,6 +1888,68 @@ fn x07_pkg_add_rejects_non_semver_versions() {
 
     let after = std::fs::read(dir.join("x07.json")).expect("read x07.json");
     assert_eq!(after, before, "x07.json changed despite invalid version");
+}
+
+#[test]
+fn x07_pkg_lock_transitive_conflict_includes_required_by_context() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_transitive_conflict_required_by");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let deps_root = dir.join(".x07").join("deps");
+    let base_dir = deps_root.join("base").join("0.1.0");
+    let meta_dir = deps_root.join("meta").join("0.1.0");
+    std::fs::create_dir_all(&base_dir).expect("create base dir");
+    std::fs::create_dir_all(&meta_dir).expect("create meta dir");
+
+    // Minimal manifests: only `meta.requires_packages` matters for this test.
+    write_bytes(&base_dir.join("x07-package.json"), b"{}\n");
+    write_bytes(
+        &meta_dir.join("x07-package.json"),
+        br#"{"meta":{"requires_packages":["base@0.2.0"]}}
+"#,
+    );
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json"))
+        .expect("parse x07.json");
+    let obj = doc.as_object_mut().expect("x07.json must be object");
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![
+            serde_json::json!({"name":"base","version":"0.1.0","path":".x07/deps/base/0.1.0"}),
+            serde_json::json!({"name":"meta","version":"0.1.0","path":".x07/deps/meta/0.1.0"}),
+        ]),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock"]);
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "expected anyhow error exit code; stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("required by meta@0.1.0"),
+        "stderr missing required-by context:\n{}",
+        stderr
+    );
 }
 
 #[test]

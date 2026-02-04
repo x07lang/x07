@@ -166,6 +166,7 @@ x07 pkg remove NAME --sync
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
+- `x07 pkg add NAME@VERSION` is safe to re-run: if the same dep+version already exists, it succeeds as a no-op. If the dep exists at a different version, pick a version explicitly and update the project deps.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
 - For stdlib modules, use `x07 doc std.<module>` (example: `x07 doc std.bytes`) and `x07 doc std.os.<module>` (example: `x07 doc std.os.env`).
@@ -175,6 +176,14 @@ Notes:
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 - Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).
+
+If you hit a dependency version conflict, the canonical repair loop is:
+
+```bash
+x07 pkg versions NAME
+x07 pkg remove NAME --sync
+x07 pkg add NAME@VERSION --sync
+```
 
 See also: [Packages & projects](../packages/index.md).
 

@@ -20,6 +20,8 @@ Then run in an OS world:
 x07 run --profile sandbox -- <your-cli-args...>
 ```
 
+Note: `x07 init --template sqlite-app` uses the canonical capability map and pins `ext-db-core@VERSION` (see `catalog/capabilities.json`). If your registry/index does not have that version, init will fail; check the registry catalog (`https://registry.x07.io/index/catalog.json`, or `https://x07.io/packages`) and sync/publish the missing versions.
+
 ## Packages
 
 Core interfaces (required):

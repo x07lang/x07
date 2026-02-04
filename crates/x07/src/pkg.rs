@@ -20,6 +20,20 @@ static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 pub(crate) const DEFAULT_INDEX_URL: &str = "sparse+https://registry.x07.io/index/";
 const PKG_PROVIDES_REPORT_SCHEMA_VERSION: &str = "x07.pkg.provides.report@0.1.0";
 
+fn default_index_url() -> String {
+    match std::env::var("X07_PKG_INDEX_URL") {
+        Ok(raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                DEFAULT_INDEX_URL.to_string()
+            } else {
+                trimmed.to_string()
+            }
+        }
+        Err(_) => DEFAULT_INDEX_URL.to_string(),
+    }
+}
+
 #[derive(Debug, Args)]
 pub struct PkgArgs {
     #[command(subcommand)]
@@ -425,12 +439,186 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
         .as_object_mut()
         .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
 
-    let (name, version) = match parse_user_pkg_spec(&args.spec) {
-        Ok(ParsedUserPkgSpec::Pinned { name, version }) => (name, version),
-        Ok(ParsedUserPkgSpec::Unpinned { name }) => {
-            let index = args.index.as_deref().unwrap_or(DEFAULT_INDEX_URL);
-            let token = x07_pkg::load_token(index).unwrap_or(None);
-            let client = match SparseIndexClient::from_index_url(index, token) {
+    let parsed_spec = match parse_user_pkg_spec(&args.spec) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            let report = PkgReport::<AddResult> {
+                ok: false,
+                command: "pkg.add",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SPEC_INVALID".to_string(),
+                    message: format!("{err:#}"),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    };
+
+    let deps_val = obj
+        .entry("dependencies".to_string())
+        .or_insert_with(|| Value::Array(Vec::new()));
+    let deps = deps_val
+        .as_array_mut()
+        .ok_or_else(|| anyhow::anyhow!("project.dependencies must be an array"))?;
+
+    let (name, version) = match parsed_spec {
+        ParsedUserPkgSpec::Pinned { name, version } => {
+            if let Some(dep) = deps
+                .iter()
+                .find(|dep| dep.get("name").and_then(Value::as_str) == Some(name.as_str()))
+            {
+                let existing_version = dep.get("version").and_then(Value::as_str).unwrap_or("");
+                let existing_path = dep.get("path").and_then(Value::as_str).unwrap_or("");
+
+                if existing_version == version {
+                    if let Some(requested_path) = args.path.as_deref() {
+                        if requested_path != existing_path {
+                            let report = PkgReport::<AddResult> {
+                                ok: false,
+                                command: "pkg.add",
+                                result: None,
+                                error: Some(PkgError {
+                                    code: "X07PKG_DEP_EXISTS".to_string(),
+                                    message: format!(
+                                        "dependency already exists: {name}@{version} with path {existing_path:?} (requested path {requested_path:?})"
+                                    ),
+                                }),
+                            };
+                            return Ok((std::process::ExitCode::from(20), report));
+                        }
+                    }
+
+                    let dep_path = if existing_path.is_empty() {
+                        format!(".x07/deps/{name}/{version}")
+                    } else {
+                        existing_path.to_string()
+                    };
+
+                    let mut add_result = AddResult {
+                        project: project_path.display().to_string(),
+                        name,
+                        version,
+                        path: dep_path,
+                        lock: None,
+                    };
+
+                    if args.sync {
+                        let lock_args = LockArgs {
+                            project: project_path.clone(),
+                            index: args.index.clone(),
+                            check: false,
+                            offline: false,
+                        };
+                        let (lock_code, lock_report) = pkg_lock_report(&lock_args)?;
+                        add_result.lock = lock_report.result;
+                        if !lock_report.ok {
+                            let report = PkgReport::<AddResult> {
+                                ok: false,
+                                command: "pkg.add",
+                                result: Some(add_result),
+                                error: lock_report.error,
+                            };
+                            return Ok((lock_code, report));
+                        }
+                    }
+
+                    let report = PkgReport {
+                        ok: true,
+                        command: "pkg.add",
+                        result: Some(add_result),
+                        error: None,
+                    };
+                    return Ok((std::process::ExitCode::SUCCESS, report));
+                }
+
+                let report = PkgReport::<AddResult> {
+                    ok: false,
+                    command: "pkg.add",
+                    result: None,
+                    error: Some(PkgError {
+                        code: "X07PKG_DEP_EXISTS".to_string(),
+                        message: format!(
+                            "dependency already exists: {name}@{existing_version} (requested {name}@{version}); hint: run `x07 pkg remove {name} --sync` then `x07 pkg add {name}@{version} --sync`"
+                        ),
+                    }),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            }
+
+            (name, version)
+        }
+        ParsedUserPkgSpec::Unpinned { name } => {
+            if let Some(dep) = deps
+                .iter()
+                .find(|dep| dep.get("name").and_then(Value::as_str) == Some(name.as_str()))
+            {
+                let existing_version = dep.get("version").and_then(Value::as_str).unwrap_or("");
+                let existing_path = dep.get("path").and_then(Value::as_str).unwrap_or("");
+
+                if let Some(requested_path) = args.path.as_deref() {
+                    if requested_path != existing_path {
+                        let report = PkgReport::<AddResult> {
+                            ok: false,
+                            command: "pkg.add",
+                            result: None,
+                            error: Some(PkgError {
+                                code: "X07PKG_DEP_EXISTS".to_string(),
+                                message: format!(
+                                    "dependency already exists: {name}@{existing_version} with path {existing_path:?} (requested path {requested_path:?})"
+                                ),
+                            }),
+                        };
+                        return Ok((std::process::ExitCode::from(20), report));
+                    }
+                }
+
+                let dep_path = if existing_path.is_empty() {
+                    format!(".x07/deps/{name}/{existing_version}")
+                } else {
+                    existing_path.to_string()
+                };
+
+                let mut add_result = AddResult {
+                    project: project_path.display().to_string(),
+                    name,
+                    version: existing_version.to_string(),
+                    path: dep_path,
+                    lock: None,
+                };
+
+                if args.sync {
+                    let lock_args = LockArgs {
+                        project: project_path.clone(),
+                        index: args.index.clone(),
+                        check: false,
+                        offline: false,
+                    };
+                    let (lock_code, lock_report) = pkg_lock_report(&lock_args)?;
+                    add_result.lock = lock_report.result;
+                    if !lock_report.ok {
+                        let report = PkgReport::<AddResult> {
+                            ok: false,
+                            command: "pkg.add",
+                            result: Some(add_result),
+                            error: lock_report.error,
+                        };
+                        return Ok((lock_code, report));
+                    }
+                }
+
+                let report = PkgReport {
+                    ok: true,
+                    command: "pkg.add",
+                    result: Some(add_result),
+                    error: None,
+                };
+                return Ok((std::process::ExitCode::SUCCESS, report));
+            }
+
+            let index = args.index.clone().unwrap_or_else(default_index_url);
+            let token = x07_pkg::load_token(&index).unwrap_or(None);
+            let client = match SparseIndexClient::from_index_url(&index, token) {
                 Ok(c) => c,
                 Err(err) => {
                     let report = PkgReport::<AddResult> {
@@ -480,45 +668,12 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
 
             (name, version)
         }
-        Err(err) => {
-            let report = PkgReport::<AddResult> {
-                ok: false,
-                command: "pkg.add",
-                result: None,
-                error: Some(PkgError {
-                    code: "X07PKG_SPEC_INVALID".to_string(),
-                    message: format!("{err:#}"),
-                }),
-            };
-            return Ok((std::process::ExitCode::from(20), report));
-        }
     };
+
     let dep_path = args
         .path
         .clone()
         .unwrap_or_else(|| format!(".x07/deps/{name}/{version}"));
-
-    let deps_val = obj
-        .entry("dependencies".to_string())
-        .or_insert_with(|| Value::Array(Vec::new()));
-    let deps = deps_val
-        .as_array_mut()
-        .ok_or_else(|| anyhow::anyhow!("project.dependencies must be an array"))?;
-
-    for dep in deps.iter() {
-        if dep.get("name").and_then(Value::as_str) == Some(name.as_str()) {
-            let report = PkgReport::<AddResult> {
-                ok: false,
-                command: "pkg.add",
-                result: None,
-                error: Some(PkgError {
-                    code: "X07PKG_DEP_EXISTS".to_string(),
-                    message: format!("dependency already exists: {name}"),
-                }),
-            };
-            return Ok((std::process::ExitCode::from(20), report));
-        }
-    }
 
     deps.push(Value::Object(
         [
@@ -743,7 +898,7 @@ fn cmd_pkg_versions(args: VersionsArgs) -> Result<std::process::ExitCode> {
 fn pkg_versions_report(
     args: &VersionsArgs,
 ) -> Result<(std::process::ExitCode, PkgReport<VersionsResult>)> {
-    let index = args.index.as_deref().unwrap_or(DEFAULT_INDEX_URL);
+    let index = args.index.clone().unwrap_or_else(default_index_url);
     let name = match parse_pkg_name(&args.name) {
         Ok(name) => name,
         Err(err) => {
@@ -760,8 +915,8 @@ fn pkg_versions_report(
         }
     };
 
-    let token = x07_pkg::load_token(index).unwrap_or(None);
-    let client = match SparseIndexClient::from_index_url(index, token) {
+    let token = x07_pkg::load_token(&index).unwrap_or(None);
+    let client = match SparseIndexClient::from_index_url(&index, token) {
         Ok(c) => c,
         Err(err) => {
             let report = PkgReport::<VersionsResult> {
@@ -1374,7 +1529,7 @@ fn resolve_transitive_deps(
 
     let index = match args.index.as_deref() {
         Some(index) => index.to_string(),
-        None => DEFAULT_INDEX_URL.to_string(),
+        None => default_index_url(),
     };
 
     let mut client: Option<SparseIndexClient> = None;
@@ -1407,7 +1562,9 @@ fn resolve_transitive_deps(
                     EnsureDepOutcome::AlreadyPresentSameVersion => {}
                     EnsureDepOutcome::AlreadyPresentDifferentVersion { existing_version } => {
                         anyhow::bail!(
-                            "dependency version conflict: project has {name}@{existing_version}, but {spec:?} is required by a dependency"
+                            "dependency version conflict: project has {name}@{existing_version}, but {spec:?} is required by {}@{}",
+                            dep.name,
+                            dep.version
                         );
                     }
                 }

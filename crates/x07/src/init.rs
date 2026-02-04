@@ -528,13 +528,21 @@ pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
         };
         let (code, err_msg) = crate::pkg::pkg_lock_for_init(&lock_args)?;
         if let Some(msg) = err_msg {
+            let mut next_steps = Vec::new();
+            next_steps.push("x07 pkg lock --project x07.json".to_string());
+            next_steps.push(format!(
+                "If you want a clean slate, delete the created paths: {}",
+                created.join(", ")
+            ));
+            next_steps.push("If this is a template, the registry/index may be missing required package versions; update/publish packages or pin to available versions.".to_string());
+
             let report = InitReport {
                 ok: false,
                 command: "init",
                 root: root.display().to_string(),
                 created,
                 notes: Vec::new(),
-                next_steps: Vec::new(),
+                next_steps,
                 error: Some(InitError {
                     code: "X07INIT_PKG_LOCK".to_string(),
                     message: msg,
