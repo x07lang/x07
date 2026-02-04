@@ -167,6 +167,14 @@ unsafe fn emit_view(emit: x07_xf_emit_v1, ptr: *const u8, len: u32, view_kind: u
 }
 
 #[inline]
+unsafe fn out_buf_write0(out: &mut x07_out_buf_v1, b: u8) {
+    if out.ptr.is_null() {
+        ev_trap(TRAP_INTERNAL);
+    }
+    out.ptr.write(b);
+}
+
+#[inline]
 unsafe fn view_as_slice<'a>(v: x07_bytes_view_v1) -> &'a [u8] {
     core::slice::from_raw_parts(v.ptr, v.len as usize)
 }
@@ -864,7 +872,7 @@ unsafe extern "C" fn xf_test_emit_limits_step_v1(
             if out_buf.cap != budget.max_out_buf_bytes {
                 ev_trap(TRAP_INTERNAL);
             }
-            *out_buf.ptr = 0;
+            out_buf_write0(&mut out_buf, 0);
             out_buf.len = budget.max_out_buf_bytes;
             let rc = emit_commit(emit, &out_buf as *const x07_out_buf_v1);
             if rc != 0 {
@@ -900,7 +908,7 @@ unsafe extern "C" fn xf_test_emit_limits_step_v1(
                 if out_buf.cap != 1 {
                     ev_trap(TRAP_INTERNAL);
                 }
-                *out_buf.ptr = 0;
+                out_buf_write0(&mut out_buf, 0);
                 out_buf.len = 1;
                 let rc = emit_commit(emit, &out_buf as *const x07_out_buf_v1);
                 if rc != 0 {
@@ -928,7 +936,7 @@ unsafe extern "C" fn xf_test_emit_limits_step_v1(
             if out_buf.cap != 1 {
                 ev_trap(TRAP_INTERNAL);
             }
-            *out_buf.ptr = 0;
+            out_buf_write0(&mut out_buf, 0);
             out_buf.len = 2;
             emit_commit(emit, &out_buf as *const x07_out_buf_v1)
         }
