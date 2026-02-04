@@ -90,7 +90,7 @@ Verify:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.0.86
+x07up override set v0.0.87
 ```
 
 This makes toolchain selection deterministic for agents and CI.
@@ -132,7 +132,7 @@ Install:
 
 This can happen if the toolchain emits malformed macOS framework link flags.
 
-Upgrade to the latest stable toolchain (for example: `x07up update stable`), then re-run. If it still fails on the latest toolchain, file a bug with the full `stderr_b64` decoded output from the run report.
+Upgrade to the latest stable toolchain (for example: `x07up update`), then re-run. If it still fails on the latest toolchain, file a bug with the full `stderr_b64` decoded output from the run report.
 
 ### “I can run `x07` but `x07 run` fails”
 
