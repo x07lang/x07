@@ -1,0 +1,25 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.streams.fs.tests",
+  "imports": ["ext.streams.fs", "std.io", "std.test"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["ext.streams.fs.tests.test_open_read_fs_hello"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.streams.fs.tests.test_open_read_fs_hello",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "reader", ["ext.streams.fs.open_read", ["bytes.lit", "hello.txt"]]],
+        ["let", "got", ["std.io.read_all", "reader"]],
+        ["try", ["std.test.assert_bytes_eq", "got", ["bytes.lit", "hello\n"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

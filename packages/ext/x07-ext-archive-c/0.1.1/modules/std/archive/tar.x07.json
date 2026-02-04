@@ -1,0 +1,619 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.archive.tar",
+  "imports": [
+    "ext.base64",
+    "ext.data_model",
+    "ext.data_model.json",
+    "std.archive",
+    "std.bytes",
+    "std.codec",
+    "std.fmt"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.archive.tar.err_code",
+        "std.archive.tar.extract_tree_from_arch_v1",
+        "std.archive.tar.extract_tree_v1",
+        "std.archive.tar.get_bytes",
+        "std.archive.tar.is_err",
+        "std.archive.tar.list_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar._make_err",
+      "params": [{ "name": "code", "ty": "i32" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "out", ["vec_u8.with_capacity", 9]],
+        ["set", "out", ["vec_u8.push", "out", 0]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["std.codec.write_u32_le", "code"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["std.codec.write_u32_le", 0]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar.err_code",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["<", ["view.len", "doc"], 5], ["return", 0], 0],
+        ["if", ["=", ["=", ["view.get_u8", "doc", 0], 0], 0], ["return", 0], 0],
+        ["std.codec.read_u32_le", "doc", 1]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar.is_err",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["<", ["view.len", "doc"], 1], ["return", 1], 0],
+        ["=", ["view.get_u8", "doc", 0], 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar.get_bytes",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["<", "n", 1], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", ["=", ["view.get_u8", "doc", 0], 1], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["view.to_bytes", ["view.slice", "doc", 1, ["-", "n", 1]]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar._field_len_until_nul",
+      "params": [
+        { "name": "header", "ty": "bytes_view" },
+        { "name": "off", "ty": "i32" },
+        { "name": "max_len", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "i", 0],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          0,
+          "max_len",
+          [
+            "if",
+            ["=", "done", 0],
+            [
+              "begin",
+              ["let", "c", ["view.get_u8", "header", ["+", "off", "i"]]],
+              ["if", ["=", "c", 0], ["set", "done", 1], ["set", "i", ["+", "i", 1]]]
+            ],
+            0
+          ]
+        ],
+        "i"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar._oct_digit",
+      "params": [{ "name": "c", "ty": "i32" }],
+      "result": "i32",
+      "body": [
+        "if",
+        ["if", [">=u", "c", 48], ["<u", "c", 56], 0],
+        ["-", "c", 48],
+        ["-", 0, 1]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar._parse_octal_u32",
+      "params": [
+        { "name": "header", "ty": "bytes_view" },
+        { "name": "off", "ty": "i32" },
+        { "name": "len", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "i", "off"],
+        ["let", "end", ["+", "off", "len"]],
+        ["let", "val", 0],
+        ["let", "started", 0],
+        ["let", "done", 0],
+        [
+          "for",
+          "_",
+          "off",
+          "end",
+          [
+            "if",
+            ["=", "done", 0],
+            [
+              "begin",
+              ["let", "c", ["view.get_u8", "header", "i"]],
+              [
+                "if",
+                ["=", "started", 0],
+                [
+                  "if",
+                  ["if", ["=", "c", 0], 1, ["=", "c", 32]],
+                  ["set", "i", ["+", "i", 1]],
+                  ["set", "started", 1]
+                ],
+                0
+              ],
+              [
+                "if",
+                ["if", ["=", ["=", "started", 0], 0], ["=", "done", 0], 0],
+                [
+                  "if",
+                  ["if", ["=", "c", 0], 1, ["=", "c", 32]],
+                  ["set", "done", 1],
+                  [
+                    "begin",
+                    ["let", "d", ["std.archive.tar._oct_digit", "c"]],
+                    ["if", ["<", "d", 0], ["return", ["-", 0, 1]], 0],
+                    ["set", "val", ["+", ["*", "val", 8], "d"]],
+                    ["if", ["<", "val", 0], ["return", ["-", 0, 1]], 0],
+                    ["set", "i", ["+", "i", 1]]
+                  ]
+                ],
+                0
+              ]
+            ],
+            0
+          ]
+        ],
+        "val"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar._read_path_v1",
+      "params": [{ "name": "header", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "name_off", 0],
+        ["let", "prefix_off", 345],
+        ["let", "name_len", ["std.archive.tar._field_len_until_nul", "header", "name_off", 100]],
+        ["let", "prefix_len", ["std.archive.tar._field_len_until_nul", "header", "prefix_off", 155]],
+        ["let", "name", ["view.to_bytes", ["view.slice", "header", "name_off", "name_len"]]],
+        [
+          "if",
+          ["=", "prefix_len", 0],
+          "name",
+          [
+            "begin",
+            ["let", "prefix", ["view.to_bytes", ["view.slice", "header", "prefix_off", "prefix_len"]]],
+            ["let", "slash", ["bytes.lit", "/"]],
+            ["let", "tmp", ["std.bytes.concat", ["bytes.view", "prefix"], ["bytes.view", "slash"]]],
+            ["std.bytes.concat", ["bytes.view", "tmp"], ["bytes.view", "name"]]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar._dm_listing_entry_v1",
+      "params": [
+        { "name": "path", "ty": "bytes_view" },
+        { "name": "mode", "ty": "i32" },
+        { "name": "size", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "k_mode", ["bytes.lit", "mode"]],
+        ["let", "k_path", ["bytes.lit", "path"]],
+        ["let", "k_size", ["bytes.lit", "size"]],
+        ["let", "mode_b", ["std.fmt.u32_to_dec", "mode"]],
+        ["let", "size_b", ["std.fmt.u32_to_dec", "size"]],
+        ["let", "mode_val", ["ext.data_model.value_number", ["bytes.view", "mode_b"]]],
+        ["let", "path_val", ["ext.data_model.value_string", "path"]],
+        ["let", "size_val", ["ext.data_model.value_number", ["bytes.view", "size_b"]]],
+        ["let", "entries", ["vec_u8.with_capacity", 128]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", 3]]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "k_mode"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "k_mode"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "mode_val"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "mode_val"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "k_path"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "k_path"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "path_val"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "path_val"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "k_size"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "k_size"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "size_val"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "size_val"]],
+        ["let", "entries_b", ["vec_u8.into_bytes", "entries"]],
+        ["ext.data_model.value_map_from_entries", ["bytes.view", "entries_b"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar._dm_extract_entry_v1",
+      "params": [
+        { "name": "path", "ty": "bytes_view" },
+        { "name": "mode", "ty": "i32" },
+        { "name": "size", "ty": "i32" },
+        { "name": "data", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "k_data", ["bytes.lit", "data_b64"]],
+        ["let", "k_mode", ["bytes.lit", "mode"]],
+        ["let", "k_path", ["bytes.lit", "path"]],
+        ["let", "k_size", ["bytes.lit", "size"]],
+        ["let", "data_b64", ["ext.base64.base64_encode", "data"]],
+        ["let", "mode_b", ["std.fmt.u32_to_dec", "mode"]],
+        ["let", "size_b", ["std.fmt.u32_to_dec", "size"]],
+        ["let", "data_val", ["ext.data_model.value_string", ["bytes.view", "data_b64"]]],
+        ["let", "mode_val", ["ext.data_model.value_number", ["bytes.view", "mode_b"]]],
+        ["let", "path_val", ["ext.data_model.value_string", "path"]],
+        ["let", "size_val", ["ext.data_model.value_number", ["bytes.view", "size_b"]]],
+        ["let", "entries", ["vec_u8.with_capacity", 192]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", 4]]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "k_data"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "k_data"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "data_val"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "data_val"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "k_mode"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "k_mode"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "mode_val"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "mode_val"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "k_path"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "k_path"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "path_val"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "path_val"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "k_size"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "k_size"]],
+        [
+          "set",
+          "entries",
+          ["vec_u8.extend_bytes", "entries", ["std.codec.write_u32_le", ["bytes.len", "size_val"]]]
+        ],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", "size_val"]],
+        ["let", "entries_b", ["vec_u8.into_bytes", "entries"]],
+        ["ext.data_model.value_map_from_entries", ["bytes.view", "entries_b"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar._emit_json_doc_v1",
+      "params": [
+        { "name": "entries_seq", "ty": "bytes_view" },
+        { "name": "key", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "k", ["view.to_bytes", "key"]],
+        ["let", "entries_val", ["ext.data_model.value_seq_from_elems", "entries_seq"]],
+        ["let", "map_entries", ["vec_u8.with_capacity", 64]],
+        ["set", "map_entries", ["vec_u8.extend_bytes", "map_entries", ["std.codec.write_u32_le", 1]]],
+        [
+          "set",
+          "map_entries",
+          ["vec_u8.extend_bytes", "map_entries", ["std.codec.write_u32_le", ["bytes.len", "k"]]]
+        ],
+        ["set", "map_entries", ["vec_u8.extend_bytes", "map_entries", "k"]],
+        [
+          "set",
+          "map_entries",
+          ["vec_u8.extend_bytes", "map_entries", ["std.codec.write_u32_le", ["bytes.len", "entries_val"]]]
+        ],
+        ["set", "map_entries", ["vec_u8.extend_bytes", "map_entries", "entries_val"]],
+        ["let", "map_entries_b", ["vec_u8.into_bytes", "map_entries"]],
+        ["let", "root_val", ["ext.data_model.value_map_from_entries", ["bytes.view", "map_entries_b"]]],
+        ["let", "dm_doc", ["ext.data_model.doc_ok", ["bytes.view", "root_val"]]],
+        ["ext.data_model.json.emit_canon", ["bytes.view", "dm_doc"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar._policy_check_v1",
+      "params": [{ "name": "path", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "std.archive.path_policy_posix_strict_check_v1",
+        "path",
+        1,
+        1,
+        1,
+        1,
+        4096,
+        255
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar.list_v1",
+      "params": [{ "name": "tar", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "tar"]],
+        ["let", "pos", 0],
+        ["let", "count", 0],
+        ["let", "elems_body", ["vec_u8.with_capacity", 256]],
+        ["let", "max_iter", ["+", ["/", "n", 512], 2]],
+        [
+          "for",
+          "_",
+          0,
+          "max_iter",
+          [
+            "begin",
+            [
+              "if",
+              [">=u", "pos", "n"],
+              [
+                "begin",
+                ["let", "count_b", ["std.codec.write_u32_le", "count"]],
+                ["let", "body_b", ["vec_u8.into_bytes", "elems_body"]],
+                ["let", "elems", ["std.bytes.concat", ["bytes.view", "count_b"], ["bytes.view", "body_b"]]],
+                ["return", ["std.archive.tar._emit_json_doc_v1", ["bytes.view", "elems"], ["bytes.lit", "entries"]]]
+              ],
+              0
+            ],
+            [
+              "if",
+              ["<u", "n", ["+", "pos", 512]],
+              ["return", ["std.archive.tar._make_err", 1]],
+              0
+            ],
+            ["let", "header", ["view.slice", "tar", "pos", 512]],
+            [
+              "if",
+              ["=", ["std.bytes.sum_u8", "header"], 0],
+              [
+                "begin",
+                ["let", "count_b", ["std.codec.write_u32_le", "count"]],
+                ["let", "body_b", ["vec_u8.into_bytes", "elems_body"]],
+                ["let", "elems", ["std.bytes.concat", ["bytes.view", "count_b"], ["bytes.view", "body_b"]]],
+                ["return", ["std.archive.tar._emit_json_doc_v1", ["bytes.view", "elems"], ["bytes.lit", "entries"]]]
+              ],
+              0
+            ],
+            ["let", "typeflag", ["view.get_u8", "header", 156]],
+            [
+              "if",
+              [
+                "if",
+                ["=", "typeflag", 0],
+                1,
+                ["=", "typeflag", 48]
+              ],
+              0,
+              [
+                "begin",
+                ["let", "size_skip", ["std.archive.tar._parse_octal_u32", "header", 124, 12]],
+                ["if", ["<", "size_skip", 0], ["return", ["std.archive.tar._make_err", 1]], 0],
+                ["set", "pos", ["+", ["+", "pos", 512], ["*", ["/", ["+", "size_skip", 511], 512], 512]]],
+                0
+              ]
+            ],
+            ["let", "path_b", ["std.archive.tar._read_path_v1", "header"]],
+            ["let", "path", ["bytes.view", "path_b"]],
+            ["let", "prc", ["std.archive.tar._policy_check_v1", "path"]],
+            ["if", ["!=", "prc", 0], ["return", ["std.archive.tar._make_err", ["+", 100, "prc"]]], 0],
+            ["let", "mode", ["std.archive.tar._parse_octal_u32", "header", 100, 8]],
+            ["let", "size", ["std.archive.tar._parse_octal_u32", "header", 124, 12]],
+            ["if", ["<", "mode", 0], ["return", ["std.archive.tar._make_err", 1]], 0],
+            ["if", ["<", "size", 0], ["return", ["std.archive.tar._make_err", 1]], 0],
+            ["let", "data_start", ["+", "pos", 512]],
+            ["if", ["<u", "n", ["+", "data_start", "size"]], ["return", ["std.archive.tar._make_err", 1]], 0],
+            ["let", "entry", ["std.archive.tar._dm_listing_entry_v1", "path", "mode", "size"]],
+            ["let", "entry_len", ["bytes.len", "entry"]],
+            ["set", "elems_body", ["vec_u8.extend_bytes", "elems_body", ["std.codec.write_u32_le", "entry_len"]]],
+            ["set", "elems_body", ["vec_u8.extend_bytes", "elems_body", "entry"]],
+            ["set", "count", ["+", "count", 1]],
+            ["if", [">", "count", 20000], ["return", ["std.archive.tar._make_err", 2]], 0],
+            ["let", "padded", ["*", ["/", ["+", "size", 511], 512], 512]],
+            ["set", "pos", ["+", "data_start", "padded"]],
+            0
+          ]
+        ],
+        ["std.archive.tar._make_err", 1]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar.extract_tree_v1",
+      "params": [{ "name": "tar", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "tar"]],
+        ["let", "pos", 0],
+        ["let", "count", 0],
+        ["let", "total_out", 0],
+        ["let", "elems_body", ["vec_u8.with_capacity", 256]],
+        ["let", "max_iter", ["+", ["/", "n", 512], 2]],
+        [
+          "for",
+          "_",
+          0,
+          "max_iter",
+          [
+            "begin",
+            [
+              "if",
+              [">=u", "pos", "n"],
+              [
+                "begin",
+                ["let", "count_b", ["std.codec.write_u32_le", "count"]],
+                ["let", "body_b", ["vec_u8.into_bytes", "elems_body"]],
+                ["let", "elems", ["std.bytes.concat", ["bytes.view", "count_b"], ["bytes.view", "body_b"]]],
+                ["return", ["std.archive.tar._emit_json_doc_v1", ["bytes.view", "elems"], ["bytes.lit", "entries"]]]
+              ],
+              0
+            ],
+            [
+              "if",
+              ["<u", "n", ["+", "pos", 512]],
+              ["return", ["std.archive.tar._make_err", 1]],
+              0
+            ],
+            ["let", "header", ["view.slice", "tar", "pos", 512]],
+            [
+              "if",
+              ["=", ["std.bytes.sum_u8", "header"], 0],
+              [
+                "begin",
+                ["let", "count_b", ["std.codec.write_u32_le", "count"]],
+                ["let", "body_b", ["vec_u8.into_bytes", "elems_body"]],
+                ["let", "elems", ["std.bytes.concat", ["bytes.view", "count_b"], ["bytes.view", "body_b"]]],
+                ["return", ["std.archive.tar._emit_json_doc_v1", ["bytes.view", "elems"], ["bytes.lit", "entries"]]]
+              ],
+              0
+            ],
+            ["let", "typeflag", ["view.get_u8", "header", 156]],
+            [
+              "if",
+              [
+                "if",
+                ["=", "typeflag", 0],
+                1,
+                ["=", "typeflag", 48]
+              ],
+              0,
+              [
+                "begin",
+                ["let", "size_skip", ["std.archive.tar._parse_octal_u32", "header", 124, 12]],
+                ["if", ["<", "size_skip", 0], ["return", ["std.archive.tar._make_err", 1]], 0],
+                ["set", "pos", ["+", ["+", "pos", 512], ["*", ["/", ["+", "size_skip", 511], 512], 512]]],
+                0
+              ]
+            ],
+            ["let", "path_b", ["std.archive.tar._read_path_v1", "header"]],
+            ["let", "path", ["bytes.view", "path_b"]],
+            ["let", "prc", ["std.archive.tar._policy_check_v1", "path"]],
+            ["if", ["!=", "prc", 0], ["return", ["std.archive.tar._make_err", ["+", 100, "prc"]]], 0],
+            ["let", "mode", ["std.archive.tar._parse_octal_u32", "header", 100, 8]],
+            ["let", "size", ["std.archive.tar._parse_octal_u32", "header", 124, 12]],
+            ["if", ["<", "mode", 0], ["return", ["std.archive.tar._make_err", 1]], 0],
+            ["if", ["<", "size", 0], ["return", ["std.archive.tar._make_err", 1]], 0],
+            ["if", [">", "size", 268435456], ["return", ["std.archive.tar._make_err", 3]], 0],
+            ["set", "total_out", ["+", "total_out", "size"]],
+            ["if", [">", "total_out", 1073741824], ["return", ["std.archive.tar._make_err", 3]], 0],
+            ["let", "data_start", ["+", "pos", 512]],
+            ["if", ["<u", "n", ["+", "data_start", "size"]], ["return", ["std.archive.tar._make_err", 1]], 0],
+            ["let", "data", ["view.slice", "tar", "data_start", "size"]],
+            ["let", "entry", ["std.archive.tar._dm_extract_entry_v1", "path", "mode", "size", "data"]],
+            ["let", "entry_len", ["bytes.len", "entry"]],
+            ["set", "elems_body", ["vec_u8.extend_bytes", "elems_body", ["std.codec.write_u32_le", "entry_len"]]],
+            ["set", "elems_body", ["vec_u8.extend_bytes", "elems_body", "entry"]],
+            ["set", "count", ["+", "count", 1]],
+            ["if", [">", "count", 20000], ["return", ["std.archive.tar._make_err", 2]], 0],
+            ["let", "padded", ["*", ["/", ["+", "size", 511], 512], 512]],
+            ["set", "pos", ["+", "data_start", "padded"]],
+            0
+          ]
+        ],
+        ["std.archive.tar._make_err", 1]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.archive.tar.extract_tree_from_arch_v1",
+      "params": [
+        { "name": "profile_id", "ty": "bytes_view" },
+        { "name": "tar", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "archive_extract_safe_v1"],
+        [
+          "begin",
+          ["let", "k", ["bytes.lit", "tar_extract_safe_v1"]],
+          [
+            "if",
+            ["view.eq", "profile_id", ["bytes.view", "k"]],
+            [
+              "begin",
+              ["let", "doc", ["std.archive.tar.extract_tree_v1", "tar"]],
+              ["let", "dv", ["bytes.view", "doc"]],
+              [
+                "if",
+                ["std.archive.tar.is_err", "dv"],
+                ["return", ["result_bytes.err", ["std.archive.tar.err_code", "dv"]]],
+                0
+              ],
+              ["result_bytes.ok", ["std.archive.tar.get_bytes", "dv"]]
+            ],
+            ["result_bytes.err", 10]
+          ]
+        ]
+      ]
+    }
+  ]
+}

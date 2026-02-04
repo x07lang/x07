@@ -90,13 +90,13 @@ fn x07_test_smoke_suite() {
     );
     let v = parse_json_stdout(&out);
     assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
-    assert_eq!(v["summary"]["passed"], 33);
+    assert_eq!(v["summary"]["passed"], 35);
     assert_eq!(v["summary"]["failed"], 0);
     assert_eq!(v["summary"]["errors"], 0);
     assert_eq!(v["summary"]["xfail_failed"], 1);
 
     let tests = v["tests"].as_array().expect("tests[]");
-    assert_eq!(tests.len(), 34);
+    assert_eq!(tests.len(), 36);
     let ids: Vec<&str> = tests
         .iter()
         .map(|t| t["id"].as_str().expect("test.id"))
@@ -106,6 +106,8 @@ fn x07_test_smoke_suite() {
         vec![
             "smoke/budget_scope_result_err_alloc_bytes",
             "smoke/fs_read_hello",
+            "smoke/fs_read_hello_run_os_sandboxed",
+            "smoke/fs_read_task_hello_run_os_sandboxed",
             "smoke/full_fs_rr_kv",
             "smoke/kv_get_pong",
             "smoke/pure_i32_eq",
@@ -152,9 +154,24 @@ fn x07_test_smoke_suite() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["summary"]["compile_failures"], 0);
     for t in v["tests"].as_array().expect("tests[]") {
-        assert_eq!(t["status"], "skip");
-        assert!(t.get("compile").is_some(), "missing compile section");
-        assert!(t.get("run").is_none(), "unexpected run section");
+        let world = t["world"].as_str().expect("test.world");
+        if world.starts_with("run-os") {
+            assert_eq!(t["status"], "error");
+            assert!(t.get("compile").is_none(), "unexpected compile section");
+            assert!(t.get("run").is_none(), "unexpected run section");
+            assert!(
+                t["diags"]
+                    .as_array()
+                    .expect("diags[]")
+                    .iter()
+                    .any(|d| d["code"] == "ETEST_NO_RUN_UNSUPPORTED"),
+                "expected ETEST_NO_RUN_UNSUPPORTED diag"
+            );
+        } else {
+            assert_eq!(t["status"], "skip");
+            assert!(t.get("compile").is_some(), "missing compile section");
+            assert!(t.get("run").is_none(), "unexpected run section");
+        }
     }
 
     // Missing manifest yields a stable non-zero exit and a report.

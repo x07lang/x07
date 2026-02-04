@@ -439,6 +439,18 @@ fn compute_test_module_roots(
     let mut roots = project::collect_module_roots(&project_path, &project_manifest, &lock)
         .context("collect module roots")?;
 
+    let project_root = project_path
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let project_root_norm = normalize_module_root_path(&project_root);
+    let project_root_already_in_roots = roots
+        .iter()
+        .any(|p| normalize_module_root_path(p) == project_root_norm);
+    if !project_root_already_in_roots {
+        roots.push(project_root);
+    }
+
     let manifest_norm = normalize_module_root_path(manifest_dir);
     let already_in_roots = roots
         .iter()
@@ -832,6 +844,10 @@ fn run_one_test_os(
         (create_temp_test_dir(&base)?, true)
     };
 
+    let out_dir = out_dir
+        .canonicalize()
+        .with_context(|| format!("canonicalize out_dir: {}", out_dir.display()))?;
+
     let driver_path = out_dir.join("driver.x07.json");
     std::fs::write(&driver_path, driver_src)
         .with_context(|| format!("write driver: {}", driver_path.display()))?;
@@ -839,6 +855,9 @@ fn run_one_test_os(
     let exe_out_path = out_dir.join("solver");
 
     let mut cmd = std::process::Command::new(crate::util::resolve_sibling_or_path("x07-os-runner"));
+    if let Some(manifest_dir) = args.manifest.parent() {
+        cmd.current_dir(manifest_dir);
+    }
     cmd.arg("--world").arg(test.world.as_str());
     cmd.arg("--program").arg(&driver_path);
     cmd.arg("--compiled-out").arg(&exe_out_path);
@@ -849,8 +868,14 @@ fn run_one_test_os(
         };
         cmd.arg("--policy").arg(policy);
     }
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     for root in module_roots {
-        cmd.arg("--module-root").arg(root);
+        let abs = if root.is_absolute() {
+            root.clone()
+        } else {
+            cwd.join(root)
+        };
+        cmd.arg("--module-root").arg(abs);
     }
 
     let cpu_time_limit_seconds = match test.timeout_ms {

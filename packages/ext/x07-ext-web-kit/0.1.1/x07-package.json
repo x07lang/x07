@@ -1,0 +1,33 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-web-kit",
+  "version": "0.1.1",
+  "description": "Web service kit: router + canonical errors + OpenAPI 3.1 generation (pinned via arch/web).",
+  "docs": "Web service kit: router + canonical errors + OpenAPI 3.1 generation (pinned via arch/web).\n\nModules:\n- std.web.core\n- std.web.router\n- std.web.middleware\n- std.web.errors\n- std.web.openapi\n- std.web.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-web-kit@0.1.1\n- Pin your API catalog in arch/web.\n- Compile a router with std.web.router.compile_from_arch_v1.\n- Route requests with std.web.router.route_v1.\n- Render OpenAPI with std.web.openapi.render_v1.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.web.core",
+    "std.web.router",
+    "std.web.middleware",
+    "std.web.errors",
+    "std.web.openapi",
+    "std.web.tests"
+  ],
+  "meta": {
+    "determinism_tier": "mixed",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-data-model@0.1.8",
+      "ext-json-rs@0.1.4"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

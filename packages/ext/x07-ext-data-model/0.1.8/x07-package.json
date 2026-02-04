@@ -1,0 +1,46 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-data-model",
+  "description": "Typed data model with JSON/TOML/YAML/XML/INI/CSV codecs.",
+  "docs": "Typed data model with JSON/TOML/YAML/XML/INI/CSV codecs.\n\nModules:\n- ext.data_model\n- ext.data_model.json\n- ext.data_model.json.tests\n- ext.data_model.toml\n- ext.data_model.toml.tests\n- ext.data_model.yaml\n- ext.data_model.yaml.tests\n- ext.data_model.xml\n- ext.data_model.xml.tests\n- ext.data_model.ini\n- ext.data_model.ini.tests\n- ext.data_model.csv\n- ext.data_model.csv.tests\n- ext.data_model.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-data-model@0.1.8\n- Import the modules listed above.\n",
+  "version": "0.1.8",
+  "module_root": "modules",
+  "modules": [
+    "ext.data_model",
+    "ext.data_model.json",
+    "ext.data_model.json.tests",
+    "ext.data_model.toml",
+    "ext.data_model.toml.tests",
+    "ext.data_model.yaml",
+    "ext.data_model.yaml.tests",
+    "ext.data_model.xml",
+    "ext.data_model.xml.tests",
+    "ext.data_model.ini",
+    "ext.data_model.ini.tests",
+    "ext.data_model.csv",
+    "ext.data_model.csv.tests",
+    "ext.data_model.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "requires_packages": [
+      "ext-csv-rs@0.1.5",
+      "ext-ini-rs@0.1.4",
+      "ext-json-rs@0.1.4",
+      "ext-toml-rs@0.1.5",
+      "ext-unicode-rs@0.1.5",
+      "ext-xml-rs@0.1.4",
+      "ext-yaml-rs@0.1.4"
+    ],
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

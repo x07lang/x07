@@ -1,0 +1,75 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.streams",
+  "imports": [
+    "std.deque_u32",
+    "std.hash_map",
+    "std.hash_set",
+    "std.heap_u32"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.streams.open_read_bytes",
+        "ext.streams.open_read_view",
+        "ext.streams.open_read_vec_u8",
+        "ext.streams.open_read_hash_set_u32le",
+        "ext.streams.open_read_hash_map_kv_u32le_u32le",
+        "ext.streams.open_read_deque_u32le",
+        "ext.streams.open_read_heap_u32le"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.streams.open_read_bytes",
+      "params": [{"name": "b", "ty": "bytes"}],
+      "result": "iface",
+      "body": ["io.open_read_bytes", "b"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.streams.open_read_view",
+      "params": [{"name": "b", "ty": "bytes_view"}],
+      "result": "iface",
+      "body": ["io.open_read_bytes", "b"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.streams.open_read_vec_u8",
+      "params": [{"name": "b", "ty": "vec_u8"}],
+      "result": "iface",
+      "body": ["io.open_read_bytes", "b"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.streams.open_read_hash_set_u32le",
+      "params": [{"name": "s", "ty": "i32"}],
+      "result": "iface",
+      "body": ["ext.streams.open_read_bytes", ["std.hash_set.emit_u32le", "s"]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.streams.open_read_hash_map_kv_u32le_u32le",
+      "params": [{"name": "m", "ty": "i32"}],
+      "result": "iface",
+      "body": ["ext.streams.open_read_bytes", ["std.hash_map.emit_kv_u32le_u32le", "m"]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.streams.open_read_deque_u32le",
+      "params": [{"name": "dq", "ty": "bytes_view"}],
+      "result": "iface",
+      "body": ["ext.streams.open_read_bytes", ["std.deque_u32.emit_u32le", "dq"]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.streams.open_read_heap_u32le",
+      "params": [{"name": "h", "ty": "bytes_view"}],
+      "result": "iface",
+      "body": ["ext.streams.open_read_bytes", ["std.heap_u32.emit_u32le", ["view.to_bytes", "h"]]]
+    }
+  ]
+}
+

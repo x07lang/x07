@@ -1,0 +1,19 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "std.net.ws/frame_roundtrip_v1",
+      "world": "run-os-sandboxed",
+      "entry": "std.net.protos.tests.test_ws_frame_roundtrip_v1",
+      "expect": "pass",
+      "policy_json": "policies/net_protos_tests_v1.policy.json"
+    },
+    {
+      "id": "std.net.grpc/msg_prefix_v1",
+      "world": "run-os-sandboxed",
+      "entry": "std.net.protos.tests.test_grpc_msg_prefix_v1",
+      "expect": "pass",
+      "policy_json": "policies/net_protos_tests_v1.policy.json"
+    }
+  ]
+}

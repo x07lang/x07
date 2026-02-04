@@ -34,7 +34,7 @@ Key flags:
 
 - `--manifest <path>` (default: `arch/manifest.x07arch.json`)
 - `--lock <path>` (default: `arch/manifest.lock.json` only when it exists)
-- `--write-lock` (create/update lock deterministically)
+- `--write-lock` (create/update `arch/manifest.lock.json` deterministically; also writes `arch/contracts.lock.json` when `manifest.contracts_v1` is enabled)
 - `--emit-patch <path>` (emit multi-file JSON Patch set)
 - `--write` (apply suggested patches deterministically and re-run)
 - `--format json|text`

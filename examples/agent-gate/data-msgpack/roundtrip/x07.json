@@ -7,9 +7,14 @@
       "version": "0.1.2"
     },
     {
+      "name": "ext-csv-rs",
+      "path": ".x07/deps/ext-csv-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
       "name": "ext-data-model",
-      "path": ".x07/deps/ext-data-model/0.1.7",
-      "version": "0.1.7"
+      "path": ".x07/deps/ext-data-model/0.1.8",
+      "version": "0.1.8"
     },
     {
       "name": "ext-decimal-rs",
@@ -22,14 +27,19 @@
       "version": "0.1.4"
     },
     {
+      "name": "ext-ini-rs",
+      "path": ".x07/deps/ext-ini-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
       "name": "ext-json-rs",
       "path": ".x07/deps/ext-json-rs/0.1.4",
       "version": "0.1.4"
     },
     {
       "name": "ext-msgpack-rs",
-      "path": ".x07/deps/ext-msgpack-rs/0.1.5",
-      "version": "0.1.5"
+      "path": ".x07/deps/ext-msgpack-rs/0.1.6",
+      "version": "0.1.6"
     },
     {
       "name": "ext-toml-rs",
@@ -40,6 +50,11 @@
       "name": "ext-unicode-rs",
       "path": ".x07/deps/ext-unicode-rs/0.1.5",
       "version": "0.1.5"
+    },
+    {
+      "name": "ext-xml-rs",
+      "path": ".x07/deps/ext-xml-rs/0.1.4",
+      "version": "0.1.4"
     },
     {
       "name": "ext-yaml-rs",

@@ -16,14 +16,35 @@
 Each entry in `tests[]` is an object with:
 
 - `id` (required): ASCII-printable string, unique across the manifest.
-- `world` (required): `run-os` or `run-os-sandboxed`.
+- `world` (required): one of:
+  - deterministic fixture worlds: `solve-pure`, `solve-fs`, `solve-rr`, `solve-kv`, `solve-full`
+  - OS worlds: `run-os`, `run-os-sandboxed`
 - `entry` (required): `module.symbol` (must contain `.`).
 - `expect` (optional): `pass`, `fail`, or `skip` (default: `pass`).
 - `returns` (optional): `result_i32` or `bytes_status_v1` (default: `result_i32`).
 - `timeout_ms` (optional): integer `>= 1` (converted to a per-test CPU time limit, ceiling to seconds).
-- `fixture_root` (optional): must not be set for OS worlds (rejected by `x07 test`).
+- `fixture_root` (optional/required depending on world):
+  - forbidden for `solve-pure` and OS worlds
+  - required for `solve-fs`, `solve-rr`, `solve-kv`
+  - required for `solve-full` (must contain `fs/`, `rr/`, and `kv/` subdirectories)
+- `policy_json` (optional/required depending on world):
+  - required for `run-os-sandboxed`
+  - forbidden for all other worlds
 
 For integration-style checks that need filesystem/network access, prefer running `x07 run` (or a bundled executable via `x07 bundle`) in the sandbox profile and asserting on the runner report.
+
+## Module roots
+
+`x07 test` resolves modules using `--module-root` directories.
+
+Defaults:
+
+- if a project `x07.json` exists (searched upwards from the manifest directory), it uses:
+  - the project module roots
+  - dependency module roots from `x07.lock.json`
+  - the project root (directory containing `x07.json`) to support generated modules (for example under `gen/`)
+  - the manifest directory (as a fallback)
+- otherwise: it uses the manifest directory
 
 ## Diagnostics
 

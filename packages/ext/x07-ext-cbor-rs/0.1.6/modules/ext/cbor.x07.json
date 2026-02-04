@@ -1,0 +1,35 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.cbor",
+  "imports": [
+    "ext.cbor.data_model"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.cbor.encode_data_model_v1",
+        "ext.cbor.decode_data_model_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.encode_data_model_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["ext.cbor.data_model.emit_v1", "doc"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.decode_data_model_v1",
+      "params": [{ "name": "cbor", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["ext.cbor.data_model.parse_v1", "cbor"]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-cbor-rs@0.1.0"
+  }
+}

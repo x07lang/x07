@@ -2109,7 +2109,7 @@ fn arch_check_once(
                 });
             }
         };
-        if lock.manifest_path != expected_manifest_rel {
+        if lock.manifest_path != expected_manifest_rel && !write_lock {
             diags.push(diag_lint_error(
                 "E_ARCH_LOCK_MISMATCH",
                 &format!(
@@ -2916,6 +2916,7 @@ fn arch_check_once(
             manifest_path,
             &budgets,
             contracts,
+            write_lock,
             &modules_by_id,
             &module_to_node,
             &node_by_id,
@@ -3149,6 +3150,7 @@ fn check_contracts_v1(
     manifest_path: &Path,
     budgets: &ArchBudgets,
     contracts: &ArchContractsV1,
+    write_lock: bool,
     modules_by_id: &BTreeMap<String, ModuleInfo>,
     module_to_node: &BTreeMap<String, String>,
     node_by_id: &BTreeMap<String, NodeMatcher>,
@@ -6585,6 +6587,10 @@ fn check_contracts_v1(
         indexes,
         files,
     };
+
+    if write_lock {
+        return Ok(Some(contracts_lock_doc));
+    }
 
     let contracts_lock_path = repo_root.join("arch/contracts.lock.json");
     let lock_rel = display_relpath(repo_root, &contracts_lock_path);

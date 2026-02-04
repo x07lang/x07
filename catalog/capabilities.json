@@ -6,7 +6,7 @@
       "summary": "Parse CLI argv (argv_v1) and define CLI interfaces.",
       "canonical": {
         "name": "ext-cli",
-        "version": "0.1.10"
+        "version": "0.1.11"
       },
       "status": "stable"
     },
@@ -15,7 +15,7 @@
       "summary": "CLI UX primitives: deterministic progress, tables, and JSONL output.",
       "canonical": {
         "name": "ext-cli-ux",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "status": "experimental"
     },
@@ -57,7 +57,7 @@
       "summary": "HTTP/2 protocol helpers for OS worlds (run-os*).",
       "canonical": {
         "name": "ext-net-protos-c",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "worlds": [
         "run-os",
@@ -70,7 +70,7 @@
       "summary": "WebSocket framing helpers for OS worlds (run-os*).",
       "canonical": {
         "name": "ext-net-protos-c",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "worlds": [
         "run-os",
@@ -83,7 +83,7 @@
       "summary": "gRPC framing/unary helpers over HTTP/2 for OS worlds (run-os*).",
       "canonical": {
         "name": "ext-net-protos-c",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "worlds": [
         "run-os",
@@ -96,7 +96,7 @@
       "summary": "JWT (Ed25519) encode/verify pinned by arch/crypto profiles (run-os*).",
       "canonical": {
         "name": "ext-auth-jwt",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "worlds": [
         "run-os",
@@ -172,7 +172,7 @@
       "summary": "Web service kit: router + canonical errors + OpenAPI 3.1 generation.",
       "canonical": {
         "name": "ext-web-kit",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "status": "experimental"
     },
@@ -181,7 +181,7 @@
       "summary": "Crawling helpers: robots/sitemaps/url normalization/scheduling + RR fetch helpers.",
       "canonical": {
         "name": "ext-web-crawl",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "status": "experimental"
     },
@@ -190,7 +190,7 @@
       "summary": "Messaging core: envelope encoding + RR entry format + driver interface.",
       "canonical": {
         "name": "ext-msg-core",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "status": "experimental"
     },
@@ -227,7 +227,7 @@
       "summary": "Typed DataModel values and deterministic codecs (JSON/TOML/YAML).",
       "canonical": {
         "name": "ext-data-model",
-        "version": "0.1.7"
+        "version": "0.1.8"
       },
       "status": "stable"
     },
@@ -254,7 +254,7 @@
       "summary": "CSV parse/encode.",
       "canonical": {
         "name": "ext-csv-rs",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "status": "stable"
     },
@@ -272,12 +272,12 @@
       "summary": "CBOR encode/decode + DataModel integration.",
       "canonical": {
         "name": "ext-cbor-rs",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "alternatives": [
         {
           "name": "ext-data-model",
-          "version": "0.1.7"
+          "version": "0.1.8"
         }
       ],
       "status": "experimental"
@@ -287,12 +287,12 @@
       "summary": "MessagePack encode/decode + DataModel integration.",
       "canonical": {
         "name": "ext-msgpack-rs",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "alternatives": [
         {
           "name": "ext-data-model",
-          "version": "0.1.7"
+          "version": "0.1.8"
         }
       ],
       "status": "experimental"
@@ -371,7 +371,7 @@
       "summary": "Tar/tgz parsing and safe extraction helpers pinned by arch/archive contracts.",
       "canonical": {
         "name": "ext-archive-c",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "status": "experimental"
     },
@@ -416,7 +416,7 @@
       "summary": "Metrics snapshot + OpenMetrics rendering + OTLP encoding/export.",
       "canonical": {
         "name": "ext-obs",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "worlds": [
         "run-os",
@@ -439,7 +439,7 @@
       "summary": "Database core interfaces and pooling for OS worlds.",
       "canonical": {
         "name": "ext-db-core",
-        "version": "0.1.8"
+        "version": "0.1.9"
       },
       "worlds": [
         "run-os",
@@ -452,7 +452,7 @@
       "summary": "Deterministic DB migration plans and apply helpers (run-os*).",
       "canonical": {
         "name": "ext-db-migrate",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "worlds": [
         "run-os",

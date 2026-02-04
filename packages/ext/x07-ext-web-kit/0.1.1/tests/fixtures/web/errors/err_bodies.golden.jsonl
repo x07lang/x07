@@ -1,0 +1,3 @@
+{"code":1,"http_status":400,"stable_id":"bad_request_v1"}
+{"code":2,"http_status":404,"stable_id":"not_found_v1"}
+{"code":3,"http_status":500,"stable_id":"internal_v1"}

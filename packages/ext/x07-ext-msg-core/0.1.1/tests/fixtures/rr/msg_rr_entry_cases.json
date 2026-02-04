@@ -1,0 +1,24 @@
+[
+  {
+    "op_tag": 1,
+    "driver_kind": 1,
+    "endpoint_hash": "kafka_local",
+    "topic": "events",
+    "key": "k1",
+    "value": "v1",
+    "headers": { "a": "1", "b": "2" },
+    "ack_tag": 1,
+    "ack": "OK"
+  },
+  {
+    "op_tag": 2,
+    "driver_kind": 2,
+    "endpoint_hash": "amqp_local",
+    "topic": "events",
+    "key": "",
+    "value": "hello",
+    "headers": {},
+    "ack_tag": 1,
+    "ack": "ACK"
+  }
+]

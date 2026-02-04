@@ -147,6 +147,20 @@
       "expect": "pass"
     },
     {
+      "id": "smoke/fs_read_hello_run_os_sandboxed",
+      "world": "run-os-sandboxed",
+      "entry": "smoke_fs_os.fs_read_hello_run_os_sandboxed",
+      "policy_json": "policies/fs_smoke_os.policy.json",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/fs_read_task_hello_run_os_sandboxed",
+      "world": "run-os-sandboxed",
+      "entry": "smoke_fs_os.fs_read_task_hello_run_os_sandboxed",
+      "policy_json": "policies/fs_smoke_os.policy.json",
+      "expect": "pass"
+    },
+    {
       "id": "smoke/stream_pipe_fs_open_read_collect",
       "world": "solve-fs",
       "entry": "smoke_stream_pipe_fs.pipe_fs_open_read_collect",

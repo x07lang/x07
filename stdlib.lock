@@ -124,8 +124,8 @@
       "name": "std.fs",
       "path": "stdlib/std/0.1.1/modules/std/fs.x07.json",
       "relpath": "std/0.1.1/modules/std/fs.x07.json",
-      "sha256": "0dab784f4a648a3711919052df184975cc01574bc01f782832a9045e7a458c2d",
-      "size_bytes": 1271,
+      "sha256": "4b59a0ec169ae60b1e0f1fa99ec9d6eef97f8414ea8f29e127decbfa511c80e3",
+      "size_bytes": 1286,
       "version": "0.1.1"
     },
     {
@@ -482,6 +482,6 @@
       "version": "0.1.1"
     }
   ],
-  "stdlib_hash": "7c38b1ebf8f4f02c3e7569a3622647d38c6afa75be80ef3e95ed79cbf8aa7998",
+  "stdlib_hash": "f26d312556d821a7b75d797b55dfca65267ac41f517ded4e8235a3240156eea3",
   "stdlib_root": "stdlib/std"
 }

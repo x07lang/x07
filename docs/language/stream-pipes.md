@@ -263,9 +263,39 @@ Notes:
 - `id` MUST be a `bytes.lit` so the compiler can resolve the plugin deterministically and `x07 arch check` can verify it against the pinned registry.
 - Plugin ids are resolved from toolchain contracts under `arch/stream/plugins/index.x07sp.json`.
 - Some built-in stages (for example `split_lines_v1`, `frame_u32le_v1`, `deframe_u32le_v1`, `json_canon_stream_v1`) are implemented via the same plugin mechanism internally, without requiring `.x07.json` rewrites.
+- If `strict_cfg_canon=1` (default), `cfg` must be canonical JSON bytes. Set `strict_cfg_canon=0` when a plugin uses a non-JSON binary config encoding.
 - Plugin emit APIs:
   - `emit_alloc` + `emit_commit`: copy/write output buffers.
   - `emit_view`: borrowed-view output (view_kind `1`=current input, `2`=scratch). Returns error code `118` when view output is not allowed; plugins should fall back to `emit_alloc`.
+
+#### Built-in plugin ids (cfg bytes layouts)
+
+Some pinned toolchain plugins use binary `cfg` layouts (little-endian `i32` fields). When calling them via `std.stream.xf.plugin_v1`, set `strict_cfg_canon=0`.
+
+- `xf.frame_u32le_v1`
+  - `cfg` must be empty (`len = 0`).
+- `xf.split_lines_v1`
+  - `cfg` length: 8 bytes
+  - fields:
+    - `delim_i32le` (for `\n`, use `10`)
+    - `max_line_bytes_i32le` (must be `>= 1`)
+- `xf.deframe_u32le_v1`
+  - `cfg` length: 16 bytes
+  - fields:
+    - `max_frame_bytes_i32le` (must be `>= 1`)
+    - `max_frames_i32le` (`0` = unlimited)
+    - `allow_empty_i32le` (`0` or `1`)
+    - `on_truncated_i32le` (`0` = error, `1` = drop trailing partial frame)
+- `xf.json_canon_stream_v1`
+  - `cfg` length: 20 bytes
+  - fields:
+    - `max_depth_i32le` (must be `>= 1`)
+    - `max_total_json_bytes_i32le` (must be `>= 1`)
+    - `max_object_members_i32le` (must be `>= 1`)
+    - `max_object_total_bytes_i32le` (must be `>= 1`)
+    - `emit_chunk_max_bytes_i32le` (must be `>= 1`)
+
+For writing these values from X07, use `std.codec.write_u32_le` and concatenate the resulting 4-byte chunks (for example, with `std.bytes.concat` or a `vec_u8` builder).
 
 ### Parallel map (`par_map_stream_*_v1`)
 

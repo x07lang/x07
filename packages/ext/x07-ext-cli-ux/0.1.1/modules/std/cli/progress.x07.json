@@ -1,0 +1,65 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.cli.progress",
+  "imports": [
+    "std.bytes",
+    "std.cli.profile",
+    "std.fmt",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.cli.progress.render_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.cli.progress._truncate_v1",
+      "params": [
+        { "name": "b", "ty": "bytes" },
+        { "name": "max", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["bytes.len", "b"]],
+        ["if", ["<", "max", 0], ["return", "b"], 0],
+        ["if", ["<u", "n", "max"], ["return", "b"], 0],
+        ["std.bytes.slice", ["bytes.view", "b"], 0, "max"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.cli.progress.render_v1",
+      "params": [
+        { "name": "profile_doc", "ty": "bytes_view" },
+        { "name": "done", "ty": "i32" },
+        { "name": "total", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "mlb", ["std.cli.profile.max_line_bytes_v1", "profile_doc"]],
+        ["let", "done_b", ["std.fmt.u32_to_dec", "done"]],
+        ["let", "out", ["std.vec.with_capacity", 64]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "done_b"]]],
+        [
+          "if",
+          ["<=", "total", 0],
+          0,
+          [
+            "begin",
+            ["let", "total_b", ["std.fmt.u32_to_dec", "total"]],
+            ["set", "out", ["std.vec.push", "out", 47]],
+            ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "total_b"]]],
+            0
+          ]
+        ],
+        ["std.cli.progress._truncate_v1", ["std.vec.as_bytes", "out"], "mlb"]
+      ]
+    }
+  ]
+}

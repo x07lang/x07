@@ -1,0 +1,92 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.web.tests",
+  "imports": [
+    "std.fs",
+    "std.test",
+    "std.text.ascii",
+    "std.text.slices",
+    "std.web.errors",
+    "std.web.openapi",
+    "std.web.router"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.web.tests.test_errors_encode_v1",
+        "std.web.tests.test_openapi_render_v1",
+        "std.web.tests.test_router_compile_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.tests.test_router_compile_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "api_id", ["bytes.lit", "service_v1"]],
+        ["let", "res", ["std.web.router.compile_from_arch_v1", ["bytes.view", "api_id"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "api_doc", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+        ["let", "req_ok", ["bytes.lit", "/healthz"]],
+        ["let", "r1", ["std.web.router.route_v1", ["bytes.view", "api_doc"], ["bytes.view", "req_ok"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "r1"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "ep", ["result_bytes.unwrap_or", "r1", ["bytes.alloc", 0]]],
+        ["try", ["std.test.assert_bytes_eq", "ep", ["bytes.lit", "healthz"], ["std.test.code_assert_bytes_eq"]]],
+        ["let", "req_nf", ["bytes.lit", "/missing"]],
+        ["let", "r2", ["std.web.router.route_v1", ["bytes.view", "api_doc"], ["bytes.view", "req_nf"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "r2"], 2, ["std.test.code_assert_i32_eq"]]],
+        ["let", "req_bad", ["bytes.alloc", 0]],
+        ["let", "r3", ["std.web.router.route_v1", ["bytes.view", "api_doc"], ["bytes.view", "req_bad"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "r3"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.tests.test_openapi_render_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "api_id", ["bytes.lit", "service_v1"]],
+        ["let", "res", ["std.web.openapi.render_v1", ["bytes.view", "api_id"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "got", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+        ["let", "golden_path", ["bytes.lit", "web/openapi/service_v1.openapi.golden.json"]],
+        ["let", "expected", ["std.fs.read", ["bytes.view", "golden_path"]]],
+        ["try", ["std.test.assert_bytes_eq", "got", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.tests.test_errors_encode_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "golden_path", ["bytes.lit", "web/errors/err_bodies.golden.jsonl"]],
+        ["let", "golden", ["std.fs.read", ["bytes.view", "golden_path"]]],
+        ["let", "golden_v", ["bytes.view", "golden"]],
+        ["let", "sl", ["std.text.ascii.split_lines_view", "golden_v"]],
+        ["let", "slv", ["bytes.view", "sl"]],
+        ["try", ["std.test.assert_i32_eq", ["std.text.slices.count_v1", "slv"], 3, ["std.test.code_assert_i32_eq"]]],
+        ["let", "e1", ["std.web.errors.encode_v1", 1]],
+        ["let", "e2", ["std.web.errors.encode_v1", 2]],
+        ["let", "e3", ["std.web.errors.encode_v1", 3]],
+        ["let", "l1", ["std.text.slices.view_at_v1", "golden_v", "slv", 0]],
+        ["let", "l2", ["std.text.slices.view_at_v1", "golden_v", "slv", 1]],
+        ["let", "l3", ["std.text.slices.view_at_v1", "golden_v", "slv", 2]],
+        ["try", ["std.test.assert_bytes_eq", "e1", ["view.to_bytes", "l1"], ["std.test.code_assert_bytes_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", "e2", ["view.to_bytes", "l2"], ["std.test.code_assert_bytes_eq"]]],
+        ["try", ["std.test.assert_bytes_eq", "e3", ["view.to_bytes", "l3"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}
+

@@ -1,0 +1,19 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.streams.fs",
+  "imports": ["std.fs"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["ext.streams.fs.open_read"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.streams.fs.open_read",
+      "params": [{"name": "path", "ty": "bytes_view"}],
+      "result": "iface",
+      "body": ["std.fs.open_read", "path"]
+    }
+  ]
+}

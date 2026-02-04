@@ -1,0 +1,25 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-net-protos-c",
+  "version": "0.1.1",
+  "description": "HTTP/2 + WebSocket + gRPC helpers, pinned by arch/net contracts.",
+  "docs": "HTTP/2 + WebSocket + gRPC helpers pinned by arch/net contracts.\n\nModules:\n- std.net.http2\n- std.net.ws\n- std.net.grpc\n- std.net.protos.tests\n\nWorlds:\n- run-os / run-os-sandboxed only\n\nUsage:\n- Add dependency: x07 pkg add ext-net-protos-c@0.1.1\n- Use *_from_arch_v1 helpers with config under arch/net.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.net.http2",
+    "std.net.ws",
+    "std.net.grpc",
+    "std.net.protos.tests"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
+    "requires_packages": [
+      "ext-byteorder-rs@0.1.4",
+      "ext-data-model@0.1.8",
+      "ext-json-rs@0.1.4"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

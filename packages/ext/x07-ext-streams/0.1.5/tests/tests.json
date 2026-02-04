@@ -1,0 +1,54 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "ext.streams/open_read_bytes_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.streams.tests.test_open_read_bytes_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.streams.fs/open_read_fs_hello",
+      "world": "solve-fs",
+      "entry": "ext.streams.fs.tests.test_open_read_fs_hello",
+      "fixture_root": "fixtures/fs_smoke/root",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.streams/open_read_view_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.streams.tests.test_open_read_view_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.streams/open_read_vec_u8_roundtrip",
+      "world": "solve-pure",
+      "entry": "ext.streams.tests.test_open_read_vec_u8_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.streams/hash_set_u32le_matches_emit",
+      "world": "solve-pure",
+      "entry": "ext.streams.tests.test_hash_set_u32le_matches_emit",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.streams/hash_map_kv_u32le_u32le_matches_emit",
+      "world": "solve-pure",
+      "entry": "ext.streams.tests.test_hash_map_kv_u32le_u32le_matches_emit",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.streams/deque_u32le_matches_emit",
+      "world": "solve-pure",
+      "entry": "ext.streams.tests.test_deque_u32le_matches_emit",
+      "expect": "pass"
+    },
+    {
+      "id": "ext.streams/heap_u32le_matches_emit",
+      "world": "solve-pure",
+      "entry": "ext.streams.tests.test_heap_u32le_matches_emit",
+      "expect": "pass"
+    }
+  ]
+}

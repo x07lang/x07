@@ -20,7 +20,7 @@ Supported schema versions:
 - `x07 arch check --out <path>` (writes report; stdout when omitted)
 - `x07 arch check --emit-patch <path>` (writes a multi-file JSON Patch set)
 - `x07 arch check --write` (applies suggested patches deterministically)
-- `x07 arch check --write-lock` (writes/updates `arch/manifest.lock.json`)
+- `x07 arch check --write-lock` (writes/updates `arch/manifest.lock.json`, and updates `arch/contracts.lock.json` when `manifest.contracts_v1` is enabled)
 
 Budgets:
 
@@ -151,7 +151,7 @@ If `manifest.contracts_v1` is present, `x07 arch check` can also validate repo-l
   - see: [Budget scopes](../language/budget-scopes.md)
 - `contracts_v1.stream_plugins` (stream plugin contracts)
   - validates the stream plugins index and referenced plugin spec files
-  - locks the registry into `arch/contracts.lock.json`
+  - locks the registry into `arch/contracts.lock.json` (written/updated by `--write-lock`)
   - verifies `std.stream.xf.plugin_v1` usage references declared plugins (and is allowed in the module’s world)
 - `contracts_v1.archive` (archive policy contracts)
   - validates `arch/archive/index.x07archive.json` and referenced profile files under `arch/archive/profiles/`
