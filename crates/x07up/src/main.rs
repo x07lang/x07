@@ -13,6 +13,7 @@ use sha2::{Digest as _, Sha256};
 const DEFAULT_CHANNELS_URL: &str = "https://x07lang.org/install/channels.json";
 const X07_TOOLCHAIN_TOML: &str = "x07-toolchain.toml";
 const X07_AGENT_DIR: &str = ".agent";
+const SELF_UPDATE_GUARD_ENV: &str = "X07UP_SELF_UPDATE_GUARD";
 
 const SHOW_SCHEMA_VERSION: &str = "x07up.show@0.1.0";
 const INSTALL_SCHEMA_VERSION: &str = "x07up.install.report@0.1.0";
@@ -365,7 +366,6 @@ struct ChannelsManifest {
 #[derive(Debug, Deserialize)]
 struct ChannelEntry {
     toolchain: String,
-    #[allow(dead_code)]
     x07up: String,
     #[allow(dead_code)]
     notes: Option<String>,
@@ -380,7 +380,6 @@ struct ToolchainRelease {
     assets: BTreeMap<String, Artifact>,
     #[allow(dead_code)]
     components: Option<BTreeMap<String, Artifact>>,
-    #[allow(dead_code)]
     min_required: Option<BTreeMap<String, String>>,
 }
 
@@ -390,7 +389,6 @@ struct X07upRelease {
     published_at: String,
     #[allow(dead_code)]
     notes: Option<String>,
-    #[allow(dead_code)]
     assets: BTreeMap<String, Artifact>,
 }
 
@@ -437,6 +435,88 @@ fn detect_target_key() -> Result<String> {
         bail!("unsupported host for x07up: os={os} arch={arch}");
     }
     Ok(key.to_string())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct SemVer {
+    major: u64,
+    minor: u64,
+    patch: u64,
+}
+
+fn parse_semver_prefix(s: &str) -> Option<SemVer> {
+    let s = s.trim();
+    let s = s.strip_prefix('v').unwrap_or(s);
+    let end = s
+        .find(|c: char| !c.is_ascii_digit() && c != '.')
+        .unwrap_or(s.len());
+    let prefix = &s[..end];
+    let mut parts = prefix.split('.');
+    let major = parts.next()?.parse::<u64>().ok()?;
+    let minor = parts.next()?.parse::<u64>().ok()?;
+    let patch = parts.next()?.parse::<u64>().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(SemVer {
+        major,
+        minor,
+        patch,
+    })
+}
+
+fn current_x07up_version() -> Option<SemVer> {
+    parse_semver_prefix(env!("CARGO_PKG_VERSION"))
+}
+
+fn toolchain_min_required_x07up(release: &ToolchainRelease) -> Option<&str> {
+    let min = release.min_required.as_ref()?;
+    let v = min.get("x07up")?.trim();
+    if v.is_empty() {
+        return None;
+    }
+    Some(v)
+}
+
+fn choose_x07up_tag(channel: Option<&str>, min_required: Option<&str>) -> Option<String> {
+    let channel = channel.and_then(|s| {
+        let t = s.trim();
+        if t.is_empty() {
+            None
+        } else {
+            Some(t)
+        }
+    });
+    let min_required = min_required.and_then(|s| {
+        let t = s.trim();
+        if t.is_empty() {
+            None
+        } else {
+            Some(t)
+        }
+    });
+
+    match (channel, min_required) {
+        (None, None) => None,
+        (Some(c), None) => Some(c.to_string()),
+        (None, Some(r)) => Some(r.to_string()),
+        (Some(c), Some(r)) => {
+            let vc = parse_semver_prefix(c);
+            let vr = parse_semver_prefix(r);
+            match (vc, vr) {
+                (Some(vc), Some(vr)) => {
+                    if vr > vc {
+                        Some(r.to_string())
+                    } else {
+                        Some(c.to_string())
+                    }
+                }
+                (None, Some(_)) => Some(r.to_string()),
+                (Some(_), None) => Some(c.to_string()),
+                (None, None) => Some(r.to_string()),
+            }
+        }
+    }
 }
 
 fn looks_like_tag(s: &str) -> bool {
@@ -494,14 +574,18 @@ fn cmd_install(
     }
 
     let manifest = fetch_channels_manifest(channels_url)?;
-    let (channel, toolchain_tag) = if looks_like_tag(&spec) {
-        (None, spec.clone())
+    let (channel, toolchain_tag, channel_x07up) = if looks_like_tag(&spec) {
+        (None, spec.clone(), None)
     } else {
         let entry = manifest
             .channels
             .get(&spec)
             .ok_or_else(|| anyhow!("channel not found: {spec}"))?;
-        (Some(spec.clone()), entry.toolchain.clone())
+        (
+            Some(spec.clone()),
+            entry.toolchain.clone(),
+            Some(entry.x07up.clone()),
+        )
     };
     validate_toolchain_id(&toolchain_tag)?;
 
@@ -509,6 +593,13 @@ fn cmd_install(
         .toolchains
         .get(&toolchain_tag)
         .ok_or_else(|| anyhow!("toolchain not found in manifest: {toolchain_tag}"))?;
+
+    if let Some(tag) = choose_x07up_tag(
+        channel_x07up.as_deref(),
+        toolchain_min_required_x07up(release),
+    ) {
+        maybe_self_update_and_reexec(root, &manifest, &tag, reporter)?;
+    }
 
     let out_dir = toolchains_dir(root);
     out_dir.mkdir_all()?;
@@ -941,12 +1032,11 @@ fn cmd_update(
     reporter: &Reporter,
 ) -> Result<std::process::ExitCode> {
     let manifest = fetch_channels_manifest(channels_url)?;
-    let stable = manifest
+    let stable_channel = manifest
         .channels
         .get("stable")
-        .ok_or_else(|| anyhow!("channels.json missing 'stable' channel"))?
-        .toolchain
-        .clone();
+        .ok_or_else(|| anyhow!("channels.json missing 'stable' channel"))?;
+    let stable = stable_channel.toolchain.clone();
 
     let cfg = Config::load(&config_path(root))?;
     let current = cfg.channels.get("stable").cloned();
@@ -980,6 +1070,17 @@ fn cmd_update(
         return Ok(std::process::ExitCode::SUCCESS);
     }
 
+    let stable_release = manifest
+        .toolchains
+        .get(&stable)
+        .ok_or_else(|| anyhow!("toolchain not found in manifest: {stable}"))?;
+    if let Some(tag) = choose_x07up_tag(
+        Some(stable_channel.x07up.as_str()),
+        toolchain_min_required_x07up(stable_release),
+    ) {
+        maybe_self_update_and_reexec(root, &manifest, &tag, reporter)?;
+    }
+
     reporter.progress("install latest stable");
     cmd_install(
         root,
@@ -993,6 +1094,162 @@ fn cmd_update(
     )?;
     cmd_default(root, "stable", reporter)?;
     Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn maybe_self_update_and_reexec(
+    root: &Path,
+    manifest: &ChannelsManifest,
+    desired_x07up_tag: &str,
+    reporter: &Reporter,
+) -> Result<()> {
+    let Some(current) = current_x07up_version() else {
+        return Ok(());
+    };
+    let Some(desired) = parse_semver_prefix(desired_x07up_tag) else {
+        return Ok(());
+    };
+    if current >= desired {
+        return Ok(());
+    }
+
+    if let Some(prev) = std::env::var_os(SELF_UPDATE_GUARD_ENV) {
+        let prev = prev.to_string_lossy();
+        if prev == desired_x07up_tag {
+            bail!(
+                "x07up self-update loop detected (current={} desired={}); hint: rerun install.sh to refresh x07up",
+                env!("CARGO_PKG_VERSION"),
+                desired_x07up_tag
+            );
+        }
+    }
+
+    reporter.progress(&format!("self-update x07up: {desired_x07up_tag}"));
+    let installed = install_x07up_release(root, manifest, desired_x07up_tag, reporter)?;
+    exec_updated_x07up(&installed, desired_x07up_tag)?;
+    Ok(())
+}
+
+fn install_x07up_release(
+    root: &Path,
+    manifest: &ChannelsManifest,
+    x07up_tag: &str,
+    reporter: &Reporter,
+) -> Result<PathBuf> {
+    let target = detect_target_key()?;
+    let release = manifest
+        .x07up
+        .get(x07up_tag)
+        .ok_or_else(|| anyhow!("x07up release not found in manifest: {x07up_tag}"))?;
+    let asset = release.assets.get(&target).ok_or_else(|| {
+        anyhow!(
+            "no x07up asset for target={target}; available: {}",
+            release
+                .assets
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    })?;
+
+    reporter.progress(&format!("download x07up: {}", asset.url));
+    let dl_dir = cache_dir(root).join("downloads");
+    dl_dir.mkdir_all()?;
+
+    let filename =
+        url_filename(&asset.url).unwrap_or_else(|| format!("x07up-{x07up_tag}-{target}"));
+    let archive_path = dl_dir.join(filename);
+    download_verify(&asset.url, &archive_path, &asset.sha256)?;
+
+    let extract_root = cache_dir(root).join("x07up");
+    extract_root.mkdir_all()?;
+    let tmp_dir = extract_root.join(format!(".tmp_{x07up_tag}_{}", std::process::id()));
+    if tmp_dir.exists() {
+        std::fs::remove_dir_all(&tmp_dir).ok();
+    }
+    tmp_dir.mkdir_all()?;
+    reporter.progress("extract x07up");
+    extract_archive(&archive_path, &asset.format, &tmp_dir)?;
+
+    let found = find_x07up_binary(&tmp_dir)?;
+
+    reporter.progress("install x07up proxies");
+    let dir = bin_dir(root);
+    dir.mkdir_all()?;
+    let tools = [
+        "x07",
+        "x07c",
+        "x07-host-runner",
+        "x07-os-runner",
+        "x07import-cli",
+        "x07up",
+    ];
+    for tool in tools {
+        let dst = dir.join(tool);
+        install_proxy_binary(&found, &dst)?;
+    }
+
+    std::fs::remove_dir_all(&tmp_dir).ok();
+    Ok(dir.join("x07up"))
+}
+
+fn find_x07up_binary(extract_dir: &Path) -> Result<PathBuf> {
+    let direct = extract_dir.join("x07up");
+    if direct.is_file() {
+        return Ok(direct);
+    }
+    let bin = extract_dir.join("bin").join("x07up");
+    if bin.is_file() {
+        return Ok(bin);
+    }
+
+    fn walk(dir: &Path) -> Result<Option<PathBuf>> {
+        for entry in
+            std::fs::read_dir(dir).with_context(|| format!("read_dir {}", dir.display()))?
+        {
+            let entry = entry?;
+            let ty = entry.file_type()?;
+            let path = entry.path();
+            if ty.is_file() && entry.file_name() == "x07up" {
+                return Ok(Some(path));
+            }
+            if ty.is_dir() {
+                if let Some(found) = walk(&path)? {
+                    return Ok(Some(found));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    walk(extract_dir)?.ok_or_else(|| {
+        anyhow!(
+            "x07up binary not found in archive extract dir: {}",
+            extract_dir.display()
+        )
+    })
+}
+
+fn exec_updated_x07up(path: &Path, guard: &str) -> Result<std::process::ExitCode> {
+    let mut cmd = std::process::Command::new(path);
+    cmd.args(std::env::args_os().skip(1));
+    cmd.env(SELF_UPDATE_GUARD_ENV, guard);
+    cmd.stdin(std::process::Stdio::inherit());
+    cmd.stdout(std::process::Stdio::inherit());
+    cmd.stderr(std::process::Stdio::inherit());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt as _;
+        let err = cmd.exec();
+        bail!("exec updated x07up failed: {err}");
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = cmd;
+        bail!("exec_updated_x07up: unsupported platform");
+    }
 }
 
 fn cmd_docs(root: &Path, args: DocsArgs, reporter: &Reporter) -> Result<std::process::ExitCode> {
@@ -1832,4 +2089,73 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_semver_prefix_accepts_plain() {
+        assert_eq!(
+            parse_semver_prefix("0.0.86"),
+            Some(SemVer {
+                major: 0,
+                minor: 0,
+                patch: 86
+            })
+        );
+    }
+
+    #[test]
+    fn parse_semver_prefix_accepts_tag_and_suffix() {
+        assert_eq!(
+            parse_semver_prefix("v0.0.0-ci"),
+            Some(SemVer {
+                major: 0,
+                minor: 0,
+                patch: 0
+            })
+        );
+        assert_eq!(
+            parse_semver_prefix("v1.2.3+meta"),
+            Some(SemVer {
+                major: 1,
+                minor: 2,
+                patch: 3
+            })
+        );
+    }
+
+    #[test]
+    fn choose_x07up_tag_prefers_higher_version() {
+        assert_eq!(
+            choose_x07up_tag(Some("v0.0.80"), Some("v0.0.82")),
+            Some("v0.0.82".to_string())
+        );
+        assert_eq!(
+            choose_x07up_tag(Some("v0.0.85"), Some("v0.0.82")),
+            Some("v0.0.85".to_string())
+        );
+        assert_eq!(
+            choose_x07up_tag(None, Some("v0.0.82")),
+            Some("v0.0.82".to_string())
+        );
+    }
+
+    #[test]
+    fn find_x07up_binary_prefers_common_locations() -> Result<()> {
+        let base = std::env::temp_dir().join(format!("x07up-test-{}", std::process::id()));
+        if base.exists() {
+            std::fs::remove_dir_all(&base).ok();
+        }
+        base.mkdir_all()?;
+        let bin_dir = base.join("bin");
+        bin_dir.mkdir_all()?;
+        std::fs::write(bin_dir.join("x07up"), b"stub")?;
+        let found = find_x07up_binary(&base)?;
+        assert_eq!(found, bin_dir.join("x07up"));
+        std::fs::remove_dir_all(&base).ok();
+        Ok(())
+    }
 }
