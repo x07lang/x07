@@ -61,7 +61,7 @@ This note summarizes the readiness reports produced under `/Users/webik/projects
 
 **Fix (ext packages):**
 - Bump the dependent packages to new patch versions with `meta.requires_packages` updated to `ext-data-model@0.1.8`.
-- Run `scripts/sync_ext_package_versions.py --write` to update the capability map and example/fixture lockfiles deterministically.
+- Run `python3 scripts/publish_ext_packages.py sync --write` to update the capability map and example/fixture lockfiles deterministically.
 
 ## Misunderstandings / doc gaps found in reports
 
@@ -98,4 +98,3 @@ Action: ensure docs/examples mention `ext.streams.fs` explicitly when the goal i
 - Publish a codec capability matrix (parse/emit/streaming semantics/known lossy behavior) for the ext codecs used in readiness prompts.
 - Consider a small stdlib helper for framing u32-length items to reduce manual byte writes in tests.
 - Improve `x07 test` failures to optionally surface ERR-doc payloads (err_code/msg + structured payload when present).
-

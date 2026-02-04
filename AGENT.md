@@ -36,3 +36,16 @@
 - Canonical solver format: x07AST JSON (`*.x07.json`, `x07.x07ast@0.3.0`) with json-sexpr expressions (`["head", ...]`).
 - Built-in stdlib version: `stdlib/std/0.1.1/`.
 - Systems-only surface is world-gated: `unsafe`, raw pointers, and `extern "C"` are available only in `run-os*` worlds (not in `solve-*` worlds).
+
+## Package publishing (registry)
+
+- Credentials are stored in `~/.x07/credentials.json` under `tokens["sparse+https://registry.x07.io/index/"]`.
+  - Prefer stdin to avoid leaking tokens into shell history:
+    - `printf '%s' "$X07_TOKEN" | x07 pkg login --index sparse+https://registry.x07.io/index/ --token-stdin`
+- Sync ext package pins + example lockfiles:
+  - Check: `python3 scripts/publish_ext_packages.py sync`
+  - Write: `python3 scripts/publish_ext_packages.py sync --write`
+- Publish missing ext versions from `catalog/capabilities.json` (plus transitive `meta.requires_packages`):
+  - Check: `python3 scripts/publish_ext_packages.py --check`
+  - Publish: `python3 scripts/publish_ext_packages.py`
+- Sparse index reads are cached (~5 minutes); prefer verifying publishes via the registry API (`GET /v1/packages/<name>`).
