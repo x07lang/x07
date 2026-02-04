@@ -10,7 +10,7 @@
   },
   "fs": {
     "enabled": true,
-    "read_roots": ["arch/obs", "packages/ext/x07-ext-obs/0.1.0/tests"],
+    "read_roots": ["arch/obs", "packages/ext/x07-ext-obs/0.1.1/tests"],
     "write_roots": [],
     "deny_hidden": true,
     "allow_symlinks": false,
