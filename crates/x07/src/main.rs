@@ -591,6 +591,41 @@ fn infer_arch_root_from_manifest(manifest: &Path) -> Option<PathBuf> {
     None
 }
 
+fn parse_run_os_policy_read_roots(policy_path: &Path) -> Result<Vec<PathBuf>> {
+    let bytes = std::fs::read(policy_path)
+        .with_context(|| format!("read run-os policy: {}", policy_path.display()))?;
+    let doc: serde_json::Value = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse run-os policy JSON: {}", policy_path.display()))?;
+
+    let fs = doc
+        .get("fs")
+        .and_then(|v| v.as_object())
+        .context("run-os policy: expected fs object")?;
+    let roots = fs
+        .get("read_roots")
+        .and_then(|v| v.as_array())
+        .context("run-os policy: expected fs.read_roots array")?;
+
+    let mut out = Vec::with_capacity(roots.len());
+    for (idx, v) in roots.iter().enumerate() {
+        let s = v
+            .as_str()
+            .with_context(|| format!("run-os policy: fs.read_roots[{idx}] must be a string"))?;
+        out.push(PathBuf::from(s));
+    }
+    Ok(out)
+}
+
+fn policy_roots_fit_cwd(read_roots: &[PathBuf], cwd: &Path) -> bool {
+    read_roots.iter().all(|root| {
+        if root.is_absolute() {
+            root.exists()
+        } else {
+            cwd.join(root).exists()
+        }
+    })
+}
+
 fn run_one_test(
     args: &TestArgs,
     module_roots: &[PathBuf],
@@ -855,26 +890,71 @@ fn run_one_test_os(
     let exe_out_path = out_dir.join("solver");
 
     let mut cmd = std::process::Command::new(crate::util::resolve_sibling_or_path("x07-os-runner"));
-    let manifest_dir = args.manifest.parent();
+    let manifest_dir = args.manifest.parent().map(Path::to_path_buf);
+    let manifest_dir = manifest_dir
+        .as_deref()
+        .and_then(|d| std::fs::canonicalize(d).ok())
+        .or(manifest_dir);
     let arch_root = infer_arch_root_from_manifest(&args.manifest);
-    if let Some(root) = arch_root.as_deref().or(manifest_dir) {
-        cmd.current_dir(root);
-    }
+    let policy_path = if test.world == WorldId::RunOsSandboxed {
+        let Some(policy) = &test.policy_json else {
+            anyhow::bail!("internal error: run-os-sandboxed test missing policy_json");
+        };
+        let raw = if policy.is_absolute() {
+            policy.clone()
+        } else if let Some(dir) = &manifest_dir {
+            dir.join(policy)
+        } else {
+            policy.clone()
+        };
+        Some(std::fs::canonicalize(&raw).unwrap_or(raw))
+    } else {
+        None
+    };
+
+    let cmd_cwd = if test.world == WorldId::RunOsSandboxed {
+        let current_dir = std::env::current_dir().ok();
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        if let Some(d) = &manifest_dir {
+            candidates.push(d.clone());
+        }
+        if let Some(d) = &arch_root {
+            if !candidates.iter().any(|c| c == d) {
+                candidates.push(d.clone());
+            }
+        }
+        if let Some(d) = &current_dir {
+            if !candidates.iter().any(|c| c == d) {
+                candidates.push(d.clone());
+            }
+        }
+        let read_roots = policy_path
+            .as_deref()
+            .and_then(|p| parse_run_os_policy_read_roots(p).ok())
+            .unwrap_or_default();
+        candidates
+            .iter()
+            .find(|cwd| policy_roots_fit_cwd(&read_roots, cwd))
+            .cloned()
+            .or_else(|| manifest_dir.clone())
+            .or_else(|| arch_root.clone())
+            .unwrap_or_else(|| PathBuf::from("."))
+    } else {
+        manifest_dir
+            .clone()
+            .or_else(|| arch_root.clone())
+            .unwrap_or_else(|| PathBuf::from("."))
+    };
+
+    cmd.current_dir(cmd_cwd);
     cmd.arg("--world").arg(test.world.as_str());
     cmd.arg("--program").arg(&driver_path);
     cmd.arg("--compiled-out").arg(&exe_out_path);
     cmd.arg("--auto-ffi");
     if test.world == WorldId::RunOsSandboxed {
-        let Some(policy) = &test.policy_json else {
-            anyhow::bail!("internal error: run-os-sandboxed test missing policy_json");
-        };
-        let policy_path = if policy.is_absolute() {
-            policy.clone()
-        } else if let Some(dir) = manifest_dir {
-            dir.join(policy)
-        } else {
-            policy.clone()
-        };
+        let policy_path = policy_path
+            .as_deref()
+            .context("internal error: missing resolved policy path")?;
         cmd.arg("--policy").arg(policy_path);
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
