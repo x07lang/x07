@@ -230,7 +230,7 @@
         {
           "module_id": "std.auth.jwt.tests",
           "path": "packages/ext/x07-ext-auth-jwt/0.1.1/modules/std/auth/jwt/tests.x07.json",
-          "sha256": "1d9e1cee9dcd628d23fce05104f22fe904bf7f2d899fcb538d6de3be4c37dc11",
+          "sha256": "4aefafd24605825da156599ccfe05022b2ed8f00196d2a5425d3e521c9cba1d6",
           "size_bytes": 6974
         },
         {
@@ -3215,7 +3215,7 @@
         }
       ],
       "name": "ext-db-migrate",
-      "package_manifest_sha256": "92327250343377d40bae49bad17c3a65f5c35f5d92a716d444227488f0aba81e",
+      "package_manifest_sha256": "dcdabbedca609165fdc0b8122c5d0f13da692d6fe6cb7312c14816be8b578d5e",
       "path": "packages/ext/x07-ext-db-migrate/0.1.1",
       "version": "0.1.1"
     },
@@ -3946,6 +3946,34 @@
       "package_manifest_sha256": "b4967c54a769063d43c6be982394aa1bcfe749913da0af62b77e5910524c264e",
       "path": "packages/ext/x07-ext-db-sqlite/0.1.8",
       "version": "0.1.8"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.db.sqlite.pool",
+          "path": "packages/ext/x07-ext-db-sqlite/0.1.9/modules/std/db/sqlite/pool.x07.json",
+          "sha256": "e2d5f6674a5777b5a127ca79e78c14beaa961ee7f3a8fe1338e74b0a4f2409f9",
+          "size_bytes": 3458
+        },
+        {
+          "module_id": "std.db.sqlite.spec",
+          "path": "packages/ext/x07-ext-db-sqlite/0.1.9/modules/std/db/sqlite/spec.x07.json",
+          "sha256": "38f33c696a22184ae7f9396be5e7c6ce359855ddb9de8bb881795f7e4db11c66",
+          "size_bytes": 5593
+        },
+        {
+          "module_id": "std.db.sqlite",
+          "path": "packages/ext/x07-ext-db-sqlite/0.1.9/modules/std/db/sqlite.x07.json",
+          "sha256": "2850c6117f50825effa7247f043d37206db89c2041c19bceb3cc4787ff798cb5",
+          "size_bytes": 2655
+        }
+      ],
+      "name": "ext-db-sqlite",
+      "package_manifest_sha256": "94f5a9b43e64c124eca8c6d45d25b1bb18c596ca2f908a1c48af2b1a076bf34b",
+      "path": "packages/ext/x07-ext-db-sqlite/0.1.9",
+      "version": "0.1.9"
     },
     {
       "determinism_tier": "pure",
@@ -10315,6 +10343,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "d88edc7fa5c5dd010bc1011989018d62a28504d5742ea8e951d54de916bd4055",
+  "packages_hash": "f1785d1a0e42a9a1169d4a4de0726a40043e3a8b2ad52f1bf457143b752fbc9c",
   "packages_root": "packages/ext"
 }
