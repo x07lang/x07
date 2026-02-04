@@ -4,9 +4,9 @@
   "limits": {
     "cpu_ms": 5000,
     "wall_ms": 6000,
-    "mem_bytes": 67108864,
+    "mem_bytes": 536870912,
     "fds": 64,
-    "procs": 16
+    "procs": 64
   },
   "fs": {
     "enabled": true,
