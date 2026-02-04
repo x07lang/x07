@@ -12,6 +12,8 @@ cd "$root"
 ./scripts/ci/ensure_math_backend.sh >/dev/null
 ./scripts/ci/ensure_stream_xf_backend.sh >/dev/null
 
+cargo build -q -p x07-os-runner >/dev/null
+
 cargo run -p x07 -- test --manifest tests/tests.json --no-fail-fast --json=false
 
 echo "ok: x07test smoke suite passed"
