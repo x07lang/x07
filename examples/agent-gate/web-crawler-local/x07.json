@@ -23,8 +23,8 @@
     },
     {
       "name": "ext-net",
-      "version": "0.1.7",
-      "path": ".x07/deps/ext-net/0.1.7"
+      "version": "0.1.8",
+      "path": ".x07/deps/ext-net/0.1.8"
     },
     {
       "name": "ext-sockets-c",

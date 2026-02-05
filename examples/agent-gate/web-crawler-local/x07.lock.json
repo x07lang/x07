@@ -36,12 +36,12 @@
     },
     {
       "name": "ext-net",
-      "version": "0.1.7",
-      "path": ".x07/deps/ext-net/0.1.7",
-      "package_manifest_sha256": "9e1d8531f27c4f110573c364a72331c7335175631300a201c2316ad78857334b",
+      "version": "0.1.8",
+      "path": ".x07/deps/ext-net/0.1.8",
+      "package_manifest_sha256": "2c9e3cd98153bc2e879039c9b777b08e10a236c4923f56929f5dd4f6fc435cfc",
       "module_root": "modules",
       "modules_sha256": {
-        "std.net.codec": "755e3dba3e9cf2ee57c86fc09f1bf4687d8348df8bf84f10ef0539ca9988e1c0",
+        "std.net.codec": "6a8c4ea9de9ae583c79bdff66a16aa9fa775d1a941617f11c77c8b690d70d474",
         "std.net.dns": "32133db3cb22b4d25272ecca3bd08881cabecbf3b9cc290b5e467b86cf3a0c94",
         "std.net.err": "662a4b0385dc9730b7ee5791e73ce1b532ea6c0421c1aa2e4030a08c7535356e",
         "std.net.http": "c65425c329faea952a1e2ece6a5d01cbb30e0f5e7c3ed8f996bcb6acc512f1a2",

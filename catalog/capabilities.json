@@ -37,7 +37,7 @@
       "summary": "HTTP client for OS worlds (GET/POST, headers, body).",
       "canonical": {
         "name": "ext-net",
-        "version": "0.1.7"
+        "version": "0.1.8"
       },
       "alternatives": [
         {
@@ -181,7 +181,7 @@
       "summary": "Crawling helpers: robots/sitemaps/url normalization/scheduling + RR fetch helpers.",
       "canonical": {
         "name": "ext-web-crawl",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "status": "experimental"
     },
@@ -416,7 +416,7 @@
       "summary": "Metrics snapshot + OpenMetrics rendering + OTLP encoding/export.",
       "canonical": {
         "name": "ext-obs",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "worlds": [
         "run-os",
