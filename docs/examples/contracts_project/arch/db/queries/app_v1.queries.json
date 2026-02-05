@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.arch.db.queries@0.1.0",
+  "id": "app_v1",
+  "v": 1,
+  "queries": [
+    {
+      "id": "db.q.insert_user_v1",
+      "op": "exec_v1",
+      "sql": "INSERT INTO users(name, email) VALUES(?, ?);",
+      "params_brand": "",
+      "row_brand": "",
+      "max_rows": 0,
+      "max_resp_bytes": 1048576,
+      "timeout_ms": 0
+    },
+    {
+      "id": "db.q.list_users_v1",
+      "op": "query_v1",
+      "sql": "SELECT id, name, email FROM users ORDER BY id;",
+      "params_brand": "",
+      "row_brand": "",
+      "max_rows": 1000,
+      "max_resp_bytes": 1048576,
+      "timeout_ms": 0
+    }
+  ]
+}

@@ -20,6 +20,11 @@ Supported schema versions:
 - `x07schema.specrows@0.1.0`
 - `x07schema.specrows@0.2.0`
 
+Examples (copy/paste):
+
+- `docs/examples/schema_derive/example_020.x07schema.json` (rows-based; strict canonicalization)
+- `docs/examples/schema_derive/event_line_020.x07schema.json` (a small “event line” struct)
+
 The tool accepts either a `types`-based schema or a `rows`-based schema (a flat, ordered table).
 
 Notes:

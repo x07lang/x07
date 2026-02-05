@@ -1,0 +1,29 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-msg-kafka-c",
+  "version": "0.1.1",
+  "description": "Kafka driver using librdkafka; integrates with std.msg envelope and RR replay (pinned via arch/msg/kafka).",
+  "docs": "Kafka driver using librdkafka; integrates with std.msg.* envelope and RR replay (pinned via arch/msg/kafka).\n\nModules:\n- std.msg.kafka\n- std.msg.kafka.rr\n- std.msg.kafka.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-msg-kafka-c@0.1.1\n- Replay from RR cassettes in solve-rr with std.rr.with_policy_v1 + std.msg.kafka.rr.replay_driver_v1.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.msg.kafka",
+    "std.msg.kafka.rr",
+    "std.msg.kafka.tests"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed",
+      "solve-rr"
+    ],
+    "requires_packages": [
+      "ext-msg-core@0.1.1"
+    ],
+    "import_mode": "ffi",
+    "ffi_libs": [
+      "rdkafka"
+    ],
+    "visibility": "canonical"
+  }
+}

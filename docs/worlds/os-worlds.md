@@ -43,6 +43,8 @@ When running in `run-os-sandboxed`, `x07 run` can materialize a derived policy u
 
 - `x07 run --profile sandbox --policy .x07/policies/base/http-client.sandbox.base.policy.json --allow-host example.com:443`
 - `x07 run --profile sandbox --policy .x07/policies/base/http-client.sandbox.base.policy.json --deny-host example.com:*`
+- Loopback-only integration targets (pick a fixed port):
+  - `x07 run --profile sandbox --policy .x07/policies/base/web-service.sandbox.base.policy.json --allow-host 127.0.0.1:18080`
 
 Syntax:
 

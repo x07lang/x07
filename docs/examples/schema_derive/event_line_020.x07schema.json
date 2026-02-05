@@ -1,0 +1,95 @@
+{
+  "schema_version": "x07schema.specrows@0.2.0",
+  "package": {
+    "name": "example",
+    "version": "0.1.0"
+  },
+  "defaults": {
+    "codec": "ext.data_model.doc_v1",
+    "canon_v1": {
+      "mode": "strict_reject_v1",
+      "map_key_order": "lex_u8_v1",
+      "unknown_fields": "reject_v1"
+    },
+    "number_style_default_v1": "int_ascii_v1",
+    "allow_unknown_fields": false,
+    "budgets": {
+      "max_doc_bytes": 4096,
+      "max_depth": 64,
+      "max_map_entries": 32,
+      "max_seq_items": 4096,
+      "max_string_bytes": 2048,
+      "max_number_bytes": 32
+    }
+  },
+  "rows": [
+    [
+      "type",
+      "event.line",
+      1,
+      "struct",
+      {
+        "err_base": 470000,
+        "brand": "example.event.line_v1"
+      }
+    ],
+    [
+      "field",
+      "event.line",
+      1,
+      "ts",
+      "number",
+      {
+        "required": true,
+        "max_number_bytes": 20,
+        "number_style_v1": "uint_ascii_v1"
+      }
+    ],
+    [
+      "field",
+      "event.line",
+      2,
+      "level",
+      "bytes",
+      {
+        "required": true,
+        "max_string_bytes": 16
+      }
+    ],
+    [
+      "field",
+      "event.line",
+      3,
+      "msg",
+      "bytes",
+      {
+        "required": true,
+        "max_string_bytes": 2048
+      }
+    ],
+    [
+      "field",
+      "event.line",
+      4,
+      "tags",
+      "seq:bytes",
+      {
+        "required": false,
+        "max_seq_items": 16,
+        "max_string_bytes": 64
+      }
+    ],
+    [
+      "example",
+      "event.line",
+      "ex0_info",
+      {
+        "ts": "1700000000",
+        "level": "info",
+        "msg": "hello world",
+        "tags": ["a", "b"]
+      }
+    ]
+  ]
+}
+

@@ -98,6 +98,7 @@
 
 ## Guides
 - [CLI apps](guides/cli-apps.md)
+- [Data interoperability](guides/data-interop.md)
 - [Web services](guides/web-apps.md)
 - [Crawling](guides/crawling.md)
 - [Messaging](guides/messaging.md)

@@ -114,6 +114,18 @@ For **multiple parameters**, build a DataModel sequence and wrap it as a doc:
 
 - Add packages manually (advanced): pick NAME@VERSION from `/agent/latest/catalog/capabilities.json` and run `x07 pkg add NAME@VERSION --sync`.
 
+## Minimal `arch/db/` example (copy/paste)
+
+Contract files referenced by `std.db.migrate.*_from_arch_v1` live under `arch/db/`:
+
+- `docs/examples/contracts_project/arch/db/index.x07db.json`
+- `docs/examples/contracts_project/arch/db/migrations/app_v1.migrate.json`
+- `docs/examples/contracts_project/arch/db/queries/app_v1.queries.json`
+
+The example DB index references a budget profile; see:
+
+- `docs/examples/contracts_project/arch/budgets/index.x07budgets.json`
+
 ## Reference contracts
 
 - [DB v1 envelope + caps](../db/db-v1.md)

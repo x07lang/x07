@@ -103,3 +103,11 @@ When using `std.rr.with_policy_v1`, rr policy/config comes from the repo’s `ar
 - `arch/rr/index.x07rr.json` (`schema_version: "x07.arch.rr.index@0.1.0"`)
 - `arch/rr/policies/*.policy.json` (`schema_version: "x07.arch.rr.policy@0.1.0"`)
 - `arch/rr/sanitizers/*.sanitize.json` (`schema_version: "x07.arch.rr.sanitize@0.1.0"`)
+
+## Minimal `arch/rr/` example (copy/paste)
+
+For a schema-valid starting point, see:
+
+- `docs/examples/contracts_project/arch/rr/index.x07rr.json`
+- `docs/examples/contracts_project/arch/rr/policies/smoke_rr_v1.policy.json`
+- `docs/examples/contracts_project/arch/rr/sanitizers/sanitize_none_v1.sanitize.json`

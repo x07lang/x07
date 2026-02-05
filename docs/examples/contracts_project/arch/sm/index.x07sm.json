@@ -1,0 +1,13 @@
+{
+  "schema_version": "x07.arch.sm.index@0.1.0",
+  "machines": [
+    {
+      "machine_id": "app.minimal_fsm",
+      "version": 1,
+      "spec_path": "arch/sm/specs/minimal.sm.json",
+      "gen_module_id": "gen.sm.app.minimal_fsm_v1",
+      "gen_paths": [],
+      "world": "solve-pure"
+    }
+  ]
+}

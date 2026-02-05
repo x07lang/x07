@@ -1,0 +1,113 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.msg.amqp.tests",
+  "imports": [
+    "ext.data_model",
+    "ext.json.data_model",
+    "std.msg.amqp",
+    "std.msg.amqp.rr",
+    "std.msg.amqp.topology",
+    "std.rr",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.msg.amqp.tests.test_connect_from_arch_v1",
+        "std.msg.amqp.tests.test_rr_replay_consume_v1",
+        "std.msg.amqp.tests.test_rr_replay_publish_v1",
+        "std.msg.amqp.tests.test_topology_plan_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp.tests.test_connect_from_arch_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "pid", ["bytes.lit", "local_dev_v1"]],
+        ["let", "res", ["std.msg.amqp.connect_from_arch_v1", ["bytes.view", "pid"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "handle", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+        ["let", "hv", ["bytes.view", "handle"]],
+        ["let", "mb", ["std.msg.amqp.rr.max_body_bytes_v1", "hv"]],
+        ["let", "mpi", ["std.msg.amqp.rr.max_poll_items_v1", "hv"]],
+        ["try", ["std.test.assert_i32_eq", "mb", 1048576, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", "mpi", 100, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp.tests.test_topology_plan_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "raw", ["bytes.lit", "{\"schema_version\":\"x07.arch.msg.amqp.topology@0.1.0\",\"id\":\"app_v1\",\"v\":1,\"exchanges\":[{\"name\":\"x07\",\"type\":\"topic\",\"durable\":true}],\"queues\":[{\"name\":\"x07\",\"durable\":true}],\"bindings\":[{\"exchange\":\"x07\",\"queue\":\"x07\",\"routing_key\":\"#\"}]}"]],
+        ["let", "doc", ["ext.json.data_model.parse", ["bytes.view", "raw"]]],
+        ["let", "dv", ["bytes.view", "doc"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.data_model.doc_is_err", "dv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "plan", ["std.msg.amqp.topology.declare_plan_v1", "dv"]],
+        ["try", ["std.test.assert_true", [">", ["bytes.len", "plan"], 0], ["std.test.code_assert_true"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp.tests.test_rr_replay_publish_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "std.rr.with_policy_v1",
+        ["bytes.lit", "msg_rr_v1"],
+        ["bytes.lit", "amqp_pub_consume_v1.x07rr.bin"],
+        ["i32.lit", 2],
+        [
+          "begin",
+          ["let", "endpoint", ["bytes.lit", "local_dev_v1"]],
+          ["let", "handle", ["std.msg.amqp.rr.replay_driver_v1", ["bytes.view", "endpoint"]]],
+          ["let", "env", ["bytes.lit", "ENV"]],
+          ["let", "res", ["std.msg.amqp.publish_env_v1", ["bytes.view", "handle"], ["bytes.lit", "x07"], ["bytes.lit", "#"], ["bytes.view", "env"]]],
+          ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "res"], 0, ["std.test.code_assert_i32_eq"]]],
+          ["let", "ack", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+          ["try", ["std.test.assert_bytes_eq", "ack", ["bytes.lit", "OK"], ["std.test.code_assert_bytes_eq"]]],
+          ["std.test.pass"]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.amqp.tests.test_rr_replay_consume_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "std.rr.with_policy_v1",
+        ["bytes.lit", "msg_rr_v1"],
+        ["bytes.lit", "amqp_pub_consume_v1.x07rr.bin"],
+        ["i32.lit", 2],
+        [
+          "begin",
+          ["let", "endpoint", ["bytes.lit", "local_dev_v1"]],
+          ["let", "handle", ["std.msg.amqp.rr.replay_driver_v1", ["bytes.view", "endpoint"]]],
+          ["let", "res", ["std.msg.amqp.consume_env_v1", ["bytes.view", "handle"], ["bytes.lit", "x07"], 10]],
+          ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "res"], 0, ["std.test.code_assert_i32_eq"]]],
+          ["let", "doc", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+          ["let", "dv", ["bytes.view", "doc"]],
+          ["try", ["std.test.assert_i32_eq", ["ext.data_model.doc_is_err", "dv"], 0, ["std.test.code_assert_i32_eq"]]],
+          ["let", "root", ["ext.data_model.root_offset", "dv"]],
+          ["let", "count", ["ext.data_model.seq_len", "dv", "root"]],
+          ["try", ["std.test.assert_i32_eq", "count", 1, ["std.test.code_assert_i32_eq"]]],
+          ["let", "off", ["ext.data_model.seq_get", "dv", "root", 0]],
+          ["try", ["std.test.assert_true", [">=", "off", 0], ["std.test.code_assert_true"]]],
+          ["let", "got", ["ext.data_model.string_get", "dv", "off"]],
+          ["try", ["std.test.assert_bytes_eq", "got", ["bytes.lit", "ENV"], ["std.test.code_assert_bytes_eq"]]],
+          ["std.test.pass"]
+        ]
+      ]
+    }
+  ]
+}

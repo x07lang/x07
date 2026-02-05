@@ -1,0 +1,30 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-msg-amqp-c",
+  "version": "0.1.1",
+  "description": "AMQP 0-9-1 driver using rabbitmq-c; integrates with std.msg envelope and RR replay (pinned via arch/msg/amqp).",
+  "docs": "AMQP 0-9-1 driver using rabbitmq-c; integrates with std.msg.* envelope and RR replay (pinned via arch/msg/amqp).\n\nModules:\n- std.msg.amqp\n- std.msg.amqp.topology\n- std.msg.amqp.rr\n- std.msg.amqp.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-msg-amqp-c@0.1.1\n- Replay from RR cassettes in solve-rr with std.rr.with_policy_v1 + std.msg.amqp.rr.replay_driver_v1.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.msg.amqp",
+    "std.msg.amqp.topology",
+    "std.msg.amqp.rr",
+    "std.msg.amqp.tests"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed",
+      "solve-rr"
+    ],
+    "requires_packages": [
+      "ext-msg-core@0.1.1"
+    ],
+    "import_mode": "ffi",
+    "ffi_libs": [
+      "rabbitmq"
+    ],
+    "visibility": "canonical"
+  }
+}

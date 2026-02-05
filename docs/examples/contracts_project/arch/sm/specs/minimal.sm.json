@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.sm.spec@0.1.0",
+  "machine_id": "app.minimal_fsm",
+  "version": 1,
+  "world": "solve-pure",
+  "states": [
+    { "id": 0, "name": "init", "terminal": false },
+    { "id": 1, "name": "ready", "terminal": false },
+    { "id": 2, "name": "running", "terminal": false },
+    { "id": 3, "name": "done", "terminal": true },
+    { "id": 4, "name": "error", "terminal": true }
+  ],
+  "events": [
+    { "id": 0, "name": "start" },
+    { "id": 1, "name": "tick" },
+    { "id": 2, "name": "finish" },
+    { "id": 3, "name": "fail" }
+  ],
+  "transitions": [
+    { "id": 0, "from": 0, "on": 0, "to": 1, "action": "on_start_v1" },
+    { "id": 1, "from": 1, "on": 1, "to": 2, "action": "on_tick_v1" },
+    { "id": 2, "from": 2, "on": 2, "to": 3, "action": "on_finish_v1" },
+    { "id": 3, "from": 0, "on": 3, "to": 4, "action": "on_fail_v1" },
+    { "id": 4, "from": 1, "on": 3, "to": 4, "action": "on_fail_v1" },
+    { "id": 5, "from": 2, "on": 3, "to": 4, "action": "on_fail_v1" }
+  ]
+}

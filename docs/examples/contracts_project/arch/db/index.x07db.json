@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.arch.db.index@0.1.0",
+  "drivers": [
+    {
+      "id": "sqlite_local_v1",
+      "kind": "sqlite_v1",
+      "module": "std.db.sqlite",
+      "worlds_allowed": ["run-os", "run-os-sandboxed"],
+      "description": "Local SQLite database file (OS worlds only)."
+    }
+  ],
+  "migrate_plans": [
+    {
+      "id": "app_v1",
+      "plan_path": "arch/db/migrations/app_v1.migrate.json",
+      "driver_id": "sqlite_local_v1",
+      "budget_profile_id": "db_migrate_v1"
+    }
+  ],
+  "query_catalogs": [
+    {
+      "id": "app_v1",
+      "catalog_path": "arch/db/queries/app_v1.queries.json"
+    }
+  ],
+  "defaults": { "default_driver_id": "sqlite_local_v1" }
+}

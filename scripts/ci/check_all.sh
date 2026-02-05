@@ -75,6 +75,9 @@ step "skills"
 step "check external packages lock"
 ./scripts/ci/check_external_packages_lock.sh
 
+step "capabilities coherence"
+"$python_bin" scripts/check_capabilities_coherence.py --check
+
 step "canary gate"
 ./scripts/ci/check_canaries.sh
 

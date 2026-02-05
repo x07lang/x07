@@ -33,6 +33,10 @@ Key fields:
   - `context`: codec + size cap for additional state
   - `budgets`: step-level caps (v1 is intentionally small)
 
+Example spec (copy/paste):
+
+- `docs/examples/contracts_project/arch/sm/specs/minimal.sm.json`
+
 ## Outputs
 
 `x07 sm gen` writes three files under `--out`:
@@ -58,4 +62,3 @@ The generated machine module exports:
 - `step_v1(snapshot: bytes_view, event: bytes_view) -> result_bytes`
 
 The step result is a deterministic doc in bytes form that includes the next snapshot (or a stable error code).
-

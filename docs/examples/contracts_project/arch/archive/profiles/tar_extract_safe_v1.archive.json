@@ -1,0 +1,22 @@
+{
+  "schema_version": "x07.arch.archive.profile@0.1.0",
+  "id": "tar_extract_safe_v1",
+  "v": 1,
+  "kind": "tar_v1",
+  "path_policy": {
+    "mode": "posix_strict_v1",
+    "reject_non_utf8": true,
+    "reject_absolute": true,
+    "reject_parent": true,
+    "reject_backslash": true,
+    "max_path_bytes": 4096,
+    "max_segment_bytes": 255
+  },
+  "limits": {
+    "max_entries": 20000,
+    "max_total_out_bytes": 1073741824,
+    "max_file_bytes": 268435456,
+    "max_link_bytes": 4096
+  },
+  "format_opts": { "tar_allow_pax": true, "tar_allow_gnu_longname": true }
+}

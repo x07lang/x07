@@ -77,6 +77,17 @@ x07 init
 - `src/` (a minimal program)
 - `tests/tests.json` + `tests/smoke.x07.json` (a harness smoke test)
 
+### `x07.json` notes (common failure mode)
+
+- The root `world` field is required (it’s used as a fallback when no run profile is selected).
+- For multi-profile projects, set the root `world` to the solve-* world you want for deterministic lint/repair (for example `solve-pure`), and run OS worlds via profiles (`run-os*`).
+
+### Contracts-by-example (copy/paste)
+
+If your project uses pinned rr policies, archive policies, DB migrations, or arch-driven budgets, start from a schema-valid example `arch/` tree:
+
+- `docs/examples/contracts_project/` (copy its `arch/` into your project root)
+
 If you are creating a publishable package repo (for `x07 pkg publish`), use `x07 init --package` instead of `x07 init`.
 
 See also: [Available skills](available-skills.md).

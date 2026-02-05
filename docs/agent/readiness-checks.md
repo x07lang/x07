@@ -17,6 +17,8 @@ This page contains the canonical “readiness prompts” used to validate that a
 
 - For structured bytes encodings, prefer branded bytes + validators over ad-hoc parsing. Schema-derived modules expose `meta.brands_v1`; use `std.brand.cast_view_v1` / `std.brand.cast_view_copy_v1` (see `x07 guide`).
 - For streaming transforms, prefer `std.stream.pipe_v1` and `std.io.bufread` over manual loops (more predictable allocations; fewer borrow/ownership hazards).
+- For pinned contracts-as-data (`arch/**`), start from the copy/paste example tree:
+  - `docs/examples/contracts_project/` (copy its `arch/` into your project root)
 
 If you hit:
 
@@ -44,7 +46,8 @@ x07 init
 
 TOOLCHAIN + PROJECT SETUP
 1) Pin toolchain to the latest.
-2) Create `x07.json` with:
+2) Edit `x07.json` (created by `x07 init`) to set:
+   - world = "solve-pure" (deterministic compile/lint/repair world; run OS worlds via profiles)
    - module_roots = ["src"]
    - default_profile = "sandbox"
    - profiles.sandbox.world = "run-os-sandboxed"
@@ -145,6 +148,8 @@ DEPENDENCIES (add via x07 pkg add … --sync and lock)
 - ext-pb-rs
 - ext-streams (stream readers)
 - ext-cli (argv parsing)
+
+See also: [Data interoperability guide](../guides/data-interop.md) (codec entrypoints map + canonical roundtrip strategy).
 
 REQUIREMENTS
 A) Use ext.data_model as the canonical internal representation.

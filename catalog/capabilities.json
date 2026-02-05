@@ -199,7 +199,7 @@
       "summary": "Kafka driver with RR replay interface (librdkafka).",
       "canonical": {
         "name": "ext-msg-kafka-c",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "worlds": [
         "run-os",
@@ -213,7 +213,7 @@
       "summary": "AMQP 0-9-1 driver with RR replay interface (rabbitmq-c).",
       "canonical": {
         "name": "ext-msg-amqp-c",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "worlds": [
         "run-os",

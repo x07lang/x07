@@ -1,0 +1,18 @@
+{
+  "schema_version": "x07.arch.crypto.index@0.1.0",
+  "keys": [
+    {
+      "id": "test_priv_ed25519_v1",
+      "kind": "ed25519_priv_v1",
+      "material_path": "arch/crypto/keys/test_priv_ed25519.b64",
+      "description": "Deterministic test key (DO NOT use in production)."
+    },
+    {
+      "id": "test_pub_ed25519_v1",
+      "kind": "ed25519_pub_v1",
+      "material_path": "arch/crypto/keys/test_pub_ed25519.b64",
+      "description": "Public key for deterministic tests (DO NOT use in production)."
+    }
+  ],
+  "algorithms": ["ed25519_v1", "jwt_ed25519_v1"]
+}

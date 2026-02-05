@@ -11,6 +11,10 @@ Supported schema versions:
 - Manifest: `arch/manifest.x07arch.json` (`schema_version: "x07.arch.manifest@0.1.0"`)
 - Lock: `arch/manifest.lock.json` (`schema_version: "x07.arch.manifest.lock@0.1.0"`)
 
+Contracts-by-example (copy/paste):
+
+- `docs/examples/contracts_project/` (copy its `arch/` into your project root)
+
 ## Command
 
 - `x07 arch check`

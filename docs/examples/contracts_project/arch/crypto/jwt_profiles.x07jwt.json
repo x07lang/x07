@@ -1,0 +1,17 @@
+{
+  "schema_version": "x07.arch.crypto.jwt_profiles@0.1.0",
+  "id": "jwt_profiles",
+  "v": 1,
+  "profiles": [
+    {
+      "id": "test_jwt_v1",
+      "issuer": "example",
+      "audience": "example",
+      "alg": "EdDSA",
+      "key_id": "test_priv_ed25519_v1",
+      "max_ttl_secs": 3600,
+      "clock_skew_secs": 30,
+      "required_claims": ["sub"]
+    }
+  ]
+}

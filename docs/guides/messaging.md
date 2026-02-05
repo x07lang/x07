@@ -17,7 +17,21 @@ X07 supports messaging through a **pure core + OS-bound drivers** split:
 
 ## Adding packages
 
-Use the capability map (`msg.core`, `msg.kafka`, `msg.amqp`) and sync the lockfile:
+Use the capability map (`msg.core`, `msg.kafka`, `msg.amqp`) and sync the lockfile.
+
+Canonical: add the driver you need; it pulls `ext-msg-core` via `meta.requires_packages`:
+
+```bash
+x07 pkg add ext-msg-kafka-c --sync
+# or:
+x07 pkg add ext-msg-amqp-c --sync
+```
+
+If you pin `ext-msg-core` manually and get a version conflict, remove it and re-lock:
+
+```bash
+x07 pkg remove ext-msg-core --sync
+```
 
 ```bash
 # Pick NAME@VERSION from /agent/latest/catalog/capabilities.json.
