@@ -1,0 +1,55 @@
+{
+  "files": {
+    "arch/archive/profiles/tar_extract_safe_v1.archive.json": {
+      "jcs_sha256_hex": "8b3294b6ce1ab54970817707d046471898ef1b14975ff87dfd7daad3d4e037e7"
+    },
+    "arch/archive/profiles/tgz_extract_safe_v1.archive.json": {
+      "jcs_sha256_hex": "c5c9a649b10b7b610a6cd39938163f51a6da9094823371c2f69d468bf4a43176"
+    },
+    "arch/budgets/profiles/archive_extract_safe_v1.budget.json": {
+      "jcs_sha256_hex": "0a3228f9c281f117b84b1075364989f0713d854a16a13699c479f90125ddd774"
+    },
+    "arch/budgets/profiles/db_migrate_v1.budget.json": {
+      "jcs_sha256_hex": "b01986857d5add4699ccc7cf8f7f3d0193d5cfc7d294057abfbb2cff29b7aca2"
+    },
+    "arch/crypto/jwt_profiles.x07jwt.json": {
+      "jcs_sha256_hex": "27a18e61a5d627810c878f4b43e55267db538857c1aceab0f505b2ecd34d0521"
+    },
+    "arch/db/migrations/app_v1.migrate.json": {
+      "jcs_sha256_hex": "df56b708340511b216f7aebf56208fc17025e5cb21149d464b26649a5c959de1"
+    },
+    "arch/db/queries/app_v1.queries.json": {
+      "jcs_sha256_hex": "d5c12ad6022edff32aaa9870097da44d2f781e8a3081e506ebdcd7bcb9fafbde"
+    },
+    "arch/rr/policies/smoke_rr_v1.policy.json": {
+      "jcs_sha256_hex": "34c0a04ddbb436d456e7ceca24dd12eefdec5d5a0a26762e75a55fe0bec86832"
+    },
+    "arch/rr/sanitizers/sanitize_none_v1.sanitize.json": {
+      "jcs_sha256_hex": "a2c6c285baa339b679eb1c6332a9eb5acf69bfc8f638a611e33e081e7f498b6b"
+    },
+    "arch/sm/specs/minimal.sm.json": {
+      "jcs_sha256_hex": "cb6b06d6c67c9685b6f6ef67ff690261a3e39958bd59bd5d65f93229a5f2ea2e"
+    }
+  },
+  "indexes": {
+    "arch/archive/index.x07archive.json": {
+      "jcs_sha256_hex": "e87e2b1cc23b456921265d56cfcb009a8a0a6b8172beef0c76812b1308e82bc3"
+    },
+    "arch/budgets/index.x07budgets.json": {
+      "jcs_sha256_hex": "6341b85f2d6153f693c582c7cf146043f4491e44ee0da10be63a6653adb973cb"
+    },
+    "arch/crypto/index.x07crypto.json": {
+      "jcs_sha256_hex": "d608e9b4e6e11f60a6c08900ab57ce7bd702f70d9339296b330e75465a96cba8"
+    },
+    "arch/db/index.x07db.json": {
+      "jcs_sha256_hex": "685f403d85189a727f8f49e3a44aee458ac09927eb8c99e43a94f96d5d0e41e5"
+    },
+    "arch/rr/index.x07rr.json": {
+      "jcs_sha256_hex": "102ef2a618792ef93e4745652807dc0205468bdad7442b66e953895a7452a281"
+    },
+    "arch/sm/index.x07sm.json": {
+      "jcs_sha256_hex": "23311aecee76643da10526fd62738adcec1e3feb3dd18a3a9ab3adaaf7f966f5"
+    }
+  },
+  "schema_version": "x07.arch.contracts.lock@0.1.0"
+}

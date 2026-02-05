@@ -229,7 +229,7 @@ See: [OS worlds](../worlds/os-worlds.md).
 
 ## 9) Known-good reference projects (copy/paste)
 
-The `x07` repo ships CI-gated example projects under `examples/agent-gate/`:
+The `x07` repo ships CI-gated example projects under `docs/examples/agent-gate/`:
 
 - `cli-newline` (pure CLI payload parsing)
 - `cli-ext-cli` (CLI args via `ext-cli` + `argv_v1`)

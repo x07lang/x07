@@ -95,20 +95,20 @@ const CAPABILITIES_JSON_BYTES: &[u8] = include_bytes!(concat!(
 
 const TEMPLATE_CLI_APP: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../examples/agent-gate/cli-ext-cli/src/app.x07.json"
+    "/../../docs/examples/agent-gate/cli-ext-cli/src/app.x07.json"
 ));
 const TEMPLATE_CLI_MAIN: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../examples/agent-gate/cli-ext-cli/src/main.x07.json"
+    "/../../docs/examples/agent-gate/cli-ext-cli/src/main.x07.json"
 ));
 
 const TEMPLATE_HTTP_CLIENT_APP: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../examples/agent-gate/http-client-get/src/app.x07.json"
+    "/../../docs/examples/agent-gate/http-client-get/src/app.x07.json"
 ));
 const TEMPLATE_HTTP_CLIENT_MAIN: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../examples/agent-gate/http-client-get/src/main.x07.json"
+    "/../../docs/examples/agent-gate/http-client-get/src/main.x07.json"
 ));
 
 fn ensure_trailing_newline(bytes: &[u8]) -> Vec<u8> {
@@ -1172,7 +1172,7 @@ fn package_ids(pkg_name: &str) -> PackageIds {
     // Canonical mapping:
     //   pkg name: ext-foo-bar  -> module_id: ext.foo_bar
     //   tests:                 -> ext.foo_bar.tests
-    // This mirrors the publishing-by-example tutorial layout under examples/tutorials/.
+    // This mirrors the publishing-by-example tutorial layout under docs/examples/tutorials/.
     let tail_raw = pkg_name.strip_prefix("ext-").unwrap_or(pkg_name);
     let mut tail = tail_raw.replace('-', "_");
     while tail.contains("__") {
@@ -1325,7 +1325,7 @@ fn project_json_bytes(template: Option<InitTemplate>, deps: &[PkgRef]) -> Result
 
 fn package_project_json_bytes(entry_rel: &str) -> Result<Vec<u8>> {
     // Package repos are designed primarily for `x07 test` + `x07 pkg publish`.
-    // We mirror the minimal shape used in examples/tutorials/package_publish_ext_hello.
+    // We mirror the minimal shape used in docs/examples/tutorials/package_publish_ext_hello.
     let v = Value::Object(
         [
             (

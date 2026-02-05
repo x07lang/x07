@@ -19,8 +19,8 @@ For C import:
 
 Companion examples (in the `x07` repo):
 
-- `examples/tutorials/x07import_rust_hex_pkg/`
-- `examples/tutorials/x07import_c_smoke_pkg/`
+- `docs/examples/tutorials/x07import_rust_hex_pkg/`
+- `docs/examples/tutorials/x07import_c_smoke_pkg/`
 
 ## Canonical layout for import-based packages
 

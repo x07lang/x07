@@ -654,7 +654,7 @@ def _closure_for_spec(seed: PackageSpec, deps: dict[PackageSpec, list[PackageSpe
 def _run_preflight(root: Path, python_bin: str) -> None:
     changes, _changed_projects = _sync_ext_package_versions(
         root=root,
-        rel_roots=["examples/agent-gate", "ci/fixtures/agent-scenarios"],
+        rel_roots=["docs/examples/agent-gate", "ci/fixtures/agent-scenarios"],
         write=False,
         python_bin=python_bin,
     )
@@ -851,7 +851,7 @@ def _sync_main(argv: list[str]) -> int:
     ap.add_argument(
         "--roots",
         nargs="*",
-        default=["examples/agent-gate", "ci/fixtures/agent-scenarios"],
+        default=["docs/examples/agent-gate", "ci/fixtures/agent-scenarios"],
         help="Relative directories to scan for x07.json files.",
     )
     ap.add_argument(

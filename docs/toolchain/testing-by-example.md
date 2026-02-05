@@ -10,7 +10,7 @@ This page is a hands-on tutorial for the built-in test harness.
 
 Companion example (in the `x07` repo):
 
-- `examples/tutorials/testing_by_example/`
+- `docs/examples/tutorials/testing_by_example/`
 
 ## What `x07 test` runs (and what it does not)
 

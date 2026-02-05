@@ -236,7 +236,7 @@ run_x07_run() {
 # Fixtures + expected outputs
 # ----------------------------
 
-require_path "examples/agent-gate"
+require_path "docs/examples/agent-gate"
 require_path "ci/fixtures/repair-corpus"
 require_path "ci/fixtures/www"
 
@@ -247,7 +247,7 @@ require_path "ci/fixtures/www"
 echo "==> agent example: cli-newline (run-os)"
 
 cli1_work="$tmp_dir/cli-newline"
-copy_project "examples/agent-gate/cli-newline" "$cli1_work"
+copy_project "docs/examples/agent-gate/cli-newline" "$cli1_work"
 
 seed_official_deps "$cli1_work"
 pkg_lock_check "$cli1_work"
@@ -276,7 +276,7 @@ echo "ok: cli-newline"
 echo "==> agent example: cli-ext-cli (run-os + ext-cli)"
 
 cli2_work="$tmp_dir/cli-ext-cli"
-copy_project "examples/agent-gate/cli-ext-cli" "$cli2_work"
+copy_project "docs/examples/agent-gate/cli-ext-cli" "$cli2_work"
 
 seed_official_deps "$cli2_work"
 pkg_lock_check "$cli2_work"
@@ -303,7 +303,7 @@ echo "ok: cli-ext-cli"
 echo "==> agent example: text-utils (run-os + ext-text)"
 
 text_work="$tmp_dir/text-utils"
-copy_project "examples/agent-gate/text-core/text-utils" "$text_work"
+copy_project "docs/examples/agent-gate/text-core/text-utils" "$text_work"
 
 seed_official_deps "$text_work"
 pkg_lock_check "$text_work"
@@ -325,7 +325,7 @@ echo "ok: text-utils"
 echo "==> agent example: factorial-100 (run-os + ext-bigint-rs)"
 
 bigint_work="$tmp_dir/factorial-100"
-copy_project "examples/agent-gate/math-bigint/factorial-100" "$bigint_work"
+copy_project "docs/examples/agent-gate/math-bigint/factorial-100" "$bigint_work"
 
 seed_official_deps "$bigint_work"
 pkg_lock_check "$bigint_work"
@@ -347,7 +347,7 @@ echo "ok: factorial-100"
 echo "==> agent example: money-format (run-os + ext-decimal-rs)"
 
 decimal_work="$tmp_dir/money-format"
-copy_project "examples/agent-gate/math-decimal/money-format" "$decimal_work"
+copy_project "docs/examples/agent-gate/math-decimal/money-format" "$decimal_work"
 
 seed_official_deps "$decimal_work"
 pkg_lock_check "$decimal_work"
@@ -368,7 +368,7 @@ echo "ok: money-format"
 echo "==> agent example: normalize-casefold (run-os + ext-unicode-rs)"
 
 unicode_work="$tmp_dir/normalize-casefold"
-copy_project "examples/agent-gate/text-unicode/normalize-casefold" "$unicode_work"
+copy_project "docs/examples/agent-gate/text-unicode/normalize-casefold" "$unicode_work"
 
 seed_official_deps "$unicode_work"
 pkg_lock_check "$unicode_work"
@@ -389,7 +389,7 @@ echo "ok: normalize-casefold"
 echo "==> agent example: cbor-roundtrip (run-os + ext-cbor-rs)"
 
 cbor_work="$tmp_dir/data-cbor"
-copy_project "examples/agent-gate/data-cbor/roundtrip" "$cbor_work"
+copy_project "docs/examples/agent-gate/data-cbor/roundtrip" "$cbor_work"
 
 seed_official_deps "$cbor_work"
 pkg_lock_check "$cbor_work"
@@ -410,7 +410,7 @@ echo "ok: data-cbor"
 echo "==> agent example: msgpack-roundtrip (run-os + ext-msgpack-rs)"
 
 msgpack_work="$tmp_dir/data-msgpack"
-copy_project "examples/agent-gate/data-msgpack/roundtrip" "$msgpack_work"
+copy_project "docs/examples/agent-gate/data-msgpack/roundtrip" "$msgpack_work"
 
 seed_official_deps "$msgpack_work"
 pkg_lock_check "$msgpack_work"
@@ -431,7 +431,7 @@ echo "ok: data-msgpack"
 echo "==> agent example: checksum-smoke (run-os + ext-checksum-rs)"
 
 checksum_work="$tmp_dir/checksum-fast"
-copy_project "examples/agent-gate/checksum-fast/smoke" "$checksum_work"
+copy_project "docs/examples/agent-gate/checksum-fast/smoke" "$checksum_work"
 
 seed_official_deps "$checksum_work"
 pkg_lock_check "$checksum_work"
@@ -452,7 +452,7 @@ echo "ok: checksum-fast"
 echo "==> agent example: diff-patch-apply (run-os + ext-diff-rs)"
 
 diff_work="$tmp_dir/diff-patch"
-copy_project "examples/agent-gate/diff-patch/apply" "$diff_work"
+copy_project "docs/examples/agent-gate/diff-patch/apply" "$diff_work"
 
 seed_official_deps "$diff_work"
 pkg_lock_check "$diff_work"
@@ -473,7 +473,7 @@ echo "ok: diff-patch"
 echo "==> agent example: compress-zstd (run-os + ext-compress-rs)"
 
 zstd_work="$tmp_dir/compress-zstd"
-copy_project "examples/agent-gate/compress-zstd/roundtrip" "$zstd_work"
+copy_project "docs/examples/agent-gate/compress-zstd/roundtrip" "$zstd_work"
 
 seed_official_deps "$zstd_work"
 pkg_lock_check "$zstd_work"
@@ -494,7 +494,7 @@ echo "ok: compress-zstd"
 echo "==> agent example: fs-globwalk (run-os + ext-path-glob-rs)"
 
 globwalk_work="$tmp_dir/fs-globwalk"
-copy_project "examples/agent-gate/fs-globwalk/list-files" "$globwalk_work"
+copy_project "docs/examples/agent-gate/fs-globwalk/list-files" "$globwalk_work"
 
 seed_official_deps "$globwalk_work"
 pkg_lock_check "$globwalk_work"
@@ -516,7 +516,7 @@ echo "ok: fs-globwalk"
 echo "==> agent example: protos-framing-loopback (run-os-sandboxed + allow-host sugar)"
 
 proto_work="$tmp_dir/protos-framing-loopback"
-copy_project "examples/agent-gate/protos-framing-loopback" "$proto_work"
+copy_project "docs/examples/agent-gate/protos-framing-loopback" "$proto_work"
 
 seed_official_deps "$proto_work"
 pkg_lock_check "$proto_work"
@@ -543,7 +543,7 @@ echo "ok: protos-framing-loopback"
 echo "==> agent example: web-crawler-local (run-os-sandboxed + allow-host sugar)"
 
 crawler_work="$tmp_dir/web-crawler-local"
-copy_project "examples/agent-gate/web-crawler-local" "$crawler_work"
+copy_project "docs/examples/agent-gate/web-crawler-local" "$crawler_work"
 
 seed_official_deps "$crawler_work"
 pkg_lock_check "$crawler_work"

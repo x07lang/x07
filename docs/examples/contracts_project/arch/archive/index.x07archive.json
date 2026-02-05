@@ -6,7 +6,7 @@
       "profile_path": "arch/archive/profiles/tar_extract_safe_v1.archive.json",
       "worlds_allowed": ["run-os", "run-os-sandboxed", "solve-fs"],
       "kinds_allowed": ["tar_v1"],
-      "ops_allowed": ["std.archive.tar.extract_tree_from_arch_v1", "std.archive.tar.list_v1"],
+      "ops_allowed": ["std.archive.tar.extract_tree_v1", "std.archive.tar.list_v1"],
       "budget_profile_id": "archive_extract_safe_v1",
       "description": "Strict path policy; bounded output; deterministic failure codes."
     },
@@ -15,7 +15,7 @@
       "profile_path": "arch/archive/profiles/tgz_extract_safe_v1.archive.json",
       "worlds_allowed": ["run-os", "run-os-sandboxed", "solve-fs"],
       "kinds_allowed": ["tgz_v1"],
-      "ops_allowed": ["std.archive.tgz.extract_tree_from_arch_v1", "std.archive.tgz.list_v1"],
+      "ops_allowed": ["std.archive.tgz.extract_tree_v1", "std.archive.tgz.list_v1"],
       "budget_profile_id": "archive_extract_safe_v1",
       "description": "tar + gzip; bounded inflate and extraction."
     }

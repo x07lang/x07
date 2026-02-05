@@ -23,7 +23,7 @@
 - `crates/`: Rust workspace crates (CLI + compiler + runners + shipped native extensions)
 - `docs/`: end-user documentation (published)
 - `labs/internal-docs/`: internal specs + design notes (not published)
-- `examples/`: public examples
+- `docs/examples/`: public examples
 - `ci/`: release-blocking fixtures and suites
 - `skills/`: released agent skills pack (installed via `x07up`)
 - `schemas/`, `spec/`: contracts

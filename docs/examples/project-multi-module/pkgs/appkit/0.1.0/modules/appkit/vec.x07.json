@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["appkit.vec.push2"]},{"body":["begin",["let","h2",["vec_u8.push","h","a"]],["vec_u8.push","h2","b"]],"kind":"defn","name":"appkit.vec.push2","params":[{"name":"h","ty":"vec_u8"},{"name":"a","ty":"i32"},{"name":"b","ty":"i32"}],"result":"vec_u8"}],"imports":[],"kind":"module","module_id":"appkit.vec","schema_version":"x07.x07ast@0.3.0"}

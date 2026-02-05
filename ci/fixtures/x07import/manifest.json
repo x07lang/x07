@@ -4,15 +4,14 @@
     {
       "module_id": "ext.hex",
       "kind": "rust",
-      "source": "examples/tutorials/x07import_rust_hex_pkg/import_sources/rust/hex.rs",
-      "out_root": "examples/tutorials/x07import_rust_hex_pkg/modules"
+      "source": "docs/examples/tutorials/x07import_rust_hex_pkg/import_sources/rust/hex.rs",
+      "out_root": "docs/examples/tutorials/x07import_rust_hex_pkg/modules"
     },
     {
       "module_id": "ext.smoke",
       "kind": "c",
-      "source": "examples/tutorials/x07import_c_smoke_pkg/import_sources/c/smoke.c",
-      "out_root": "examples/tutorials/x07import_c_smoke_pkg/modules"
+      "source": "docs/examples/tutorials/x07import_c_smoke_pkg/import_sources/c/smoke.c",
+      "out_root": "docs/examples/tutorials/x07import_c_smoke_pkg/modules"
     }
   ]
 }
-

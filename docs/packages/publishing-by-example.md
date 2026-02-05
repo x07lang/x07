@@ -33,7 +33,7 @@ If you are publishing to the public registry, choose a unique package name (for 
 
 Companion example (in the `x07` repo):
 
-- `examples/tutorials/package_publish_acme_hello_demo/`
+- `docs/examples/tutorials/package_publish_acme_hello_demo/`
 
 ## Step 0: create the skeleton (publish-ready)
 

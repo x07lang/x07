@@ -29,7 +29,7 @@ For the HTTP stage:
 
 Companion example (in the `x07` repo):
 
-- `examples/tutorials/sandbox_policy_walkthrough/`
+- `docs/examples/tutorials/sandbox_policy_walkthrough/`
 
 ## Step 0: create a project
 

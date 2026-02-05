@@ -3,11 +3,11 @@
   "generated_at": "2026-01-24T00:00:00Z",
   "notes": [
     "Offline-only: this repo is the source of truth for packages, examples, and CI fixtures.",
-    "Agent gates reference paths under examples/agent-gate/ and ci/fixtures/agent-scenarios/."
+    "Agent gates reference paths under docs/examples/agent-gate/ and ci/fixtures/agent-scenarios/."
   ],
   "global_definition_of_done": {
     "examples": {
-      "base_dir": "examples/agent-gate/",
+      "base_dir": "docs/examples/agent-gate/",
       "must_be_runnable_via": "x07 run",
       "canonical_runner": "x07 run",
       "must_capture_machine_report": "artifacts/run.report.json"
@@ -60,7 +60,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/text-core/text-utils/",
+          "path": "docs/examples/agent-gate/text-core/text-utils/",
           "profile": "test",
           "must_pass_command": "x07 run --profile test",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -109,7 +109,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/math-bigint/factorial-100/",
+          "path": "docs/examples/agent-gate/math-bigint/factorial-100/",
           "profile": "test",
           "must_pass_command": "x07 run --profile test",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -159,7 +159,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/math-decimal/money-format/",
+          "path": "docs/examples/agent-gate/math-decimal/money-format/",
           "profile": "test",
           "must_pass_command": "x07 run --profile test",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -211,7 +211,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/text-unicode/normalize-casefold/",
+          "path": "docs/examples/agent-gate/text-unicode/normalize-casefold/",
           "profile": "test",
           "must_pass_command": "x07 run --profile test",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -254,7 +254,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/data-cbor/roundtrip/",
+          "path": "docs/examples/agent-gate/data-cbor/roundtrip/",
           "profile": "test",
           "must_pass_command": "x07 run --profile test",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -297,7 +297,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/data-msgpack/roundtrip/",
+          "path": "docs/examples/agent-gate/data-msgpack/roundtrip/",
           "profile": "test",
           "must_pass_command": "x07 run --profile test",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -340,7 +340,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/checksum-fast/smoke/",
+          "path": "docs/examples/agent-gate/checksum-fast/smoke/",
           "profile": "test",
           "must_pass_command": "x07 run --profile test",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -383,7 +383,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/diff-patch/apply/",
+          "path": "docs/examples/agent-gate/diff-patch/apply/",
           "profile": "test",
           "must_pass_command": "x07 run --profile test",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -431,7 +431,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/fs-globwalk/list-files/",
+          "path": "docs/examples/agent-gate/fs-globwalk/list-files/",
           "profile": "os",
           "must_pass_command": "x07 run --profile os",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -482,7 +482,7 @@
           ]
         },
         "example": {
-          "path": "examples/agent-gate/compress-zstd/roundtrip/",
+          "path": "docs/examples/agent-gate/compress-zstd/roundtrip/",
           "profile": "test",
           "must_pass_command": "x07 run --profile test",
           "expected_artifacts": ["artifacts/run.report.json"]
@@ -504,4 +504,3 @@
     }
   ]
 }
-

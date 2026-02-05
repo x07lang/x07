@@ -68,7 +68,7 @@ x07 run --profile sandbox -- tool --url https://example.com --depth 2 --out out/
 
 This eliminates the need to manually construct `--input` bytes for normal runs. `--input` remains available for advanced usage.
 
-See also: `examples/agent-gate/cli-ext-cli` in the `x07` repo (CI-gated reference project).
+See also: `docs/examples/agent-gate/cli-ext-cli` in the `x07` repo (CI-gated reference project).
 
 ## Using `ext-cli-ux`
 
