@@ -5563,26 +5563,26 @@
         {
           "module_id": "std.msg.amqp.rr",
           "path": "packages/ext/x07-ext-msg-amqp-c/0.1.1/modules/std/msg/amqp/rr.x07.json",
-          "sha256": "06f60ffe32166e79d7657736792f19b0c605ef5ea2e9ddeb8af3b89317549019",
-          "size_bytes": 13278
+          "sha256": "822b29459f5142a399cad75a7e3925c4383e4d132686d12f9fe787d339d9aeaa",
+          "size_bytes": 10554
         },
         {
           "module_id": "std.msg.amqp.tests",
           "path": "packages/ext/x07-ext-msg-amqp-c/0.1.1/modules/std/msg/amqp/tests.x07.json",
-          "sha256": "4e97c5787043fad13d69b4954557468bc0d135d0fb50ebf9ddcf02a620caaf35",
-          "size_bytes": 5094
+          "sha256": "17af6750e26fc4105fe35dad322266bac16832900ec95348393347a3a753b818",
+          "size_bytes": 4020
         },
         {
           "module_id": "std.msg.amqp.topology",
           "path": "packages/ext/x07-ext-msg-amqp-c/0.1.1/modules/std/msg/amqp/topology.x07.json",
-          "sha256": "9d45ab396b2c57a71ccbb2f3a89df77db717923f9dc4f75e6929ab49d015e1c6",
-          "size_bytes": 9446
+          "sha256": "60c9525cb52239f8bc11a8732ac8b16ea9dbd707142e77ba115b9d1ae9675bcd",
+          "size_bytes": 6197
         },
         {
           "module_id": "std.msg.amqp",
           "path": "packages/ext/x07-ext-msg-amqp-c/0.1.1/modules/std/msg/amqp.x07.json",
-          "sha256": "c14fba88ba93297a7bc34782b513f3be111a0fbe9455df89a7a868d422b2fc1c",
-          "size_bytes": 8548
+          "sha256": "cae9d12e442d3becba3173a1dbb1e6efcb0733f00d6315e48873d161f3129777",
+          "size_bytes": 6209
         }
       ],
       "name": "ext-msg-amqp-c",
@@ -5711,20 +5711,20 @@
         {
           "module_id": "std.msg.kafka.rr",
           "path": "packages/ext/x07-ext-msg-kafka-c/0.1.1/modules/std/msg/kafka/rr.x07.json",
-          "sha256": "7d8f02aae6cf8518d00d5a6c2870dc28131f90a21449beadf14da928d4a77611",
-          "size_bytes": 13920
+          "sha256": "9a81182e2de2a616ff9524018a1c651791044e2c0b146285c55afec5c856a88b",
+          "size_bytes": 11063
         },
         {
           "module_id": "std.msg.kafka.tests",
           "path": "packages/ext/x07-ext-msg-kafka-c/0.1.1/modules/std/msg/kafka/tests.x07.json",
-          "sha256": "5633fec257babda5fb7275569ff447c35ecce6ca6f5e410a957989329f57369f",
-          "size_bytes": 4218
+          "sha256": "254b267699d1c56d8b09bbbc39f0410f9174235668488bf1775c12d8e16cb8bf",
+          "size_bytes": 3283
         },
         {
           "module_id": "std.msg.kafka",
           "path": "packages/ext/x07-ext-msg-kafka-c/0.1.1/modules/std/msg/kafka.x07.json",
-          "sha256": "c5f4562e91f8c26a3849e62ae667a154d4524c7e19813c4ff4856e10f9a9d43f",
-          "size_bytes": 7777
+          "sha256": "4336913e86891aaf0c6742f77fc1cf0282a7ad3ccd87f8c3e47cbbe4c373e5b3",
+          "size_bytes": 5708
         }
       ],
       "name": "ext-msg-kafka-c",
@@ -10411,6 +10411,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "c332a0c2b53e121c77c744f77f414fcde1c27c9096da9fc3afd92faabcc5d5bb",
+  "packages_hash": "1ae399bdc804964ad5240d30096ef1b02f89c97cd8909b9986250003d37fd5c7",
   "packages_root": "packages/ext"
 }
