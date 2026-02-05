@@ -6573,8 +6573,8 @@
         {
           "module_id": "std.net.http.spec",
           "path": "packages/ext/x07-ext-net/0.1.8/modules/std/net/http/spec.x07.json",
-          "sha256": "a4e5f352cc6f0aa695cff3ca59fce58e612a8ec5b4b6933876a1c0cce99285ab",
-          "size_bytes": 26091
+          "sha256": "675c224d33ab97a25d7cd8f6593f98cae0778f719fdffe83750e8308db4430e3",
+          "size_bytes": 26348
         },
         {
           "module_id": "std.net.http",
@@ -10579,6 +10579,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "42dd1e42ccf9f39109cec589a844847af523784406704cdbbfc8de71efc9f166",
+  "packages_hash": "c6a1a306ca8e1be2ff7a70aab7251b9f38fd66816d025035c46e4450517d670a",
   "packages_root": "packages/ext"
 }
