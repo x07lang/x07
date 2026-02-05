@@ -2053,6 +2053,9 @@ fn run_child(artifact_path: &Path, input: &[u8], config: &RunnerConfig) -> Resul
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
         cmd.env_clear();
+        if let Ok(v) = std::env::var("X07_DEBUG_SCHED") {
+            cmd.env("X07_DEBUG_SCHED", v);
+        }
         cmd.current_dir(tmp.path());
 
         #[cfg(unix)]

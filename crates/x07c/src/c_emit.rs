@@ -31662,6 +31662,7 @@ static uint32_t rt_sched_step(ctx_t* ctx) {
     uint32_t done = t->poll(ctx, t->fut, &out);
 
     ctx->sched_current_task = prev;
+    t = rt_task_ptr(ctx, task_id);
 
     if (done) {
       t->done = 1;
@@ -31690,6 +31691,21 @@ static uint32_t rt_sched_step(ctx_t* ctx) {
     }
 
     if (!t->in_ready && t->wait_kind == RT_WAIT_NONE) {
+      const char* dbg = getenv("X07_DEBUG_SCHED");
+      if (dbg && dbg[0] == '1' && dbg[1] == '\0') {
+        char msg[192];
+        uint32_t st = 0;
+        if (t->fut) memcpy(&st, t->fut, sizeof(uint32_t));
+        (void)snprintf(
+          msg,
+          sizeof(msg),
+          "task pending without block (task_id=%" PRIu32 " poll=%p state=%" PRIu32 ")",
+          task_id,
+          (void*)t->poll,
+          st
+        );
+        rt_trap(msg);
+      }
       char msg[96];
       (void)snprintf(
         msg,
