@@ -6543,7 +6543,7 @@
         {
           "module_id": "std.net.codec",
           "path": "packages/ext/x07-ext-net/0.1.8/modules/std/net/codec.x07.json",
-          "sha256": "6a8c4ea9de9ae583c79bdff66a16aa9fa775d1a941617f11c77c8b690d70d474",
+          "sha256": "c44592bb0ef0753a74c2a57f7b8e65e8ee9390513ae1852ba26746ad812f61c3",
           "size_bytes": 8965
         },
         {
@@ -6567,8 +6567,8 @@
         {
           "module_id": "std.net.http.server",
           "path": "packages/ext/x07-ext-net/0.1.8/modules/std/net/http/server.x07.json",
-          "sha256": "0f8cd6c161fd3c16795b67ad79461cf85b2da3eb6145e0a6d11eddda45e5ca46",
-          "size_bytes": 17305
+          "sha256": "cdee2135124db79035ba1fb2184e98fad8791b9b8260748341ae75cb26496bd1",
+          "size_bytes": 17306
         },
         {
           "module_id": "std.net.http.spec",
@@ -6585,14 +6585,14 @@
         {
           "module_id": "std.net.io",
           "path": "packages/ext/x07-ext-net/0.1.8/modules/std/net/io.x07.json",
-          "sha256": "7d7b8fa79fa148c767e7f4f3503ab9e98b1e6c286e843fb795d1b39a8721235f",
-          "size_bytes": 2842
+          "sha256": "4878202d5cdbf19d144d4e5f17155f161ee9ac11be49d96056fc5412d26115ca",
+          "size_bytes": 2843
         },
         {
           "module_id": "std.net.tcp",
           "path": "packages/ext/x07-ext-net/0.1.8/modules/std/net/tcp.x07.json",
-          "sha256": "b8a1c50a154c8bf5bcc321b4660b65aa1f845859f8be5e611bb2c70ab24b8e78",
-          "size_bytes": 10891
+          "sha256": "34d996b9e5998960030df14cab6899270fdcbac942db2f2eaf6f5e44458be903",
+          "size_bytes": 10892
         },
         {
           "module_id": "std.net.tls",
@@ -6767,32 +6767,32 @@
         {
           "module_id": "std.obs.export",
           "path": "packages/ext/x07-ext-obs/0.1.2/modules/std/obs/export.x07.json",
-          "sha256": "663ffc1d3bb5dc02403e21b9479e4acf94f88dccb1be9d312ff187163e1d6b54",
-          "size_bytes": 12784
+          "sha256": "7dc3d658aada87fb5f21a093038b1703a7275ea1c9d335d425dfa2776178309c",
+          "size_bytes": 8903
         },
         {
           "module_id": "std.obs.metrics",
           "path": "packages/ext/x07-ext-obs/0.1.2/modules/std/obs/metrics.x07.json",
-          "sha256": "9df5160467a6a0d45ebfd994d3c9a6037ec3d17b7d5c27934f2ba5048a5eec20",
-          "size_bytes": 1738
+          "sha256": "f66ba3380c0ceb02b2079bb7c9a1d3b8fa8de102c7b4c5b9f152c5ae3bdf63ae",
+          "size_bytes": 1408
         },
         {
           "module_id": "std.obs.openmetrics",
           "path": "packages/ext/x07-ext-obs/0.1.2/modules/std/obs/openmetrics.x07.json",
-          "sha256": "ea5e8ed5820fc2684afd70d7de05e756599a709c969a40dbbf9c29efc267073f",
-          "size_bytes": 16309
+          "sha256": "36e4bcccc9c5de3f9714d74737b1a8c0f72344745935527dd50e72d7fa24de00",
+          "size_bytes": 10803
         },
         {
           "module_id": "std.obs.otlp",
           "path": "packages/ext/x07-ext-obs/0.1.2/modules/std/obs/otlp.x07.json",
-          "sha256": "7b438975e953616fdbb1bcc0d6e64cbab34f8e7d21da4e397815f29386ee6917",
-          "size_bytes": 23593
+          "sha256": "fa025074b8aaae68d67353a85d414e6a29ea458228660cc7d9b623844e40ccec",
+          "size_bytes": 16806
         },
         {
           "module_id": "std.obs.tests",
           "path": "packages/ext/x07-ext-obs/0.1.2/modules/std/obs/tests.x07.json",
-          "sha256": "5ec46d3a2568131272d3cef7287af7a15077c4070c6b75608e163b156f1af09a",
-          "size_bytes": 3215
+          "sha256": "0887a3357cdf7dbec0761da5055dc56979918ef4d773e74a697d0ea3e7e604cd",
+          "size_bytes": 2525
         }
       ],
       "name": "ext-obs",
@@ -9981,44 +9981,44 @@
         {
           "module_id": "std.crawl.fetch.os",
           "path": "packages/ext/x07-ext-web-crawl/0.1.2/modules/std/crawl/fetch/os.x07.json",
-          "sha256": "62bdc8d18ee4a2311b588d380f432e9bd398b7b4ad77f6183c3fc4013b3a3f29",
-          "size_bytes": 8007
+          "sha256": "41ea60b7deb5abc57516bbc8d7a1f3fea3c7a56ee5958e8d844ce5c5df0d7e0b",
+          "size_bytes": 5710
         },
         {
           "module_id": "std.crawl.fetch",
           "path": "packages/ext/x07-ext-web-crawl/0.1.2/modules/std/crawl/fetch.x07.json",
-          "sha256": "092f9c342425e25640b9d630ddcdeb6ff0fc7d9c2048146bb7077b7319142398",
-          "size_bytes": 6555
+          "sha256": "56a65ccabfa5911d5d619808e607d5b4757df20629174e45d51e3de59b5947a7",
+          "size_bytes": 4939
         },
         {
           "module_id": "std.crawl.robots",
           "path": "packages/ext/x07-ext-web-crawl/0.1.2/modules/std/crawl/robots.x07.json",
-          "sha256": "28ee6abde8b12eb23049e801923d84704996b3cf9d2e26e973e35695b7584f61",
-          "size_bytes": 3754
+          "sha256": "3bf7831ecd35eff92bb2d2c5382cc3fd6b411350f196fdff6a86d1dcf2b56024",
+          "size_bytes": 2533
         },
         {
           "module_id": "std.crawl.schedule",
           "path": "packages/ext/x07-ext-web-crawl/0.1.2/modules/std/crawl/schedule.x07.json",
-          "sha256": "63f4344bd4a2897bdd996921043500813c8ffb119ff0192fa41d409647f85b08",
-          "size_bytes": 7520
+          "sha256": "1f42a84b454a6e734c1bc24850e4111a7af6b951c86a204b7ffb82cbfc2a4e8b",
+          "size_bytes": 5276
         },
         {
           "module_id": "std.crawl.sitemap",
           "path": "packages/ext/x07-ext-web-crawl/0.1.2/modules/std/crawl/sitemap.x07.json",
-          "sha256": "d8fc4dba839a364f5c215b747500a17812eb2ac697ffd72482df3fc901b52708",
-          "size_bytes": 2055
+          "sha256": "1ca115325354ffb08e1005cb9f2c69fc66a55eb9f8e58a961bd1b1cfd4eb2f7a",
+          "size_bytes": 1439
         },
         {
           "module_id": "std.crawl.tests",
           "path": "packages/ext/x07-ext-web-crawl/0.1.2/modules/std/crawl/tests.x07.json",
-          "sha256": "678c1ad65d6fab974fc005cbd82f0b603f772d7ceac720fd6816b9b37b321af3",
-          "size_bytes": 10248
+          "sha256": "2a57314f31ef8712177eda32bc856e62864de0a769701dc5652f7d39c270935d",
+          "size_bytes": 8019
         },
         {
           "module_id": "std.crawl.urlnorm",
           "path": "packages/ext/x07-ext-web-crawl/0.1.2/modules/std/crawl/urlnorm.x07.json",
-          "sha256": "fc760e7d21133b1eb0a177123f455bdb1146bd960da29e71d63ca02e01cba009",
-          "size_bytes": 4472
+          "sha256": "82ac321f4dbf2d0bf59476307cb92063e8e1308c4db0ec828be8d26d54b69b6c",
+          "size_bytes": 3002
         }
       ],
       "name": "ext-web-crawl",
@@ -10579,6 +10579,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "6beeb222afcdf3bfffc413a3b5c20a937528a125de0f708073c172906176db8b",
+  "packages_hash": "42dd1e42ccf9f39109cec589a844847af523784406704cdbbfc8de71efc9f166",
   "packages_root": "packages/ext"
 }

@@ -90,15 +90,15 @@
       "package_manifest_sha256": "2c9e3cd98153bc2e879039c9b777b08e10a236c4923f56929f5dd4f6fc435cfc",
       "module_root": "modules",
       "modules_sha256": {
-        "std.net.codec": "6a8c4ea9de9ae583c79bdff66a16aa9fa775d1a941617f11c77c8b690d70d474",
+        "std.net.codec": "c44592bb0ef0753a74c2a57f7b8e65e8ee9390513ae1852ba26746ad812f61c3",
         "std.net.dns": "32133db3cb22b4d25272ecca3bd08881cabecbf3b9cc290b5e467b86cf3a0c94",
         "std.net.err": "662a4b0385dc9730b7ee5791e73ce1b532ea6c0421c1aa2e4030a08c7535356e",
         "std.net.http": "c65425c329faea952a1e2ece6a5d01cbb30e0f5e7c3ed8f996bcb6acc512f1a2",
         "std.net.http.client": "eadb198ac302344827430d35063ed1e7a02d216c6ead3a5097636d2169e3b6fa",
-        "std.net.http.server": "0f8cd6c161fd3c16795b67ad79461cf85b2da3eb6145e0a6d11eddda45e5ca46",
+        "std.net.http.server": "cdee2135124db79035ba1fb2184e98fad8791b9b8260748341ae75cb26496bd1",
         "std.net.http.spec": "a4e5f352cc6f0aa695cff3ca59fce58e612a8ec5b4b6933876a1c0cce99285ab",
-        "std.net.io": "7d7b8fa79fa148c767e7f4f3503ab9e98b1e6c286e843fb795d1b39a8721235f",
-        "std.net.tcp": "b8a1c50a154c8bf5bcc321b4660b65aa1f845859f8be5e611bb2c70ab24b8e78",
+        "std.net.io": "4878202d5cdbf19d144d4e5f17155f161ee9ac11be49d96056fc5412d26115ca",
+        "std.net.tcp": "34d996b9e5998960030df14cab6899270fdcbac942db2f2eaf6f5e44458be903",
         "std.net.tls": "525a4e5181b94d59f30b2ae055b642421788a00bd776f7cef16376f2f921ea27",
         "std.net.udp": "d632703b7e750934891a60b155ce10f9a9cc21d674f23933b0023b5ea53dad18"
       }
