@@ -666,7 +666,6 @@ def _run_preflight(root: Path, python_bin: str) -> None:
         _die("\n".join(lines), code=1)
 
     jobs: list[list[str]] = [
-        [python_bin, "scripts/check_x07_parens.py", "packages/ext"],
         [python_bin, "scripts/check_pkg_contracts.py", "--check"],
         ["bash", "scripts/ci/check_external_packages_lock.sh"],
         [python_bin, "scripts/ci/check_package_manifests.py"],
@@ -675,6 +674,23 @@ def _run_preflight(root: Path, python_bin: str) -> None:
     ]
     for cmd in jobs:
         _run(cmd, cwd=root)
+
+
+def _run_x07_parens_for_dirs(root: Path, python_bin: str, dirs: list[Path]) -> None:
+    # check_x07_parens.py enforces canonical formatting with the current x07c formatter.
+    # This is intentionally scoped to the package module roots we are about to publish to
+    # avoid failing on older, already-published package versions.
+    if not dirs:
+        return
+    chunk: list[str] = []
+    for p in dirs:
+        chunk.append(str(p))
+        if len(chunk) >= 32:
+            _run([python_bin, "scripts/check_x07_parens.py", *chunk], cwd=root)
+            chunk = []
+    if chunk:
+        _run([python_bin, "scripts/check_x07_parens.py", *chunk], cwd=root)
+
 
 def _publish_main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Publish missing ext package versions to a registry index.")
@@ -759,6 +775,10 @@ def _publish_main(argv: list[str]) -> int:
 
     if args.check:
         return 1
+
+    if not args.no_preflight:
+        module_roots = _module_roots_for_closure(root, manifests, missing)
+        _run_x07_parens_for_dirs(root, python_bin, module_roots)
 
     publish_order = _topo_sort(missing, deps)
 
