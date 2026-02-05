@@ -180,8 +180,9 @@ Notes:
 - `x07 pkg add NAME@VERSION` is safe to re-run: if the same dep+version already exists, it succeeds as a no-op. If the dep exists at a different version, pick a version explicitly and update the project deps.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
-- For stdlib modules, use `x07 doc std.<module>` (example: `x07 doc std.bytes`) and `x07 doc std.os.<module>` (example: `x07 doc std.os.env`).
-- For builtins (example: `std.brand.*`), use `x07 guide`.
+- For builtin `std.*` modules (file: `<builtin>`), use `x07 doc std.<module>` (example: `x07 doc std.bytes`).
+- For package-provided `std.*` modules, run `x07 doc <module-id> --project x07.json` after adding the package (example: after `x07 pkg add ext-net --sync`, run `x07 doc std.net.tcp --project x07.json`).
+- For special forms (pipes, `task.scope_v1`, `budget.*`) and non-module builtins (example: `std.brand.*`), use `x07 guide` + linked docs pages (not `x07 doc`).
 - For structured encodings, prefer branded bytes + validators over ad-hoc parsing (see `std.brand.cast_view_v1` / `std.brand.cast_view_copy_v1` in `x07 guide` and `meta.brands_v1` in schema-derived modules).
 - For streaming transforms, prefer `std.stream.pipe_v1` and `std.io.bufread` over manual loops (more predictable allocations; fewer borrow/ownership hazards).
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.

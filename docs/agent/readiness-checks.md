@@ -117,7 +117,88 @@ DELIVERABLES
 
 ---
 
-### Prompt 2 — Data model + full codec roundtrip laboratory
+### Prompt 2 — Schema derive + types/brands + pipes integration lab
+
+```text
+You are an X07 coding agent building `x07-schema-types-pipes-lab`.
+
+GOAL
+Build an executable `types_pipes.main` that proves the full “types + brands + pipe elaboration” story:
+- generate types/validators from schema via `x07 schema derive`
+- feed those validators into a brand registry
+- build a pipe that relies on compile-time brand inference AND auto-inserted runtime validation
+- produce a canonical JSON report + deterministic tests + drift checks
+
+START PROJECT
+https://x07lang.org/docs/getting-started/agent-quickstart
+mkdir x07-schema-types-pipes-lab
+cd x07-schema-types-pipes-lab
+x07 init
+
+DEPENDENCIES (lock)
+- ext-data-model (required by schema-derived modules)
+- ext-json-rs (canonical JSON helpers where needed)
+- ext-cli
+
+SCHEMA DERIVE REQUIREMENTS
+1) Create TWO schema files under `schemas/`:
+   - `schemas/frame_payload.x07schema.json`
+   - `schemas/event_line.x07schema.json`
+2) Run:
+   - `x07 schema derive --input schemas/frame_payload.x07schema.json --out-dir gen/frame_payload --write`
+   - `x07 schema derive --input schemas/event_line.x07schema.json --out-dir gen/event_line --write`
+3) Add the derived module roots to `x07.json.module_roots`:
+   - `gen/frame_payload/modules`
+   - `gen/event_line/modules`
+4) Commit generated outputs and add drift checks:
+   - `x07 schema derive --input ... --out-dir ... --check`
+
+TYPES + BRANDS REQUIREMENTS
+1) Import the generated modules and build a central brand registry module that re-exports brand ids + validators.
+2) Demonstrate both:
+   - a validator used directly in `std.stream.xf.require_brand_v1`
+   - a validator resolved indirectly via `meta.brands_v1` / `brand_registry_ref_v1` (omit the validator in `require_brand_v1` and let elaboration resolve it)
+
+PIPES REQUIREMENTS
+1) Build a pipe that processes u32-framed items:
+   - source: bytes source containing u32le-framed items
+   - chain: deframe → require_brand (auto inserted by elaborator) → map_bytes (brand-inferred) → frame → collect
+2) Pipe cfg MUST include:
+   - typecheck_item_brands_v1=1
+   - auto_require_brand_v1=1
+   - verify_produced_brands_v1=1
+   - brand_registry_ref_v1 pointing to your registry module
+   - emit_stats=1, emit_payload=1
+3) Include a second pipe that uses plugin_id "xf.json_canon_stream_v1" on a JSON-lines stream and shows byte-stable canonicalization.
+
+ARCH CHECK (contracts)
+1) Add `arch/manifest.x07arch.json` enabling at least:
+   - contracts_v1.stream_plugins (since you use plugin stages)
+   - contracts_v1.canonical_json (your report output)
+2) Run `x07 arch check --write-lock` and commit:
+   - arch/manifest.lock.json
+   - arch/contracts.lock.json
+
+TESTS
+- Provide a `fixtures/` corpus containing:
+  - valid framed payloads
+  - invalid payloads (to prove brand validation triggers ERR doc)
+  - JSON-lines corpus for json_canon stream stage
+- Add deterministic tests that:
+  - run the pipe twice and compare output bytes exactly
+  - validate that ERR docs surface stable err codes and messages
+
+OUTPUT
+- One canonical JSON report that includes:
+  - schema versions used
+  - which brands were enforced
+  - pipe stats (bytes/items) extracted from the pipe doc
+  - pass/fail + stable error codes
+```
+
+---
+
+### Prompt 3 — Data model + full codec roundtrip laboratory
 
 ```text
 You are an X07 coding agent building a “data interchange torture test” project named `x07-data-interop-lab`.
@@ -179,7 +260,7 @@ OUTPUT
 
 ---
 
-### Prompt 3 — Crypto + compression + archive + diff integrity pipeline
+### Prompt 4 — Crypto + compression + archive + diff integrity pipeline
 
 ```text
 You are an X07 coding agent building `x07-artifact-integrity-pipeline`.
@@ -247,29 +328,36 @@ DELIVERABLES
 
 ---
 
-### Prompt 4 — Sandboxed networking + HTTP + crawler/search + observability
+### Prompt 5 — Sandboxed web stack (HTTP + crawler/search + WS/gRPC framing + observability)
 
 ```text
-You are an X07 coding agent building `x07-sandbox-net-stack`.
+You are an X07 coding agent building `x07-sandbox-web-stack`.
 
 GOAL
 Build a single project that contains BOTH:
-1) a local HTTP server (for deterministic integration testing)
-2) a sandboxed crawler/client that fetches pages, respects robots.txt, parses sitemap, extracts links + visible text, and performs high-performance searches.
+1) a local HTTP server (deterministic integration target)
+2) a sandboxed crawler/client that fetches pages, respects robots.txt, parses sitemap, extracts links + visible text, and performs high-performance searches
+3) a non-HTTP protocol coverage path via loopback TCP that exchanges:
+   - WebSocket frames (framing helpers)
+   - gRPC length-prefixed messages (message framing helpers)
+4) observability outputs: canonical JSON report + OpenMetrics snapshot
 
 START PROJECT
 https://x07lang.org/docs/getting-started/agent-quickstart
-mkdir myapp
-cd myapp
-x07 init
+mkdir x07-sandbox-web-stack
+cd x07-sandbox-web-stack
+x07 init --template web-service
 
 DEPENDENCIES (lock them)
-Networking stack (run-os only):
-- ext-net (std.net.* modules including http client/server)
-- ext-sockets-c (FFI backend)
-- ext-curl-c (additional HTTP client via libcurl bindings)
-URL + HTTP parsing:
-- ext-url-rs (ext.url.* + http_types + httparse)
+HTTP + crawling (run-os only):
+- ext-net
+- ext-sockets-c
+- ext-curl-c
+- ext-url-rs
+- ext-web-kit
+- ext-web-crawl
+Modern protocols (run-os only):
+- ext-net-protos-c (std.net.ws + std.net.grpc helpers)
 Content parsing/search:
 - ext-html-lite-rs
 - ext-robots-txt-rs
@@ -280,20 +368,24 @@ Content parsing/search:
 Text handling:
 - ext-text
 - ext-unicode-rs
-Time + observability:
-- ext-time-rs
+Observability:
 - ext-log
 - ext-tracing
+- ext-obs
 CLI:
 - ext-cli
-Stdlib cross-coverage:
-- must also use std.lru_cache, std.hash_map, std.rr (fetch/send) where appropriate
+- ext-cli-ux
+Note: x7sl “slice documents” are provided by stdlib `std.text.slices` (brand `std.text.slices.x7sl_v1`).
 
 SANDBOX POLICY REQUIREMENTS
 - Run everything under run-os-sandboxed.
-- Allow network ONLY to 127.0.0.1:<port> (the local server you spin up).
+- Use fixed loopback ports:
+  - HTTP server: 127.0.0.1:18080
+  - TCP proto service: 127.0.0.1:18081
+- Allow network ONLY to those loopback ports (explicit ports only), for example:
+  - `x07 run --profile sandbox --allow-host 127.0.0.1:18080,18081 -- ...`
 - Deny all external hosts.
-- Allow write only to out/ for reports.
+- Allow write only to out/ for reports and metrics snapshots.
 
 FUNCTIONAL REQUIREMENTS
 A) Server:
@@ -307,24 +399,28 @@ B) Crawler:
      - regex patterns
      - Aho–Corasick multi-pattern search
      - raw byte scanning via memchr
-C) Observability:
+C) WS + gRPC framing over loopback TCP:
+   - implement a tiny TCP protocol where:
+     - client sends one WebSocket frame with an ASCII payload and receives a deterministic echo
+     - client sends one gRPC msg-prefix frame with an ASCII payload and receives a deterministic echo
+   - use `std.net.ws.frame_v1` / accessors and `std.net.grpc.msg_prefix_v1` / `std.net.grpc.msg_unprefix_v1` (framing only; no WS handshake / no gRPC service server).
+D) Observability + output:
    - emit structured logs and trace spans for each fetch/parse/search stage
-   - include RFC3339 timestamps
-D) Output:
-   - canonical JSON report with:
+   - maintain metrics counters and export an OpenMetrics snapshot under out/
+   - print one canonical JSON report with:
      - fetched URLs
      - extracted links
      - search hits
-     - timing + counters
+     - WS/gRPC transcripts
      - policy info (what was allowed)
 
 TESTS
-- A test entrypoint that starts the server on an ephemeral port, runs the crawler against it, and asserts output stability.
+- A test entrypoint that uses the fixed ports above, runs the crawler against the local server, exercises the loopback WS/gRPC framing path, and asserts output stability.
 ```
 
 ---
 
-### Prompt 5 — Filesystem + glob/walk + multi-DB ingestion + query engine
+### Prompt 6 — Filesystem + glob/walk + multi-DB ingestion + query engine
 
 ```text
 You are an X07 coding agent building `x07-db-fs-indexer`.
@@ -351,6 +447,7 @@ Filesystem + traversal (run-os only):
 Database core + drivers (run-os only):
 - ext-db-core       (std.db.*, pool/spec/params/dm)
 - ext-db-sqlite     (required for CI tests)
+- ext-db-migrate    (REQUIRED: std.db.migrate)
 - ext-db-postgres   (optional, feature-gated)
 - ext-db-mysql      (optional, feature-gated)
 - ext-db-redis      (optional, feature-gated)
@@ -361,6 +458,7 @@ Math + numeric edge cases:
 Errors + CLI:
 - ext-error
 - ext-cli
+- ext-cli-ux (deterministic table/jsonl output helpers)
 
 STDLIB COVERAGE REQUIREMENTS (must explicitly exercise these “OS-edge” stdlib modules here)
 - std.fs (list_dir/read/read_async/read_task)
@@ -379,7 +477,7 @@ A) Indexing pipeline:
 - walk file tree deterministically (sorted output)
 - for each file: compute size, line count, and one stable hash/checksum (you may reuse std.hash or ext.checksum if you also include it)
 - parse a couple numeric fields from text and store them as decimal and bigint to exercise those packages
-- store in sqlite using std.db + sqlite pool; schema migrations are part of the program.
+- store in sqlite using std.db + sqlite pool; schema migrations are part of the program (use `std.db.migrate`).
 B) Query CLI:
 - queries by glob, extension, size ranges, numeric fields, and full-text substring matches (can reuse std.regex-lite or ext.regex if desired)
 C) Error handling:
@@ -399,7 +497,7 @@ DELIVERABLES
 
 ---
 
-### Prompt 6 — Record/replay + stream pipes + budgets (deterministic ingest)
+### Prompt 7 — Record/replay + stream pipes + budgets (deterministic ingest)
 
 ```text
 You are an X07 coding agent building `x07-rr-pipes-smoke`.
@@ -462,7 +560,7 @@ DELIVERABLES
 
 ---
 
-### Prompt 7 — State machines as data + arch contracts (gen + drift + enforcement)
+### Prompt 8 — State machines as data + arch contracts (gen + drift + enforcement)
 
 ```text
 You are an X07 coding agent building `x07-sm-arch-contracts-smoke`.
@@ -514,4 +612,86 @@ TESTS
 - CI must fail if:
   - generated outputs drift (`x07 sm gen --check`)
   - arch contracts drift (`x07 arch check` errors)
+```
+
+---
+
+### Prompt 9 — Messaging + rr determinism + obs metrics
+
+```text
+You are an X07 coding agent building `x07-messaging-rr-lab`.
+
+GOAL
+Exercise the messaging stack + deterministic record/replay:
+- real broker integration in OS mode (Kafka OR AMQP)
+- deterministic replay in solve-rr mode using recorded transcripts
+- canonical JSON + OpenMetrics output for CI
+
+START PROJECT
+https://x07lang.org/docs/getting-started/agent-quickstart
+mkdir x07-messaging-rr-lab
+cd x07-messaging-rr-lab
+x07 init --template worker
+
+DEPENDENCIES (lock)
+Core:
+- ext-msg-core (std.msg.* including std.msg.rr)
+Driver (choose one; you may include both if time permits):
+- ext-msg-kafka-c
+- ext-msg-amqp-c
+Observability:
+- ext-obs
+- ext-tracing
+- ext-log
+CLI:
+- ext-cli
+- ext-cli-ux
+Data model:
+- ext-data-model
+- ext-json-rs
+
+LOCAL BROKER FIXTURES
+- Use the Docker Compose fixtures in `x07/docs/examples/messaging_brokers/`.
+- Fixed loopback ports:
+  - Kafka (Redpanda): 127.0.0.1:9092
+  - AMQP (RabbitMQ): 127.0.0.1:5672
+
+PROFILES
+1) os_record: run-os-sandboxed
+   - policy allows ONLY loopback connections to the local broker port(s)
+   - allows write to `.x07_rr/` and `out/`
+2) rr_replay: solve-rr
+   - no network
+   - reads `.x07_rr/` cassette
+3) ci_replay: solve-rr (same as rr_replay, used by CI)
+
+FUNCTIONAL REQUIREMENTS
+A) OS mode (record):
+- Produce N messages with a deterministic envelope:
+  - key, headers, payload (payload is canonical JSON)
+- Consume them and process into a deterministic aggregate (counts, hashes).
+- Record publish/deliver interactions using std.msg.rr helpers.
+- Wrap the whole run in std.rr.with_policy_v1 so the capture is a proper rr cassette.
+
+B) Replay mode:
+- Do NOT touch the network.
+- Parse the recorded transcript and replay the same processing.
+- Assert that aggregate output bytes are identical to OS mode for the same transcript.
+
+C) Observability:
+- Maintain metrics for produced/consumed counts and processing latency buckets.
+- Emit:
+  - canonical JSON report
+  - OpenMetrics text snapshot
+
+ARCH CONTRACTS
+- Add arch/manifest.x07arch.json enabling:
+  - contracts_v1.msg (and msg_kafka/msg_amqp depending on driver)
+  - contracts_v1.rr
+  - contracts_v1.canonical_json
+- Run `x07 arch check --write-lock` and commit locks.
+
+TESTS
+- CI must run replay-only mode deterministically (no broker required).
+- Provide README instructions to run the local broker and record a new cassette.
 ```

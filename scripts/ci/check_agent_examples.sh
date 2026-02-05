@@ -510,7 +510,34 @@ expected_12="a.txt"$'\n'"sub/c.txt"$'\n'
 echo "ok: fs-globwalk"
 
 # ----------------------------
-# Example 13: Web crawler against a local fixture site (sandboxed OS world)
+# Example 13: WS/gRPC framing over loopback TCP (sandboxed OS world)
+# ----------------------------
+
+echo "==> agent example: protos-framing-loopback (run-os-sandboxed + allow-host sugar)"
+
+proto_work="$tmp_dir/protos-framing-loopback"
+copy_project "examples/agent-gate/protos-framing-loopback" "$proto_work"
+
+seed_official_deps "$proto_work"
+pkg_lock_check "$proto_work"
+"$x07_bin" policy init --template web-service --project "$proto_work/x07.json" --mkdir-out >/dev/null
+fmt_check_all "$proto_work"
+lint_check_one "$proto_work" "run-os-sandboxed" "src/main.x07.json"
+
+wrapped_13="$(run_x07_run "protos-framing-loopback" "$proto_work" \
+  --profile sandbox \
+  --allow-host "127.0.0.1:18081" \
+  --cpu-time-limit-seconds 60 \
+)"
+unwrap_and_check_wrapped_report "protos-framing-loopback" "$wrapped_13" "$proto_work/tmp/runner.json" "os" "run-os-sandboxed" "true"
+
+expected_13='{"grpc":"ping","ok":true,"ws":"hello"}'$'\n'
+"$python_bin" "$root/scripts/ci/assert_run_os_ok.py" "protos-framing-loopback" --path "$proto_work/tmp/runner.json" --expect "$expected_13" >/dev/null
+
+echo "ok: protos-framing-loopback"
+
+# ----------------------------
+# Example 14: Web crawler against a local fixture site (sandboxed OS world)
 # ----------------------------
 
 echo "==> agent example: web-crawler-local (run-os-sandboxed + allow-host sugar)"

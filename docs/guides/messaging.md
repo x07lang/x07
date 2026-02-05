@@ -38,6 +38,33 @@ x07 pkg remove ext-msg-core --sync
 x07 pkg add NAME@VERSION --sync
 ```
 
+## Local broker fixtures (Docker Compose)
+
+For readiness checks and local development, prefer a fixed-port, local-only broker setup:
+
+- Kafka-compatible (Redpanda): `127.0.0.1:9092`
+- AMQP 0-9-1 (RabbitMQ): `127.0.0.1:5672`
+
+Copy/paste:
+
+```bash
+cd docs/examples/messaging_brokers
+docker compose up -d
+docker compose ps
+```
+
+Sandboxed run examples (explicit allowlist):
+
+```bash
+# Kafka / Redpanda
+x07 run --profile sandbox --allow-host 127.0.0.1:9092 -- <your-args...>
+
+# AMQP / RabbitMQ
+x07 run --profile sandbox --allow-host 127.0.0.1:5672 -- <your-args...>
+```
+
+See `docs/examples/messaging_brokers/README.md` for service details and teardown commands.
+
 ## Expert (operations)
 
 - Prefer `run-os-sandboxed` for broker access in CI; relax to `run-os` only when the execution host is trusted and locked down.

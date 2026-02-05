@@ -50,6 +50,15 @@ Modern protocols:
 
 - `ext-net-protos-c` provides HTTP/2, WebSockets, and gRPC helpers (`std.net.http2`, `std.net.ws`, `std.net.grpc`) and is pinned by repo-local contracts under `arch/net/`.
 
+## WebSockets + gRPC (current surface)
+
+X07 currently exposes:
+
+- WebSocket **frame** helpers (`std.net.ws.frame_v1` and accessors). This is framing only (no handshake / server protocol surface).
+- gRPC **message framing** helpers (`std.net.grpc.msg_prefix_v1`, `std.net.grpc.msg_unprefix_v1`) and a unary **client** helper (`std.net.grpc.unary_from_arch_v1`). This is not a gRPC service server surface.
+
+For a deterministic loopback reference that exercises both framing formats over TCP under `run-os-sandboxed`, see `x07/examples/agent-gate/protos-framing-loopback/`.
+
 ## Canonical approach
 
 - Always construct requests through pack/unpack helpers:
