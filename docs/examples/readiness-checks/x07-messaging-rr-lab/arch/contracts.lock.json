@@ -1,0 +1,46 @@
+{
+  "files": {
+    "arch/budgets/profiles/msg_amqp_v1.budget.json": {
+      "jcs_sha256_hex": "c03d022376c97cb6995a85b5817a9530c5244cafb4a3401521a9547c96e14848"
+    },
+    "arch/budgets/profiles/msg_core_v1.budget.json": {
+      "jcs_sha256_hex": "e4764ca3caa273b34359614f25d356be979ac514bdf64fbeb8b48019c062fd9b"
+    },
+    "arch/budgets/profiles/msg_kafka_v1.budget.json": {
+      "jcs_sha256_hex": "56a37707449581c1ec2ca46d0b9f74a2dcc89360edada21639dda11e50d532ba"
+    },
+    "arch/msg/amqp/profiles/local_dev_v1.amqp_profile.json": {
+      "jcs_sha256_hex": "38a179ce5894a484bd1cdbcd65694f0325445da94d9ce7279ce6b5e951a05a1e"
+    },
+    "arch/msg/amqp/topology/app_v1.topology.json": {
+      "jcs_sha256_hex": "155d52a90f11f0976298e4c0962c9e15068dd710c700e6c3a16bd074e4dab89e"
+    },
+    "arch/msg/kafka/profiles/local_dev_v1.kafka_profile.json": {
+      "jcs_sha256_hex": "3dbda961590f6d70090cfc571293fffef01b2f995cd79a62c7c1059cb6446b53"
+    },
+    "arch/rr/policies/msg_rr_v1.policy.json": {
+      "jcs_sha256_hex": "a8132a64f8abba13d0d90c4ae2e2115be0d17790d661601d10180b57576f139d"
+    },
+    "arch/rr/sanitizers/sanitize_none_v1.sanitize.json": {
+      "jcs_sha256_hex": "a2c6c285baa339b679eb1c6332a9eb5acf69bfc8f638a611e33e081e7f498b6b"
+    }
+  },
+  "indexes": {
+    "arch/budgets/index.x07budgets.json": {
+      "jcs_sha256_hex": "a5a18ccdc741fbc678f0e65533143f7df47d8db26936e8dcaab10078efd4bf87"
+    },
+    "arch/msg/amqp/index.x07amqp.json": {
+      "jcs_sha256_hex": "ce43dbe64f168ccac4ecd7bdbe73697182bc32633d68b3d125827e836df15341"
+    },
+    "arch/msg/index.x07msg.json": {
+      "jcs_sha256_hex": "49f20e3b4c29d94029d72925a61e50fd42fd108a4f7b1020c11af66ad978e0c7"
+    },
+    "arch/msg/kafka/index.x07kafka.json": {
+      "jcs_sha256_hex": "c6adf6c064bfb8af8d82bca6cc7c0ee51314dc39523203699fa68323189eaf3e"
+    },
+    "arch/rr/index.x07rr.json": {
+      "jcs_sha256_hex": "f5dbe26f6033f0893594915f8eb6a34566bb6364760dd1ac120ca1eaab2d91f7"
+    }
+  },
+  "schema_version": "x07.arch.contracts.lock@0.1.0"
+}

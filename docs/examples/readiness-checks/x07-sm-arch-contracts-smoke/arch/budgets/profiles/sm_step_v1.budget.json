@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "sm_step_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "result_err_v1",
+    "label": "sm.step.v1",
+    "alloc_bytes": 1048576,
+    "alloc_calls": 5000,
+    "realloc_calls": 2000,
+    "memcpy_bytes": 2097152,
+    "sched_ticks": 100000,
+    "fuel": 0
+  }
+}
+

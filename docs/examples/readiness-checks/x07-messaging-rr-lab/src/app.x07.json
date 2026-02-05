@@ -1,0 +1,150 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "app",
+  "imports": [
+    "ext.data_model",
+    "std.bytes",
+    "std.fmt",
+    "std.json",
+    "std.msg.amqp",
+    "std.msg.amqp.rr",
+    "std.msg.kafka",
+    "std.msg.kafka.rr",
+    "std.rr",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "app.main",
+        "app.openmetrics_snapshot_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app._seq_count_or_neg1_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["=", ["ext.data_model.doc_is_err", "doc"], 1], ["return", -1], 0],
+        ["let", "root", ["ext.data_model.root_offset", "doc"]],
+        ["ext.data_model.seq_len", "doc", "root"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app._run_kafka_replay_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "std.rr.with_policy_v1",
+        ["bytes.lit", "msg_rr_v1"],
+        ["bytes.lit", "kafka_publish_poll_v1.x07rr.bin"],
+        ["i32.lit", 2],
+        [
+          "begin",
+          ["let", "endpoint", ["bytes.lit", "local_dev_v1"]],
+          ["let", "handle", ["std.msg.kafka.rr.replay_driver_v1", ["bytes.view", "endpoint"]]],
+          ["let", "env", ["bytes.lit", "ENV"]],
+          ["let", "pub_res", ["std.msg.kafka.publish_env_v1", ["bytes.view", "handle"], ["bytes.view", "env"]]],
+          ["if", ["!=", ["result_bytes.err_code", "pub_res"], 0], ["return", ["result_i32.err", 9101]], 0],
+          ["let", "poll_res", ["std.msg.kafka.poll_env_v1", ["bytes.view", "handle"], 10]],
+          ["if", ["!=", ["result_bytes.err_code", "poll_res"], 0], ["return", ["result_i32.err", 9102]], 0],
+          ["let", "poll_doc", ["result_bytes.unwrap_or", "poll_res", ["bytes.alloc", 0]]],
+          ["let", "count", ["app._seq_count_or_neg1_v1", ["bytes.view", "poll_doc"]]],
+          ["if", ["=", "count", 1], ["result_i32.ok", 1], ["result_i32.err", 9103]]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app._run_amqp_replay_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "std.rr.with_policy_v1",
+        ["bytes.lit", "msg_rr_v1"],
+        ["bytes.lit", "amqp_pub_consume_v1.x07rr.bin"],
+        ["i32.lit", 2],
+        [
+          "begin",
+          ["let", "endpoint", ["bytes.lit", "local_dev_v1"]],
+          ["let", "handle", ["std.msg.amqp.rr.replay_driver_v1", ["bytes.view", "endpoint"]]],
+          ["let", "env", ["bytes.lit", "ENV"]],
+          ["let", "pub_res", ["std.msg.amqp.publish_env_v1", ["bytes.view", "handle"], ["bytes.lit", "x07"], ["bytes.lit", "#"], ["bytes.view", "env"]]],
+          ["if", ["!=", ["result_bytes.err_code", "pub_res"], 0], ["return", ["result_i32.err", 9201]], 0],
+          ["let", "cons_res", ["std.msg.amqp.consume_env_v1", ["bytes.view", "handle"], ["bytes.lit", "x07"], 10]],
+          ["if", ["!=", ["result_bytes.err_code", "cons_res"], 0], ["return", ["result_i32.err", 9202]], 0],
+          ["let", "cons_doc", ["result_bytes.unwrap_or", "cons_res", ["bytes.alloc", 0]]],
+          ["let", "count", ["app._seq_count_or_neg1_v1", ["bytes.view", "cons_doc"]]],
+          ["if", ["=", "count", 1], ["result_i32.ok", 1], ["result_i32.err", 9203]]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.openmetrics_snapshot_v1",
+      "params": [
+        { "name": "kafka_ok", "ty": "i32" },
+        { "name": "amqp_ok", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "out", ["std.vec.with_capacity", 256]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "x07_msg_produced_total{driver=\"kafka\"} "]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "kafka_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "\nx07_msg_consumed_total{driver=\"kafka\"} "]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "kafka_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "\nx07_msg_produced_total{driver=\"amqp\"} "]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "amqp_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "\nx07_msg_consumed_total{driver=\"amqp\"} "]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "amqp_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "\n"]]],
+        ["std.vec.as_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.main",
+      "params": [
+        { "name": "input_bytes", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "_ignored", ["view.len", "input_bytes"]],
+        ["let", "k_res", ["app._run_kafka_replay_v1"]],
+        ["let", "a_res", ["app._run_amqp_replay_v1"]],
+        ["let", "k_err", ["result_i32.err_code", "k_res"]],
+        ["let", "a_err", ["result_i32.err_code", "a_res"]],
+        ["let", "k_ok", ["if", ["=", "k_err", 0], ["result_i32.unwrap_or", "k_res", 0], 0]],
+        ["let", "a_ok", ["if", ["=", "a_err", 0], ["result_i32.unwrap_or", "a_res", 0], 0]],
+        ["let", "metrics", ["app.openmetrics_snapshot_v1", "k_ok", "a_ok"]],
+        ["let", "metrics_len", ["bytes.len", "metrics"]],
+        ["let", "ok", ["if", ["if", ["=", "k_ok", 1], ["=", "a_ok", 1], 0], 1, 0]],
+        ["let", "out", ["std.vec.with_capacity", 256]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "{\"amqp_err\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "a_err"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"amqp_ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "a_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"kafka_err\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "k_err"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"kafka_ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "k_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"metrics_len\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "metrics_len"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "}"]]],
+        ["let", "raw", ["std.vec.as_bytes", "out"]],
+        ["std.json.canonicalize_small", ["bytes.view", "raw"]]
+      ]
+    }
+  ]
+}

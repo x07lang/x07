@@ -1,0 +1,19 @@
+{
+  "schema_version": "x07.arch.msg.amqp.index@0.1.0",
+  "profiles": [
+    {
+      "id": "local_dev_v1",
+      "path": "arch/msg/amqp/profiles/local_dev_v1.amqp_profile.json",
+      "budget_profile_id": "msg_amqp_v1",
+      "rr_policy_id": "msg_rr_v1"
+    }
+  ],
+  "topologies": [
+    {
+      "id": "app_v1",
+      "path": "arch/msg/amqp/topology/app_v1.topology.json",
+      "budget_profile_id": "msg_amqp_v1",
+      "rr_policy_id": "msg_rr_v1"
+    }
+  ]
+}

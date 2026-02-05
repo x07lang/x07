@@ -1,0 +1,86 @@
+{
+  "env": {
+    "allow_keys": [],
+    "deny_keys": [],
+    "enabled": false
+  },
+  "fs": {
+    "allow_glob": false,
+    "allow_mkdir": false,
+    "allow_remove": false,
+    "allow_rename": false,
+    "allow_symlinks": false,
+    "allow_walk": false,
+    "deny_hidden": true,
+    "enabled": false,
+    "max_depth": 0,
+    "max_entries": 0,
+    "max_read_bytes": 0,
+    "max_write_bytes": 0,
+    "read_roots": [],
+    "write_roots": []
+  },
+  "language": {
+    "allow_ffi": false,
+    "allow_unsafe": false
+  },
+  "limits": {
+    "core_dumps": false,
+    "cpu_ms": 300000,
+    "fds": 64,
+    "mem_bytes": 1073741824,
+    "procs": 16,
+    "wall_ms": 300000
+  },
+  "net": {
+    "allow_dns": false,
+    "allow_hosts": [],
+    "allow_tcp": false,
+    "allow_udp": false,
+    "enabled": false
+  },
+  "notes": "Base policy for compute workers. No fs/net/env by default. Allows bounded sleep for backoff.",
+  "policy_id": "sandbox.worker.base",
+  "process": {
+    "allow_args_regex_lite": [],
+    "allow_cwd": false,
+    "allow_cwd_roots": [],
+    "allow_env_keys": [],
+    "allow_exec": false,
+    "allow_exec_prefixes": [],
+    "allow_execs": [],
+    "allow_exit": true,
+    "allow_spawn": false,
+    "enabled": true,
+    "kill_on_drop": true,
+    "kill_tree": true,
+    "max_arg_bytes": 4096,
+    "max_args": 64,
+    "max_env": 64,
+    "max_env_key_bytes": 256,
+    "max_env_val_bytes": 4096,
+    "max_exe_bytes": 4096,
+    "max_live": 0,
+    "max_runtime_ms": 0,
+    "max_spawns": 0,
+    "max_stderr_bytes": 10485760,
+    "max_stdin_bytes": 1048576,
+    "max_stdout_bytes": 10485760,
+    "max_total_bytes": 16777216
+  },
+  "schema_version": "x07.run-os-policy@0.1.0",
+  "threads": {
+    "enabled": true,
+    "max_blocking": 4,
+    "max_queue": 1024,
+    "max_workers": 0
+  },
+  "time": {
+    "allow_local_tzid": false,
+    "allow_monotonic": true,
+    "allow_sleep": true,
+    "allow_wall_clock": false,
+    "enabled": true,
+    "max_sleep_ms": 5000
+  }
+}

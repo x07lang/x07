@@ -400,12 +400,11 @@ fn render_sm_artifacts(
     spec_rel_path: &str,
     spec_jcs_sha256_hex: &str,
 ) -> Result<Vec<(PathBuf, Vec<u8>)>> {
-    let file_stem = machine_file_stem(spec);
     let module_id = machine_module_id(spec);
     let tests_module_id = format!("{module_id}.tests");
 
-    let machine_file = out_dir.join(format!("{file_stem}.x07.json"));
-    let tests_file = out_dir.join(format!("{file_stem}.tests.x07.json"));
+    let machine_file = sm_module_file_path(out_dir, &module_id)?;
+    let tests_file = sm_module_file_path(out_dir, &tests_module_id)?;
     let manifest_file = out_dir.join("tests.manifest.json");
 
     let machine = gen_machine_module(spec, &module_id, spec_rel_path, spec_jcs_sha256_hex)?;
@@ -431,9 +430,22 @@ fn render_sm_artifacts(
     ])
 }
 
-fn machine_file_stem(spec: &SmSpecFile) -> String {
-    let machine = spec.machine_id.replace('.', "_");
-    format!("{machine}_v{}", spec.version)
+fn sm_module_file_path(out_dir: &Path, module_id: &str) -> Result<PathBuf> {
+    let parts: Vec<&str> = module_id.split('.').collect();
+    if parts.len() < 3 || parts[0] != "gen" || parts[1] != "sm" {
+        anyhow::bail!("sm gen: unexpected generated module id: {module_id:?}");
+    }
+    let rel_parts = &parts[2..];
+    let Some((file_stem, subdirs)) = rel_parts.split_last() else {
+        anyhow::bail!("sm gen: invalid module id: {module_id:?}");
+    };
+
+    let mut path = out_dir.to_path_buf();
+    for seg in subdirs {
+        path.push(seg);
+    }
+    path.push(format!("{file_stem}.x07.json"));
+    Ok(path)
 }
 
 fn machine_module_id(spec: &SmSpecFile) -> String {
@@ -1297,5 +1309,58 @@ mod tests {
         assert!(errors
             .iter()
             .any(|e| e.contains("duplicate transition key")));
+    }
+
+    #[test]
+    fn gen_outputs_paths_match_module_id_layout() {
+        let spec = SmSpecFile {
+            schema_version: X07_SM_SPEC_SCHEMA_VERSION.to_string(),
+            machine_id: "app.minimal_fsm".to_string(),
+            version: 1,
+            world: "solve-pure".to_string(),
+            brand: None,
+            states: vec![
+                SmState {
+                    id: 0,
+                    name: "init".to_string(),
+                    terminal: false,
+                },
+                SmState {
+                    id: 1,
+                    name: "ready".to_string(),
+                    terminal: true,
+                },
+            ],
+            events: vec![SmEvent {
+                id: 0,
+                name: "start".to_string(),
+            }],
+            transitions: vec![SmTransition {
+                id: 0,
+                from: 0,
+                on: 0,
+                to: 1,
+                action: "actions.noop_v1".to_string(),
+            }],
+            context: None,
+            budgets: None,
+        };
+
+        let out_dir = std::path::PathBuf::from("gen/sm");
+        let out = render_sm_artifacts(&spec, &out_dir, "spec", "deadbeef").expect("render");
+        let paths: Vec<_> = out.into_iter().map(|(p, _)| p).collect();
+
+        assert!(
+            paths
+                .iter()
+                .any(|p| p == &out_dir.join("app/minimal_fsm_v1.x07.json")),
+            "missing machine module file path; got {paths:?}"
+        );
+        assert!(
+            paths
+                .iter()
+                .any(|p| p == &out_dir.join("app/minimal_fsm_v1/tests.x07.json")),
+            "missing tests module file path; got {paths:?}"
+        );
     }
 }

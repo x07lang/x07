@@ -1,0 +1,8 @@
+{
+  "schema_version": "x07.arch.msg.kafka.profile@0.1.0",
+  "id": "local_dev_v1",
+  "v": 1,
+  "bootstrap": ["127.0.0.1:9092"],
+  "security": { "sasl_mode": "none_v1", "tls": false },
+  "limits": { "max_message_bytes": 1048576, "max_poll_items": 100, "max_poll_wait_ms": 1000 }
+}

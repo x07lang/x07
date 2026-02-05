@@ -2,6 +2,7 @@ use serde_json::json;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use x07_worlds::WorldId;
 use x07c::ast::expr_from_json;
@@ -134,6 +135,20 @@ fn compile_options_with_repo_arch_root() -> CompileOptions {
         .expect("repo root")
         .to_path_buf();
     options.arch_root = Some(repo_root);
+    options
+}
+
+static EMPTY_ARCH_ROOT_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn compile_options_with_empty_arch_root() -> CompileOptions {
+    let mut options = CompileOptions::default();
+    let nonce = EMPTY_ARCH_ROOT_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let temp_root = std::env::temp_dir().join(format!(
+        "x07c-stream-pipe-empty-arch-{}-{nonce}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&temp_root).expect("create empty arch root");
+    options.arch_root = Some(temp_root);
     options
 }
 
@@ -323,6 +338,42 @@ fn pipe_elaboration_plugin_stage_emits_native_requires() {
         .expect("spawn plugin stage test")
         .join()
         .expect("join plugin stage test");
+}
+
+#[test]
+fn pipe_elaboration_plugin_stage_falls_back_to_builtin_registry() {
+    std::thread::Builder::new()
+        .name("stream_pipe_elaboration_plugin_stage_builtin_fallback".to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            let module_metas: BTreeMap<String, BTreeMap<String, serde_json::Value>> =
+                BTreeMap::new();
+            let mut program = Program {
+                functions: Vec::new(),
+                async_functions: Vec::new(),
+                extern_functions: Vec::new(),
+                solve: pipe_expr_plugin_stage_frame_u32le(),
+            };
+
+            let options = compile_options_with_empty_arch_root();
+            let temp_root = options.arch_root.clone().expect("arch_root");
+            stream_pipe::elaborate_stream_pipes(&mut program, &options, &module_metas)
+                .expect("elaboration");
+            let (_c_src, native_requires) =
+                x07c::c_emit::emit_c_program_with_native_requires(&program, &options)
+                    .expect("emit");
+            let _ = std::fs::remove_dir_all(temp_root);
+
+            assert!(
+                native_requires
+                    .iter()
+                    .any(|r| r.backend_id == "x07.stream.xf" && r.abi_major == 1),
+                "expected x07.stream.xf in native requires: {native_requires:?}"
+            );
+        })
+        .expect("spawn plugin stage fallback test")
+        .join()
+        .expect("join plugin stage fallback test");
 }
 
 #[test]

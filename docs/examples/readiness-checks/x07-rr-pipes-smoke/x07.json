@@ -1,0 +1,23 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "src/main.x07.json",
+  "module_roots": [
+    "src"
+  ],
+  "lockfile": "x07.lock.json",
+  "default_profile": "rr_replay",
+  "profiles": {
+    "os_record": {
+      "world": "run-os-sandboxed",
+      "policy": "policy/sandbox.base.json"
+    },
+    "rr_replay": {
+      "world": "solve-rr"
+    },
+    "ci_replay": {
+      "world": "solve-rr"
+    }
+  },
+  "dependencies": []
+}

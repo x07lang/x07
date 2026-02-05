@@ -432,15 +432,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 anyhow::bail!("--module-root is only valid with --program");
             }
             let manifest = project::load_project_manifest(project_path)?;
-            if cli.world.as_str() != manifest.world {
-                anyhow::bail!(
-                    "--world {} does not match project world {:?}",
-                    cli.world.as_str(),
-                    manifest.world
-                );
-            }
-            let world = WorldId::parse(&manifest.world)
-                .with_context(|| format!("invalid project world {:?}", manifest.world))?;
+            let world = cli.world;
             if !world.is_eval_world() {
                 anyhow::bail!(
                     "x07-host-runner supports only deterministic solve worlds, got {}",
@@ -451,28 +443,28 @@ fn try_main() -> Result<std::process::ExitCode> {
                 WorldId::SolvePure => {}
                 WorldId::SolveFs => {
                     if cli.fixture_fs_dir.is_none() {
-                        anyhow::bail!("set --fixture-fs-dir for project world solve-fs");
+                        anyhow::bail!("set --fixture-fs-dir for --world solve-fs");
                     }
                 }
                 WorldId::SolveRr => {
                     if cli.fixture_rr_dir.is_none() {
-                        anyhow::bail!("set --fixture-rr-dir for project world solve-rr");
+                        anyhow::bail!("set --fixture-rr-dir for --world solve-rr");
                     }
                 }
                 WorldId::SolveKv => {
                     if cli.fixture_kv_dir.is_none() {
-                        anyhow::bail!("set --fixture-kv-dir for project world solve-kv");
+                        anyhow::bail!("set --fixture-kv-dir for --world solve-kv");
                     }
                 }
                 WorldId::SolveFull => {
                     if cli.fixture_fs_dir.is_none() {
-                        anyhow::bail!("set --fixture-fs-dir for project world solve-full");
+                        anyhow::bail!("set --fixture-fs-dir for --world solve-full");
                     }
                     if cli.fixture_rr_dir.is_none() {
-                        anyhow::bail!("set --fixture-rr-dir for project world solve-full");
+                        anyhow::bail!("set --fixture-rr-dir for --world solve-full");
                     }
                     if cli.fixture_kv_dir.is_none() {
-                        anyhow::bail!("set --fixture-kv-dir for project world solve-full");
+                        anyhow::bail!("set --fixture-kv-dir for --world solve-full");
                     }
                 }
                 _ => anyhow::bail!(

@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.arch.msg.index@0.1.0",
+  "topics": [
+    {
+      "id": "events",
+      "key_brand": "std.bytes.raw_v1",
+      "value_brand": "std.bytes.raw_v1",
+      "max_value_bytes": 1048576
+    }
+  ],
+  "rr_policy_id": "msg_rr_v1"
+}

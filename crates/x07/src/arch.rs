@@ -113,6 +113,7 @@ const X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_BYTES: &[u8] =
 const DEFAULT_MODULE_SCAN_INCLUDE: &[&str] = &["**/*.x07.json"];
 const DEFAULT_MODULE_SCAN_EXCLUDE: &[&str] = &[
     "**/.git/**",
+    "**/.x07/**",
     "**/dist/**",
     "**/gen/**",
     "**/node_modules/**",

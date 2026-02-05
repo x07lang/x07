@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure",
+  "entry": "src/main.x07.json",
+  "module_roots": [
+    "src",
+    "gen/sm"
+  ],
+  "lockfile": "x07.lock.json",
+  "dependencies": []
+}
+

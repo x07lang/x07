@@ -46,7 +46,7 @@ Scan configuration comes from:
 - `arch/manifest.lock.json` `module_scan.include_globs` / `exclude_globs` when a lock is used, otherwise
 - defaults:
   - include: `**/*.x07.json`
-  - exclude: `.git/`, `dist/`, `gen/`, `node_modules/`, `target/`, `tmp/` (and a few common OS-specific junk files)
+  - exclude: `.git/`, `.x07/`, `dist/`, `gen/`, `node_modules/`, `target/`, `tmp/` (and a few common OS-specific junk files)
 
 ## Nodes and assignment
 

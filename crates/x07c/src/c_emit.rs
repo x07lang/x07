@@ -7101,6 +7101,25 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
+                    "process.set_exit_code_v1" => {
+                        if args.len() != 1 || args[0].ty != Ty::I32 || dest.ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "process.set_exit_code_v1 expects (i32 code) and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("ctx->exit_code = (int32_t){};", args[0].c_name),
+                        );
+                        self.line(
+                            state,
+                            format!("{} = (int32_t){};", dest.c_name, args[0].c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
                     "os.process.exit" => {
                         if !self.options.world.is_standalone_only() {
                             return Err(CompilerError::new(
@@ -12265,6 +12284,9 @@ impl<'a> Emitter<'a> {
             }
             "os.time.tzdb_snapshot_id_v1" => {
                 self.emit_os_time_tzdb_snapshot_id_v1_to(args, dest_ty, dest)
+            }
+            "process.set_exit_code_v1" => {
+                self.emit_process_set_exit_code_v1_to(args, dest_ty, dest)
             }
             "os.process.exit" => self.emit_os_process_exit_to(args, dest_ty, dest),
             "os.process.spawn_capture_v1" => {
@@ -18280,6 +18302,36 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         Ok(())
     }
 
+    fn emit_process_set_exit_code_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "process.set_exit_code_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "process.set_exit_code_v1 returns i32".to_string(),
+            ));
+        }
+        let code = self.emit_expr(&args[0])?;
+        if code.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "process.set_exit_code_v1 expects i32 code".to_string(),
+            ));
+        }
+        self.line(&format!("ctx->exit_code = (int32_t){};", code.c_name));
+        self.line(&format!("{dest} = (int32_t){};", code.c_name));
+        Ok(())
+    }
+
     fn emit_os_process_spawn_capture_v1_to(
         &mut self,
         args: &[Expr],
@@ -23693,12 +23745,31 @@ fn load_budget_profile_cfg_from_arch_v1(
         .join("profiles")
         .join(format!("{profile_id}.budget.json"));
 
-    let bytes = std::fs::read(&profile_path).map_err(|err| {
-        CompilerError::new(
-            CompileErrorKind::Parse,
-            format!("read budget profile file {}: {err}", profile_path.display()),
-        )
-    })?;
+    let bytes = match std::fs::read(&profile_path) {
+        Ok(bytes) => bytes,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            let builtin = match profile_id {
+                "stream_xf_plugin_v1" => Some(include_str!(
+                    "../../../arch/budgets/profiles/stream_xf_plugin_v1.budget.json"
+                )),
+                _ => None,
+            };
+            if let Some(doc) = builtin {
+                doc.as_bytes().to_vec()
+            } else {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Parse,
+                    format!("read budget profile file {}: {err}", profile_path.display()),
+                ));
+            }
+        }
+        Err(err) => {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("read budget profile file {}: {err}", profile_path.display()),
+            ));
+        }
+    };
 
     let doc: Value = serde_json::from_slice(&bytes).map_err(|err| {
         CompilerError::new(
@@ -26438,6 +26509,21 @@ impl InferCtx {
                             ));
                         }
                         Ok(Ty::Bytes.into())
+                    }
+                    "process.set_exit_code_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "process.set_exit_code_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "process.set_exit_code_v1 expects i32 code".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
                     }
                     "os.process.exit" => {
                         self.require_standalone_only(head)?;
@@ -30026,6 +30112,7 @@ typedef struct rt_os_proc_s rt_os_proc_t;
 typedef struct {
   uint64_t fuel_init;
   uint64_t fuel;
+  int32_t exit_code;
   uint32_t budget_fuel_depth;
   heap_t heap;
   allocator_v1_t allocator;
@@ -40129,6 +40216,7 @@ int main(void) {
 
   bytes_view_t input = rt_bytes_view(&ctx, input_bytes);
   bytes_t out = solve(&ctx, input);
+  int32_t exit_code = ctx.exit_code;
   rt_ext_ctx = NULL;
 
 #ifdef X07_DEBUG_BORROW
@@ -40282,7 +40370,8 @@ int main(void) {
   } else {
     free(mem);
   }
-  return 0;
+  if (exit_code < 0 || exit_code > 255) exit_code = 255;
+  return (int)exit_code;
 }
 "#;
 
@@ -40317,6 +40406,8 @@ bytes_t x07_solve_v2(
     uint32_t input_len
 );
 
+int32_t x07_exit_code_v1(void);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
@@ -40326,6 +40417,11 @@ bytes_t x07_solve_v2(
 
 const RUNTIME_C_LIB: &str = r#"
 static uint8_t rt_dummy_heap_mem[1];
+static int32_t rt_last_exit_code = 0;
+
+int32_t x07_exit_code_v1(void) {
+  return rt_last_exit_code;
+}
 
 bytes_t x07_solve_v2(
     uint8_t* arena_mem,
@@ -40364,6 +40460,7 @@ bytes_t x07_solve_v2(
 
   bytes_view_t input = rt_bytes_view(&ctx, input_bytes);
   bytes_t out = solve(&ctx, input);
+  rt_last_exit_code = ctx.exit_code;
   rt_ext_ctx = NULL;
 
 #ifdef X07_DEBUG_BORROW

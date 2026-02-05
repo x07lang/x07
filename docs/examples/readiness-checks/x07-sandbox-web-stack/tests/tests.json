@@ -1,0 +1,45 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "sandbox_web/report_ok_v1",
+      "world": "solve-pure",
+      "entry": "smoke.test_report_ok_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "sandbox_web/frames_roundtrip_v1",
+      "world": "solve-pure",
+      "entry": "smoke.frames_roundtrip",
+      "expect": "pass"
+    },
+    {
+      "id": "sandbox_web/crawl_robots_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.crawl.tests.test_robots_rfc9309_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "sandbox_web/crawl_sitemap_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.crawl.tests.test_sitemap_parse_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "sandbox_web/crawl_schedule_v1",
+      "world": "solve-fs",
+      "fixture_root": "fixtures",
+      "entry": "std.crawl.tests.test_schedule_determinism_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "sandbox_web/crawl_rr_replay_v1",
+      "world": "solve-rr",
+      "fixture_root": "fixtures/rr",
+      "entry": "std.crawl.tests.test_fetch_replay_rr_v1",
+      "expect": "pass"
+    }
+  ]
+}

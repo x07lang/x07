@@ -1132,7 +1132,9 @@ int main(int argc, char** argv) {{
     }}
   }}
   fflush(stdout);
-  return 0;
+  int32_t exit_code = x07_exit_code_v1();
+  if (exit_code < 0 || exit_code > 255) exit_code = 255;
+  return (int)exit_code;
 }}
 "#
     )

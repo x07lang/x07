@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["std.process.set_exit_code_v1"]},{"body":["process.set_exit_code_v1","code"],"kind":"defn","name":"std.process.set_exit_code_v1","params":[{"name":"code","ty":"i32"}],"result":"i32"}],"imports":[],"kind":"module","module_id":"std.process","schema_version":"x07.x07ast@0.3.0"}

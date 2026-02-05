@@ -1,0 +1,35 @@
+{
+  "schema_version": "x07.arch.manifest@0.1.0",
+  "repo": { "id": "x07-schema-types-pipes-lab", "root": "." },
+  "externals": {
+    "allowed_import_prefixes": ["std.", "ext.", "types_pipes_lab."],
+    "allowed_exact": ["app", "brand_registry"]
+  },
+  "nodes": [],
+  "rules": [],
+  "checks": {
+    "deny_cycles": false,
+    "deny_orphans": false,
+    "enforce_visibility": false,
+    "enforce_world_caps": false
+  },
+  "tool_budgets": {
+    "max_modules": 2000,
+    "max_edges": 8000,
+    "max_diags": 1000,
+    "contracts_budgets": { "max_contract_files": 2000, "max_contract_bytes": 67108864 }
+  },
+  "contracts_v1": {
+    "budgets": {
+      "index_path": "arch/budgets/index.x07budgets.json",
+      "gen_dir": "arch/budgets/gen",
+      "require_scopes": false
+    },
+    "stream_plugins": {
+      "index_path": "arch/stream/plugins/index.x07sp.json",
+      "gen_dir": "arch/stream/plugins",
+      "require_registry_uptodate": true
+    },
+    "canonical_json": { "mode": "jcs_rfc8785_v1" }
+  }
+}

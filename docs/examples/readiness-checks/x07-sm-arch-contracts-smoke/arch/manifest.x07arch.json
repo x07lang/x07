@@ -1,0 +1,43 @@
+{
+  "schema_version": "x07.arch.manifest@0.1.0",
+  "repo": {
+    "id": "x07-sm-arch-contracts-smoke",
+    "root": "."
+  },
+  "externals": {
+    "allowed_import_prefixes": ["std.", "ext.", "gen."],
+    "allowed_exact": []
+  },
+  "nodes": [],
+  "rules": [],
+  "checks": {
+    "deny_cycles": false,
+    "deny_orphans": false,
+    "enforce_visibility": false,
+    "enforce_world_caps": false
+  },
+  "tool_budgets": {
+    "max_modules": 5000,
+    "max_edges": 50000,
+    "max_diags": 2000,
+    "contracts_budgets": {
+      "max_contract_files": 2000,
+      "max_contract_bytes": 67108864
+    }
+  },
+  "contracts_v1": {
+    "sm": {
+      "index_path": "arch/sm/index.x07sm.json",
+      "gen_dir": "gen/sm",
+      "require_gen_uptodate": true
+    },
+    "budgets": {
+      "index_path": "arch/budgets/index.x07budgets.json",
+      "gen_dir": "arch/budgets",
+      "require_scopes": false
+    },
+    "canonical_json": {
+      "mode": "jcs_rfc8785_v1"
+    }
+  }
+}

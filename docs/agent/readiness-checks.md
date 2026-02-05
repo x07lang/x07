@@ -2,6 +2,10 @@
 
 This page contains the canonical “readiness prompts” used to validate that an agent can go from `x07 init` → deps → lockfile → run → test across the core toolchain, stdlib, and the external package ecosystem.
 
+Reference implementations (prompt + full project dirs):
+
+- [`docs/examples/readiness-checks/`](../examples/readiness-checks/index.md)
+
 ## Dependency conventions
 
 - Prefer adding dependencies without pinning a version:
@@ -31,6 +35,10 @@ it usually means you pinned an older package version. Upgrade to a newer package
 ---
 
 ### Prompt 1 — Core stdlib conformance and determinism harness
+
+Reference implementation:
+
+- [`docs/examples/readiness-checks/x07-core-conformance/`](../examples/readiness-checks/x07-core-conformance/README.md)
 
 ```text
 You are a senior X07 coding agent. Create a repo/workspace named `x07-core-conformance` that serves as the “pure stdlib + core language” conformance harness.
@@ -119,6 +127,10 @@ DELIVERABLES
 
 ### Prompt 2 — Schema derive + types/brands + pipes integration lab
 
+Reference implementation:
+
+- [`docs/examples/readiness-checks/x07-schema-types-pipes-lab/`](../examples/readiness-checks/x07-schema-types-pipes-lab/README.md)
+
 ```text
 You are an X07 coding agent building `x07-schema-types-pipes-lab`.
 
@@ -200,6 +212,10 @@ OUTPUT
 
 ### Prompt 3 — Data model + full codec roundtrip laboratory
 
+Reference implementation:
+
+- [`docs/examples/readiness-checks/x07-data-interop-lab/`](../examples/readiness-checks/x07-data-interop-lab/README.md)
+
 ```text
 You are an X07 coding agent building a “data interchange torture test” project named `x07-data-interop-lab`.
 
@@ -261,6 +277,10 @@ OUTPUT
 ---
 
 ### Prompt 4 — Crypto + compression + archive + diff integrity pipeline
+
+Reference implementation:
+
+- [`docs/examples/readiness-checks/x07-artifact-integrity-pipeline/`](../examples/readiness-checks/x07-artifact-integrity-pipeline/README.md)
 
 ```text
 You are an X07 coding agent building `x07-artifact-integrity-pipeline`.
@@ -329,6 +349,10 @@ DELIVERABLES
 ---
 
 ### Prompt 5 — Sandboxed web stack (HTTP + crawler/search + WS/gRPC framing + observability)
+
+Reference implementation:
+
+- [`docs/examples/readiness-checks/x07-sandbox-web-stack/`](../examples/readiness-checks/x07-sandbox-web-stack/README.md)
 
 ```text
 You are an X07 coding agent building `x07-sandbox-web-stack`.
@@ -422,6 +446,10 @@ TESTS
 
 ### Prompt 6 — Filesystem + glob/walk + multi-DB ingestion + query engine
 
+Reference implementation:
+
+- [`docs/examples/readiness-checks/x07-db-fs-indexer/`](../examples/readiness-checks/x07-db-fs-indexer/README.md)
+
 ```text
 You are an X07 coding agent building `x07-db-fs-indexer`.
 
@@ -499,6 +527,10 @@ DELIVERABLES
 
 ### Prompt 7 — Record/replay + stream pipes + budgets (deterministic ingest)
 
+Reference implementation:
+
+- [`docs/examples/readiness-checks/x07-rr-pipes-smoke/`](../examples/readiness-checks/x07-rr-pipes-smoke/README.md)
+
 ```text
 You are an X07 coding agent building `x07-rr-pipes-smoke`.
 
@@ -562,6 +594,10 @@ DELIVERABLES
 
 ### Prompt 8 — State machines as data + arch contracts (gen + drift + enforcement)
 
+Reference implementation:
+
+- [`docs/examples/readiness-checks/x07-sm-arch-contracts-smoke/`](../examples/readiness-checks/x07-sm-arch-contracts-smoke/README.md)
+
 ```text
 You are an X07 coding agent building `x07-sm-arch-contracts-smoke`.
 
@@ -617,6 +653,10 @@ TESTS
 ---
 
 ### Prompt 9 — Messaging + rr determinism + obs metrics
+
+Reference implementation:
+
+- [`docs/examples/readiness-checks/x07-messaging-rr-lab/`](../examples/readiness-checks/x07-messaging-rr-lab/README.md)
 
 ```text
 You are an X07 coding agent building `x07-messaging-rr-lab`.

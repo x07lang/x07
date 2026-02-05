@@ -1,0 +1,75 @@
+{
+  "schema_version": "x07.arch.stream.plugins.index@0.1.0",
+  "plugins": [
+    {
+      "plugin_id": "xf.deframe_u32le_v1",
+      "plugin_spec_path": "arch/stream/plugins/specs/xf.deframe_u32le_v1.x07sp-plugin.json",
+      "budget_profile_id": "stream_xf_plugin_v1",
+      "native_backend_id": "x07.stream.xf",
+      "abi_major": 1,
+      "export_symbol": "x07_xf_deframe_u32le_v1",
+      "determinism": "deterministic_v1",
+      "worlds_allowed": ["solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full", "run-os", "run-os-sandboxed"],
+      "in_item_brand": "any",
+      "out_item_brand": "none",
+      "state_bytes": 64,
+      "scratch_bytes": 8388608
+    },
+    {
+      "plugin_id": "xf.frame_u32le_v1",
+      "plugin_spec_path": "arch/stream/plugins/specs/xf.frame_u32le_v1.x07sp-plugin.json",
+      "budget_profile_id": "stream_xf_plugin_v1",
+      "native_backend_id": "x07.stream.xf",
+      "abi_major": 1,
+      "export_symbol": "x07_xf_frame_u32le_v1",
+      "determinism": "deterministic_v1",
+      "worlds_allowed": ["solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full", "run-os", "run-os-sandboxed"],
+      "in_item_brand": "any",
+      "out_item_brand": "none",
+      "state_bytes": 32,
+      "scratch_bytes": 0
+    },
+    {
+      "plugin_id": "xf.json_canon_stream_v1",
+      "plugin_spec_path": "arch/stream/plugins/specs/xf.json_canon_stream_v1.x07sp-plugin.json",
+      "budget_profile_id": "stream_xf_plugin_v1",
+      "native_backend_id": "x07.stream.xf",
+      "abi_major": 1,
+      "export_symbol": "x07_xf_json_canon_stream_v1",
+      "determinism": "deterministic_v1",
+      "worlds_allowed": ["solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full", "run-os", "run-os-sandboxed"],
+      "in_item_brand": "any",
+      "out_item_brand": "none",
+      "state_bytes": 64,
+      "scratch_bytes": 8388608
+    },
+    {
+      "plugin_id": "xf.split_lines_v1",
+      "plugin_spec_path": "arch/stream/plugins/specs/xf.split_lines_v1.x07sp-plugin.json",
+      "budget_profile_id": "stream_xf_plugin_v1",
+      "native_backend_id": "x07.stream.xf",
+      "abi_major": 1,
+      "export_symbol": "x07_xf_split_lines_v1",
+      "determinism": "deterministic_v1",
+      "worlds_allowed": ["solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full", "run-os", "run-os-sandboxed"],
+      "in_item_brand": "any",
+      "out_item_brand": "none",
+      "state_bytes": 32,
+      "scratch_bytes": 1048576
+    },
+    {
+      "plugin_id": "xf.test_emit_limits_v1",
+      "plugin_spec_path": "arch/stream/plugins/specs/xf.test_emit_limits_v1.x07sp-plugin.json",
+      "budget_profile_id": "stream_xf_plugin_v1",
+      "native_backend_id": "x07.stream.xf",
+      "abi_major": 1,
+      "export_symbol": "x07_xf_test_emit_limits_v1",
+      "determinism": "deterministic_v1",
+      "worlds_allowed": ["solve-pure"],
+      "in_item_brand": "any",
+      "out_item_brand": "none",
+      "state_bytes": 32,
+      "scratch_bytes": 0
+    }
+  ]
+}

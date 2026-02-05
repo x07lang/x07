@@ -289,6 +289,14 @@
       "version": "0.1.1"
     },
     {
+      "name": "std.process",
+      "path": "stdlib/std/0.1.1/modules/std/process.x07.json",
+      "relpath": "std/0.1.1/modules/std/process.x07.json",
+      "sha256": "54ed22dcc3faab1265a3eb11d58b05a4e78066ade24e05bd519ecb6a67863bd3",
+      "size_bytes": 312,
+      "version": "0.1.1"
+    },
+    {
       "name": "std.regex-lite",
       "path": "stdlib/std/0.1.0/modules/std/regex-lite.x07.json",
       "relpath": "std/0.1.0/modules/std/regex-lite.x07.json",
@@ -482,6 +490,6 @@
       "version": "0.1.1"
     }
   ],
-  "stdlib_hash": "f26d312556d821a7b75d797b55dfca65267ac41f517ded4e8235a3240156eea3",
+  "stdlib_hash": "c6fa1095f2f25e56498bab0ef9a3ee9fced9c3767e7f85608e0446c28127f56b",
   "stdlib_root": "stdlib/std"
 }

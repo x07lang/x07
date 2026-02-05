@@ -1,0 +1,105 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "app",
+  "imports": [
+    "std.bytes",
+    "std.db.sqlite.spec",
+    "std.fmt",
+    "std.json",
+    "std.os.fs.spec",
+    "std.os.fs.walk",
+    "std.path",
+    "std.text.ascii",
+    "std.text.slices",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["app.main", "app.spec_only_v1"]
+    },
+    {
+      "kind": "defn",
+      "name": "app._spec_checks_ok_v1",
+      "params": [],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "db_path", ["bytes.lit", "out/indexer.sqlite"]],
+        ["let", "open_flags", ["std.db.sqlite.spec.open_flag_create_v1"]],
+        ["let", "open_req", ["std.db.sqlite.spec.open_req_path_v1", "db_path", "open_flags"]],
+        ["let", "db_ok", ["if", [">", ["bytes.len", "open_req"], 0], 1, 0]],
+        ["let", "sample_base", ["bytes.lit", "tests/fixtures/tree/sub/c.txt"]],
+        ["let", "sample_ext", ["bytes.lit", "tests/fixtures/tree/sub/c.txt"]],
+        ["let", "base", ["std.path.basename", "sample_base"]],
+        ["let", "ext", ["std.path.extname", "sample_ext"]],
+        ["let", "base_ok", ["if", ["=", ["std.bytes.eq", ["bytes.view", "base"], ["bytes.lit", "c.txt"]], 1], 1, 0]],
+        ["let", "ext_ok", ["if", ["=", ["std.bytes.eq", ["bytes.view", "ext"], ["bytes.lit", ".txt"]], 1], 1, 0]],
+        ["if", ["if", ["if", ["=", "db_ok", 1], ["=", "base_ok", 1], 0], ["=", "ext_ok", 1], 0], 1, 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.spec_only_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "spec_ok", ["app._spec_checks_ok_v1"]],
+        ["let", "out", ["std.vec.with_capacity", 192]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "{\"db_path_ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "spec_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "spec_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "}"]]],
+        ["let", "raw", ["std.vec.as_bytes", "out"]],
+        ["std.json.canonicalize_small", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.main",
+      "params": [
+        { "name": "input_bytes", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "_ignored", ["view.len", "input_bytes"]],
+        ["let", "caps", ["std.os.fs.spec.caps_default_v1"]],
+        [
+          "let",
+          "res",
+          [
+            "std.os.fs.walk.walk_glob_sorted_text_v1",
+            ["bytes.lit", "fixtures/tree"],
+            ["bytes.lit", "**/*.txt"],
+            ["std.bytes.copy", "caps"]
+          ]
+        ],
+        ["let", "walk_err", ["result_bytes.err_code", "res"]],
+        ["let", "walk_out", ["result_bytes.unwrap_or", "res", ["bytes.alloc", 0]]],
+        ["let", "sl", ["std.text.ascii.split_lines_view", ["bytes.view", "walk_out"]]],
+        ["let", "file_count", ["std.text.slices.count_v1", ["bytes.view", "sl"]]],
+        ["let", "fs_walk_ok", ["if", ["=", "walk_err", 0], 1, 0]],
+        ["let", "spec_ok", ["app._spec_checks_ok_v1"]],
+        ["let", "ok", ["if", ["if", ["=", "fs_walk_ok", 1], ["=", "spec_ok", 1], 0], 1, 0]],
+        ["let", "out", ["std.vec.with_capacity", 256]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "{\"db_path_ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "spec_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"file_count\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "file_count"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"walk_err\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "walk_err"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"fs_walk_ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "fs_walk_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "}"]]],
+        ["let", "raw", ["std.vec.as_bytes", "out"]],
+        ["std.json.canonicalize_small", ["bytes.view", "raw"]]
+      ]
+    }
+  ]
+}

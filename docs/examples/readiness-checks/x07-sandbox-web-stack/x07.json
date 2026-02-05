@@ -1,0 +1,178 @@
+{
+  "default_profile": "sandbox",
+  "dependencies": [
+    {
+      "name": "ext-aho-corasick-rs",
+      "path": ".x07/deps/ext-aho-corasick-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-byteorder-rs",
+      "path": ".x07/deps/ext-byteorder-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-cli",
+      "path": ".x07/deps/ext-cli/0.1.11",
+      "version": "0.1.11"
+    },
+    {
+      "name": "ext-cli-ux",
+      "path": ".x07/deps/ext-cli-ux/0.1.1",
+      "version": "0.1.1"
+    },
+    {
+      "name": "ext-csv-rs",
+      "path": ".x07/deps/ext-csv-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-curl-c",
+      "path": ".x07/deps/ext-curl-c/0.1.6",
+      "version": "0.1.6"
+    },
+    {
+      "name": "ext-data-model",
+      "path": ".x07/deps/ext-data-model/0.1.8",
+      "version": "0.1.8"
+    },
+    {
+      "name": "ext-hex-rs",
+      "path": ".x07/deps/ext-hex-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-html-lite-rs",
+      "path": ".x07/deps/ext-html-lite-rs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-ini-rs",
+      "path": ".x07/deps/ext-ini-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-json-rs",
+      "path": ".x07/deps/ext-json-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-log",
+      "path": ".x07/deps/ext-log/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-math",
+      "path": ".x07/deps/ext-math/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-memchr-rs",
+      "path": ".x07/deps/ext-memchr-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-net",
+      "path": ".x07/deps/ext-net/0.1.8",
+      "version": "0.1.8"
+    },
+    {
+      "name": "ext-net-protos-c",
+      "path": ".x07/deps/ext-net-protos-c/0.1.1",
+      "version": "0.1.1"
+    },
+    {
+      "name": "ext-obs",
+      "path": ".x07/deps/ext-obs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-pb-rs",
+      "path": ".x07/deps/ext-pb-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-regex",
+      "path": ".x07/deps/ext-regex/0.2.4",
+      "version": "0.2.4"
+    },
+    {
+      "name": "ext-robots-txt-rs",
+      "path": ".x07/deps/ext-robots-txt-rs/0.1.3",
+      "version": "0.1.3"
+    },
+    {
+      "name": "ext-sitemap-rs",
+      "path": ".x07/deps/ext-sitemap-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-sockets-c",
+      "path": ".x07/deps/ext-sockets-c/0.1.6",
+      "version": "0.1.6"
+    },
+    {
+      "name": "ext-text",
+      "path": ".x07/deps/ext-text/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-toml-rs",
+      "path": ".x07/deps/ext-toml-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-tracing",
+      "path": ".x07/deps/ext-tracing/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-u64-rs",
+      "path": ".x07/deps/ext-u64-rs/0.1.0",
+      "version": "0.1.0"
+    },
+    {
+      "name": "ext-unicode-rs",
+      "path": ".x07/deps/ext-unicode-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-url-rs",
+      "path": ".x07/deps/ext-url-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-web-crawl",
+      "path": ".x07/deps/ext-web-crawl/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-web-kit",
+      "path": ".x07/deps/ext-web-kit/0.1.1",
+      "version": "0.1.1"
+    },
+    {
+      "name": "ext-xml-rs",
+      "path": ".x07/deps/ext-xml-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-yaml-rs",
+      "path": ".x07/deps/ext-yaml-rs/0.1.4",
+      "version": "0.1.4"
+    }
+  ],
+  "entry": "src/main.x07.json",
+  "lockfile": "x07.lock.json",
+  "module_roots": [
+    "src"
+  ],
+  "profiles": {
+    "sandbox": {
+      "policy": "policy/sandbox.base.json",
+      "world": "run-os-sandboxed"
+    }
+  },
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure"
+}

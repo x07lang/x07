@@ -42,6 +42,7 @@
     "std.fs",
     "std.rr",
     "std.kv",
-    "std.path"
+    "std.path",
+    "std.process"
   ]
 }

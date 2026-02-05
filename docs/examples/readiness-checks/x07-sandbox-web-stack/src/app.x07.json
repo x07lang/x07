@@ -1,0 +1,83 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "app",
+  "imports": [
+    "std.bytes",
+    "std.fmt",
+    "std.json",
+    "std.net.grpc",
+    "std.net.ws",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["app.main"]
+    },
+    {
+      "kind": "defn",
+      "name": "app.main",
+      "params": [
+        { "name": "input_bytes", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "_ignored", ["view.len", "input_bytes"]],
+        ["let", "ws_payload0", ["bytes.lit", "hello"]],
+        ["let", "ws_res", ["std.net.ws.frame_v1", 1, 1, ["bytes.view", "ws_payload0"]]],
+        ["let", "ws_err", ["result_bytes.err_code", "ws_res"]],
+        ["let", "ws_frame", ["result_bytes.unwrap_or", "ws_res", ["bytes.alloc", 0]]],
+        ["let", "ws_payload1", ["std.net.ws.frame_payload_v1", ["bytes.view", "ws_frame"]]],
+        [
+          "let",
+          "ws_ok",
+          [
+            "if",
+            [
+              "if",
+              ["=", "ws_err", 0],
+              ["=", ["std.bytes.eq", ["bytes.view", "ws_payload1"], ["bytes.view", "ws_payload0"]], 1],
+              0
+            ],
+            1,
+            0
+          ]
+        ],
+        ["let", "grpc_payload0", ["bytes.lit", "ping"]],
+        ["let", "grpc_res", ["std.net.grpc.msg_prefix_v1", 0, ["bytes.view", "grpc_payload0"]]],
+        ["let", "grpc_frame", ["result_bytes.unwrap_or", "grpc_res", ["bytes.alloc", 0]]],
+        ["let", "grpc_un", ["std.net.grpc.msg_unprefix_v1", ["bytes.view", "grpc_frame"]]],
+        ["let", "grpc_err", ["result_bytes.err_code", "grpc_un"]],
+        ["let", "grpc_payload1", ["result_bytes.unwrap_or", "grpc_un", ["bytes.alloc", 0]]],
+        [
+          "let",
+          "grpc_ok",
+          [
+            "if",
+            [
+              "if",
+              ["=", "grpc_err", 0],
+              ["=", ["std.bytes.eq", ["bytes.view", "grpc_payload1"], ["bytes.view", "grpc_payload0"]], 1],
+              0
+            ],
+            1,
+            0
+          ]
+        ],
+        ["let", "ok", ["if", ["if", ["=", "ws_ok", 1], ["=", "grpc_ok", 1], 0], 1, 0]],
+        ["let", "out", ["std.vec.with_capacity", 256]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "{\"crawler_checks\":4,\"grpc_ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "grpc_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"robots_sitemap_suite\":\"std.crawl.tests\",\"ws_ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ws_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "}"]]],
+        ["let", "raw", ["std.vec.as_bytes", "out"]],
+        ["std.json.canonicalize_small", ["bytes.view", "raw"]]
+      ]
+    }
+  ]
+}

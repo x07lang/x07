@@ -1,0 +1,363 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "app",
+  "imports": [
+    "brand_registry",
+    "std.bytes",
+    "std.codec",
+    "std.fmt",
+    "std.json",
+    "std.vec",
+    "types_pipes_lab.schema.event_line_v1",
+    "types_pipes_lab.schema.frame_payload_v1"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "app.build_invalid_frames_v1",
+        "app.build_valid_frames_v1",
+        "app.main",
+        "app.pipe_bytes_out_v1",
+        "app.pipe_payload_v1",
+        "app.pipe_err_code_v1",
+        "app.pipe_items_out_v1",
+        "app.pipe_ok_v1",
+        "app.run_auto_pipe_v1",
+        "app.run_plugin_json_pipe_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app._frame_one_v1",
+      "params": [
+        { "name": "payload", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "v", ["std.vec.with_capacity", ["+", 4, ["view.len", "payload"]]]],
+        ["set", "v", ["std.vec.extend_bytes", "v", ["std.codec.write_u32_le", ["view.len", "payload"]]]],
+        ["set", "v", ["std.vec.extend_bytes", "v", "payload"]],
+        ["std.vec.as_bytes", "v"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app._json_canon_cfg_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "v", ["std.vec.with_capacity", 20]],
+        ["set", "v", ["std.vec.extend_bytes", "v", ["std.codec.write_u32_le", 64]]],
+        ["set", "v", ["std.vec.extend_bytes", "v", ["std.codec.write_u32_le", 8192]]],
+        ["set", "v", ["std.vec.extend_bytes", "v", ["std.codec.write_u32_le", 256]]],
+        ["set", "v", ["std.vec.extend_bytes", "v", ["std.codec.write_u32_le", 8192]]],
+        ["set", "v", ["std.vec.extend_bytes", "v", ["std.codec.write_u32_le", 1024]]],
+        ["std.vec.as_bytes", "v"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.map_payload_to_event_line_v1",
+      "params": [
+        {
+          "name": "item",
+          "ty": "bytes_view",
+          "brand": "types_pipes_lab.frame_payload_v1"
+        }
+      ],
+      "result": "bytes",
+      "result_brand": "types_pipes_lab.event_line_v1",
+      "body": [
+        "begin",
+        ["let", "id", ["types_pipes_lab.schema.frame_payload_v1.get_id_view_v1", "item"]],
+        ["let", "event", ["types_pipes_lab.schema.frame_payload_v1.get_event_view_v1", "item"]],
+        ["let", "value", ["types_pipes_lab.schema.frame_payload_v1.get_value_view_v1", "item"]],
+        ["let", "enc", ["types_pipes_lab.schema.event_line_v1.encode_doc_v1", "id", "event", "value"]],
+        ["result_bytes.unwrap_or", "enc", ["bytes.alloc", 0]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.build_valid_frames_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "id1", ["bytes.lit", "1"]],
+        ["let", "event1", ["bytes.lit", "tick"]],
+        ["let", "value1", ["bytes.lit", "-7"]],
+        [
+          "let",
+          "doc1_r",
+          [
+            "types_pipes_lab.schema.frame_payload_v1.encode_doc_v1",
+            ["bytes.view", "id1"],
+            ["bytes.view", "event1"],
+            ["bytes.view", "value1"]
+          ]
+        ],
+        ["let", "doc1", ["result_bytes.unwrap_or", "doc1_r", ["bytes.alloc", 0]]],
+        ["let", "frame1", ["app._frame_one_v1", ["bytes.view", "doc1"]]],
+        ["let", "id2", ["bytes.lit", "2"]],
+        ["let", "event2", ["bytes.lit", "finish"]],
+        ["let", "value2", ["bytes.lit", "0"]],
+        [
+          "let",
+          "doc2_r",
+          [
+            "types_pipes_lab.schema.frame_payload_v1.encode_doc_v1",
+            ["bytes.view", "id2"],
+            ["bytes.view", "event2"],
+            ["bytes.view", "value2"]
+          ]
+        ],
+        ["let", "doc2", ["result_bytes.unwrap_or", "doc2_r", ["bytes.alloc", 0]]],
+        ["let", "frame2", ["app._frame_one_v1", ["bytes.view", "doc2"]]],
+        ["std.bytes.concat", ["bytes.view", "frame1"], ["bytes.view", "frame2"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.build_invalid_frames_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "frames", ["app.build_valid_frames_v1"]],
+        ["let", "bad", ["view.to_bytes", ["bytes.view", "frames"]]],
+        ["if", [">", ["bytes.len", "bad"], 14], ["set", "bad", ["bytes.set_u8", "bad", 14, 120]], 0],
+        "bad"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.run_direct_pipe_v1",
+      "params": [
+        { "name": "frames", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "frames_bytes", ["view.to_bytes", "frames"]],
+        [
+          "std.stream.pipe_v1",
+          [
+            "std.stream.cfg_v1",
+            ["chunk_max_bytes", 128],
+            ["bufread_cap_bytes", 128],
+            ["max_in_bytes", 1048576],
+            ["max_out_bytes", 1048576],
+            ["max_items", 1024],
+            ["emit_payload", 1],
+            ["emit_stats", 1]
+          ],
+          ["std.stream.src.bytes_v1", ["std.stream.expr_v1", "frames_bytes"]],
+          [
+            "std.stream.chain_v1",
+            ["std.stream.xf.deframe_u32le_v1", ["max_frame_bytes", 4096]],
+            [
+              "std.stream.xf.require_brand_v1",
+              ["brand", "types_pipes_lab.frame_payload_v1"],
+              ["validator", "brand_registry.validate_frame_payload_v1"],
+              ["max_item_bytes", 4096]
+            ],
+            ["std.stream.xf.frame_u32le_v1"]
+          ],
+          ["std.stream.sink.collect_bytes_v1"]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.run_auto_pipe_v1",
+      "params": [
+        { "name": "frames", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "frames_bytes", ["view.to_bytes", "frames"]],
+        [
+          "std.stream.pipe_v1",
+          [
+            "std.stream.cfg_v1",
+            ["chunk_max_bytes", 128],
+            ["bufread_cap_bytes", 128],
+            ["max_in_bytes", 1048576],
+            ["max_out_bytes", 1048576],
+            ["max_items", 1024],
+            ["emit_payload", 1],
+            ["emit_stats", 1],
+            ["typecheck_item_brands_v1", 1],
+            ["auto_require_brand_v1", 1],
+            ["verify_produced_brands_v1", 1],
+            ["brand_registry_ref_v1", ["bytes.lit", "brand_registry"]]
+          ],
+          ["std.stream.src.bytes_v1", ["std.stream.expr_v1", "frames_bytes"]],
+          [
+            "std.stream.chain_v1",
+            ["std.stream.xf.deframe_u32le_v1", ["max_frame_bytes", 4096]],
+            ["std.stream.xf.map_bytes_v1", ["std.stream.fn_v1", "app.map_payload_to_event_line_v1"]],
+            ["std.stream.xf.frame_u32le_v1"]
+          ],
+          ["std.stream.sink.collect_bytes_v1"]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.run_plugin_json_pipe_v1",
+      "params": [
+        { "name": "raw", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "cfg", ["app._json_canon_cfg_v1"]],
+        ["let", "raw_bytes", ["view.to_bytes", "raw"]],
+        [
+          "std.stream.pipe_v1",
+          [
+            "std.stream.cfg_v1",
+            ["chunk_max_bytes", 128],
+            ["bufread_cap_bytes", 128],
+            ["max_in_bytes", 1048576],
+            ["max_out_bytes", 1048576],
+            ["max_items", 1024],
+            ["emit_payload", 1],
+            ["emit_stats", 1]
+          ],
+          ["std.stream.src.bytes_v1", ["std.stream.expr_v1", "raw_bytes"]],
+          [
+            "std.stream.chain_v1",
+            ["std.stream.xf.split_lines_v1", ["std.stream.expr_v1", 10], ["std.stream.expr_v1", 1048576]],
+            [
+              "std.stream.xf.plugin_v1",
+              ["id", ["bytes.lit", "xf.json_canon_stream_v1"]],
+              ["cfg", ["std.stream.expr_v1", "cfg"]],
+              ["opts_v1", ["opts_v1", ["strict_cfg_canon", 0]]]
+            ]
+          ],
+          ["std.stream.sink.collect_bytes_v1"]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.pipe_ok_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "if",
+        ["=", ["view.get_u8", "doc", 0], 1],
+        1,
+        0
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.pipe_err_code_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "if",
+        ["=", ["view.get_u8", "doc", 0], 0],
+        ["std.codec.read_u32_le", "doc", 1],
+        0
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.pipe_items_out_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "if",
+        ["=", ["view.get_u8", "doc", 0], 1],
+        ["std.codec.read_u32_le", "doc", 13],
+        0
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.pipe_bytes_out_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "if",
+        ["=", ["view.get_u8", "doc", 0], 1],
+        ["std.codec.read_u32_le", "doc", 5],
+        0
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.pipe_payload_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["=", ["view.get_u8", "doc", 0], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "n", ["std.codec.read_u32_le", "doc", 17]],
+        ["view.to_bytes", ["view.slice", "doc", 21, "n"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.main",
+      "params": [
+        { "name": "input_bytes", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "frames", ["app.build_valid_frames_v1"]],
+        ["let", "direct_doc", ["app.run_direct_pipe_v1", ["bytes.view", "frames"]]],
+        ["let", "auto_doc1", ["app.run_auto_pipe_v1", ["bytes.view", "frames"]]],
+        ["let", "auto_doc2", ["app.run_auto_pipe_v1", ["bytes.view", "frames"]]],
+        ["let", "plugin_in", ["if", [">", ["view.len", "input_bytes"], 0], ["view.to_bytes", "input_bytes"], ["bytes.lit", "{\"b\":2,\"a\":1}"]]],
+        ["let", "plugin_doc", ["app.run_plugin_json_pipe_v1", ["bytes.view", "plugin_in"]]],
+        ["let", "direct_ok", ["app.pipe_ok_v1", ["bytes.view", "direct_doc"]]],
+        ["let", "auto_ok", ["app.pipe_ok_v1", ["bytes.view", "auto_doc1"]]],
+        ["let", "plugin_ok", ["app.pipe_ok_v1", ["bytes.view", "plugin_doc"]]],
+        ["let", "auto_deterministic", ["std.bytes.eq", ["bytes.view", "auto_doc1"], ["bytes.view", "auto_doc2"]]],
+        ["let", "out", ["std.vec.with_capacity", 1024]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "{\"auto_deterministic\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "auto_deterministic"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"brands\":[\"types_pipes_lab.frame_payload_v1\",\"types_pipes_lab.event_line_v1\"],\"direct_err\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", ["app.pipe_err_code_v1", ["bytes.view", "direct_doc"]]]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"direct_items_out\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", ["app.pipe_items_out_v1", ["bytes.view", "direct_doc"]]]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"direct_ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "direct_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"pipe_stats\":{\"auto_bytes_out\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", ["app.pipe_bytes_out_v1", ["bytes.view", "auto_doc1"]]]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"auto_items_out\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", ["app.pipe_items_out_v1", ["bytes.view", "auto_doc1"]]]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"plugin_bytes_out\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", ["app.pipe_bytes_out_v1", ["bytes.view", "plugin_doc"]]]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "},\"plugin_err\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", ["app.pipe_err_code_v1", ["bytes.view", "plugin_doc"]]]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"plugin_ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "plugin_ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"schemas\":[\"types_pipes_lab.schema.event_line_v1\",\"types_pipes_lab.schema.frame_payload_v1\"]}"]]],
+        ["let", "raw", ["std.vec.as_bytes", "out"]],
+        ["std.json.canonicalize_small", ["bytes.view", "raw"]]
+      ]
+    }
+  ]
+}

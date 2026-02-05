@@ -1,0 +1,4 @@
+name = "x07"
+items = [1, 2, 3]
+[nested]
+ok = true

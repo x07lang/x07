@@ -117,6 +117,9 @@ pub fn builtin_module_source(module_id: &str) -> Option<&'static str> {
         "std.path" => Some(include_str!(
             "../../../stdlib/std/0.1.1/modules/std/path.x07.json"
         )),
+        "std.process" => Some(include_str!(
+            "../../../stdlib/std/0.1.1/modules/std/process.x07.json"
+        )),
         _ => None,
     }
 }
@@ -162,5 +165,6 @@ pub fn builtin_module_ids() -> &'static [&'static str] {
         "std.rr",
         "std.kv",
         "std.path",
+        "std.process",
     ]
 }

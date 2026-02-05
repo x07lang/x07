@@ -1,0 +1,19 @@
+{
+  "files": {
+    "arch/budgets/profiles/sm_step_v1.budget.json": {
+      "jcs_sha256_hex": "71d9a721760e1e86260e219c366b161b650b7435bd3cd763f4ecf604534ae274"
+    },
+    "arch/sm/specs/lifecycle.sm.json": {
+      "jcs_sha256_hex": "f6d8c3e755d1669a366ffd250f8cd56881cec4fd05e6ec555f07183ddd4b1a7e"
+    }
+  },
+  "indexes": {
+    "arch/budgets/index.x07budgets.json": {
+      "jcs_sha256_hex": "57c62500462a3c7b9a2277731c73ba66e48d6532f2f5d90c95b32353b84029e3"
+    },
+    "arch/sm/index.x07sm.json": {
+      "jcs_sha256_hex": "e2346e031494fdd2a9f1615a0ef4b2cce30df6c2e4f71dd769a56d4b972d725d"
+    }
+  },
+  "schema_version": "x07.arch.contracts.lock@0.1.0"
+}

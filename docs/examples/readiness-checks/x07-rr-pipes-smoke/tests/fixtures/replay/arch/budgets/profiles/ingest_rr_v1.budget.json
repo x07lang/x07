@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "ingest_rr_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "result_err_v1",
+    "label": "rr.ingest.v1",
+    "alloc_bytes": 4194304,
+    "alloc_calls": 10000,
+    "realloc_calls": 2000,
+    "memcpy_bytes": 8388608,
+    "sched_ticks": 200000,
+    "fuel": 0
+  }
+}

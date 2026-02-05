@@ -1,0 +1,148 @@
+{
+  "default_profile": "sandbox",
+  "dependencies": [
+    {
+      "name": "ext-bigint-rs",
+      "path": ".x07/deps/ext-bigint-rs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-cli",
+      "path": ".x07/deps/ext-cli/0.1.11",
+      "version": "0.1.11"
+    },
+    {
+      "name": "ext-cli-ux",
+      "path": ".x07/deps/ext-cli-ux/0.1.1",
+      "version": "0.1.1"
+    },
+    {
+      "name": "ext-crypto-rs",
+      "path": ".x07/deps/ext-crypto-rs/0.1.0",
+      "version": "0.1.0"
+    },
+    {
+      "name": "ext-csv-rs",
+      "path": ".x07/deps/ext-csv-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-data-model",
+      "path": ".x07/deps/ext-data-model/0.1.8",
+      "version": "0.1.8"
+    },
+    {
+      "name": "ext-db-core",
+      "path": ".x07/deps/ext-db-core/0.1.9",
+      "version": "0.1.9"
+    },
+    {
+      "name": "ext-db-migrate",
+      "path": ".x07/deps/ext-db-migrate/0.1.1",
+      "version": "0.1.1"
+    },
+    {
+      "name": "ext-db-mysql",
+      "path": ".x07/deps/ext-db-mysql/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-db-postgres",
+      "path": ".x07/deps/ext-db-postgres/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-db-redis",
+      "path": ".x07/deps/ext-db-redis/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-db-sqlite",
+      "path": ".x07/deps/ext-db-sqlite/0.1.9",
+      "version": "0.1.9"
+    },
+    {
+      "name": "ext-decimal-rs",
+      "path": ".x07/deps/ext-decimal-rs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-error",
+      "path": ".x07/deps/ext-error/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-fs",
+      "path": ".x07/deps/ext-fs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-glob-rs",
+      "path": ".x07/deps/ext-glob-rs/0.1.3",
+      "version": "0.1.3"
+    },
+    {
+      "name": "ext-hex-rs",
+      "path": ".x07/deps/ext-hex-rs/0.1.0",
+      "version": "0.1.0"
+    },
+    {
+      "name": "ext-ini-rs",
+      "path": ".x07/deps/ext-ini-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-json-rs",
+      "path": ".x07/deps/ext-json-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-math",
+      "path": ".x07/deps/ext-math/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-path-glob-rs",
+      "path": ".x07/deps/ext-path-glob-rs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-toml-rs",
+      "path": ".x07/deps/ext-toml-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-unicode-rs",
+      "path": ".x07/deps/ext-unicode-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-walkdir-rs",
+      "path": ".x07/deps/ext-walkdir-rs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-xml-rs",
+      "path": ".x07/deps/ext-xml-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-yaml-rs",
+      "path": ".x07/deps/ext-yaml-rs/0.1.4",
+      "version": "0.1.4"
+    }
+  ],
+  "entry": "src/main.x07.json",
+  "lockfile": "x07.lock.json",
+  "module_roots": [
+    "src"
+  ],
+  "profiles": {
+    "sandbox": {
+      "policy": "policy/sandbox.base.json",
+      "world": "run-os-sandboxed"
+    }
+  },
+  "schema_version": "x07.project@0.2.0",
+  "world": "solve-pure"
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.arch.sm.index@0.1.0",
+  "machines": [
+    {
+      "machine_id": "lifecycle",
+      "version": 1,
+      "spec_path": "arch/sm/specs/lifecycle.sm.json",
+      "gen_module_id": "gen.sm.lifecycle_v1",
+      "gen_paths": [
+        "gen/sm/lifecycle_v1.x07.json",
+        "gen/sm/lifecycle_v1/tests.x07.json"
+      ],
+      "world": "solve-pure"
+    }
+  ]
+}

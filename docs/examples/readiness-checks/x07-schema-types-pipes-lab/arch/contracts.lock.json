@@ -1,0 +1,31 @@
+{
+  "files": {
+    "arch/budgets/profiles/stream_xf_plugin_v1.budget.json": {
+      "jcs_sha256_hex": "2d42a78c9cfa823a8d7a56611819ac29b3894d9834118963ecab149a1177cb82"
+    },
+    "arch/stream/plugins/specs/xf.deframe_u32le_v1.x07sp-plugin.json": {
+      "jcs_sha256_hex": "05f4ad2b4d8da3cd30863be2ee4053a83946a569142b8c3a51b16beed680a228"
+    },
+    "arch/stream/plugins/specs/xf.frame_u32le_v1.x07sp-plugin.json": {
+      "jcs_sha256_hex": "2490a0d54cb1271d649b2bd006c866430959a3aa9369fef43259453c84ac5b5f"
+    },
+    "arch/stream/plugins/specs/xf.json_canon_stream_v1.x07sp-plugin.json": {
+      "jcs_sha256_hex": "44674e398248fcdfa50af809b2432b43a1c82567539c7410954457551b48a8ee"
+    },
+    "arch/stream/plugins/specs/xf.split_lines_v1.x07sp-plugin.json": {
+      "jcs_sha256_hex": "ab080b14a0a4a94485ebe54e0359c2bc2c203ebda4a1c1c9e119536363d23344"
+    },
+    "arch/stream/plugins/specs/xf.test_emit_limits_v1.x07sp-plugin.json": {
+      "jcs_sha256_hex": "eefb5efc71626eee8b29a3c84d0335b00d29482551ebccc2bb38198d6640cbce"
+    }
+  },
+  "indexes": {
+    "arch/budgets/index.x07budgets.json": {
+      "jcs_sha256_hex": "e4d7adf0ba712671fd709971f0c4eb047eaf621640fce4f7c2470bf8b2feb45e"
+    },
+    "arch/stream/plugins/index.x07sp.json": {
+      "jcs_sha256_hex": "8658fd3c1b79221e47e5606785f818226354e0e41255389d0c1de3e1213ff926"
+    }
+  },
+  "schema_version": "x07.arch.contracts.lock@0.1.0"
+}

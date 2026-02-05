@@ -1,0 +1,49 @@
+{
+  "schema_version": "x07.arch.manifest@0.1.0",
+  "repo": { "id": "x07_messaging_rr_lab", "root": "." },
+  "externals": {
+    "allowed_import_prefixes": ["std.", "ext."],
+    "allowed_exact": []
+  },
+  "nodes": [],
+  "rules": [],
+  "checks": {
+    "deny_cycles": false,
+    "deny_orphans": false,
+    "enforce_visibility": false,
+    "enforce_world_caps": false
+  },
+  "tool_budgets": {
+    "max_modules": 5000,
+    "max_edges": 20000,
+    "max_diags": 2000,
+    "contracts_budgets": { "max_contract_files": 2000, "max_contract_bytes": 67108864 }
+  },
+  "contracts_v1": {
+    "msg": {
+      "index_path": "arch/msg/index.x07msg.json",
+      "enforce": "error"
+    },
+    "msg_kafka": {
+      "index_path": "arch/msg/kafka/index.x07kafka.json",
+      "enforce": "error"
+    },
+    "msg_amqp": {
+      "index_path": "arch/msg/amqp/index.x07amqp.json",
+      "enforce": "error"
+    },
+    "rr": {
+      "index_path": "arch/rr/index.x07rr.json",
+      "gen_dir": "arch/rr",
+      "require_policy_for_os_calls": false
+    },
+    "budgets": {
+      "index_path": "arch/budgets/index.x07budgets.json",
+      "gen_dir": "arch/budgets",
+      "require_scopes": false
+    },
+    "canonical_json": {
+      "mode": "jcs_rfc8785_v1"
+    }
+  }
+}

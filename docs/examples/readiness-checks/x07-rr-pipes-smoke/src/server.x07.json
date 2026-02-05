@@ -1,0 +1,26 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "server",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "server.main"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "server.main",
+      "params": [
+        { "name": "_input", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "bytes.lit",
+        "PONG\n"
+      ]
+    }
+  ]
+}

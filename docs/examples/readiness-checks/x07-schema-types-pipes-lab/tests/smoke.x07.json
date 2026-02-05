@@ -1,0 +1,83 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "smoke",
+  "imports": [
+    "app",
+    "std.bytes",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "smoke.test_auto_pipe_deterministic_v1",
+        "smoke.test_auto_pipe_invalid_err_v1",
+        "smoke.test_main_report_v1",
+        "smoke.test_plugin_pipe_deterministic_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "smoke.test_auto_pipe_deterministic_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "frames", ["app.build_valid_frames_v1"]],
+        ["let", "doc1", ["app.run_auto_pipe_v1", ["bytes.view", "frames"]]],
+        ["let", "doc2", ["app.run_auto_pipe_v1", ["bytes.view", "frames"]]],
+        ["try", ["std.test.assert_i32_eq", ["app.pipe_ok_v1", ["bytes.view", "doc1"]], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["std.bytes.eq", ["bytes.view", "doc1"], ["bytes.view", "doc2"]], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["app.pipe_items_out_v1", ["bytes.view", "doc1"]], 2, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "smoke.test_auto_pipe_invalid_err_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "frames", ["app.build_invalid_frames_v1"]],
+        ["let", "doc", ["app.run_auto_pipe_v1", ["bytes.view", "frames"]]],
+        ["let", "err", ["app.pipe_err_code_v1", ["bytes.view", "doc"]]],
+        ["try", ["std.test.assert_i32_eq", ["app.pipe_ok_v1", ["bytes.view", "doc"]], 0, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_true", [">", "err", 0], ["std.test.code_assert_true"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "smoke.test_plugin_pipe_deterministic_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "raw", ["bytes.lit", "{\"b\":2,\"a\":1}"]],
+        ["let", "doc1", ["app.run_plugin_json_pipe_v1", ["bytes.view", "raw"]]],
+        ["let", "doc2", ["app.run_plugin_json_pipe_v1", ["bytes.view", "raw"]]],
+        ["try", ["std.test.assert_i32_eq", ["app.pipe_ok_v1", ["bytes.view", "doc1"]], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["std.bytes.eq", ["bytes.view", "doc1"], ["bytes.view", "doc2"]], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_true", [">", ["app.pipe_bytes_out_v1", ["bytes.view", "doc1"]], 0], ["std.test.code_assert_true"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "smoke.test_main_report_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "empty", ["bytes.alloc", 0]],
+        ["let", "report", ["app.main", ["bytes.view", "empty"]]],
+        ["let", "n", ["bytes.len", "report"]],
+        ["try", ["std.test.assert_true", [">", "n", 0], ["std.test.code_assert_true"]]],
+        ["try", ["std.test.assert_i32_eq", ["bytes.get_u8", "report", 0], 123, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

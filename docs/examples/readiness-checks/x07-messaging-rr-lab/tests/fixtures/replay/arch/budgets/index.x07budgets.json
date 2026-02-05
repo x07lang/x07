@@ -1,0 +1,55 @@
+{
+  "schema_version": "x07.arch.budgets.index@0.1.0",
+  "profiles": [
+    {
+      "id": "msg_amqp_v1",
+      "profile_path": "arch/budgets/profiles/msg_amqp_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "std.msg.amqp", "fn": "connect_from_arch_v1" },
+        { "module_prefix": "std.msg.amqp", "fn": "ensure_topology_from_arch_v1" }
+      ],
+      "worlds_allowed": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    {
+      "id": "msg_core_v1",
+      "profile_path": "arch/budgets/profiles/msg_core_v1.budget.json",
+      "enforce": "error",
+      "selectors": [],
+      "worlds_allowed": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    {
+      "id": "msg_kafka_v1",
+      "profile_path": "arch/budgets/profiles/msg_kafka_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "std.msg.kafka", "fn": "connect_from_arch_v1" }
+      ],
+      "worlds_allowed": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    }
+  ]
+}

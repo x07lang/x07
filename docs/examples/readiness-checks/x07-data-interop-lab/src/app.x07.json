@@ -1,0 +1,86 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "app",
+  "imports": [
+    "ext.cbor.tests",
+    "ext.csv.tests",
+    "ext.ini.tests",
+    "ext.json.tests",
+    "ext.msgpack.tests",
+    "ext.pb.tests",
+    "ext.streams.fs.tests",
+    "ext.toml.tests",
+    "ext.xml.tests",
+    "ext.yaml.tests",
+    "std.fmt",
+    "std.json",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "app.main",
+        "app.test_stream_reader_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.run_codec_suite_v1",
+      "params": [],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "ok", 1],
+        ["let", "r_json", ["ext.json.tests.test_data_model_empty_object"]],
+        ["if", ["=", ["result_i32.is_ok", "r_json"], 1], 0, ["set", "ok", 0]],
+        ["let", "r_toml", ["ext.toml.tests.test_parse_simple"]],
+        ["if", ["=", ["result_i32.is_ok", "r_toml"], 1], 0, ["set", "ok", 0]],
+        ["let", "r_yaml", ["ext.yaml.tests.test_data_model_parse_map"]],
+        ["if", ["=", ["result_i32.is_ok", "r_yaml"], 1], 0, ["set", "ok", 0]],
+        ["let", "r_xml", ["ext.xml.tests.test_tree_basic"]],
+        ["if", ["=", ["result_i32.is_ok", "r_xml"], 1], 0, ["set", "ok", 0]],
+        ["let", "r_ini", ["ext.ini.tests.test_parse_basic"]],
+        ["if", ["=", ["result_i32.is_ok", "r_ini"], 1], 0, ["set", "ok", 0]],
+        ["let", "r_csv", ["ext.csv.tests.test_parse_basic"]],
+        ["if", ["=", ["result_i32.is_ok", "r_csv"], 1], 0, ["set", "ok", 0]],
+        ["let", "r_cbor", ["ext.cbor.tests.test_data_model_roundtrip"]],
+        ["if", ["=", ["result_i32.is_ok", "r_cbor"], 1], 0, ["set", "ok", 0]],
+        ["let", "r_msgpack", ["ext.msgpack.tests.test_data_model_roundtrip"]],
+        ["if", ["=", ["result_i32.is_ok", "r_msgpack"], 1], 0, ["set", "ok", 0]],
+        ["let", "r_pb", ["ext.pb.tests.test_data_model_emit_v1_roundtrip"]],
+        ["if", ["=", ["result_i32.is_ok", "r_pb"], 1], 0, ["set", "ok", 0]],
+        "ok"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.main",
+      "params": [
+        { "name": "input_bytes", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "_ignored", ["view.len", "input_bytes"]],
+        ["let", "ok", ["app.run_codec_suite_v1"]],
+        ["let", "out", ["std.vec.with_capacity", 256]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "{\"codec_checks\":9,\"ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"stream_reader_world\":\"run-os-sandboxed\"}"]]],
+        ["let", "raw", ["std.vec.as_bytes", "out"]],
+        ["std.json.canonicalize_small", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.test_stream_reader_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "ext.streams.fs.tests.test_open_read_fs_hello"
+      ]
+    }
+  ]
+}

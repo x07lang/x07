@@ -1,0 +1,7 @@
+{
+  "schema_version": "x07.arch.rr.sanitize@0.1.0",
+  "id": "sanitize_none_v1",
+  "v": 1,
+  "redact_headers": [],
+  "redact_token": "<redacted>"
+}

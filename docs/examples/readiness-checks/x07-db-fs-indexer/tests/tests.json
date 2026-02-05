@@ -1,0 +1,18 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "indexer/spec_only_v1",
+      "world": "solve-pure",
+      "entry": "smoke.test_spec_only_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "indexer/fs_walk_v1",
+      "world": "run-os-sandboxed",
+      "entry": "smoke.test_fs_walk_v1",
+      "expect": "pass",
+      "policy_json": "policies/indexer.policy.json"
+    }
+  ]
+}

@@ -748,6 +748,32 @@ struct StreamPluginSpecLimitsV1 {
     max_out_buf_bytes: u32,
 }
 
+const BUILTIN_STREAM_PLUGINS_INDEX_V1: &str =
+    include_str!("../../../arch/stream/plugins/index.x07sp.json");
+
+fn builtin_stream_plugin_spec_source_v1(plugin_spec_path: &str) -> Option<&'static str> {
+    match plugin_spec_path {
+        "arch/stream/plugins/specs/xf.deframe_u32le_v1.x07sp-plugin.json" => Some(include_str!(
+            "../../../arch/stream/plugins/specs/xf.deframe_u32le_v1.x07sp-plugin.json"
+        )),
+        "arch/stream/plugins/specs/xf.frame_u32le_v1.x07sp-plugin.json" => Some(include_str!(
+            "../../../arch/stream/plugins/specs/xf.frame_u32le_v1.x07sp-plugin.json"
+        )),
+        "arch/stream/plugins/specs/xf.json_canon_stream_v1.x07sp-plugin.json" => {
+            Some(include_str!(
+                "../../../arch/stream/plugins/specs/xf.json_canon_stream_v1.x07sp-plugin.json"
+            ))
+        }
+        "arch/stream/plugins/specs/xf.split_lines_v1.x07sp-plugin.json" => Some(include_str!(
+            "../../../arch/stream/plugins/specs/xf.split_lines_v1.x07sp-plugin.json"
+        )),
+        "arch/stream/plugins/specs/xf.test_emit_limits_v1.x07sp-plugin.json" => Some(include_str!(
+            "../../../arch/stream/plugins/specs/xf.test_emit_limits_v1.x07sp-plugin.json"
+        )),
+        _ => None,
+    }
+}
+
 impl StreamPluginRegistryV1 {
     fn load(arch_root: &std::path::Path) -> Result<Self, CompilerError> {
         let index_path = arch_root
@@ -756,15 +782,27 @@ impl StreamPluginRegistryV1 {
             .join("plugins")
             .join("index.x07sp.json");
 
-        let index_bytes = std::fs::read(&index_path).map_err(|e| {
-            CompilerError::new(
-                CompileErrorKind::Typing,
-                format!(
-                    "E_PIPE_PLUGIN_INDEX_READ_FAILED: failed to read {}: {e}",
-                    index_path.display()
-                ),
-            )
-        })?;
+        let (index_bytes, index_display_path, fs_plugin_root) = match std::fs::read(&index_path) {
+            Ok(bytes) => (
+                bytes,
+                index_path.display().to_string(),
+                Some(arch_root.to_path_buf()),
+            ),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (
+                BUILTIN_STREAM_PLUGINS_INDEX_V1.as_bytes().to_vec(),
+                "<builtin>/arch/stream/plugins/index.x07sp.json".to_string(),
+                None,
+            ),
+            Err(e) => {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "E_PIPE_PLUGIN_INDEX_READ_FAILED: failed to read {}: {e}",
+                        index_path.display()
+                    ),
+                ));
+            }
+        };
 
         let index: StreamPluginsIndexFileV1 =
             serde_json::from_slice(&index_bytes).map_err(|e| {
@@ -772,7 +810,7 @@ impl StreamPluginRegistryV1 {
                     CompileErrorKind::Typing,
                     format!(
                         "E_PIPE_PLUGIN_INDEX_INVALID: failed to parse {}: {e}",
-                        index_path.display()
+                        index_display_path
                     ),
                 )
             })?;
@@ -784,7 +822,7 @@ impl StreamPluginRegistryV1 {
                     "E_PIPE_PLUGIN_INDEX_INVALID: expected schema_version {:?} got {:?} in {}",
                     x07_contracts::X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION,
                     index.schema_version,
-                    index_path.display()
+                    index_display_path
                 ),
             ));
         }
@@ -801,16 +839,35 @@ impl StreamPluginRegistryV1 {
             validate::validate_local_name(&entry.export_symbol)
                 .map_err(|message| CompilerError::new(CompileErrorKind::Typing, message))?;
 
-            let spec_path = arch_root.join(&entry.plugin_spec_path);
-            let spec_bytes = std::fs::read(&spec_path).map_err(|e| {
-                CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!(
-                        "E_PIPE_PLUGIN_SPEC_READ_FAILED: failed to read {}: {e}",
-                        spec_path.display()
-                    ),
+            let (spec_bytes, spec_display_path) = if let Some(plugin_root) = fs_plugin_root.as_ref()
+            {
+                let spec_path = plugin_root.join(&entry.plugin_spec_path);
+                let spec_bytes = std::fs::read(&spec_path).map_err(|e| {
+                    CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "E_PIPE_PLUGIN_SPEC_READ_FAILED: failed to read {}: {e}",
+                            spec_path.display()
+                        ),
+                    )
+                })?;
+                (spec_bytes, spec_path.display().to_string())
+            } else {
+                let Some(spec_src) = builtin_stream_plugin_spec_source_v1(&entry.plugin_spec_path)
+                else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "E_PIPE_PLUGIN_SPEC_READ_FAILED: unknown builtin stream plugin spec path {:?}",
+                            entry.plugin_spec_path
+                        ),
+                    ));
+                };
+                (
+                    spec_src.as_bytes().to_vec(),
+                    format!("<builtin>/{}", entry.plugin_spec_path),
                 )
-            })?;
+            };
 
             let spec: StreamPluginSpecFileV1 =
                 serde_json::from_slice(&spec_bytes).map_err(|e| {
@@ -818,7 +875,7 @@ impl StreamPluginRegistryV1 {
                         CompileErrorKind::Typing,
                         format!(
                             "E_PIPE_PLUGIN_SPEC_INVALID: failed to parse {}: {e}",
-                            spec_path.display()
+                            spec_display_path
                         ),
                     )
                 })?;
@@ -830,7 +887,7 @@ impl StreamPluginRegistryV1 {
                         "E_PIPE_PLUGIN_SPEC_INVALID: expected schema_version {:?} got {:?} in {}",
                         x07_contracts::X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION,
                         spec.schema_version,
-                        spec_path.display()
+                        spec_display_path
                     ),
                 ));
             }
@@ -842,7 +899,7 @@ impl StreamPluginRegistryV1 {
                         "E_PIPE_PLUGIN_SPEC_MISMATCH: plugin_id mismatch: index has {:?} spec has {:?} (spec_path={})",
                         entry.plugin_id,
                         spec.plugin_id,
-                        spec_path.display()
+                        spec_display_path
                     ),
                 ));
             }
@@ -856,7 +913,7 @@ impl StreamPluginRegistryV1 {
                     format!(
                         "E_PIPE_PLUGIN_SPEC_MISMATCH: abi mismatch between index and spec (plugin_id={:?} spec_path={})",
                         entry.plugin_id,
-                        spec_path.display()
+                        spec_display_path
                     ),
                 ));
             }
@@ -867,7 +924,7 @@ impl StreamPluginRegistryV1 {
                     format!(
                         "E_PIPE_PLUGIN_SPEC_MISMATCH: worlds_allowed mismatch between index and spec (plugin_id={:?} spec_path={})",
                         entry.plugin_id,
-                        spec_path.display()
+                        spec_display_path
                     ),
                 ));
             }
@@ -878,7 +935,7 @@ impl StreamPluginRegistryV1 {
                     format!(
                         "E_PIPE_PLUGIN_SPEC_MISMATCH: determinism mismatch between index and spec (plugin_id={:?} spec_path={})",
                         entry.plugin_id,
-                        spec_path.display()
+                        spec_display_path
                     ),
                 ));
             }
@@ -891,7 +948,7 @@ impl StreamPluginRegistryV1 {
                     format!(
                         "E_PIPE_PLUGIN_SPEC_MISMATCH: brands mismatch between index and spec (plugin_id={:?} spec_path={})",
                         entry.plugin_id,
-                        spec_path.display()
+                        spec_display_path
                     ),
                 ));
             }
@@ -904,7 +961,7 @@ impl StreamPluginRegistryV1 {
                     format!(
                         "E_PIPE_PLUGIN_SPEC_MISMATCH: budgets mismatch between index and spec (plugin_id={:?} spec_path={})",
                         entry.plugin_id,
-                        spec_path.display()
+                        spec_display_path
                     ),
                 ));
             }
@@ -919,7 +976,7 @@ impl StreamPluginRegistryV1 {
                             "E_PIPE_PLUGIN_SPEC_INVALID: unknown determinism {:?} (plugin_id={:?} spec_path={})",
                             other,
                             entry.plugin_id,
-                            spec_path.display()
+                            spec_display_path
                         ),
                     ));
                 }
@@ -935,7 +992,7 @@ impl StreamPluginRegistryV1 {
                             "E_PIPE_PLUGIN_SPEC_INVALID: unknown cfg.canon_mode {:?} (plugin_id={:?} spec_path={})",
                             other,
                             entry.plugin_id,
-                            spec_path.display()
+                            spec_display_path
                         ),
                     ));
                 }
@@ -961,8 +1018,7 @@ impl StreamPluginRegistryV1 {
                     CompileErrorKind::Typing,
                     format!(
                         "E_PIPE_PLUGIN_SPEC_INVALID: v must be >= 1 (plugin_id={:?} spec_path={})",
-                        entry.plugin_id,
-                        spec_path.display()
+                        entry.plugin_id, spec_display_path
                     ),
                 ));
             }
@@ -972,7 +1028,7 @@ impl StreamPluginRegistryV1 {
                     format!(
                         "E_PIPE_PLUGIN_SPEC_INVALID: budgets.max_expand_ratio must be >= 0 and finite (plugin_id={:?} spec_path={})",
                         entry.plugin_id,
-                        spec_path.display()
+                        spec_display_path
                     ),
                 ));
             }
@@ -1007,8 +1063,7 @@ impl StreamPluginRegistryV1 {
                     CompileErrorKind::Typing,
                     format!(
                         "E_PIPE_PLUGIN_DUPLICATE_ID: duplicate plugin_id {:?} in {}",
-                        entry.plugin_id,
-                        index_path.display()
+                        entry.plugin_id, index_display_path
                     ),
                 ));
             }

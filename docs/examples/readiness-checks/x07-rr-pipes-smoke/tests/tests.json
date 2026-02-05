@@ -1,0 +1,18 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "rr_pipes/replay_report_v1",
+      "world": "solve-rr",
+      "fixture_root": "fixtures/replay",
+      "entry": "smoke.test_replay_report_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "rr_pipes/server_payload_v1",
+      "world": "solve-pure",
+      "entry": "smoke.test_server_payload_v1",
+      "expect": "pass"
+    }
+  ]
+}

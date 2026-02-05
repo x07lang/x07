@@ -1,0 +1,160 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "app",
+  "imports": [
+    "ext.base64",
+    "ext.checksum.crc32c",
+    "ext.checksum.xxhash64",
+    "ext.diff.bytes",
+    "ext.diff.patch_v1",
+    "ext.hex",
+    "ext.u64",
+    "ext.zstd",
+    "std.bytes",
+    "std.codec",
+    "std.fmt",
+    "std.json",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["app.main"]
+    },
+    {
+      "kind": "defn",
+      "name": "app.check_checksum_v1",
+      "params": [],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "abc", ["bytes.lit", "abc"]],
+        ["let", "got_crc", ["ext.checksum.crc32c.sum_u32_le_v1", ["bytes.view", "abc"]]],
+        ["let", "exp_crc", ["std.codec.write_u32_le", 910901175]],
+        ["let", "ok_crc", ["std.bytes.eq", ["bytes.view", "got_crc"], ["bytes.view", "exp_crc"]]],
+        ["let", "got_xx", ["ext.checksum.xxhash64.sum_u64_le_seed0_v1", ["bytes.view", "abc"]]],
+        ["let", "exp_xx", ["ext.u64.to_bytes_le", -1384707687, 1153182965]],
+        ["let", "ok_xx", ["std.bytes.eq", ["bytes.view", "got_xx"], ["bytes.view", "exp_xx"]]],
+        ["if", ["if", ["=", "ok_crc", 1], ["=", "ok_xx", 1], 0], 1, 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.check_compress_v1",
+      "params": [],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "data", ["bytes.lit", "hello-hello-hello"]],
+        ["let", "cdoc", ["ext.zstd.compress_store_v1", ["bytes.view", "data"], 1024]],
+        ["if", ["!=", ["ext.zstd.is_err", ["bytes.view", "cdoc"]], 0], ["return", 0], 0],
+        ["let", "compressed", ["ext.zstd.get_bytes", ["bytes.view", "cdoc"]]],
+        ["let", "ddoc", ["ext.zstd.decompress_v1", ["bytes.view", "compressed"], 1024]],
+        ["if", ["!=", ["ext.zstd.is_err", ["bytes.view", "ddoc"]], 0], ["return", 0], 0],
+        ["let", "out", ["ext.zstd.get_bytes", ["bytes.view", "ddoc"]]],
+        ["if", ["=", ["std.bytes.eq", ["bytes.view", "out"], ["bytes.view", "data"]], 1], 1, 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.check_diff_patch_v1",
+      "params": [],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "before", ["bytes.lit", "hello\n"]],
+        ["let", "after", ["bytes.lit", "hello-world\n"]],
+        ["let", "patch_doc", ["ext.diff.bytes.patch_v1", ["bytes.view", "before"], ["bytes.view", "after"], 1024]],
+        ["if", ["!=", ["ext.diff.patch_v1.is_err", ["bytes.view", "patch_doc"]], 0], ["return", 0], 0],
+        ["let", "patch", ["ext.diff.patch_v1.get_bytes", ["bytes.view", "patch_doc"]]],
+        ["let", "out_doc", ["ext.diff.patch_v1.apply_v1", ["bytes.view", "before"], ["bytes.view", "patch"], 1024]],
+        ["if", ["!=", ["ext.diff.patch_v1.is_err", ["bytes.view", "out_doc"]], 0], ["return", 0], 0],
+        ["let", "out", ["ext.diff.patch_v1.get_bytes", ["bytes.view", "out_doc"]]],
+        ["if", ["=", ["std.bytes.eq", ["bytes.view", "out"], ["bytes.view", "after"]], 1], 1, 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.check_base_encodings_v1",
+      "params": [],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "raw", ["bytes.lit", "x07"]],
+        ["let", "b64", ["ext.base64.base64_encode", ["bytes.view", "raw"]]],
+        ["let", "b64d_doc", ["ext.base64.base64_decode", ["bytes.view", "b64"]]],
+        ["if", ["=", ["ext.base64.base64_is_err", ["bytes.view", "b64d_doc"]], 1], ["return", 0], 0],
+        ["let", "b64d", ["ext.base64.base64_get_bytes", ["bytes.view", "b64d_doc"]]],
+        ["let", "hex", ["ext.hex.hex_encode", ["bytes.view", "raw"]]],
+        ["let", "hexd_doc", ["ext.hex.hex_decode", ["bytes.view", "hex"]]],
+        ["if", ["=", ["ext.hex.hex_is_err", ["bytes.view", "hexd_doc"]], 1], ["return", 0], 0],
+        ["let", "hexd", ["ext.hex.hex_get_bytes", ["bytes.view", "hexd_doc"]]],
+        [
+          "if",
+          [
+            "if",
+            ["=", ["std.bytes.eq", ["bytes.view", "b64d"], ["bytes.view", "raw"]], 1],
+            ["=", ["std.bytes.eq", ["bytes.view", "hexd"], ["bytes.view", "raw"]], 1],
+            0
+          ],
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "app.main",
+      "params": [
+        { "name": "input_bytes", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "_unused", ["view.len", "input_bytes"]],
+        ["let", "ok_base", ["app.check_base_encodings_v1"]],
+        ["let", "ok_checksum", ["app.check_checksum_v1"]],
+        ["let", "ok_compress", ["app.check_compress_v1"]],
+        ["let", "ok_diff", ["app.check_diff_patch_v1"]],
+        [
+          "let",
+          "ok",
+          [
+            "if",
+            [
+              "if",
+              ["if", ["=", "ok_base", 1], ["=", "ok_checksum", 1], 0],
+              ["if", ["=", "ok_compress", 1], ["=", "ok_diff", 1], 0],
+              0
+            ],
+            1,
+            0
+          ]
+        ],
+        ["let", "out", ["std.vec.with_capacity", 512]],
+        [
+          "set",
+          "out",
+          [
+            "std.vec.extend_bytes",
+            "out",
+            ["bytes.lit", "{\"artifact_id\":\"00000000-0000-0000-0000-000000000000\",\"checks\":{\"base64_hex\":"]
+          ]
+        ],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ok_base"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"checksum\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ok_checksum"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"compress\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ok_compress"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"diff_patch\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ok_diff"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", "},\"ok\":"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["std.fmt.s32_to_dec", "ok"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.lit", ",\"schema_semver\":\"0.1.0\"}"]]],
+        ["let", "raw", ["std.vec.as_bytes", "out"]],
+        ["std.json.canonicalize_small", ["bytes.view", "raw"]]
+      ]
+    }
+  ]
+}
