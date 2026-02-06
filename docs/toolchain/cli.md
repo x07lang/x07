@@ -43,6 +43,22 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 See: [Architecture check](arch-check.md).
 
+### Diagnostics catalog / coverage
+
+- `x07 diag catalog --catalog catalog/diagnostics.json --format both`
+  - Validates `catalog/diagnostics.json` against `x07.diag.catalog@0.1.0`.
+  - Emits canonical JSON and generated docs (default: `docs/toolchain/diagnostic-codes.md`).
+- `x07 diag check`
+  - Scans source diagnostic codes and fails on catalog drift.
+  - Writes extracted scan data to `target/x07diag/extracted_codes.json`.
+- `x07 diag coverage`
+  - Emits `x07.diag.coverage@0.1.0` quickfix coverage report JSON.
+  - Supports threshold gating with `--min-coverage`.
+- `x07 diag explain <CODE>`
+  - Prints summary, origins, quickfix policy, and agent strategy for one code.
+- `x07 diag sarif --in <x07diag.json> --out <results.sarif>`
+  - Converts `x07diag` to SARIF v2.1.0 for code-scanning UIs.
+
 ### Patching (RFC 6902 JSON Patch)
 
 - `x07 ast apply-patch --in <path> --patch <patch.json> --out <path> --validate`

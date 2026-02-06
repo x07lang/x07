@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-diag.coverage.schema.json",
+  "title": "x07.diag.coverage@0.1.0",
+  "description": "Quickfix coverage and completeness report for X07 diagnostics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "catalog_path",
+    "summary",
+    "by_component",
+    "missing"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "x07.diag.coverage@0.1.0"
+    },
+    "generated_at_unix_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "toolchain_version": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "catalog_path": {
+      "type": "string",
+      "maxLength": 1024
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 1024
+      },
+      "default": []
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "by_component": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/component_row"
+      },
+      "default": []
+    },
+    "missing": {
+      "$ref": "#/$defs/missing"
+    }
+  },
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_codes",
+        "with_quickfix",
+        "without_quickfix",
+        "coverage"
+      ],
+      "properties": {
+        "total_codes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "with_quickfix": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "without_quickfix": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "component_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "total_codes",
+        "with_quickfix",
+        "coverage"
+      ],
+      "properties": {
+        "component": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "total_codes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "with_quickfix": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "missing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "codes_in_source_but_not_in_catalog",
+        "codes_in_catalog_but_not_in_source"
+      ],
+      "properties": {
+        "codes_in_source_but_not_in_catalog": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "default": []
+        },
+        "codes_in_catalog_but_not_in_source": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "default": []
+        },
+        "codes_without_quickfix": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

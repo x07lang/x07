@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-diag.catalog.schema.json",
+  "title": "x07.diag.catalog@0.1.0",
+  "description": "Canonical catalog of diagnostic codes across X07 tools. Intended for humans (docs) and agents (repair strategies + quickfix availability).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "x07.diag.catalog@0.1.0"
+    },
+    "generated_at_unix_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "toolchain_version": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      },
+      "default": []
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    }
+  },
+  "$defs": {
+    "code": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Z][A-Z0-9_-]*$",
+      "description": "Diagnostic code as emitted in x07diag (stable identifier)."
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "error",
+        "warning",
+        "info",
+        "hint"
+      ]
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "parse",
+        "lint",
+        "rewrite",
+        "type",
+        "lower",
+        "codegen",
+        "link",
+        "run"
+      ]
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "stage",
+        "default_severity"
+      ],
+      "properties": {
+        "component": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Producer component (e.g. x07c, x07/arch, x07/run, x07/test, x07import)."
+        },
+        "stage": {
+          "$ref": "#/$defs/stage"
+        },
+        "default_severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "since": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Semver or release tag where this code first appeared (optional)."
+        },
+        "deprecated_since": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64,
+          "default": null
+        },
+        "replaced_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64,
+          "default": null
+        }
+      }
+    },
+    "quickfix_support": {
+      "type": "string",
+      "enum": [
+        "never",
+        "sometimes",
+        "always"
+      ]
+    },
+    "quickfix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "support"
+      ],
+      "properties": {
+        "support": {
+          "$ref": "#/$defs/quickfix_support"
+        },
+        "kind": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "json_patch"
+            ]
+          },
+          "default": [],
+          "description": "Kinds of machine-applied fixes the tool may emit (aligned with x07diag.quickfix.kind)."
+        },
+        "auto_apply_safe": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, agent tooling may apply quickfix without human confirmation."
+        },
+        "no_quickfix_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2048,
+          "default": null,
+          "description": "If support=never, explain why (e.g. ambiguous, requires semantic intent, needs external IO)."
+        }
+      }
+    },
+    "doc_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "details_md": {
+          "type": "string",
+          "maxLength": 20000,
+          "default": "",
+          "description": "Markdown. Keep it short, structured, and actionable."
+        },
+        "agent_strategy_md": {
+          "type": "string",
+          "maxLength": 20000,
+          "default": "",
+          "description": "Markdown. Describe repair-loop strategy (what to inspect, what tools to run, safe edits)."
+        }
+      }
+    },
+    "example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "example_message"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "example_message": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "example_stage": {
+          "$ref": "#/$defs/stage"
+        },
+        "example_loc_ptr": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2048,
+          "default": null,
+          "description": "Optional JSON pointer to an x07AST node (RFC 6901)."
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "origins",
+        "doc",
+        "quickfix"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/code"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "default": []
+        },
+        "origins": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/origin"
+          }
+        },
+        "doc": {
+          "$ref": "#/$defs/doc_block"
+        },
+        "quickfix": {
+          "$ref": "#/$defs/quickfix"
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/example"
+          },
+          "default": []
+        },
+        "meta": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    }
+  }
+}

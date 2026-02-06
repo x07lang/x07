@@ -7,6 +7,8 @@
 pub const X07AST_SCHEMA_VERSION: &str = "x07.x07ast@0.3.0";
 pub const X07DIAG_SCHEMA_VERSION: &str = "x07.x07diag@0.1.0";
 pub const X07TEST_SCHEMA_VERSION: &str = "x07.x07test@0.2.0";
+pub const X07_DIAG_CATALOG_SCHEMA_VERSION: &str = "x07.diag.catalog@0.1.0";
+pub const X07_DIAG_COVERAGE_SCHEMA_VERSION: &str = "x07.diag.coverage@0.1.0";
 
 pub const X07C_REPORT_SCHEMA_VERSION: &str = "x07c.report@0.1.0";
 pub const X07_HOST_RUNNER_REPORT_SCHEMA_VERSION: &str = "x07-host-runner.report@0.3.0";

@@ -1,172 +1,2376 @@
-# Diagnostic codes (common)
+# Diagnostic codes catalog
 
-X07 uses stable diagnostic identifiers so failures are searchable and agent-recoverable.
+This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-This page documents the codes you’ll most commonly see in front-door commands.
+- total codes: 112
+- quickfix support (`sometimes` or `always`): 104
+- quickfix coverage: 92.86%
 
-## `x07 test` manifest validation (`ETEST_*`)
+| Code | Origins | Quickfix | Summary |
+| ---- | ------- | -------- | ------- |
+| `COMPONENT_MISSING` | x07up / lint / error | sometimes | Requested toolchain component is missing. |
+| `ECLI_COMPILE_FAILED` | x07 / lint / error | sometimes | CLI specrows tooling diagnostic `ECLI_COMPILE_FAILED`. |
+| `ECLI_JSON_PARSE` | x07 / parse / error | sometimes | CLI specrows tooling diagnostic `ECLI_JSON_PARSE`. |
+| `ECLI_SCHEMA_INVALID` | x07 / lint / error | sometimes | CLI specrows tooling diagnostic `ECLI_SCHEMA_INVALID`. |
+| `ECLI_SEMANTIC` | x07 / lint / error | sometimes | CLI specrows tooling diagnostic `ECLI_SEMANTIC`. |
+| `ECLI_TOOL` | x07 / lint / error | sometimes | CLI specrows tooling diagnostic `ECLI_TOOL`. |
+| `ETEST_ENTRY_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_ENTRY_INVALID`. |
+| `ETEST_EXPECT_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_EXPECT_INVALID`. |
+| `ETEST_FIXTURE_FORBIDDEN` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_FIXTURE_FORBIDDEN`. |
+| `ETEST_FIXTURE_MISSING` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_FIXTURE_MISSING`. |
+| `ETEST_FIXTURE_REQUIRED` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_FIXTURE_REQUIRED`. |
+| `ETEST_FIXTURE_UNSAFE_PATH` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_FIXTURE_UNSAFE_PATH`. |
+| `ETEST_ID_DUPLICATE` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_ID_DUPLICATE`. |
+| `ETEST_ID_EMPTY` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_ID_EMPTY`. |
+| `ETEST_ID_NON_ASCII` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_ID_NON_ASCII`. |
+| `ETEST_MANIFEST_IO` | x07 / run / error | never | Diagnostic code `ETEST_MANIFEST_IO`. |
+| `ETEST_MANIFEST_JSON` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_MANIFEST_JSON`. |
+| `ETEST_POLICY_FORBIDDEN` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_POLICY_FORBIDDEN`. |
+| `ETEST_POLICY_MISSING` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_POLICY_MISSING`. |
+| `ETEST_POLICY_REQUIRED` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_POLICY_REQUIRED`. |
+| `ETEST_POLICY_UNSAFE_PATH` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_POLICY_UNSAFE_PATH`. |
+| `ETEST_RETURNS_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_RETURNS_INVALID`. |
+| `ETEST_SCHEMA_VERSION` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_SCHEMA_VERSION`. |
+| `ETEST_TESTS_EMPTY` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TESTS_EMPTY`. |
+| `ETEST_TIMEOUT_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TIMEOUT_INVALID`. |
+| `ETEST_WORLD_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_WORLD_INVALID`. |
+| `E_ARCH_BUDGET_SCOPE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_SCOPE_MISSING`. |
+| `E_ARCH_LOCK_READ` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_READ`. |
+| `E_ARCH_MODULE_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_MODULE_PARSE`. |
+| `E_ARCH_TOOL_BUDGET_EXCEEDED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_TOOL_BUDGET_EXCEEDED`. |
+| `W_ARCH_CONTRACTS_LOCK_MISSING` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`. |
+| `W_ARCH_CONTRACT_OPAQUE_USAGE` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACT_OPAQUE_USAGE`. |
+| `X07-ARITY-0000` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-0000`. |
+| `X07-ARITY-BEGIN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-BEGIN-0001`. |
+| `X07-ARITY-FOR-0001` | x07c / lint / error | sometimes | `for` has invalid arity. |
+| `X07-ARITY-IF-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-IF-0001`. |
+| `X07-ARITY-LET-0001` | x07c / lint / error | sometimes | `let`/`set` has invalid arity. |
+| `X07-ARITY-RETURN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-RETURN-0001`. |
+| `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
+| `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
+| `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
+| `X07-MOVE-0001` | x07c / lint / error | always | `bytes.concat` uses the same identifier on both sides (use-after-move risk). |
+| `X07-MOVE-0002` | x07c / lint / error | always | `if` condition and branch both borrow `bytes.view` from the same owner. |
+| `X07-POLICY-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-POLICY-SCHEMA-0001`. |
+| `X07-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-SCHEMA-0001`. |
+| `X07-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-UNSAFE-0001`. |
+| `X07-WORLD-0001` | x07c / lint / error | always | Program imports capabilities not allowed by the selected world flags. |
+| `X07-WORLD-FFI-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-FFI-0001`. |
+| `X07-WORLD-FS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-FS-0001`. |
+| `X07-WORLD-KV-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-KV-0001`. |
+| `X07-WORLD-OS-0001` | x07c / lint / error | always | std.os imports are forbidden in solve-* worlds. |
+| `X07-WORLD-OS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-OS-0002`. |
+| `X07-WORLD-RR-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-RR-0001`. |
+| `X07-WORLD-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0001`. |
+| `X07-WORLD-UNSAFE-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0002`. |
+| `X07-X07AST-PARSE-0001` | x07 / parse / error | sometimes | Core lint/schema diagnostic `X07-X07AST-PARSE-0001`. |
+| `X07INIT_AGENT` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_AGENT`. |
+| `X07INIT_AGENT_DIR` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_AGENT_DIR`. |
+| `X07INIT_ARGS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_ARGS`. |
+| `X07INIT_CWD` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_CWD`. |
+| `X07INIT_EXISTS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_EXISTS`. |
+| `X07INIT_GITIGNORE` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_GITIGNORE`. |
+| `X07INIT_IO` | x07 / lint / error | never | Diagnostic code `X07INIT_IO`. |
+| `X07INIT_MODULES` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MODULES`. |
+| `X07INIT_PKG_LOCK` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_PKG_LOCK`. |
+| `X07INIT_SRC` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_SRC`. |
+| `X07INIT_TESTS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_TESTS`. |
+| `X07PKG_API_URL` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_API_URL`. |
+| `X07PKG_DEP_EXISTS` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_DEP_EXISTS`. |
+| `X07PKG_DEP_NOT_FOUND` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_DEP_NOT_FOUND`. |
+| `X07PKG_DOWNLOAD_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_DOWNLOAD_FAILED`. |
+| `X07PKG_INDEX_CONFIG` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_CONFIG`. |
+| `X07PKG_INDEX_FETCH` | x07 / lint / error | never | Diagnostic code `X07PKG_INDEX_FETCH`. |
+| `X07PKG_INDEX_NO_MATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_NO_MATCH`. |
+| `X07PKG_LOCK_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISMATCH`. |
+| `X07PKG_LOCK_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISSING`. |
+| `X07PKG_LOGIN_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_LOGIN_FAILED`. |
+| `X07PKG_LOGIN_TOKEN` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOGIN_TOKEN`. |
+| `X07PKG_OFFLINE_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_MISSING_DEP`. |
+| `X07PKG_PUBLISH_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_PUBLISH_FAILED`. |
+| `X07PKG_PUBLISH_RESPONSE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE`. |
+| `X07PKG_PUBLISH_RESPONSE_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE_MISMATCH`. |
+| `X07PKG_SPEC_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_SPEC_INVALID`. |
+| `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
+| `X07RR_ENTRY_EXISTS` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_ENTRY_EXISTS`. |
+| `X07RR_HTTP` | x07 / run / error | never | Diagnostic code `X07RR_HTTP`. |
+| `X07RR_KEY_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_KEY_EMPTY`. |
+| `X07RR_KIND_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_KIND_EMPTY`. |
+| `X07RR_LATENCY_OUT_OF_RANGE` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_LATENCY_OUT_OF_RANGE`. |
+| `X07RR_OP_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_OP_EMPTY`. |
+| `X07RR_URL_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_URL_EMPTY`. |
+| `X7I0001` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0001`. |
+| `X7I0100` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0100`. |
+| `X7I0110` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0110`. |
+| `X7I0111` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0111`. |
+| `X7I0120` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0120`. |
+| `X7I0122` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0122`. |
+| `X7I0123` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0123`. |
+| `X7I0200` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0200`. |
+| `X7I0201` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0201`. |
+| `X7I0210` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0210`. |
+| `X7I0211` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0211`. |
+| `X7I0300` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0300`. |
+| `X7I0301` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0301`. |
+| `X7I0310` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0310`. |
+| `X7I0311` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0311`. |
+| `X7I0320` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0320`. |
+| `X7I0330` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0330`. |
+| `X7I0340` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0340`. |
+| `X7I0350` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0350`. |
+| `X7I0360` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0360`. |
+| `X7I0901` | x07import-core / lint / error | never | Diagnostic code `X7I0901`. |
 
-These codes appear when `tests/tests.json` (or `--manifest ...`) is invalid.
+## `COMPONENT_MISSING`
 
-- `ETEST_MANIFEST_IO`: manifest file could not be read.
-- `ETEST_MANIFEST_JSON`: manifest is not valid JSON.
-- `ETEST_SCHEMA_VERSION`: `schema_version` is not `x07.tests_manifest@0.1.0`.
-- `ETEST_TESTS_EMPTY`: `tests[]` is empty.
-- `ETEST_ID_EMPTY`: `tests[i].id` is empty.
-- `ETEST_ID_NON_ASCII`: `tests[i].id` is not ASCII-printable.
-- `ETEST_ID_DUPLICATE`: duplicate `tests[i].id`.
-- `ETEST_WORLD_INVALID`: invalid `tests[i].world` (allowed: `run-os`, `run-os-sandboxed`).
-- `ETEST_ENTRY_INVALID`: invalid `tests[i].entry` (must be `module.symbol`).
-- `ETEST_EXPECT_INVALID`: invalid `tests[i].expect` (allowed: `pass`, `fail`, `skip`).
-- `ETEST_RETURNS_INVALID`: invalid `tests[i].returns` (allowed: `result_i32`, `bytes_status_v1`).
-- `ETEST_TIMEOUT_INVALID`: invalid `tests[i].timeout_ms` (must be `>= 1` when present).
-- `ETEST_FIXTURE_FORBIDDEN`: `fixture_root` must not be set for OS worlds.
+Summary: Requested toolchain component is missing.
 
-See: [Test manifest](tests-manifest.md).
+Origins:
+- x07up (stage: lint, severity: error)
 
-## `x07 test` execution (selected)
+Quickfix support: `sometimes`
 
-- `ETEST_COMPILE`: compile failed for the generated test driver or test module.
-- `EDETERMINISM`: nondeterminism detected across `--repeat` runs.
-- `EBAD_STATUS`: a test returned an invalid `bytes_status_v1` payload.
-- `ETEST_NO_RUN_UNSUPPORTED`: `--no-run` is not supported for OS-world tests.
-- `ETEST_OS_RUNNER_JSON`: `x07-os-runner` did not emit a valid JSON report.
+Details:
 
-## `x07 bench` benchmark harness (`E_BENCH_*`)
+The installer/updater can usually remediate by installing the missing component.
 
-- `E_BENCH_SUITE_LOAD`: failed to read/parse `suite.json`.
-- `E_BENCH_SUITE_SCHEMA_INVALID`: suite JSON does not match `x07.bench.suite@0.1.0`.
-- `E_BENCH_INSTANCE_SCHEMA_INVALID`: instance JSON does not match `x07.bench.instance@0.1.0`.
-- `E_BENCH_REPORT_SCHEMA_INVALID`: generated report does not match `x07.bench.report@0.1.0`.
-- `E_BENCH_PRED_IO`: failed while reading predictions JSONL.
-- `E_BENCH_PRED_JSON_PARSE`: invalid JSON in predictions JSONL.
-- `E_BENCH_PRED_SCHEMA_VERSION`: unsupported prediction row `schema_version`.
-- `E_BENCH_PRED_INSTANCE_ID_EMPTY`: missing/empty `instance_id`.
-- `E_BENCH_PRED_PATCH_KIND_UNSUPPORTED`: unsupported `patch_kind`.
-- `E_BENCH_PRED_PATCH_SOURCE_INVALID`: invalid patch source fields (`patch_path` / `patch_inline`).
-- `E_BENCH_PRED_DUPLICATE_INSTANCE_ID`: duplicate prediction rows for one instance id.
-- `E_BENCH_PRED_PATCH_PATH_INVALID`: invalid or missing patch file path.
-- `E_BENCH_PRED_PATCH_INLINE_INVALID`: inline patch payload does not match `patch_kind`.
-- `E_BENCH_PATCHSET_SCHEMA_INVALID`: patchset JSON does not match `x07.arch.patchset@0.1.0`.
-- `E_BENCH_X07TEST_NO_REPORT`: `x07 test` subprocess exited without emitting its report file.
+Agent strategy:
 
-## `x07 run` common errors (stderr prefixes)
+- Run `x07up` install/update for the missing component.
+- Re-run the failed command.
 
-These codes appear as `[...]` prefixes in `x07 run` stderr output:
 
-- `X07PROJECT_READ`: failed to read `x07.json`.
-- `X07PROJECT_PARSE`: invalid `x07.json` JSON.
-- `X07LOCK_READ`: failed to read `x07.lock.json` (hint: run `x07 pkg lock`).
-- `X07LOCK_PARSE`: invalid `x07.lock.json` JSON (hint: run `x07 pkg lock`).
-- `X07LOCK_SCHEMA`: lockfile schema mismatch (hint: run `x07 pkg lock`).
-- `X07ENTRY_READ`: failed to read the project `entry` module (hint: check `x07.json` `entry`).
+## `ECLI_COMPILE_FAILED`
 
-## `x07 pkg` JSON errors (`error.code`)
+Summary: CLI specrows tooling diagnostic `ECLI_COMPILE_FAILED`.
 
-`x07 pkg` commands emit JSON reports; on failure, look at `error.code`:
+Origins:
+- x07 (stage: lint, severity: error)
 
-- `X07PKG_SPEC_INVALID`: invalid `NAME@VERSION` spec (versions must be SemVer).
-- `X07PKG_DEP_EXISTS`: dependency already present in `x07.json`.
-- `X07PKG_INDEX_CONFIG`: invalid index URL / configuration.
-- `X07PKG_INDEX_FETCH`: could not fetch entries from the index.
-- `X07PKG_INDEX_NO_MATCH`: no non-yanked entry matched `name@version`.
-- `X07PKG_DOWNLOAD_FAILED`: failed to download an archive from the index.
-- `X07PKG_LOCK_MISSING`: missing lockfile.
-- `X07PKG_LOCK_MISMATCH`: lockfile out of date.
-- `X07PKG_TRANSITIVE_MISSING`: transitive dependencies missing from `x07.json`.
+Quickfix support: `sometimes`
 
-## `x07 arch check` (selected `E_ARCH_*`)
+Details:
 
-Manifest / lock / scan:
+The input spec JSON is parse/schema/semantic-invalid or compile-invalid. Repair is usually deterministic by formatting/fixing schema shape and rerunning spec commands.
 
-- `E_ARCH_MANIFEST_READ`: failed to read the manifest file.
-- `E_ARCH_MANIFEST_JSON_PARSE`: manifest is not valid JSON.
-- `E_ARCH_MANIFEST_SCHEMA_INVALID`: manifest JSON does not match `x07.arch.manifest@0.1.0`.
-- `E_ARCH_MANIFEST_INVALID`: manifest is schema-valid but semantically unsupported (for example, an invalid `world`).
-- `E_ARCH_LOCK_READ`: failed to read the lock file.
-- `E_ARCH_LOCK_JSON_PARSE`: lock is not valid JSON.
-- `E_ARCH_LOCK_SCHEMA_INVALID`: lock JSON does not match `x07.arch.manifest.lock@0.1.0`.
-- `E_ARCH_LOCK_INVALID`: lock is schema-valid but semantically unusable.
-- `E_ARCH_LOCK_MISMATCH`: manifest path/hash does not match the lock.
-- `E_ARCH_MODULE_PARSE`: failed to parse a scanned `*.x07.json` module.
-- `E_ARCH_DUPLICATE_MODULE_ID`: the scan found duplicate `module_id` values across files.
-- `E_ARCH_TOOL_BUDGET_EXCEEDED`: tool budget exceeded (exit code `4`).
+Agent strategy:
 
-Architecture checks:
+- Run `x07 cli spec fmt` and `x07 cli spec check`.
+- Fix schema or semantic issues in the spec document.
+- Re-run compile/check to verify.
 
-- `E_ARCH_NODE_ORPHAN_MODULE`: a module matched 0 manifest nodes (when orphans are denied).
-- `E_ARCH_NODE_OVERLAP_MODULE`: a module matched multiple manifest nodes.
-- `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED`: external import not allowed by `externals.*`.
-- `E_ARCH_IMPORT_PREFIX_DENIED`: import denied by node `imports.deny_prefixes`.
-- `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED`: import not allowed by node `imports.allow_prefixes`.
-- `E_ARCH_VISIBILITY`: importing node not allowed by target node visibility.
-- `E_ARCH_DEPS_DENY`: node edge denied by a `deps_v1` rule.
-- `E_ARCH_LAYERS_VIOLATION`: node edge violates a `layers_v1` rule.
-- `E_ARCH_CYCLE`: cyclic node dependency detected.
-- `E_ARCH_EDGE_NOT_ALLOWED`: allowlist mode is enabled and the node edge is not explicitly allowed.
-- `E_ARCH_WORLD_EDGE_FORBIDDEN`: `solve-*` node depends on `run-os*` node.
-- `E_ARCH_SMOKE_MISSING`: node is missing a required `contracts.smoke_entry` export.
-- `E_ARCH_PUBLIC_BYTES_UNBRANDED`: public node exports a `bytes` boundary without a brand.
 
-Stream plugins contracts (`contracts_v1.stream_plugins`):
+## `ECLI_JSON_PARSE`
 
-- `E_ARCH_STREAM_PLUGINS_DIR_MISSING`: stream plugins contract root directory is missing.
-- `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING`: stream plugins `gen_dir` is missing (when `require_registry_uptodate=true`).
-- `E_ARCH_STREAM_PLUGINS_INDEX_READ`: failed to read the stream plugins index file.
-- `E_ARCH_STREAM_PLUGINS_INDEX_JSON_PARSE`: index is not valid JSON.
-- `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION`: index `schema_version` mismatch.
-- `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_INVALID`: index JSON does not match the pinned schema.
-- `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED`: index `plugins[]` is not sorted by `plugin_id`.
-- `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID`: duplicate `plugin_id` in the index.
-- `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING`: index entry references a missing `budget_profile_id`.
-- `E_ARCH_STREAM_PLUGIN_SPEC_READ`: failed to read a referenced plugin spec file.
-- `E_ARCH_STREAM_PLUGIN_SPEC_JSON_PARSE`: spec is not valid JSON.
-- `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION`: spec `schema_version` mismatch.
-- `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_INVALID`: spec JSON does not match the pinned schema.
-- `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH`: spec `plugin_id` does not match the index entry.
-- `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE`: spec has an invalid cfg canonicalization mode.
-- `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID`: spec has invalid output limit fields.
-- `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH`: spec ABI fields do not match the index entry.
-- `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH`: spec budgets do not match the index entry.
-- `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH`: spec brands do not match the index entry.
-- `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH`: spec determinism does not match the index entry.
-- `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`: spec `worlds_allowed` does not match the index entry.
-- `E_ARCH_STREAM_PLUGIN_NOT_FOUND`: a module references a `std.stream.xf.plugin_v1` id that is not declared.
-- `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`: plugin usage is forbidden in the module’s world.
+Summary: CLI specrows tooling diagnostic `ECLI_JSON_PARSE`.
 
-Archive contracts (`contracts_v1.archive`):
+Origins:
+- x07 (stage: parse, severity: error)
 
-- `E_ARCH_ARCHIVE_INDEX_MISSING`: archive index file is missing.
-- `E_ARCH_ARCHIVE_PROFILE_MISSING`: archive profile file referenced by the index is missing.
-- `E_ARCH_ARCHIVE_SCHEMA_INVALID`: archive index/profile JSON does not match the pinned schema.
-- `E_ARCH_ARCHIVE_OP_UNKNOWN`: archive profile references an unknown `module.symbol` operation.
-- `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`: archive profile references a missing budget profile id.
+Quickfix support: `sometimes`
 
-DB contracts (`contracts_v1.db`):
+Details:
 
-- `E_ARCH_DB_INDEX_MISSING`: DB index file is missing.
-- `E_ARCH_DB_MIGRATE_PLAN_MISSING`: referenced migration plan file is missing.
-- `E_ARCH_DB_SQL_MISSING`: migration SQL file referenced by a plan is missing.
-- `E_ARCH_DB_SQL_HASH_MISMATCH`: migration SQL file hash does not match the plan.
-- `E_ARCH_DB_QUERY_CATALOG_INVALID`: referenced query catalog file is missing or schema-invalid.
-- `E_ARCH_DB_BUDGET_PROFILE_MISSING`: DB plan references a missing budget profile id.
+The input spec JSON is parse/schema/semantic-invalid or compile-invalid. Repair is usually deterministic by formatting/fixing schema shape and rerunning spec commands.
 
-Observability contracts (`contracts_v1.obs`):
+Agent strategy:
 
-- `E_ARCH_OBS_INDEX_MISSING`: observability index file is missing.
-- `E_ARCH_OBS_REGISTRY_MISSING`: metrics registry file is missing.
-- `E_ARCH_OBS_EXPORTER_PROFILE_INVALID`: exporter profile file is missing or schema-invalid.
-- `E_ARCH_OBS_BUDGET_PROFILE_MISSING`: exporter profile references a missing budget profile id.
+- Run `x07 cli spec fmt` and `x07 cli spec check`.
+- Fix schema or semantic issues in the spec document.
+- Re-run compile/check to verify.
 
-Network protocol contracts (`contracts_v1.net`):
 
-- `E_ARCH_NET_INDEX_MISSING`: network index file is missing.
-- `E_ARCH_NET_GRPC_SERVICES_INVALID`: gRPC services catalog is missing or schema-invalid.
-- `E_ARCH_NET_LIMITS_EXCESSIVE`: configured protocol limits exceed hard-coded safety bounds.
-- `E_ARCH_NET_BUDGET_PROFILE_MISSING`: net config references a missing budget profile id.
+## `ECLI_SCHEMA_INVALID`
 
-Crypto/auth contracts (`contracts_v1.crypto`):
+Summary: CLI specrows tooling diagnostic `ECLI_SCHEMA_INVALID`.
 
-- `E_ARCH_CRYPTO_INDEX_MISSING`: crypto index file is missing.
-- `E_ARCH_CRYPTO_KEY_MISSING`: crypto key material file referenced by the index is missing.
-- `E_ARCH_CRYPTO_JWT_PROFILE_INVALID`: JWT profiles file is missing or schema-invalid.
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The input spec JSON is parse/schema/semantic-invalid or compile-invalid. Repair is usually deterministic by formatting/fixing schema shape and rerunning spec commands.
+
+Agent strategy:
+
+- Run `x07 cli spec fmt` and `x07 cli spec check`.
+- Fix schema or semantic issues in the spec document.
+- Re-run compile/check to verify.
+
+
+## `ECLI_SEMANTIC`
+
+Summary: CLI specrows tooling diagnostic `ECLI_SEMANTIC`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The input spec JSON is parse/schema/semantic-invalid or compile-invalid. Repair is usually deterministic by formatting/fixing schema shape and rerunning spec commands.
+
+Agent strategy:
+
+- Run `x07 cli spec fmt` and `x07 cli spec check`.
+- Fix schema or semantic issues in the spec document.
+- Re-run compile/check to verify.
+
+
+## `ECLI_TOOL`
+
+Summary: CLI specrows tooling diagnostic `ECLI_TOOL`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The input spec JSON is parse/schema/semantic-invalid or compile-invalid. Repair is usually deterministic by formatting/fixing schema shape and rerunning spec commands.
+
+Agent strategy:
+
+- Run `x07 cli spec fmt` and `x07 cli spec check`.
+- Fix schema or semantic issues in the spec document.
+- Re-run compile/check to verify.
+
+
+## `ETEST_ENTRY_INVALID`
+
+Summary: Test manifest validation diagnostic `ETEST_ENTRY_INVALID`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_EXPECT_INVALID`
+
+Summary: Test manifest validation diagnostic `ETEST_EXPECT_INVALID`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_FIXTURE_FORBIDDEN`
+
+Summary: Test manifest validation diagnostic `ETEST_FIXTURE_FORBIDDEN`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_FIXTURE_MISSING`
+
+Summary: Test manifest validation diagnostic `ETEST_FIXTURE_MISSING`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_FIXTURE_REQUIRED`
+
+Summary: Test manifest validation diagnostic `ETEST_FIXTURE_REQUIRED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_FIXTURE_UNSAFE_PATH`
+
+Summary: Test manifest validation diagnostic `ETEST_FIXTURE_UNSAFE_PATH`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_ID_DUPLICATE`
+
+Summary: Test manifest validation diagnostic `ETEST_ID_DUPLICATE`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_ID_EMPTY`
+
+Summary: Test manifest validation diagnostic `ETEST_ID_EMPTY`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_ID_NON_ASCII`
+
+Summary: Test manifest validation diagnostic `ETEST_ID_NON_ASCII`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_MANIFEST_IO`
+
+Summary: Diagnostic code `ETEST_MANIFEST_IO`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires filesystem availability and possibly creating/restoring external files.
+
+Details:
+
+This diagnostic generally requires external state changes or human intent to resolve (`ETEST_MANIFEST_IO`).
+
+Agent strategy:
+
+- Reproduce `ETEST_MANIFEST_IO` and capture structured context.
+- Resolve the external dependency/state.
+- Re-run the command and continue repair loop.
+
+
+## `ETEST_MANIFEST_JSON`
+
+Summary: Test manifest validation diagnostic `ETEST_MANIFEST_JSON`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_POLICY_FORBIDDEN`
+
+Summary: Test manifest validation diagnostic `ETEST_POLICY_FORBIDDEN`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_POLICY_MISSING`
+
+Summary: Test manifest validation diagnostic `ETEST_POLICY_MISSING`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_POLICY_REQUIRED`
+
+Summary: Test manifest validation diagnostic `ETEST_POLICY_REQUIRED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_POLICY_UNSAFE_PATH`
+
+Summary: Test manifest validation diagnostic `ETEST_POLICY_UNSAFE_PATH`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_RETURNS_INVALID`
+
+Summary: Test manifest validation diagnostic `ETEST_RETURNS_INVALID`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_SCHEMA_VERSION`
+
+Summary: Test manifest validation diagnostic `ETEST_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_TESTS_EMPTY`
+
+Summary: Test manifest validation diagnostic `ETEST_TESTS_EMPTY`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_TIMEOUT_INVALID`
+
+Summary: Test manifest validation diagnostic `ETEST_TIMEOUT_INVALID`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_WORLD_INVALID`
+
+Summary: Test manifest validation diagnostic `ETEST_WORLD_INVALID`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `E_ARCH_BUDGET_SCOPE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_SCOPE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_LOCK_READ`
+
+Summary: Architecture contract diagnostic `E_ARCH_LOCK_READ`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MODULE_PARSE`
+
+Summary: Architecture contract diagnostic `E_ARCH_MODULE_PARSE`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_TOOL_BUDGET_EXCEEDED`
+
+Summary: Architecture contract diagnostic `E_ARCH_TOOL_BUDGET_EXCEEDED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `W_ARCH_CONTRACTS_LOCK_MISSING`
+
+Summary: Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `W_ARCH_CONTRACT_OPAQUE_USAGE`
+
+Summary: Architecture contract diagnostic `W_ARCH_CONTRACT_OPAQUE_USAGE`.
+
+Origins:
+- x07 (stage: lint, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `X07-ARITY-0000`
+
+Summary: Core lint/schema diagnostic `X07-ARITY-0000`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-ARITY-BEGIN-0001`
+
+Summary: Core lint/schema diagnostic `X07-ARITY-BEGIN-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-ARITY-FOR-0001`
+
+Summary: `for` has invalid arity.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+A quickfix is emitted when extra trailing expressions are present: they are wrapped into a `begin` body so the loop keeps canonical arity.
+
+Agent strategy:
+
+- If quickfix is present, apply it to wrap extra body expressions.
+- Otherwise rewrite to `for <id> <iter> <init> <body>` manually.
+- Re-run lint.
+
+
+## `X07-ARITY-IF-0001`
+
+Summary: Core lint/schema diagnostic `X07-ARITY-IF-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-ARITY-LET-0001`
+
+Summary: `let`/`set` has invalid arity.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+A quickfix is emitted when extra trailing expressions exist: the assignment is rewritten into a `begin` block preserving later expressions.
+
+Agent strategy:
+
+- Apply quickfix when available.
+- Otherwise rewrite to canonical `let <name> <expr>` / `set <name> <expr>`.
+- Re-run lint.
+
+
+## `X07-ARITY-RETURN-0001`
+
+Summary: Core lint/schema diagnostic `X07-ARITY-RETURN-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-ARITY-UNSAFE-0001`
+
+Summary: Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-AST-0001`
+
+Summary: Core lint/schema diagnostic `X07-AST-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-BORROW-0001`
+
+Summary: Borrowing view/subview from a temporary expression is invalid.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Quickfix is context-dependent: when a safe insertion point exists, linter emits JSON Patch introducing a temporary `let` binding and rewriting the borrow site.
+
+Agent strategy:
+
+- Prefer binding owner expressions to locals before `bytes.view`/`bytes.subview`/`vec_u8.as_view`.
+- Apply quickfix when present.
+- If quickfix is absent, perform equivalent manual rewrite and re-run lint.
+
+
+## `X07-MOVE-0001`
+
+Summary: `bytes.concat` uses the same identifier on both sides (use-after-move risk).
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `always`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Linter emits a JSON Patch quickfix that copies one side using `view.to_bytes(bytes.view(name))` before concat.
+
+Agent strategy:
+
+- Apply quickfix.
+- Confirm resulting expression keeps ownership semantics.
+- Re-run lint/build.
+
+
+## `X07-MOVE-0002`
+
+Summary: `if` condition and branch both borrow `bytes.view` from the same owner.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `always`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Linter emits a JSON Patch quickfix that copies bytes for condition use (`_x07_tmp_copy`) and rewrites the condition to avoid move conflicts.
+
+Agent strategy:
+
+- Apply quickfix.
+- Validate condition logic still matches intent.
+- Re-run lint/build.
+
+
+## `X07-POLICY-SCHEMA-0001`
+
+Summary: Core lint/schema diagnostic `X07-POLICY-SCHEMA-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-SCHEMA-0001`
+
+Summary: Core lint/schema diagnostic `X07-SCHEMA-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-UNSAFE-0001`
+
+Summary: Core lint/schema diagnostic `X07-UNSAFE-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-WORLD-0001`
+
+Summary: Program imports capabilities not allowed by the selected world flags.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `always`
+Quickfix kinds: `json_patch`
+
+Details:
+
+The linter computes forbidden imports for the current world/config and emits a JSON Patch quickfix replacing `/imports` with the allowed subset.
+
+Agent strategy:
+
+- Review world toggles (`--enable-fs`, `--enable-rr`, `--enable-kv`) and imports.
+- Apply quickfix to drop forbidden imports.
+- Re-run lint and tests for the same world profile.
+
+
+## `X07-WORLD-FFI-0001`
+
+Summary: Core lint/schema diagnostic `X07-WORLD-FFI-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-WORLD-FS-0001`
+
+Summary: Core lint/schema diagnostic `X07-WORLD-FS-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-WORLD-KV-0001`
+
+Summary: Core lint/schema diagnostic `X07-WORLD-KV-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-WORLD-OS-0001`
+
+Summary: std.os imports are forbidden in solve-* worlds.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `always`
+Quickfix kinds: `json_patch`
+
+Details:
+
+The linter emits this when a solve-world program imports `std.os.*`. A JSON Patch quickfix is emitted to remove those imports from `/imports`.
+
+Agent strategy:
+
+- Use solve adapters (`std.fs`, `std.rr`, `std.kv`) for deterministic worlds.
+- Apply quickfix to remove `std.os.*` imports.
+- Re-run lint/build in the target world.
+
+
+## `X07-WORLD-OS-0002`
+
+Summary: Core lint/schema diagnostic `X07-WORLD-OS-0002`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-WORLD-RR-0001`
+
+Summary: Core lint/schema diagnostic `X07-WORLD-RR-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-WORLD-UNSAFE-0001`
+
+Summary: Core lint/schema diagnostic `X07-WORLD-UNSAFE-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-WORLD-UNSAFE-0002`
+
+Summary: Core lint/schema diagnostic `X07-WORLD-UNSAFE-0002`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-X07AST-PARSE-0001`
+
+Summary: Core lint/schema diagnostic `X07-X07AST-PARSE-0001`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07INIT_AGENT`
+
+Summary: Project/package scaffold diagnostic `X07INIT_AGENT`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_AGENT_DIR`
+
+Summary: Project/package scaffold diagnostic `X07INIT_AGENT_DIR`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_ARGS`
+
+Summary: Project/package scaffold diagnostic `X07INIT_ARGS`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_CWD`
+
+Summary: Project/package scaffold diagnostic `X07INIT_CWD`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_EXISTS`
+
+Summary: Project/package scaffold diagnostic `X07INIT_EXISTS`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_GITIGNORE`
+
+Summary: Project/package scaffold diagnostic `X07INIT_GITIGNORE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_IO`
+
+Summary: Diagnostic code `X07INIT_IO`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on host filesystem/permissions state outside AST/config patching.
+
+Details:
+
+This diagnostic generally requires external state changes or human intent to resolve (`X07INIT_IO`).
+
+Agent strategy:
+
+- Reproduce `X07INIT_IO` and capture structured context.
+- Resolve the external dependency/state.
+- Re-run the command and continue repair loop.
+
+
+## `X07INIT_MODULES`
+
+Summary: Project/package scaffold diagnostic `X07INIT_MODULES`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_PKG_LOCK`
+
+Summary: Project/package scaffold diagnostic `X07INIT_PKG_LOCK`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_SRC`
+
+Summary: Project/package scaffold diagnostic `X07INIT_SRC`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07INIT_TESTS`
+
+Summary: Project/package scaffold diagnostic `X07INIT_TESTS`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
+## `X07PKG_API_URL`
+
+Summary: Package workflow diagnostic `X07PKG_API_URL`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_DEP_EXISTS`
+
+Summary: Package workflow diagnostic `X07PKG_DEP_EXISTS`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_DEP_NOT_FOUND`
+
+Summary: Package workflow diagnostic `X07PKG_DEP_NOT_FOUND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_DOWNLOAD_FAILED`
+
+Summary: Diagnostic code `X07PKG_DOWNLOAD_FAILED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on remote archive availability and network reliability.
+
+Details:
+
+This diagnostic generally requires external state changes or human intent to resolve (`X07PKG_DOWNLOAD_FAILED`).
+
+Agent strategy:
+
+- Reproduce `X07PKG_DOWNLOAD_FAILED` and capture structured context.
+- Resolve the external dependency/state.
+- Re-run the command and continue repair loop.
+
+
+## `X07PKG_INDEX_CONFIG`
+
+Summary: Package workflow diagnostic `X07PKG_INDEX_CONFIG`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_INDEX_FETCH`
+
+Summary: Diagnostic code `X07PKG_INDEX_FETCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on remote index/network availability.
+
+Details:
+
+This diagnostic generally requires external state changes or human intent to resolve (`X07PKG_INDEX_FETCH`).
+
+Agent strategy:
+
+- Reproduce `X07PKG_INDEX_FETCH` and capture structured context.
+- Resolve the external dependency/state.
+- Re-run the command and continue repair loop.
+
+
+## `X07PKG_INDEX_NO_MATCH`
+
+Summary: Package workflow diagnostic `X07PKG_INDEX_NO_MATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_LOCK_MISMATCH`
+
+Summary: Package workflow diagnostic `X07PKG_LOCK_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_LOCK_MISSING`
+
+Summary: Package workflow diagnostic `X07PKG_LOCK_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_LOGIN_FAILED`
+
+Summary: Diagnostic code `X07PKG_LOGIN_FAILED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on remote registry authentication response.
+
+Details:
+
+This diagnostic generally requires external state changes or human intent to resolve (`X07PKG_LOGIN_FAILED`).
+
+Agent strategy:
+
+- Reproduce `X07PKG_LOGIN_FAILED` and capture structured context.
+- Resolve the external dependency/state.
+- Re-run the command and continue repair loop.
+
+
+## `X07PKG_LOGIN_TOKEN`
+
+Summary: Package workflow diagnostic `X07PKG_LOGIN_TOKEN`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_OFFLINE_MISSING_DEP`
+
+Summary: Package workflow diagnostic `X07PKG_OFFLINE_MISSING_DEP`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_PUBLISH_FAILED`
+
+Summary: Diagnostic code `X07PKG_PUBLISH_FAILED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on remote registry/network state.
+
+Details:
+
+This diagnostic generally requires external state changes or human intent to resolve (`X07PKG_PUBLISH_FAILED`).
+
+Agent strategy:
+
+- Reproduce `X07PKG_PUBLISH_FAILED` and capture structured context.
+- Resolve the external dependency/state.
+- Re-run the command and continue repair loop.
+
+
+## `X07PKG_PUBLISH_RESPONSE`
+
+Summary: Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_PUBLISH_RESPONSE_MISMATCH`
+
+Summary: Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_SPEC_INVALID`
+
+Summary: Package workflow diagnostic `X07PKG_SPEC_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_TRANSITIVE_MISSING`
+
+Summary: Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
+
+Agent strategy:
+
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07RR_ENTRY_EXISTS`
+
+Summary: Record/replay fixture diagnostic `X07RR_ENTRY_EXISTS`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+RR fixture fields and constraints are deterministic; repair usually means correcting entry schema values or regenerating fixture entries.
+
+Agent strategy:
+
+- Validate RR entry fields (key/url/kind/op/latency).
+- Regenerate or edit fixtures deterministically.
+- Re-run `x07 rr` operation.
+
+
+## `X07RR_HTTP`
+
+Summary: Diagnostic code `X07RR_HTTP`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on external HTTP service behavior.
+
+Details:
+
+This diagnostic generally requires external state changes or human intent to resolve (`X07RR_HTTP`).
+
+Agent strategy:
+
+- Reproduce `X07RR_HTTP` and capture structured context.
+- Resolve the external dependency/state.
+- Re-run the command and continue repair loop.
+
+
+## `X07RR_KEY_EMPTY`
+
+Summary: Record/replay fixture diagnostic `X07RR_KEY_EMPTY`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+RR fixture fields and constraints are deterministic; repair usually means correcting entry schema values or regenerating fixture entries.
+
+Agent strategy:
+
+- Validate RR entry fields (key/url/kind/op/latency).
+- Regenerate or edit fixtures deterministically.
+- Re-run `x07 rr` operation.
+
+
+## `X07RR_KIND_EMPTY`
+
+Summary: Record/replay fixture diagnostic `X07RR_KIND_EMPTY`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+RR fixture fields and constraints are deterministic; repair usually means correcting entry schema values or regenerating fixture entries.
+
+Agent strategy:
+
+- Validate RR entry fields (key/url/kind/op/latency).
+- Regenerate or edit fixtures deterministically.
+- Re-run `x07 rr` operation.
+
+
+## `X07RR_LATENCY_OUT_OF_RANGE`
+
+Summary: Record/replay fixture diagnostic `X07RR_LATENCY_OUT_OF_RANGE`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+RR fixture fields and constraints are deterministic; repair usually means correcting entry schema values or regenerating fixture entries.
+
+Agent strategy:
+
+- Validate RR entry fields (key/url/kind/op/latency).
+- Regenerate or edit fixtures deterministically.
+- Re-run `x07 rr` operation.
+
+
+## `X07RR_OP_EMPTY`
+
+Summary: Record/replay fixture diagnostic `X07RR_OP_EMPTY`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+RR fixture fields and constraints are deterministic; repair usually means correcting entry schema values or regenerating fixture entries.
+
+Agent strategy:
+
+- Validate RR entry fields (key/url/kind/op/latency).
+- Regenerate or edit fixtures deterministically.
+- Re-run `x07 rr` operation.
+
+
+## `X07RR_URL_EMPTY`
+
+Summary: Record/replay fixture diagnostic `X07RR_URL_EMPTY`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+RR fixture fields and constraints are deterministic; repair usually means correcting entry schema values or regenerating fixture entries.
+
+Agent strategy:
+
+- Validate RR entry fields (key/url/kind/op/latency).
+- Regenerate or edit fixtures deterministically.
+- Re-run `x07 rr` operation.
+
+
+## `X7I0001`
+
+Summary: x07import subset compatibility diagnostic `X7I0001`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0100`
+
+Summary: x07import subset compatibility diagnostic `X7I0100`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0110`
+
+Summary: x07import subset compatibility diagnostic `X7I0110`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0111`
+
+Summary: x07import subset compatibility diagnostic `X7I0111`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0120`
+
+Summary: x07import subset compatibility diagnostic `X7I0120`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0122`
+
+Summary: x07import subset compatibility diagnostic `X7I0122`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0123`
+
+Summary: x07import subset compatibility diagnostic `X7I0123`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0200`
+
+Summary: x07import subset compatibility diagnostic `X7I0200`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0201`
+
+Summary: x07import subset compatibility diagnostic `X7I0201`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0210`
+
+Summary: x07import subset compatibility diagnostic `X7I0210`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0211`
+
+Summary: x07import subset compatibility diagnostic `X7I0211`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0300`
+
+Summary: x07import subset compatibility diagnostic `X7I0300`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0301`
+
+Summary: x07import subset compatibility diagnostic `X7I0301`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0310`
+
+Summary: x07import subset compatibility diagnostic `X7I0310`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0311`
+
+Summary: x07import subset compatibility diagnostic `X7I0311`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0320`
+
+Summary: x07import subset compatibility diagnostic `X7I0320`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0330`
+
+Summary: x07import subset compatibility diagnostic `X7I0330`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0340`
+
+Summary: x07import subset compatibility diagnostic `X7I0340`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0350`
+
+Summary: x07import subset compatibility diagnostic `X7I0350`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0360`
+
+Summary: x07import subset compatibility diagnostic `X7I0360`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs.
+
+Agent strategy:
+
+- Inspect importer diagnostic phase/context.
+- Rewrite unsupported Rust/C constructs into supported subset forms.
+- Re-run x07import and tests.
+
+
+## `X7I0901`
+
+Summary: Diagnostic code `X7I0901`.
+
+Origins:
+- x07import-core (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Internal importer bug; requires toolchain fix rather than source-level quickfix.
+
+Details:
+
+This diagnostic generally requires external state changes or human intent to resolve (`X7I0901`).
+
+Agent strategy:
+
+- Reproduce `X7I0901` and capture structured context.
+- Resolve the external dependency/state.
+- Re-run the command and continue repair loop.
+

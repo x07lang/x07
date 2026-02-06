@@ -22,6 +22,7 @@ mod ast;
 mod bench;
 mod bundle;
 mod cli;
+mod diag;
 mod doc;
 mod doctor;
 mod guide;
@@ -68,6 +69,8 @@ enum Command {
     Guide(guide::GuideArgs),
     /// Check platform prerequisites for OS worlds.
     Doctor(doctor::DoctorArgs),
+    /// Inspect and enforce diagnostics catalog/coverage.
+    Diag(diag::DiagArgs),
     /// Generate and manage run-os-sandboxed policy files.
     Policy(policy::PolicyArgs),
     /// Initialize, validate, and patch x07AST JSON files.
@@ -228,6 +231,15 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Bundle(_)) => vec!["bundle"],
             Some(Command::Guide(_)) => vec!["guide"],
             Some(Command::Doctor(_)) => vec!["doctor"],
+            Some(Command::Diag(args)) => match &args.cmd {
+                None => vec!["diag"],
+                Some(diag::DiagCommand::Catalog(_)) => vec!["diag", "catalog"],
+                Some(diag::DiagCommand::InitCatalog(_)) => vec!["diag", "init-catalog"],
+                Some(diag::DiagCommand::Explain(_)) => vec!["diag", "explain"],
+                Some(diag::DiagCommand::Check(_)) => vec!["diag", "check"],
+                Some(diag::DiagCommand::Coverage(_)) => vec!["diag", "coverage"],
+                Some(diag::DiagCommand::Sarif(_)) => vec!["diag", "sarif"],
+            },
             Some(Command::Policy(args)) => match &args.cmd {
                 None => vec!["policy"],
                 Some(policy::PolicyCommand::Init(_)) => vec!["policy", "init"],
@@ -299,6 +311,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Bundle(args) => bundle::cmd_bundle(*args),
         Command::Guide(args) => guide::cmd_guide(args),
         Command::Doctor(args) => doctor::cmd_doctor(args),
+        Command::Diag(args) => diag::cmd_diag(args),
         Command::Policy(args) => policy::cmd_policy(args),
         Command::Ast(args) => ast::cmd_ast(args),
         Command::Fmt(args) => toolchain::cmd_fmt(args),

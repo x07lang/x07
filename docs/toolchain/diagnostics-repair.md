@@ -30,5 +30,17 @@ For explicit control (or when you want the raw reports), use `x07 fmt` / `x07 li
 
 - Raw diagnostics output: `x07diag` (schema: `spec/x07diag.schema.json`)
 - Tool wrapper reports (`--report-json`): `x07c.report@0.1.0` (schema: `spec/x07c.report.schema.json`)
+- Diagnostics catalog (source of truth): `catalog/diagnostics.json` (schema: `spec/x07-diag.catalog.schema.json`)
+- Diagnostics coverage report: `x07.diag.coverage@0.1.0` (schema: `spec/x07-diag.coverage.schema.json`)
 
 Agents should treat these as APIs: parse JSON, key off `schema_version`, and avoid scraping text.
+
+## Catalog workflows
+
+- Validate and regenerate canonical artifacts:
+  - `x07 diag catalog --catalog catalog/diagnostics.json --format both`
+- Guard against source/catalog drift:
+  - `x07 diag check`
+- Measure quickfix coverage:
+  - `x07 diag coverage --severity error,warning --min-coverage <threshold>`
+  - CI gate target (roadmap): `x07 diag coverage --severity error,warning --min-coverage 0.90`

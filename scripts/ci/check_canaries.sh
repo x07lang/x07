@@ -62,6 +62,7 @@ run_quiet "check_ext_pb_data_model_emit_smoke" ./scripts/ci/check_ext_pb_data_mo
 
 # Milestone 3: actionable diagnostics (ptr + suggested fix + quickfix).
 run_quiet "check_diagnostics_actionable" "$python_bin" scripts/ci/check_diagnostics_actionable.py
+run_quiet "check_diag_catalog_sync" ./scripts/ci/check_diag_catalog_sync.sh
 
 # Milestone 4: package/module discovery (provides).
 run_quiet "check_pkg_provides_smoke" ./scripts/ci/check_pkg_provides_smoke.sh

@@ -2804,6 +2804,7 @@ dependencies = [
  "clap",
  "globset",
  "jsonschema",
+ "regex",
  "rpassword",
  "serde",
  "serde_json",
