@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.arch.patchset@0.1.0",
+  "patches": [
+    {
+      "path": "modules/bench_math_bug.x07.json",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/decls/1/body/2/1/2",
+          "value": 4
+        }
+      ],
+      "note": "Fix expected sum constant"
+    }
+  ]
+}

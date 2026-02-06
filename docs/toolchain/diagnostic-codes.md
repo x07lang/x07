@@ -32,6 +32,24 @@ See: [Test manifest](tests-manifest.md).
 - `ETEST_NO_RUN_UNSUPPORTED`: `--no-run` is not supported for OS-world tests.
 - `ETEST_OS_RUNNER_JSON`: `x07-os-runner` did not emit a valid JSON report.
 
+## `x07 bench` benchmark harness (`E_BENCH_*`)
+
+- `E_BENCH_SUITE_LOAD`: failed to read/parse `suite.json`.
+- `E_BENCH_SUITE_SCHEMA_INVALID`: suite JSON does not match `x07.bench.suite@0.1.0`.
+- `E_BENCH_INSTANCE_SCHEMA_INVALID`: instance JSON does not match `x07.bench.instance@0.1.0`.
+- `E_BENCH_REPORT_SCHEMA_INVALID`: generated report does not match `x07.bench.report@0.1.0`.
+- `E_BENCH_PRED_IO`: failed while reading predictions JSONL.
+- `E_BENCH_PRED_JSON_PARSE`: invalid JSON in predictions JSONL.
+- `E_BENCH_PRED_SCHEMA_VERSION`: unsupported prediction row `schema_version`.
+- `E_BENCH_PRED_INSTANCE_ID_EMPTY`: missing/empty `instance_id`.
+- `E_BENCH_PRED_PATCH_KIND_UNSUPPORTED`: unsupported `patch_kind`.
+- `E_BENCH_PRED_PATCH_SOURCE_INVALID`: invalid patch source fields (`patch_path` / `patch_inline`).
+- `E_BENCH_PRED_DUPLICATE_INSTANCE_ID`: duplicate prediction rows for one instance id.
+- `E_BENCH_PRED_PATCH_PATH_INVALID`: invalid or missing patch file path.
+- `E_BENCH_PRED_PATCH_INLINE_INVALID`: inline patch payload does not match `patch_kind`.
+- `E_BENCH_PATCHSET_SCHEMA_INVALID`: patchset JSON does not match `x07.arch.patchset@0.1.0`.
+- `E_BENCH_X07TEST_NO_REPORT`: `x07 test` subprocess exited without emitting its report file.
+
 ## `x07 run` common errors (stderr prefixes)
 
 These codes appear as `[...]` prefixes in `x07 run` stderr output:

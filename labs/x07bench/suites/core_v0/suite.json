@@ -1,0 +1,25 @@
+{
+  "schema_version": "x07.bench.suite@0.1.0",
+  "suite_id": "core_v0",
+  "description": "Seed X07 benchmark suite for patch-based agent correctness evaluation.",
+  "instances": [
+    {
+      "id": "std_logic_0002",
+      "path": "instances/std_logic_0002",
+      "enabled": true
+    },
+    {
+      "id": "std_math_0001",
+      "path": "instances/std_math_0001",
+      "enabled": true
+    }
+  ],
+  "defaults": {
+    "world": "solve-pure",
+    "repair_mode": "write",
+    "jobs": 1,
+    "keep_artifacts": false,
+    "artifact_dir": "target/x07bench",
+    "determinism_runs": 2
+  }
+}

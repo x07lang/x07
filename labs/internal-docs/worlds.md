@@ -24,7 +24,7 @@ Compiler/linter world → feature-flag mapping (fs/rr/kv + sandboxed unsafe/ffi 
 
 ## Capability gating rules
 
-- **Suite allowlist**: deterministic suite tooling refuses any non-eval world (see `labs/scripts/bench/run_bench_suite.py`).
+- **Suite allowlist**: deterministic benchmark tooling refuses non-eval worlds for `x07 bench` suites.
 - **Compiler gating**:
   - `os.*` builtins are standalone-only and are rejected in `solve-*` worlds at compile time.
   - Phase H4 “systems” features are standalone-only:

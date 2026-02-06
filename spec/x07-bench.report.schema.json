@@ -1,0 +1,448 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-bench.report.schema.json",
+  "title": "x07.bench.report@0.1.0",
+  "description": "Machine-readable report emitted by `x07 bench`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "invocation",
+    "suite",
+    "env",
+    "summary",
+    "instances"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "x07.bench.report@0.1.0"
+    },
+    "tool": {
+      "$ref": "#/$defs/tool_info"
+    },
+    "invocation": {
+      "$ref": "#/$defs/invocation"
+    },
+    "suite": {
+      "$ref": "#/$defs/suite_info"
+    },
+    "env": {
+      "$ref": "#/$defs/env_info"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "instances": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/instance_result"
+      }
+    }
+  },
+  "$defs": {
+    "sha256_hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tool_info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "const": "x07"
+        },
+        "version": {
+          "type": "string"
+        },
+        "build": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "repair_mode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "memory",
+        "write"
+      ]
+    },
+    "runner": {
+      "type": "string",
+      "enum": [
+        "local",
+        "docker"
+      ]
+    },
+    "bench_status": {
+      "type": "string",
+      "enum": [
+        "resolved",
+        "unresolved",
+        "error",
+        "skipped"
+      ]
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "argv",
+        "cwd",
+        "started_at_unix_ms",
+        "suite_path",
+        "repair_mode",
+        "jobs",
+        "keep_artifacts",
+        "artifact_dir"
+      ],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "started_at_unix_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "suite_path": {
+          "type": "string"
+        },
+        "predictions_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "oracle": {
+          "type": "boolean"
+        },
+        "runner": {
+          "$ref": "#/$defs/runner"
+        },
+        "repair_mode": {
+          "$ref": "#/$defs/repair_mode"
+        },
+        "jobs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "keep_artifacts": {
+          "type": "boolean"
+        },
+        "artifact_dir": {
+          "type": "string"
+        },
+        "filter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exact": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "suite_info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "suite_path"
+      ],
+      "properties": {
+        "suite_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "suite_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suite_jcs_sha256_hex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256_hex"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "env_info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner",
+        "platform"
+      ],
+      "properties": {
+        "runner": {
+          "$ref": "#/$defs/runner"
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "cc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "docker_image": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instances_total",
+        "resolved",
+        "unresolved",
+        "errors",
+        "skipped",
+        "duration_ms"
+      ],
+      "properties": {
+        "instances_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resolved": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "avg_repair_iterations": {
+          "type": "number",
+          "minimum": 0
+        },
+        "avg_repair_applied_ops": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "test_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "exit_code",
+        "report_path",
+        "passed",
+        "failed",
+        "skipped",
+        "errors",
+        "duration_ms",
+        "compile_failures",
+        "run_failures"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "report_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compile_failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "run_failures": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "repair_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "iterations",
+        "applied_ops_count",
+        "last_lint_ok"
+      ],
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/repair_mode"
+        },
+        "iterations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "applied_ops_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_lint_ok": {
+          "type": "boolean"
+        }
+      }
+    },
+    "instance_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instance_id",
+        "status",
+        "baseline"
+      ],
+      "properties": {
+        "instance_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "$ref": "#/$defs/bench_status"
+        },
+        "baseline": {
+          "$ref": "#/$defs/test_summary"
+        },
+        "after_patch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/test_summary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "repair": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/repair_summary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifacts_dir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "patch_kind": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "patch_sha256_hex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256_hex"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_name_or_path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 8192
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

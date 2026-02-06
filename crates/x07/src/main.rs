@@ -19,6 +19,7 @@ use x07c::project;
 
 mod arch;
 mod ast;
+mod bench;
 mod bundle;
 mod cli;
 mod doc;
@@ -55,6 +56,8 @@ enum Command {
     Init(init::InitArgs),
     /// Run deterministic test suites.
     Test(TestArgs),
+    /// Run x07bench suites (agent correctness benchmark harness).
+    Bench(bench::BenchArgs),
     /// Check architecture manifests (architecture as data).
     Arch(arch::ArchArgs),
     /// Run X07 programs via the appropriate runner.
@@ -210,6 +213,12 @@ fn try_main() -> Result<std::process::ExitCode> {
         let path: Vec<&str> = match &cli.command {
             None => Vec::new(),
             Some(Command::Test(_)) => vec!["test"],
+            Some(Command::Bench(args)) => match &args.cmd {
+                None => vec!["bench"],
+                Some(bench::BenchCommand::List(_)) => vec!["bench", "list"],
+                Some(bench::BenchCommand::Validate(_)) => vec!["bench", "validate"],
+                Some(bench::BenchCommand::Eval(_)) => vec!["bench", "eval"],
+            },
             Some(Command::Init(_)) => vec!["init"],
             Some(Command::Arch(args)) => match &args.cmd {
                 None => vec!["arch"],
@@ -284,6 +293,7 @@ fn try_main() -> Result<std::process::ExitCode> {
     match command {
         Command::Init(args) => init::cmd_init(args),
         Command::Test(args) => cmd_test(args),
+        Command::Bench(args) => bench::cmd_bench(args),
         Command::Arch(args) => arch::cmd_arch(args),
         Command::Run(args) => run::cmd_run(*args),
         Command::Bundle(args) => bundle::cmd_bundle(*args),

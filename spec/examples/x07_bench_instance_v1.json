@@ -1,0 +1,40 @@
+{
+  "schema_version": "x07.bench.instance@0.1.0",
+  "instance_id": "std_math_0001",
+  "tags": [
+    "stdlib",
+    "bugfix",
+    "repair-loop"
+  ],
+  "world": "solve-pure",
+  "problem_statement_path": "issue.md",
+  "repo_path": "repo",
+  "eval": {
+    "kind": "x07test",
+    "manifest": "tests/tests.json",
+    "module_root": [
+      "modules"
+    ],
+    "stdlib_lock": "stdlib.lock",
+    "filter": null,
+    "exact": false,
+    "repeat": 1,
+    "jobs": 1,
+    "keep_artifacts": false,
+    "artifact_dir": "target/x07test",
+    "no_fail_fast": false,
+    "no_run": false,
+    "verbose": false,
+    "fail_to_pass": [
+      "bench/math_bug"
+    ],
+    "pass_to_pass": []
+  },
+  "oracle": {
+    "patch_kind": "x07-arch-patchset-json",
+    "patch_path": "oracle.patchset.json"
+  },
+  "notes": [
+    "Baseline fails before patch; oracle patch resolves the issue."
+  ]
+}

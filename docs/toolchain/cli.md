@@ -53,6 +53,18 @@ See: [Architecture check](arch-check.md).
   - Runs each test in its declared world.
   - Prints an `x07test` JSON report (or writes it with `--report-out`).
 
+### Agent correctness benchmarks (`x07bench` JSON)
+
+- `x07 bench list --suite labs/x07bench/suites/core_v0/suite.json`
+- `x07 bench validate --suite labs/x07bench/suites/core_v0/suite.json`
+- `x07 bench eval --suite labs/x07bench/suites/core_v0/suite.json --predictions <predictions.jsonl>`
+- `x07 bench eval --suite labs/x07bench/suites/core_v0/suite.json --oracle`
+- `x07 bench eval --suite labs/x07bench/suites/core_v0/suite.json --oracle --runner docker`
+
+Reports use `schema_version: "x07.bench.report@0.1.0"`.
+
+See: [Benchmarks](benchmarks.md).
+
 ### Doc (module exports)
 
 - `x07 doc <module-id>`

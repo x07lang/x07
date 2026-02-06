@@ -1,0 +1,94 @@
+{
+  "schema_version": "x07.bench.report@0.1.0",
+  "tool": {
+    "name": "x07",
+    "version": "0.0.96",
+    "build": null
+  },
+  "invocation": {
+    "argv": [
+      "x07",
+      "bench",
+      "eval",
+      "--suite",
+      "labs/x07bench/suites/core_v0/suite.json",
+      "--oracle"
+    ],
+    "cwd": "/workspace/x07",
+    "started_at_unix_ms": 0,
+    "suite_path": "labs/x07bench/suites/core_v0/suite.json",
+    "predictions_path": null,
+    "oracle": true,
+    "runner": "local",
+    "repair_mode": "write",
+    "jobs": 1,
+    "keep_artifacts": false,
+    "artifact_dir": "target/x07bench",
+    "filter": null,
+    "exact": false,
+    "limit": null
+  },
+  "suite": {
+    "suite_id": "core_v0",
+    "suite_path": "labs/x07bench/suites/core_v0/suite.json",
+    "suite_jcs_sha256_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "env": {
+    "runner": "local",
+    "platform": "linux-x86_64",
+    "cc": "clang",
+    "docker_image": null
+  },
+  "summary": {
+    "instances_total": 1,
+    "resolved": 1,
+    "unresolved": 0,
+    "errors": 0,
+    "skipped": 0,
+    "duration_ms": 123,
+    "avg_repair_iterations": 1,
+    "avg_repair_applied_ops": 1
+  },
+  "instances": [
+    {
+      "instance_id": "std_math_0001",
+      "status": "resolved",
+      "baseline": {
+        "ok": false,
+        "exit_code": 10,
+        "report_path": "target/x07bench/suites/id_123/instances/id_456/baseline.x07test.report.json",
+        "passed": 0,
+        "failed": 1,
+        "skipped": 0,
+        "errors": 0,
+        "duration_ms": 7,
+        "compile_failures": 0,
+        "run_failures": 0
+      },
+      "after_patch": {
+        "ok": true,
+        "exit_code": 0,
+        "report_path": "target/x07bench/suites/id_123/instances/id_456/after_patch.x07test.report.json",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0,
+        "duration_ms": 6,
+        "compile_failures": 0,
+        "run_failures": 0
+      },
+      "repair": {
+        "mode": "write",
+        "iterations": 1,
+        "applied_ops_count": 1,
+        "last_lint_ok": true
+      },
+      "artifacts_dir": "target/x07bench/suites/id_123/instances/id_456",
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "model_name_or_path": "oracle",
+      "error": null,
+      "notes": []
+    }
+  ]
+}

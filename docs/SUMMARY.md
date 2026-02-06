@@ -34,6 +34,7 @@
 
 ## Toolchain
 - [CLI](toolchain/cli.md)
+- [Benchmarks](toolchain/benchmarks.md)
 - [Compiler limits](toolchain/compiler-limits.md)
 - [Architecture check](toolchain/arch-check.md)
 - [Schema derive](toolchain/schema-derive.md)

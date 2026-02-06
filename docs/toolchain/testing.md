@@ -19,6 +19,7 @@ See also:
 - [Test manifest](tests-manifest.md)
 - [Testing by example](testing-by-example.md)
 - [Diagnostic codes](diagnostic-codes.md)
+- [Benchmarks](benchmarks.md)
 
 ## Why X07 includes a built-in test harness
 
