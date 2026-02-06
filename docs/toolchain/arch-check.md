@@ -48,6 +48,12 @@ Scan configuration comes from:
   - include: `**/*.x07.json`
   - exclude: `.git/`, `.x07/`, `dist/`, `gen/`, `node_modules/`, `target/`, `tmp/` (and a few common OS-specific junk files)
 
+**Note:** `.x07/` is excluded by default — vendored dependencies under `.x07/deps/` are not scanned. To opt back in for vendored deps, add `.x07/deps/**/*.x07.json` to `module_scan.include_globs` in the lock file.
+
+**SM and generated modules:** When using `contracts_v1.sm` with generated modules under `gen/`, either:
+- Remove `gen/` from the default exclude list in the lock file's `module_scan`, or
+- Add `"gen."` to `externals.allowed_import_prefixes` in the arch manifest (treats SM imports as external — simpler for most projects)
+
 ## Nodes and assignment
 
 `manifest.nodes[]` defines named architecture groups (“nodes”) over modules.
@@ -192,6 +198,10 @@ If `manifest.contracts_v1` is present, `x07 arch check` can also validate repo-l
   - validates referenced JWT profiles (when declared under the crypto contract group)
 - `contracts_v1.canonical_json` (canonical JSON enforcement)
   - enforces canonical JSON at contract file boundaries (for example, JCS / RFC 8785)
+
+### Cross-contract dependencies
+
+Several contracts validate `budget_profile_id` references against `arch/budgets/index.x07budgets.json`. If you enable any of: `archive`, `db`, `obs`, `net`, `web`, `crawl`, `msg`, `msg_kafka`, `msg_amqp`, `stream_plugins` — ensure the referenced budget profile IDs exist in the budgets index. Missing profiles produce validation errors during `x07 arch check`.
 
 ## Output
 

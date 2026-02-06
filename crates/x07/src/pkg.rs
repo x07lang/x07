@@ -78,6 +78,11 @@ pub struct AddArgs {
     #[arg(long, value_name = "PATH")]
     pub path: Option<String>,
 
+    /// Add transitive dependencies from `meta.requires_packages` to x07.json
+    /// (without writing the lockfile). Use --sync for full lock+closure.
+    #[arg(long)]
+    pub with_closure: bool,
+
     /// Package spec in `NAME` or `NAME@VERSION` form.
     ///
     /// If only `NAME` is provided, this command resolves the latest non-yanked semver version from
@@ -233,6 +238,8 @@ struct AddResult {
     path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     lock: Option<LockResult>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    transitive_added: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -501,6 +508,7 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
                         version,
                         path: dep_path,
                         lock: None,
+                        transitive_added: Vec::new(),
                     };
 
                     if args.sync {
@@ -585,6 +593,7 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
                     version: existing_version.to_string(),
                     path: dep_path,
                     lock: None,
+                    transitive_added: Vec::new(),
                 };
 
                 if args.sync {
@@ -695,7 +704,71 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
         version,
         path: dep_path,
         lock: None,
+        transitive_added: Vec::new(),
     };
+
+    if args.with_closure && !args.sync {
+        let manifest =
+            project::load_project_manifest(&project_path).context("load project manifest")?;
+        let base = project_path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let lock_args = LockArgs {
+            project: project_path.clone(),
+            index: args.index.clone(),
+            check: false,
+            offline: false,
+        };
+        let mut fetched: Vec<FetchedDep> = Vec::new();
+        let mut index_used: Option<String> = None;
+        let closure_outcome = match resolve_transitive_deps(
+            &mut doc,
+            &project_path,
+            &manifest,
+            base,
+            &lock_args,
+            &mut fetched,
+            &mut index_used,
+        ) {
+            Ok(outcome) => outcome,
+            Err(err) => {
+                if let Err(rollback_err) = std::fs::write(&project_path, &original_project_bytes) {
+                    return Err(anyhow::anyhow!(
+                        "{err}\nrollback failed ({}): {rollback_err}",
+                        project_path.display()
+                    ));
+                }
+                return Err(err);
+            }
+        };
+        match closure_outcome {
+            TransitiveResolutionOutcome::Ok(resolution) => {
+                if resolution.changed {
+                    sort_project_deps(
+                        doc.as_object_mut()
+                            .and_then(|o| o.get_mut("dependencies"))
+                            .and_then(Value::as_array_mut)
+                            .expect("dependencies array"),
+                    );
+                    write_canonical_json_file(&project_path, &doc)
+                        .with_context(|| format!("write: {}", project_path.display()))?;
+                }
+                add_result.transitive_added = resolution.added_specs;
+            }
+            TransitiveResolutionOutcome::Error(err) => {
+                std::fs::write(&project_path, &original_project_bytes)
+                    .with_context(|| format!("rollback write: {}", project_path.display()))?;
+                let report = PkgReport::<AddResult> {
+                    ok: false,
+                    command: "pkg.add",
+                    result: Some(add_result),
+                    error: Some(err),
+                };
+                return Ok((std::process::ExitCode::from(20), report));
+            }
+        }
+    }
 
     if args.sync {
         let lock_args = LockArgs {
@@ -1007,6 +1080,7 @@ pub(crate) fn pkg_add_sync_quiet(
         sync: true,
         index,
         path: None,
+        with_closure: false,
         spec,
     };
 

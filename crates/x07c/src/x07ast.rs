@@ -450,7 +450,10 @@ fn parse_params(
         })?;
         if arg_name == "input" {
             return Err(X07AstError {
-                message: format!("{kind_label} arg name must not be 'input'"),
+                message: format!(
+                    "{kind_label} arg name must not be 'input' (reserved); \
+                     rename to 'data', 'payload', 'in_bytes', or 'buf'"
+                ),
                 ptr: format!("{pptr}/name"),
             });
         }

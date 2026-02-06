@@ -108,4 +108,24 @@ for t in r.get("tests", []):
 PY
 ```
 
+## Working directory and fixture paths
+
+`x07 test` runs with the working directory set to the **manifest directory** — the directory containing your `tests.json` file, not the project root.
+
+If your manifest is at `tests/tests.json`, then:
+
+- Fixture reads resolve relative to `tests/`
+- `fixtures/input.bin` → `tests/fixtures/input.bin`
+- `tests/fixtures/input.bin` → `tests/tests/fixtures/input.bin` (wrong)
+
+This also affects `fixture_root` in test entries and cassette paths for record/replay fixtures. See [Record/replay fixture mode](../worlds/record-replay.md#fixture-mode-test-harness) for details.
+
+## Common test pitfalls
+
+- **Symbol naming:** dots in function names before the last segment are parsed as module id, not namespacing. `smoke.test_add_v1` is function `test_add_v1` in module `smoke`; `smoke.tests.add_v1` is function `add_v1` in module `smoke.tests`.
+- **assert_bytes_eq consumes inputs:** use `std.test.assert_view_eq` when you need to reuse values after assertion.
+- **Reserved param name:** `input` is reserved in `defn` parameter lists — use `in_bytes`, `payload`, etc.
+
+For full recipes, see [Agent patterns](../recipes/agent-patterns.md).
+
 See also: [Testing reference](testing.md).

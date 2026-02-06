@@ -104,6 +104,58 @@ When using `std.rr.with_policy_v1`, rr policy/config comes from the repo’s `ar
 - `arch/rr/policies/*.policy.json` (`schema_version: "x07.arch.rr.policy@0.1.0"`)
 - `arch/rr/sanitizers/*.sanitize.json` (`schema_version: "x07.arch.rr.sanitize@0.1.0"`)
 
+## Fixture mode (test harness)
+
+When running rr tests through `x07 test` (the test harness), cassette path resolution changes:
+
+- In the test manifest (`tests/tests.json`), `fixture_root` sets the base directory for fixture data.
+- Cassette paths in `std.rr.with_policy_v1` resolve relative to `fixture_root`'s `rr/` subdirectory — not relative to `.x07_rr/`.
+
+### Canonical setup
+
+```
+tests/
+├── tests.json
+└── fixtures/
+    └── replay/
+        └── rr/
+            └── smoke.rrbin
+```
+
+In `tests/tests.json`:
+
+```json
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "rr_smoke",
+      "world": "solve-rr",
+      "entry": "app.rr_smoke_v1",
+      "expect": "pass",
+      "fixture_root": "fixtures/replay"
+    }
+  ]
+}
+```
+
+In the program, `cassette_path` is just the filename (relative to `fixture_root/rr/`):
+
+```jsonc
+["std.rr.with_policy_v1",
+  ["bytes.lit", "smoke_rr_v1"],
+  ["bytes.lit", "smoke.rrbin"],
+  ["i32.lit", 2],
+  <body_expr>
+]
+```
+
+This resolves to `tests/fixtures/replay/rr/smoke.rrbin`.
+
+### Common mistake
+
+Using `fixture_root: "."` with `cassette_path: ".x07_rr/smoke.rrbin"` — this fails safety checks because the rr fixture resolver does not allow path traversal into `.x07_rr/`. Always use a dedicated fixture directory with cassettes copied under its `rr/` subdirectory.
+
 ## Minimal `arch/rr/` example (copy/paste)
 
 For a schema-valid starting point, see:

@@ -373,6 +373,18 @@ pub fn cmd_fix(args: FixArgs) -> Result<std::process::ExitCode> {
     let formatted = repair_result.formatted;
     let final_report = repair_result.final_report;
 
+    let remaining_errors: usize = final_report
+        .diagnostics
+        .iter()
+        .filter(|d| d.severity == diagnostics::Severity::Error)
+        .count();
+    if remaining_errors > 0 && !args.report_json {
+        eprintln!(
+            "x07 fix: {remaining_errors} error(s) remain after auto-fix. \
+             Run `x07 build` to see codegen-stage errors."
+        );
+    }
+
     if args.write {
         if let Err(err) = std::fs::write(&args.input, formatted.as_bytes()) {
             if args.report_json {

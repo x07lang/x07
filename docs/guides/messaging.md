@@ -15,6 +15,8 @@ X07 supports messaging through a **pure core + OS-bound drivers** split:
 
 `x07 arch check` validates the pinned contracts under `arch/msg/**` and rejects importing OS-only drivers into solve worlds.
 
+**Budget dependency:** Messaging contracts (`contracts_v1.msg`, `contracts_v1.msg_kafka`, `contracts_v1.msg_amqp`) validate `budget_profile_id` references against `arch/budgets/index.x07budgets.json`. Even if your application code doesn't otherwise use budgets, a valid budgets index must contain the referenced profile IDs. Canonical fix: copy the budgets index from `docs/examples/contracts_project/arch/budgets/` and add the referenced profile entries. See also [Architecture check — cross-contract dependencies](../toolchain/arch-check.md#cross-contract-dependencies).
+
 ## Adding packages
 
 Use the capability map (`msg.core`, `msg.kafka`, `msg.amqp`) and sync the lockfile.

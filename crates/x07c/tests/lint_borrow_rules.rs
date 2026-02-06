@@ -18,11 +18,44 @@ fn lint_rejects_bytes_view_of_temporary() {
 
     let report = lint::lint_file(&file, lint::LintOptions::default());
     assert!(!report.ok, "expected lint errors");
+    let diag = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "X07-BORROW-0001")
+        .expect("expected X07-BORROW-0001 diagnostic");
     assert!(
-        report
-            .diagnostics
+        diag.notes
             .iter()
-            .any(|d| d.code == "X07-BORROW-0001"),
-        "expected X07-BORROW-0001 diagnostic"
+            .any(|note| note.contains("Suggested fix:")),
+        "expected X07-BORROW-0001 Suggested fix note"
+    );
+}
+
+#[test]
+fn lint_borrow_subview_note_preserves_start_len_args() {
+    let doc = json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": ["view.to_bytes", ["bytes.subview", ["bytes.lit", "hello"], 0, 3]]
+    });
+    let doc_bytes = serde_json::to_vec(&doc).expect("serialize");
+    let mut file = x07ast::parse_x07ast_json(&doc_bytes).expect("parse x07ast");
+    x07ast::canonicalize_x07ast_file(&mut file);
+
+    let report = lint::lint_file(&file, lint::LintOptions::default());
+    assert!(!report.ok, "expected lint errors");
+    let diag = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "X07-BORROW-0001")
+        .expect("expected X07-BORROW-0001 diagnostic");
+    assert!(
+        diag.notes
+            .iter()
+            .any(|note| note.contains("[\"bytes.subview\", <expr>, <start>, <len>]")),
+        "expected bytes.subview note to include start/len placeholders"
     );
 }

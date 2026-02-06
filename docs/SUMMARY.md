@@ -16,6 +16,7 @@
 
 ## Recipes
 - [Patch-based recipes](recipes/index.md)
+- [Agent patterns](recipes/agent-patterns.md)
 
 ## Language
 - [Overview](language/overview.md)

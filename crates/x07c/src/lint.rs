@@ -595,15 +595,21 @@ fn lint_core_borrow_rules(
         "This operation borrows from an owned value. It cannot borrow from a temporary expression."
             .to_string(),
     ];
-    if head == "bytes.view" || head == "bytes.subview" {
+    if head == "bytes.view" {
         notes.push(
-            "Suggested fix: bind the bytes to a variable first, then call bytes.view/bytes.subview on that variable.".to_string(),
+            "Suggested fix: replace [\"bytes.view\", <expr>] with [\"begin\", [\"let\", \"tmp\", <expr>], [\"bytes.view\", \"tmp\"]].".to_string(),
+        );
+    } else if head == "bytes.subview" {
+        notes.push(
+            "Suggested fix: replace [\"bytes.subview\", <expr>, <start>, <len>] with [\"begin\", [\"let\", \"tmp\", <expr>], [\"bytes.subview\", \"tmp\", <start>, <len>]].".to_string(),
         );
     } else if head == "vec_u8.as_view" {
         notes.push(
-            "Suggested fix: bind the vec_u8 to a variable first, then call vec_u8.as_view on that variable.".to_string(),
+            "Suggested fix: replace [\"vec_u8.as_view\", <expr>] with [\"begin\", [\"let\", \"tmp\", <expr>], [\"vec_u8.as_view\", \"tmp\"]]."
+                .to_string(),
         );
     }
+    notes.push("Auto-fix available: run `x07 fix --input <file> --write`.".to_string());
 
     let tmp = borrow_tmp_name(ptr);
     let mut call_items: Vec<Expr> = Vec::with_capacity(items.len());
@@ -659,7 +665,9 @@ fn lint_core_borrow_rules(
         code: "X07-BORROW-0001".to_string(),
         severity: Severity::Error,
         stage: Stage::Lint,
-        message: format!("{head} requires an identifier owner"),
+        message: format!(
+            "{head} requires an identifier owner (bind the value to a local with `let` first)"
+        ),
         loc: Some(Location::X07Ast { ptr: owner_ptr }),
         notes,
         related: Vec::new(),
@@ -759,6 +767,7 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
                         .to_string(),
                     "Suggested fix: copy the bytes for the condition (for example via view.to_bytes) and use the copy in the condition."
                         .to_string(),
+                    "Auto-fix available: run `x07 fix --input <file> --write`.".to_string(),
                 ],
                 related: Vec::new(),
                 data: Default::default(),
@@ -794,6 +803,7 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
             .to_string(),
         "Suggested fix: copy one side (for example: [\"bytes.concat\", [\"view.to_bytes\", [\"bytes.view\", name]], name])."
             .to_string(),
+        "Auto-fix available: run `x07 fix --input <file> --write`.".to_string(),
     ];
 
     let fixed = expr_list(vec![

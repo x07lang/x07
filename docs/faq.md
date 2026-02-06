@@ -40,3 +40,24 @@ Use [Record/replay](worlds/record-replay.md) (`std.rr`) to record real interacti
 ## How do I prevent “agent refactor” performance regressions?
 
 Use [Budget scopes](language/budget-scopes.md) to localize resource contracts, and enforce repo-wide invariants with [`x07 arch check`](toolchain/arch-check.md).
+
+## How do I integrate multiple subsystems (pipes + RR + budgets + contracts)?
+
+Start from the readiness-check examples under `docs/examples/` — they combine real subsystems end-to-end. For the common patterns that trip up agents (bytes/view friction, assertion ownership, fixture paths), see [Agent patterns](recipes/agent-patterns.md).
+
+## Why does my `bytes.view` fail with "requires an identifier"?
+
+`bytes.view` takes a **named local**, not an arbitrary expression. Bind the bytes-producing expression to a local first:
+
+```json
+["let", "raw", ["bytes.lit", "hello"]],
+["bytes.view", "raw"]
+```
+
+See [Agent patterns — bytes vs bytes_view](recipes/agent-patterns.md#1-bytes-vs-bytes_view) for the full set of ownership recipes.
+
+## What does `x07 doc std.stream.pipe_v1` return?
+
+`x07 doc std.stream.pipe_v1` prints built-in documentation for the special form, including its shape and a short example.
+
+Use `x07 guide` and [Streaming pipes](language/stream-pipes.md) for the complete reference and composition guidance.

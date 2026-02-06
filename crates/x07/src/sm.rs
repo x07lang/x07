@@ -67,6 +67,11 @@ pub struct SmGenArgs {
 
     #[arg(long)]
     pub check: bool,
+
+    /// Repository root for canonicalizing embedded paths.
+    /// When set, source_contract_path is stored relative to this directory.
+    #[arg(long, value_name = "DIR")]
+    pub repo_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -192,7 +197,22 @@ fn cmd_sm_gen(args: SmGenArgs) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::from(2));
     }
 
-    let input_rel = normalize_rel_path_for_meta(&args.input);
+    let input_rel = if let Some(ref repo_root) = args.repo_root {
+        let abs_input = std::fs::canonicalize(&args.input)
+            .with_context(|| format!("canonicalize input: {}", args.input.display()))?;
+        let abs_root = std::fs::canonicalize(repo_root)
+            .with_context(|| format!("canonicalize repo-root: {}", repo_root.display()))?;
+        match abs_input.strip_prefix(&abs_root) {
+            Ok(rel) => normalize_rel_path_for_meta(rel),
+            Err(_) => anyhow::bail!(
+                "input {} is not under repo-root {}",
+                args.input.display(),
+                repo_root.display()
+            ),
+        }
+    } else {
+        normalize_rel_path_for_meta(&args.input)
+    };
     let spec_doc: Value = serde_json::from_slice(
         &std::fs::read(&args.input).with_context(|| format!("read: {}", args.input.display()))?,
     )
@@ -1361,6 +1381,18 @@ mod tests {
                 .iter()
                 .any(|p| p == &out_dir.join("app/minimal_fsm_v1/tests.x07.json")),
             "missing tests module file path; got {paths:?}"
+        );
+    }
+
+    #[test]
+    fn normalize_rel_path_strips_dotslash() {
+        assert_eq!(
+            normalize_rel_path_for_meta(Path::new("./spec/foo.json")),
+            "spec/foo.json"
+        );
+        assert_eq!(
+            normalize_rel_path_for_meta(Path::new("spec/foo.json")),
+            "spec/foo.json"
         );
     }
 }

@@ -1866,6 +1866,97 @@ fn x07_pkg_add_sync_is_atomic_on_failure() {
 }
 
 #[test]
+fn x07_pkg_add_with_closure_is_atomic_on_failure() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_add_with_closure_atomic");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    write_bytes(
+        &dir.join("deps/baddep/0.1.0/x07-package.json"),
+        br#"{
+  "schema_version": "x07.package@0.1.0",
+  "name": "baddep",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": ["baddep.main"],
+  "meta": { "requires_packages": ["NOT_A_VALID_SPEC"] }
+}
+"#,
+    );
+    write_bytes(
+        &dir.join("deps/newdep/0.1.0/x07-package.json"),
+        br#"{
+  "schema_version": "x07.package@0.1.0",
+  "name": "newdep",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": ["newdep.main"]
+}
+"#,
+    );
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value =
+        serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json")).expect("parse");
+    let obj = doc.as_object_mut().expect("x07.json object");
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![serde_json::json!({
+            "name": "baddep",
+            "version": "0.1.0",
+            "path": "deps/baddep/0.1.0"
+        })]),
+    );
+    write_bytes(
+        &proj_path,
+        &serde_json::to_vec_pretty(&doc).expect("serialize"),
+    );
+
+    let before = std::fs::read(&proj_path).expect("read x07.json before");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "pkg",
+            "add",
+            "newdep@0.1.0",
+            "--path",
+            "deps/newdep/0.1.0",
+            "--with-closure",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("expected NAME@VERSION"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let after = std::fs::read(&proj_path).expect("read x07.json after");
+    assert_eq!(
+        after, before,
+        "x07.json changed despite failed --with-closure"
+    );
+}
+
+#[test]
 fn x07_pkg_add_rejects_non_semver_versions() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_add_bad_version");

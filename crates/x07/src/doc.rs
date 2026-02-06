@@ -18,15 +18,111 @@ pub struct DocArgs {
     #[arg(long, value_name = "DIR")]
     pub module_root: Vec<PathBuf>,
 
+    /// Print documentation for a compiler built-in form (e.g. `bytes.view`, `task.scope_v1`).
+    #[arg(long)]
+    pub builtin: bool,
+
     /// Module id (example: `ext.cli`) or exported symbol (example: `ext.cli.parse_specrows`).
     #[arg(value_name = "QUERY")]
     pub query: String,
+}
+
+fn special_form_doc(name: &str) -> Option<&'static str> {
+    match name {
+        "bytes.view" => Some(
+            "bytes.view(bytes) -> bytes_view\n\
+             Borrow an immutable view of owned bytes. Owner must be an identifier.\n\
+             Example: [\"bytes.view\", \"my_bytes\"]",
+        ),
+        "bytes.subview" => Some(
+            "bytes.subview(bytes, i32, i32) -> bytes_view\n\
+             Borrow a sub-range view: (owner, start, length). Owner must be an identifier.\n\
+             Example: [\"bytes.subview\", \"my_bytes\", 0, 4]",
+        ),
+        "bytes.lit" => Some(
+            "bytes.lit(string) -> bytes\n\
+             Create bytes from a UTF-8 string literal.\n\
+             Example: [\"bytes.lit\", \"hello\"]",
+        ),
+        "bytes.concat" => Some(
+            "bytes.concat(bytes, bytes) -> bytes\n\
+             Concatenate two owned byte values (moves both).\n\
+             Example: [\"bytes.concat\", \"a\", \"b\"]",
+        ),
+        "bytes.alloc" => Some(
+            "bytes.alloc(i32) -> bytes\n\
+             Allocate zero-filled bytes of the given length.\n\
+             Example: [\"bytes.alloc\", 64]",
+        ),
+        "view.to_bytes" => Some(
+            "view.to_bytes(bytes_view) -> bytes\n\
+             Copy a view into a new owned bytes value.\n\
+             Example: [\"view.to_bytes\", [\"bytes.view\", \"v\"]]",
+        ),
+        "view.len" => Some(
+            "view.len(bytes_view) -> i32\n\
+             Return the length of a bytes view.\n\
+             Example: [\"view.len\", [\"bytes.view\", \"v\"]]",
+        ),
+        "view.get_u8" => Some(
+            "view.get_u8(bytes_view, i32) -> i32\n\
+             Read a single byte (0-255) at the given index.\n\
+             Example: [\"view.get_u8\", [\"bytes.view\", \"v\"], 0]",
+        ),
+        "view.slice" => Some(
+            "view.slice(bytes_view, i32, i32) -> bytes_view\n\
+             Slice a view: (view, start, length).\n\
+             Example: [\"view.slice\", [\"bytes.view\", \"v\"], 0, 4]",
+        ),
+        "view.eq" => Some(
+            "view.eq(bytes_view, bytes_view) -> i32\n\
+             Compare two views for byte equality (1 if equal, 0 otherwise).\n\
+             Example: [\"view.eq\", [\"bytes.view\", \"a\"], [\"bytes.view\", \"b\"]]",
+        ),
+        "vec_u8.as_view" => Some(
+            "vec_u8.as_view(vec_u8) -> bytes_view\n\
+             Borrow a view of the current contents of a vec_u8. Owner must be an identifier.\n\
+             Example: [\"vec_u8.as_view\", \"my_vec\"]",
+        ),
+        "task.scope_v1" => Some(
+            "task.scope_v1(config, body) -> <body type>\n\
+             Open a structured concurrency scope. Only in solve/defasync contexts.\n\
+             Example: [\"task.scope_v1\", [\"task.scope.cfg_v1\", {}], <body>]",
+        ),
+        "budget.scope_v1" => Some(
+            "budget.scope_v1(config, body) -> <body type>\n\
+             Run body under a resource budget (alloc_bytes, fuel, etc.).\n\
+             Example: [\"budget.scope_v1\", [\"budget.cfg_v1\", {\"mode\": \"trap_v1\"}], <body>]",
+        ),
+        "budget.scope_from_arch_v1" => Some(
+            "budget.scope_from_arch_v1(profile_id, body) -> <body type>\n\
+             Run body under a budget loaded from an arch profile.\n\
+             Example: [\"budget.scope_from_arch_v1\", [\"bytes.lit\", \"default\"], <body>]",
+        ),
+        "std.stream.pipe_v1" => Some(
+            "std.stream.pipe_v1(cfg, src, chain, sink) -> bytes\n\
+             Compose a deterministic streaming pipeline (OS world only).\n\
+             Example: [\"std.stream.pipe_v1\", [\"std.stream.cfg_v1\", ...], <src>, <chain>, <sink>]",
+        ),
+        _ => None,
+    }
 }
 
 pub fn cmd_doc(args: DocArgs) -> Result<std::process::ExitCode> {
     let query = args.query.trim();
     if query.is_empty() {
         anyhow::bail!("missing QUERY (try --help)");
+    }
+
+    if args.builtin {
+        if let Some(doc) = special_form_doc(query) {
+            println!("{doc}");
+            return Ok(std::process::ExitCode::SUCCESS);
+        }
+        if try_print_builtin_stdlib_docs(query)? {
+            return Ok(std::process::ExitCode::SUCCESS);
+        }
+        anyhow::bail!("unknown builtin: {query}");
     }
 
     let cwd = std::env::current_dir().context("get cwd")?;
@@ -81,6 +177,12 @@ pub fn cmd_doc(args: DocArgs) -> Result<std::process::ExitCode> {
         if try_print_package_docs(query, project_path)? {
             return Ok(std::process::ExitCode::SUCCESS);
         }
+    }
+
+    if let Some(doc) = special_form_doc(query) {
+        println!("{doc}");
+        println!("hint: run `x07 guide` for the full language reference");
+        return Ok(std::process::ExitCode::SUCCESS);
     }
 
     anyhow::bail!("module/symbol not found: {query}");
@@ -587,5 +689,13 @@ mod tests {
         assert_eq!(pkg2.name, "ext-net");
 
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn special_form_doc_known_forms() {
+        assert!(special_form_doc("bytes.view").is_some());
+        assert!(special_form_doc("task.scope_v1").is_some());
+        assert!(special_form_doc("std.stream.pipe_v1").is_some());
+        assert!(special_form_doc("nonexistent.form").is_none());
     }
 }
