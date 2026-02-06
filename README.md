@@ -10,7 +10,7 @@ X07 is a programming language built from the ground up for **100% agentic coding
 
 > **X07 is under active development. APIs and tooling may change.**
 
-**[Documentation](https://x07lang.org)** · [FAQ](https://x07lang.org/docs/faq) · [Support](SUPPORT.md) · [Releases](https://github.com/x07lang/x07/releases)
+**[Documentation](https://x07lang.org)** · [FAQ](https://x07lang.org/docs/faq) · [Support](SUPPORT.md) · [Discord](https://discord.gg/59xuEuPN47) · [Email](mailto:support@x07lang.org) · [Releases](https://github.com/x07lang/x07/releases)
 
 ---
 
@@ -36,11 +36,11 @@ Errors are **structured identifiers with actionable fixes** designed for LLM con
 
 ### Explicit Capability Worlds
 
-Side effects are opt-in. Programs run in OS worlds, and sandboxing is explicit and policy-driven.
+Side effects are opt-in. Programs run in deterministic solve worlds or OS worlds, and sandboxing is explicit and policy-driven.
 
 ### High Performance
 
-X07 compiles to optimized native code with **runtime performance on par with C and Rust**. In direct binary benchmarks, X07 matches or exceeds C/Rust execution times while compiling ~3x faster than C and ~6-7x faster than Rust. Binary sizes are comparable to C (~34 KiB).
+X07 compiles to optimized native code with competitive runtime performance. In the direct-binary benchmarks published in `x07lang/x07-perf-compare` (v0.0.3 snapshot), X07 matched or exceeded C/Rust execution times on the included workloads while compiling ~3x faster than C and ~6-7x faster than Rust. Binary sizes in that snapshot were comparable to C (~34 KiB).
 
 See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) for detailed benchmarks.
 
@@ -77,6 +77,8 @@ x07 run
 
 ### Agent Tooling
 
+For the canonical agent loop, start with `x07 run` (auto-repair by default). Use the commands below when you need explicit control over individual repair steps.
+
 ```bash
 x07 fmt --input program.x07.json --write
 x07 lint --input program.x07.json
@@ -103,7 +105,7 @@ x07/
 ├── crates/         # Rust workspace
 │   ├── x07c/           # Compiler (X07 → C)
 │   ├── x07-host-runner # Deterministic native runner
-│   └── x07-os-runner   # Standalone OS runner
+│   └── x07-os-runner   # OS-world runner backend (canonical entrypoint: `x07 run`)
 ├── stdlib/         # Standard library
 ├── ci/             # Release-blocking fixtures + suites
 ├── labs/           # Optional benchmarks, perf, fuzz, eval tooling

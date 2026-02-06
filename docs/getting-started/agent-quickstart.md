@@ -16,7 +16,7 @@ High-level primitives to learn early (the “one whole system”):
 
 - Streaming pipes: [`std.stream.pipe_v1`](../language/stream-pipes.md) (deterministic, budgeted streaming composition)
 - Branded bytes: [`bytes@B` + `std.brand.*`](../language/types-memory.md#branded-bytes-typed-encodings) (typed boundary encodings)
-- Structured concurrency: [`task.scope_v1`](../language/concurrency-multiprocessing.md#structured-concurrency-taskscopev1) (no orphan tasks; slots/select)
+- Structured concurrency: [`task.scope_v1`](../language/concurrency-multiprocessing.md#structured-concurrency-taskscope_v1) (no orphan tasks; slots/select)
 - Record/replay: [`std.rr` + rr scopes](../worlds/record-replay.md) (OS → deterministic cassette)
 - Budget scopes: [`budget.scope_v1`](../language/budget-scopes.md) (localize cost contracts; arch-driven budgets)
 - Contracts tooling: `x07 arch check`, `x07 schema derive`, `x07 sm gen` (pinned contracts → deterministic checks/generation)

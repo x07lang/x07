@@ -56,20 +56,20 @@ curl -fsSL https://x07lang.org/install.sh | sh -s -- \
 Write `x07-toolchain.toml`:
 
 ```bash
-x07up override set v0.0.93
+x07up override set v0.0.94
 ```
 
 This writes a file like:
 
 ```toml
 [toolchain]
-channel = "v0.0.93"
+channel = "v0.0.94"
 components = ["docs", "skills"]
 ```
 
 Notes:
 
-- `channel` can be `stable` or a specific tag like `v0.0.93`.
+- `channel` can be `stable` or a specific tag like `v0.0.94`.
 - `components` controls whether `x07up` installs the offline docs and skills pack.
 
 Remove it:

@@ -12,9 +12,13 @@ Single front door for agent data (schemas, skills, examples, stdlib index, packa
 - Manifest: https://x07lang.org/agent/latest/manifest.json
 - Schemas index: https://x07lang.org/agent/latest/schemas/index.json
 - Skills index: https://x07lang.org/agent/latest/skills/index.json
-- Examples index: https://x07lang.org/agent/latest/examples/index.json
+- Examples index (starter set): https://x07lang.org/agent/latest/examples/index.json
+- Examples catalog index (recursive): https://x07lang.org/agent/latest/examples/catalog.json
 - Stdlib index: https://x07lang.org/agent/latest/stdlib/index.json
 - Packages index: https://x07lang.org/agent/latest/packages/index.json
+
+`examples/index.json` is intentionally compact (top-level starter programs).  
+Use `examples/catalog.json` when you need the full recursive `docs/examples/**` surface.
 
 For canonical “one happy path” recommendations (templates/docs should derive from this):
 

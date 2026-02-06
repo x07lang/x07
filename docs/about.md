@@ -13,7 +13,7 @@ Some high-level concepts that make those goals practical:
 
 - [Streaming pipes](language/stream-pipes.md) (`std.stream.pipe_v1`) for deterministic, budgeted streaming composition
 - [Branded bytes](language/types-memory.md#branded-bytes-typed-encodings) (`bytes@B`) for typed boundary encodings
-- [Structured concurrency](language/concurrency-multiprocessing.md#structured-concurrency-taskscopev1) (`task.scope_v1`) for “no orphan tasks”
+- [Structured concurrency](language/concurrency-multiprocessing.md#structured-concurrency-taskscope_v1) (`task.scope_v1`) for “no orphan tasks”
 - [Record/replay](worlds/record-replay.md) (`std.rr`) for OS → deterministic cassettes
 - [Budget scopes](language/budget-scopes.md) (`budget.scope_v1`) for local cost contracts
 - Contracts tooling: [architecture check](toolchain/arch-check.md), [schema derive](toolchain/schema-derive.md), [state machines](toolchain/state-machines.md)
