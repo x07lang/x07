@@ -825,7 +825,12 @@ pub extern "C" fn x07_ext_db_redis_cmd_v1(
         }
     }) {
         Ok(v) => v,
-        Err((code, msg)) => return alloc_return_bytes(&evdb_err(OP_QUERY_V1, code, &msg)),
+        Err((code, msg)) => {
+            if msg.as_slice() == b"timeout" {
+                dbcore::evict_conn_slot(conns(), conn_id);
+            }
+            return alloc_return_bytes(&evdb_err(OP_QUERY_V1, code, &msg));
+        }
     };
 
     let max_resp = effective_max(pol.max_resp_bytes, caps.max_resp_bytes);

@@ -167,7 +167,7 @@ unsafe fn bind_params(stmt: *mut sqlite::sqlite3_stmt, params_doc: &[u8]) -> Res
     Ok(())
 }
 
-fn parse_evso_open_req(req: &[u8]) -> Result<(u32, Vec<u8>), u32> {
+fn parse_evso_open_req(req: &[u8]) -> Result<(u32, &[u8]), u32> {
     if req.len() < 16 {
         return Err(DB_ERR_BAD_REQ);
     }
@@ -183,10 +183,17 @@ fn parse_evso_open_req(req: &[u8]) -> Result<(u32, Vec<u8>), u32> {
     if req.len() != 16 + path_len {
         return Err(DB_ERR_BAD_REQ);
     }
-    Ok((flags, req[16..].to_vec()))
+    Ok((flags, &req[16..]))
 }
 
-fn parse_evsq_req(req: &[u8], magic: &[u8; 4]) -> Result<(u32, u32, Vec<u8>, Vec<u8>), u32> {
+struct SqlReq<'a> {
+    conn_id: u32,
+    flags: u32,
+    sql: &'a [u8],
+    params: &'a [u8],
+}
+
+fn parse_evsq_req<'a>(req: &'a [u8], magic: &[u8; 4]) -> Result<SqlReq<'a>, u32> {
     if req.len() < 24 {
         return Err(DB_ERR_BAD_REQ);
     }
@@ -205,15 +212,20 @@ fn parse_evsq_req(req: &[u8], magic: &[u8; 4]) -> Result<(u32, u32, Vec<u8>, Vec
     }
     let sql_start = 20;
     let sql_end = sql_start + sql_len;
-    let sql = req[sql_start..sql_end].to_vec();
+    let sql = &req[sql_start..sql_end];
     let params_len = read_u32_le(req, sql_end).ok_or(DB_ERR_BAD_REQ)? as usize;
     let params_start = sql_end + 4;
     let params_end = params_start + params_len;
     if req.len() != params_end {
         return Err(DB_ERR_BAD_REQ);
     }
-    let params = req[params_start..params_end].to_vec();
-    Ok((conn_id, flags, sql, params))
+    let params = &req[params_start..params_end];
+    Ok(SqlReq {
+        conn_id,
+        flags,
+        sql,
+        params,
+    })
 }
 
 fn parse_evsc_close_req(req: &[u8]) -> Result<u32, u32> {
@@ -248,15 +260,25 @@ fn open_slot(db: *mut sqlite::sqlite3, pol: &Policy) -> Option<u32> {
     None
 }
 
-fn take_conn(conn_id: u32) -> Option<*mut sqlite::sqlite3> {
-    let mut table = conns().lock().ok()?;
-    let slot = table.get_mut(conn_id as usize)?;
-    slot.take().map(|c| c.0)
-}
-
 fn get_conn(conn_id: u32) -> Option<*mut sqlite::sqlite3> {
     let table = conns().lock().ok()?;
     table.get(conn_id as usize).copied().flatten().map(|c| c.0)
+}
+
+fn close_conn(conn_id: u32) -> Result<(), u32> {
+    let mut table = conns().lock().map_err(|_| DB_ERR_BAD_CONN)?;
+    let slot = table.get_mut(conn_id as usize).ok_or(DB_ERR_BAD_CONN)?;
+    let Some(conn) = *slot else {
+        return Err(DB_ERR_BAD_CONN);
+    };
+
+    let rc = unsafe { sqlite::sqlite3_close(conn.0) };
+    if rc != SQLITE_OK {
+        return Err(DB_ERR_BAD_CONN);
+    }
+
+    *slot = None;
+    Ok(())
 }
 
 unsafe fn bytes_to_utf8_path(b: &[u8]) -> Result<PathBuf, u32> {
@@ -313,7 +335,7 @@ pub extern "C" fn x07_ext_db_sqlite_open_v1(req: ev_bytes, caps: ev_bytes) -> ev
         return alloc_return_bytes(&evdb_err(OP_OPEN_V1, DB_ERR_POLICY_DENIED, &[]));
     }
 
-    let path = match unsafe { bytes_to_utf8_path(&path_bytes) } {
+    let path = match unsafe { bytes_to_utf8_path(path_bytes) } {
         Ok(p) => p,
         Err(code) => return alloc_return_bytes(&evdb_err(OP_OPEN_V1, code, &[])),
     };
@@ -380,12 +402,7 @@ pub extern "C" fn x07_ext_db_sqlite_close_v1(req: ev_bytes, caps: ev_bytes) -> e
         Err(code) => return alloc_return_bytes(&evdb_err(OP_CLOSE_V1, code, &[])),
     };
 
-    let Some(db) = take_conn(conn_id) else {
-        return alloc_return_bytes(&evdb_err(OP_CLOSE_V1, DB_ERR_BAD_CONN, &[]));
-    };
-
-    let rc = unsafe { sqlite::sqlite3_close(db) };
-    if rc != SQLITE_OK {
+    if close_conn(conn_id).is_err() {
         return alloc_return_bytes(&evdb_err(OP_CLOSE_V1, DB_ERR_BAD_CONN, &[]));
     }
     alloc_return_bytes(&evdb_ok(OP_CLOSE_V1, &[]))
@@ -496,10 +513,14 @@ pub extern "C" fn x07_ext_db_sqlite_query_v1(req: ev_bytes, caps: ev_bytes) -> e
         Err(code) => return alloc_return_bytes(&evdb_err(OP_QUERY_V1, code, &[])),
     };
 
-    let (conn_id, _flags, sql, params) = match parse_evsq_req(req, b"X7SQ") {
+    let sql_req = match parse_evsq_req(req, b"X7SQ") {
         Ok(v) => v,
         Err(code) => return alloc_return_bytes(&evdb_err(OP_QUERY_V1, code, &[])),
     };
+    let conn_id = sql_req.conn_id;
+    let _flags = sql_req.flags;
+    let sql = sql_req.sql;
+    let params = sql_req.params;
 
     if sql.len() > pol.max_sql_bytes as usize {
         return alloc_return_bytes(&evdb_err(OP_QUERY_V1, DB_ERR_TOO_LARGE, &[]));
@@ -536,7 +557,7 @@ pub extern "C" fn x07_ext_db_sqlite_query_v1(req: ev_bytes, caps: ev_bytes) -> e
         return alloc_return_bytes(&evdb_err(OP_QUERY_V1, DB_ERR_SQLITE_PREP, &msg));
     }
 
-    let bind_res = unsafe { bind_params(stmt, &params) };
+    let bind_res = unsafe { bind_params(stmt, params) };
     if bind_res.is_err() {
         unsafe {
             let _ = sqlite::sqlite3_finalize(stmt);
@@ -580,10 +601,14 @@ pub extern "C" fn x07_ext_db_sqlite_exec_v1(req: ev_bytes, caps: ev_bytes) -> ev
         Err(code) => return alloc_return_bytes(&evdb_err(OP_EXEC_V1, code, &[])),
     };
 
-    let (conn_id, _flags, sql, params) = match parse_evsq_req(req, b"X7SE") {
+    let sql_req = match parse_evsq_req(req, b"X7SE") {
         Ok(v) => v,
         Err(code) => return alloc_return_bytes(&evdb_err(OP_EXEC_V1, code, &[])),
     };
+    let conn_id = sql_req.conn_id;
+    let _flags = sql_req.flags;
+    let sql = sql_req.sql;
+    let params = sql_req.params;
 
     if sql.len() > pol.max_sql_bytes as usize {
         return alloc_return_bytes(&evdb_err(OP_EXEC_V1, DB_ERR_TOO_LARGE, &[]));
@@ -620,7 +645,7 @@ pub extern "C" fn x07_ext_db_sqlite_exec_v1(req: ev_bytes, caps: ev_bytes) -> ev
         return alloc_return_bytes(&evdb_err(OP_EXEC_V1, DB_ERR_SQLITE_PREP, &msg));
     }
 
-    let bind_res = unsafe { bind_params(stmt, &params) };
+    let bind_res = unsafe { bind_params(stmt, params) };
     if bind_res.is_err() {
         unsafe {
             let _ = sqlite::sqlite3_finalize(stmt);

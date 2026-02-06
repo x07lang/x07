@@ -2,6 +2,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 use std::net::IpAddr;
+use std::sync::Mutex;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -143,6 +144,16 @@ pub fn effective_connect_timeout_ms(policy_max_connect_timeout_ms: u32, caps: Db
 
 pub fn effective_query_timeout_ms(policy_max_query_timeout_ms: u32, caps: DbCapsV1) -> u32 {
     effective_max(policy_max_query_timeout_ms, caps.query_timeout_ms)
+}
+
+pub fn evict_conn_slot<T>(table: &Mutex<Vec<Option<T>>>, conn_id: u32) {
+    let Ok(mut table) = table.lock() else {
+        return;
+    };
+    let Some(slot) = table.get_mut(conn_id as usize) else {
+        return;
+    };
+    *slot = None;
 }
 
 pub fn evdb_ok(op: u32, ok_payload: &[u8]) -> Vec<u8> {

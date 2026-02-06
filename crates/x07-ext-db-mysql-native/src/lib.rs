@@ -567,7 +567,12 @@ pub extern "C" fn x07_ext_db_mysql_query_v1(
         }
     }) {
         Ok(doc) => doc,
-        Err((code, msg)) => return alloc_return_bytes(&evdb_err(OP_QUERY_V1, code, &msg)),
+        Err((code, msg)) => {
+            if code == DB_ERR_BAD_CONN || msg.as_slice() == b"timeout" {
+                dbcore::evict_conn_slot(conns(), conn_id);
+            }
+            return alloc_return_bytes(&evdb_err(OP_QUERY_V1, code, &msg));
+        }
     };
 
     let max_resp = effective_max(pol.max_resp_bytes, caps.max_resp_bytes);
@@ -653,7 +658,12 @@ pub extern "C" fn x07_ext_db_mysql_exec_v1(
         }
     }) {
         Ok(v) => v,
-        Err((code, msg)) => return alloc_return_bytes(&evdb_err(OP_EXEC_V1, code, &msg)),
+        Err((code, msg)) => {
+            if code == DB_ERR_BAD_CONN || msg.as_slice() == b"timeout" {
+                dbcore::evict_conn_slot(conns(), conn_id);
+            }
+            return alloc_return_bytes(&evdb_err(OP_EXEC_V1, code, &msg));
+        }
     };
 
     let mut entries: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();

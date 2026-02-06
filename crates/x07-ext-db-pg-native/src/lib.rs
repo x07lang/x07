@@ -670,7 +670,12 @@ pub extern "C" fn x07_ext_db_pg_query_v1(
         dm_rows_doc_from_pg(stmt.columns(), &rows).map_err(|code| (code, Vec::new()))
     }) {
         Ok(doc) => doc,
-        Err((code, msg)) => return alloc_return_bytes(&evdb_err(OP_QUERY_V1, code, &msg)),
+        Err((code, msg)) => {
+            if code == DB_ERR_BAD_CONN || msg.as_slice() == b"timeout" {
+                dbcore::evict_conn_slot(conns(), conn_id);
+            }
+            return alloc_return_bytes(&evdb_err(OP_QUERY_V1, code, &msg));
+        }
     };
 
     let max_resp = effective_max(pol.max_resp_bytes, caps.max_resp_bytes);
@@ -759,7 +764,12 @@ pub extern "C" fn x07_ext_db_pg_exec_v1(
         Ok::<u64, (u32, Vec<u8>)>(stream.rows_affected().unwrap_or(0))
     }) {
         Ok(v) => v,
-        Err((code, msg)) => return alloc_return_bytes(&evdb_err(OP_EXEC_V1, code, &msg)),
+        Err((code, msg)) => {
+            if code == DB_ERR_BAD_CONN || msg.as_slice() == b"timeout" {
+                dbcore::evict_conn_slot(conns(), conn_id);
+            }
+            return alloc_return_bytes(&evdb_err(OP_EXEC_V1, code, &msg));
+        }
     };
 
     let mut entries: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
