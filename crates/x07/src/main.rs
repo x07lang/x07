@@ -27,6 +27,7 @@ mod doc;
 mod doctor;
 mod guide;
 mod init;
+mod patch;
 mod pkg;
 mod policy;
 mod policy_overrides;
@@ -37,6 +38,7 @@ mod rr;
 mod run;
 mod schema;
 mod sm;
+mod tool_api;
 mod toolchain;
 mod trust;
 mod util;
@@ -94,6 +96,8 @@ enum Command {
     Review(review::ReviewArgs),
     /// Emit CI trust artifacts (budgets/caps, capabilities, nondeterminism, SBOM placeholders).
     Trust(trust::TrustArgs),
+    /// Apply deterministic multi-file JSON patchsets.
+    Patch(patch::PatchArgs),
     /// Inspect module exports and signatures.
     Doc(doc::DocArgs),
     /// Derive schema modules from x07schema JSON.
@@ -205,6 +209,16 @@ struct TestArgs {
 }
 
 fn main() -> std::process::ExitCode {
+    let raw_args: Vec<std::ffi::OsString> = std::env::args_os().collect();
+    match tool_api::maybe_handle(&raw_args) {
+        Ok(Some(code)) => return code,
+        Ok(None) => {}
+        Err(err) => {
+            eprintln!("{err:#}");
+            return std::process::ExitCode::from(2);
+        }
+    }
+
     match try_main() {
         Ok(code) => code,
         Err(err) => {
@@ -293,6 +307,10 @@ fn try_main() -> Result<std::process::ExitCode> {
                 None => vec!["trust"],
                 Some(trust::TrustCommand::Report(_)) => vec!["trust", "report"],
             },
+            Some(Command::Patch(args)) => match &args.cmd {
+                None => vec!["patch"],
+                Some(patch::PatchCommand::Apply(_)) => vec!["patch", "apply"],
+            },
             Some(Command::Doc(_)) => vec!["doc"],
             Some(Command::Schema(args)) => match &args.cmd {
                 None => vec!["schema"],
@@ -339,6 +357,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Pkg(args) => pkg::cmd_pkg(args),
         Command::Review(args) => review::cmd_review(args),
         Command::Trust(args) => trust::cmd_trust(args),
+        Command::Patch(args) => patch::cmd_patch(args),
         Command::Doc(args) => doc::cmd_doc(args),
         Command::Schema(args) => schema::cmd_schema(args),
         Command::Sm(args) => sm::cmd_sm(args),

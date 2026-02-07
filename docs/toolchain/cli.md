@@ -83,6 +83,9 @@ See: [Review & trust artifacts](review-trust.md).
 ### Patching (RFC 6902 JSON Patch)
 
 - `x07 ast apply-patch --in <path> --patch <patch.json> --out <path> --validate`
+- `x07 patch apply --in <patchset.json> --repo-root . --write`
+  - Applies a multi-file patchset (`schema_version: "x07.patchset@0.1.0"`).
+  - Without `--write`, validates and reports only (dry run).
 
 ### x07AST schema + grammar generation pack
 
@@ -222,7 +225,22 @@ For the complete guide (targets, worlds, input, policies, reports), see [Running
 
 ## JSON outputs (agent-friendly)
 
-Commands that emit structured outputs must guarantee:
+All command scopes support machine schema discovery:
+
+- `x07 <scope> --json-schema`
+- `x07 <scope> --json-schema-id`
+
+And command scopes without native JSON reports are wrapped by a universal machine envelope:
+
+- `x07 <scope> --json`
+- `x07 <scope> --json=pretty`
+- `x07 <scope> --jsonl`
+- `x07 <scope> --json --report-out <path>`
+- `x07 <scope> --json --report-out <path> --quiet-json`
+
+Universal wrapper schema: `spec/x07-tool.report.schema.json` (`x07.tool.report@0.1.0`).
+
+Structured commands must guarantee:
 
 - valid JSON
 - schema-valid output
@@ -236,7 +254,7 @@ Review/trust artifact commands also follow this contract:
 For machine-first discovery and debugging:
 
 - `x07 --cli-specrows` emits a deterministic CLI surface description.
-- Many commands support `--report-json` for tool-style wrapper reports.
+- Legacy tool wrappers still support `--report-json` (alias during migration).
 
 See [Diagnostics & repair](diagnostics-repair.md).
 
@@ -260,15 +278,15 @@ Each row is a small tuple. Examples:
 
 Schema: `spec/x07cli.specrows.schema.json`.
 
-## Tool wrapper reports (`--report-json`)
+## Tool wrapper reports (`--report-json`, compatibility)
 
-Some commands can emit a tool-style wrapper report for agents:
+Compatibility mode is still available for existing automation:
 
 - `x07 fmt --report-json ...`
 - `x07 lint --report-json ...`
 - `x07 fix --report-json ...` (requires `--write`)
 
-Wrapper schema: `schema_version: "x07c.report@0.1.0"` (see `spec/x07c.report.schema.json`).
+Compatibility schema: `schema_version: "x07c.report@0.1.0"` (see `spec/x07c.report.schema.json`).
 
 Notes:
 

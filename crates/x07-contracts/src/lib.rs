@@ -21,6 +21,7 @@ pub const X07_BENCH_INSTANCE_SCHEMA_VERSION: &str = "x07.bench.instance@0.1.0";
 pub const X07_BENCH_REPORT_SCHEMA_VERSION: &str = "x07.bench.report@0.1.0";
 pub const X07_REVIEW_DIFF_SCHEMA_VERSION: &str = "x07.review.diff@0.1.0";
 pub const X07_TRUST_REPORT_SCHEMA_VERSION: &str = "x07.trust.report@0.1.0";
+pub const X07_TOOL_REPORT_SCHEMA_VERSION: &str = "x07.tool.report@0.1.0";
 
 pub const RUN_OS_POLICY_SCHEMA_VERSION: &str = "x07.run-os-policy@0.1.0";
 pub const X07_POLICY_INIT_REPORT_SCHEMA_VERSION: &str = "x07.policy.init.report@0.1.0";
@@ -32,6 +33,7 @@ pub const X07_ARCH_MANIFEST_SCHEMA_VERSION: &str = "x07.arch.manifest@0.1.0";
 pub const X07_ARCH_MANIFEST_LOCK_SCHEMA_VERSION: &str = "x07.arch.manifest.lock@0.1.0";
 pub const X07_ARCH_REPORT_SCHEMA_VERSION: &str = "x07.arch.report@0.1.0";
 pub const X07_ARCH_PATCHSET_SCHEMA_VERSION: &str = "x07.arch.patchset@0.1.0";
+pub const X07_PATCHSET_SCHEMA_VERSION: &str = "x07.patchset@0.1.0";
 pub const X07_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION: &str = "x07.arch.contracts.lock@0.1.0";
 pub const X07_ARCH_RR_INDEX_SCHEMA_VERSION: &str = "x07.arch.rr.index@0.1.0";
 pub const X07_ARCH_RR_POLICY_SCHEMA_VERSION: &str = "x07.arch.rr.policy@0.1.0";

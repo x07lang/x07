@@ -673,6 +673,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool.report.schema.json",
+      "schema_version": "",
+      "title": "x07.tool.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-trust.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-trust.report.schema.json",
       "schema_version": "x07.trust.report@0.1.0",
@@ -684,6 +691,13 @@
       "schema_id": "https://x07.io/spec/x07-website.package-index.schema.json",
       "schema_version": "x07.website.package-index@0.2.0",
       "title": "x07.website.package-index@0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07.patchset.schema.json",
+      "schema_id": "https://x07.io/spec/x07.patchset.schema.json",
+      "schema_version": "x07.patchset@0.1.0",
+      "title": "x07.patchset@0.1.0"
     },
     {
       "kind": "schema",

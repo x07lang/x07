@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.patchset.schema.json",
+  "title": "x07.patchset@0.1.0",
+  "description": "Multi-file JSON Patch set for deterministic project-level edits.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "x07.patchset@0.1.0" },
+    "patches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "patch": { "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/json_patch" },
+          "note": { "type": "string" }
+        },
+        "required": ["path", "patch"]
+      }
+    }
+  },
+  "required": ["schema_version", "patches"]
+}

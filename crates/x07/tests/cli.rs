@@ -3370,3 +3370,114 @@ fn x07_trust_report_outputs_expected_schema_and_flags() {
         String::from_utf8_lossy(&out.stderr)
     );
 }
+
+#[test]
+fn x07_tool_wrapper_json_for_guide_scope() {
+    let out = run_x07(&["guide", "--json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: Value = serde_json::from_slice(&out.stdout).expect("parse tool wrapper report");
+    assert_eq!(report["schema_version"], "x07.guide.report@0.1.0");
+    assert_eq!(report["command"], "x07.guide");
+    assert_eq!(report["ok"], Value::Bool(true));
+    assert!(
+        report["result"]["stdout"]["text"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("# Language Guide"),
+        "expected captured guide markdown in wrapped stdout"
+    );
+}
+
+#[test]
+fn x07_patch_apply_dry_run_and_write_modes() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_patch_apply");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let target = dir.join("doc.json");
+    write_json(&target, &serde_json::json!({ "a": 1, "b": true }));
+
+    let patchset = dir.join("changes.patchset.json");
+    write_json(
+        &patchset,
+        &serde_json::json!({
+            "schema_version": "x07.patchset@0.1.0",
+            "patches": [
+                {
+                    "path": "doc.json",
+                    "patch": [
+                        { "op": "replace", "path": "/a", "value": 7 }
+                    ]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07(&[
+        "patch",
+        "apply",
+        "--in",
+        patchset.to_str().unwrap(),
+        "--repo-root",
+        dir.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: Value = serde_json::from_slice(&out.stdout).expect("parse dry-run report");
+    assert_eq!(report["ok"], Value::Bool(true));
+    let unchanged: Value =
+        serde_json::from_slice(&std::fs::read(&target).expect("read unchanged target"))
+            .expect("parse unchanged target");
+    assert_eq!(unchanged["a"], Value::from(1));
+
+    let out = run_x07(&[
+        "patch",
+        "apply",
+        "--in",
+        patchset.to_str().unwrap(),
+        "--repo-root",
+        dir.to_str().unwrap(),
+        "--write",
+        "--json",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let changed: Value =
+        serde_json::from_slice(&std::fs::read(&target).expect("read changed target"))
+            .expect("parse changed target");
+    assert_eq!(changed["a"], Value::from(7));
+}
+
+#[test]
+fn x07_scope_json_schema_for_arch_check_is_available() {
+    let out = run_x07(&["arch", "check", "--json-schema"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let schema: Value = serde_json::from_slice(&out.stdout).expect("parse schema");
+    assert_eq!(
+        schema["properties"]["schema_version"]["const"],
+        Value::String("x07.arch.check.report@0.1.0".to_string())
+    );
+    assert_eq!(
+        schema["properties"]["command"]["const"],
+        Value::String("x07.arch.check".to_string())
+    );
+}

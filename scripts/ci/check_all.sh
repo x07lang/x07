@@ -51,6 +51,9 @@ step "published spec sync"
 step "genpack error-codes completeness"
 "$python_bin" scripts/check_genpack_error_codes.py --check
 
+step "tool JSON contracts"
+"$python_bin" scripts/ci/check_tool_json_contracts.py
+
 if [[ "${X07_ENABLE_GENPACK_SDK_CHECKS:-0}" == "1" ]]; then
   step "genpack sdk integration"
   ./scripts/ci/check_genpack_sdk.sh
