@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Args;
-use serde::Serialize;
-use x07_contracts::X07C_REPORT_SCHEMA_VERSION;
 use x07_worlds::WorldId;
 use x07c::diagnostics;
 use x07c::lint;
@@ -20,8 +18,6 @@ pub struct FmtArgs {
     pub check: bool,
     #[arg(long)]
     pub write: bool,
-    #[arg(long)]
-    pub report_json: bool,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -31,8 +27,6 @@ pub struct LintArgs {
     /// Lint world gating (advanced; the public surface defaults to `run-os`).
     #[arg(long, value_enum, default_value_t = WorldId::RunOs, hide = true)]
     pub world: WorldId,
-    #[arg(long)]
-    pub report_json: bool,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -44,8 +38,6 @@ pub struct FixArgs {
     pub world: WorldId,
     #[arg(long)]
     pub write: bool,
-    #[arg(long)]
-    pub report_json: bool,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -70,87 +62,20 @@ pub struct BuildArgs {
     pub repair: RepairArgs,
 }
 
-#[derive(Debug, Serialize)]
-struct X07cToolReport {
-    schema_version: &'static str,
-    command: &'static str,
-    ok: bool,
-    r#in: String,
-    diagnostics_count: usize,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    diagnostics: Vec<diagnostics::Diagnostic>,
-    exit_code: u8,
-}
-
 pub fn cmd_fmt(
     _machine: &crate::reporting::MachineArgs,
     args: FmtArgs,
 ) -> Result<std::process::ExitCode> {
     if args.check == args.write {
-        if args.report_json {
-            let report = X07cToolReport {
-                schema_version: X07C_REPORT_SCHEMA_VERSION,
-                command: "fmt",
-                ok: false,
-                r#in: args.input.display().to_string(),
-                diagnostics_count: 1,
-                diagnostics: vec![diagnostic_error(
-                    "X07-CLI-ARGS-0001",
-                    diagnostics::Stage::Parse,
-                    "set exactly one of --check or --write",
-                )],
-                exit_code: 2,
-            };
-            print_json(&report)?;
-            return Ok(std::process::ExitCode::from(2));
-        }
         anyhow::bail!("set exactly one of --check or --write");
     }
 
-    let bytes = match std::fs::read(&args.input) {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            if args.report_json {
-                let report = X07cToolReport {
-                    schema_version: X07C_REPORT_SCHEMA_VERSION,
-                    command: "fmt",
-                    ok: false,
-                    r#in: args.input.display().to_string(),
-                    diagnostics_count: 1,
-                    diagnostics: vec![diagnostic_error(
-                        "X07-IO-READ-0001",
-                        diagnostics::Stage::Parse,
-                        &format!("read input {}: {err}", args.input.display()),
-                    )],
-                    exit_code: 2,
-                };
-                print_json(&report)?;
-                return Ok(std::process::ExitCode::from(2));
-            }
-            return Err(err).with_context(|| format!("read input: {}", args.input.display()));
-        }
-    };
+    let bytes = std::fs::read(&args.input)
+        .with_context(|| format!("read input: {}", args.input.display()))?;
 
     let mut file = match x07ast::parse_x07ast_json(&bytes) {
         Ok(file) => file,
         Err(err) => {
-            if args.report_json {
-                let report = X07cToolReport {
-                    schema_version: X07C_REPORT_SCHEMA_VERSION,
-                    command: "fmt",
-                    ok: false,
-                    r#in: args.input.display().to_string(),
-                    diagnostics_count: 1,
-                    diagnostics: vec![diagnostic_error(
-                        "X07-X07AST-PARSE-0001",
-                        diagnostics::Stage::Parse,
-                        &err.to_string(),
-                    )],
-                    exit_code: 2,
-                };
-                print_json(&report)?;
-                return Ok(std::process::ExitCode::from(2));
-            }
             return Err(anyhow::anyhow!("{err}"));
         }
     };
@@ -161,113 +86,28 @@ pub fn cmd_fmt(
     let formatted = serde_json::to_string(&v)? + "\n";
 
     if args.check && bytes != formatted.as_bytes() {
-        if args.report_json {
-            let report = X07cToolReport {
-                schema_version: X07C_REPORT_SCHEMA_VERSION,
-                command: "fmt",
-                ok: false,
-                r#in: args.input.display().to_string(),
-                diagnostics_count: 1,
-                diagnostics: vec![diagnostic_error(
-                    "X07-FMT-0001",
-                    diagnostics::Stage::Rewrite,
-                    &format!("file is not formatted: {}", args.input.display()),
-                )],
-                exit_code: 1,
-            };
-            print_json(&report)?;
-            return Ok(std::process::ExitCode::from(1));
-        }
-        anyhow::bail!("file is not formatted: {}", args.input.display());
+        eprintln!("file is not formatted: {}", args.input.display());
+        return Ok(std::process::ExitCode::from(1));
     }
 
     if args.write && bytes != formatted.as_bytes() {
-        if let Err(err) = std::fs::write(&args.input, formatted.as_bytes()) {
-            if args.report_json {
-                let report = X07cToolReport {
-                    schema_version: X07C_REPORT_SCHEMA_VERSION,
-                    command: "fmt",
-                    ok: false,
-                    r#in: args.input.display().to_string(),
-                    diagnostics_count: 1,
-                    diagnostics: vec![diagnostic_error(
-                        "X07-IO-WRITE-0001",
-                        diagnostics::Stage::Rewrite,
-                        &format!("write {}: {err}", args.input.display()),
-                    )],
-                    exit_code: 2,
-                };
-                print_json(&report)?;
-                return Ok(std::process::ExitCode::from(2));
-            }
-            return Err(err).with_context(|| format!("write: {}", args.input.display()));
-        }
-    }
-
-    if args.report_json {
-        let report = X07cToolReport {
-            schema_version: X07C_REPORT_SCHEMA_VERSION,
-            command: "fmt",
-            ok: true,
-            r#in: args.input.display().to_string(),
-            diagnostics_count: 0,
-            diagnostics: Vec::new(),
-            exit_code: 0,
-        };
-        print_json(&report)?;
+        std::fs::write(&args.input, formatted.as_bytes())
+            .with_context(|| format!("write: {}", args.input.display()))?;
     }
 
     Ok(std::process::ExitCode::SUCCESS)
 }
 
 pub fn cmd_lint(
-    _machine: &crate::reporting::MachineArgs,
+    machine: &crate::reporting::MachineArgs,
     args: LintArgs,
 ) -> Result<std::process::ExitCode> {
-    let bytes = match std::fs::read(&args.input) {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            if args.report_json {
-                let report = X07cToolReport {
-                    schema_version: X07C_REPORT_SCHEMA_VERSION,
-                    command: "lint",
-                    ok: false,
-                    r#in: args.input.display().to_string(),
-                    diagnostics_count: 1,
-                    diagnostics: vec![diagnostic_error(
-                        "X07-IO-READ-0001",
-                        diagnostics::Stage::Parse,
-                        &format!("read input {}: {err}", args.input.display()),
-                    )],
-                    exit_code: 2,
-                };
-                print_json(&report)?;
-                return Ok(std::process::ExitCode::from(2));
-            }
-            return Err(err).with_context(|| format!("read input: {}", args.input.display()));
-        }
-    };
+    let bytes = std::fs::read(&args.input)
+        .with_context(|| format!("read input: {}", args.input.display()))?;
 
     let mut file = match x07ast::parse_x07ast_json(&bytes) {
         Ok(file) => file,
         Err(err) => {
-            if args.report_json {
-                let report = X07cToolReport {
-                    schema_version: X07C_REPORT_SCHEMA_VERSION,
-                    command: "lint",
-                    ok: false,
-                    r#in: args.input.display().to_string(),
-                    diagnostics_count: 1,
-                    diagnostics: vec![diagnostic_error(
-                        "X07-X07AST-PARSE-0001",
-                        diagnostics::Stage::Parse,
-                        &err.to_string(),
-                    )],
-                    exit_code: 2,
-                };
-                print_json(&report)?;
-                return Ok(std::process::ExitCode::from(2));
-            }
             return Err(anyhow::anyhow!("{err}"));
         }
     };
@@ -276,21 +116,13 @@ pub fn cmd_lint(
     let lint_options = x07c::world_config::lint_options_for_world(args.world);
     let report = lint::lint_file(&file, lint_options);
 
-    if args.report_json {
-        let tool_report = X07cToolReport {
-            schema_version: X07C_REPORT_SCHEMA_VERSION,
-            command: "lint",
-            ok: report.ok,
-            r#in: args.input.display().to_string(),
-            diagnostics_count: report.diagnostics.len(),
-            diagnostics: report.diagnostics,
-            exit_code: if report.ok { 0 } else { 1 },
-        };
-        print_json(&tool_report)?;
-        return Ok(std::process::ExitCode::from(tool_report.exit_code));
+    let out = serde_json::to_string(&report)? + "\n";
+    if let Some(path) = machine.out.as_deref() {
+        crate::reporting::write_bytes(path, out.as_bytes())?;
+    } else {
+        print!("{out}");
     }
 
-    println!("{}", serde_json::to_string(&report)?);
     Ok(if report.ok {
         std::process::ExitCode::SUCCESS
     } else {
@@ -299,71 +131,19 @@ pub fn cmd_lint(
 }
 
 pub fn cmd_fix(
-    _machine: &crate::reporting::MachineArgs,
+    machine: &crate::reporting::MachineArgs,
     args: FixArgs,
 ) -> Result<std::process::ExitCode> {
-    if args.report_json && !args.write {
-        let report = X07cToolReport {
-            schema_version: X07C_REPORT_SCHEMA_VERSION,
-            command: "fix",
-            ok: false,
-            r#in: args.input.display().to_string(),
-            diagnostics_count: 1,
-            diagnostics: vec![diagnostic_error(
-                "X07-CLI-ARGS-0002",
-                diagnostics::Stage::Parse,
-                "--report-json requires --write (otherwise stdout would be the fixed x07AST)",
-            )],
-            exit_code: 2,
-        };
-        print_json(&report)?;
-        return Ok(std::process::ExitCode::from(2));
+    if args.write && machine.out.is_some() {
+        anyhow::bail!("--out cannot be combined with --write");
     }
 
-    let bytes = match std::fs::read(&args.input) {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            if args.report_json {
-                let report = X07cToolReport {
-                    schema_version: X07C_REPORT_SCHEMA_VERSION,
-                    command: "fix",
-                    ok: false,
-                    r#in: args.input.display().to_string(),
-                    diagnostics_count: 1,
-                    diagnostics: vec![diagnostic_error(
-                        "X07-IO-READ-0001",
-                        diagnostics::Stage::Parse,
-                        &format!("read input {}: {err}", args.input.display()),
-                    )],
-                    exit_code: 2,
-                };
-                print_json(&report)?;
-                return Ok(std::process::ExitCode::from(2));
-            }
-            return Err(err).with_context(|| format!("read input: {}", args.input.display()));
-        }
-    };
+    let bytes = std::fs::read(&args.input)
+        .with_context(|| format!("read input: {}", args.input.display()))?;
 
     let mut doc: serde_json::Value = match serde_json::from_slice(&bytes) {
         Ok(doc) => doc,
         Err(err) => {
-            if args.report_json {
-                let report = X07cToolReport {
-                    schema_version: X07C_REPORT_SCHEMA_VERSION,
-                    command: "fix",
-                    ok: false,
-                    r#in: args.input.display().to_string(),
-                    diagnostics_count: 1,
-                    diagnostics: vec![diagnostic_error(
-                        "X07-JSON-PARSE-0001",
-                        diagnostics::Stage::Parse,
-                        &format!("parse JSON {}: {err}", args.input.display()),
-                    )],
-                    exit_code: 2,
-                };
-                print_json(&report)?;
-                return Ok(std::process::ExitCode::from(2));
-            }
             return Err(err).with_context(|| format!("parse JSON: {}", args.input.display()));
         }
     };
@@ -383,7 +163,7 @@ pub fn cmd_fix(
         .iter()
         .filter(|d| d.severity == diagnostics::Severity::Error)
         .count();
-    if remaining_errors > 0 && !args.report_json {
+    if remaining_errors > 0 {
         eprintln!(
             "x07 fix: {remaining_errors} error(s) remain after auto-fix. \
              Run `x07 build` to see codegen-stage errors."
@@ -391,45 +171,20 @@ pub fn cmd_fix(
     }
 
     if args.write {
-        if let Err(err) = std::fs::write(&args.input, formatted.as_bytes()) {
-            if args.report_json {
-                let report = X07cToolReport {
-                    schema_version: X07C_REPORT_SCHEMA_VERSION,
-                    command: "fix",
-                    ok: false,
-                    r#in: args.input.display().to_string(),
-                    diagnostics_count: 1,
-                    diagnostics: vec![diagnostic_error(
-                        "X07-IO-WRITE-0001",
-                        diagnostics::Stage::Rewrite,
-                        &format!("write {}: {err}", args.input.display()),
-                    )],
-                    exit_code: 2,
-                };
-                print_json(&report)?;
-                return Ok(std::process::ExitCode::from(2));
-            }
-            return Err(err).with_context(|| format!("write: {}", args.input.display()));
-        }
+        std::fs::write(&args.input, formatted.as_bytes())
+            .with_context(|| format!("write: {}", args.input.display()))?;
     } else {
-        print!("{formatted}");
+        match machine.out.as_deref() {
+            Some(path) => crate::reporting::write_bytes(path, formatted.as_bytes())?,
+            None => print!("{formatted}"),
+        }
     }
 
-    if args.report_json {
-        let report = X07cToolReport {
-            schema_version: X07C_REPORT_SCHEMA_VERSION,
-            command: "fix",
-            ok: final_report.ok,
-            r#in: args.input.display().to_string(),
-            diagnostics_count: final_report.diagnostics.len(),
-            diagnostics: final_report.diagnostics,
-            exit_code: if final_report.ok { 0 } else { 1 },
-        };
-        print_json(&report)?;
-        return Ok(std::process::ExitCode::from(report.exit_code));
-    }
-
-    Ok(std::process::ExitCode::SUCCESS)
+    Ok(if final_report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(1)
+    })
 }
 
 pub fn cmd_build(
@@ -505,27 +260,4 @@ pub fn cmd_build(
     }
 
     Ok(std::process::ExitCode::SUCCESS)
-}
-
-fn print_json<T: Serialize>(value: &T) -> Result<()> {
-    println!("{}", serde_json::to_string(value)?);
-    Ok(())
-}
-
-fn diagnostic_error(
-    code: &str,
-    stage: diagnostics::Stage,
-    message: &str,
-) -> diagnostics::Diagnostic {
-    diagnostics::Diagnostic {
-        code: code.to_string(),
-        severity: diagnostics::Severity::Error,
-        stage,
-        message: message.to_string(),
-        loc: None,
-        notes: Vec::new(),
-        related: Vec::new(),
-        data: Default::default(),
-        quickfix: None,
-    }
 }
