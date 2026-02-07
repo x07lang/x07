@@ -5,7 +5,7 @@ Use the `x07` CLI as the canonical source of x07AST generation artifacts.
 ## Recipe A: compile from JSON Schema (preferred)
 
 ```bash
-x07 ast schema --json-schema > /tmp/x07ast.schema.json
+x07 ast schema > /tmp/x07ast.schema.json
 ```
 
 ```python

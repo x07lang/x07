@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-tool.events.schema.json",
+  "title": "x07.tool.events@0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "seq", "elapsed_ms", "event", "data"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "x07.tool.events@0.1.0" },
+    "command": { "type": "string" },
+    "seq": { "type": "integer", "minimum": 0 },
+    "elapsed_ms": { "type": "integer", "minimum": 0 },
+    "event": { "type": "string" },
+    "data": {}
+  }
+}

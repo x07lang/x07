@@ -27,14 +27,6 @@ pub struct DocArgs {
     #[arg(long)]
     pub builtin: bool,
 
-    /// Emit machine-readable JSON output.
-    #[arg(long)]
-    pub json: bool,
-
-    /// Write JSON report to a file (valid only with `--json`).
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-
     /// Module id (example: `ext.cli`) or exported symbol (example: `ext.cli.parse_specrows`).
     #[arg(value_name = "QUERY")]
     pub query: String,
@@ -252,14 +244,18 @@ fn special_form_doc(name: &str) -> Option<&'static str> {
     }
 }
 
-pub fn cmd_doc(args: DocArgs) -> Result<std::process::ExitCode> {
-    if args.out.is_some() && !args.json {
-        anyhow::bail!("--out requires --json");
+pub fn cmd_doc(
+    machine: &crate::reporting::MachineArgs,
+    args: DocArgs,
+) -> Result<std::process::ExitCode> {
+    let wants_json = machine
+        .json
+        .is_some_and(|mode| mode != crate::reporting::JsonArg::Off);
+    if wants_json {
+        cmd_doc_json(machine, args)
+    } else {
+        cmd_doc_text(args)
     }
-    if args.json {
-        return cmd_doc_json(args);
-    }
-    cmd_doc_text(args)
 }
 
 fn cmd_doc_text(args: DocArgs) -> Result<std::process::ExitCode> {
@@ -342,7 +338,14 @@ fn cmd_doc_text(args: DocArgs) -> Result<std::process::ExitCode> {
     anyhow::bail!("module/symbol not found: {query}");
 }
 
-fn cmd_doc_json(args: DocArgs) -> Result<std::process::ExitCode> {
+fn cmd_doc_json(
+    machine: &crate::reporting::MachineArgs,
+    args: DocArgs,
+) -> Result<std::process::ExitCode> {
+    let mode = machine
+        .json
+        .unwrap_or(crate::reporting::JsonArg::Canon)
+        .to_mode();
     let query = args.query.trim().to_string();
     let resolution = if query.is_empty() {
         error_resolution(
@@ -358,10 +361,36 @@ fn cmd_doc_json(args: DocArgs) -> Result<std::process::ExitCode> {
         }
     };
 
-    let report = build_doc_report(query, resolution);
-    if let Err(err) = emit_doc_report(&report, args.out.as_deref()) {
-        eprintln!("{err:#}");
-        return Ok(std::process::ExitCode::from(2));
+    let mut report = build_doc_report(query, resolution);
+    let report_out = machine.report_out.as_deref();
+    let quiet = machine.quiet_json;
+
+    let value = serde_json::to_value(&report)?;
+    let bytes = crate::reporting::encode_json_bytes(&value, mode)?;
+
+    if let Some(path) = report_out {
+        if let Err(err) = crate::reporting::write_bytes(path, &bytes) {
+            report.ok = false;
+            report.exit_code = 2;
+            report.diagnostics.push(diagnostic_error(
+                "X07-IO-WRITE-0001",
+                &format!("write {}: {err:#}", path.display()),
+            ));
+            report.diagnostics_count = report.diagnostics.len();
+
+            let value = serde_json::to_value(&report)?;
+            let bytes = crate::reporting::encode_json_bytes(&value, mode)?;
+            std::io::stdout()
+                .write_all(&bytes)
+                .context("write stdout")?;
+            return Ok(std::process::ExitCode::from(2));
+        }
+    }
+
+    if !quiet {
+        std::io::stdout()
+            .write_all(&bytes)
+            .context("write stdout")?;
     }
     Ok(std::process::ExitCode::from(report.exit_code))
 }
@@ -624,29 +653,6 @@ fn build_doc_report(query: String, resolution: DocResolution) -> DocReport {
         exit_code,
         hints: resolution.hints,
         meta: BTreeMap::new(),
-    }
-}
-
-fn emit_doc_report(report: &DocReport, out: Option<&Path>) -> Result<()> {
-    let mut bytes = serde_json::to_vec(report)?;
-    if bytes.last() != Some(&b'\n') {
-        bytes.push(b'\n');
-    }
-    match out {
-        Some(path) => {
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)
-                    .with_context(|| format!("create output dir: {}", parent.display()))?;
-            }
-            std::fs::write(path, &bytes)
-                .with_context(|| format!("write report: {}", path.display()))
-        }
-        None => {
-            std::io::stdout()
-                .write_all(&bytes)
-                .context("write stdout")?;
-            Ok(())
-        }
     }
 }
 
@@ -1736,8 +1742,6 @@ mod tests {
             project: None,
             module_root: vec![root.join("src")],
             builtin: false,
-            json: true,
-            out: None,
             query: "ext.cli".to_string(),
         };
         let ctx = resolve_doc_context(&args).unwrap();
@@ -1768,8 +1772,6 @@ mod tests {
             project: None,
             module_root: vec![root.join("src")],
             builtin: false,
-            json: true,
-            out: None,
             query: "missing.module".to_string(),
         };
         let ctx = resolve_doc_context(&args).unwrap();
@@ -1812,8 +1814,6 @@ mod tests {
             project: None,
             module_root: vec![root.join("src")],
             builtin: false,
-            json: true,
-            out: None,
             query: "ext.cli".to_string(),
         };
         let ctx = resolve_doc_context(&args).unwrap();

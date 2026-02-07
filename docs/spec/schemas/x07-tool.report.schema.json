@@ -38,9 +38,28 @@
         "argv": {
           "type": "array",
           "items": { "type": "string" }
-        }
+        },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file_digest" },
+          "default": []
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file_digest" },
+          "default": []
+        },
+        "nondeterminism": { "$ref": "#/$defs/nondeterminism" }
       },
-      "required": ["tool", "elapsed_ms", "cwd", "argv"]
+      "required": [
+        "tool",
+        "elapsed_ms",
+        "cwd",
+        "argv",
+        "inputs",
+        "outputs",
+        "nondeterminism"
+      ]
     },
     "tool_meta": {
       "type": "object",
@@ -51,9 +70,30 @@
         "git_sha": {
           "type": "string",
           "pattern": "^[0-9a-fA-F]{7,40}$"
-        }
+        },
+        "rustc": { "type": "string" }
       },
       "required": ["name", "version"]
+    },
+    "file_digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "bytes_len": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["path", "sha256", "bytes_len"]
+    },
+    "nondeterminism": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uses_os_time": { "type": "boolean" },
+        "uses_network": { "type": "boolean" },
+        "uses_process": { "type": "boolean" }
+      },
+      "required": ["uses_os_time", "uses_network", "uses_process"]
     },
     "result": {
       "type": "object",

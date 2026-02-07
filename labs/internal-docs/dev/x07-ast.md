@@ -39,7 +39,7 @@ Agent-facing contract tooling is `x07c` (`fmt`/`lint`/`fix` + `apply-patch`). `x
 Use `x07 ast` as the canonical export surface for tool-builders:
 
 - Schema export:
-  - `cargo run -p x07 -- ast schema --json-schema`
+  - `cargo run -p x07 -- ast schema`
 - Grammar bundle export:
   - `cargo run -p x07 -- ast grammar --cfg`
 - Materialize to files (schema/grammar/supplement/manifest):

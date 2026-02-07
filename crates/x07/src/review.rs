@@ -246,7 +246,10 @@ struct DeclView {
     body: Option<Value>,
 }
 
-pub fn cmd_review(args: ReviewArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_review(
+    _machine: &crate::reporting::MachineArgs,
+    args: ReviewArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing review subcommand (try --help)");
     };

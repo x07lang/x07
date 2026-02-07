@@ -23,21 +23,23 @@ cat >"$tmp/x07.json" <<'JSON'
 }
 JSON
 
-"$X07_BIN" pkg provides std.os.process --project "$tmp/x07.json" --report-json >"$tmp/provides.json"
+"$X07_BIN" pkg provides std.os.process --project "$tmp/x07.json" --json >"$tmp/provides.json"
 
 python3 - "$tmp/provides.json" <<'PY'
 import json, sys
 
 r = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-assert r.get("schema_version") == "x07.pkg.provides.report@0.1.0", r.get("schema_version")
+assert r.get("schema_version") == "x07.tool.pkg.provides.report@0.1.0", r.get("schema_version")
 assert r.get("ok") is True, r
-providers = r.get("providers", [])
+result = r.get("result") or {}
+provides = result.get("stdout_json") or {}
+providers = provides.get("providers", [])
 assert isinstance(providers, list) and len(providers) >= 1, providers
 print("ok: pkg provides returns providers")
 PY
 
 set +e
-"$X07_BIN" pkg provides ext.checksum.crc32c --project "$tmp/x07.json" --report-json >"$tmp/provides_ext.json" 2>"$tmp/provides_ext.err"
+"$X07_BIN" pkg provides ext.checksum.crc32c --project "$tmp/x07.json" --json >"$tmp/provides_ext.json" 2>"$tmp/provides_ext.err"
 rc=$?
 set -e
 if [[ $rc -ne 0 ]]; then
@@ -50,7 +52,9 @@ python3 - "$tmp/provides_ext.json" <<'PY'
 import json, sys
 
 r = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-providers = r.get("providers") or []
+result = r.get("result") or {}
+provides = result.get("stdout_json") or {}
+providers = provides.get("providers") or []
 has = any(isinstance(p, dict) and p.get("kind") == "catalog" and p.get("name") == "ext-checksum-rs" for p in providers)
 assert has, providers
 print("ok: pkg provides finds catalog providers")

@@ -38,10 +38,6 @@ pub struct PatchApplyArgs {
     /// Write patched files. Without this flag, validates and reports only.
     #[arg(long)]
     pub write: bool,
-
-    /// Emit a machine-readable report.
-    #[arg(long)]
-    pub json: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -77,7 +73,10 @@ struct PatchApplyResult {
     created_paths: Vec<String>,
 }
 
-pub fn cmd_patch(args: PatchArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_patch(
+    _machine: &crate::reporting::MachineArgs,
+    args: PatchArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         bail!("missing subcommand (try: x07 patch apply --in <patchset.json> --write)");
     };
@@ -103,23 +102,20 @@ fn cmd_patch_apply(args: PatchApplyArgs) -> Result<std::process::ExitCode> {
         &doc,
     )?;
     if !diagnostics.is_empty() {
-        return emit_report(
-            args.json,
-            PatchApplyReport {
-                schema_version: X07_PATCHSET_SCHEMA_VERSION,
-                command: "patch.apply",
-                ok: false,
-                exit_code: 1,
-                diagnostics,
-                result: PatchApplyResult {
-                    patchset_path: patchset_path.display().to_string(),
-                    repo_root: repo_root_abs.display().to_string(),
-                    write: args.write,
-                    changed_paths: Vec::new(),
-                    created_paths: Vec::new(),
-                },
+        return emit_report(PatchApplyReport {
+            schema_version: X07_PATCHSET_SCHEMA_VERSION,
+            command: "patch.apply",
+            ok: false,
+            exit_code: 1,
+            diagnostics,
+            result: PatchApplyResult {
+                patchset_path: patchset_path.display().to_string(),
+                repo_root: repo_root_abs.display().to_string(),
+                write: args.write,
+                changed_paths: Vec::new(),
+                created_paths: Vec::new(),
             },
-        );
+        });
     }
 
     let patchset: PatchSet = serde_json::from_value(doc)
@@ -133,23 +129,20 @@ fn cmd_patch_apply(args: PatchApplyArgs) -> Result<std::process::ExitCode> {
                 X07_PATCHSET_SCHEMA_VERSION, patchset.schema_version
             ),
         ));
-        return emit_report(
-            args.json,
-            PatchApplyReport {
-                schema_version: X07_PATCHSET_SCHEMA_VERSION,
-                command: "patch.apply",
-                ok: false,
-                exit_code: 1,
-                diagnostics,
-                result: PatchApplyResult {
-                    patchset_path: patchset_path.display().to_string(),
-                    repo_root: repo_root_abs.display().to_string(),
-                    write: args.write,
-                    changed_paths: Vec::new(),
-                    created_paths: Vec::new(),
-                },
+        return emit_report(PatchApplyReport {
+            schema_version: X07_PATCHSET_SCHEMA_VERSION,
+            command: "patch.apply",
+            ok: false,
+            exit_code: 1,
+            diagnostics,
+            result: PatchApplyResult {
+                patchset_path: patchset_path.display().to_string(),
+                repo_root: repo_root_abs.display().to_string(),
+                write: args.write,
+                changed_paths: Vec::new(),
+                created_paths: Vec::new(),
             },
-        );
+        });
     }
 
     let mut changed_paths = Vec::new();
@@ -192,23 +185,20 @@ fn cmd_patch_apply(args: PatchApplyArgs) -> Result<std::process::ExitCode> {
     created_paths.sort();
     created_paths.dedup();
 
-    emit_report(
-        args.json,
-        PatchApplyReport {
-            schema_version: X07_PATCHSET_SCHEMA_VERSION,
-            command: "patch.apply",
-            ok: true,
-            exit_code: 0,
-            diagnostics: Vec::new(),
-            result: PatchApplyResult {
-                patchset_path: patchset_path.display().to_string(),
-                repo_root: repo_root_abs.display().to_string(),
-                write: args.write,
-                changed_paths,
-                created_paths,
-            },
+    emit_report(PatchApplyReport {
+        schema_version: X07_PATCHSET_SCHEMA_VERSION,
+        command: "patch.apply",
+        ok: true,
+        exit_code: 0,
+        diagnostics: Vec::new(),
+        result: PatchApplyResult {
+            patchset_path: patchset_path.display().to_string(),
+            repo_root: repo_root_abs.display().to_string(),
+            write: args.write,
+            changed_paths,
+            created_paths,
         },
-    )
+    })
 }
 
 fn canonicalized_output_bytes(path: &Path, doc: &Value) -> Result<Vec<u8>> {
@@ -268,11 +258,8 @@ fn normalize_path(path: &Path) -> PathBuf {
     out
 }
 
-fn emit_report(json: bool, report: PatchApplyReport) -> Result<std::process::ExitCode> {
-    if json {
-        let bytes = canonical_pretty_json_bytes(&serde_json::to_value(&report)?)?;
-        std::io::Write::write_all(&mut std::io::stdout(), &bytes).context("write stdout")?;
-    } else if report.ok {
+fn emit_report(report: PatchApplyReport) -> Result<std::process::ExitCode> {
+    if report.ok {
         for path in &report.result.changed_paths {
             println!("{path}");
         }

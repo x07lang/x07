@@ -19,10 +19,6 @@ pub enum RrCommand {
 
 #[derive(Debug, Args)]
 pub struct RecordArgs {
-    /// Fixture output directory (will contain `*.rrbin`).
-    #[arg(long, value_name = "DIR", default_value = "fixtures/rr")]
-    pub out: PathBuf,
-
     /// Cassette file path relative to --out.
     #[arg(long, value_name = "PATH", default_value = "cassette.rrbin")]
     pub cassette: PathBuf,
@@ -81,12 +77,15 @@ struct RecordResult {
     seq: u64,
 }
 
-pub fn cmd_rr(args: RrArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_rr(
+    machine: &crate::reporting::MachineArgs,
+    args: RrArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing rr subcommand (try --help)");
     };
     match cmd {
-        RrCommand::Record(args) => cmd_rr_record(args),
+        RrCommand::Record(args) => cmd_rr_record(machine, args),
     }
 }
 
@@ -361,7 +360,10 @@ fn read_exact_or_eof(r: &mut impl std::io::Read, buf: &mut [u8]) -> Result<bool>
     Ok(true)
 }
 
-fn cmd_rr_record(args: RecordArgs) -> Result<std::process::ExitCode> {
+fn cmd_rr_record(
+    machine: &crate::reporting::MachineArgs,
+    args: RecordArgs,
+) -> Result<std::process::ExitCode> {
     let key = args.key.trim();
     if key.is_empty() {
         let report = RrReport::<RecordResult> {
@@ -464,7 +466,10 @@ fn cmd_rr_record(args: RecordArgs) -> Result<std::process::ExitCode> {
 
     ensure_safe_rel_path(&args.cassette).context("validate --cassette")?;
 
-    let out_dir = args.out;
+    let out_dir = machine
+        .out
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("fixtures/rr"));
     let cassette_path = out_dir.join(&args.cassette);
     if let Some(parent) = cassette_path.parent() {
         std::fs::create_dir_all(parent)

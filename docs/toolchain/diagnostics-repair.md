@@ -29,7 +29,8 @@ For explicit control (or when you want the raw reports), use `x07 fmt` / `x07 li
 ## Output contracts (agent-friendly)
 
 - Raw diagnostics output: `x07diag` (schema: `spec/x07diag.schema.json`)
-- Tool wrapper reports (`--report-json`): `x07c.report@0.1.0` (schema: `spec/x07c.report.schema.json`)
+- Tool reports (`--json`): `spec/x07-tool-<scope>.report.schema.json` (base: `spec/x07-tool.report.schema.json`)
+- Tool streaming events (`--jsonl`): `spec/x07-tool.events.schema.json` (`schema_version: "x07.tool.events@0.1.0"`)
 - Diagnostics catalog (source of truth): `catalog/diagnostics.json` (schema: `spec/x07-diag.catalog.schema.json`)
 - Diagnostics coverage report: `x07.diag.coverage@0.1.0` (schema: `spec/x07-diag.coverage.schema.json`)
 

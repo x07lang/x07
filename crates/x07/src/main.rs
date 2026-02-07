@@ -33,12 +33,14 @@ mod policy;
 mod policy_overrides;
 mod repair;
 mod report_common;
+mod reporting;
 mod review;
 mod rr;
 mod run;
 mod schema;
 mod sm;
 mod tool_api;
+mod tool_report_schemas;
 mod toolchain;
 mod trust;
 mod util;
@@ -51,6 +53,9 @@ mod util;
 struct Cli {
     #[arg(long, global = true)]
     cli_specrows: bool,
+
+    #[command(flatten)]
+    machine: reporting::MachineArgs,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -173,18 +178,6 @@ struct TestArgs {
 
     #[arg(long)]
     list: bool,
-
-    #[arg(
-        long,
-        action = clap::ArgAction::Set,
-        value_name = "BOOL",
-        value_parser = clap::value_parser!(bool),
-        default_value = "true"
-    )]
-    json: bool,
-
-    #[arg(long, value_name = "PATH")]
-    report_out: Option<PathBuf>,
 
     #[arg(long)]
     keep_artifacts: bool,
@@ -338,34 +331,34 @@ fn try_main() -> Result<std::process::ExitCode> {
     };
 
     match command {
-        Command::Init(args) => init::cmd_init(args),
-        Command::Test(args) => cmd_test(args),
-        Command::Bench(args) => bench::cmd_bench(args),
-        Command::Arch(args) => arch::cmd_arch(args),
-        Command::Run(args) => run::cmd_run(*args),
-        Command::Bundle(args) => bundle::cmd_bundle(*args),
-        Command::Guide(args) => guide::cmd_guide(args),
-        Command::Doctor(args) => doctor::cmd_doctor(args),
-        Command::Diag(args) => diag::cmd_diag(args),
-        Command::Policy(args) => policy::cmd_policy(args),
-        Command::Ast(args) => ast::cmd_ast(args),
-        Command::Fmt(args) => toolchain::cmd_fmt(args),
-        Command::Lint(args) => toolchain::cmd_lint(args),
-        Command::Fix(args) => toolchain::cmd_fix(args),
-        Command::Build(args) => toolchain::cmd_build(args),
-        Command::Cli(args) => cli::cmd_cli(args),
-        Command::Pkg(args) => pkg::cmd_pkg(args),
-        Command::Review(args) => review::cmd_review(args),
-        Command::Trust(args) => trust::cmd_trust(args),
-        Command::Patch(args) => patch::cmd_patch(args),
-        Command::Doc(args) => doc::cmd_doc(args),
-        Command::Schema(args) => schema::cmd_schema(args),
-        Command::Sm(args) => sm::cmd_sm(args),
-        Command::Rr(args) => rr::cmd_rr(args),
+        Command::Init(args) => init::cmd_init(&cli.machine, args),
+        Command::Test(args) => cmd_test(&cli.machine, args),
+        Command::Bench(args) => bench::cmd_bench(&cli.machine, args),
+        Command::Arch(args) => arch::cmd_arch(&cli.machine, args),
+        Command::Run(args) => run::cmd_run(&cli.machine, *args),
+        Command::Bundle(args) => bundle::cmd_bundle(&cli.machine, *args),
+        Command::Guide(args) => guide::cmd_guide(&cli.machine, args),
+        Command::Doctor(args) => doctor::cmd_doctor(&cli.machine, args),
+        Command::Diag(args) => diag::cmd_diag(&cli.machine, args),
+        Command::Policy(args) => policy::cmd_policy(&cli.machine, args),
+        Command::Ast(args) => ast::cmd_ast(&cli.machine, args),
+        Command::Fmt(args) => toolchain::cmd_fmt(&cli.machine, args),
+        Command::Lint(args) => toolchain::cmd_lint(&cli.machine, args),
+        Command::Fix(args) => toolchain::cmd_fix(&cli.machine, args),
+        Command::Build(args) => toolchain::cmd_build(&cli.machine, args),
+        Command::Cli(args) => cli::cmd_cli(&cli.machine, args),
+        Command::Pkg(args) => pkg::cmd_pkg(&cli.machine, args),
+        Command::Review(args) => review::cmd_review(&cli.machine, args),
+        Command::Trust(args) => trust::cmd_trust(&cli.machine, args),
+        Command::Patch(args) => patch::cmd_patch(&cli.machine, args),
+        Command::Doc(args) => doc::cmd_doc(&cli.machine, args),
+        Command::Schema(args) => schema::cmd_schema(&cli.machine, args),
+        Command::Sm(args) => sm::cmd_sm(&cli.machine, args),
+        Command::Rr(args) => rr::cmd_rr(&cli.machine, args),
     }
 }
 
-fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
+fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::process::ExitCode> {
     let started = Instant::now();
 
     let mut args = args;
@@ -378,7 +371,7 @@ fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
                 eprintln!("{}: {} ({})", d.code, d.message, d.path);
             }
             let report = X07TestReport::error_from_manifest(&args, started.elapsed(), diags);
-            return write_report_and_exit(args, report, 12);
+            return write_report_and_exit(machine, args, report, 12);
         }
     };
 
@@ -450,7 +443,7 @@ fn cmd_test(args: TestArgs) -> Result<std::process::ExitCode> {
     let report = finalize_report(&args, &module_root_used, started.elapsed(), results);
 
     let exit_code = compute_exit_code(&args, &report);
-    write_report_and_exit(args, report, exit_code)
+    write_report_and_exit(machine, args, report, exit_code)
 }
 
 fn compute_test_module_roots(
@@ -2067,45 +2060,42 @@ fn compute_exit_code(args: &TestArgs, report: &X07TestReport) -> u8 {
 }
 
 fn write_report_and_exit(
+    machine: &reporting::MachineArgs,
     args: TestArgs,
     report: X07TestReport,
     exit_code: u8,
 ) -> Result<std::process::ExitCode> {
-    let json = serde_json::to_string(&report)? + "\n";
+    let _ = args;
 
-    if let Some(out_path) = &args.report_out {
-        if let Some(parent) = out_path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("create report dir: {}", parent.display()))?;
-        }
-        std::fs::write(out_path, json.as_bytes())
-            .with_context(|| format!("write report: {}", out_path.display()))?;
-        eprintln!(
-            "x07test: passed={} failed={} skipped={} errors={} (exit={})",
-            report.summary.passed,
-            report.summary.failed,
-            report.summary.skipped,
-            report.summary.errors,
-            exit_code
-        );
+    let mut report_bytes = serde_json::to_vec(&report)?;
+    if report_bytes.last() != Some(&b'\n') {
+        report_bytes.push(b'\n');
     }
 
-    if args.json {
-        print!("{json}");
-    } else {
-        for t in &report.tests {
-            println!("{}\t{}", t.status, t.id);
+    if let Some(path) = machine.report_out.as_deref() {
+        if path.as_os_str() == std::ffi::OsStr::new("-") {
+            anyhow::bail!("--report-out '-' is not supported (stdout is reserved for the report)");
         }
+        reporting::write_bytes(path, &report_bytes)?;
+    }
+
+    if machine.quiet_json {
+        return Ok(std::process::ExitCode::from(exit_code));
+    }
+
+    if matches!(machine.json, Some(reporting::JsonArg::Off)) {
         println!(
-            "summary: passed={} failed={} skipped={} errors={} xfail_passed={} xfail_failed={} (exit={})",
+            "summary: passed={} failed={} skipped={} errors={} duration_ms={} compile_failures={} run_failures={}",
             report.summary.passed,
             report.summary.failed,
             report.summary.skipped,
             report.summary.errors,
-            report.summary.xfail_passed,
-            report.summary.xfail_failed,
-            exit_code
+            report.summary.duration_ms,
+            report.summary.compile_failures,
+            report.summary.run_failures,
         );
+    } else {
+        std::io::Write::write_all(&mut std::io::stdout(), &report_bytes).context("write stdout")?;
     }
 
     Ok(std::process::ExitCode::from(exit_code))

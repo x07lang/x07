@@ -8,8 +8,9 @@
   - Writes generated outputs under `<dir>/modules/**` and `<dir>/tests/tests.json`.
 - `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --check`
   - Fails if any generated output would change (drift check).
-- `x07 schema derive ... --report-json`
-  - Prints a machine-readable derive report to stdout (`schema_version: "x07.schema.derive.report@0.1.0"`).
+
+The command always prints a machine-readable derive report to stdout (`schema_version: "x07.schema.derive.report@0.1.0"`).
+To wrap it in the universal tool report envelope, run with `--json` (and optionally `--report-out` / `--quiet-json`).
 
 `--write` and `--check` are mutually exclusive.
 

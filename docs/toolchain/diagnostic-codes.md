@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 112
+- total codes: 115
 - quickfix support (`sometimes` or `always`): 104
-- quickfix coverage: 92.86%
+- quickfix coverage: 90.43%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -49,10 +49,13 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
 | `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
+| `X07-INTERNAL-0001` | x07 / run / error | never | Internal tool failure `X07-INTERNAL-0001`. |
 | `X07-MOVE-0001` | x07c / lint / error | always | `bytes.concat` uses the same identifier on both sides (use-after-move risk). |
 | `X07-MOVE-0002` | x07c / lint / error | always | `if` condition and branch both borrow `bytes.view` from the same owner. |
 | `X07-POLICY-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-POLICY-SCHEMA-0001`. |
 | `X07-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-SCHEMA-0001`. |
+| `X07-TOOL-ARGS-0001` | x07 / parse / error | never | Tool wrapper argument error `X07-TOOL-ARGS-0001`. |
+| `X07-TOOL-EXEC-0001` | x07 / run / error | never | Tool wrapper execution error `X07-TOOL-EXEC-0001`. |
 | `X07-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-UNSAFE-0001`. |
 | `X07-WORLD-0001` | x07c / lint / error | always | Program imports capabilities not allowed by the selected world flags. |
 | `X07-WORLD-FFI-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-FFI-0001`. |
@@ -944,6 +947,27 @@ Agent strategy:
 - If quickfix is absent, perform equivalent manual rewrite and re-run lint.
 
 
+## `X07-INTERNAL-0001`
+
+Summary: Internal tool failure `X07-INTERNAL-0001`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a toolchain fix; no safe source-level quickfix exists.
+
+Details:
+
+The toolchain encountered an internal error or panic while producing a machine report. In machine mode, the wrapper emits this stable code with `exit_code=3`.
+
+Agent strategy:
+
+- Re-run with `--verbose` / `--debug` if available.
+- Reduce to a minimal repro.
+- File a toolchain bug with the machine report JSON (especially `diagnostics[].data`).
+
+
 ## `X07-MOVE-0001`
 
 Summary: `bytes.concat` uses the same identifier on both sides (use-after-move risk).
@@ -1024,6 +1048,46 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07-TOOL-ARGS-0001`
+
+Summary: Tool wrapper argument error `X07-TOOL-ARGS-0001`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires changing the CLI invocation.
+
+Details:
+
+The invocation requested machine output (`--json`, `--jsonl`, `--json-schema`, etc.) but the wrapper flags were invalid or inconsistent.
+
+Agent strategy:
+
+- Fix the CLI flags (for example: add a missing path for `--report-out`, remove conflicting flags).
+- Re-run the command.
+
+
+## `X07-TOOL-EXEC-0001`
+
+Summary: Tool wrapper execution error `X07-TOOL-EXEC-0001`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on the underlying wrapped command failure.
+
+Details:
+
+The wrapped command exited non-zero but did not produce a structured diagnostic. The wrapper emitted this stable tool-level error and captured stdout/stderr in the report payload.
+
+Agent strategy:
+
+- Inspect `diagnostics[].message` and any captured stderr/stdout fields in the report.
+- Fix the underlying failure and re-run the command.
 
 
 ## `X07-UNSAFE-0001`

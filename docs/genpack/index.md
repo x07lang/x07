@@ -4,7 +4,7 @@ Generation-pack exports make x07AST a first-class target for structured generati
 
 Canonical commands:
 
-- `x07 ast schema --json-schema`
+- `x07 ast schema`
 - `x07 ast grammar --cfg`
 - `x07 ast grammar --cfg --out-dir <dir>`
 
@@ -20,4 +20,4 @@ Cookbooks:
 
 MCP-friendly note:
 
-- `x07 ast schema --json-schema` and `x07 ast grammar --cfg` intentionally emit tool-style, schema-first payloads so they can be exposed as MCP tools without changing formats.
+- `x07 ast schema` and `x07 ast grammar --cfg` intentionally emit tool-style, schema-first payloads so they can be exposed as MCP tools without changing formats.

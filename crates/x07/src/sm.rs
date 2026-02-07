@@ -43,24 +43,12 @@ pub enum SmCommand {
 pub struct SmCheckArgs {
     #[arg(long, value_name = "PATH")]
     pub input: PathBuf,
-
-    #[arg(
-        long,
-        action = clap::ArgAction::Set,
-        value_name = "BOOL",
-        value_parser = clap::value_parser!(bool),
-        default_value = "true"
-    )]
-    pub json: bool,
 }
 
 #[derive(Debug, Args)]
 pub struct SmGenArgs {
     #[arg(long, value_name = "PATH")]
     pub input: PathBuf,
-
-    #[arg(long = "out", value_name = "DIR")]
-    pub out_dir: PathBuf,
 
     #[arg(long)]
     pub write: bool,
@@ -144,14 +132,17 @@ struct SmCheckReport {
     errors: Vec<String>,
 }
 
-pub fn cmd_sm(args: SmArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_sm(
+    machine: &crate::reporting::MachineArgs,
+    args: SmArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing sm subcommand (try --help)");
     };
 
     match cmd {
         SmCommand::Check(args) => cmd_sm_check(args),
-        SmCommand::Gen(args) => cmd_sm_gen(args),
+        SmCommand::Gen(args) => cmd_sm_gen(machine, args),
     }
 }
 
@@ -159,18 +150,12 @@ fn cmd_sm_check(args: SmCheckArgs) -> Result<std::process::ExitCode> {
     let (spec, errors) = load_and_validate_spec(&args.input)?;
     let ok = errors.is_empty();
 
-    if args.json {
-        let report = SmCheckReport {
-            schema_version: "x07.sm.check@0.1.0".to_string(),
-            ok,
-            errors,
-        };
-        println!("{}", serde_json::to_string(&report)?);
-    } else {
-        for e in &errors {
-            eprintln!("{e}");
-        }
-    }
+    let report = SmCheckReport {
+        schema_version: "x07.sm.check@0.1.0".to_string(),
+        ok,
+        errors,
+    };
+    println!("{}", serde_json::to_string(&report)?);
 
     if ok {
         // Ensure we don't warn about unused parsed spec.
@@ -181,7 +166,10 @@ fn cmd_sm_check(args: SmCheckArgs) -> Result<std::process::ExitCode> {
     }
 }
 
-fn cmd_sm_gen(args: SmGenArgs) -> Result<std::process::ExitCode> {
+fn cmd_sm_gen(
+    machine: &crate::reporting::MachineArgs,
+    args: SmGenArgs,
+) -> Result<std::process::ExitCode> {
     if args.write && args.check {
         anyhow::bail!("sm gen: choose exactly one of --write or --check");
     }
@@ -219,7 +207,11 @@ fn cmd_sm_gen(args: SmGenArgs) -> Result<std::process::ExitCode> {
     .with_context(|| format!("parse JSON: {}", args.input.display()))?;
     let spec_hash = util::sha256_hex(&util::canonical_jcs_bytes(&spec_doc)?);
 
-    let out_dir = args.out_dir;
+    let out_dir = machine
+        .out
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("sm gen: missing --out <DIR>"))?
+        .clone();
     let out = render_sm_artifacts(&spec, &out_dir, &input_rel, &spec_hash)?;
 
     if args.check {

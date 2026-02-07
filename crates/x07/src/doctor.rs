@@ -37,7 +37,10 @@ struct Check {
     detail: Option<String>,
 }
 
-pub fn cmd_doctor(_args: DoctorArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_doctor(
+    _machine: &crate::reporting::MachineArgs,
+    _args: DoctorArgs,
+) -> Result<std::process::ExitCode> {
     let platform = detect_platform();
     let mut checks: Vec<Check> = Vec::new();
     let mut suggestions: Vec<String> = Vec::new();

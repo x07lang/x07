@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07c.report.schema.json",
   "title": "X07 x07c tool report v0.1.0",
-  "description": "Machine-readable report emitted by x07 fmt/lint/fix (and x07c subcommands) when using --report-json.",
+  "description": "Machine-readable report emitted by `x07c` subcommands when using `--report-json`.",
   "type": "object",
   "additionalProperties": false,
   "required": [

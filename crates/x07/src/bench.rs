@@ -109,10 +109,6 @@ pub struct BenchValidateArgs {
     #[arg(long, value_enum, default_value_t = BenchFormat::Json)]
     pub format: BenchFormat,
 
-    /// Write the validation report to a file (stdout when omitted).
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-
     /// Number of x07 test jobs per instance.
     #[arg(long, value_name = "N", default_value_t = 1)]
     pub jobs: usize,
@@ -175,10 +171,6 @@ pub struct BenchEvalArgs {
     #[arg(long, value_enum, default_value_t = BenchFormat::Json)]
     pub format: BenchFormat,
 
-    /// Write the report to a file (stdout when omitted).
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-
     /// Filter instances by id substring.
     #[arg(long, value_name = "SUBSTR")]
     pub filter: Option<String>,
@@ -204,15 +196,18 @@ pub struct BenchEvalArgs {
     pub artifact_dir: PathBuf,
 }
 
-pub fn cmd_bench(args: BenchArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_bench(
+    machine: &crate::reporting::MachineArgs,
+    args: BenchArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing bench subcommand (try --help)");
     };
 
     match cmd {
         BenchCommand::List(args) => cmd_bench_list(args),
-        BenchCommand::Validate(args) => cmd_bench_validate(args),
-        BenchCommand::Eval(args) => cmd_bench_eval(args),
+        BenchCommand::Validate(args) => cmd_bench_validate(machine, args),
+        BenchCommand::Eval(args) => cmd_bench_eval(machine, args),
     }
 }
 
@@ -691,7 +686,10 @@ fn run_docker_bench_command(
     Ok(exit_code_from_i32(status.code().unwrap_or(1)))
 }
 
-fn run_validate_via_docker(args: &BenchValidateArgs) -> Result<std::process::ExitCode> {
+fn run_validate_via_docker(
+    machine: &crate::reporting::MachineArgs,
+    args: &BenchValidateArgs,
+) -> Result<std::process::ExitCode> {
     let (script, repo_root) = resolve_bench_docker_runner_paths()?;
     let suite = docker_mount_rel(&args.suite, &repo_root, true)?;
     let artifact_dir = docker_mount_rel(&args.artifact_dir, &repo_root, false)?;
@@ -727,7 +725,7 @@ fn run_validate_via_docker(args: &BenchValidateArgs) -> Result<std::process::Exi
     if args.keep_artifacts {
         argv.push("--keep-artifacts".to_string());
     }
-    if let Some(out) = args.out.as_ref() {
+    if let Some(out) = machine.out.as_ref() {
         argv.push("--out".to_string());
         argv.push(docker_mount_rel(out, &repo_root, false)?);
     }
@@ -739,7 +737,10 @@ fn run_validate_via_docker(args: &BenchValidateArgs) -> Result<std::process::Exi
     run_docker_bench_command(&script, args.docker_image.as_deref(), &argv)
 }
 
-fn run_eval_via_docker(args: &BenchEvalArgs) -> Result<std::process::ExitCode> {
+fn run_eval_via_docker(
+    machine: &crate::reporting::MachineArgs,
+    args: &BenchEvalArgs,
+) -> Result<std::process::ExitCode> {
     let (script, repo_root) = resolve_bench_docker_runner_paths()?;
     let suite = docker_mount_rel(&args.suite, &repo_root, true)?;
     let artifact_dir = docker_mount_rel(&args.artifact_dir, &repo_root, false)?;
@@ -787,7 +788,7 @@ fn run_eval_via_docker(args: &BenchEvalArgs) -> Result<std::process::ExitCode> {
     if args.keep_artifacts {
         argv.push("--keep-artifacts".to_string());
     }
-    if let Some(out) = args.out.as_ref() {
+    if let Some(out) = machine.out.as_ref() {
         argv.push("--out".to_string());
         argv.push(docker_mount_rel(out, &repo_root, false)?);
     }
@@ -842,9 +843,12 @@ fn cmd_bench_list(args: BenchListArgs) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
-fn cmd_bench_validate(args: BenchValidateArgs) -> Result<std::process::ExitCode> {
+fn cmd_bench_validate(
+    machine: &crate::reporting::MachineArgs,
+    args: BenchValidateArgs,
+) -> Result<std::process::ExitCode> {
     if args.runner == BenchRunner::Docker && !running_inside_bench_docker() {
-        return run_validate_via_docker(&args);
+        return run_validate_via_docker(machine, &args);
     }
 
     let started = Instant::now();
@@ -869,7 +873,7 @@ fn cmd_bench_validate(args: BenchValidateArgs) -> Result<std::process::ExitCode>
                     None,
                 )],
             };
-            emit_json_or_text(args.format, &report, args.out.as_deref())?;
+            emit_json_or_text(args.format, &report, machine.out.as_deref())?;
             return Ok(std::process::ExitCode::from(20));
         }
     };
@@ -942,7 +946,7 @@ fn cmd_bench_validate(args: BenchValidateArgs) -> Result<std::process::ExitCode>
         diags: Vec::new(),
     };
 
-    emit_json_or_text(args.format, &report, args.out.as_deref())?;
+    emit_json_or_text(args.format, &report, machine.out.as_deref())?;
     Ok(if ok {
         std::process::ExitCode::SUCCESS
     } else {
@@ -950,9 +954,12 @@ fn cmd_bench_validate(args: BenchValidateArgs) -> Result<std::process::ExitCode>
     })
 }
 
-fn cmd_bench_eval(args: BenchEvalArgs) -> Result<std::process::ExitCode> {
+fn cmd_bench_eval(
+    machine: &crate::reporting::MachineArgs,
+    args: BenchEvalArgs,
+) -> Result<std::process::ExitCode> {
     if args.runner == BenchRunner::Docker && !running_inside_bench_docker() {
-        return run_eval_via_docker(&args);
+        return run_eval_via_docker(machine, &args);
     }
 
     let started = Instant::now();
@@ -996,7 +1003,7 @@ fn cmd_bench_eval(args: BenchEvalArgs) -> Result<std::process::ExitCode> {
                     notes: Vec::new(),
                 }],
             };
-            emit_report(args.format, &report, args.out.as_deref())?;
+            emit_report(args.format, &report, machine.out.as_deref())?;
             return Ok(std::process::ExitCode::from(20));
         }
     };
@@ -1112,7 +1119,7 @@ fn cmd_bench_eval(args: BenchEvalArgs) -> Result<std::process::ExitCode> {
         anyhow::bail!("bench report did not validate against schema");
     }
 
-    emit_report(args.format, &report, args.out.as_deref())?;
+    emit_report(args.format, &report, machine.out.as_deref())?;
 
     Ok(if report.summary.errors == 0 {
         std::process::ExitCode::SUCCESS

@@ -1,8 +1,8 @@
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::path::PathBuf;
-use std::process::Command;
+use std::io::Read as _;
+use std::process::{Command, Stdio};
+use std::sync::mpsc;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
@@ -11,47 +11,14 @@ use serde::Serialize;
 use serde_json::Value;
 use x07c::diagnostics;
 
-use crate::util;
+use crate::reporting;
 
 const TOOL_API_CHILD_ENV: &str = "X07_TOOL_API_CHILD";
-const X07_TOOL_REPORT_SCHEMA_BYTES: &[u8] =
-    include_bytes!("../../../spec/x07-tool.report.schema.json");
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum JsonMode {
-    Off,
-    Canon,
-    Pretty,
-}
-
-#[derive(Debug, Clone)]
-struct ParsedMachineFlags {
-    mode: JsonMode,
-    jsonl: bool,
-    json_schema: bool,
-    json_schema_id: bool,
-    report_out: Option<PathBuf>,
-    quiet_json: bool,
-    passthrough: Vec<OsString>,
-    parse_errors: Vec<String>,
-    saw_any: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct ToolReportMeta {
-    tool: ToolVersionMeta,
-    elapsed_ms: u64,
-    cwd: String,
-    argv: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct ToolVersionMeta {
-    name: &'static str,
-    version: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    git_sha: Option<String>,
-}
+const TOOL_REPORT_SEMVER: &str = "0.1.0";
+const X07_DOC_REPORT_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-doc.report.schema.json");
+const X07_TOOL_EVENTS_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-tool.events.schema.json");
 
 #[derive(Debug, Clone, Serialize)]
 struct StreamPayload {
@@ -72,17 +39,6 @@ struct ToolResultPayload {
     stderr_json: Option<Value>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct ToolReport {
-    schema_version: String,
-    command: String,
-    ok: bool,
-    exit_code: u8,
-    diagnostics: Vec<diagnostics::Diagnostic>,
-    meta: ToolReportMeta,
-    result: ToolResultPayload,
-}
-
 pub(crate) fn maybe_handle(raw_args: &[OsString]) -> Result<Option<std::process::ExitCode>> {
     if std::env::var_os(TOOL_API_CHILD_ENV).is_some() {
         return Ok(None);
@@ -91,508 +47,469 @@ pub(crate) fn maybe_handle(raw_args: &[OsString]) -> Result<Option<std::process:
         return Ok(None);
     }
 
-    let parsed = parse_machine_flags(&raw_args[1..]);
+    let parsed = reporting::parse_machine_flags(&raw_args[1..]);
     if !parsed.saw_any {
         return Ok(None);
     }
-
-    let scope = detect_scope(&parsed.passthrough).unwrap_or_else(|| "root".to_string());
-    let has_native_json = has_native_json_mode(&scope);
-    let has_native_schema = has_native_json_schema(&scope);
-
-    let wants_schema = parsed.json_schema || parsed.json_schema_id;
-    let wants_json = parsed.mode != JsonMode::Off || parsed.jsonl;
-    let needs_wrapper = if wants_schema {
-        !has_native_schema
-            || parsed.mode != JsonMode::Off
-            || parsed.jsonl
-            || parsed.quiet_json
-            || parsed.report_out.is_some()
-    } else if wants_json {
-        if parsed.mode == JsonMode::Pretty
-            || parsed.jsonl
-            || parsed.quiet_json
-            || parsed.report_out.is_some()
-        {
-            true
-        } else {
-            !has_native_json
-        }
-    } else {
-        parsed.report_out.is_some() || parsed.quiet_json || parsed.jsonl
-    };
-
-    if !needs_wrapper {
+    let should_handle = parsed.mode != reporting::JsonMode::Off
+        || parsed.json_schema
+        || parsed.json_schema_id
+        || !parsed.parse_errors.is_empty();
+    if !should_handle {
         return Ok(None);
     }
 
     let started = Instant::now();
+    let scope = reporting::detect_scope(&parsed.passthrough);
 
-    if parsed.json_schema_id {
-        let schema_id = schema_id_for_scope(&scope);
-        if parsed.json_schema {
-            let schema = command_schema(&scope)?;
-            let bytes = encode_json_bytes(&schema, parsed.mode)?;
-            if let Some(path) = &parsed.report_out {
-                write_bytes(path, &bytes)?;
-            }
-            if !parsed.quiet_json {
-                std::io::Write::write_all(&mut std::io::stdout(), &bytes)
-                    .context("write stdout")?;
-            }
-            return Ok(Some(std::process::ExitCode::SUCCESS));
+    let res = std::panic::catch_unwind(|| {
+        handle_machine_request(raw_args, &parsed, scope.as_deref(), started)
+    });
+    match res {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(err)) => {
+            let report =
+                internal_error_report(raw_args, scope.as_deref(), started, &format!("{err:#}"));
+            emit_error_or_report(&parsed, scope.as_deref(), started, &report)?;
+            Ok(Some(std::process::ExitCode::from(report.exit_code)))
         }
-
-        let mut out = schema_id.into_bytes();
-        out.push(b'\n');
-        if let Some(path) = &parsed.report_out {
-            write_bytes(path, &out)?;
+        Err(panic) => {
+            let msg = panic_message(panic);
+            let report = internal_error_report(raw_args, scope.as_deref(), started, &msg);
+            emit_error_or_report(&parsed, scope.as_deref(), started, &report)?;
+            Ok(Some(std::process::ExitCode::from(report.exit_code)))
         }
-        if !parsed.quiet_json {
-            std::io::Write::write_all(&mut std::io::stdout(), &out).context("write stdout")?;
-        }
-        return Ok(Some(std::process::ExitCode::SUCCESS));
     }
-
-    if parsed.json_schema {
-        let schema = command_schema(&scope)?;
-        let bytes = encode_json_bytes(&schema, parsed.mode)?;
-        if let Some(path) = &parsed.report_out {
-            write_bytes(path, &bytes)?;
-        }
-        if !parsed.quiet_json {
-            std::io::Write::write_all(&mut std::io::stdout(), &bytes).context("write stdout")?;
-        }
-        return Ok(Some(std::process::ExitCode::SUCCESS));
-    }
-
-    if parsed.parse_errors.is_empty() {
-        let report = run_wrapped_command(raw_args, &parsed, &scope, started)?;
-        let code = report.exit_code;
-        emit_report(&parsed, &report)?;
-        return Ok(Some(std::process::ExitCode::from(code)));
-    }
-
-    let mut diags = Vec::new();
-    for msg in &parsed.parse_errors {
-        diags.push(diag_error(
-            "X07-TOOL-ARGS-0001",
-            diagnostics::Stage::Parse,
-            msg,
-        ));
-    }
-    let report = error_report(raw_args, &scope, started, 2, diags);
-    emit_report(&parsed, &report)?;
-    Ok(Some(std::process::ExitCode::from(2)))
 }
 
-fn run_wrapped_command(
+fn handle_machine_request(
     raw_args: &[OsString],
-    parsed: &ParsedMachineFlags,
-    scope: &str,
+    parsed: &reporting::ParsedMachineFlags,
+    scope: Option<&str>,
     started: Instant,
-) -> Result<ToolReport> {
+) -> Result<Option<std::process::ExitCode>> {
+    if parsed.json_schema || parsed.json_schema_id {
+        let code = emit_schema_or_id(parsed, scope)?;
+        return Ok(Some(code));
+    }
+
+    let wants_report = parsed.mode != reporting::JsonMode::Off;
+    if !wants_report {
+        let mut diags = Vec::new();
+        if !parsed.parse_errors.is_empty() {
+            for msg in &parsed.parse_errors {
+                diags.push(reporting::diag_error(
+                    "X07-TOOL-ARGS-0001",
+                    diagnostics::Stage::Parse,
+                    msg,
+                ));
+            }
+        } else if parsed.report_out.is_some() || parsed.quiet_json {
+            diags.push(reporting::diag_error(
+                "X07-TOOL-ARGS-0001",
+                diagnostics::Stage::Parse,
+                "--report-out/--quiet-json requires --json",
+            ));
+        } else {
+            return Ok(None);
+        }
+
+        let report = reporting::build_report(
+            scope,
+            TOOL_REPORT_SEMVER,
+            started,
+            raw_args,
+            2,
+            diags,
+            ToolResultPayload {
+                stdout: empty_stream_payload(),
+                stderr: empty_stream_payload(),
+                stdout_json: None,
+                stderr_json: None,
+            },
+            reporting::MetaDelta::default(),
+        );
+        emit_error_or_report(parsed, scope, started, &report)?;
+        return Ok(Some(std::process::ExitCode::from(report.exit_code)));
+    }
+
+    if !parsed.parse_errors.is_empty() {
+        let mut diags = Vec::new();
+        for msg in &parsed.parse_errors {
+            diags.push(reporting::diag_error(
+                "X07-TOOL-ARGS-0001",
+                diagnostics::Stage::Parse,
+                msg,
+            ));
+        }
+
+        let report = reporting::build_report(
+            scope,
+            TOOL_REPORT_SEMVER,
+            started,
+            raw_args,
+            2,
+            diags,
+            ToolResultPayload {
+                stdout: empty_stream_payload(),
+                stderr: empty_stream_payload(),
+                stdout_json: None,
+                stderr_json: None,
+            },
+            reporting::MetaDelta::default(),
+        );
+        emit_error_or_report(parsed, scope, started, &report)?;
+        return Ok(Some(std::process::ExitCode::from(report.exit_code)));
+    }
+
+    if parsed.mode == reporting::JsonMode::Jsonl {
+        let command_id = reporting::command_id_for_scope(scope);
+        let mut emitter = reporting::JsonlEmitter::new(started);
+        emitter.emit(&command_id, "start", serde_json::json!({ "scope": scope }))?;
+
+        let out = run_wrapped_command_streaming(&parsed.passthrough, &command_id, &mut emitter)?;
+        let report = wrapped_report(raw_args, parsed, scope, started, out)?;
+
+        emitter.emit(&command_id, "final_report", serde_json::to_value(&report)?)?;
+
+        if let Some(path) = parsed.report_out.as_deref() {
+            let bytes = reporting::encode_json_bytes(
+                &serde_json::to_value(&report)?,
+                reporting::JsonMode::Canon,
+            )?;
+            reporting::write_bytes(path, &bytes)?;
+        }
+
+        return Ok(Some(std::process::ExitCode::from(report.exit_code)));
+    }
+
+    if parsed.mode != reporting::JsonMode::Off && is_native_json_scope(scope) {
+        let out = run_native_json_command(parsed)?;
+        return Ok(Some(emit_native_or_fallback(
+            raw_args, parsed, scope, started, out,
+        )?));
+    }
+
+    let out = run_wrapped_command(&parsed.passthrough)?;
+    let report = wrapped_report(raw_args, parsed, scope, started, out)?;
+    emit_report_json(parsed, &report)?;
+
+    Ok(Some(std::process::ExitCode::from(report.exit_code)))
+}
+
+fn wrapped_report(
+    raw_args: &[OsString],
+    parsed: &reporting::ParsedMachineFlags,
+    scope: Option<&str>,
+    started: Instant,
+    out: ChildOutput,
+) -> Result<reporting::ToolReport<ToolResultPayload>> {
+    let stdout_json = parse_json_bytes(&out.stdout);
+    let stderr_json = parse_json_bytes(&out.stderr);
+
+    let mut diagnostics = extract_diagnostics(stdout_json.as_ref())
+        .or_else(|| extract_diagnostics(stderr_json.as_ref()))
+        .unwrap_or_default();
+
+    let mut exit_code = out.exit_code;
+    if out.internal_failure {
+        exit_code = 3;
+        diagnostics.clear();
+        let mut diag = reporting::diag_error(
+            "X07-INTERNAL-0001",
+            diagnostics::Stage::Run,
+            "internal tool failure",
+        );
+        if let Ok(text) = String::from_utf8(out.stderr.clone()) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                diag.data.insert(
+                    "panic_stderr".to_string(),
+                    Value::String(trimmed.to_string()),
+                );
+            }
+        }
+        diagnostics.push(diag);
+    }
+
+    if exit_code != 0
+        && diagnostics
+            .iter()
+            .all(|d| d.severity != diagnostics::Severity::Error)
+    {
+        let msg = stream_payload(&out.stderr)
+            .text
+            .unwrap_or_else(|| format!("wrapped command failed with exit code {exit_code}"));
+        diagnostics.push(reporting::diag_error(
+            "X07-TOOL-EXEC-0001",
+            diagnostics::Stage::Run,
+            msg.trim(),
+        ));
+    }
+
+    let result = ToolResultPayload {
+        stdout: stream_payload(&out.stdout),
+        stderr: stream_payload(&out.stderr),
+        stdout_json,
+        stderr_json,
+    };
+
+    let mut meta = reporting::MetaDelta::default();
+    if let Some(out) = parsed.out.as_ref() {
+        meta.outputs.push(out.clone());
+    }
+    if let Some(path) = parsed.report_out.as_ref() {
+        meta.outputs.push(path.clone());
+    }
+
+    Ok(reporting::build_report(
+        scope,
+        TOOL_REPORT_SEMVER,
+        started,
+        raw_args,
+        exit_code,
+        diagnostics,
+        result,
+        meta,
+    ))
+}
+
+fn emit_schema_or_id(
+    parsed: &reporting::ParsedMachineFlags,
+    scope: Option<&str>,
+) -> Result<std::process::ExitCode> {
+    if parsed.json_schema {
+        let bytes = if parsed.mode == reporting::JsonMode::Jsonl {
+            X07_TOOL_EVENTS_SCHEMA_BYTES
+        } else {
+            schema_bytes_for_scope(scope)?
+        };
+        reporting::emit_report_bytes(bytes, parsed.report_out.as_deref(), parsed.quiet_json)?;
+        return Ok(std::process::ExitCode::SUCCESS);
+    }
+
+    if parsed.json_schema_id {
+        let id = if parsed.mode == reporting::JsonMode::Jsonl {
+            reporting::TOOL_EVENTS_SCHEMA_VERSION.to_string()
+        } else if scope == Some("doc") {
+            x07_contracts::X07_DOC_REPORT_SCHEMA_VERSION.to_string()
+        } else {
+            reporting::schema_id_for_scope(scope, TOOL_REPORT_SEMVER)
+        };
+        let mut bytes = id.into_bytes();
+        bytes.push(b'\n');
+        reporting::emit_report_bytes(&bytes, parsed.report_out.as_deref(), parsed.quiet_json)?;
+        return Ok(std::process::ExitCode::SUCCESS);
+    }
+
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn emit_error_or_report(
+    parsed: &reporting::ParsedMachineFlags,
+    scope: Option<&str>,
+    started: Instant,
+    report: &reporting::ToolReport<ToolResultPayload>,
+) -> Result<()> {
+    if parsed.mode == reporting::JsonMode::Jsonl {
+        let command_id = reporting::command_id_for_scope(scope);
+        let mut emitter = reporting::JsonlEmitter::new(started);
+        emitter.emit(&command_id, "start", serde_json::json!({ "scope": scope }))?;
+        emitter.emit(&command_id, "final_report", serde_json::to_value(report)?)?;
+
+        if let Some(path) = parsed.report_out.as_deref() {
+            let bytes = reporting::encode_json_bytes(
+                &serde_json::to_value(report)?,
+                reporting::JsonMode::Canon,
+            )?;
+            reporting::write_bytes(path, &bytes)?;
+        }
+        return Ok(());
+    }
+
+    emit_report_json(parsed, report)
+}
+
+fn emit_report_json(
+    parsed: &reporting::ParsedMachineFlags,
+    report: &reporting::ToolReport<ToolResultPayload>,
+) -> Result<()> {
+    let report_value = serde_json::to_value(report)?;
+    let bytes = reporting::encode_json_bytes(&report_value, parsed.mode)?;
+    reporting::emit_report_bytes(&bytes, parsed.report_out.as_deref(), parsed.quiet_json)
+}
+
+fn schema_bytes_for_scope(scope: Option<&str>) -> Result<&'static [u8]> {
+    match scope {
+        Some("doc") => Ok(X07_DOC_REPORT_SCHEMA_BYTES),
+        _ => crate::tool_report_schemas::tool_report_schema_bytes(scope.map(std::ffi::OsStr::new))
+            .context("missing embedded tool report schema for scope"),
+    }
+}
+
+fn is_native_json_scope(scope: Option<&str>) -> bool {
+    matches!(scope, Some("doc"))
+}
+
+fn run_native_json_command(parsed: &reporting::ParsedMachineFlags) -> Result<ChildOutput> {
+    let mut args = parsed.passthrough.clone();
+    args.push(OsString::from("--json"));
+    run_wrapped_command(&args)
+}
+
+fn emit_native_or_fallback(
+    raw_args: &[OsString],
+    parsed: &reporting::ParsedMachineFlags,
+    scope: Option<&str>,
+    started: Instant,
+    out: ChildOutput,
+) -> Result<std::process::ExitCode> {
+    if out.internal_failure {
+        let report = wrapped_report(raw_args, parsed, scope, started, out)?;
+        emit_report_json(parsed, &report)?;
+        return Ok(std::process::ExitCode::from(report.exit_code));
+    }
+
+    let doc: Value = match serde_json::from_slice(&out.stdout) {
+        Ok(v) => v,
+        Err(_) => {
+            let report = wrapped_report(raw_args, parsed, scope, started, out)?;
+            emit_report_json(parsed, &report)?;
+            return Ok(std::process::ExitCode::from(report.exit_code));
+        }
+    };
+
+    let bytes = reporting::encode_json_bytes(&doc, parsed.mode)?;
+    reporting::emit_report_bytes(&bytes, parsed.report_out.as_deref(), parsed.quiet_json)?;
+    Ok(std::process::ExitCode::from(out.exit_code))
+}
+
+#[derive(Debug)]
+struct ChildOutput {
+    exit_code: u8,
+    internal_failure: bool,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
+fn run_wrapped_command(args: &[OsString]) -> Result<ChildOutput> {
     let exe = std::env::current_exe().context("resolve current executable")?;
     let output = Command::new(exe)
-        .args(&parsed.passthrough)
+        .args(args)
         .env(TOOL_API_CHILD_ENV, "1")
         .output()
         .context("run wrapped command")?;
 
-    let exit_code = output.status.code().unwrap_or(3).clamp(0, 255) as u8;
-    let ok = exit_code == 0;
+    let raw = output.status.code();
+    let internal_failure = raw.is_none() || raw == Some(101);
+    let exit_code = raw.unwrap_or(3).clamp(0, 255) as u8;
 
-    let stdout_payload = stream_payload(&output.stdout);
-    let stderr_payload = stream_payload(&output.stderr);
-    let stdout_json = parse_json_bytes(&output.stdout);
-    let stderr_json = parse_json_bytes(&output.stderr);
-
-    let mut diagnostics = extract_diagnostics(stdout_json.as_ref())
-        .or_else(|| extract_diagnostics(stderr_json.as_ref()));
-    if !ok && diagnostics.is_none() {
-        let msg = if let Some(text) = stderr_payload.text.as_deref() {
-            let trimmed = text.trim();
-            if trimmed.is_empty() {
-                format!("wrapped command failed with exit code {exit_code}")
-            } else {
-                trimmed.to_string()
-            }
-        } else {
-            format!("wrapped command failed with exit code {exit_code}")
-        };
-        diagnostics = Some(vec![diag_error(
-            "X07-TOOL-EXEC-0001",
-            diagnostics::Stage::Run,
-            &msg,
-        )]);
-    }
-
-    Ok(ToolReport {
-        schema_version: schema_id_for_scope(scope),
-        command: command_id_for_scope(scope),
-        ok,
+    Ok(ChildOutput {
         exit_code,
-        diagnostics: diagnostics.unwrap_or_default(),
-        meta: ToolReportMeta {
-            tool: ToolVersionMeta {
-                name: "x07",
-                version: env!("CARGO_PKG_VERSION"),
-                git_sha: std::env::var("X07_GIT_SHA").ok(),
-            },
-            elapsed_ms: started.elapsed().as_millis() as u64,
-            cwd: std::env::current_dir()
-                .unwrap_or_else(|_| PathBuf::from("."))
-                .display()
-                .to_string(),
-            argv: raw_args.iter().map(os_to_string).collect(),
-        },
-        result: ToolResultPayload {
-            stdout: stdout_payload,
-            stderr: stderr_payload,
-            stdout_json,
-            stderr_json,
-        },
+        internal_failure,
+        stdout: output.stdout,
+        stderr: output.stderr,
     })
 }
 
-fn emit_report(parsed: &ParsedMachineFlags, report: &ToolReport) -> Result<()> {
-    let report_value = serde_json::to_value(report)?;
-    let out = if parsed.jsonl {
-        let mut bytes = util::canonical_jcs_bytes(&report_value)?;
-        if bytes.last() != Some(&b'\n') {
-            bytes.push(b'\n');
-        }
-        bytes
-    } else {
-        encode_json_bytes(&report_value, parsed.mode)?
-    };
-
-    if let Some(path) = &parsed.report_out {
-        write_bytes(path, &out)?;
-    }
-    if !parsed.quiet_json {
-        std::io::Write::write_all(&mut std::io::stdout(), &out).context("write stdout")?;
-    }
-    Ok(())
+#[derive(Debug)]
+enum StreamKind {
+    Stdout,
+    Stderr,
 }
 
-fn command_schema(scope: &str) -> Result<Value> {
-    let mut schema: Value =
-        serde_json::from_slice(X07_TOOL_REPORT_SCHEMA_BYTES).context("parse tool report schema")?;
-    let schema_id = schema_id_for_scope(scope);
-    let command_id = command_id_for_scope(scope);
-    let schema_url = schema_url_for_scope(scope);
-
-    let obj = schema
-        .as_object_mut()
-        .context("tool report schema must be an object")?;
-    obj.insert("$id".to_string(), Value::String(schema_url));
-    obj.insert("title".to_string(), Value::String(schema_id.clone()));
-
-    if let Some(props) = obj.get_mut("properties").and_then(Value::as_object_mut) {
-        if let Some(v) = props
-            .get_mut("schema_version")
-            .and_then(Value::as_object_mut)
-        {
-            v.insert("const".to_string(), Value::String(schema_id));
-        }
-        if let Some(v) = props.get_mut("command").and_then(Value::as_object_mut) {
-            v.insert("const".to_string(), Value::String(command_id));
-        }
-    }
-
-    Ok(schema)
+#[derive(Debug)]
+struct StreamMsg {
+    kind: StreamKind,
+    bytes: Vec<u8>,
 }
 
-fn parse_machine_flags(tokens: &[OsString]) -> ParsedMachineFlags {
-    let mut mode = JsonMode::Off;
-    let mut jsonl = false;
-    let mut json_schema = false;
-    let mut json_schema_id = false;
-    let mut report_out = None;
-    let mut quiet_json = false;
-    let mut parse_errors = Vec::new();
-    let mut passthrough = Vec::new();
-    let mut saw_any = false;
+fn run_wrapped_command_streaming(
+    args: &[OsString],
+    command_id: &str,
+    emitter: &mut reporting::JsonlEmitter,
+) -> Result<ChildOutput> {
+    let exe = std::env::current_exe().context("resolve current executable")?;
+    let mut child = Command::new(exe)
+        .args(args)
+        .env(TOOL_API_CHILD_ENV, "1")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("spawn wrapped command")?;
 
-    let mut i = 0usize;
-    while i < tokens.len() {
-        let token = &tokens[i];
-        let s = token.to_string_lossy();
+    let mut stdout = child.stdout.take().context("child stdout")?;
+    let mut stderr = child.stderr.take().context("child stderr")?;
 
-        if s == "--json" {
-            saw_any = true;
-            if let Some(next) = tokens.get(i + 1).map(|v| v.to_string_lossy()) {
-                if !next.starts_with('-') {
-                    match parse_json_mode_value(next.as_ref()) {
-                        Ok(m) => {
-                            mode = m;
-                            i += 2;
-                            continue;
-                        }
-                        Err(_) => {
-                            mode = JsonMode::Canon;
-                            i += 1;
-                            continue;
-                        }
-                    }
-                }
+    let (tx, rx) = mpsc::channel::<StreamMsg>();
+
+    let tx_out = tx.clone();
+    let out_thread = std::thread::spawn(move || {
+        let mut buf = [0u8; 8 * 1024];
+        while let Ok(n) = stdout.read(&mut buf) {
+            if n == 0 {
+                break;
             }
-            mode = JsonMode::Canon;
-            i += 1;
-            continue;
+            let _ = tx_out.send(StreamMsg {
+                kind: StreamKind::Stdout,
+                bytes: buf[..n].to_vec(),
+            });
         }
-        if let Some(raw) = s.strip_prefix("--json=") {
-            saw_any = true;
-            match parse_json_mode_value(raw) {
-                Ok(m) => mode = m,
-                Err(err) => parse_errors.push(err),
+    });
+
+    let tx_err = tx;
+    let err_thread = std::thread::spawn(move || {
+        let mut buf = [0u8; 8 * 1024];
+        while let Ok(n) = stderr.read(&mut buf) {
+            if n == 0 {
+                break;
             }
-            i += 1;
-            continue;
+            let _ = tx_err.send(StreamMsg {
+                kind: StreamKind::Stderr,
+                bytes: buf[..n].to_vec(),
+            });
         }
-        if s == "--jsonl" {
-            saw_any = true;
-            jsonl = true;
-            i += 1;
-            continue;
-        }
-        if s == "--json-schema" {
-            saw_any = true;
-            json_schema = true;
-            i += 1;
-            continue;
-        }
-        if s == "--json-schema-id" {
-            saw_any = true;
-            json_schema_id = true;
-            i += 1;
-            continue;
-        }
-        if s == "--quiet-json" {
-            saw_any = true;
-            quiet_json = true;
-            i += 1;
-            continue;
-        }
-        if s == "--report-out" {
-            saw_any = true;
-            if let Some(path) = tokens.get(i + 1) {
-                report_out = Some(PathBuf::from(path));
-                i += 2;
-                continue;
+    });
+
+    let mut out_bytes = Vec::new();
+    let mut err_bytes = Vec::new();
+
+    while let Ok(msg) = rx.recv() {
+        match msg.kind {
+            StreamKind::Stdout => {
+                out_bytes.extend_from_slice(&msg.bytes);
+                emitter.emit(
+                    command_id,
+                    "stdout_chunk",
+                    serde_json::to_value(stream_payload(&msg.bytes))?,
+                )?;
             }
-            parse_errors.push("--report-out requires a path".to_string());
-            i += 1;
-            continue;
-        }
-        if let Some(path) = s.strip_prefix("--report-out=") {
-            saw_any = true;
-            report_out = Some(PathBuf::from(path));
-            i += 1;
-            continue;
-        }
-
-        passthrough.push(token.clone());
-        i += 1;
-    }
-
-    if quiet_json && report_out.is_none() {
-        parse_errors.push("--quiet-json requires --report-out <PATH>".to_string());
-    }
-    if mode != JsonMode::Off && jsonl {
-        parse_errors.push("--jsonl conflicts with --json=<mode>".to_string());
-    }
-
-    ParsedMachineFlags {
-        mode,
-        jsonl,
-        json_schema,
-        json_schema_id,
-        report_out,
-        quiet_json,
-        passthrough,
-        parse_errors,
-        saw_any,
-    }
-}
-
-fn parse_json_mode_value(raw: &str) -> Result<JsonMode, String> {
-    match raw.trim() {
-        "" | "true" | "canon" => Ok(JsonMode::Canon),
-        "false" | "off" => Ok(JsonMode::Off),
-        "pretty" => Ok(JsonMode::Pretty),
-        other => Err(format!(
-            "unsupported --json value {other:?}; expected one of: true,false,canon,pretty,off"
-        )),
-    }
-}
-
-fn detect_scope(tokens: &[OsString]) -> Option<String> {
-    let top = first_positional(tokens)?;
-    let top_cmd = top.to_string();
-    if !is_top_level_command(&top_cmd) {
-        return None;
-    }
-    let mut scope = top_cmd;
-
-    if let Some(next) = next_positional(tokens, &scope, 1) {
-        if nested_commands(&scope).contains(&next.as_str()) {
-            scope = format!("{scope}.{next}");
-            if let Some(third) = next_positional(tokens, &scope, 2) {
-                if nested_commands(&scope).contains(&third.as_str()) {
-                    scope = format!("{scope}.{third}");
-                }
+            StreamKind::Stderr => {
+                err_bytes.extend_from_slice(&msg.bytes);
+                emitter.emit(
+                    command_id,
+                    "stderr_chunk",
+                    serde_json::to_value(stream_payload(&msg.bytes))?,
+                )?;
             }
         }
     }
 
-    Some(scope)
-}
+    let _ = out_thread.join();
+    let _ = err_thread.join();
 
-fn first_positional(tokens: &[OsString]) -> Option<String> {
-    let mut idx = 0usize;
-    while idx < tokens.len() {
-        let s = tokens[idx].to_string_lossy();
-        if !s.starts_with('-') {
-            return Some(s.to_string());
-        }
-        idx += 1;
-    }
-    None
-}
+    let status = child.wait().context("wait wrapped command")?;
 
-fn next_positional(
-    tokens: &[OsString],
-    _scope: &str,
-    ordinal_after_first: usize,
-) -> Option<String> {
-    let mut seen = 0usize;
-    for tok in tokens {
-        let s = tok.to_string_lossy();
-        if s.starts_with('-') {
-            continue;
-        }
-        if seen == 0 {
-            seen += 1;
-            continue;
-        }
-        if seen == ordinal_after_first {
-            return Some(s.to_string());
-        }
-        seen += 1;
-    }
-    None
-}
+    let raw = status.code();
+    let internal_failure = raw.is_none() || raw == Some(101);
+    let exit_code = raw.unwrap_or(3).clamp(0, 255) as u8;
 
-fn is_top_level_command(cmd: &str) -> bool {
-    matches!(
-        cmd,
-        "init"
-            | "test"
-            | "bench"
-            | "arch"
-            | "run"
-            | "bundle"
-            | "guide"
-            | "doctor"
-            | "diag"
-            | "policy"
-            | "ast"
-            | "fmt"
-            | "lint"
-            | "fix"
-            | "build"
-            | "cli"
-            | "pkg"
-            | "review"
-            | "trust"
-            | "doc"
-            | "schema"
-            | "sm"
-            | "rr"
-            | "patch"
-    )
-}
-
-fn nested_commands(scope: &str) -> &'static [&'static str] {
-    match scope {
-        "arch" => &["check"],
-        "ast" => &[
-            "init",
-            "get",
-            "apply-patch",
-            "validate",
-            "canon",
-            "schema",
-            "grammar",
-        ],
-        "bench" => &["list", "validate", "eval"],
-        "cli" => &["spec"],
-        "cli.spec" => &["fmt", "check", "compile"],
-        "diag" => &[
-            "catalog",
-            "init-catalog",
-            "explain",
-            "check",
-            "coverage",
-            "sarif",
-        ],
-        "pkg" => &[
-            "add", "remove", "versions", "pack", "lock", "provides", "login", "publish",
-        ],
-        "policy" => &["init"],
-        "review" => &["diff"],
-        "trust" => &["report"],
-        "schema" => &["derive"],
-        "sm" => &["check", "gen"],
-        "rr" => &["record"],
-        "patch" => &["apply"],
-        _ => &[],
-    }
-}
-
-fn has_native_json_mode(scope: &str) -> bool {
-    matches!(
-        scope,
-        "diag.explain"
-            | "doc"
-            | "fmt"
-            | "lint"
-            | "fix"
-            | "pkg.provides"
-            | "schema.derive"
-            | "sm.check"
-            | "test"
-            | "patch.apply"
-    )
-}
-
-fn has_native_json_schema(scope: &str) -> bool {
-    matches!(scope, "ast.schema")
-}
-
-fn schema_id_for_scope(scope: &str) -> String {
-    if scope == "root" {
-        return "x07.root.report@0.1.0".to_string();
-    }
-    format!("x07.{scope}.report@0.1.0")
-}
-
-fn command_id_for_scope(scope: &str) -> String {
-    if scope == "root" {
-        return "x07".to_string();
-    }
-    format!("x07.{scope}")
-}
-
-fn schema_url_for_scope(scope: &str) -> String {
-    let suffix = if scope == "root" {
-        "x07-root.report.schema.json".to_string()
-    } else {
-        format!("x07-{}.report.schema.json", scope.replace('.', "-"))
-    };
-    format!("https://x07.io/spec/{suffix}")
+    Ok(ChildOutput {
+        exit_code,
+        internal_failure,
+        stdout: out_bytes,
+        stderr: err_bytes,
+    })
 }
 
 fn parse_json_bytes(bytes: &[u8]) -> Option<Value> {
@@ -602,12 +519,19 @@ fn parse_json_bytes(bytes: &[u8]) -> Option<Value> {
 fn extract_diagnostics(doc: Option<&Value>) -> Option<Vec<diagnostics::Diagnostic>> {
     let doc = doc?;
     let obj = doc.as_object()?;
+
     for key in ["diagnostics", "diags"] {
-        let Some(v) = obj.get(key) else { continue };
-        let Some(arr) = v.as_array() else { continue };
+        let Some(v) = obj.get(key) else {
+            continue;
+        };
+
+        let Some(arr) = v.as_array() else {
+            continue;
+        };
         if arr.is_empty() {
             return Some(Vec::new());
         }
+
         let mut diags = Vec::new();
         for entry in arr {
             let Some(obj) = entry.as_object() else {
@@ -653,6 +577,7 @@ fn extract_diagnostics(doc: Option<&Value>) -> Option<Vec<diagnostics::Diagnosti
             return Some(diags);
         }
     }
+
     None
 }
 
@@ -670,95 +595,55 @@ fn stream_payload(bytes: &[u8]) -> StreamPayload {
     }
 }
 
-fn encode_json_bytes(value: &Value, mode: JsonMode) -> Result<Vec<u8>> {
-    match mode {
-        JsonMode::Pretty => {
-            let mut v = value.clone();
-            x07c::x07ast::canon_value_jcs(&mut v);
-            let mut out = serde_json::to_vec_pretty(&v)?;
-            if out.last() != Some(&b'\n') {
-                out.push(b'\n');
-            }
-            Ok(out)
-        }
-        JsonMode::Off | JsonMode::Canon => {
-            let mut out = util::canonical_jcs_bytes(value)?;
-            if out.last() != Some(&b'\n') {
-                out.push(b'\n');
-            }
-            Ok(out)
-        }
+fn empty_stream_payload() -> StreamPayload {
+    StreamPayload {
+        bytes_len: 0,
+        text: None,
+        base64: None,
     }
 }
 
-fn write_bytes(path: &PathBuf, bytes: &[u8]) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create report-out dir: {}", parent.display()))?;
+fn panic_message(panic: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = panic.downcast_ref::<&str>() {
+        s.to_string()
+    } else if let Some(s) = panic.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "panic".to_string()
     }
-    std::fs::write(path, bytes).with_context(|| format!("write report-out: {}", path.display()))
 }
 
-fn error_report(
+fn internal_error_report(
     raw_args: &[OsString],
-    scope: &str,
+    scope: Option<&str>,
     started: Instant,
-    exit_code: u8,
-    diagnostics: Vec<diagnostics::Diagnostic>,
-) -> ToolReport {
-    ToolReport {
-        schema_version: schema_id_for_scope(scope),
-        command: command_id_for_scope(scope),
-        ok: false,
-        exit_code,
-        diagnostics,
-        meta: ToolReportMeta {
-            tool: ToolVersionMeta {
-                name: "x07",
-                version: env!("CARGO_PKG_VERSION"),
-                git_sha: std::env::var("X07_GIT_SHA").ok(),
-            },
-            elapsed_ms: started.elapsed().as_millis() as u64,
-            cwd: std::env::current_dir()
-                .unwrap_or_else(|_| PathBuf::from("."))
-                .display()
-                .to_string(),
-            argv: raw_args.iter().map(os_to_string).collect(),
-        },
-        result: ToolResultPayload {
-            stdout: StreamPayload {
-                bytes_len: 0,
-                text: None,
-                base64: None,
-            },
-            stderr: StreamPayload {
-                bytes_len: 0,
-                text: None,
-                base64: None,
-            },
+    message: &str,
+) -> reporting::ToolReport<ToolResultPayload> {
+    let mut diag = reporting::diag_error(
+        "X07-INTERNAL-0001",
+        diagnostics::Stage::Run,
+        "internal tool failure",
+    );
+    if !message.trim().is_empty() {
+        diag.data.insert(
+            "panic".to_string(),
+            Value::String(message.trim().to_string()),
+        );
+    }
+
+    reporting::build_report(
+        scope,
+        TOOL_REPORT_SEMVER,
+        started,
+        raw_args,
+        3,
+        vec![diag],
+        ToolResultPayload {
+            stdout: empty_stream_payload(),
+            stderr: empty_stream_payload(),
             stdout_json: None,
             stderr_json: None,
         },
-    }
-}
-
-fn diag_error(code: &str, stage: diagnostics::Stage, message: &str) -> diagnostics::Diagnostic {
-    diagnostics::Diagnostic {
-        code: code.to_string(),
-        severity: diagnostics::Severity::Error,
-        stage,
-        message: message.to_string(),
-        loc: None,
-        notes: Vec::new(),
-        related: Vec::new(),
-        data: BTreeMap::new(),
-        quickfix: None,
-    }
-}
-
-fn os_to_string(v: &OsString) -> String {
-    match v.to_string_lossy() {
-        Cow::Borrowed(s) => s.to_string(),
-        Cow::Owned(s) => s,
-    }
+        reporting::MetaDelta::default(),
+    )
 }

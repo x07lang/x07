@@ -203,7 +203,10 @@ fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> 
     }
 }
 
-pub fn cmd_init(args: InitArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_init(
+    _machine: &crate::reporting::MachineArgs,
+    args: InitArgs,
+) -> Result<std::process::ExitCode> {
     let root = match std::env::current_dir() {
         Ok(p) => p,
         Err(err) => {

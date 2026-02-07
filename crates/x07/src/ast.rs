@@ -62,9 +62,6 @@ pub struct AstInitArgs {
 
     #[arg(long, value_enum, default_value = "entry")]
     pub kind: AstInitKind,
-
-    #[arg(long, value_name = "PATH")]
-    pub out: PathBuf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -91,9 +88,6 @@ pub struct AstApplyPatchArgs {
     #[arg(long, value_name = "PATH")]
     pub patch: PathBuf,
 
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-
     #[arg(long)]
     pub validate: bool,
 }
@@ -111,19 +105,10 @@ pub struct AstValidateArgs {
 pub struct AstCanonArgs {
     #[arg(long, value_name = "PATH")]
     pub r#in: PathBuf,
-
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct AstSchemaArgs {
-    #[arg(long, required = true)]
-    pub json_schema: bool,
-
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-
     #[arg(long)]
     pub pretty: bool,
 }
@@ -137,18 +122,21 @@ pub struct AstGrammarArgs {
     pub out_dir: Option<PathBuf>,
 }
 
-pub fn cmd_ast(args: AstArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_ast(
+    machine: &crate::reporting::MachineArgs,
+    args: AstArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing subcommand (try --help)");
     };
 
     match cmd {
-        AstCommand::Init(args) => cmd_init(args),
-        AstCommand::Get(args) => cmd_get(args),
-        AstCommand::ApplyPatch(args) => cmd_apply_patch(args),
+        AstCommand::Init(args) => cmd_init(machine, args),
+        AstCommand::Get(args) => cmd_get(machine, args),
+        AstCommand::ApplyPatch(args) => cmd_apply_patch(machine, args),
         AstCommand::Validate(args) => cmd_validate(args),
-        AstCommand::Canon(args) => cmd_canon(args),
-        AstCommand::Schema(args) => cmd_schema(args),
+        AstCommand::Canon(args) => cmd_canon(machine, args),
+        AstCommand::Schema(args) => cmd_schema(machine, args),
         AstCommand::Grammar(args) => cmd_grammar(args),
     }
 }
@@ -169,9 +157,6 @@ pub struct AstGetArgs {
 
     #[arg(long, value_name = "JSON_POINTER")]
     pub ptr: String,
-
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize)]
@@ -187,11 +172,19 @@ struct AstGetReport {
     value: Option<Value>,
 }
 
-fn cmd_init(args: AstInitArgs) -> Result<std::process::ExitCode> {
+fn cmd_init(
+    machine: &crate::reporting::MachineArgs,
+    args: AstInitArgs,
+) -> Result<std::process::ExitCode> {
+    let out_path = machine
+        .out
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("ast init: missing --out <PATH>"))?
+        .clone();
     if args.module.is_empty() || args.module.chars().any(|c| c.is_whitespace()) {
         let report = AstInitReport {
             ok: false,
-            out: args.out.display().to_string(),
+            out: out_path.display().to_string(),
             schema_version: X07AST_SCHEMA_VERSION.to_string(),
             template_id: format!("{}/{}@v1", args.world.as_str(), args.module),
             sha256: String::new(),
@@ -227,12 +220,12 @@ fn cmd_init(args: AstInitArgs) -> Result<std::process::ExitCode> {
     let out_bytes = serde_json::to_string(&v)?.into_bytes();
     let out_bytes = with_trailing_newline(out_bytes);
 
-    util::write_atomic(&args.out, &out_bytes)
-        .with_context(|| format!("write: {}", args.out.display()))?;
+    util::write_atomic(&out_path, &out_bytes)
+        .with_context(|| format!("write: {}", out_path.display()))?;
 
     let report = AstInitReport {
         ok: true,
-        out: args.out.display().to_string(),
+        out: out_path.display().to_string(),
         schema_version: X07AST_SCHEMA_VERSION.to_string(),
         template_id: format!("{}/{}@v1", args.world.as_str(), args.module),
         sha256: sha256_hex(&out_bytes),
@@ -241,7 +234,11 @@ fn cmd_init(args: AstInitArgs) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
-fn cmd_get(args: AstGetArgs) -> Result<std::process::ExitCode> {
+fn cmd_get(
+    machine: &crate::reporting::MachineArgs,
+    args: AstGetArgs,
+) -> Result<std::process::ExitCode> {
+    let out_path = machine.out.as_ref();
     let input_bytes = match std::fs::read(&args.r#in) {
         Ok(bytes) => bytes,
         Err(err) => {
@@ -249,7 +246,7 @@ fn cmd_get(args: AstGetArgs) -> Result<std::process::ExitCode> {
                 ok: false,
                 r#in: args.r#in.display().to_string(),
                 ptr: args.ptr.clone(),
-                out: args.out.as_ref().map(|p| p.display().to_string()),
+                out: out_path.map(|p| p.display().to_string()),
                 error: Some(err.to_string()),
                 value: None,
             };
@@ -267,7 +264,7 @@ fn cmd_get(args: AstGetArgs) -> Result<std::process::ExitCode> {
                     ok: false,
                     r#in: args.r#in.display().to_string(),
                     ptr: args.ptr.clone(),
-                    out: args.out.as_ref().map(|p| p.display().to_string()),
+                    out: out_path.map(|p| p.display().to_string()),
                     error: Some(err.to_string()),
                     value: None,
                 };
@@ -284,7 +281,7 @@ fn cmd_get(args: AstGetArgs) -> Result<std::process::ExitCode> {
                 ok: false,
                 r#in: args.r#in.display().to_string(),
                 ptr: args.ptr.clone(),
-                out: args.out.as_ref().map(|p| p.display().to_string()),
+                out: out_path.map(|p| p.display().to_string()),
                 error: Some(msg),
                 value: None,
             };
@@ -293,7 +290,7 @@ fn cmd_get(args: AstGetArgs) -> Result<std::process::ExitCode> {
         }
     };
 
-    if let Some(out_path) = &args.out {
+    if let Some(out_path) = out_path {
         if out_path.as_os_str() == "-" {
             let report = AstGetReport {
                 ok: false,
@@ -319,7 +316,7 @@ fn cmd_get(args: AstGetArgs) -> Result<std::process::ExitCode> {
         ok: true,
         r#in: args.r#in.display().to_string(),
         ptr: args.ptr.clone(),
-        out: args.out.as_ref().map(|p| p.display().to_string()),
+        out: out_path.map(|p| p.display().to_string()),
         error: None,
         value: Some(value),
     };
@@ -335,8 +332,11 @@ struct AstApplyPatchReport {
     sha256: String,
 }
 
-fn cmd_apply_patch(args: AstApplyPatchArgs) -> Result<std::process::ExitCode> {
-    let out_path = args.out.clone().unwrap_or_else(|| args.r#in.clone());
+fn cmd_apply_patch(
+    machine: &crate::reporting::MachineArgs,
+    args: AstApplyPatchArgs,
+) -> Result<std::process::ExitCode> {
+    let out_path = machine.out.clone().unwrap_or_else(|| args.r#in.clone());
     let input_bytes = match std::fs::read(&args.r#in) {
         Ok(bytes) => bytes,
         Err(err) => {
@@ -505,8 +505,11 @@ struct AstCanonReport {
     sha256: String,
 }
 
-fn cmd_canon(args: AstCanonArgs) -> Result<std::process::ExitCode> {
-    let out_path = args.out.clone().unwrap_or_else(|| args.r#in.clone());
+fn cmd_canon(
+    machine: &crate::reporting::MachineArgs,
+    args: AstCanonArgs,
+) -> Result<std::process::ExitCode> {
+    let out_path = machine.out.clone().unwrap_or_else(|| args.r#in.clone());
     let input_bytes = match std::fs::read(&args.r#in) {
         Ok(bytes) => bytes,
         Err(err) => {
@@ -590,7 +593,10 @@ struct GenpackManifest {
     artifacts: Vec<GenpackManifestArtifact>,
 }
 
-fn cmd_schema(args: AstSchemaArgs) -> Result<std::process::ExitCode> {
+fn cmd_schema(
+    machine: &crate::reporting::MachineArgs,
+    args: AstSchemaArgs,
+) -> Result<std::process::ExitCode> {
     let out_bytes = if args.pretty {
         let doc: Value =
             serde_json::from_slice(X07AST_SCHEMA_BYTES).context("parse spec/x07ast.schema.json")?;
@@ -599,7 +605,7 @@ fn cmd_schema(args: AstSchemaArgs) -> Result<std::process::ExitCode> {
         with_trailing_newline(X07AST_SCHEMA_BYTES.to_vec())
     };
 
-    if let Some(out_path) = &args.out {
+    if let Some(out_path) = machine.out.as_ref() {
         util::write_atomic(out_path, &out_bytes)
             .with_context(|| format!("write: {}", out_path.display()))?;
     } else {

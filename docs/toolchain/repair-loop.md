@@ -20,27 +20,27 @@ Use the manual loop below when you need explicit control (or when you’re worki
 ### 1) Format (canonicalize)
 
 ```bash
-x07 fmt --input src/main.x07.json --write --report-json
+x07 fmt --input src/main.x07.json --write --json
 ```
 
 ### 2) Lint (collect diagnostics)
 
 ```bash
-x07 lint --input src/main.x07.json --report-json
+x07 lint --input src/main.x07.json --json
 ```
 
-If you want the raw diagnostics report (instead of the tool wrapper), omit `--report-json`.
+If you want the raw diagnostics report (instead of the tool wrapper), omit `--json`.
 
 ### 3) Apply quickfixes (when available)
 
 ```bash
-x07 fix --input src/main.x07.json --write --report-json
+x07 fix --input src/main.x07.json --write --json
 ```
 
 Notes:
 
 - `x07 fix` applies any `diagnostic.quickfix` entries that are `kind: "json_patch"` (RFC 6902) and then re-lints the result.
-- `--report-json` requires `--write` so stdout can stay JSON.
+- `--write` controls whether fixes are applied to disk; `--json` controls machine report output.
 
 ### 4) Apply an explicit patch (when required)
 
@@ -53,8 +53,8 @@ x07 ast apply-patch --in src/main.x07.json --patch patch.json --out src/main.x07
 ### 5) Re-format and re-lint
 
 ```bash
-x07 fmt --input src/main.x07.json --write --report-json
-x07 lint --input src/main.x07.json --report-json
+x07 fmt --input src/main.x07.json --write --json
+x07 lint --input src/main.x07.json --json
 ```
 
 Repeat until lint is green.
@@ -76,4 +76,4 @@ x07 pkg lock --project x07.json
 ## Output contracts (for agents)
 
 - Diagnostics schema: `spec/x07diag.schema.json`
-- Tool wrapper schema (`--report-json`): `spec/x07c.report.schema.json` (`schema_version: "x07c.report@0.1.0"`)
+- Tool report schema (`--json`): `spec/x07-tool-<scope>.report.schema.json` (base: `spec/x07-tool.report.schema.json`)

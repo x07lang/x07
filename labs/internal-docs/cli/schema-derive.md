@@ -20,7 +20,8 @@ Internal notes for the schema derivation tool (end-user docs live in `docs/toolc
 
 - Generated modules: `modules/<pkg>/schema/**`
 - Generated test manifest: `tests/tests.json`
-- Optional report (`--report-json`): `schema_version: "x07.schema.derive.report@0.1.0"`
+- Report (always): `schema_version: "x07.schema.derive.report@0.1.0"`
+- Tool wrapper report (`--json`): `schema_version: "x07.tool.schema.derive.report@0.1.0"`
 - Derived runtime modules use branded bytes for validated docs:
   - brand id is derived as `<pkg>.<type_id>_vN`
   - modules export `cast_doc_view_v1(doc: bytes_view) -> result_bytes_view@brand`

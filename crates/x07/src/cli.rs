@@ -65,9 +65,6 @@ pub struct SpecFmtArgs {
     #[arg(long, value_name = "PATH")]
     r#in: PathBuf,
 
-    #[arg(long, value_name = "PATH")]
-    out: Option<PathBuf>,
-
     #[arg(long)]
     write: bool,
 }
@@ -85,28 +82,31 @@ pub struct SpecCheckArgs {
 pub struct SpecCompileArgs {
     #[arg(long, value_name = "PATH")]
     r#in: PathBuf,
-
-    #[arg(long, value_name = "PATH")]
-    out: PathBuf,
 }
 
-pub fn cmd_cli(args: CliArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_cli(
+    machine: &crate::reporting::MachineArgs,
+    args: CliArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing cli subcommand (try --help)");
     };
     match cmd {
-        CliCommand::Spec(args) => cmd_cli_spec(args),
+        CliCommand::Spec(args) => cmd_cli_spec(machine, args),
     }
 }
 
-fn cmd_cli_spec(args: SpecArgs) -> Result<std::process::ExitCode> {
+fn cmd_cli_spec(
+    machine: &crate::reporting::MachineArgs,
+    args: SpecArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing cli spec subcommand (try --help)");
     };
     match cmd {
-        SpecCommand::Fmt(args) => cmd_cli_spec_fmt(args),
+        SpecCommand::Fmt(args) => cmd_cli_spec_fmt(machine, args),
         SpecCommand::Check(args) => cmd_cli_spec_check(args),
-        SpecCommand::Compile(args) => cmd_cli_spec_compile(args),
+        SpecCommand::Compile(args) => cmd_cli_spec_compile(machine, args),
     }
 }
 
@@ -212,8 +212,11 @@ fn write_diagnostics_if_requested(
     fs::write(diag_out, &out).with_context(|| format!("write diagnostics: {}", diag_out.display()))
 }
 
-fn cmd_cli_spec_fmt(args: SpecFmtArgs) -> Result<std::process::ExitCode> {
-    if args.write && args.out.is_some() {
+fn cmd_cli_spec_fmt(
+    machine: &crate::reporting::MachineArgs,
+    args: SpecFmtArgs,
+) -> Result<std::process::ExitCode> {
+    if args.write && machine.out.is_some() {
         anyhow::bail!("set at most one of --out or --write");
     }
 
@@ -268,7 +271,7 @@ fn cmd_cli_spec_fmt(args: SpecFmtArgs) -> Result<std::process::ExitCode> {
         }
     };
 
-    match (args.write, args.out.as_ref()) {
+    match (args.write, machine.out.as_ref()) {
         (true, _) => write_bytes(&in_path, &canon_json)?,
         (false, None) => {
             std::io::stdout().write_all(&canon_json)?;
@@ -293,9 +296,19 @@ struct SpecCompileReport {
     tool_error: Option<String>,
 }
 
-fn cmd_cli_spec_compile(args: SpecCompileArgs) -> Result<std::process::ExitCode> {
+fn cmd_cli_spec_compile(
+    machine: &crate::reporting::MachineArgs,
+    args: SpecCompileArgs,
+) -> Result<std::process::ExitCode> {
     let in_path = util::resolve_existing_path_upwards(&args.r#in);
-    let out_path = args.out;
+    let out_path = machine
+        .out
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("cli spec compile: missing --out <PATH>"))?
+        .clone();
+    if out_path.as_os_str() == "-" {
+        anyhow::bail!("--out '-' is not supported");
+    }
 
     let bytes = fs::read(&in_path).with_context(|| format!("read: {}", in_path.display()))?;
     let doc: Value = match serde_json::from_slice(&bytes) {

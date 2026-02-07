@@ -30,8 +30,9 @@ X07 builds and runs native solver artifacts from generated C, so the only extern
   - `x07 review diff --from <baseline> --to <candidate> --html-out target/review/diff.html --json-out target/review/diff.json`
 - Trust artifact generation:
   - `x07 trust report --project x07.json --out target/trust/trust.json --html-out target/trust/trust.html`
-- Universal machine wrapper (for command scopes without native JSON reports):
+- Universal machine surface:
   - `x07 <scope> --json`
+  - `x07 <scope> --jsonl`
   - `x07 <scope> --json-schema`
   - `x07 <scope> --json --report-out <path> --quiet-json`
 - Benchmark harness smoke:

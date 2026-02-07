@@ -89,9 +89,11 @@ See: [Review & trust artifacts](review-trust.md).
 
 ### x07AST schema + grammar generation pack
 
-- `x07 ast schema --json-schema`
+- `x07 ast schema`
   - Emits the canonical `x07ast.schema.json` document on stdout (raw JSON bytes + trailing newline).
-- `x07 ast schema --json-schema --out <path> --pretty`
+- `x07 ast schema --out <path>`
+  - Writes the schema document bytes to file.
+- `x07 ast schema --pretty --out <path>`
   - Writes a pretty-printed schema document to file.
 - `x07 ast grammar --cfg`
   - Emits a machine-readable grammar bundle JSON:
@@ -140,9 +142,9 @@ See: [Benchmarks](benchmarks.md).
   - Exit codes:
     - `0` on `ok=true`
     - `1` on `ok=false` (for example: not found or query errors)
-    - `2` on tool failures (for example: failed `--out` write)
-- `x07 doc --json --out <path> <query>`
-  - Writes the JSON report to a file. Parent directories are created automatically.
+    - `2` on tool failures (for example: filesystem read/write errors)
+- `x07 doc --json <query> --report-out <path> --quiet-json`
+  - Writes the JSON report to a file and suppresses stdout.
 - `x07 doc --json spec:<path-or-id>`
   - Resolves published spec docs and schemas via `docs/spec/` / `.agent/docs/spec/`.
 
@@ -152,7 +154,7 @@ Doc report schema: `docs/spec/schemas/x07-doc.report.schema.json`.
 
 - `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --write`
 - `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --check`
-- `x07 schema derive --report-json ...`
+- `x07 schema derive --json ...`
 
 See: [Schema derive](schema-derive.md).
 
@@ -230,15 +232,23 @@ All command scopes support machine schema discovery:
 - `x07 <scope> --json-schema`
 - `x07 <scope> --json-schema-id`
 
-And command scopes without native JSON reports are wrapped by a universal machine envelope:
+Machine report output:
 
 - `x07 <scope> --json`
 - `x07 <scope> --json=pretty`
 - `x07 <scope> --jsonl`
 - `x07 <scope> --json --report-out <path>`
 - `x07 <scope> --json --report-out <path> --quiet-json`
+- `x07 <scope> --out <path>` (redirect primary output, when applicable)
 
-Universal wrapper schema: `spec/x07-tool.report.schema.json` (`x07.tool.report@0.1.0`).
+Schemas:
+
+- Tool report base schema: `spec/x07-tool.report.schema.json` (`schema_version: "x07.tool.report@0.1.0"`)
+- Tool report per-scope schemas:
+  - Root: `spec/x07-tool-root.report.schema.json`
+  - Wrapped scopes: `spec/x07-tool-<scope>.report.schema.json` (`schema_version: "x07.tool.<scope>.report@0.1.0"`)
+  - `x07 doc` (native): `spec/x07-doc.report.schema.json` (`schema_version: "x07.doc.report@0.1.0"`)
+- JSONL events schema: `spec/x07-tool.events.schema.json` (`schema_version: "x07.tool.events@0.1.0"`)
 
 Structured commands must guarantee:
 
@@ -254,7 +264,7 @@ Review/trust artifact commands also follow this contract:
 For machine-first discovery and debugging:
 
 - `x07 --cli-specrows` emits a deterministic CLI surface description.
-- Legacy tool wrappers still support `--report-json` (alias during migration).
+- `--report-json` is accepted as a hidden alias for `--json` during migration.
 
 See [Diagnostics & repair](diagnostics-repair.md).
 
@@ -278,20 +288,18 @@ Each row is a small tuple. Examples:
 
 Schema: `spec/x07cli.specrows.schema.json`.
 
-## Tool wrapper reports (`--report-json`, compatibility)
+## Legacy alias (`--report-json`)
 
 Compatibility mode is still available for existing automation:
 
-- `x07 fmt --report-json ...`
-- `x07 lint --report-json ...`
-- `x07 fix --report-json ...` (requires `--write`)
-
-Compatibility schema: `schema_version: "x07c.report@0.1.0"` (see `spec/x07c.report.schema.json`).
+- `x07 <scope> --report-json` is equivalent to `x07 <scope> --json` (same report schema + output shape).
 
 Notes:
 
-- `x07 lint` without `--report-json` prints the raw diagnostics report (`x07diag`, see `spec/x07diag.schema.json`).
-- `x07 fix` without `--report-json` prints the fixed x07AST JSON to stdout unless `--write` is set.
+Notes:
+
+- `x07 lint` without `--json` prints the raw diagnostics report (`x07diag`, see `spec/x07diag.schema.json`).
+- `x07 fix` without `--json` prints the fixed x07AST JSON to stdout unless `--write` is set.
 
 ## Agent bootstrap recipe
 

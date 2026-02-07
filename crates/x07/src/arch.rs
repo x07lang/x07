@@ -166,10 +166,6 @@ pub struct ArchCheckArgs {
     #[arg(long, value_enum, default_value_t = ArchFormat::Json)]
     pub format: ArchFormat,
 
-    /// Write the report to a file (stdout when omitted).
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-
     /// Emit suggested patches (multi-file JSON Patch set).
     #[arg(long, value_name = "PATH")]
     pub emit_patch: Option<PathBuf>,
@@ -191,12 +187,15 @@ pub struct ArchCheckArgs {
     pub max_bytes_in: Option<u64>,
 }
 
-pub fn cmd_arch(args: ArchArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_arch(
+    machine: &crate::reporting::MachineArgs,
+    args: ArchArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing arch subcommand (try --help)");
     };
     match cmd {
-        ArchCommand::Check(args) => cmd_arch_check(args),
+        ArchCommand::Check(args) => cmd_arch_check(machine, args),
     }
 }
 
@@ -1514,10 +1513,13 @@ impl DiagSink {
     }
 }
 
-fn cmd_arch_check(args: ArchCheckArgs) -> Result<std::process::ExitCode> {
-    if args.out.as_ref().is_some_and(|p| p.as_os_str() == "-") {
-        anyhow::bail!("--out '-' is not supported (stdout is reserved for the report)");
-    }
+fn cmd_arch_check(
+    machine: &crate::reporting::MachineArgs,
+    args: ArchCheckArgs,
+) -> Result<std::process::ExitCode> {
+    let out_path = machine.out.as_ref();
+    let out_path = out_path.filter(|p| p.as_os_str() != "-");
+    let out_path = out_path.map(|p| p.as_path());
     if args
         .emit_patch
         .as_ref()
@@ -1561,7 +1563,7 @@ fn cmd_arch_check(args: ArchCheckArgs) -> Result<std::process::ExitCode> {
             &args,
             args.write_lock,
         )?;
-        emit_report(&args, &final_out.report)?;
+        emit_report(out_path, &args, &final_out.report)?;
         return Ok(final_out.exit_code);
     }
 
@@ -1575,7 +1577,7 @@ fn cmd_arch_check(args: ArchCheckArgs) -> Result<std::process::ExitCode> {
     if let Some(path) = &args.emit_patch {
         write_patchset(&repo_root, path, &out.suggested_patches)?;
     }
-    emit_report(&args, &out.report)?;
+    emit_report(out_path, &args, &out.report)?;
     Ok(out.exit_code)
 }
 
@@ -7483,11 +7485,11 @@ fn allow_deps_rule_id(from: &str, to: &str) -> String {
     format!("allow:sha256:{h}")
 }
 
-fn emit_report(args: &ArchCheckArgs, report: &ArchReport) -> Result<()> {
+fn emit_report(out_path: Option<&Path>, args: &ArchCheckArgs, report: &ArchReport) -> Result<()> {
     match args.format {
         ArchFormat::Json => {
             let bytes = canonical_pretty_json_bytes(&serde_json::to_value(report)?)?;
-            if let Some(path) = &args.out {
+            if let Some(path) = out_path {
                 util::write_atomic(path, &bytes)
                     .with_context(|| format!("write report: {}", path.display()))?;
             } else {
@@ -7527,7 +7529,7 @@ fn emit_report(args: &ArchCheckArgs, report: &ArchReport) -> Result<()> {
                     d.message
                 ));
             }
-            if let Some(path) = &args.out {
+            if let Some(path) = out_path {
                 util::write_atomic(path, out.as_bytes())
                     .with_context(|| format!("write report: {}", path.display()))?;
             } else {

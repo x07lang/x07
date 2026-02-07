@@ -72,12 +72,12 @@ pub struct SchemaDeriveArgs {
 
     #[arg(long)]
     pub check: bool,
-
-    #[arg(long)]
-    pub report_json: bool,
 }
 
-pub fn cmd_schema(args: SchemaArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_schema(
+    _machine: &crate::reporting::MachineArgs,
+    args: SchemaArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing schema subcommand (try --help)");
     };
@@ -495,15 +495,15 @@ fn cmd_schema_derive(args: SchemaDeriveArgs) -> Result<std::process::ExitCode> {
         }
     }
 
-    if args.report_json {
-        let mut v = serde_json::to_value(&report)?;
-        x07c::x07ast::canon_value_jcs(&mut v);
-        let mut bytes = serde_json::to_vec(&v)?;
-        if bytes.last() != Some(&b'\n') {
-            bytes.push(b'\n');
-        }
-        std::io::Write::write_all(&mut std::io::stdout(), &bytes).context("write stdout")?;
-    } else if !drifted.is_empty() {
+    let mut v = serde_json::to_value(&report)?;
+    x07c::x07ast::canon_value_jcs(&mut v);
+    let mut bytes = serde_json::to_vec(&v)?;
+    if bytes.last() != Some(&b'\n') {
+        bytes.push(b'\n');
+    }
+    std::io::Write::write_all(&mut std::io::stdout(), &bytes).context("write stdout")?;
+
+    if !drifted.is_empty() && !args.write {
         for p in &drifted {
             eprintln!("schema derive drift: {}", p.display());
         }

@@ -53,25 +53,33 @@ fn app_meta(cmd: &Command) -> Value {
 fn rows_for_command(cmd: &Command) -> Vec<Value> {
     let mut rows: Vec<Value> = Vec::new();
 
-    push_scope_rows(&mut rows, "root", cmd);
+    let mut global_args: Vec<&Arg> = cmd.get_arguments().filter(|a| a.is_global_set()).collect();
+    global_args.sort_by(|a, b| a.get_id().cmp(b.get_id()));
+
+    push_scope_rows(&mut rows, "root", cmd, &[]);
 
     let mut subs: Vec<&Command> = cmd.get_subcommands().collect();
     subs.sort_by(|a, b| a.get_name().cmp(b.get_name()));
     for sc in subs {
-        push_scope_rows_recursive(&mut rows, sc.get_name(), sc);
+        push_scope_rows_recursive(&mut rows, sc.get_name(), sc, &global_args);
     }
 
     rows
 }
 
-fn push_scope_rows_recursive(rows: &mut Vec<Value>, scope: &str, cmd: &Command) {
-    push_scope_rows(rows, scope, cmd);
+fn push_scope_rows_recursive(
+    rows: &mut Vec<Value>,
+    scope: &str,
+    cmd: &Command,
+    global_args: &[&Arg],
+) {
+    push_scope_rows(rows, scope, cmd, global_args);
 
     let mut subs: Vec<&Command> = cmd.get_subcommands().collect();
     subs.sort_by(|a, b| a.get_name().cmp(b.get_name()));
     for sc in subs {
         let nested = format!("{scope}.{}", sc.get_name());
-        push_scope_rows_recursive(rows, &nested, sc);
+        push_scope_rows_recursive(rows, &nested, sc, global_args);
     }
 }
 
@@ -263,7 +271,7 @@ fn meta_to_json(meta: &BTreeMap<String, Value>) -> Map<String, Value> {
     meta.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
 }
 
-fn push_scope_rows(rows: &mut Vec<Value>, scope: &str, cmd: &Command) {
+fn push_scope_rows(rows: &mut Vec<Value>, scope: &str, cmd: &Command, global_args: &[&Arg]) {
     let mut scope_rows: Vec<Row> = Vec::new();
 
     let about = cmd
@@ -278,9 +286,15 @@ fn push_scope_rows(rows: &mut Vec<Value>, scope: &str, cmd: &Command) {
         });
     }
 
-    let mut args: Vec<&Arg> = cmd.get_arguments().collect();
-    args.sort_by(|a, b| a.get_id().cmp(b.get_id()));
-    for arg in args {
+    let mut args_by_id: BTreeMap<String, &Arg> = BTreeMap::new();
+    for arg in global_args {
+        args_by_id.insert(arg.get_id().to_string(), *arg);
+    }
+    for arg in cmd.get_arguments() {
+        args_by_id.insert(arg.get_id().to_string(), arg);
+    }
+
+    for (_, arg) in args_by_id {
         if arg.is_hide_set() {
             continue;
         }

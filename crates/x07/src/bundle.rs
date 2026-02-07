@@ -38,10 +38,6 @@ pub struct BundleArgs {
     #[arg(long, value_enum, hide = true)]
     pub world: Option<WorldId>,
 
-    /// Output path. If a directory, the binary name defaults to `app`.
-    #[arg(long, value_name = "PATH")]
-    pub out: PathBuf,
-
     /// Policy JSON (required for `run-os-sandboxed`; not a hardened sandbox).
     #[arg(long, value_name = "PATH")]
     pub policy: Option<PathBuf>,
@@ -100,9 +96,6 @@ pub struct BundleArgs {
     /// Emit intermediate C sources and report JSON for debugging/CI.
     #[arg(long, value_name = "DIR", alias = "emit")]
     pub emit_dir: Option<PathBuf>,
-
-    #[arg(long, value_name = "PATH")]
-    pub report_out: Option<PathBuf>,
 
     /// Module root directory for resolving module ids (required for --program).
     /// May be passed multiple times.
@@ -185,7 +178,10 @@ struct ResolvedPolicyEnv {
     allow_ffi: Option<bool>,
 }
 
-pub fn cmd_bundle(args: BundleArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_bundle(
+    machine: &crate::reporting::MachineArgs,
+    args: BundleArgs,
+) -> Result<std::process::ExitCode> {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     let (target_kind, target_path, project_manifest) = resolve_target(&cwd, &args)?;
@@ -282,7 +278,11 @@ pub fn cmd_bundle(args: BundleArgs) -> Result<std::process::ExitCode> {
         effective_policy.as_deref(),
     )?;
 
-    let out_path = resolve_out_path(&args.out, target_kind, &project_root);
+    let out = machine
+        .out
+        .as_ref()
+        .context("missing --out <PATH> for output executable")?;
+    let out_path = resolve_out_path(out, target_kind, &project_root);
     let out_path = normalize_exe_extension(out_path);
     let bundle_name = out_path
         .file_stem()
@@ -391,14 +391,6 @@ pub fn cmd_bundle(args: BundleArgs) -> Result<std::process::ExitCode> {
 
     let mut bytes = serde_json::to_vec_pretty(&report)?;
     bytes.push(b'\n');
-
-    if let Some(path) = &args.report_out {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("create report-out dir: {}", parent.display()))?;
-        }
-        std::fs::write(path, &bytes).with_context(|| format!("write: {}", path.display()))?;
-    }
 
     if let Some(dir) = &args.emit_dir {
         std::fs::create_dir_all(dir)

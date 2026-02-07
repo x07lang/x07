@@ -175,9 +175,6 @@ pub struct RunArgs {
     #[arg(long, value_enum, default_value_t = ReportMode::Runner)]
     pub report: ReportMode,
 
-    #[arg(long, value_name = "PATH")]
-    pub report_out: Option<PathBuf>,
-
     #[command(flatten)]
     pub repair: RepairArgs,
 }
@@ -247,7 +244,10 @@ pub(crate) struct ResolvedProfile {
     pub(crate) cc_profile: Option<CcProfile>,
 }
 
-pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_run(
+    machine: &crate::reporting::MachineArgs,
+    args: RunArgs,
+) -> Result<std::process::ExitCode> {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     let (target_kind, target_path, project_manifest) = resolve_target(&cwd, &args)?;
@@ -697,15 +697,16 @@ pub fn cmd_run(args: RunArgs) -> Result<std::process::ExitCode> {
         }
     };
 
-    if let Some(path) = &args.report_out {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("create report-out dir: {}", parent.display()))?;
+    if let Some(path) = machine.report_out.as_deref() {
+        if path.as_os_str() == std::ffi::OsStr::new("-") {
+            anyhow::bail!("--report-out '-' is not supported (stdout is reserved for the report)");
         }
-        std::fs::write(path, &emitted).with_context(|| format!("write: {}", path.display()))?;
+        crate::reporting::write_bytes(path, &emitted)?;
     }
 
-    std::io::Write::write_all(&mut std::io::stdout(), &emitted).context("write stdout")?;
+    if !machine.quiet_json {
+        std::io::Write::write_all(&mut std::io::stdout(), &emitted).context("write stdout")?;
+    }
 
     Ok(std::process::ExitCode::from(exit_code as u8))
 }

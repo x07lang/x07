@@ -54,10 +54,6 @@ pub struct BuildArgs {
     #[arg(long, value_name = "PATH")]
     pub project: PathBuf,
 
-    /// Write generated C source to a file (default: stdout).
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-
     /// Emit the runtime C header (requires `emit_main=false`; use `--freestanding` for embedding).
     #[arg(long, value_name = "PATH")]
     pub emit_c_header: Option<PathBuf>,
@@ -86,7 +82,10 @@ struct X07cToolReport {
     exit_code: u8,
 }
 
-pub fn cmd_fmt(args: FmtArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_fmt(
+    _machine: &crate::reporting::MachineArgs,
+    args: FmtArgs,
+) -> Result<std::process::ExitCode> {
     if args.check == args.write {
         if args.report_json {
             let report = X07cToolReport {
@@ -221,7 +220,10 @@ pub fn cmd_fmt(args: FmtArgs) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
-pub fn cmd_lint(args: LintArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_lint(
+    _machine: &crate::reporting::MachineArgs,
+    args: LintArgs,
+) -> Result<std::process::ExitCode> {
     let bytes = match std::fs::read(&args.input) {
         Ok(bytes) => bytes,
         Err(err) => {
@@ -296,7 +298,10 @@ pub fn cmd_lint(args: LintArgs) -> Result<std::process::ExitCode> {
     })
 }
 
-pub fn cmd_fix(args: FixArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_fix(
+    _machine: &crate::reporting::MachineArgs,
+    args: FixArgs,
+) -> Result<std::process::ExitCode> {
     if args.report_json && !args.write {
         let report = X07cToolReport {
             schema_version: X07C_REPORT_SCHEMA_VERSION,
@@ -427,7 +432,10 @@ pub fn cmd_fix(args: FixArgs) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
-pub fn cmd_build(args: BuildArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_build(
+    machine: &crate::reporting::MachineArgs,
+    args: BuildArgs,
+) -> Result<std::process::ExitCode> {
     if let Some(max_c_bytes) = args.max_c_bytes {
         std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
     }
@@ -471,13 +479,13 @@ pub fn cmd_build(args: BuildArgs) -> Result<std::process::ExitCode> {
 
     let c = x07c::compile::compile_program_to_c(&program_bytes, &options)
         .map_err(|e| anyhow::anyhow!("compile failed: {:?}: {}", e.kind, e.message))?;
-    match args.out {
+    match machine.out.as_ref() {
         Some(path) => {
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)
                     .with_context(|| format!("create output dir: {}", parent.display()))?;
             }
-            std::fs::write(&path, c.as_bytes())
+            std::fs::write(path, c.as_bytes())
                 .with_context(|| format!("write: {}", path.display()))?;
         }
         None => {

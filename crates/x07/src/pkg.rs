@@ -126,10 +126,6 @@ pub struct PackArgs {
     /// Package directory containing `x07-package.json`.
     #[arg(long, value_name = "DIR")]
     pub package: PathBuf,
-
-    /// Output archive path.
-    #[arg(long, value_name = "PATH")]
-    pub out: PathBuf,
 }
 
 #[derive(Debug, Args)]
@@ -156,10 +152,6 @@ pub struct ProvidesArgs {
     /// Project manifest path (`x07.json`).
     #[arg(long, value_name = "PATH", default_value = "x07.json")]
     pub project: PathBuf,
-
-    /// Emit a machine-readable JSON report to stdout (default: true).
-    #[arg(long, default_value_t = true)]
-    pub report_json: bool,
 
     /// Module id to resolve.
     #[arg(value_name = "MODULE_ID")]
@@ -260,7 +252,10 @@ struct FetchedDep {
     sha256: String,
 }
 
-pub fn cmd_pkg(args: PkgArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_pkg(
+    machine: &crate::reporting::MachineArgs,
+    args: PkgArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing pkg subcommand (try --help)");
     };
@@ -269,7 +264,7 @@ pub fn cmd_pkg(args: PkgArgs) -> Result<std::process::ExitCode> {
         PkgCommand::Add(args) => cmd_pkg_add(args),
         PkgCommand::Remove(args) => cmd_pkg_remove(args),
         PkgCommand::Versions(args) => cmd_pkg_versions(args),
-        PkgCommand::Pack(args) => cmd_pkg_pack(args),
+        PkgCommand::Pack(args) => cmd_pkg_pack(machine, args),
         PkgCommand::Lock(args) => cmd_pkg_lock(args),
         PkgCommand::Provides(args) => cmd_pkg_provides(args),
         PkgCommand::Login(args) => cmd_pkg_login(args),
@@ -296,12 +291,6 @@ struct ProvidesReport {
 }
 
 fn cmd_pkg_provides(args: ProvidesArgs) -> Result<std::process::ExitCode> {
-    if !args.report_json {
-        anyhow::bail!(
-            "--report-json=false is not supported (stdout is reserved for machine output)"
-        );
-    }
-
     let project_path = util::resolve_existing_path_upwards(&args.project);
     let project_root = project_path
         .parent()
@@ -1385,22 +1374,30 @@ fn latest_non_yanked_semver_version(entries: &[x07_pkg::IndexEntry]) -> Option<S
     best.map(|(_, version)| version)
 }
 
-fn cmd_pkg_pack(args: PackArgs) -> Result<std::process::ExitCode> {
+fn cmd_pkg_pack(
+    machine: &crate::reporting::MachineArgs,
+    args: PackArgs,
+) -> Result<std::process::ExitCode> {
     let package_dir = util::resolve_existing_path_upwards(&args.package);
+    let out_path = machine
+        .out
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("pkg pack: missing --out <PATH>"))?
+        .clone();
 
     let (_pkg, tar) = pack_package_to_tar(&package_dir)?;
-    if let Some(parent) = args.out.parent() {
+    if let Some(parent) = out_path.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("create output dir: {}", parent.display()))?;
     }
-    std::fs::write(&args.out, &tar).with_context(|| format!("write: {}", args.out.display()))?;
+    std::fs::write(&out_path, &tar).with_context(|| format!("write: {}", out_path.display()))?;
 
     let report = PkgReport {
         ok: true,
         command: "pkg.pack",
         result: Some(PackResult {
             package_dir: package_dir.display().to_string(),
-            out: args.out.display().to_string(),
+            out: out_path.display().to_string(),
             sha256: x07_pkg::sha256_hex(&tar),
             bytes: tar.len(),
         }),

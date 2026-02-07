@@ -5,7 +5,7 @@ Use the `x07` schema export directly with Outlines JSON generation.
 ## Recipe: JSON Schema path
 
 ```bash
-x07 ast schema --json-schema > /tmp/x07ast.schema.json
+x07 ast schema > /tmp/x07ast.schema.json
 ```
 
 ```python

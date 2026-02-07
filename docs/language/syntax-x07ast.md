@@ -78,7 +78,7 @@ For a full project skeleton (`x07.json`, lockfile, `src/`, `tests/`), use `x07 i
   - applies quickfixes (JSON Patch) and rewrites `*.x07.json` deterministically
 - `x07 ast apply-patch`:
   - applies RFC 6902 JSON Patch deterministically (agent-safe edits)
-- `x07 ast schema --json-schema`:
+- `x07 ast schema`:
   - emits the canonical JSON Schema for constrained/structured generation engines
 - `x07 ast grammar --cfg`:
   - emits GBNF variants plus semantic supplement for grammar-constrained decoding

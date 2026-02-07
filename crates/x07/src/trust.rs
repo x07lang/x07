@@ -55,10 +55,6 @@ pub struct TrustReportArgs {
     #[arg(long, value_name = "NAME")]
     pub profile: Option<String>,
 
-    /// Output path for the JSON trust report (required).
-    #[arg(long, value_name = "PATH")]
-    pub out: PathBuf,
-
     /// Optional output path for the HTML trust summary.
     #[arg(long, value_name = "PATH")]
     pub html_out: Option<PathBuf>,
@@ -260,17 +256,27 @@ struct StaticScan {
     uses_os_time: bool,
 }
 
-pub fn cmd_trust(args: TrustArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_trust(
+    machine: &crate::reporting::MachineArgs,
+    args: TrustArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing trust subcommand (try --help)");
     };
 
     match cmd {
-        TrustCommand::Report(args) => cmd_trust_report(args),
+        TrustCommand::Report(args) => cmd_trust_report(machine, args),
     }
 }
 
-fn cmd_trust_report(args: TrustReportArgs) -> Result<std::process::ExitCode> {
+fn cmd_trust_report(
+    machine: &crate::reporting::MachineArgs,
+    args: TrustReportArgs,
+) -> Result<std::process::ExitCode> {
+    let out_path = machine
+        .out
+        .as_ref()
+        .context("missing --out <PATH> for trust report")?;
     let cwd = std::env::current_dir().context("get cwd")?;
     let project_path = match args.project.as_deref() {
         Some(p) => Some(util::resolve_existing_path_upwards(p)),
@@ -581,8 +587,8 @@ fn cmd_trust_report(args: TrustReportArgs) -> Result<std::process::ExitCode> {
     let fail_on_triggered = trust_fail_on_triggered(&report, &args.fail_on);
 
     let json_bytes = report_common::canonical_pretty_json_bytes(&report_value)?;
-    util::write_atomic(&args.out, &json_bytes)
-        .with_context(|| format!("write trust report: {}", args.out.display()))?;
+    util::write_atomic(out_path, &json_bytes)
+        .with_context(|| format!("write trust report: {}", out_path.display()))?;
 
     if let Some(html_out) = &args.html_out {
         let html = render_trust_html(&report, &strict_issues, &schema_diags);

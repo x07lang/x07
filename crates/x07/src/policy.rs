@@ -52,10 +52,6 @@ pub struct PolicyInitArgs {
     #[arg(long, value_name = "PATH")]
     pub project: Option<PathBuf>,
 
-    /// Output path for the generated policy.
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-
     /// Override the policy_id field (must match the schema regex).
     #[arg(long, value_name = "ID")]
     pub policy_id: Option<String>,
@@ -83,13 +79,16 @@ struct PolicyInitReport {
     policy_id: String,
 }
 
-pub fn cmd_policy(args: PolicyArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_policy(
+    machine: &crate::reporting::MachineArgs,
+    args: PolicyArgs,
+) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing policy subcommand (try --help)");
     };
 
     match cmd {
-        PolicyCommand::Init(args) => cmd_policy_init(args),
+        PolicyCommand::Init(args) => cmd_policy_init(machine, args),
     }
 }
 
@@ -122,14 +121,17 @@ pub(crate) fn render_base_policy_template_bytes(
     Ok(bytes)
 }
 
-fn cmd_policy_init(args: PolicyInitArgs) -> Result<std::process::ExitCode> {
+fn cmd_policy_init(
+    machine: &crate::reporting::MachineArgs,
+    args: PolicyInitArgs,
+) -> Result<std::process::ExitCode> {
     if let Some(id) = args.policy_id.as_deref() {
         validate_policy_id(id).map_err(|e| anyhow::anyhow!("{e}"))?;
     }
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let (project_root, _discovered_project) = resolve_project_root(&cwd, args.project.as_deref())?;
-    let out_path = resolve_out_path(&project_root, &args);
+    let out_path = resolve_out_path(&project_root, args.template, machine.out.as_deref());
 
     let policy = base_policy_template(args.template, args.policy_id.as_deref());
     let (policy_bytes, policy_value) = canonical_policy_bytes(policy)?;
@@ -144,7 +146,7 @@ fn cmd_policy_init(args: PolicyInitArgs) -> Result<std::process::ExitCode> {
             ensure_parent_dir_for_write(
                 &project_root,
                 &out_path,
-                args.out.is_none(),
+                machine.out.is_none(),
                 args.mkdir_out,
             )
             .map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -161,7 +163,7 @@ fn cmd_policy_init(args: PolicyInitArgs) -> Result<std::process::ExitCode> {
                 ensure_parent_dir_for_write(
                     &project_root,
                     &out_path,
-                    args.out.is_none(),
+                    machine.out.is_none(),
                     args.mkdir_out,
                 )
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -246,11 +248,10 @@ fn resolve_project_root(cwd: &Path, project: Option<&Path>) -> Result<(PathBuf, 
     Ok((cwd.to_path_buf(), None))
 }
 
-fn resolve_out_path(project_root: &Path, args: &PolicyInitArgs) -> PathBuf {
-    let rel = match (args.out.as_deref(), args.template) {
-        (Some(out), _) => out.to_path_buf(),
-        (None, template) => PathBuf::from(default_base_policy_rel_path(template)),
-    };
+fn resolve_out_path(project_root: &Path, template: PolicyTemplate, out: Option<&Path>) -> PathBuf {
+    let rel = out
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from(default_base_policy_rel_path(template)));
 
     if rel.is_absolute() {
         rel

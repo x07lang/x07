@@ -1139,7 +1139,6 @@ fn run_schema_derive_smoke(fixture: &PathBuf) {
             "--out-dir",
             ".",
             "--write",
-            "--report-json",
         ],
     );
     assert_eq!(
@@ -1193,7 +1192,6 @@ fn run_schema_derive_smoke(fixture: &PathBuf) {
             "--out-dir",
             ".",
             "--check",
-            "--report-json",
         ],
     );
     assert_eq!(out.status.code(), Some(1), "expected drift exit code");
@@ -1253,7 +1251,7 @@ fn x07_fix_applies_multiple_borrow_quickfixes() {
         "--input",
         program_path.to_str().unwrap(),
         "--write",
-        "--report-json",
+        "--json",
     ]);
     assert_eq!(
         out.status.code(),
@@ -1262,9 +1260,30 @@ fn x07_fix_applies_multiple_borrow_quickfixes() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_json_stdout(&out);
-    assert_eq!(v["command"], "fix");
+    assert_eq!(v["schema_version"], "x07.tool.fix.report@0.1.0");
+    assert_eq!(v["command"], "x07.fix");
     assert_eq!(v["ok"], true);
-    assert_eq!(v["diagnostics_count"], 0);
+    assert_eq!(v["exit_code"], 0);
+    assert!(
+        v["diagnostics"]
+            .as_array()
+            .expect("diagnostics[]")
+            .is_empty(),
+        "expected fix wrapper report to be clean"
+    );
+
+    let out = run_x07(&["lint", "--input", program_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let lint_report = parse_json_stdout(&out);
+    assert_eq!(
+        lint_report["ok"], true,
+        "expected lint to be green after fix"
+    );
 }
 
 #[test]
@@ -2772,7 +2791,7 @@ fn x07_ast_get_extracts_json_pointer() {
 #[test]
 fn x07_ast_schema_json_schema_matches_embedded_bytes() {
     let root = repo_root();
-    let out = run_x07(&["ast", "schema", "--json-schema"]);
+    let out = run_x07(&["ast", "schema"]);
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -2801,7 +2820,6 @@ fn x07_ast_schema_pretty_writes_json_document() {
     let out = run_x07(&[
         "ast",
         "schema",
-        "--json-schema",
         "--pretty",
         "--out",
         out_path.to_str().unwrap(),
@@ -3381,7 +3399,7 @@ fn x07_tool_wrapper_json_for_guide_scope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let report: Value = serde_json::from_slice(&out.stdout).expect("parse tool wrapper report");
-    assert_eq!(report["schema_version"], "x07.guide.report@0.1.0");
+    assert_eq!(report["schema_version"], "x07.tool.guide.report@0.1.0");
     assert_eq!(report["command"], "x07.guide");
     assert_eq!(report["ok"], Value::Bool(true));
     assert!(
@@ -3474,7 +3492,7 @@ fn x07_scope_json_schema_for_arch_check_is_available() {
     let schema: Value = serde_json::from_slice(&out.stdout).expect("parse schema");
     assert_eq!(
         schema["properties"]["schema_version"]["const"],
-        Value::String("x07.arch.check.report@0.1.0".to_string())
+        Value::String("x07.tool.arch.check.report@0.1.0".to_string())
     );
     assert_eq!(
         schema["properties"]["command"]["const"],

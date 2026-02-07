@@ -70,10 +70,6 @@ pub struct DiagCatalogArgs {
     #[arg(long, value_enum, default_value_t = DiagCatalogFormat::Both)]
     pub format: DiagCatalogFormat,
 
-    /// Generic output path (valid only for a single-format run).
-    #[arg(long, value_name = "PATH")]
-    pub out: Option<PathBuf>,
-
     /// Output path for canonical catalog JSON.
     #[arg(long, value_name = "PATH")]
     pub out_json: Option<PathBuf>,
@@ -93,10 +89,6 @@ pub struct DiagInitCatalogArgs {
     #[arg(long, value_name = "PATH", default_value = DEFAULT_EXTRACTED_PATH)]
     pub from: PathBuf,
 
-    /// Catalog output path.
-    #[arg(long, value_name = "PATH", default_value = DEFAULT_CATALOG_PATH)]
-    pub out: PathBuf,
-
     /// Overwrite an existing catalog file.
     #[arg(long)]
     pub overwrite: bool,
@@ -111,10 +103,6 @@ pub struct DiagExplainArgs {
     /// Catalog JSON path.
     #[arg(long, value_name = "PATH", default_value = DEFAULT_CATALOG_PATH)]
     pub catalog: PathBuf,
-
-    /// Emit JSON instead of text.
-    #[arg(long)]
-    pub json: bool,
 }
 
 #[derive(Debug, Args)]
@@ -151,10 +139,6 @@ pub struct DiagCoverageArgs {
     #[arg(long, value_name = "PATH", default_value = DEFAULT_CATALOG_PATH)]
     pub catalog: PathBuf,
 
-    /// Output coverage report path.
-    #[arg(long, value_name = "PATH", default_value = DEFAULT_COVERAGE_PATH)]
-    pub out: PathBuf,
-
     /// Optional x07diag report files for observed quickfix statistics.
     #[arg(long = "inputs", value_name = "PATH")]
     pub inputs: Vec<PathBuf>,
@@ -190,10 +174,6 @@ pub struct DiagSarifArgs {
     /// Input x07diag report JSON.
     #[arg(long = "in", value_name = "PATH")]
     pub input: PathBuf,
-
-    /// Output SARIF path.
-    #[arg(long, value_name = "PATH")]
-    pub out: PathBuf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -415,19 +395,25 @@ struct ObservedStats {
     missing_by_code: BTreeMap<String, u64>,
 }
 
-pub fn cmd_diag(args: DiagArgs) -> Result<std::process::ExitCode> {
+pub fn cmd_diag(
+    machine: &crate::reporting::MachineArgs,
+    args: DiagArgs,
+) -> Result<std::process::ExitCode> {
     match args.cmd {
-        Some(DiagCommand::Catalog(args)) => cmd_diag_catalog(args),
-        Some(DiagCommand::InitCatalog(args)) => cmd_diag_init_catalog(args),
+        Some(DiagCommand::Catalog(args)) => cmd_diag_catalog(machine, args),
+        Some(DiagCommand::InitCatalog(args)) => cmd_diag_init_catalog(machine, args),
         Some(DiagCommand::Explain(args)) => cmd_diag_explain(args),
         Some(DiagCommand::Check(args)) => cmd_diag_check(args),
-        Some(DiagCommand::Coverage(args)) => cmd_diag_coverage(args),
-        Some(DiagCommand::Sarif(args)) => cmd_diag_sarif(args),
+        Some(DiagCommand::Coverage(args)) => cmd_diag_coverage(machine, args),
+        Some(DiagCommand::Sarif(args)) => cmd_diag_sarif(machine, args),
         None => anyhow::bail!("missing subcommand for `x07 diag` (try --help)"),
     }
 }
 
-fn cmd_diag_catalog(args: DiagCatalogArgs) -> Result<std::process::ExitCode> {
+fn cmd_diag_catalog(
+    machine: &crate::reporting::MachineArgs,
+    args: DiagCatalogArgs,
+) -> Result<std::process::ExitCode> {
     let catalog_path = resolve_existing_path_like(&args.catalog);
     let mut catalog = load_catalog(&catalog_path)?;
     normalize_catalog(&mut catalog);
@@ -440,7 +426,7 @@ fn cmd_diag_catalog(args: DiagCatalogArgs) -> Result<std::process::ExitCode> {
         );
     }
 
-    let (out_json, out_md) = resolve_catalog_outputs(&args)?;
+    let (out_json, out_md) = resolve_catalog_outputs(&args, machine.out.as_ref())?;
 
     let catalog_value = serde_json::to_value(&catalog).context("serialize catalog JSON")?;
     let canonical_json =
@@ -468,7 +454,10 @@ fn cmd_diag_catalog(args: DiagCatalogArgs) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
-fn cmd_diag_init_catalog(args: DiagInitCatalogArgs) -> Result<std::process::ExitCode> {
+fn cmd_diag_init_catalog(
+    machine: &crate::reporting::MachineArgs,
+    args: DiagInitCatalogArgs,
+) -> Result<std::process::ExitCode> {
     let extracted_path = resolve_existing_path_like(&args.from);
     if !extracted_path.exists() {
         anyhow::bail!(
@@ -488,7 +477,10 @@ fn cmd_diag_init_catalog(args: DiagInitCatalogArgs) -> Result<std::process::Exit
         );
     }
 
-    let out_path = args.out;
+    let out_path = machine
+        .out
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_CATALOG_PATH));
     if out_path.exists() && !args.overwrite {
         anyhow::bail!(
             "catalog already exists: {} (pass --overwrite to replace)",
@@ -561,11 +553,6 @@ fn cmd_diag_explain(args: DiagExplainArgs) -> Result<std::process::ExitCode> {
     let Some(entry) = catalog.entries.iter().find(|e| e.code == code) else {
         anyhow::bail!("diagnostic code not found in catalog: {code}");
     };
-
-    if args.json {
-        println!("{}", serde_json::to_string_pretty(entry)?);
-        return Ok(std::process::ExitCode::SUCCESS);
-    }
 
     println!("code: {}", entry.code);
     println!("summary: {}", entry.doc.summary);
@@ -668,7 +655,10 @@ fn cmd_diag_check(args: DiagCheckArgs) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
-fn cmd_diag_coverage(args: DiagCoverageArgs) -> Result<std::process::ExitCode> {
+fn cmd_diag_coverage(
+    machine: &crate::reporting::MachineArgs,
+    args: DiagCoverageArgs,
+) -> Result<std::process::ExitCode> {
     if let Some(min) = args.min_coverage {
         if !(0.0..=1.0).contains(&min) {
             anyhow::bail!("--min-coverage must be in [0, 1], got {min}");
@@ -749,8 +739,12 @@ fn cmd_diag_coverage(args: DiagCoverageArgs) -> Result<std::process::ExitCode> {
             schema_errors.join("\n")
         );
     }
-    write_json_file(&args.out, &report_value)?;
-    println!("wrote: {}", args.out.display());
+    let out_path = machine
+        .out
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_COVERAGE_PATH));
+    write_json_file(&out_path, &report_value)?;
+    println!("wrote: {}", out_path.display());
     println!(
         "catalog coverage: {}/{} ({:.2}%)",
         with_quickfix,
@@ -794,9 +788,20 @@ fn cmd_diag_coverage(args: DiagCoverageArgs) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
-fn cmd_diag_sarif(args: DiagSarifArgs) -> Result<std::process::ExitCode> {
+fn cmd_diag_sarif(
+    machine: &crate::reporting::MachineArgs,
+    args: DiagSarifArgs,
+) -> Result<std::process::ExitCode> {
     let input_path = resolve_existing_path_like(&args.input);
     let report = load_x07diag_report(&input_path)?;
+    let out_path = machine
+        .out
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("diag sarif: missing --out <PATH>"))?
+        .clone();
+    if out_path.as_os_str() == "-" {
+        anyhow::bail!("--out '-' is not supported");
+    }
 
     let mut rules: BTreeMap<String, Value> = BTreeMap::new();
     let mut results: Vec<Value> = Vec::new();
@@ -844,12 +849,15 @@ fn cmd_diag_sarif(args: DiagSarifArgs) -> Result<std::process::ExitCode> {
             }
         ]
     });
-    write_json_file(&args.out, &sarif)?;
-    println!("wrote: {}", args.out.display());
+    write_json_file(&out_path, &sarif)?;
+    println!("wrote: {}", out_path.display());
     Ok(std::process::ExitCode::SUCCESS)
 }
 
-fn resolve_catalog_outputs(args: &DiagCatalogArgs) -> Result<(Option<PathBuf>, Option<PathBuf>)> {
+fn resolve_catalog_outputs(
+    args: &DiagCatalogArgs,
+    generic_out: Option<&PathBuf>,
+) -> Result<(Option<PathBuf>, Option<PathBuf>)> {
     match args.format {
         DiagCatalogFormat::Json => {
             if args.out_md.is_some() {
@@ -858,7 +866,7 @@ fn resolve_catalog_outputs(args: &DiagCatalogArgs) -> Result<(Option<PathBuf>, O
             let out = args
                 .out_json
                 .clone()
-                .or_else(|| args.out.clone())
+                .or_else(|| generic_out.cloned())
                 .unwrap_or_else(|| args.catalog.clone());
             Ok((Some(out), None))
         }
@@ -869,12 +877,12 @@ fn resolve_catalog_outputs(args: &DiagCatalogArgs) -> Result<(Option<PathBuf>, O
             let out = args
                 .out_md
                 .clone()
-                .or_else(|| args.out.clone())
+                .or_else(|| generic_out.cloned())
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_DOCS_PATH));
             Ok((None, Some(out)))
         }
         DiagCatalogFormat::Both => {
-            if args.out.is_some() {
+            if generic_out.is_some() {
                 anyhow::bail!("--out is ambiguous when --format=both; use --out-json and --out-md");
             }
             let out_json = args
