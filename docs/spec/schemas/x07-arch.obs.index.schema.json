@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.obs.index.schema.json",
+  "title": "x07.arch.obs.index@0.1.0",
+  "description": "Pinned observability index: metrics registry + exporter profiles.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "metrics_registry_path", "exporters"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.obs.index@0.1.0" },
+    "metrics_registry_path": { "$ref": "#/$defs/rel_path" },
+    "exporters": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/exporter_ref" }
+    },
+    "defaults": { "$ref": "#/$defs/defaults", "default": {} }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "exporter_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "profile_path", "budget_profile_id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "profile_path": { "$ref": "#/$defs/rel_path" },
+        "budget_profile_id": { "$ref": "#/$defs/id" }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "default_exporter_id": { "$ref": "#/$defs/id" } }
+    }
+  }
+}

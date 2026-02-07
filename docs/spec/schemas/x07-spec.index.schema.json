@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-spec.index.schema.json",
+  "title": "x07.spec.index@0.1.0",
+  "description": "Machine-readable manifest for published spec pages and schema assets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "entries"],
+  "properties": {
+    "schema_version": { "const": "x07.spec.index@0.1.0" },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "kind": {
+      "type": "string",
+      "enum": ["markdown", "schema", "contract"]
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "title"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/kind" },
+        "path": { "$ref": "#/$defs/path" },
+        "title": { "type": "string", "maxLength": 512 },
+        "spec_id": { "type": "string", "maxLength": 256 },
+        "status": { "type": "string", "enum": ["draft", "stable"] },
+        "schema_id": { "type": "string", "maxLength": 512 },
+        "schema_version": { "type": "string", "maxLength": 128 }
+      }
+    }
+  }
+}

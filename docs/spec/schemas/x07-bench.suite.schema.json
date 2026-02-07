@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-bench.suite.schema.json",
+  "title": "x07.bench.suite@0.1.0",
+  "description": "Benchmark suite descriptor consumed by `x07 bench` (instance catalog + suite-wide defaults).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite_id",
+    "instances"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "x07.bench.suite@0.1.0"
+    },
+    "suite_id": {
+      "$ref": "#/$defs/id"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 4096,
+      "default": ""
+    },
+    "instances": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/instance_ref"
+      }
+    },
+    "defaults": {
+      "$ref": "#/$defs/defaults",
+      "default": {}
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+    },
+    "rel_dir": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/rel_path"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?!.*\\.x07\\.json$).+$"
+        }
+      ]
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "repair_mode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "memory",
+        "write"
+      ]
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "world": {
+          "$ref": "#/$defs/world_id",
+          "default": "solve-pure"
+        },
+        "repair_mode": {
+          "$ref": "#/$defs/repair_mode",
+          "default": "write"
+        },
+        "jobs": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "keep_artifacts": {
+          "type": "boolean",
+          "default": false
+        },
+        "artifact_dir": {
+          "$ref": "#/$defs/rel_dir",
+          "default": "target/x07bench"
+        },
+        "determinism_runs": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2
+        }
+      },
+      "default": {}
+    },
+    "instance_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "path": {
+          "$ref": "#/$defs/rel_dir"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    }
+  }
+}

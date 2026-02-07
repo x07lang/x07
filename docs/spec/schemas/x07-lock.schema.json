@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-lock.schema.json",
+  "title": "x07.lock@0.2.0",
+  "description": "Project lockfile (x07.lock.json). Written by `x07 pkg lock`; consumed by x07c and x07 run when resolving dependency module roots.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "dependencies"],
+  "properties": {
+    "schema_version": { "const": "x07.lock@0.2.0" },
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/locked_dependency" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "pkg_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_-]{0,127}$"
+    },
+    "module_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+    },
+    "sha256_hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lowercase hex sha256 digest."
+    },
+    "modules_sha256": {
+      "type": "object",
+      "description": "Map of module_id -> sha256 digest of the module x07AST JSON bytes.",
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$": { "$ref": "#/$defs/sha256_hex" }
+      },
+      "additionalProperties": false,
+      "default": {}
+    },
+    "locked_dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "path",
+        "package_manifest_sha256",
+        "module_root",
+        "modules_sha256"
+      ],
+      "properties": {
+        "name": { "$ref": "#/$defs/pkg_name" },
+        "version": { "$ref": "#/$defs/semver" },
+        "path": { "$ref": "#/$defs/rel_path" },
+        "package_manifest_sha256": { "$ref": "#/$defs/sha256_hex" },
+        "module_root": { "$ref": "#/$defs/rel_path" },
+        "modules_sha256": { "$ref": "#/$defs/modules_sha256" }
+      }
+    }
+  }
+}

@@ -107,6 +107,8 @@ jobs:
             libsqlite3-dev
       - name: LLM/tool contracts
         run: python3 scripts/check_contracts.py
+      - name: Published spec sync (check)
+        run: python3 scripts/sync_published_spec.py --check
 
   e2e-smoke:
     name: ci / e2e-smoke

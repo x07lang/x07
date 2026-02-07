@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.db.queries.schema.json",
+  "title": "x07.arch.db.queries@0.1.0",
+  "description": "Pinned DB query catalog: stable query ids + SQL + I/O encodings + limits.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "queries"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.db.queries@0.1.0" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "v": { "type": "integer", "minimum": 1 },
+    "queries": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/query" } }
+  },
+  "$defs": {
+    "u32": { "type": "integer", "minimum": 0 },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "sql", "max_rows", "max_resp_bytes"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "op": { "type": "string", "enum": ["query_v1", "exec_v1"] },
+        "sql": { "type": "string", "minLength": 1, "maxLength": 65536 },
+        "params_brand": { "type": "string", "maxLength": 256, "default": "" },
+        "row_brand": { "type": "string", "maxLength": 256, "default": "" },
+        "max_rows": { "$ref": "#/$defs/u32" },
+        "max_resp_bytes": { "$ref": "#/$defs/u32" },
+        "timeout_ms": { "$ref": "#/$defs/u32", "default": 0 }
+      }
+    }
+  }
+}

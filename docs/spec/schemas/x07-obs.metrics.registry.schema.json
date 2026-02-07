@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-obs.metrics.registry.schema.json",
+  "title": "x07.obs.metrics.registry@0.1.0",
+  "description": "Pinned metric ids/types/labels for deterministic instrumentation and rendering.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "metrics"],
+  "properties": {
+    "schema_version": { "const": "x07.obs.metrics.registry@0.1.0" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "v": { "type": "integer", "minimum": 1 },
+    "metrics": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/metric" } }
+  },
+  "$defs": {
+    "metric_type": {
+      "type": "string",
+      "enum": ["counter_u64_v1", "gauge_f64_v1", "histogram_f64_v1"]
+    },
+    "label_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "help", "unit", "labels"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "type": { "$ref": "#/$defs/metric_type" },
+        "help": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "unit": { "type": "string", "maxLength": 64, "default": "" },
+        "labels": { "type": "array", "items": { "$ref": "#/$defs/label_name" }, "default": [] },
+        "histogram_buckets": {
+          "type": "array",
+          "items": { "type": "number" },
+          "default": []
+        }
+      }
+    }
+  }
+}

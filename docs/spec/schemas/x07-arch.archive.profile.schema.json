@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.archive.profile.schema.json",
+  "title": "x07.arch.archive.profile@0.1.0",
+  "description": "A concrete archive policy profile (path safety + size limits).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "kind", "path_policy", "limits"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.archive.profile@0.1.0" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "v": { "type": "integer", "minimum": 1 },
+    "kind": { "type": "string", "enum": ["tar_v1", "tgz_v1", "zip_v1"] },
+    "path_policy": { "$ref": "#/$defs/path_policy" },
+    "limits": { "$ref": "#/$defs/limits" },
+    "format_opts": { "$ref": "#/$defs/format_opts", "default": {} }
+  },
+  "$defs": {
+    "u64": { "type": "integer", "minimum": 0 },
+    "u32": { "type": "integer", "minimum": 0 },
+    "path_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "reject_non_utf8",
+        "reject_absolute",
+        "reject_parent",
+        "reject_backslash"
+      ],
+      "properties": {
+        "mode": { "type": "string", "enum": ["posix_strict_v1"] },
+        "reject_non_utf8": { "type": "boolean" },
+        "reject_absolute": { "type": "boolean" },
+        "reject_parent": { "type": "boolean" },
+        "reject_backslash": { "type": "boolean" },
+        "max_path_bytes": { "$ref": "#/$defs/u32", "default": 4096 },
+        "max_segment_bytes": { "$ref": "#/$defs/u32", "default": 255 }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_entries", "max_total_out_bytes", "max_file_bytes"],
+      "properties": {
+        "max_entries": { "$ref": "#/$defs/u32" },
+        "max_total_out_bytes": { "$ref": "#/$defs/u64" },
+        "max_file_bytes": { "$ref": "#/$defs/u64" },
+        "max_link_bytes": { "$ref": "#/$defs/u32", "default": 4096 },
+        "max_inflate_out_bytes": { "$ref": "#/$defs/u64", "default": 0 },
+        "max_inflate_ratio_x100": { "$ref": "#/$defs/u32", "default": 0 }
+      }
+    },
+    "format_opts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tar_allow_pax": { "type": "boolean", "default": true },
+        "tar_allow_gnu_longname": { "type": "boolean", "default": true }
+      }
+    }
+  }
+}

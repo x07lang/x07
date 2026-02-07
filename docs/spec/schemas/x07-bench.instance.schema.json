@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-bench.instance.schema.json",
+  "title": "x07.bench.instance@0.1.0",
+  "description": "Benchmark instance descriptor consumed by `x07 bench` (problem statement + repo snapshot + evaluation config).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "instance_id",
+    "world",
+    "problem_statement_path",
+    "repo_path",
+    "eval"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "x07.bench.instance@0.1.0"
+    },
+    "instance_id": {
+      "$ref": "#/$defs/id"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/tag"
+      },
+      "default": []
+    },
+    "world": {
+      "$ref": "#/$defs/world_id"
+    },
+    "problem_statement_path": {
+      "$ref": "#/$defs/rel_path"
+    },
+    "repo_path": {
+      "$ref": "#/$defs/rel_dir"
+    },
+    "eval": {
+      "$ref": "#/$defs/eval_config"
+    },
+    "oracle": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/oracle_config"
+        }
+      ],
+      "default": null
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 4096
+      },
+      "default": []
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "tag": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+    },
+    "rel_dir": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/rel_path"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?!.*\\.x07\\.json$).+$"
+        }
+      ]
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "eval_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "manifest"
+      ],
+      "properties": {
+        "kind": {
+          "const": "x07test"
+        },
+        "manifest": {
+          "$ref": "#/$defs/rel_path",
+          "default": "tests/tests.json"
+        },
+        "module_root": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rel_dir"
+          },
+          "default": []
+        },
+        "stdlib_lock": {
+          "$ref": "#/$defs/rel_path",
+          "default": "stdlib.lock"
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "exact": {
+          "type": "boolean",
+          "default": false
+        },
+        "repeat": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "jobs": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "keep_artifacts": {
+          "type": "boolean",
+          "default": false
+        },
+        "artifact_dir": {
+          "$ref": "#/$defs/rel_dir",
+          "default": "target/x07test"
+        },
+        "no_fail_fast": {
+          "type": "boolean",
+          "default": false
+        },
+        "no_run": {
+          "type": "boolean",
+          "default": false
+        },
+        "verbose": {
+          "type": "boolean",
+          "default": false
+        },
+        "fail_to_pass": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "default": []
+        },
+        "pass_to_pass": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "default": []
+        }
+      }
+    },
+    "patch_kind": {
+      "type": "string",
+      "enum": [
+        "x07-arch-patchset-json",
+        "unified-diff"
+      ]
+    },
+    "oracle_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "patch_kind",
+        "patch_path"
+      ],
+      "properties": {
+        "patch_kind": {
+          "$ref": "#/$defs/patch_kind"
+        },
+        "patch_path": {
+          "$ref": "#/$defs/rel_path"
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    }
+  }
+}

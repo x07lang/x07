@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-doc.report.schema.json",
+  "title": "X07 x07 doc report v0.1.0",
+  "description": "Machine-readable report emitted by `x07 doc --json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "ok",
+    "query",
+    "result",
+    "diagnostics_count",
+    "exit_code"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.doc.report@0.1.0" },
+    "command": { "const": "doc" },
+    "ok": { "type": "boolean" },
+    "query": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "result": { "$ref": "#/$defs/result" },
+    "diagnostics_count": { "type": "integer", "minimum": 0 },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/diagnostic" },
+      "default": []
+    },
+    "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "hints": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 4096 },
+      "default": []
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    }
+  },
+  "$defs": {
+    "module_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)*$"
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)*$"
+    },
+    "local_name": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "type_name": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "semver": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([+-][0-9A-Za-z.-]+)?$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["builtin", "stdlib", "project", "dependency", "filesystem"]
+        },
+        "path": { "type": "string", "maxLength": 4096 },
+        "package": { "type": "string", "maxLength": 512 }
+      }
+    },
+    "param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ty"],
+      "properties": {
+        "name": { "$ref": "#/$defs/local_name" },
+        "ty": { "$ref": "#/$defs/type_name" }
+      }
+    },
+    "export_sig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "params", "result"],
+      "properties": {
+        "name": { "$ref": "#/$defs/symbol" },
+        "kind": { "type": "string", "enum": ["export", "defn", "defasync"] },
+        "params": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/param" },
+          "default": []
+        },
+        "result": { "$ref": "#/$defs/type_name" }
+      }
+    },
+    "suggestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query", "kind"],
+      "properties": {
+        "query": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "kind": { "type": "string", "enum": ["builtin_form", "module", "symbol", "package", "spec"] }
+      }
+    },
+    "result": {
+      "oneOf": [
+        { "$ref": "#/$defs/result_builtin_form" },
+        { "$ref": "#/$defs/result_module" },
+        { "$ref": "#/$defs/result_symbol" },
+        { "$ref": "#/$defs/result_package" },
+        { "$ref": "#/$defs/result_spec" },
+        { "$ref": "#/$defs/result_not_found" },
+        { "$ref": "#/$defs/result_error" }
+      ]
+    },
+    "result_builtin_form": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "doc", "source"],
+      "properties": {
+        "kind": { "const": "builtin_form" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "doc": { "type": "string", "maxLength": 131072 },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "result_module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "module_id", "path", "exports", "source"],
+      "properties": {
+        "kind": { "const": "module" },
+        "module_id": { "$ref": "#/$defs/module_id" },
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "exports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/export_sig" },
+          "default": []
+        },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "result_symbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "symbol", "module_id", "path", "sig", "source"],
+      "properties": {
+        "kind": { "const": "symbol" },
+        "symbol": { "$ref": "#/$defs/symbol" },
+        "module_id": { "$ref": "#/$defs/module_id" },
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sig": { "$ref": "#/$defs/export_sig" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "result_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "version", "description", "docs", "module_root", "modules", "source"],
+      "properties": {
+        "kind": { "const": "package" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "version": { "$ref": "#/$defs/semver" },
+        "description": { "type": "string", "maxLength": 4096, "default": "" },
+        "docs": { "type": "string", "maxLength": 131072, "default": "" },
+        "module_root": { "type": "string", "maxLength": 1024, "default": "" },
+        "modules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/module_id" },
+          "default": []
+        },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "result_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "spec_id", "path"],
+      "properties": {
+        "kind": { "const": "spec" },
+        "spec_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "result_not_found": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "suggestions"],
+      "properties": {
+        "kind": { "const": "not_found" },
+        "suggestions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/suggestion" },
+          "default": []
+        }
+      }
+    },
+    "result_error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "message"],
+      "properties": {
+        "kind": { "const": "error" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 8192 }
+      }
+    }
+  }
+}

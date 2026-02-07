@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.stream-plugins.index.schema.json",
+  "title": "x07.arch.stream.plugins.index@0.1.0",
+  "description": "Pinned stream plugin registry index (contracts-as-data) consumed by `x07 arch check` and the compiler.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plugins"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.stream.plugins.index@0.1.0" },
+    "plugins": { "type": "array", "items": { "$ref": "#/$defs/plugin_ref" }, "default": [] }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "determinism": { "type": "string", "enum": ["deterministic_v1", "nondet_os_only_v1"] },
+    "native_backend_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "export_symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "item_brand": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "plugin_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plugin_id",
+        "plugin_spec_path",
+        "budget_profile_id",
+        "native_backend_id",
+        "abi_major",
+        "export_symbol",
+        "determinism",
+        "worlds_allowed",
+        "in_item_brand",
+        "out_item_brand",
+        "state_bytes",
+        "scratch_bytes"
+      ],
+      "properties": {
+        "plugin_id": { "$ref": "#/$defs/id" },
+        "plugin_spec_path": { "$ref": "#/$defs/rel_path" },
+        "budget_profile_id": { "$ref": "#/$defs/id" },
+        "native_backend_id": { "$ref": "#/$defs/native_backend_id" },
+        "abi_major": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "export_symbol": { "$ref": "#/$defs/export_symbol" },
+        "determinism": { "$ref": "#/$defs/determinism" },
+        "worlds_allowed": { "type": "array", "items": { "$ref": "#/$defs/world_id" }, "default": [] },
+        "in_item_brand": { "$ref": "#/$defs/item_brand" },
+        "out_item_brand": { "$ref": "#/$defs/item_brand" },
+        "state_bytes": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+        "scratch_bytes": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+        "doc": { "type": "string", "maxLength": 4096, "default": "" },
+        "since": { "type": "string", "maxLength": 64, "default": "" }
+      }
+    }
+  }
+}

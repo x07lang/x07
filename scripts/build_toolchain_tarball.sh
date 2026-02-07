@@ -98,6 +98,7 @@ stage_root="$root/dist/.tmp_toolchain_${tag}_${platform}"
 rm -rf "$stage_root"
 mkdir -p "$stage_root/bin"
 mkdir -p "$stage_root/deps/x07"
+mkdir -p "$stage_root/spec"
 mkdir -p "$stage_root/stdlib/os/0.2.0"
 mkdir -p "$stage_root/.agent/docs"
 mkdir -p "$stage_root/.agent/skills"
@@ -140,6 +141,10 @@ for lock in stdlib.lock stdlib.os.lock; do
     exit 1
   fi
   cp -f "$lock_src" "$stage_root/$lock"
+done
+
+for schema in "$root"/spec/*.schema.json; do
+  cp -f "$schema" "$stage_root/spec/"
 done
 
 docs_src="$root/docs"

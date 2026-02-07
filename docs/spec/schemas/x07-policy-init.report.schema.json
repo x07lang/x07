@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-policy-init.report.schema.json",
+  "title": "X07 policy init report v0.1.0",
+  "description": "Report emitted by `x07 policy init` in default report mode.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "template", "project_root", "out", "status", "policy_id"],
+  "properties": {
+    "schema_version": { "const": "x07.policy.init.report@0.1.0" },
+    "template": {
+      "enum": [
+        "cli",
+        "http-client",
+        "web-service",
+        "fs-tool",
+        "sqlite-app",
+        "postgres-client",
+        "worker"
+      ]
+    },
+    "project_root": { "type": "string" },
+    "out": { "type": "string" },
+    "status": { "enum": ["created", "unchanged", "overwritten", "exists_different"] },
+    "policy_id": { "type": "string" }
+  }
+}

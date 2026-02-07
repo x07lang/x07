@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.org/spec/x07cli.specrows.schema.json",
+  "title": "x07CLI SpecRows (cli-v1) schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "app",
+    "rows"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "x07cli.specrows@0.1.0"
+    },
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+          "description": "CLI binary name shown in help/usage."
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([+-][0-9A-Za-z.-]+)?$",
+          "description": "Semantic-ish version string."
+        },
+        "about": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "homepage": {
+          "type": "string",
+          "maxLength": 2048
+        }
+      }
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    }
+  },
+  "$defs": {
+    "scope": {
+      "type": "string",
+      "pattern": "^(root|[a-z][a-z0-9_-]{0,31})$",
+      "description": "Command scope. 'root' or a subcommand name."
+    },
+    "shortOpt": {
+      "type": "string",
+      "pattern": "^(|-[A-Za-z0-9])$",
+      "description": "Short option form, or empty string if none."
+    },
+    "longOpt": {
+      "type": "string",
+      "pattern": "^(|--[A-Za-z][A-Za-z0-9-]{0,63})$",
+      "description": "Long option form, or empty string if none."
+    },
+    "posName": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{0,31}$",
+      "description": "Positional arg name (UPPER_SNAKE)."
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
+    },
+    "metaCommon": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "global": {
+          "type": "boolean"
+        },
+        "hidden": {
+          "type": "boolean"
+        }
+      }
+    },
+    "metaOpt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "global": {
+          "type": "boolean"
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "multiple": {
+          "type": "boolean"
+        },
+        "default": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 4096
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "env": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
+        }
+      }
+    },
+    "metaArg": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "multiple": {
+          "type": "boolean"
+        },
+        "default": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      }
+    },
+    "row": {
+      "description": "A single CLI specification row (tuple).",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/rowAbout"
+        },
+        {
+          "$ref": "#/$defs/rowHelp"
+        },
+        {
+          "$ref": "#/$defs/rowVersion"
+        },
+        {
+          "$ref": "#/$defs/rowFlag"
+        },
+        {
+          "$ref": "#/$defs/rowOpt"
+        },
+        {
+          "$ref": "#/$defs/rowArg"
+        }
+      ]
+    },
+    "rowAbout": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/scope"
+        },
+        {
+          "const": "about"
+        },
+        {
+          "type": "string",
+          "maxLength": 4096
+        }
+      ]
+    },
+    "rowHelp": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/scope"
+        },
+        {
+          "const": "help"
+        },
+        {
+          "$ref": "#/$defs/shortOpt"
+        },
+        {
+          "$ref": "#/$defs/longOpt"
+        },
+        {
+          "type": "string",
+          "maxLength": 4096
+        }
+      ]
+    },
+    "rowVersion": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/scope"
+        },
+        {
+          "const": "version"
+        },
+        {
+          "$ref": "#/$defs/shortOpt"
+        },
+        {
+          "$ref": "#/$defs/longOpt"
+        },
+        {
+          "type": "string",
+          "maxLength": 4096
+        }
+      ]
+    },
+    "rowFlag": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 7,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/scope"
+        },
+        {
+          "const": "flag"
+        },
+        {
+          "$ref": "#/$defs/shortOpt"
+        },
+        {
+          "$ref": "#/$defs/longOpt"
+        },
+        {
+          "$ref": "#/$defs/key"
+        },
+        {
+          "type": "string",
+          "maxLength": 4096
+        },
+        {
+          "$ref": "#/$defs/metaCommon"
+        }
+      ],
+      "items": false
+    },
+    "rowOpt": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 8,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/scope"
+        },
+        {
+          "const": "opt"
+        },
+        {
+          "$ref": "#/$defs/shortOpt"
+        },
+        {
+          "$ref": "#/$defs/longOpt"
+        },
+        {
+          "$ref": "#/$defs/key"
+        },
+        {
+          "enum": [
+            "STR",
+            "PATH",
+            "U32",
+            "I32",
+            "BYTES",
+            "BYTES_HEX"
+          ],
+          "description": "Value kind."
+        },
+        {
+          "type": "string",
+          "maxLength": 4096
+        },
+        {
+          "$ref": "#/$defs/metaOpt"
+        }
+      ],
+      "items": false
+    },
+    "rowArg": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 6,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/scope"
+        },
+        {
+          "const": "arg"
+        },
+        {
+          "$ref": "#/$defs/posName"
+        },
+        {
+          "$ref": "#/$defs/key"
+        },
+        {
+          "type": "string",
+          "maxLength": 4096
+        },
+        {
+          "$ref": "#/$defs/metaArg"
+        }
+      ],
+      "items": false
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.contracts.lock.schema.json",
+  "title": "x07.arch.contracts.lock@0.1.0",
+  "description": "Pinned lockfile for contracts referenced by `arch/manifest.x07arch.json` (JCS sha256).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "indexes", "files"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.contracts.lock@0.1.0" },
+    "indexes": { "$ref": "#/$defs/lock_map" },
+    "files": { "$ref": "#/$defs/lock_map" }
+  },
+  "$defs": {
+    "sha256_hex": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "lock_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jcs_sha256_hex"],
+      "properties": {
+        "jcs_sha256_hex": { "$ref": "#/$defs/sha256_hex" }
+      }
+    },
+    "lock_map": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/lock_entry" },
+      "default": {}
+    }
+  }
+}

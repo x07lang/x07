@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.stream-plugin.schema.json",
+  "title": "x07.arch.stream.plugin@0.1.0",
+  "description": "Pinned stream plugin spec (contracts-as-data) consumed by `x07 arch check` and the compiler.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plugin_id",
+    "v",
+    "abi",
+    "determinism",
+    "worlds_allowed",
+    "brands",
+    "budgets",
+    "cfg",
+    "limits"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.arch.stream.plugin@0.1.0" },
+    "plugin_id": { "$ref": "#/$defs/id" },
+    "v": { "type": "integer", "minimum": 1 },
+    "abi": { "$ref": "#/$defs/abi" },
+    "determinism": { "$ref": "#/$defs/determinism" },
+    "worlds_allowed": { "type": "array", "items": { "$ref": "#/$defs/world_id" }, "default": [] },
+    "brands": { "$ref": "#/$defs/brands" },
+    "budgets": { "$ref": "#/$defs/budgets" },
+    "cfg": { "$ref": "#/$defs/cfg" },
+    "limits": { "$ref": "#/$defs/limits" },
+    "fixtures": { "$ref": "#/$defs/fixtures" },
+    "doc": { "type": "string", "maxLength": 4096, "default": "" },
+    "since": { "type": "string", "maxLength": 64, "default": "" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "determinism": { "type": "string", "enum": ["deterministic_v1", "nondet_os_only_v1"] },
+    "native_backend_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "export_symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "item_brand": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "abi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["native_backend_id", "abi_major", "export_symbol"],
+      "properties": {
+        "native_backend_id": { "$ref": "#/$defs/native_backend_id" },
+        "abi_major": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "export_symbol": { "$ref": "#/$defs/export_symbol" }
+      }
+    },
+    "brands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["in_item_brand", "out_item_brand"],
+      "properties": {
+        "in_item_brand": { "$ref": "#/$defs/item_brand" },
+        "out_item_brand": { "$ref": "#/$defs/item_brand" }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state_bytes", "scratch_bytes"],
+      "properties": {
+        "state_bytes": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+        "scratch_bytes": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+        "max_expand_ratio": { "type": "number", "minimum": 0, "default": 0 }
+      }
+    },
+    "cfg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_bytes", "canon_mode"],
+      "properties": {
+        "max_bytes": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+        "canon_mode": { "type": "string", "enum": ["none_v1", "canon_json_v1"] },
+        "schema_path": { "$ref": "#/$defs/rel_path" }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_out_bytes_per_step", "max_out_items_per_step", "max_out_buf_bytes"],
+      "properties": {
+        "max_out_bytes_per_step": { "type": "integer", "minimum": 0, "maximum": 1073741824 },
+        "max_out_items_per_step": { "type": "integer", "minimum": 0, "maximum": 1048576 },
+        "max_out_buf_bytes": { "type": "integer", "minimum": 1, "maximum": 268435456 }
+      }
+    },
+    "fixtures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tests_manifest", "golden_dir"],
+      "properties": {
+        "tests_manifest": { "$ref": "#/$defs/rel_path" },
+        "golden_dir": { "$ref": "#/$defs/rel_path" }
+      }
+    }
+  }
+}

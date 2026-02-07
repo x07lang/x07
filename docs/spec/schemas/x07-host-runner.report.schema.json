@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-host-runner.report.schema.json",
+  "title": "X07 x07-host-runner report v0.3.0",
+  "description": "Machine-readable report emitted by x07-host-runner.",
+  "oneOf": [
+    { "$ref": "#/$defs/solve_report" },
+    { "$ref": "#/$defs/compile_report" },
+    { "$ref": "#/$defs/compile_run_report" },
+    { "$ref": "#/$defs/project_compile_report" },
+    { "$ref": "#/$defs/project_compile_run_report" }
+  ],
+  "$defs": {
+    "base64_bytes": { "type": "string" },
+    "maybe_u64": { "type": ["integer", "null"], "minimum": 0 },
+    "maybe_i32": { "type": ["integer", "null"] },
+    "maybe_string": { "type": ["string", "null"] },
+    "native_backend_req": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend_id", "abi_major"],
+      "properties": {
+        "backend_id": { "type": "string" },
+        "abi_major": { "type": "integer", "minimum": 1 },
+        "features": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "native_requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "requires"],
+      "properties": {
+        "schema_version": { "const": "x07.native-requires@0.1.0" },
+        "world": { "type": "string" },
+        "requires": { "type": "array", "items": { "$ref": "#/$defs/native_backend_req" } }
+      }
+    },
+    "mem_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alloc_calls",
+        "realloc_calls",
+        "free_calls",
+        "bytes_alloc_total",
+        "bytes_freed_total",
+        "live_bytes",
+        "peak_live_bytes",
+        "live_allocs",
+        "peak_live_allocs",
+        "memcpy_bytes"
+      ],
+      "properties": {
+        "alloc_calls": { "type": "integer", "minimum": 0 },
+        "realloc_calls": { "type": "integer", "minimum": 0 },
+        "free_calls": { "type": "integer", "minimum": 0 },
+        "bytes_alloc_total": { "type": "integer", "minimum": 0 },
+        "bytes_freed_total": { "type": "integer", "minimum": 0 },
+        "live_bytes": { "type": "integer", "minimum": 0 },
+        "peak_live_bytes": { "type": "integer", "minimum": 0 },
+        "live_allocs": { "type": "integer", "minimum": 0 },
+        "peak_live_allocs": { "type": "integer", "minimum": 0 },
+        "memcpy_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "debug_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["borrow_violations"],
+      "properties": { "borrow_violations": { "type": "integer", "minimum": 0 } }
+    },
+    "sched_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tasks_spawned",
+        "spawn_calls",
+        "join_calls",
+        "yield_calls",
+        "sleep_calls",
+        "chan_send_calls",
+        "chan_recv_calls",
+        "ctx_switches",
+        "wake_events",
+        "blocked_waits",
+        "virtual_time_end",
+        "sched_trace_hash"
+      ],
+      "properties": {
+        "tasks_spawned": { "type": "integer", "minimum": 0 },
+        "spawn_calls": { "type": "integer", "minimum": 0 },
+        "join_calls": { "type": "integer", "minimum": 0 },
+        "yield_calls": { "type": "integer", "minimum": 0 },
+        "sleep_calls": { "type": "integer", "minimum": 0 },
+        "chan_send_calls": { "type": "integer", "minimum": 0 },
+        "chan_recv_calls": { "type": "integer", "minimum": 0 },
+        "ctx_switches": { "type": "integer", "minimum": 0 },
+        "wake_events": { "type": "integer", "minimum": 0 },
+        "blocked_waits": { "type": "integer", "minimum": 0 },
+        "virtual_time_end": { "type": "integer", "minimum": 0 },
+        "sched_trace_hash": { "type": "string" }
+      }
+    },
+    "compiler_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "exit_status",
+        "lang_id",
+        "native_requires",
+        "c_source_size",
+        "compiled_exe",
+        "compiled_exe_size",
+        "compile_error",
+        "stdout_b64",
+        "stderr_b64",
+        "fuel_used",
+        "trap"
+      ],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "exit_status": { "type": "integer" },
+        "lang_id": { "type": "string" },
+        "native_requires": { "$ref": "#/$defs/native_requires" },
+        "c_source_size": { "type": "integer", "minimum": 0 },
+        "compiled_exe": { "$ref": "#/$defs/maybe_string" },
+        "compiled_exe_size": { "$ref": "#/$defs/maybe_u64" },
+        "compile_error": { "$ref": "#/$defs/maybe_string" },
+        "stdout_b64": { "$ref": "#/$defs/base64_bytes" },
+        "stderr_b64": { "$ref": "#/$defs/base64_bytes" },
+        "fuel_used": { "$ref": "#/$defs/maybe_u64" },
+        "trap": { "$ref": "#/$defs/maybe_string" }
+      }
+    },
+    "runner_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "exit_status",
+        "solve_output_b64",
+        "stdout_b64",
+        "stderr_b64",
+        "fuel_used",
+        "heap_used",
+        "fs_read_file_calls",
+        "fs_list_dir_calls",
+        "rr_open_calls",
+        "rr_close_calls",
+        "rr_stats_calls",
+        "rr_next_calls",
+        "rr_next_miss_calls",
+        "rr_append_calls",
+        "kv_get_calls",
+        "kv_set_calls",
+        "sched_stats",
+        "mem_stats",
+        "debug_stats",
+        "trap"
+      ],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "exit_status": { "type": "integer" },
+        "solve_output_b64": { "$ref": "#/$defs/base64_bytes" },
+        "stdout_b64": { "$ref": "#/$defs/base64_bytes" },
+        "stderr_b64": { "$ref": "#/$defs/base64_bytes" },
+        "fuel_used": { "$ref": "#/$defs/maybe_u64" },
+        "heap_used": { "$ref": "#/$defs/maybe_u64" },
+        "fs_read_file_calls": { "$ref": "#/$defs/maybe_u64" },
+        "fs_list_dir_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_open_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_close_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_stats_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_next_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_next_miss_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_append_calls": { "$ref": "#/$defs/maybe_u64" },
+        "kv_get_calls": { "$ref": "#/$defs/maybe_u64" },
+        "kv_set_calls": { "$ref": "#/$defs/maybe_u64" },
+        "sched_stats": { "oneOf": [{ "$ref": "#/$defs/sched_stats" }, { "type": "null" }] },
+        "mem_stats": { "oneOf": [{ "$ref": "#/$defs/mem_stats" }, { "type": "null" }] },
+        "debug_stats": { "oneOf": [{ "$ref": "#/$defs/debug_stats" }, { "type": "null" }] },
+        "trap": { "$ref": "#/$defs/maybe_string" }
+      }
+    },
+    "solve_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "mode",
+        "ok",
+        "exit_code",
+        "exit_status",
+        "solve_output_b64",
+        "stdout_b64",
+        "stderr_b64",
+        "fuel_used",
+        "heap_used",
+        "fs_read_file_calls",
+        "fs_list_dir_calls",
+        "rr_open_calls",
+        "rr_close_calls",
+        "rr_stats_calls",
+        "rr_next_calls",
+        "rr_next_miss_calls",
+        "rr_append_calls",
+        "kv_get_calls",
+        "kv_set_calls",
+        "sched_stats",
+        "mem_stats",
+        "debug_stats",
+        "trap"
+      ],
+      "properties": {
+        "schema_version": { "const": "x07-host-runner.report@0.3.0" },
+        "mode": { "const": "solve" },
+        "ok": { "type": "boolean" },
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "exit_status": { "type": "integer" },
+        "solve_output_b64": { "$ref": "#/$defs/base64_bytes" },
+        "stdout_b64": { "$ref": "#/$defs/base64_bytes" },
+        "stderr_b64": { "$ref": "#/$defs/base64_bytes" },
+        "fuel_used": { "$ref": "#/$defs/maybe_u64" },
+        "heap_used": { "$ref": "#/$defs/maybe_u64" },
+        "fs_read_file_calls": { "$ref": "#/$defs/maybe_u64" },
+        "fs_list_dir_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_open_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_close_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_stats_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_next_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_next_miss_calls": { "$ref": "#/$defs/maybe_u64" },
+        "rr_append_calls": { "$ref": "#/$defs/maybe_u64" },
+        "kv_get_calls": { "$ref": "#/$defs/maybe_u64" },
+        "kv_set_calls": { "$ref": "#/$defs/maybe_u64" },
+        "sched_stats": { "oneOf": [{ "$ref": "#/$defs/sched_stats" }, { "type": "null" }] },
+        "mem_stats": { "oneOf": [{ "$ref": "#/$defs/mem_stats" }, { "type": "null" }] },
+        "debug_stats": { "oneOf": [{ "$ref": "#/$defs/debug_stats" }, { "type": "null" }] },
+        "trap": { "$ref": "#/$defs/maybe_string" }
+      }
+    },
+    "compile_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "mode", "exit_code", "compile", "solve"],
+      "properties": {
+        "schema_version": { "const": "x07-host-runner.report@0.3.0" },
+        "mode": { "const": "compile" },
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "compile": { "$ref": "#/$defs/compiler_result" },
+        "solve": { "type": "null" }
+      }
+    },
+    "compile_run_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "mode", "exit_code", "compile", "solve"],
+      "properties": {
+        "schema_version": { "const": "x07-host-runner.report@0.3.0" },
+        "mode": { "const": "compile-run" },
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "compile": { "$ref": "#/$defs/compiler_result" },
+        "solve": { "oneOf": [{ "$ref": "#/$defs/runner_result" }, { "type": "null" }] }
+      }
+    },
+    "project_compile_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "mode", "exit_code", "compile", "solve"],
+      "properties": {
+        "schema_version": { "const": "x07-host-runner.report@0.3.0" },
+        "mode": { "const": "project-compile" },
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "compile": { "$ref": "#/$defs/compiler_result" },
+        "solve": { "type": "null" }
+      }
+    },
+    "project_compile_run_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "mode", "exit_code", "compile", "solve"],
+      "properties": {
+        "schema_version": { "const": "x07-host-runner.report@0.3.0" },
+        "mode": { "const": "project-compile-run" },
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "compile": { "$ref": "#/$defs/compiler_result" },
+        "solve": { "oneOf": [{ "$ref": "#/$defs/runner_result" }, { "type": "null" }] }
+      }
+    }
+  }
+}

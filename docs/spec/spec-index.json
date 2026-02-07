@@ -1,0 +1,711 @@
+{
+  "entries": [
+    {
+      "kind": "contract",
+      "path": "docs/db/db-v1.md",
+      "spec_id": "x07.spec.contract.db.db-v1@0.1.0",
+      "title": "DB v1 (external packages) \u2014 `X7DB` responses and `X7DC` caps"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/db/mysql-v1.md",
+      "spec_id": "x07.spec.contract.db.mysql-v1@0.1.0",
+      "title": "MySQL adapter v1 \u2014 request blobs (`X7MO`/`X7MQ`/`X7ME`/`X7MC`)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/db/pool-v1.md",
+      "spec_id": "x07.spec.contract.db.pool-v1@0.1.0",
+      "title": "`std.db.pool` v1 (`X7PL`)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/db/postgres-v1.md",
+      "spec_id": "x07.spec.contract.db.postgres-v1@0.1.0",
+      "title": "Postgres adapter v1 \u2014 request blobs (`X7PO`/`X7PQ`/`X7PE`/`X7PC`)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/db/redis-v1.md",
+      "spec_id": "x07.spec.contract.db.redis-v1@0.1.0",
+      "title": "Redis adapter v1 \u2014 request blobs (`X7RO`/`X7RQ`/`X7RX` + `X7RV`)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/db/sqlite-v1.md",
+      "spec_id": "x07.spec.contract.db.sqlite-v1@0.1.0",
+      "title": "SQLite adapter v1 \u2014 request blobs (`X7SO`/`X7SQ`/`X7SE`/`X7SC`)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/fs/fs-v1.md",
+      "spec_id": "x07.spec.contract.fs.fs-v1@0.1.0",
+      "title": "FS v1 (run-os) \u2014 External Filesystem Package"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/math/math-v1.md",
+      "spec_id": "x07.spec.contract.math.math-v1@0.1.0",
+      "title": "X07 external math package \u2014 v1 (normative)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/math/native-backend-v1.md",
+      "spec_id": "x07.spec.contract.math.native-backend-v1@0.1.0",
+      "title": "Native math backend (libx07_math)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/math/smoke-suites-v1.md",
+      "spec_id": "x07.spec.contract.math.smoke-suites-v1@0.1.0",
+      "title": "Math package smoke suites (v1)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/math/vendor-v1.md",
+      "spec_id": "x07.spec.contract.math.vendor-v1@0.1.0",
+      "title": "x07-ext-math \u2014 v1 native backend (normative guidance)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/net/errors-v1.md",
+      "spec_id": "x07.spec.contract.net.errors-v1@0.1.0",
+      "title": "Networking error docs v1 (`std.net.err.*`)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/net/net-v1.md",
+      "spec_id": "x07.spec.contract.net.net-v1@0.1.0",
+      "title": "Networking bytes ABIs v1 (`std.net.*`)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/os/process-abi-v1.md",
+      "spec_id": "x07.spec.contract.os.process-abi-v1@0.1.0",
+      "title": "OS Process ABI v1 (`os.process.*`)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/text/regex-v1.md",
+      "spec_id": "x07.spec.contract.text.regex-v1@0.1.0",
+      "title": "Regex v1 (ext.regex)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/text/x7sl-v1.md",
+      "spec_id": "x07.spec.contract.text.x7sl-v1@0.1.0",
+      "title": "X7SL v1 \u2014 X07 Slice List (canonical bytes encoding)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/time/civil-v1.md",
+      "spec_id": "x07.spec.contract.time.civil-v1@0.1.0",
+      "title": "Civil Time v1 (ext.time.civil)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/time/duration-v1.md",
+      "spec_id": "x07.spec.contract.time.duration-v1@0.1.0",
+      "title": "Duration v1 (X7DU)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/time/os-time-v1.md",
+      "spec_id": "x07.spec.contract.time.os-time-v1@0.1.0",
+      "title": "OS time v1 (run-os*)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/time/rfc3339-v1.md",
+      "spec_id": "x07.spec.contract.time.rfc3339-v1@0.1.0",
+      "title": "RFC3339 v1 (X7TS)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/time/time-v1.md",
+      "spec_id": "x07.spec.contract.time.time-v1@0.1.0",
+      "title": "Time v1 (ext.time.*)"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/time/tzdb-v1.md",
+      "spec_id": "x07.spec.contract.time.tzdb-v1@0.1.0",
+      "title": "TZDB v1 (time zone database)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/abi/abi-v1.md",
+      "spec_id": "x07.spec.abi.abi-v1@0.1.0",
+      "status": "stable",
+      "title": "X07 ABI v1 (value layouts)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/abi/abi-v2.md",
+      "spec_id": "x07.spec.abi.abi-v2@0.1.0",
+      "status": "stable",
+      "title": "X07 ABI v2 (value layouts + ownership semantics)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/abi/allocator-v1.md",
+      "spec_id": "x07.spec.abi.allocator-v1@0.1.0",
+      "status": "stable",
+      "title": "Allocator ABI v1"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/abi/interface-records-v1.md",
+      "spec_id": "x07.spec.abi.interface-records-v1@0.1.0",
+      "status": "stable",
+      "title": "Interface records ABI v1"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/abi/stability-policy.md",
+      "spec_id": "x07.spec.abi.stability-policy@0.1.0",
+      "status": "stable",
+      "title": "ABI stability policy"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/changelog.md",
+      "spec_id": "x07.spec.changelog@0.1.0",
+      "status": "stable",
+      "title": "Spec Changelog"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/index.md",
+      "spec_id": "x07.spec.index@0.1.0",
+      "status": "stable",
+      "title": "Spec Index"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/modules-packages.md",
+      "spec_id": "x07.spec.internal.modules-packages@0.1.0",
+      "status": "draft",
+      "title": "Phase E: Modules, packages, and composable stdlib"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/stdlib-emitters-v1.md",
+      "spec_id": "x07.spec.internal.stdlib-emitters-v1@0.1.0",
+      "status": "draft",
+      "title": "Stdlib emitters v1 (normative)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/stream-pipe.md",
+      "spec_id": "x07.spec.internal.stream-pipe@0.1.0",
+      "status": "draft",
+      "title": "Stream pipe (`std.stream.pipe_v1`)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/types/type-system-v1.md",
+      "spec_id": "x07.spec.internal.types.type-system-v1@0.1.0",
+      "status": "draft",
+      "title": "Type System v1 (Phase H1)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/x07-c-backend.md",
+      "spec_id": "x07.spec.internal.x07-c-backend@0.1.0",
+      "status": "draft",
+      "title": "C Backend (Native Execution)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/x07-core.md",
+      "spec_id": "x07.spec.internal.x07-core@0.1.0",
+      "status": "draft",
+      "title": "X07 Core (Track B): build a compiler, not a VM"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/x07-memory-management.md",
+      "spec_id": "x07.spec.internal.x07-memory-management@0.1.0",
+      "status": "draft",
+      "title": "Memory management (native C backend)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/x07-standalone.md",
+      "spec_id": "x07.spec.internal.x07-standalone@0.1.0",
+      "status": "draft",
+      "title": "X07 as a standalone language"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/x07-stdlib-translation.md",
+      "spec_id": "x07.spec.internal.x07-stdlib-translation@0.1.0",
+      "status": "draft",
+      "title": "Stdlib translation (`x07import`)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/x07-stdlib.md",
+      "spec_id": "x07.spec.internal.x07-stdlib@0.1.0",
+      "status": "draft",
+      "title": ""
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/internal/x07-testing-v1.md",
+      "spec_id": "x07.spec.internal.x07-testing-v1@0.1.0",
+      "status": "draft",
+      "title": "X07 Testing v1 (Deterministic harness)"
+    },
+    {
+      "kind": "markdown",
+      "path": "docs/spec/language-guide.md",
+      "spec_id": "",
+      "status": "",
+      "title": "Language Guide (x07AST JSON)"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.archive.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.archive.index.schema.json",
+      "schema_version": "x07.arch.archive.index@0.1.0",
+      "title": "x07.arch.archive.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.archive.profile.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.archive.profile.schema.json",
+      "schema_version": "x07.arch.archive.profile@0.1.0",
+      "title": "x07.arch.archive.profile@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.budgets.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.budgets.index.schema.json",
+      "schema_version": "x07.arch.budgets.index@0.1.0",
+      "title": "x07.arch.budgets.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.cli.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.cli.index.schema.json",
+      "schema_version": "x07.arch.cli.index@0.1.0",
+      "title": "x07.arch.cli.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.cli.profile.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.cli.profile.schema.json",
+      "schema_version": "x07.arch.cli.profile@0.1.0",
+      "title": "x07.arch.cli.profile@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.contracts.lock.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.contracts.lock.schema.json",
+      "schema_version": "x07.arch.contracts.lock@0.1.0",
+      "title": "x07.arch.contracts.lock@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.crawl.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.crawl.index.schema.json",
+      "schema_version": "x07.arch.crawl.index@0.1.0",
+      "title": "x07.arch.crawl.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.crawl.policy.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.crawl.policy.schema.json",
+      "schema_version": "x07.arch.crawl.policy@0.1.0",
+      "title": "x07.arch.crawl.policy@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.crypto.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.crypto.index.schema.json",
+      "schema_version": "x07.arch.crypto.index@0.1.0",
+      "title": "x07.arch.crypto.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.crypto.jwt_profiles.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.crypto.jwt_profiles.schema.json",
+      "schema_version": "x07.arch.crypto.jwt_profiles@0.1.0",
+      "title": "x07.arch.crypto.jwt_profiles@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.db.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.db.index.schema.json",
+      "schema_version": "x07.arch.db.index@0.1.0",
+      "title": "x07.arch.db.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.db.queries.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.db.queries.schema.json",
+      "schema_version": "x07.arch.db.queries@0.1.0",
+      "title": "x07.arch.db.queries@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.manifest.lock.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.manifest.lock.schema.json",
+      "schema_version": "x07.arch.manifest.lock@0.1.0",
+      "title": "x07.arch.manifest.lock@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.manifest.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.manifest.schema.json",
+      "schema_version": "x07.arch.manifest@0.1.0",
+      "title": "x07.arch.manifest@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.msg.amqp.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.msg.amqp.index.schema.json",
+      "schema_version": "x07.arch.msg.amqp.index@0.1.0",
+      "title": "x07.arch.msg.amqp.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.msg.amqp.profile.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.msg.amqp.profile.schema.json",
+      "schema_version": "x07.arch.msg.amqp.profile@0.1.0",
+      "title": "x07.arch.msg.amqp.profile@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.msg.amqp.topology.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.msg.amqp.topology.schema.json",
+      "schema_version": "x07.arch.msg.amqp.topology@0.1.0",
+      "title": "x07.arch.msg.amqp.topology@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.msg.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.msg.index.schema.json",
+      "schema_version": "x07.arch.msg.index@0.1.0",
+      "title": "x07.arch.msg.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.msg.kafka.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.msg.kafka.index.schema.json",
+      "schema_version": "x07.arch.msg.kafka.index@0.1.0",
+      "title": "x07.arch.msg.kafka.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.msg.kafka.profile.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.msg.kafka.profile.schema.json",
+      "schema_version": "x07.arch.msg.kafka.profile@0.1.0",
+      "title": "x07.arch.msg.kafka.profile@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.net.grpc.services.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.net.grpc.services.schema.json",
+      "schema_version": "x07.arch.net.grpc.services@0.1.0",
+      "title": "x07.arch.net.grpc.services@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.net.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.net.index.schema.json",
+      "schema_version": "x07.arch.net.index@0.1.0",
+      "title": "x07.arch.net.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.obs.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.obs.index.schema.json",
+      "schema_version": "x07.arch.obs.index@0.1.0",
+      "title": "x07.arch.obs.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.patchset.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.patchset.schema.json",
+      "schema_version": "x07.arch.patchset@0.1.0",
+      "title": "x07.arch.patchset@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.report.schema.json",
+      "schema_version": "x07.arch.report@0.1.0",
+      "title": "x07.arch.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.rr.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.rr.index.schema.json",
+      "schema_version": "x07.arch.rr.index@0.1.0",
+      "title": "x07.arch.rr.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.rr.policy.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.rr.policy.schema.json",
+      "schema_version": "x07.arch.rr.policy@0.1.0",
+      "title": "x07.arch.rr.policy@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.rr.sanitize.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.rr.sanitize.schema.json",
+      "schema_version": "x07.arch.rr.sanitize@0.1.0",
+      "title": "x07.arch.rr.sanitize@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.sm.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.sm.index.schema.json",
+      "schema_version": "x07.arch.sm.index@0.1.0",
+      "title": "x07.arch.sm.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.stream-plugin.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.stream-plugin.schema.json",
+      "schema_version": "x07.arch.stream.plugin@0.1.0",
+      "title": "x07.arch.stream.plugin@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.stream-plugins.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.stream-plugins.index.schema.json",
+      "schema_version": "x07.arch.stream.plugins.index@0.1.0",
+      "title": "x07.arch.stream.plugins.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.web.api.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.web.api.schema.json",
+      "schema_version": "x07.arch.web.api@0.1.0",
+      "title": "x07.arch.web.api@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.web.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.web.index.schema.json",
+      "schema_version": "x07.arch.web.index@0.1.0",
+      "title": "x07.arch.web.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-arch.web.openapi_profile.schema.json",
+      "schema_id": "https://x07.io/spec/x07-arch.web.openapi_profile.schema.json",
+      "schema_version": "x07.arch.web.openapi_profile@0.1.0",
+      "title": "x07.arch.web.openapi_profile@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-bench.instance.schema.json",
+      "schema_id": "https://x07.io/spec/x07-bench.instance.schema.json",
+      "schema_version": "x07.bench.instance@0.1.0",
+      "title": "x07.bench.instance@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-bench.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-bench.report.schema.json",
+      "schema_version": "x07.bench.report@0.1.0",
+      "title": "x07.bench.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-bench.suite.schema.json",
+      "schema_id": "https://x07.io/spec/x07-bench.suite.schema.json",
+      "schema_version": "x07.bench.suite@0.1.0",
+      "title": "x07.bench.suite@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-budget.profile.schema.json",
+      "schema_id": "https://x07.io/spec/x07-budget.profile.schema.json",
+      "schema_version": "x07.budget.profile@0.1.0",
+      "title": "x07.budget.profile@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-bundle.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-bundle.report.schema.json",
+      "schema_version": "x07.bundle.report@0.1.0",
+      "title": "X07 x07 bundle report v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-capabilities.schema.json",
+      "schema_id": "https://x07.io/spec/x07-capabilities.schema.json",
+      "schema_version": "x07.capabilities@0.1.0",
+      "title": "x07.capabilities@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-db.migrate.plan.schema.json",
+      "schema_id": "https://x07.io/spec/x07-db.migrate.plan.schema.json",
+      "schema_version": "x07.db.migrate.plan@0.1.0",
+      "title": "x07.db.migrate.plan@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-diag.catalog.schema.json",
+      "schema_id": "https://x07.io/spec/x07-diag.catalog.schema.json",
+      "schema_version": "x07.diag.catalog@0.1.0",
+      "title": "x07.diag.catalog@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-diag.coverage.schema.json",
+      "schema_id": "https://x07.io/spec/x07-diag.coverage.schema.json",
+      "schema_version": "x07.diag.coverage@0.1.0",
+      "title": "x07.diag.coverage@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-doc.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-doc.report.schema.json",
+      "schema_version": "x07.doc.report@0.1.0",
+      "title": "X07 x07 doc report v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-host-runner.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-host-runner.report.schema.json",
+      "schema_version": "",
+      "title": "X07 x07-host-runner report v0.3.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-install.channels.schema.json",
+      "schema_id": "https://x07.io/spec/x07-install.channels.schema.json",
+      "schema_version": "x07.install.channels@0.1.0",
+      "title": "X07 installer channels manifest v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-lock.schema.json",
+      "schema_id": "https://x07.io/spec/x07-lock.schema.json",
+      "schema_version": "x07.lock@0.2.0",
+      "title": "x07.lock@0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-obs.exporter.profile.schema.json",
+      "schema_id": "https://x07.io/spec/x07-obs.exporter.profile.schema.json",
+      "schema_version": "x07.obs.exporter.profile@0.1.0",
+      "title": "x07.obs.exporter.profile@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-obs.metrics.registry.schema.json",
+      "schema_id": "https://x07.io/spec/x07-obs.metrics.registry.schema.json",
+      "schema_version": "x07.obs.metrics.registry@0.1.0",
+      "title": "x07.obs.metrics.registry@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-os-runner.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-os-runner.report.schema.json",
+      "schema_version": "",
+      "title": "X07 x07-os-runner report v0.3.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-package.schema.json",
+      "schema_id": "https://x07.io/spec/x07-package.schema.json",
+      "schema_version": "x07.package@0.1.0",
+      "title": "x07.package@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-policy-init.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-policy-init.report.schema.json",
+      "schema_version": "x07.policy.init.report@0.1.0",
+      "title": "X07 policy init report v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-project.schema.json",
+      "schema_id": "https://x07.io/spec/x07-project.schema.json",
+      "schema_version": "x07.project@0.2.0",
+      "title": "x07.project@0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-run.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-run.report.schema.json",
+      "schema_version": "x07.run.report@0.1.0",
+      "title": "X07 x07 run report v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-sm.spec.schema.json",
+      "schema_id": "https://x07.io/spec/x07-sm.spec.schema.json",
+      "schema_version": "x07.sm.spec@0.1.0",
+      "title": "x07.sm.spec@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-spec.index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-spec.index.schema.json",
+      "schema_version": "x07.spec.index@0.1.0",
+      "title": "x07.spec.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-website.package-index.schema.json",
+      "schema_id": "https://x07.io/spec/x07-website.package-index.schema.json",
+      "schema_version": "x07.website.package-index@0.2.0",
+      "title": "x07.website.package-index@0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07ast.schema.json",
+      "schema_id": "https://x07.io/spec/x07ast.schema.json",
+      "schema_version": "x07.x07ast@0.3.0",
+      "title": "X07 x07AST v0.3.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07c.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07c.report.schema.json",
+      "schema_version": "x07c.report@0.1.0",
+      "title": "X07 x07c tool report v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07cli.specrows.schema.json",
+      "schema_id": "https://x07.org/spec/x07cli.specrows.schema.json",
+      "schema_version": "x07cli.specrows@0.1.0",
+      "title": "x07CLI SpecRows (cli-v1) schema"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07diag.schema.json",
+      "schema_id": "https://x07.io/spec/x07diag.schema.json",
+      "schema_version": "x07.x07diag@0.1.0",
+      "title": "X07 x07Diag v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07patch.schema.json",
+      "schema_id": "https://x07.io/spec/x07patch.schema.json",
+      "schema_version": "",
+      "title": "X07 x07Patch v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07test.schema.json",
+      "schema_id": "https://x07.io/spec/x07test.schema.json",
+      "schema_version": "x07.x07test@0.2.0",
+      "title": "X07 x07Test v0.2.0"
+    }
+  ],
+  "schema_version": "x07.spec.index@0.1.0"
+}

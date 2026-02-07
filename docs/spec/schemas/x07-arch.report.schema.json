@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.report.schema.json",
+  "title": "x07.arch.report@0.1.0",
+  "description": "Machine-readable report emitted by `x07 arch check`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "manifest", "stats", "diags", "suggested_patches"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.report@0.1.0" },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "jcs_sha256_hex"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "jcs_sha256_hex": {
+          "anyOf": [{ "$ref": "#/$defs/sha256_hex" }, { "type": "null" }]
+        }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modules", "nodes", "module_edges", "node_edges"],
+      "properties": {
+        "modules": { "type": "integer", "minimum": 0 },
+        "nodes": { "type": "integer", "minimum": 0 },
+        "module_edges": { "type": "integer", "minimum": 0 },
+        "node_edges": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "diags": { "type": "array", "items": { "$ref": "x07diag.schema.json#/$defs/diagnostic" } },
+    "suggested_patches": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/patch_target" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "patch_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "patch"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "patch": { "$ref": "x07diag.schema.json#/$defs/json_patch" },
+        "note": { "type": "string", "maxLength": 1024 }
+      }
+    }
+  }
+}
+

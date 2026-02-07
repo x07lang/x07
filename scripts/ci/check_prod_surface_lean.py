@@ -91,6 +91,13 @@ FORBIDDEN_PATH_FRAGMENTS = [
     "scripts\\bench\\",
 ]
 
+# Published spec mirrors can legitimately contain historical phase labels and benchmark references.
+FORBIDDEN_PUBLIC_EXEMPT_PREFIXES = [
+    "docs/spec/internal/",
+    "docs/spec/abi/",
+    "docs/spec/spec-index.json",
+]
+
 # If you want x07import to remain shipped but not part of the default workspace build/test surface,
 # keep it out of workspace.default-members.
 OPTIONAL_WORKSPACE_MEMBERS = [
@@ -202,6 +209,10 @@ def check_public_strings_and_paths() -> None:
 
     violations: list[str] = []
     for p in files:
+        rel = p.relative_to(ROOT).as_posix()
+        if any(rel.startswith(prefix) for prefix in FORBIDDEN_PUBLIC_EXEMPT_PREFIXES):
+            continue
+
         try:
             text = p.read_text("utf-8", errors="replace")
         except Exception:
@@ -209,11 +220,11 @@ def check_public_strings_and_paths() -> None:
 
         for s in FORBIDDEN_PUBLIC_STRINGS:
             if s in text:
-                violations.append(f"{p.relative_to(ROOT)}: contains forbidden public string: {s!r}")
+                violations.append(f"{rel}: contains forbidden public string: {s!r}")
 
         for frag in FORBIDDEN_PATH_FRAGMENTS:
             if frag in text:
-                violations.append(f"{p.relative_to(ROOT)}: references forbidden path fragment: {frag!r}")
+                violations.append(f"{rel}: references forbidden path fragment: {frag!r}")
 
     if violations:
         die("error: production docs/guides contain forbidden references:\n" + "\n".join(f"  - {v}" for v in violations))

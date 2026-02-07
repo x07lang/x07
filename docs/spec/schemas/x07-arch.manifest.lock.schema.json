@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.manifest.lock.schema.json",
+  "title": "x07.arch.manifest.lock@0.1.0",
+  "description": "Pinned lockfile for `arch/manifest.x07arch.json` (JCS sha256 + module scan configuration).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "manifest_path", "jcs_sha256_hex", "module_scan"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.manifest.lock@0.1.0" },
+    "manifest_path": { "$ref": "#/$defs/rel_path" },
+    "jcs_sha256_hex": { "$ref": "#/$defs/sha256_hex" },
+    "module_scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["include_globs", "exclude_globs"],
+      "properties": {
+        "include_globs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/glob" },
+          "default": ["**/*.x07.json"]
+        },
+        "exclude_globs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/glob" },
+          "default": ["**/gen/**", "**/target/**"]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "glob": { "type": "string", "minLength": 1, "maxLength": 256 }
+  }
+}
+

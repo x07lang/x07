@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07ast.schema.json",
+  "title": "X07 x07AST v0.3.0",
+  "description": "Canonical, JSON-based AST carrier for LLM-first X07 program generation and repair. Expressions are encoded as JSON S-expressions (json-sexpr).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "module_id", "imports", "decls"],
+  "properties": {
+    "schema_version": { "const": "x07.x07ast@0.3.0" },
+    "kind": {
+      "type": "string",
+      "enum": ["entry", "module"],
+      "default": "entry"
+    },
+    "module_id": { "$ref": "#/$defs/module_id" },
+    "imports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/module_id" },
+      "uniqueItems": true,
+      "default": []
+    },
+    "decls": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/decl" },
+      "default": []
+    },
+    "solve": { "$ref": "#/$defs/sexpr" },
+    "meta": {
+      "type": "object",
+      "description": "Optional tool metadata. Not interpreted by the compiler; may be used for traceability.",
+      "additionalProperties": true,
+      "default": {}
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "entry" } } },
+      "then": { "required": ["solve"] },
+      "else": { "not": { "required": ["solve"] } }
+    }
+  ],
+  "$defs": {
+    "module_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)*$",
+      "description": "Dot-separated module identifier."
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)*$",
+      "description": "Dot-separated symbol name (e.g., main.helper, std.text.utf8.validate_or_empty)."
+    },
+    "local_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "description": "Local identifier (variable/parameter)."
+    },
+    "type_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Type name token (e.g., i32, bytes, bytes_view, vec_u8, iface)."
+    },
+    "i32": {
+      "type": "integer",
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    },
+    "atom": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s]+$",
+      "description": "Identifier token (no whitespace). Operators like '+', '<u', '>=u' are represented as atoms."
+    },
+    "sexpr": {
+      "description": "An expression encoded as json-sexpr: either an i32, an atom string, or a list whose head is an atom string.",
+      "oneOf": [
+        { "$ref": "#/$defs/i32" },
+        { "$ref": "#/$defs/atom" },
+        { "$ref": "#/$defs/sexpr_list" }
+      ]
+    },
+    "sexpr_list": {
+      "description": "A list expression; first element is the head atom (form/callee), rest are arguments/subexpressions.",
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [{ "const": "bytes.lit" }, { "$ref": "#/$defs/text" }]
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100000,
+          "prefixItems": [{ "$ref": "#/$defs/atom" }],
+          "items": { "$ref": "#/$defs/sexpr" }
+        }
+      ]
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 1048576,
+      "description": "UTF-8 text literal (whitespace allowed)."
+    },
+    "param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ty"],
+      "properties": {
+        "name": { "$ref": "#/$defs/local_name" },
+        "ty": { "$ref": "#/$defs/type_name" },
+        "brand": { "$ref": "#/$defs/symbol" }
+      }
+    },
+    "decl_defn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "params", "result", "body"],
+      "properties": {
+        "kind": { "const": "defn" },
+        "name": { "$ref": "#/$defs/symbol" },
+        "params": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/param" },
+          "default": []
+        },
+        "result": { "$ref": "#/$defs/type_name" },
+        "result_brand": { "$ref": "#/$defs/symbol" },
+        "body": { "$ref": "#/$defs/sexpr" }
+      }
+    },
+    "decl_defasync": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "params", "result", "body"],
+      "properties": {
+        "kind": { "const": "defasync" },
+        "name": { "$ref": "#/$defs/symbol" },
+        "params": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/param" },
+          "default": []
+        },
+        "result": { "$ref": "#/$defs/type_name" },
+        "result_brand": { "$ref": "#/$defs/symbol" },
+        "body": { "$ref": "#/$defs/sexpr" }
+      }
+    },
+    "decl_export": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "names"],
+      "properties": {
+        "kind": { "const": "export" },
+        "names": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/symbol" },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "decl_extern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "abi", "name", "params", "result"],
+      "properties": {
+        "kind": { "const": "extern" },
+        "abi": { "type": "string", "enum": ["C"], "default": "C" },
+        "name": { "$ref": "#/$defs/symbol" },
+        "link_name": {
+          "$ref": "#/$defs/local_name",
+          "description": "Optional C symbol name to link against; if omitted, defaults to the last segment of /name."
+        },
+        "params": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/param" },
+          "default": []
+        },
+        "result": { "$ref": "#/$defs/type_name" }
+      }
+    },
+    "decl": {
+      "oneOf": [
+        { "$ref": "#/$defs/decl_defn" },
+        { "$ref": "#/$defs/decl_defasync" },
+        { "$ref": "#/$defs/decl_export" },
+        { "$ref": "#/$defs/decl_extern" }
+      ]
+    }
+  }
+}

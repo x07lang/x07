@@ -1,9 +1,14 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Args;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use walkdir::WalkDir;
+use x07_contracts::X07_DOC_REPORT_SCHEMA_VERSION;
+use x07c::diagnostics;
 
 use crate::run;
 use crate::util;
@@ -22,9 +27,148 @@ pub struct DocArgs {
     #[arg(long)]
     pub builtin: bool,
 
+    /// Emit machine-readable JSON output.
+    #[arg(long)]
+    pub json: bool,
+
+    /// Write JSON report to a file (valid only with `--json`).
+    #[arg(long, value_name = "PATH")]
+    pub out: Option<PathBuf>,
+
     /// Module id (example: `ext.cli`) or exported symbol (example: `ext.cli.parse_specrows`).
     #[arg(value_name = "QUERY")]
     pub query: String,
+}
+
+#[derive(Debug, Clone)]
+struct DocContext {
+    cwd: PathBuf,
+    project_path: Option<PathBuf>,
+    module_roots: Vec<PathBuf>,
+    module_roots_with_source: Vec<ModuleRootSource>,
+}
+
+#[derive(Debug, Clone)]
+struct ModuleRootSource {
+    root: PathBuf,
+    source: DocSource,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+struct DocReport {
+    schema_version: &'static str,
+    command: &'static str,
+    ok: bool,
+    query: String,
+    result: DocResult,
+    diagnostics_count: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    diagnostics: Vec<diagnostics::Diagnostic>,
+    exit_code: u8,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    hints: Vec<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    meta: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+enum DocSuggestionKind {
+    BuiltinForm,
+    Module,
+    Symbol,
+    Package,
+    Spec,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+struct DocSuggestion {
+    query: String,
+    kind: DocSuggestionKind,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum DocSourceKind {
+    Builtin,
+    Stdlib,
+    Project,
+    Dependency,
+    Filesystem,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+struct DocSource {
+    kind: DocSourceKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    package: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+struct DocParam {
+    name: String,
+    ty: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+struct DocExportSig {
+    name: String,
+    kind: String,
+    #[serde(default)]
+    params: Vec<DocParam>,
+    result: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum DocResult {
+    BuiltinForm {
+        name: String,
+        doc: String,
+        source: DocSource,
+    },
+    Module {
+        module_id: String,
+        path: String,
+        exports: Vec<DocExportSig>,
+        source: DocSource,
+    },
+    Symbol {
+        symbol: String,
+        module_id: String,
+        path: String,
+        sig: DocExportSig,
+        source: DocSource,
+    },
+    Package {
+        name: String,
+        version: String,
+        description: String,
+        docs: String,
+        module_root: String,
+        modules: Vec<String>,
+        source: DocSource,
+    },
+    Spec {
+        spec_id: String,
+        path: String,
+    },
+    NotFound {
+        #[serde(default)]
+        suggestions: Vec<DocSuggestion>,
+    },
+    Error {
+        message: String,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct DocResolution {
+    result: DocResult,
+    diagnostics: Vec<diagnostics::Diagnostic>,
+    hints: Vec<String>,
 }
 
 fn special_form_doc(name: &str) -> Option<&'static str> {
@@ -109,6 +253,16 @@ fn special_form_doc(name: &str) -> Option<&'static str> {
 }
 
 pub fn cmd_doc(args: DocArgs) -> Result<std::process::ExitCode> {
+    if args.out.is_some() && !args.json {
+        anyhow::bail!("--out requires --json");
+    }
+    if args.json {
+        return cmd_doc_json(args);
+    }
+    cmd_doc_text(args)
+}
+
+fn cmd_doc_text(args: DocArgs) -> Result<std::process::ExitCode> {
     let query = args.query.trim();
     if query.is_empty() {
         anyhow::bail!("missing QUERY (try --help)");
@@ -188,6 +342,867 @@ pub fn cmd_doc(args: DocArgs) -> Result<std::process::ExitCode> {
     anyhow::bail!("module/symbol not found: {query}");
 }
 
+fn cmd_doc_json(args: DocArgs) -> Result<std::process::ExitCode> {
+    let query = args.query.trim().to_string();
+    let resolution = if query.is_empty() {
+        error_resolution(
+            "missing QUERY (try --help)".to_string(),
+            "X07-DOC-QUERY-0001",
+            vec!["hint: run `x07 doc --help`".to_string()],
+        )
+    } else {
+        match resolve_doc_context(&args).and_then(|ctx| resolve_doc_json_query(&ctx, &args, &query))
+        {
+            Ok(v) => v,
+            Err(err) => error_resolution(format!("{err:#}"), "X07-DOC-RESOLVE-0001", Vec::new()),
+        }
+    };
+
+    let report = build_doc_report(query, resolution);
+    if let Err(err) = emit_doc_report(&report, args.out.as_deref()) {
+        eprintln!("{err:#}");
+        return Ok(std::process::ExitCode::from(2));
+    }
+    Ok(std::process::ExitCode::from(report.exit_code))
+}
+
+fn resolve_doc_context(args: &DocArgs) -> Result<DocContext> {
+    let cwd = std::env::current_dir().context("get cwd")?;
+    let project_path = match args.project.as_ref() {
+        Some(p) => Some(util::resolve_existing_path_upwards(p)),
+        None => run::discover_project_manifest(&cwd)?,
+    };
+
+    let module_roots_with_source = if !args.module_root.is_empty() {
+        args.module_root
+            .iter()
+            .map(|root| ModuleRootSource {
+                root: root.clone(),
+                source: DocSource {
+                    kind: DocSourceKind::Filesystem,
+                    path: Some(root.display().to_string()),
+                    package: None,
+                },
+            })
+            .collect()
+    } else if let Some(project_path) = project_path.as_deref() {
+        resolve_project_module_roots_with_sources(project_path)?
+    } else {
+        vec![ModuleRootSource {
+            root: cwd.clone(),
+            source: DocSource {
+                kind: DocSourceKind::Filesystem,
+                path: Some(cwd.display().to_string()),
+                package: None,
+            },
+        }]
+    };
+    let module_roots = module_roots_with_source
+        .iter()
+        .map(|row| row.root.clone())
+        .collect();
+
+    Ok(DocContext {
+        cwd,
+        project_path,
+        module_roots,
+        module_roots_with_source,
+    })
+}
+
+fn resolve_doc_json_query(ctx: &DocContext, args: &DocArgs, query: &str) -> Result<DocResolution> {
+    if args.builtin {
+        if let Some(doc) = special_form_doc(query) {
+            return Ok(DocResolution {
+                result: DocResult::BuiltinForm {
+                    name: query.to_string(),
+                    doc: doc.to_string(),
+                    source: DocSource {
+                        kind: DocSourceKind::Builtin,
+                        path: None,
+                        package: None,
+                    },
+                },
+                diagnostics: Vec::new(),
+                hints: vec!["hint: run `x07 guide` for the full language reference".to_string()],
+            });
+        }
+        if let Some(result) = resolve_builtin_stdlib_doc_result(query)? {
+            return Ok(DocResolution {
+                result,
+                diagnostics: Vec::new(),
+                hints: Vec::new(),
+            });
+        }
+        return Ok(not_found_resolution(
+            query,
+            vec![
+                DocSuggestion {
+                    query: "bytes.view".to_string(),
+                    kind: DocSuggestionKind::BuiltinForm,
+                },
+                DocSuggestion {
+                    query: "task.scope_v1".to_string(),
+                    kind: DocSuggestionKind::BuiltinForm,
+                },
+            ],
+            vec!["hint: run `x07 guide` for the full language reference".to_string()],
+            "X07-DOC-BUILTIN-0001",
+            format!("unknown builtin: {query}"),
+        ));
+    }
+
+    if let Some(spec) = resolve_spec_query(query, &ctx.cwd)? {
+        return Ok(spec);
+    }
+
+    if is_path_query(query) {
+        let path = util::resolve_existing_path_upwards_from(&ctx.cwd, Path::new(query));
+        if !path.is_file() {
+            return Ok(not_found_resolution(
+                query,
+                vec![DocSuggestion {
+                    query: "spec:index.md".to_string(),
+                    kind: DocSuggestionKind::Spec,
+                }],
+                Vec::new(),
+                "X07-DOC-PATH-0001",
+                format!("module path not found: {}", path.display()),
+            ));
+        }
+        let (module_id, exports) = parse_module_file(&path)?;
+        let result = module_result(
+            &module_id,
+            &path,
+            &exports,
+            DocSource {
+                kind: DocSourceKind::Filesystem,
+                path: Some(path.display().to_string()),
+                package: None,
+            },
+        );
+        return Ok(DocResolution {
+            result,
+            diagnostics: Vec::new(),
+            hints: Vec::new(),
+        });
+    }
+
+    if let Some((path, source)) = find_module_file_with_source(query, &ctx.module_roots_with_source)
+    {
+        let (module_id, exports) = parse_module_file(&path)?;
+        let result = module_result(&module_id, &path, &exports, source);
+        return Ok(DocResolution {
+            result,
+            diagnostics: Vec::new(),
+            hints: Vec::new(),
+        });
+    }
+
+    if let Some((module_id, _suffix)) = query.rsplit_once('.') {
+        if let Some((path, source)) =
+            find_module_file_with_source(module_id, &ctx.module_roots_with_source)
+        {
+            let (_mid, exports) = parse_module_file(&path)?;
+            if let Some(sig) = exports.get(query) {
+                return Ok(DocResolution {
+                    result: symbol_result(query, module_id, &path, sig, source),
+                    diagnostics: Vec::new(),
+                    hints: Vec::new(),
+                });
+            }
+            let mut suggestions: Vec<DocSuggestion> = exports
+                .keys()
+                .filter(|name| name.starts_with(module_id))
+                .take(20)
+                .map(|name| DocSuggestion {
+                    query: name.clone(),
+                    kind: DocSuggestionKind::Symbol,
+                })
+                .collect();
+            suggestions.sort_by(|a, b| a.kind.cmp(&b.kind).then_with(|| a.query.cmp(&b.query)));
+            return Ok(not_found_resolution(
+                query,
+                suggestions,
+                Vec::new(),
+                "X07-DOC-SYMBOL-0001",
+                format!("symbol not exported by {module_id}: {query}"),
+            ));
+        }
+    }
+
+    if query.starts_with("std.") {
+        if let Some(result) = resolve_builtin_stdlib_doc_result(query)? {
+            return Ok(DocResolution {
+                result,
+                diagnostics: Vec::new(),
+                hints: Vec::new(),
+            });
+        }
+        if let Some(result) = resolve_toolchain_stdlib_doc_result(query, &ctx.cwd)? {
+            return Ok(DocResolution {
+                result,
+                diagnostics: Vec::new(),
+                hints: Vec::new(),
+            });
+        }
+    }
+
+    if let Some(project_path) = ctx.project_path.as_deref() {
+        if let Some((pkg, pkg_dir, package_ref)) =
+            resolve_project_package_by_query(project_path, query)?
+        {
+            return Ok(DocResolution {
+                result: DocResult::Package {
+                    name: pkg.name.trim().to_string(),
+                    version: pkg.version.trim().to_string(),
+                    description: pkg.description.trim().to_string(),
+                    docs: pkg.docs.trim_end().to_string(),
+                    module_root: pkg.module_root.trim().to_string(),
+                    modules: {
+                        let mut modules: Vec<String> =
+                            pkg.modules.iter().map(|m| m.trim().to_string()).collect();
+                        modules.retain(|m| !m.is_empty());
+                        modules.sort();
+                        modules
+                    },
+                    source: DocSource {
+                        kind: DocSourceKind::Dependency,
+                        path: Some(pkg_dir.display().to_string()),
+                        package: Some(package_ref),
+                    },
+                },
+                diagnostics: Vec::new(),
+                hints: Vec::new(),
+            });
+        }
+    }
+
+    if let Some(doc) = special_form_doc(query) {
+        return Ok(DocResolution {
+            result: DocResult::BuiltinForm {
+                name: query.to_string(),
+                doc: doc.to_string(),
+                source: DocSource {
+                    kind: DocSourceKind::Builtin,
+                    path: None,
+                    package: None,
+                },
+            },
+            diagnostics: Vec::new(),
+            hints: vec!["hint: run `x07 guide` for the full language reference".to_string()],
+        });
+    }
+
+    Ok(not_found_resolution(
+        query,
+        default_not_found_suggestions(query, ctx),
+        vec!["hint: run `x07 guide` for the full language reference".to_string()],
+        "X07-DOC-NOTFOUND-0001",
+        format!("module/symbol not found: {query}"),
+    ))
+}
+
+fn build_doc_report(query: String, resolution: DocResolution) -> DocReport {
+    let diagnostics_count = resolution.diagnostics.len();
+    let ok = !matches!(
+        resolution.result,
+        DocResult::NotFound { .. } | DocResult::Error { .. }
+    ) && resolution
+        .diagnostics
+        .iter()
+        .all(|d| d.severity != diagnostics::Severity::Error);
+    let exit_code = if ok { 0 } else { 1 };
+    DocReport {
+        schema_version: X07_DOC_REPORT_SCHEMA_VERSION,
+        command: "doc",
+        ok,
+        query,
+        result: resolution.result,
+        diagnostics_count,
+        diagnostics: resolution.diagnostics,
+        exit_code,
+        hints: resolution.hints,
+        meta: BTreeMap::new(),
+    }
+}
+
+fn emit_doc_report(report: &DocReport, out: Option<&Path>) -> Result<()> {
+    let mut bytes = serde_json::to_vec(report)?;
+    if bytes.last() != Some(&b'\n') {
+        bytes.push(b'\n');
+    }
+    match out {
+        Some(path) => {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("create output dir: {}", parent.display()))?;
+            }
+            std::fs::write(path, &bytes)
+                .with_context(|| format!("write report: {}", path.display()))
+        }
+        None => {
+            std::io::stdout()
+                .write_all(&bytes)
+                .context("write stdout")?;
+            Ok(())
+        }
+    }
+}
+
+fn not_found_resolution(
+    query: &str,
+    suggestions: Vec<DocSuggestion>,
+    hints: Vec<String>,
+    code: &str,
+    message: String,
+) -> DocResolution {
+    let mut suggestions = suggestions;
+    suggestions.sort_by(|a, b| a.kind.cmp(&b.kind).then_with(|| a.query.cmp(&b.query)));
+    suggestions.dedup_by(|a, b| a.kind == b.kind && a.query == b.query);
+    suggestions.truncate(50);
+    DocResolution {
+        result: DocResult::NotFound { suggestions },
+        diagnostics: vec![diagnostic_error(code, &message)],
+        hints: if hints.is_empty() {
+            vec![format!("hint: query not found: {query}")]
+        } else {
+            hints
+        },
+    }
+}
+
+fn error_resolution(message: String, code: &str, hints: Vec<String>) -> DocResolution {
+    DocResolution {
+        result: DocResult::Error {
+            message: message.clone(),
+        },
+        diagnostics: vec![diagnostic_error(code, &message)],
+        hints,
+    }
+}
+
+fn diagnostic_error(code: &str, message: &str) -> diagnostics::Diagnostic {
+    diagnostics::Diagnostic {
+        code: code.to_string(),
+        severity: diagnostics::Severity::Error,
+        stage: diagnostics::Stage::Parse,
+        message: message.to_string(),
+        loc: None,
+        notes: Vec::new(),
+        related: Vec::new(),
+        data: BTreeMap::new(),
+        quickfix: None,
+    }
+}
+
+fn module_result(
+    module_id: &str,
+    path: &Path,
+    exports: &BTreeMap<String, ExportSig>,
+    source: DocSource,
+) -> DocResult {
+    let mut rows: Vec<DocExportSig> = exports
+        .iter()
+        .map(|(name, sig)| export_sig_row(name, sig))
+        .collect();
+    rows.sort_by(|a, b| a.name.cmp(&b.name));
+    DocResult::Module {
+        module_id: module_id.to_string(),
+        path: path.display().to_string(),
+        exports: rows,
+        source,
+    }
+}
+
+fn symbol_result(
+    symbol: &str,
+    module_id: &str,
+    path: &Path,
+    sig: &ExportSig,
+    source: DocSource,
+) -> DocResult {
+    DocResult::Symbol {
+        symbol: symbol.to_string(),
+        module_id: module_id.to_string(),
+        path: path.display().to_string(),
+        sig: export_sig_row(symbol, sig),
+        source,
+    }
+}
+
+fn export_sig_row(name: &str, sig: &ExportSig) -> DocExportSig {
+    DocExportSig {
+        name: name.to_string(),
+        kind: sig.kind.clone(),
+        params: sig
+            .params
+            .iter()
+            .map(|(pname, pty)| DocParam {
+                name: pname.clone(),
+                ty: pty.clone(),
+            })
+            .collect(),
+        result: sig.result.clone(),
+    }
+}
+
+fn find_module_file_with_source(
+    module_id: &str,
+    module_roots: &[ModuleRootSource],
+) -> Option<(PathBuf, DocSource)> {
+    let rel = format!("{}.x07.json", module_id.trim().replace('.', "/"));
+    for row in module_roots {
+        let path = row.root.join(&rel);
+        if path.is_file() {
+            let mut source = row.source.clone();
+            if source.path.is_none() {
+                source.path = Some(path.display().to_string());
+            }
+            return Some((path, source));
+        }
+    }
+    None
+}
+
+fn resolve_project_module_roots_with_sources(project_path: &Path) -> Result<Vec<ModuleRootSource>> {
+    let manifest = x07c::project::load_project_manifest(project_path).context("load project")?;
+    let base = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+
+    let mut roots = Vec::new();
+    for r in &manifest.module_roots {
+        let root = base.join(r);
+        roots.push(ModuleRootSource {
+            root: root.clone(),
+            source: DocSource {
+                kind: DocSourceKind::Project,
+                path: Some(root.display().to_string()),
+                package: None,
+            },
+        });
+    }
+    for dep in &manifest.dependencies {
+        let dep_dir = base.join(&dep.path);
+        let (pkg, _, _) = x07c::project::load_package_manifest(&dep_dir).with_context(|| {
+            format!(
+                "load package manifest for {:?}@{:?} from {}",
+                dep.name,
+                dep.version,
+                dep_dir.display()
+            )
+        })?;
+        let root = dep_dir.join(pkg.module_root);
+        roots.push(ModuleRootSource {
+            root: root.clone(),
+            source: DocSource {
+                kind: DocSourceKind::Dependency,
+                path: Some(root.display().to_string()),
+                package: Some(format!("{}@{}", dep.name, dep.version)),
+            },
+        });
+    }
+    Ok(roots)
+}
+
+fn resolve_builtin_stdlib_doc_result(query: &str) -> Result<Option<DocResult>> {
+    if let Some(src) = x07c::builtin_modules::builtin_module_source(query) {
+        let (module_id, exports) = parse_module_bytes(src.as_bytes())
+            .with_context(|| format!("parse builtin module: {query}"))?;
+        return Ok(Some(module_result(
+            &module_id,
+            Path::new("<builtin>"),
+            &exports,
+            DocSource {
+                kind: DocSourceKind::Builtin,
+                path: None,
+                package: None,
+            },
+        )));
+    }
+
+    if let Some((module_id, _suffix)) = query.rsplit_once('.') {
+        if let Some(src) = x07c::builtin_modules::builtin_module_source(module_id) {
+            let (_mid, exports) = parse_module_bytes(src.as_bytes())
+                .with_context(|| format!("parse builtin module: {module_id}"))?;
+            if let Some(sig) = exports.get(query) {
+                return Ok(Some(symbol_result(
+                    query,
+                    module_id,
+                    Path::new("<builtin>"),
+                    sig,
+                    DocSource {
+                        kind: DocSourceKind::Builtin,
+                        path: None,
+                        package: None,
+                    },
+                )));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+fn resolve_toolchain_stdlib_doc_result(query: &str, cwd: &Path) -> Result<Option<DocResult>> {
+    let Some(toolchain_root) = detect_toolchain_root_best_effort(cwd) else {
+        return Ok(None);
+    };
+    let module_roots = toolchain_stdlib_module_roots(&toolchain_root);
+    if module_roots.is_empty() {
+        return Ok(None);
+    }
+
+    if let Some(path) = find_module_file(query, &module_roots) {
+        let (module_id, exports) = parse_module_file(&path)?;
+        return Ok(Some(module_result(
+            &module_id,
+            &path,
+            &exports,
+            DocSource {
+                kind: DocSourceKind::Stdlib,
+                path: Some(path.display().to_string()),
+                package: None,
+            },
+        )));
+    }
+
+    if let Some((module_id, _suffix)) = query.rsplit_once('.') {
+        if let Some(path) = find_module_file(module_id, &module_roots) {
+            let (_mid, exports) = parse_module_file(&path)?;
+            if let Some(sig) = exports.get(query) {
+                return Ok(Some(symbol_result(
+                    query,
+                    module_id,
+                    &path,
+                    sig,
+                    DocSource {
+                        kind: DocSourceKind::Stdlib,
+                        path: Some(path.display().to_string()),
+                        package: None,
+                    },
+                )));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+fn is_path_query(query: &str) -> bool {
+    query.contains('/') || query.contains('\\') || query.ends_with(".x07.json")
+}
+
+fn default_not_found_suggestions(query: &str, ctx: &DocContext) -> Vec<DocSuggestion> {
+    let mut out: Vec<DocSuggestion> = Vec::new();
+
+    let modules = collect_module_id_candidates(&ctx.module_roots);
+    for module_id in modules {
+        if query.is_empty() || module_id.contains(query) || module_id.starts_with(query) {
+            out.push(DocSuggestion {
+                query: module_id,
+                kind: DocSuggestionKind::Module,
+            });
+        }
+    }
+    for module_id in x07c::builtin_modules::builtin_module_ids() {
+        if module_id.starts_with(query) {
+            out.push(DocSuggestion {
+                query: (*module_id).to_string(),
+                kind: DocSuggestionKind::Module,
+            });
+        }
+    }
+    for name in special_form_names() {
+        if name.starts_with(query) {
+            out.push(DocSuggestion {
+                query: (*name).to_string(),
+                kind: DocSuggestionKind::BuiltinForm,
+            });
+        }
+    }
+    if let Some(project_path) = ctx.project_path.as_deref() {
+        if let Ok(manifest) = x07c::project::load_project_manifest(project_path) {
+            for dep in manifest.dependencies {
+                if dep.name.starts_with(query) {
+                    out.push(DocSuggestion {
+                        query: dep.name,
+                        kind: DocSuggestionKind::Package,
+                    });
+                }
+            }
+        }
+    }
+    if "spec".starts_with(query) || query.starts_with("spec:") {
+        out.push(DocSuggestion {
+            query: "spec:index.md".to_string(),
+            kind: DocSuggestionKind::Spec,
+        });
+    }
+    out.sort_by(|a, b| a.kind.cmp(&b.kind).then_with(|| a.query.cmp(&b.query)));
+    out.dedup_by(|a, b| a.kind == b.kind && a.query == b.query);
+    out.truncate(50);
+    out
+}
+
+fn collect_module_id_candidates(module_roots: &[PathBuf]) -> Vec<String> {
+    let mut out: BTreeSet<String> = BTreeSet::new();
+    for root in module_roots {
+        if !root.is_dir() {
+            continue;
+        }
+        for entry in WalkDir::new(root)
+            .follow_links(false)
+            .max_depth(8)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path();
+            let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if !name.ends_with(".x07.json") {
+                continue;
+            }
+            let Ok(rel) = path.strip_prefix(root) else {
+                continue;
+            };
+            let rel = rel.to_string_lossy().replace('\\', "/");
+            if let Some(id) = rel.strip_suffix(".x07.json") {
+                out.insert(id.replace('/', "."));
+            }
+            if out.len() >= 512 {
+                break;
+            }
+        }
+        if out.len() >= 512 {
+            break;
+        }
+    }
+    out.into_iter().collect()
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct SpecIndexDoc {
+    entries: Vec<SpecIndexEntry>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct SpecIndexEntry {
+    kind: String,
+    path: String,
+    spec_id: String,
+    schema_version: String,
+}
+
+fn resolve_spec_query(query: &str, cwd: &Path) -> Result<Option<DocResolution>> {
+    let Some(raw) = query.strip_prefix("spec:") else {
+        return Ok(None);
+    };
+    let token = raw.trim();
+    let spec_roots = find_spec_roots(cwd);
+    if spec_roots.is_empty() {
+        return Ok(Some(not_found_resolution(
+            query,
+            Vec::new(),
+            vec!["hint: expected docs/spec under the current toolchain or repository".to_string()],
+            "X07-DOC-SPEC-0001",
+            "spec docs root not found".to_string(),
+        )));
+    }
+
+    if token.is_empty() {
+        for root in &spec_roots {
+            let idx = root.join("spec-index.json");
+            if idx.is_file() {
+                return Ok(Some(DocResolution {
+                    result: DocResult::Spec {
+                        spec_id: "x07.spec.index@0.1.0".to_string(),
+                        path: idx.display().to_string(),
+                    },
+                    diagnostics: Vec::new(),
+                    hints: Vec::new(),
+                }));
+            }
+        }
+    }
+
+    if !token.is_empty() {
+        for root in &spec_roots {
+            let cand = root.join(token);
+            if cand.is_file() {
+                return Ok(Some(DocResolution {
+                    result: DocResult::Spec {
+                        spec_id: spec_id_from_spec_path(&cand),
+                        path: cand.display().to_string(),
+                    },
+                    diagnostics: Vec::new(),
+                    hints: Vec::new(),
+                }));
+            }
+        }
+    }
+
+    let mut suggestions: Vec<DocSuggestion> = Vec::new();
+    for root in &spec_roots {
+        let idx = root.join("spec-index.json");
+        if !idx.is_file() {
+            continue;
+        }
+        let doc: SpecIndexDoc = match std::fs::read(&idx) {
+            Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
+            Err(_) => continue,
+        };
+        for entry in doc.entries {
+            if !entry.spec_id.is_empty() && entry.spec_id == token {
+                let rel = entry.path.trim_start_matches("docs/spec/");
+                let cand = root.join(rel);
+                if cand.is_file() {
+                    return Ok(Some(DocResolution {
+                        result: DocResult::Spec {
+                            spec_id: entry.spec_id,
+                            path: cand.display().to_string(),
+                        },
+                        diagnostics: Vec::new(),
+                        hints: Vec::new(),
+                    }));
+                }
+            }
+            if !entry.schema_version.is_empty() && entry.schema_version == token {
+                let rel = entry.path.trim_start_matches("docs/spec/");
+                let cand = root.join(rel);
+                if cand.is_file() {
+                    return Ok(Some(DocResolution {
+                        result: DocResult::Spec {
+                            spec_id: entry.schema_version,
+                            path: cand.display().to_string(),
+                        },
+                        diagnostics: Vec::new(),
+                        hints: Vec::new(),
+                    }));
+                }
+            }
+            if !token.is_empty()
+                && (!entry.spec_id.is_empty() && entry.spec_id.contains(token)
+                    || !entry.path.is_empty() && entry.path.contains(token))
+            {
+                if !entry.spec_id.is_empty() {
+                    suggestions.push(DocSuggestion {
+                        query: entry.spec_id,
+                        kind: DocSuggestionKind::Spec,
+                    });
+                } else if !entry.path.is_empty() {
+                    let rel = entry.path.trim_start_matches("docs/spec/");
+                    suggestions.push(DocSuggestion {
+                        query: rel.to_string(),
+                        kind: DocSuggestionKind::Spec,
+                    });
+                }
+            }
+        }
+    }
+    suggestions.sort_by(|a, b| a.query.cmp(&b.query));
+    suggestions.dedup_by(|a, b| a.query == b.query && a.kind == b.kind);
+    suggestions.truncate(50);
+
+    Ok(Some(not_found_resolution(
+        query,
+        suggestions,
+        vec!["hint: use `spec:index.md` or `spec:spec-index.json`".to_string()],
+        "X07-DOC-SPEC-0002",
+        format!("spec not found: {query}"),
+    )))
+}
+
+fn find_spec_roots(cwd: &Path) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    let cand_docs = util::resolve_existing_path_upwards_from(cwd, Path::new("docs/spec"));
+    if cand_docs.is_dir() {
+        roots.push(cand_docs);
+    }
+    let cand_agent = util::resolve_existing_path_upwards_from(cwd, Path::new(".agent/docs/spec"));
+    if cand_agent.is_dir() {
+        roots.push(cand_agent);
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        for anc in exe.ancestors() {
+            let docs = anc.join("docs/spec");
+            if docs.is_dir() {
+                roots.push(docs);
+            }
+            let agent = anc.join(".agent/docs/spec");
+            if agent.is_dir() {
+                roots.push(agent);
+            }
+        }
+    }
+    roots.sort();
+    roots.dedup();
+    roots
+}
+
+fn spec_id_from_spec_path(path: &Path) -> String {
+    if path.extension().and_then(|s| s.to_str()) == Some("md") {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            for line in content.lines() {
+                if let Some(v) = line.strip_prefix("Spec-ID: ") {
+                    return v.trim().to_string();
+                }
+            }
+        }
+    }
+    if path.extension().and_then(|s| s.to_str()) == Some("json")
+        && path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .is_some_and(|n| n.ends_with(".schema.json"))
+    {
+        if let Ok(bytes) = std::fs::read(path) {
+            if let Ok(doc) = serde_json::from_slice::<Value>(&bytes) {
+                if let Some(v) = doc
+                    .get("properties")
+                    .and_then(|v| v.get("schema_version"))
+                    .and_then(|v| v.get("const"))
+                    .and_then(Value::as_str)
+                {
+                    return v.to_string();
+                }
+            }
+        }
+    }
+    path.file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn special_form_names() -> &'static [&'static str] {
+    &[
+        "bytes.view",
+        "bytes.subview",
+        "bytes.lit",
+        "bytes.concat",
+        "bytes.alloc",
+        "view.to_bytes",
+        "view.len",
+        "view.get_u8",
+        "view.slice",
+        "view.eq",
+        "vec_u8.as_view",
+        "task.scope_v1",
+        "budget.scope_v1",
+        "budget.scope_from_arch_v1",
+        "std.stream.pipe_v1",
+    ]
+}
+
 fn resolve_project_module_roots(project_path: &Path) -> Result<Vec<PathBuf>> {
     let manifest = x07c::project::load_project_manifest(project_path).context("load project")?;
     let base = project_path
@@ -226,7 +1241,7 @@ struct PackageDocManifest {
 }
 
 fn try_print_package_docs(query: &str, project_path: &Path) -> Result<bool> {
-    let (pkg, _pkg_dir) = match resolve_project_package_by_query(project_path, query)? {
+    let (pkg, _pkg_dir, _pkg_ref) = match resolve_project_package_by_query(project_path, query)? {
         Some(v) => v,
         None => return Ok(false),
     };
@@ -262,7 +1277,7 @@ fn try_print_package_docs(query: &str, project_path: &Path) -> Result<bool> {
 fn resolve_project_package_by_query(
     project_path: &Path,
     query: &str,
-) -> Result<Option<(PackageDocManifest, PathBuf)>> {
+) -> Result<Option<(PackageDocManifest, PathBuf, String)>> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(None);
@@ -291,7 +1306,11 @@ fn resolve_project_package_by_query(
         .with_context(|| format!("read package: {}", pkg_path.display()))?;
     let pkg: PackageDocManifest = serde_json::from_slice(&bytes)
         .with_context(|| format!("parse JSON: {}", pkg_path.display()))?;
-    Ok(Some((pkg, dep_dir)))
+    Ok(Some((
+        pkg,
+        dep_dir,
+        format!("{}@{}", dep.name, dep.version),
+    )))
 }
 
 #[derive(Debug, Clone)]
@@ -676,17 +1695,142 @@ mod tests {
         )
         .unwrap();
 
-        let (pkg, _dir) = resolve_project_package_by_query(&project_path, "ext-net")
+        let (pkg, _dir, _pkg_ref) = resolve_project_package_by_query(&project_path, "ext-net")
             .unwrap()
             .unwrap();
         assert_eq!(pkg.name, "ext-net");
         assert_eq!(pkg.version, "0.1.4");
         assert_eq!(pkg.modules, vec!["std.net.http.client"]);
 
-        let (pkg2, _dir2) = resolve_project_package_by_query(&project_path, "ext-net@0.1.4")
-            .unwrap()
-            .unwrap();
+        let (pkg2, _dir2, _pkg_ref2) =
+            resolve_project_package_by_query(&project_path, "ext-net@0.1.4")
+                .unwrap()
+                .unwrap();
         assert_eq!(pkg2.name, "ext-net");
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn doc_json_module_smoke() {
+        let root = make_temp_dir("doc_json_module");
+        let src_dir = root.join("src").join("ext");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(
+            src_dir.join("cli.x07.json"),
+            r#"{
+  "schema_version":"x07.x07ast@0.3.0",
+  "kind":"module",
+  "module_id":"ext.cli",
+  "imports":[],
+  "decls":[
+    {"kind":"export","names":["ext.cli.hello"]},
+    {"kind":"defn","name":"ext.cli.hello","params":[{"name":"x","ty":"i32"}],"result":"i32","body":0}
+  ]
+}
+"#,
+        )
+        .unwrap();
+
+        let args = DocArgs {
+            project: None,
+            module_root: vec![root.join("src")],
+            builtin: false,
+            json: true,
+            out: None,
+            query: "ext.cli".to_string(),
+        };
+        let ctx = resolve_doc_context(&args).unwrap();
+        let resolution = resolve_doc_json_query(&ctx, &args, args.query.as_str()).unwrap();
+        let report = build_doc_report(args.query, resolution);
+
+        assert!(report.ok);
+        match report.result {
+            DocResult::Module {
+                module_id, exports, ..
+            } => {
+                assert_eq!(module_id, "ext.cli");
+                assert_eq!(exports.len(), 1);
+                assert_eq!(exports[0].name, "ext.cli.hello");
+            }
+            other => panic!("unexpected doc result: {other:?}"),
+        }
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn doc_json_not_found_has_result_not_found() {
+        let root = make_temp_dir("doc_json_not_found");
+        std::fs::create_dir_all(root.join("src")).unwrap();
+
+        let args = DocArgs {
+            project: None,
+            module_root: vec![root.join("src")],
+            builtin: false,
+            json: true,
+            out: None,
+            query: "missing.module".to_string(),
+        };
+        let ctx = resolve_doc_context(&args).unwrap();
+        let resolution = resolve_doc_json_query(&ctx, &args, args.query.as_str()).unwrap();
+        let report = build_doc_report(args.query, resolution);
+
+        assert!(!report.ok);
+        assert_eq!(report.exit_code, 1);
+        match report.result {
+            DocResult::NotFound { .. } => {}
+            other => panic!("expected not_found result, got {other:?}"),
+        }
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn doc_json_export_sort_is_stable() {
+        let root = make_temp_dir("doc_json_sort");
+        let src_dir = root.join("src").join("ext");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(
+            src_dir.join("cli.x07.json"),
+            r#"{
+  "schema_version":"x07.x07ast@0.3.0",
+  "kind":"module",
+  "module_id":"ext.cli",
+  "imports":[],
+  "decls":[
+    {"kind":"export","names":["ext.cli.zeta","ext.cli.alpha"]},
+    {"kind":"defn","name":"ext.cli.zeta","params":[],"result":"i32","body":0},
+    {"kind":"defn","name":"ext.cli.alpha","params":[],"result":"i32","body":0}
+  ]
+}
+"#,
+        )
+        .unwrap();
+
+        let args = DocArgs {
+            project: None,
+            module_root: vec![root.join("src")],
+            builtin: false,
+            json: true,
+            out: None,
+            query: "ext.cli".to_string(),
+        };
+        let ctx = resolve_doc_context(&args).unwrap();
+        let resolution = resolve_doc_json_query(&ctx, &args, args.query.as_str()).unwrap();
+        let report = build_doc_report(args.query, resolution);
+
+        let exports = match report.result {
+            DocResult::Module { exports, .. } => exports,
+            other => panic!("unexpected doc result: {other:?}"),
+        };
+        assert_eq!(
+            exports
+                .iter()
+                .map(|row| row.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ext.cli.alpha", "ext.cli.zeta"]
+        );
 
         std::fs::remove_dir_all(&root).unwrap();
     }

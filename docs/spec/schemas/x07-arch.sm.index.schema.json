@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.sm.index.schema.json",
+  "title": "x07.arch.sm.index@0.1.0",
+  "description": "Pinned state-machine index (contracts-as-data) consumed by `x07 arch check`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "machines"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.sm.index@0.1.0" },
+    "machines": { "type": "array", "items": { "$ref": "#/$defs/machine" }, "default": [] }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "module_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["machine_id", "version", "spec_path", "gen_module_id", "gen_paths", "world"],
+      "properties": {
+        "machine_id": { "$ref": "#/$defs/id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "spec_path": { "$ref": "#/$defs/rel_path" },
+        "gen_module_id": { "$ref": "#/$defs/module_id" },
+        "gen_paths": { "type": "array", "items": { "$ref": "#/$defs/rel_path" }, "default": [] },
+        "world": { "$ref": "#/$defs/world_id" }
+      }
+    }
+  }
+}

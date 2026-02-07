@@ -45,6 +45,9 @@ step "licenses"
 step "release manifest (check)"
 "$python_bin" scripts/build_release_manifest.py --check
 
+step "published spec sync"
+"$python_bin" scripts/sync_published_spec.py --check
+
 step "cargo fmt --check"
 cargo fmt --check
 

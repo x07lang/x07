@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.db.index.schema.json",
+  "title": "x07.arch.db.index@0.1.0",
+  "description": "Pinned DB index: drivers + migration plans + query catalogs (contracts-as-data).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "drivers", "migrate_plans", "query_catalogs"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.db.index@0.1.0" },
+    "drivers": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/driver" } },
+    "migrate_plans": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/migrate_plan_ref" }
+    },
+    "query_catalogs": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/query_catalog_ref" }
+    },
+    "defaults": { "$ref": "#/$defs/defaults", "default": {} }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "driver_kind": { "type": "string", "enum": ["sqlite_v1", "postgres_v1"] },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "module", "worlds_allowed"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "$ref": "#/$defs/driver_kind" },
+        "module": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "worlds_allowed": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/world_id" } },
+        "description": { "type": "string", "maxLength": 512, "default": "" }
+      }
+    },
+    "migrate_plan_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "plan_path", "driver_id", "budget_profile_id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "plan_path": { "$ref": "#/$defs/rel_path" },
+        "driver_id": { "$ref": "#/$defs/id" },
+        "budget_profile_id": { "$ref": "#/$defs/id" },
+        "rr_policy_id": { "$ref": "#/$defs/id", "default": "" }
+      }
+    },
+    "query_catalog_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "catalog_path"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "catalog_path": { "$ref": "#/$defs/rel_path" }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "default_driver_id": { "$ref": "#/$defs/id" } }
+    }
+  }
+}

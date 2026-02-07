@@ -15,6 +15,7 @@ pub const X07_HOST_RUNNER_REPORT_SCHEMA_VERSION: &str = "x07-host-runner.report@
 pub const X07_OS_RUNNER_REPORT_SCHEMA_VERSION: &str = "x07-os-runner.report@0.3.0";
 pub const X07_RUN_REPORT_SCHEMA_VERSION: &str = "x07.run.report@0.1.0";
 pub const X07_BUNDLE_REPORT_SCHEMA_VERSION: &str = "x07.bundle.report@0.1.0";
+pub const X07_DOC_REPORT_SCHEMA_VERSION: &str = "x07.doc.report@0.1.0";
 pub const X07_BENCH_SUITE_SCHEMA_VERSION: &str = "x07.bench.suite@0.1.0";
 pub const X07_BENCH_INSTANCE_SCHEMA_VERSION: &str = "x07.bench.instance@0.1.0";
 pub const X07_BENCH_REPORT_SCHEMA_VERSION: &str = "x07.bench.report@0.1.0";

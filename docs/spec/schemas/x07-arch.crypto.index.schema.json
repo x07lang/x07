@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.crypto.index.schema.json",
+  "title": "x07.arch.crypto.index@0.1.0",
+  "description": "Pinned crypto configuration: key registry + allowed algorithms (agent-stable).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "keys", "algorithms"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.crypto.index@0.1.0" },
+    "keys": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/key" } },
+    "algorithms": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/alg" } }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "alg": { "type": "string", "enum": ["ed25519_v1", "jwt_ed25519_v1"] },
+    "key_kind": { "type": "string", "enum": ["ed25519_pub_v1", "ed25519_priv_v1"] },
+    "key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "material_path"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "$ref": "#/$defs/key_kind" },
+        "material_path": { "$ref": "#/$defs/rel_path" },
+        "description": { "type": "string", "maxLength": 512, "default": "" }
+      }
+    }
+  }
+}

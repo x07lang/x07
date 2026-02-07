@@ -86,6 +86,18 @@ See: [Benchmarks](benchmarks.md).
 - `x07 doc <module-id>`
 - `x07 doc <module-id>.<exported_symbol>`
   - Prints exported symbol signatures from a module file (useful for agents exploring unfamiliar modules).
+- `x07 doc --json <query>`
+  - Emits a stable machine-readable report (`schema_version: "x07.doc.report@0.1.0"`).
+  - Exit codes:
+    - `0` on `ok=true`
+    - `1` on `ok=false` (for example: not found or query errors)
+    - `2` on tool failures (for example: failed `--out` write)
+- `x07 doc --json --out <path> <query>`
+  - Writes the JSON report to a file. Parent directories are created automatically.
+- `x07 doc --json spec:<path-or-id>`
+  - Resolves published spec docs and schemas via `docs/spec/` / `.agent/docs/spec/`.
+
+Doc report schema: `docs/spec/schemas/x07-doc.report.schema.json`.
 
 ### Schema derive (generate modules + tests)
 

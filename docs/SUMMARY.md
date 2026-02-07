@@ -49,6 +49,20 @@
 - [Testing by example](toolchain/testing-by-example.md)
 - [Performance comparisons](dev/perf-compare.md)
 
+## Spec
+- [Spec index](spec/index.md)
+- [Spec changelog](spec/changelog.md)
+- [Language guide](spec/language-guide.md)
+- [Core](spec/internal/x07-core.md)
+- [Type system v1](spec/internal/types/type-system-v1.md)
+- [Memory management](spec/internal/x07-memory-management.md)
+- [C backend](spec/internal/x07-c-backend.md)
+- [Testing v1](spec/internal/x07-testing-v1.md)
+- [ABI v1](spec/abi/abi-v1.md)
+- [ABI v2](spec/abi/abi-v2.md)
+- [ABI stability policy](spec/abi/stability-policy.md)
+- [Published spec manifest](spec/spec-index.json)
+
 ## Packages
 - [Packages & workspaces](packages/index.md)
 - [Publishing](packages/publishing.md)

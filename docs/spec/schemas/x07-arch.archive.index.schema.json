@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.archive.index.schema.json",
+  "title": "x07.arch.archive.index@0.1.0",
+  "description": "Pinned archive policy index (contracts-as-data) consumed by `x07 arch check` and archive helpers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profiles"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.archive.index@0.1.0" },
+    "profiles": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/profile_ref" } },
+    "defaults": { "$ref": "#/$defs/defaults", "default": {} }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "archive_kind": { "type": "string", "enum": ["tar_v1", "tgz_v1", "zip_v1"] },
+    "op_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "profile_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "profile_path",
+        "worlds_allowed",
+        "kinds_allowed",
+        "ops_allowed",
+        "budget_profile_id"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "profile_path": { "$ref": "#/$defs/rel_path" },
+        "worlds_allowed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/world_id" },
+          "minItems": 1
+        },
+        "kinds_allowed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/archive_kind" },
+          "minItems": 1
+        },
+        "ops_allowed": { "type": "array", "items": { "$ref": "#/$defs/op_id" }, "minItems": 1 },
+        "budget_profile_id": { "$ref": "#/$defs/id" },
+        "description": { "type": "string", "maxLength": 512, "default": "" }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "default_profile_id": { "$ref": "#/$defs/id" } }
+    }
+  }
+}

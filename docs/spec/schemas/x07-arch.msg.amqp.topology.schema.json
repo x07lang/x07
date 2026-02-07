@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.msg.amqp.topology.schema.json",
+  "title": "x07.arch.msg.amqp.topology@0.1.0",
+  "description": "Pinned AMQP exchange/queue/binding topology (contracts-as-data).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "v", "exchanges", "queues", "bindings"],
+  "properties": {
+    "schema_version": { "const": "x07.arch.msg.amqp.topology@0.1.0" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "v": { "type": "integer", "minimum": 1 },
+    "exchanges": { "type": "array", "default": [], "items": { "$ref": "#/$defs/exchange" } },
+    "queues": { "type": "array", "default": [], "items": { "$ref": "#/$defs/queue" } },
+    "bindings": { "type": "array", "default": [], "items": { "$ref": "#/$defs/binding" } }
+  },
+  "$defs": {
+    "exchange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "type": { "type": "string", "enum": ["direct", "topic", "fanout", "headers"] },
+        "durable": { "type": "boolean", "default": true }
+      }
+    },
+    "queue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "durable": { "type": "boolean", "default": true }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exchange", "queue", "routing_key"],
+      "properties": {
+        "exchange": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "queue": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "routing_key": { "type": "string", "minLength": 0, "maxLength": 512 }
+      }
+    }
+  }
+}

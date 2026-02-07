@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07test.schema.json",
+  "title": "X07 x07Test v0.2.0",
+  "description": "Deterministic test report format for the built-in X07 test harness (manifest-driven; stable ordering; JSON-first).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "invocation", "summary", "tests"],
+  "properties": {
+    "schema_version": { "const": "x07.x07test@0.2.0" },
+    "tool": { "$ref": "#/$defs/tool_info" },
+    "invocation": { "$ref": "#/$defs/invocation" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "tests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/test_case_result" }
+    }
+  },
+  "$defs": {
+    "tool_info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "const": "x07" },
+        "version": { "type": "string" },
+        "build": { "type": "string" }
+      }
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "cwd", "started_at_unix_ms"],
+      "properties": {
+        "argv": { "type": "array", "items": { "type": "string" } },
+        "cwd": { "type": "string" },
+        "started_at_unix_ms": { "type": "integer", "minimum": 0 },
+        "repeat": { "type": "integer", "minimum": 1 },
+        "jobs": { "type": "integer", "minimum": 1 },
+        "manifest_path": { "type": "string" },
+        "module_root": { "type": "string" },
+        "stdlib_lock": { "type": "string" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "passed",
+        "failed",
+        "skipped",
+        "errors",
+        "xfail_passed",
+        "xfail_failed",
+        "duration_ms"
+      ],
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "errors": { "type": "integer", "minimum": 0 },
+        "xfail_passed": { "type": "integer", "minimum": 0 },
+        "xfail_failed": { "type": "integer", "minimum": 0 },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "compile_failures": { "type": "integer", "minimum": 0 },
+        "run_failures": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "expect": { "type": "string", "enum": ["pass", "fail", "skip"] },
+    "world": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "test_status": {
+      "type": "string",
+      "enum": ["pass", "fail", "skip", "error", "xfail_pass", "xfail_fail"]
+    },
+    "diag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Z][A-Z0-9_-]*$"
+        },
+        "message": { "type": "string" },
+        "path": { "type": "string" },
+        "span": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["line", "col", "end_line", "end_col"],
+          "properties": {
+            "line": { "type": "integer", "minimum": 1 },
+            "col": { "type": "integer", "minimum": 1 },
+            "end_line": { "type": "integer", "minimum": 1 },
+            "end_col": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "details": { "type": "object" }
+      }
+    },
+    "mem_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alloc_calls",
+        "realloc_calls",
+        "free_calls",
+        "bytes_alloc_total",
+        "bytes_freed_total",
+        "live_bytes",
+        "peak_live_bytes",
+        "live_allocs",
+        "peak_live_allocs",
+        "memcpy_bytes"
+      ],
+      "properties": {
+        "alloc_calls": { "type": "integer", "minimum": 0 },
+        "realloc_calls": { "type": "integer", "minimum": 0 },
+        "free_calls": { "type": "integer", "minimum": 0 },
+        "bytes_alloc_total": { "type": "integer", "minimum": 0 },
+        "bytes_freed_total": { "type": "integer", "minimum": 0 },
+        "live_bytes": { "type": "integer", "minimum": 0 },
+        "peak_live_bytes": { "type": "integer", "minimum": 0 },
+        "live_allocs": { "type": "integer", "minimum": 0 },
+        "peak_live_allocs": { "type": "integer", "minimum": 0 },
+        "memcpy_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "sched_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tasks_spawned",
+        "spawn_calls",
+        "join_calls",
+        "yield_calls",
+        "sleep_calls",
+        "chan_send_calls",
+        "chan_recv_calls",
+        "ctx_switches",
+        "wake_events",
+        "blocked_waits",
+        "virtual_time_end",
+        "sched_trace_hash"
+      ],
+      "properties": {
+        "tasks_spawned": { "type": "integer", "minimum": 0 },
+        "spawn_calls": { "type": "integer", "minimum": 0 },
+        "join_calls": { "type": "integer", "minimum": 0 },
+        "yield_calls": { "type": "integer", "minimum": 0 },
+        "sleep_calls": { "type": "integer", "minimum": 0 },
+        "chan_send_calls": { "type": "integer", "minimum": 0 },
+        "chan_recv_calls": { "type": "integer", "minimum": 0 },
+        "ctx_switches": { "type": "integer", "minimum": 0 },
+        "wake_events": { "type": "integer", "minimum": 0 },
+        "blocked_waits": { "type": "integer", "minimum": 0 },
+        "virtual_time_end": { "type": "integer", "minimum": 0 },
+        "sched_trace_hash": { "type": "string" }
+      }
+    },
+    "compile_section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "exit_code": { "type": "integer" },
+        "compiler_diags": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diag" },
+          "default": []
+        },
+        "artifact_path": { "type": "string" },
+        "c_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "run_section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "exit_code": { "type": "integer" },
+        "fuel_used": { "type": "integer", "minimum": 0 },
+        "mem_stats": { "$ref": "#/$defs/mem_stats" },
+        "sched_stats": { "$ref": "#/$defs/sched_stats" },
+        "solve_output_b64": { "type": "string" },
+        "stdout_b64": { "type": "string" },
+        "stderr_b64": { "type": "string" },
+        "failure_code_u32": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "test_case_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "world", "expect", "status", "duration_ms"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "world": { "$ref": "#/$defs/world" },
+        "expect": { "$ref": "#/$defs/expect" },
+        "status": { "$ref": "#/$defs/test_status" },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "entry": { "type": "string" },
+        "fixture_root": { "type": "string" },
+        "compile": { "$ref": "#/$defs/compile_section" },
+        "run": { "$ref": "#/$defs/run_section" },
+        "diags": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diag" },
+          "default": []
+        }
+      }
+    }
+  }
+}
