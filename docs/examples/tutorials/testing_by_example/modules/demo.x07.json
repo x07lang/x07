@@ -1,1 +1,1 @@
-{"decls":[{"kind":"export","names":["demo.add_i32"]},{"body":["+","a","b"],"kind":"defn","name":"demo.add_i32","params":[{"name":"a","ty":"i32"},{"name":"b","ty":"i32"}],"result":"i32"}],"imports":[],"kind":"module","module_id":"demo","schema_version":"x07.x07ast@0.3.0"}
+{"decls":[{"kind":"export","names":["demo.add_i32"]},{"body":["+","a","b"],"kind":"defn","name":"demo.add_i32","params":[{"name":"a","ty":"i32"},{"name":"b","ty":"i32"}],"result":"i32"}],"imports":[],"kind":"module","module_id":"demo","schema_version":"x07.x07ast@0.4.0"}

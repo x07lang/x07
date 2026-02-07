@@ -1,1 +1,1 @@
-{"decls":[],"imports":["std.bytes"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.3.0","solve":["std.bytes.reverse","input"]}
+{"decls":[],"imports":["std.bytes"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.4.0","solve":["std.bytes.reverse","input"]}

@@ -4,12 +4,12 @@ IMPORTANT:
 - Output ONLY one JSON object (no preamble).
 - Do NOT use Markdown code fences.
 - Do NOT output extra prose.
-- Must satisfy x07AST schema_version `x07.x07ast@0.3.0`.
+- Must satisfy x07AST schema_version `x07.x07ast@0.4.0`.
 
 Program encoding: UTF-8 JSON text.
 
 Entry program object fields:
-- `schema_version`: `x07.x07ast@0.3.0`
+- `schema_version`: `x07.x07ast@0.4.0`
 - `kind`: `entry`
 - `module_id`: `main`
 - `imports`: array of module IDs (e.g. `std.bytes`)
@@ -30,6 +30,9 @@ Entry program object fields:
 - `vec_u8` for mutable byte vectors (move-only; capacity-planned builders)
 - `option_i32`, `option_bytes`, `option_bytes_view` for typed optional values
 - `result_i32`, `result_bytes`, `result_bytes_view`, `result_result_bytes` for typed results with deterministic error codes
+- Signature types use `type_ref`:
+  - legacy concrete type tokens (strings), like `"i32"`
+  - structured type expressions (arrays), like `["t","A"]` and `["option",["t","A"]]`
 - `iface` for interface records (used for streaming readers)
 - Raw pointer types (standalone-only; require unsafe capability): `ptr_const_u8`, `ptr_mut_u8`, `ptr_const_void`, `ptr_mut_void`, `ptr_const_i32`, `ptr_mut_i32`
 
@@ -60,7 +63,7 @@ Move rules (critical):
 ## Examples
 
 Echo (returns input):
-{"schema_version":"x07.x07ast@0.3.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
+{"schema_version":"x07.x07ast@0.4.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
 
 Arity reminder:
 - `if` is `["if", cond, then, else]`
@@ -77,7 +80,7 @@ Top-level fields:
 
 Declaration objects:
 
-- `{"kind":"defn","name":"main.f","params":[{"name":"x","ty":"bytes"}],"result":"bytes","body":<expr>}`
+- `{"kind":"defn","name":"main.f","type_params":[{"name":"A","bound":"num_like"}],"params":[{"name":"x","ty":["t","A"]}],"result":["t","A"],"body":<expr>}` (generic; `type_params` optional)
 - `{"kind":"defasync",...}` (returns awaited type; calling returns a task handle i32)
 - `{"kind":"extern","abi":"C","name":"main.c_fn","link_name":"c_fn","params":[{"name":"x","ty":"i32"}],"result":"i32"}` (standalone-only; `result` may also be `"void"`)
 - `{"kind":"export","names":["std.foo.bar", ...]}` (module files only)
@@ -86,7 +89,7 @@ Module IDs are dot-separated identifiers like `app.rle` or `std.bytes`.
 
 Module resolution is deterministic:
 
-- Built-in modules: `std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque_u32`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.rr`, `std.kv`, `std.path`
+- Built-in modules: `std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque`, `std.deque_u32`, `std.heap`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.rr`, `std.kv`, `std.path`
 - Filesystem modules (standalone): `x07c compile --module-root <dir>` resolves `a.b` to `<dir>/a/b.x07.json`
 
 Standalone binding override:
@@ -310,41 +313,99 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.u32.write_le_at","b","off","x"]` -> bytes
   - `["std.u32.push_le","v","x"]` -> vec_u8
   - `["std.u32.pow2_ceil","x"]` -> i32
-- `std.small_map`
-  - `["std.small_map.empty_bytes_u32"]` -> bytes
-  - `["std.small_map.len_bytes_u32","m"]` -> i32
-  - `["std.small_map.get_bytes_u32","m","key"]` -> i32 (0 if missing)
-  - `["std.small_map.put_bytes_u32","m","key","val"]` -> bytes
-  - `["std.small_map.remove_bytes_u32","m","key"]` -> bytes
-- `std.small_set`
-  - `["std.small_set.empty_bytes"]` -> bytes
-  - `["std.small_set.len_bytes","s"]` -> i32
-  - `["std.small_set.contains_bytes","s","key"]` -> i32
-  - `["std.small_set.insert_bytes","s","key"]` -> bytes
+- `std.small_map` (generic; key is bytes_view, value is `V: num_like`)
+  - `["std.small_map.empty"]` -> bytes
+  - `["tapp","std.small_map.len","u32","m"]` -> i32
+  - `["tapp","std.small_map.get_or","u32","m","key","default"]` -> i32
+  - `["tapp","std.small_map.put","u32","m","key","val"]` -> bytes
+  - `["tapp","std.small_map.remove","u32","m","key"]` -> bytes
+  - `["tapp","std.small_map.inc1","u32","m","key"]` -> bytes
+  - wrappers (bytes_view -> u32):
+    - `["std.small_map.empty_bytes_u32"]` -> bytes
+    - `["std.small_map.len_bytes_u32","m"]` -> i32
+    - `["std.small_map.get_bytes_u32","m","key"]` -> i32 (0 if missing)
+    - `["std.small_map.get_bytes_u32_or","m","key","default"]` -> i32
+    - `["std.small_map.put_bytes_u32","m","key","val"]` -> bytes
+    - `["std.small_map.remove_bytes_u32","m","key"]` -> bytes
+    - `["std.small_map.inc1_bytes_u32","m","key"]` -> bytes
+- `std.small_set` (generic; key is `K: bytes_like`)
+  - `["std.small_set.empty"]` -> bytes
+  - `["std.small_set.len","s"]` -> i32
+  - `["tapp","std.small_set.contains","bytes","s","key"]` -> i32
+  - `["tapp","std.small_set.insert","bytes","s","key"]` -> bytes
+  - wrappers (bytes_view key):
+    - `["std.small_set.empty_bytes"]` -> bytes
+    - `["std.small_set.len_bytes","s"]` -> i32
+    - `["std.small_set.contains_bytes","s","key"]` -> i32
+    - `["std.small_set.insert_bytes","s","key"]` -> bytes
 - `std.hash`
   - `["std.hash.fnv1a32_bytes","b"]` -> i32
   - `["std.hash.fnv1a32_range","b","start","len"]` -> i32
   - `["std.hash.fnv1a32_view","v"]` -> i32
   - `["std.hash.mix32","x"]` -> i32
-- `std.hash_map` (u32 keys/values)
-  - `["std.hash_map.with_capacity_u32","expected_len"]` -> i32
-  - `["std.hash_map.len_u32","m"]` -> i32
-  - `["std.hash_map.contains_u32","m","key"]` -> i32
-  - `["std.hash_map.get_u32_or","m","key","default"]` -> i32
-  - `["std.hash_map.set_u32","m","key","val"]` -> i32
-- `std.hash_set`
-  - u32 set: `["std.hash_set.new_u32","cap_pow2"]` -> i32, `["std.hash_set.add_u32","s","key"]` -> i32
-  - view-key set: `["std.hash_set.view_new","expected_len"]` -> vec_u8, `["std.hash_set.view_insert","set","base","start","len"]` -> vec_u8
-- `std.btree_map` (ordered u32->u32)
-  - `["std.btree_map.empty_u32_u32"]` -> bytes
-  - `["std.btree_map.len_u32_u32","m"]` -> i32
-  - `["std.btree_map.get_u32_u32_or","m","key","default"]` -> i32
-  - `["std.btree_map.put_u32_u32","m","key","val"]` -> bytes
-- `std.btree_set` (ordered u32)
-  - `["std.btree_set.empty_u32"]` -> bytes
-  - `["std.btree_set.len_u32","s"]` -> i32
-  - `["std.btree_set.contains_u32","s","key"]` -> i32
-  - `["std.btree_set.insert_u32","s","key"]` -> bytes
+- `std.hash_map` (generic; `K: hashable`, `V: num_like`)
+  - `["std.hash_map.with_capacity","expected_len"]` -> i32
+  - `["std.hash_map.len","m"]` -> i32
+  - `["tapp","std.hash_map.contains","u32","m","key"]` -> i32
+  - `["tapp","std.hash_map.get_or","u32","u32","m","key","default"]` -> i32
+  - `["tapp","std.hash_map.set","u32","u32","m","key","val"]` -> i32
+  - `["tapp","std.hash_map.emit_kv_le","u32","u32","m"]` -> bytes
+  - wrappers (u32 keys/values):
+    - `["std.hash_map.with_capacity_u32","expected_len"]` -> i32
+    - `["std.hash_map.len_u32","m"]` -> i32
+    - `["std.hash_map.contains_u32","m","key"]` -> i32
+    - `["std.hash_map.get_u32_or","m","key","default"]` -> i32
+    - `["std.hash_map.set_u32","m","key","val"]` -> i32
+    - `["std.hash_map.emit_kv_u32le_u32le","m"]` -> bytes
+- `std.hash_set` (generic; `A: hashable`)
+  - `["std.hash_set.new","cap_pow2"]` -> i32
+  - `["std.hash_set.len","s"]` -> i32
+  - `["tapp","std.hash_set.add","u32","s","key"]` -> i32
+  - `["tapp","std.hash_set.contains","u32","s","key"]` -> i32
+  - `["tapp","std.hash_set.emit_le","u32","s"]` -> bytes (`A: orderable`)
+  - wrappers (u32 key):
+    - `["std.hash_set.new_u32","cap_pow2"]` -> i32
+    - `["std.hash_set.len_u32","s"]` -> i32
+    - `["std.hash_set.add_u32","s","key"]` -> i32
+    - `["std.hash_set.contains_u32","s","key"]` -> i32
+    - `["std.hash_set.emit_u32le","s"]` -> bytes
+  - view-key set:
+    - `["std.hash_set.view_new","expected_len"]` -> vec_u8
+    - `["std.hash_set.view_len","set"]` -> i32
+    - `["std.hash_set.view_contains","set","base","start","len"]` -> i32
+    - `["std.hash_set.view_insert","set","base","start","len"]` -> vec_u8
+- `std.btree_map` (generic; `K: orderable`, `V: num_like`)
+  - `["std.btree_map.empty"]` -> bytes
+  - `["tapp","std.btree_map.len","u32","u32","m"]` -> i32
+  - `["tapp","std.btree_map.contains","u32","u32","m","key"]` -> i32
+  - `["tapp","std.btree_map.get_or","u32","u32","m","key","default"]` -> i32
+  - `["tapp","std.btree_map.put","u32","u32","m","key","val"]` -> bytes
+  - `["tapp","std.btree_map.emit_kv_le","u32","u32","m"]` -> bytes
+  - wrappers (ordered u32->u32):
+    - `["std.btree_map.empty_u32_u32"]` -> bytes
+    - `["std.btree_map.len_u32_u32","m"]` -> i32
+    - `["std.btree_map.get_u32_u32_or","m","key","default"]` -> i32
+    - `["std.btree_map.put_u32_u32","m","key","val"]` -> bytes
+    - `["std.btree_map.emit_kv_u32le_u32le","m"]` -> bytes
+- `std.btree_set` (generic; `A: orderable`)
+  - `["std.btree_set.empty"]` -> bytes
+  - `["tapp","std.btree_set.len","u32","s"]` -> i32
+  - `["tapp","std.btree_set.contains","u32","s","key"]` -> i32
+  - `["tapp","std.btree_set.insert","u32","s","key"]` -> bytes
+  - `["tapp","std.btree_set.emit_le","u32","s"]` -> bytes
+  - wrappers (ordered u32):
+    - `["std.btree_set.empty_u32"]` -> bytes
+    - `["std.btree_set.len_u32","s"]` -> i32
+    - `["std.btree_set.contains_u32","s","key"]` -> i32
+    - `["std.btree_set.insert_u32","s","key"]` -> bytes
+    - `["std.btree_set.emit_u32le","s"]` -> bytes
+- `std.deque` (generic; `A: num_like`)
+  - `["tapp","std.deque.with_capacity","u32","cap"]` -> bytes
+  - `["std.deque.len","dq"]` -> i32
+  - `["tapp","std.deque.push_back","u32","dq","x"]` -> bytes
+  - `["tapp","std.deque.front_or","u32","dq","default"]` -> i32
+  - `["std.deque.pop_front","dq"]` -> bytes
+  - `["tapp","std.deque.emit_le","u32","dq"]` -> bytes
 - `std.deque_u32`
   - `["std.deque_u32.with_capacity","cap"]` -> bytes
   - `["std.deque_u32.len","dq"]` -> i32
@@ -352,6 +413,13 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.deque_u32.front_or","dq","default"]` -> i32
   - `["std.deque_u32.pop_front","dq"]` -> bytes
   - `["std.deque_u32.emit_u32le","dq"]` -> bytes
+- `std.heap` (generic; `A: orderable`)
+  - `["tapp","std.heap.with_capacity","u32","cap"]` -> bytes
+  - `["std.heap.len","h"]` -> i32
+  - `["tapp","std.heap.push","u32","h","x"]` -> bytes
+  - `["tapp","std.heap.min_or","u32","h","default"]` -> i32
+  - `["tapp","std.heap.pop_min","u32","h"]` -> bytes
+  - `["tapp","std.heap.emit_le","u32","h"]` -> bytes
 - `std.heap_u32`
   - `["std.heap_u32.with_capacity","cap"]` -> bytes
   - `["std.heap_u32.len","h"]` -> i32
@@ -364,20 +432,34 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.bitset.set","bs","bit"]` -> bytes
   - `["std.bitset.test","bs","bit"]` -> i32
   - `["std.bitset.intersection_count","a","b"]` -> i32
-- `std.slab` (u32 values)
-  - `["std.slab.new_u32","cap"]` -> bytes
-  - `["std.slab.free_head_u32","slab"]` -> i32 (-1 if none)
-  - `["std.slab.alloc_u32","slab"]` -> bytes
-  - `["std.slab.free_u32","slab","handle"]` -> bytes
-  - `["std.slab.get_u32","slab","handle","default"]` -> i32
-  - `["std.slab.set_u32","slab","handle","val"]` -> bytes
-- `std.lru_cache` (u32 keys/values)
-  - `["std.lru_cache.new_u32","cap"]` -> bytes
-  - `["std.lru_cache.len_u32","cache"]` -> i32
-  - `["std.lru_cache.peek_u32_opt","cache","key"]` -> option_i32
-  - `["std.lru_cache.peek_u32_or","cache","key","default"]` -> i32
-  - `["std.lru_cache.touch_u32","cache","key"]` -> bytes
-  - `["std.lru_cache.put_u32","cache","key","val"]` -> bytes
+- `std.slab` (generic; `V: num_like`)
+  - `["tapp","std.slab.new","u32","cap"]` -> bytes
+  - `["std.slab.free_head","slab"]` -> i32 (-1 if none)
+  - `["std.slab.alloc","slab"]` -> bytes
+  - `["std.slab.free","slab","handle"]` -> bytes
+  - `["tapp","std.slab.get_or","u32","slab","handle","default"]` -> i32
+  - `["tapp","std.slab.set","u32","slab","handle","val"]` -> bytes
+  - wrappers (u32 values):
+    - `["std.slab.new_u32","cap"]` -> bytes
+    - `["std.slab.free_head_u32","slab"]` -> i32 (-1 if none)
+    - `["std.slab.alloc_u32","slab"]` -> bytes
+    - `["std.slab.free_u32","slab","handle"]` -> bytes
+    - `["std.slab.get_u32","slab","handle","default"]` -> i32
+    - `["std.slab.set_u32","slab","handle","val"]` -> bytes
+- `std.lru_cache` (generic; `K: hashable`, `V: num_like`)
+  - `["std.lru_cache.new","cap"]` -> bytes
+  - `["std.lru_cache.len","cache"]` -> i32
+  - `["tapp","std.lru_cache.peek_opt","u32","u32","cache","key"]` -> option_i32
+  - `["tapp","std.lru_cache.peek_or","u32","u32","cache","key","default"]` -> i32
+  - `["tapp","std.lru_cache.touch","u32","cache","key"]` -> bytes
+  - `["tapp","std.lru_cache.put","u32","u32","cache","key","val"]` -> bytes
+  - wrappers (u32 keys/values):
+    - `["std.lru_cache.new_u32","cap"]` -> bytes
+    - `["std.lru_cache.len_u32","cache"]` -> i32
+    - `["std.lru_cache.peek_u32_opt","cache","key"]` -> option_i32
+    - `["std.lru_cache.peek_u32_or","cache","key","default"]` -> i32
+    - `["std.lru_cache.touch_u32","cache","key"]` -> bytes
+    - `["std.lru_cache.put_u32","cache","key","val"]` -> bytes
 - `std.test`
   - `["std.test.pass"]` -> result_i32
   - `["std.test.fail","code"]` -> result_i32

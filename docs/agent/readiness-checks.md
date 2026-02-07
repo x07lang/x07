@@ -27,7 +27,7 @@ Reference implementations (prompt + full project dirs):
 If you hit:
 
 ```
-unsupported schema_version: expected x07.x07ast@0.3.0 got "x07.x07ast@0.2.0"
+unsupported schema_version: got "x07.x07ast@0.2.0" (supported: x07.x07ast@0.3.0, x07.x07ast@0.4.0)
 ```
 
 it usually means you pinned an older package version. Upgrade to a newer package version.

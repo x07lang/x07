@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-mono.map.schema.json",
+  "title": "X07 monomorphization map v0.1.0",
+  "description": "Machine-readable monomorphization report emitted by x07c when compiling generic x07AST programs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "tool_version",
+    "input_schema_version",
+    "entry_module",
+    "limits",
+    "stats",
+    "items"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.mono.map@0.1.0" },
+    "tool": { "const": "x07c" },
+    "tool_version": { "type": "string", "minLength": 1 },
+    "input_schema_version": { "type": "string", "minLength": 1 },
+    "entry_module": { "type": "string", "minLength": 1 },
+    "limits": { "$ref": "#/$defs/limits" },
+    "stats": { "$ref": "#/$defs/stats" },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" },
+      "default": []
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    }
+  },
+  "$defs": {
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_specializations", "max_depth"],
+      "properties": {
+        "max_specializations": { "type": "integer", "minimum": 0 },
+        "max_depth": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generic_functions_defined",
+        "specializations_emitted",
+        "tapp_sites_total"
+      ],
+      "properties": {
+        "generic_functions_defined": { "type": "integer", "minimum": 0 },
+        "specializations_emitted": { "type": "integer", "minimum": 0 },
+        "tapp_sites_total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caller", "caller_module", "ptr"],
+      "properties": {
+        "caller": { "type": "string", "minLength": 1 },
+        "caller_module": { "type": "string", "minLength": 1 },
+        "ptr": { "type": "string" }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generic", "type_args", "specialized", "def_module"],
+      "properties": {
+        "generic": { "type": "string", "minLength": 1 },
+        "type_args": {
+          "type": "array",
+          "items": {
+            "$ref": "https://x07.io/spec/x07ast.v0.4.0.schema.json#/$defs/type_ref"
+          }
+        },
+        "specialized": { "type": "string", "minLength": 1 },
+        "def_module": { "type": "string", "minLength": 1 },
+        "sites": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/site" },
+          "default": []
+        }
+      }
+    }
+  }
+}
+

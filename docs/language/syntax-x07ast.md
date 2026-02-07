@@ -37,9 +37,22 @@ The root JSON object must include `schema_version`.
 
 Current schema version:
 
-- `x07.x07ast@0.3.0`
+- `x07.x07ast@0.4.0`
+
+The toolchain also accepts legacy `x07.x07ast@0.3.0` for concrete-only programs.
 
 Tooling (`x07 ast init`, `x07 fmt`, `x07 lint`) keeps the AST compatible with the current schema.
+
+## Generics (v0.4)
+
+x07AST v0.4 adds:
+
+- `type_ref` in signatures (either legacy concrete type tokens or structured type expressions)
+- `type_params` on `defn` / `defasync`
+- `tapp` at call sites
+- `ty.*` intrinsics for type-dependent ops inside generic bodies
+
+See [Generics](generics.md).
 
 ## Branded bytes annotations
 

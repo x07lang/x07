@@ -37,7 +37,7 @@
       "const": "x07.x07ast.semantic@0.1.0"
     },
     "x07ast_schema_version": {
-      "const": "x07.x07ast@0.3.0"
+      "const": "x07.x07ast@0.4.0"
     }
   },
   "$defs": {

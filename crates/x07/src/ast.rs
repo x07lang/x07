@@ -7,7 +7,10 @@ use clap::{Args, Subcommand, ValueEnum};
 use jsonschema::Draft;
 use serde::Serialize;
 use serde_json::Value;
-use x07_contracts::X07AST_SCHEMA_VERSION;
+use x07_contracts::{
+    X07AST_SCHEMA_VERSION, X07AST_SCHEMA_VERSIONS_SUPPORTED, X07AST_SCHEMA_VERSION_V0_3_0,
+    X07AST_SCHEMA_VERSION_V0_4_0,
+};
 use x07_worlds::WorldId;
 use x07c::diagnostics;
 use x07c::json_patch;
@@ -15,6 +18,8 @@ use x07c::json_patch;
 use crate::util;
 
 const X07AST_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.schema.json");
+const X07AST_SCHEMA_V0_3_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.v0.3.0.schema.json");
+const X07AST_SCHEMA_V0_4_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.v0.4.0.schema.json");
 const X07AST_MIN_GBNF_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.min.gbnf");
 const X07AST_PRETTY_GBNF_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.pretty.gbnf");
 const X07AST_SEMANTIC_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.semantic.json");
@@ -59,6 +64,9 @@ pub struct AstInitArgs {
 
     #[arg(long)]
     pub module: String,
+
+    #[arg(long, value_name = "SCHEMA_VERSION")]
+    pub schema_version: Option<String>,
 
     #[arg(long, value_enum, default_value = "entry")]
     pub kind: AstInitKind,
@@ -111,6 +119,9 @@ pub struct AstCanonArgs {
 pub struct AstSchemaArgs {
     #[arg(long)]
     pub pretty: bool,
+
+    #[arg(long, value_name = "SCHEMA_VERSION")]
+    pub schema_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -181,11 +192,24 @@ fn cmd_init(
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("ast init: missing --out <PATH>"))?
         .clone();
+
+    let schema_version = match args.schema_version.as_deref() {
+        None => X07AST_SCHEMA_VERSION,
+        Some(X07AST_SCHEMA_VERSION_V0_3_0) => X07AST_SCHEMA_VERSION_V0_3_0,
+        Some(X07AST_SCHEMA_VERSION_V0_4_0) => X07AST_SCHEMA_VERSION_V0_4_0,
+        Some(other) => {
+            anyhow::bail!(
+                "unsupported schema_version: expected {} got {other:?}",
+                X07AST_SCHEMA_VERSIONS_SUPPORTED.join(", ")
+            )
+        }
+    };
+
     if args.module.is_empty() || args.module.chars().any(|c| c.is_whitespace()) {
         let report = AstInitReport {
             ok: false,
             out: out_path.display().to_string(),
-            schema_version: X07AST_SCHEMA_VERSION.to_string(),
+            schema_version: schema_version.to_string(),
             template_id: format!("{}/{}@v1", args.world.as_str(), args.module),
             sha256: String::new(),
         };
@@ -196,7 +220,7 @@ fn cmd_init(
     let mut doc = serde_json::Map::new();
     doc.insert(
         "schema_version".to_string(),
-        Value::String(X07AST_SCHEMA_VERSION.to_string()),
+        Value::String(schema_version.to_string()),
     );
     doc.insert(
         "kind".to_string(),
@@ -226,7 +250,7 @@ fn cmd_init(
     let report = AstInitReport {
         ok: true,
         out: out_path.display().to_string(),
-        schema_version: X07AST_SCHEMA_VERSION.to_string(),
+        schema_version: schema_version.to_string(),
         template_id: format!("{}/{}@v1", args.world.as_str(), args.module),
         sha256: sha256_hex(&out_bytes),
     };
@@ -597,12 +621,24 @@ fn cmd_schema(
     machine: &crate::reporting::MachineArgs,
     args: AstSchemaArgs,
 ) -> Result<std::process::ExitCode> {
+    let schema_bytes = match args.schema_version.as_deref() {
+        None => X07AST_SCHEMA_BYTES,
+        Some(X07AST_SCHEMA_VERSION_V0_3_0) => X07AST_SCHEMA_V0_3_BYTES,
+        Some(X07AST_SCHEMA_VERSION_V0_4_0) => X07AST_SCHEMA_V0_4_BYTES,
+        Some(other) => {
+            anyhow::bail!(
+                "unsupported schema_version: expected {} got {other:?}",
+                X07AST_SCHEMA_VERSIONS_SUPPORTED.join(", ")
+            )
+        }
+    };
+
     let out_bytes = if args.pretty {
         let doc: Value =
-            serde_json::from_slice(X07AST_SCHEMA_BYTES).context("parse spec/x07ast.schema.json")?;
+            serde_json::from_slice(schema_bytes).context("parse spec/x07ast.schema.json")?;
         with_trailing_newline(serde_json::to_string_pretty(&doc)?.into_bytes())
     } else {
-        with_trailing_newline(X07AST_SCHEMA_BYTES.to_vec())
+        with_trailing_newline(schema_bytes.to_vec())
     };
 
     if let Some(out_path) = machine.out.as_ref() {
@@ -796,8 +832,54 @@ fn unescape_json_pointer_token(token: &str) -> Result<String, String> {
 }
 
 fn validate_x07ast_doc(doc: &Value) -> Result<Vec<diagnostics::Diagnostic>> {
+    let schema_bytes = match doc.get("schema_version").and_then(|v| v.as_str()) {
+        Some(X07AST_SCHEMA_VERSION_V0_3_0) => X07AST_SCHEMA_V0_3_BYTES,
+        Some(X07AST_SCHEMA_VERSION_V0_4_0) => X07AST_SCHEMA_V0_4_BYTES,
+        Some(other) => {
+            let mut data = BTreeMap::new();
+            data.insert("got".to_string(), Value::String(other.to_string()));
+            data.insert(
+                "supported".to_string(),
+                Value::Array(
+                    X07AST_SCHEMA_VERSIONS_SUPPORTED
+                        .iter()
+                        .map(|s| Value::String((*s).to_string()))
+                        .collect(),
+                ),
+            );
+
+            return Ok(vec![diagnostics::Diagnostic {
+                code: "X07-SCHEMA-0002".to_string(),
+                severity: diagnostics::Severity::Error,
+                stage: diagnostics::Stage::Parse,
+                message: format!(
+                    "unsupported schema_version: {other:?} (supported: {})",
+                    X07AST_SCHEMA_VERSIONS_SUPPORTED.join(", ")
+                ),
+                loc: Some(diagnostics::Location::X07Ast {
+                    ptr: "/schema_version".to_string(),
+                }),
+                notes: Vec::new(),
+                related: Vec::new(),
+                data,
+                quickfix: Some(diagnostics::Quickfix {
+                    kind: diagnostics::QuickfixKind::JsonPatch,
+                    patch: vec![diagnostics::PatchOp::Replace {
+                        path: "/schema_version".to_string(),
+                        value: Value::String(X07AST_SCHEMA_VERSION.to_string()),
+                    }],
+                    note: Some(format!("Set schema_version to {}", X07AST_SCHEMA_VERSION)),
+                }),
+            }]);
+        }
+        // If schema_version is missing or not a string, validate against the currently
+        // emitted default schema. The schema validator will report the missing/invalid
+        // field deterministically.
+        None => X07AST_SCHEMA_BYTES,
+    };
+
     let schema_json: Value =
-        serde_json::from_slice(X07AST_SCHEMA_BYTES).context("parse spec/x07ast.schema.json")?;
+        serde_json::from_slice(schema_bytes).context("parse x07ast JSON schema")?;
     let validator = jsonschema::options()
         .with_draft(Draft::Draft202012)
         .build(&schema_json)
@@ -806,6 +888,10 @@ fn validate_x07ast_doc(doc: &Value) -> Result<Vec<diagnostics::Diagnostic>> {
     let mut out = Vec::new();
     for error in validator.iter_errors(doc) {
         let mut data = BTreeMap::new();
+        data.insert(
+            "instance_path".to_string(),
+            Value::String(error.instance_path().to_string()),
+        );
         data.insert(
             "schema_path".to_string(),
             Value::String(error.schema_path().to_string()),

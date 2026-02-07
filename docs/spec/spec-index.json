@@ -603,6 +603,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-mono.map.schema.json",
+      "schema_id": "https://x07.io/spec/x07-mono.map.schema.json",
+      "schema_version": "x07.mono.map@0.1.0",
+      "title": "X07 monomorphization map v0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-obs.exporter.profile.schema.json",
       "schema_id": "https://x07.io/spec/x07-obs.exporter.profile.schema.json",
       "schema_version": "x07.obs.exporter.profile@0.1.0",
@@ -1137,8 +1144,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07ast.schema.json",
       "schema_id": "https://x07.io/spec/x07ast.schema.json",
-      "schema_version": "x07.x07ast@0.3.0",
-      "title": "X07 x07AST v0.3.0"
+      "schema_version": "x07.x07ast@0.4.0",
+      "title": "X07 x07AST v0.4.0"
     },
     {
       "kind": "schema",
@@ -1146,6 +1153,20 @@
       "schema_id": "https://x07.io/spec/x07ast.semantic.schema.json",
       "schema_version": "x07.x07ast.semantic@0.1.0",
       "title": "X07 x07AST semantic supplement v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07ast.v0.3.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07ast.v0.3.0.schema.json",
+      "schema_version": "x07.x07ast@0.3.0",
+      "title": "X07 x07AST v0.3.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07ast.v0.4.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07ast.v0.4.0.schema.json",
+      "schema_version": "x07.x07ast@0.4.0",
+      "title": "X07 x07AST v0.4.0"
     },
     {
       "kind": "schema",

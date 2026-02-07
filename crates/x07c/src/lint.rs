@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::ast::Expr;
 use crate::diagnostics::{
     Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Report, Severity, Stage,
@@ -15,6 +17,46 @@ fn expr_list(items: Vec<Expr>) -> Expr {
     Expr::List {
         items,
         ptr: String::new(),
+    }
+}
+
+fn quickfix_add_type_param(decl_idx: usize, type_params_len: usize, var_name: &str) -> Quickfix {
+    let item = serde_json::json!({ "name": var_name });
+    let op = if type_params_len == 0 {
+        PatchOp::Add {
+            path: format!("/decls/{decl_idx}/type_params"),
+            value: serde_json::Value::Array(vec![item]),
+        }
+    } else {
+        PatchOp::Add {
+            path: format!("/decls/{decl_idx}/type_params/-"),
+            value: item,
+        }
+    };
+    Quickfix {
+        kind: QuickfixKind::JsonPatch,
+        patch: vec![op],
+        note: Some(format!("Declare type param {var_name:?}")),
+    }
+}
+
+#[derive(Debug)]
+struct UndefinedVarQuickfixCtx<'a> {
+    decl_idx: usize,
+    type_params_len: usize,
+    quickfixed_undefined: &'a mut BTreeSet<String>,
+}
+
+impl UndefinedVarQuickfixCtx<'_> {
+    fn maybe_quickfix(&mut self, var_name: &str) -> Option<Quickfix> {
+        if !self.quickfixed_undefined.insert(var_name.to_string()) {
+            return None;
+        }
+        Some(quickfix_add_type_param(
+            self.decl_idx,
+            self.type_params_len,
+            var_name,
+        ))
     }
 }
 
@@ -88,6 +130,7 @@ pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
 
     lint_world_imports(file, options, &mut diagnostics);
     lint_world_decls(file, options, &mut diagnostics);
+    lint_generics_decls(file, &mut diagnostics);
 
     if let Some(solve) = &file.solve {
         lint_expr(
@@ -131,6 +174,259 @@ pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
     Report::ok().with_diagnostics(diagnostics)
 }
 
+fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
+    let export_slots = if file.kind == X07AstKind::Module && !file.exports.is_empty() {
+        1usize
+    } else {
+        0usize
+    };
+    let extern_slots = file.extern_functions.len();
+    let defn_base = export_slots + extern_slots;
+
+    for (idx, f) in file.extern_functions.iter().enumerate() {
+        let decl_idx = export_slots + idx;
+        let declared: BTreeSet<&str> = BTreeSet::new();
+        lint_type_ref_for_undefined_vars(
+            &declared,
+            &f.name,
+            &f.params,
+            f.result.as_ref(),
+            decl_idx,
+            None,
+            diagnostics,
+        );
+    }
+
+    for (idx, f) in file.functions.iter().enumerate() {
+        let decl_idx = defn_base + idx;
+        lint_type_params_usage(
+            decl_idx,
+            &f.name,
+            &f.type_params,
+            &f.params,
+            Some(&f.result),
+            Some(&f.body),
+            diagnostics,
+        );
+    }
+
+    for (idx, f) in file.async_functions.iter().enumerate() {
+        let decl_idx = defn_base + file.functions.len() + idx;
+        lint_type_params_usage(
+            decl_idx,
+            &f.name,
+            &f.type_params,
+            &f.params,
+            Some(&f.result),
+            Some(&f.body),
+            diagnostics,
+        );
+    }
+}
+
+fn lint_type_params_usage(
+    decl_idx: usize,
+    func_name: &str,
+    type_params: &[x07ast::TypeParam],
+    params: &[x07ast::AstFunctionParam],
+    result: Option<&x07ast::TypeRef>,
+    body: Option<&Expr>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let mut declared: BTreeSet<&str> = BTreeSet::new();
+    for tp in type_params {
+        declared.insert(tp.name.as_str());
+    }
+
+    let mut quickfixed_undefined: BTreeSet<String> = BTreeSet::new();
+    let mut quickfix_ctx = UndefinedVarQuickfixCtx {
+        decl_idx,
+        type_params_len: type_params.len(),
+        quickfixed_undefined: &mut quickfixed_undefined,
+    };
+
+    lint_type_ref_for_undefined_vars(
+        &declared,
+        func_name,
+        params,
+        result,
+        decl_idx,
+        Some(&mut quickfix_ctx),
+        diagnostics,
+    );
+
+    let mut used: BTreeSet<String> = BTreeSet::new();
+    for p in params {
+        collect_type_vars_from_type_ref(&p.ty, &mut used);
+    }
+    if let Some(result) = result {
+        collect_type_vars_from_type_ref(result, &mut used);
+    }
+    if let Some(body) = body {
+        collect_type_vars_from_expr(body, &declared, &mut used, &mut quickfix_ctx, diagnostics);
+    }
+
+    for (tp_idx, tp) in type_params.iter().enumerate() {
+        if used.contains(&tp.name) {
+            continue;
+        }
+        diagnostics.push(Diagnostic {
+            code: "X07-GENERICS-0002".to_string(),
+            severity: Severity::Warning,
+            stage: Stage::Lint,
+            message: format!("unused type param: {:?}", tp.name),
+            loc: Some(Location::X07Ast {
+                ptr: format!("/decls/{decl_idx}/type_params/{tp_idx}/name"),
+            }),
+            notes: vec![
+                "Remove the unused type param or use it in the signature/body.".to_string(),
+            ],
+            related: Vec::new(),
+            data: Default::default(),
+            quickfix: Some(Quickfix {
+                kind: QuickfixKind::JsonPatch,
+                patch: vec![PatchOp::Remove {
+                    path: format!("/decls/{decl_idx}/type_params/{tp_idx}"),
+                }],
+                note: Some("Remove unused type param".to_string()),
+            }),
+        });
+    }
+}
+
+fn lint_type_ref_for_undefined_vars(
+    declared: &BTreeSet<&str>,
+    func_name: &str,
+    params: &[x07ast::AstFunctionParam],
+    result: Option<&x07ast::TypeRef>,
+    decl_idx: usize,
+    mut quickfix_ctx: Option<&mut UndefinedVarQuickfixCtx<'_>>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for (pidx, p) in params.iter().enumerate() {
+        if let Some(var_name) = first_undefined_var_in_type_ref(&p.ty, declared) {
+            let quickfix = quickfix_ctx
+                .as_mut()
+                .and_then(|ctx| ctx.maybe_quickfix(&var_name));
+            diagnostics.push(Diagnostic {
+                code: "X07-GENERICS-0001".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Lint,
+                message: format!(
+                    "undefined type var: {:?} (not declared in type_params of {func_name})",
+                    var_name
+                ),
+                loc: Some(Location::X07Ast {
+                    ptr: format!("/decls/{decl_idx}/params/{pidx}/ty"),
+                }),
+                notes: vec![
+                    "Declare the type var under type_params, or use a concrete type.".to_string(),
+                ],
+                related: Vec::new(),
+                data: Default::default(),
+                quickfix,
+            });
+        }
+    }
+
+    if let Some(result) = result {
+        if let Some(var_name) = first_undefined_var_in_type_ref(result, declared) {
+            let quickfix = quickfix_ctx
+                .as_mut()
+                .and_then(|ctx| ctx.maybe_quickfix(&var_name));
+            diagnostics.push(Diagnostic {
+                code: "X07-GENERICS-0001".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Lint,
+                message: format!(
+                    "undefined type var: {:?} (not declared in type_params of {func_name})",
+                    var_name
+                ),
+                loc: Some(Location::X07Ast {
+                    ptr: format!("/decls/{decl_idx}/result"),
+                }),
+                notes: vec![
+                    "Declare the type var under type_params, or use a concrete type.".to_string(),
+                ],
+                related: Vec::new(),
+                data: Default::default(),
+                quickfix,
+            });
+        }
+    }
+}
+
+fn first_undefined_var_in_type_ref(
+    ty: &x07ast::TypeRef,
+    declared: &BTreeSet<&str>,
+) -> Option<String> {
+    match ty {
+        x07ast::TypeRef::Named(_) => None,
+        x07ast::TypeRef::Var(name) => {
+            if declared.contains(name.as_str()) {
+                None
+            } else {
+                Some(name.clone())
+            }
+        }
+        x07ast::TypeRef::App { args, .. } => args
+            .iter()
+            .find_map(|a| first_undefined_var_in_type_ref(a, declared)),
+    }
+}
+
+fn collect_type_vars_from_type_ref(ty: &x07ast::TypeRef, out: &mut BTreeSet<String>) {
+    match ty {
+        x07ast::TypeRef::Named(_) => {}
+        x07ast::TypeRef::Var(name) => {
+            out.insert(name.clone());
+        }
+        x07ast::TypeRef::App { args, .. } => {
+            for a in args {
+                collect_type_vars_from_type_ref(a, out);
+            }
+        }
+    }
+}
+
+fn collect_type_vars_from_expr(
+    expr: &Expr,
+    declared: &BTreeSet<&str>,
+    used: &mut BTreeSet<String>,
+    quickfix_ctx: &mut UndefinedVarQuickfixCtx<'_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match expr {
+        Expr::Int { .. } | Expr::Ident { .. } => {}
+        Expr::List { items, .. } => {
+            if items.len() == 2 && items.first().and_then(Expr::as_ident) == Some("t") {
+                if let Some(var) = items.get(1).and_then(Expr::as_ident) {
+                    used.insert(var.to_string());
+                    if !declared.contains(var) {
+                        let quickfix = quickfix_ctx.maybe_quickfix(var);
+                        diagnostics.push(Diagnostic {
+                            code: "X07-GENERICS-0001".to_string(),
+                            severity: Severity::Error,
+                            stage: Stage::Lint,
+                            message: format!("undefined type var: {var:?}"),
+                            loc: Some(Location::X07Ast {
+                                ptr: expr.ptr().to_string(),
+                            }),
+                            notes: vec!["Declare the type var under type_params.".to_string()],
+                            related: Vec::new(),
+                            data: Default::default(),
+                            quickfix,
+                        });
+                    }
+                }
+            }
+            for it in items {
+                collect_type_vars_from_expr(it, declared, used, quickfix_ctx, diagnostics);
+            }
+        }
+    }
+}
+
 fn lint_world_decls(file: &X07AstFile, options: LintOptions, diagnostics: &mut Vec<Diagnostic>) {
     let export_slots = if file.kind == X07AstKind::Module && !file.exports.is_empty() {
         1usize
@@ -162,57 +458,66 @@ fn lint_world_decls(file: &X07AstFile, options: LintOptions, diagnostics: &mut V
     }
 
     if !options.allow_unsafe() {
-        let mut check_defn_like = |base: usize,
-                                   idx: usize,
-                                   name: &str,
-                                   params: &[crate::program::FunctionParam],
-                                   ret_ty: crate::types::Ty| {
-            for (pidx, p) in params.iter().enumerate() {
-                if p.ty.is_ptr_ty() {
-                    diagnostics.push(Diagnostic {
-                        code: "X07-WORLD-UNSAFE-0002".to_string(),
-                        severity: Severity::Error,
-                        stage: Stage::Lint,
-                        message: format!("unsafe capability is not enabled in this world: raw pointer type in signature of {name}"),
-                        loc: Some(Location::X07Ast {
-                            ptr: format!("/decls/{}/params/{}/ty", base + idx, pidx),
-                        }),
-                        notes: vec![
-                            "Compile with --world run-os or --world run-os-sandboxed for raw pointers."
-                                .to_string(),
-                        ],
-                        related: Vec::new(),
-                        data: Default::default(),
-                        quickfix: None,
-                    });
+        let mut check_defn_like =
+            |base: usize,
+             idx: usize,
+             name: &str,
+             params: &[x07ast::AstFunctionParam],
+             ret: Option<&x07ast::TypeRef>| {
+                for (pidx, p) in params.iter().enumerate() {
+                    if let Some(ty) = p.ty.as_mono_ty() {
+                        if ty.is_ptr_ty() {
+                            diagnostics.push(Diagnostic {
+                            code: "X07-WORLD-UNSAFE-0002".to_string(),
+                            severity: Severity::Error,
+                            stage: Stage::Lint,
+                            message: format!("unsafe capability is not enabled in this world: raw pointer type in signature of {name}"),
+                            loc: Some(Location::X07Ast {
+                                ptr: format!("/decls/{}/params/{}/ty", base + idx, pidx),
+                            }),
+                            notes: vec![
+                                "Compile with --world run-os or --world run-os-sandboxed for raw pointers."
+                                    .to_string(),
+                            ],
+                            related: Vec::new(),
+                            data: Default::default(),
+                            quickfix: None,
+                        });
+                        }
+                    }
                 }
-            }
-            if ret_ty.is_ptr_ty() {
-                diagnostics.push(Diagnostic {
-                    code: "X07-WORLD-UNSAFE-0002".to_string(),
-                    severity: Severity::Error,
-                    stage: Stage::Lint,
-                    message: format!("unsafe capability is not enabled in this world: raw pointer type in signature of {name}"),
-                    loc: Some(Location::X07Ast {
-                        ptr: format!("/decls/{}/result", base + idx),
-                    }),
-                    notes: vec![
-                        "Compile with --world run-os or --world run-os-sandboxed for raw pointers."
-                            .to_string(),
-                    ],
-                    related: Vec::new(),
-                    data: Default::default(),
-                    quickfix: None,
-                });
-            }
-        };
+                if let Some(ret) = ret {
+                    if let Some(ty) = ret.as_mono_ty() {
+                        if ty.is_ptr_ty() {
+                            diagnostics.push(Diagnostic {
+                            code: "X07-WORLD-UNSAFE-0002".to_string(),
+                            severity: Severity::Error,
+                            stage: Stage::Lint,
+                            message: format!(
+                                "unsafe capability is not enabled in this world: raw pointer type in signature of {name}"
+                            ),
+                            loc: Some(Location::X07Ast {
+                                ptr: format!("/decls/{}/result", base + idx),
+                            }),
+                            notes: vec![
+                                "Compile with --world run-os or --world run-os-sandboxed for raw pointers."
+                                    .to_string(),
+                            ],
+                            related: Vec::new(),
+                            data: Default::default(),
+                            quickfix: None,
+                        });
+                        }
+                    }
+                }
+            };
 
         for (idx, f) in file.extern_functions.iter().enumerate() {
-            check_defn_like(export_slots, idx, &f.name, &f.params, f.ret_ty);
+            check_defn_like(export_slots, idx, &f.name, &f.params, f.result.as_ref());
         }
         let defn_base = export_slots + file.extern_functions.len();
         for (idx, f) in file.functions.iter().enumerate() {
-            check_defn_like(defn_base, idx, &f.name, &f.params, f.ret_ty);
+            check_defn_like(defn_base, idx, &f.name, &f.params, Some(&f.result));
         }
         for (idx, f) in file.async_functions.iter().enumerate() {
             check_defn_like(
@@ -220,7 +525,7 @@ fn lint_world_decls(file: &X07AstFile, options: LintOptions, diagnostics: &mut V
                 idx,
                 &f.name,
                 &f.params,
-                f.ret_ty,
+                Some(&f.result),
             );
         }
     }

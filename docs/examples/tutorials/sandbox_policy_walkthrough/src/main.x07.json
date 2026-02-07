@@ -1,1 +1,1 @@
-{"decls":[],"imports":["app"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.3.0","solve":["app.solve","input"]}
+{"decls":[],"imports":["app"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.4.0","solve":["app.solve","input"]}

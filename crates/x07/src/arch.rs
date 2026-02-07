@@ -7350,7 +7350,7 @@ fn check_public_module_brands(node: &NodeMatcher, m: &ModuleInfo, diags: &mut Di
             continue;
         }
         for p in &f.params {
-            if is_bytesish(p.ty) && p.brand.is_none() {
+            if is_bytesish(&p.ty) && p.brand.is_none() {
                 let mut data = BTreeMap::new();
                 data.insert("node".to_string(), Value::String(node.id.clone()));
                 data.insert("module_path".to_string(), Value::String(m.rel_path.clone()));
@@ -7365,12 +7365,12 @@ fn check_public_module_brands(node: &NodeMatcher, m: &ModuleInfo, diags: &mut Di
                 ));
             }
         }
-        if is_bytesish(f.ret_ty) && f.ret_brand.is_none() {
+        if is_bytesish(&f.result) && f.result_brand.is_none() {
             let mut data = BTreeMap::new();
             data.insert("node".to_string(), Value::String(node.id.clone()));
             data.insert("module_path".to_string(), Value::String(m.rel_path.clone()));
             data.insert("symbol".to_string(), Value::String(f.name.clone()));
-            data.insert("ty".to_string(), Value::String(format!("{:?}", f.ret_ty)));
+            data.insert("ty".to_string(), Value::String(format!("{:?}", f.result)));
             diags.push(diag_lint_error(
                 "E_ARCH_PUBLIC_BYTES_UNBRANDED",
                 "public exported bytes result is missing a brand",
@@ -7385,7 +7385,7 @@ fn check_public_module_brands(node: &NodeMatcher, m: &ModuleInfo, diags: &mut Di
             continue;
         }
         for p in &f.params {
-            if is_bytesish(p.ty) && p.brand.is_none() {
+            if is_bytesish(&p.ty) && p.brand.is_none() {
                 let mut data = BTreeMap::new();
                 data.insert("node".to_string(), Value::String(node.id.clone()));
                 data.insert("module_path".to_string(), Value::String(m.rel_path.clone()));
@@ -7400,12 +7400,12 @@ fn check_public_module_brands(node: &NodeMatcher, m: &ModuleInfo, diags: &mut Di
                 ));
             }
         }
-        if is_bytesish(f.ret_ty) && f.ret_brand.is_none() {
+        if is_bytesish(&f.result) && f.result_brand.is_none() {
             let mut data = BTreeMap::new();
             data.insert("node".to_string(), Value::String(node.id.clone()));
             data.insert("module_path".to_string(), Value::String(m.rel_path.clone()));
             data.insert("symbol".to_string(), Value::String(f.name.clone()));
-            data.insert("ty".to_string(), Value::String(format!("{:?}", f.ret_ty)));
+            data.insert("ty".to_string(), Value::String(format!("{:?}", f.result)));
             diags.push(diag_lint_error(
                 "E_ARCH_PUBLIC_BYTES_UNBRANDED",
                 "public exported bytes result is missing a brand",
@@ -7416,16 +7416,18 @@ fn check_public_module_brands(node: &NodeMatcher, m: &ModuleInfo, diags: &mut Di
     }
 }
 
-fn is_bytesish(ty: x07c::types::Ty) -> bool {
+fn is_bytesish(ty: &x07c::x07ast::TypeRef) -> bool {
     matches!(
-        ty,
-        x07c::types::Ty::Bytes
-            | x07c::types::Ty::BytesView
-            | x07c::types::Ty::OptionBytes
-            | x07c::types::Ty::OptionBytesView
-            | x07c::types::Ty::ResultBytes
-            | x07c::types::Ty::ResultBytesView
-            | x07c::types::Ty::ResultResultBytes
+        ty.as_mono_ty(),
+        Some(
+            x07c::types::Ty::Bytes
+                | x07c::types::Ty::BytesView
+                | x07c::types::Ty::OptionBytes
+                | x07c::types::Ty::OptionBytesView
+                | x07c::types::Ty::ResultBytes
+                | x07c::types::Ty::ResultBytesView
+                | x07c::types::Ty::ResultResultBytes
+        )
     )
 }
 

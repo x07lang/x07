@@ -32,6 +32,7 @@ impl Ty {
     pub fn parse_named(name: &str) -> Option<Self> {
         match name {
             "i32" => Some(Ty::I32),
+            "u32" => Some(Ty::I32),
             "bytes" => Some(Ty::Bytes),
             "bytes_view" => Some(Ty::BytesView),
             "vec_u8" => Some(Ty::VecU8),

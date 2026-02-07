@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 115
-- quickfix support (`sometimes` or `always`): 104
-- quickfix coverage: 90.43%
+- total codes: 118
+- quickfix support (`sometimes` or `always`): 107
+- quickfix coverage: 90.68%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -49,11 +49,14 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
 | `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
+| `X07-GENERICS-0001` | x07c / lint / error | sometimes | Type variable is not declared in type_params. |
+| `X07-GENERICS-0002` | x07c / lint / warning | always | Unused type parameter. |
 | `X07-INTERNAL-0001` | x07 / run / error | never | Internal tool failure `X07-INTERNAL-0001`. |
 | `X07-MOVE-0001` | x07c / lint / error | always | `bytes.concat` uses the same identifier on both sides (use-after-move risk). |
 | `X07-MOVE-0002` | x07c / lint / error | always | `if` condition and branch both borrow `bytes.view` from the same owner. |
 | `X07-POLICY-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-POLICY-SCHEMA-0001`. |
 | `X07-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-SCHEMA-0001`. |
+| `X07-SCHEMA-0002` | x07 / parse / error | always | Unsupported x07AST schema_version. |
 | `X07-TOOL-ARGS-0001` | x07 / parse / error | never | Tool wrapper argument error `X07-TOOL-ARGS-0001`. |
 | `X07-TOOL-EXEC-0001` | x07 / run / error | never | Tool wrapper execution error `X07-TOOL-EXEC-0001`. |
 | `X07-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-UNSAFE-0001`. |
@@ -947,6 +950,47 @@ Agent strategy:
 - If quickfix is absent, perform equivalent manual rewrite and re-run lint.
 
 
+## `X07-GENERICS-0001`
+
+Summary: Type variable is not declared in type_params.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+A type expression references a type variable like `["t","A"]`, but the surrounding function does not declare `A` in `type_params`.
+
+Agent strategy:
+
+- If the function should be generic, add `{"name":"A"}` (and optional `bound`) to `type_params`.
+- Otherwise, replace the type variable with a concrete type name (e.g. `"u32"`).
+- Re-run `x07 lint` to confirm the signature is consistent.
+
+
+## `X07-GENERICS-0002`
+
+Summary: Unused type parameter.
+
+Origins:
+- x07c (stage: lint, severity: warning)
+
+Quickfix support: `always`
+Quickfix kinds: `json_patch`
+
+Details:
+
+A function declares a `type_params` entry that is never referenced in its signature types.
+
+Agent strategy:
+
+- Remove the unused type param from `type_params`, or reference it from `params[].ty` / `result`.
+- Re-run `x07 lint`.
+
+
 ## `X07-INTERNAL-0001`
 
 Summary: Internal tool failure `X07-INTERNAL-0001`.
@@ -1048,6 +1092,29 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07-SCHEMA-0002`
+
+Summary: Unsupported x07AST schema_version.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `always`
+Quickfix kinds: `json_patch`
+
+Details:
+
+The x07AST file declares a `schema_version` that is not supported by this toolchain.
+
+Use one of the supported schema versions, or upgrade/downgrade your toolchain to match the file.
+
+Agent strategy:
+
+- Inspect `/schema_version` in the failing `*.x07.json` file.
+- Replace it with a supported value (see the diagnostic `data.supported`).
+- Re-run `x07 ast validate` (or `x07 fmt` / `x07 lint`).
 
 
 ## `X07-TOOL-ARGS-0001`

@@ -58,9 +58,21 @@ cleanup() { rm -rf "$tmp_dir"; }
 trap cleanup EXIT
 
 program="$tmp_dir/program.x07.json"
+program_v03="$tmp_dir/program_v03.x07.json"
 patch="$tmp_dir/patch.json"
 
 cat >"$program" <<'JSON'
+{
+  "schema_version": "x07.x07ast@0.4.0",
+  "kind": "entry",
+  "module_id": "main",
+  "imports": [],
+  "decls": [],
+  "solve": ["bytes.alloc", 0]
+}
+JSON
+
+cat >"$program_v03" <<'JSON'
 {
   "schema_version": "x07.x07ast@0.3.0",
   "kind": "entry",
@@ -83,5 +95,6 @@ JSON
 "$x07_bin" ast apply-patch --in "$program" --patch "$patch" --out "$program" --validate >/dev/null
 "$x07_bin" fmt --input "$program" --check >/dev/null
 "$x07_bin" lint --input "$program" --world solve-pure >/dev/null
+"$x07_bin" ast validate --in "$program_v03" >/dev/null
 
 echo "ok: llm contracts"

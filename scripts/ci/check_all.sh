@@ -77,6 +77,9 @@ step "stage native stream-xf backend"
 step "cargo test"
 cargo test
 
+step "monomorphization map determinism"
+"$python_bin" scripts/check_monomorphization_map.py
+
 step "cargo clippy --all-targets -- -D warnings"
 cargo clippy --all-targets -- -D warnings
 

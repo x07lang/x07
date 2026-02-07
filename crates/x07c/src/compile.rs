@@ -4,11 +4,12 @@ use serde_json::Value;
 
 use crate::builtin_modules;
 use crate::c_emit;
+use crate::generics;
 use crate::guide;
 use crate::language;
 use crate::native::NativeRequires;
 use crate::optimize;
-use crate::program::{AsyncFunctionDef, FunctionDef, Program};
+use crate::program::Program;
 use crate::stream_pipe;
 use crate::types::Ty;
 use crate::validate;
@@ -124,6 +125,7 @@ pub struct CompileToCOutput {
     pub c_src: String,
     pub stats: CompileStats,
     pub native_requires: NativeRequires,
+    pub mono_map: Option<crate::generics::MonoMapV1>,
 }
 
 pub fn compile_program_to_c_with_meta(
@@ -180,7 +182,7 @@ pub fn compile_program_to_c_with_meta(
         .map_err(|e| CompilerError::new(CompileErrorKind::Parse, format!("main: {e}")))?;
     fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
     let main = parse_main_file_x07ast(file)?;
-    forbid_internal_only_heads_in_program("main", &main.program)?;
+    forbid_internal_only_heads_in_entry("main", &main)?;
     let mut modules = BTreeMap::new();
     let mut module_infos = BTreeMap::new();
     module_infos.insert(
@@ -203,23 +205,56 @@ pub fn compile_program_to_c_with_meta(
         )?;
     }
 
-    let mut parsed_program = Program {
-        functions: main.program.functions,
-        async_functions: main.program.async_functions,
-        extern_functions: main.program.extern_functions,
-        solve: main.program.solve,
-    };
+    let ParsedMain {
+        schema_version: main_schema_version,
+        imports: _main_imports,
+        functions: main_functions,
+        async_functions: main_async_functions,
+        extern_functions: main_extern_functions,
+        solve: main_solve,
+        meta: main_meta,
+    } = main;
+
     let mut module_metas: BTreeMap<String, BTreeMap<String, Value>> = BTreeMap::new();
-    module_metas.insert("main".to_string(), main.meta);
+    module_metas.insert("main".to_string(), main_meta);
+
+    let mut generic_program = generics::GenericProgram {
+        functions: main_functions,
+        async_functions: main_async_functions,
+        extern_functions: main_extern_functions,
+        solve: main_solve,
+    };
     for m in modules.values() {
-        parsed_program.functions.extend(m.functions.clone());
-        parsed_program
+        generic_program.functions.extend(m.functions.clone());
+        generic_program
             .async_functions
             .extend(m.async_functions.clone());
-        parsed_program
+        generic_program
             .extern_functions
             .extend(m.extern_functions.clone());
         module_metas.insert(m.module_id.clone(), m.meta.clone());
+    }
+
+    let module_exports: BTreeMap<String, BTreeSet<String>> = module_infos
+        .iter()
+        .map(|(mid, info)| (mid.clone(), info.exports.clone()))
+        .collect();
+
+    let (mut parsed_program, mono_map) =
+        generics::monomorphize(generic_program, &module_exports, &main_schema_version)?;
+    for item in &mono_map.items {
+        let Some(info) = module_infos.get_mut(&item.def_module) else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Internal,
+                format!(
+                    "internal error: mono map item references unknown module: {:?}",
+                    item.def_module
+                ),
+            ));
+        };
+        if info.exports.contains(&item.generic) {
+            info.exports.insert(item.specialized.clone());
+        }
     }
 
     forbid_reserved_helper_function_names(&parsed_program)?;
@@ -300,6 +335,7 @@ pub fn compile_program_to_c_with_meta(
             world: Some(options.world.as_str().to_string()),
             requires: native_requires,
         },
+        mono_map: Some(mono_map),
     })
 }
 
@@ -335,16 +371,20 @@ struct ModuleInfo {
 #[derive(Debug, Clone)]
 struct ParsedModule {
     module_id: String,
-    functions: Vec<FunctionDef>,
-    async_functions: Vec<AsyncFunctionDef>,
-    extern_functions: Vec<crate::program::ExternFunctionDecl>,
+    functions: Vec<x07ast::AstFunctionDef>,
+    async_functions: Vec<x07ast::AstAsyncFunctionDef>,
+    extern_functions: Vec<x07ast::AstExternFunctionDecl>,
     meta: BTreeMap<String, Value>,
 }
 
 #[derive(Debug, Clone)]
 struct ParsedMain {
+    schema_version: String,
     imports: BTreeSet<String>,
-    program: Program,
+    functions: Vec<x07ast::AstFunctionDef>,
+    async_functions: Vec<x07ast::AstAsyncFunctionDef>,
+    extern_functions: Vec<x07ast::AstExternFunctionDecl>,
+    solve: crate::ast::Expr,
     meta: BTreeMap<String, Value>,
 }
 
@@ -384,17 +424,17 @@ fn find_internal_only_head(expr: &crate::ast::Expr) -> Option<&'static str> {
     }
 }
 
-fn forbid_internal_only_heads_in_program(
+fn forbid_internal_only_heads_in_entry(
     label: &str,
-    program: &Program,
+    main: &ParsedMain,
 ) -> Result<(), CompilerError> {
-    if let Some(head) = find_internal_only_head(&program.solve) {
+    if let Some(head) = find_internal_only_head(&main.solve) {
         return Err(CompilerError::new(
             CompileErrorKind::Unsupported,
             format!("{label}: internal-only builtin is not allowed here: {head}"),
         ));
     }
-    for f in &program.functions {
+    for f in &main.functions {
         if let Some(head) = find_internal_only_head(&f.body) {
             return Err(CompilerError::new(
                 CompileErrorKind::Unsupported,
@@ -402,7 +442,7 @@ fn forbid_internal_only_heads_in_program(
             ));
         }
     }
-    for f in &program.async_functions {
+    for f in &main.async_functions {
         if let Some(head) = find_internal_only_head(&f.body) {
             return Err(CompilerError::new(
                 CompileErrorKind::Unsupported,
@@ -544,14 +584,14 @@ fn parse_main_file_x07ast(file: x07ast::X07AstFile) -> Result<ParsedMain, Compil
             "main: missing solve expression".to_string(),
         )
     })?;
+
     Ok(ParsedMain {
+        schema_version: file.schema_version,
         imports: file.imports,
-        program: Program {
-            functions: file.functions,
-            async_functions: file.async_functions,
-            extern_functions: file.extern_functions,
-            solve,
-        },
+        functions: file.functions,
+        async_functions: file.async_functions,
+        extern_functions: file.extern_functions,
+        solve,
         meta: file.meta,
     })
 }
@@ -603,12 +643,16 @@ fn parse_module_file_x07ast(
         }
     }
 
+    let functions = file.functions;
+    let async_functions = file.async_functions;
+    let extern_functions = file.extern_functions;
+
     Ok((
         ParsedModule {
             module_id: module_id.to_string(),
-            functions: file.functions,
-            async_functions: file.async_functions,
-            extern_functions: file.extern_functions,
+            functions,
+            async_functions,
+            extern_functions,
             meta: file.meta,
         },
         ModuleInfo {

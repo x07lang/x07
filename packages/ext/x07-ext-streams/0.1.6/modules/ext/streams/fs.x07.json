@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["ext.streams.fs.open_read"]},{"body":["std.fs.open_read","path"],"kind":"defn","name":"ext.streams.fs.open_read","params":[{"name":"path","ty":"bytes_view"}],"result":"iface"}],"imports":["std.fs"],"kind":"module","module_id":"ext.streams.fs","schema_version":"x07.x07ast@0.3.0"}

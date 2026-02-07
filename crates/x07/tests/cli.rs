@@ -5,10 +5,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use x07_contracts::{
-    X07TEST_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
+    X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
     X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_REVIEW_DIFF_SCHEMA_VERSION,
     X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
 };
+use x07c::json_patch;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -400,7 +401,7 @@ fn x07_module_doc(module_id: &str, imports: &[&str], decls: Vec<Value>) -> Value
         [
             (
                 "schema_version".to_string(),
-                Value::String("x07.x07ast@0.3.0".to_string()),
+                Value::String(X07AST_SCHEMA_VERSION.to_string()),
             ),
             ("kind".to_string(), Value::String("module".to_string())),
             (
@@ -1228,7 +1229,7 @@ fn x07_fix_applies_multiple_borrow_quickfixes() {
     std::fs::create_dir_all(&dir).expect("create tmp dir");
 
     let program = serde_json::to_vec(&serde_json::json!({
-        "schema_version": "x07.x07ast@0.3.0",
+        "schema_version": X07AST_SCHEMA_VERSION,
         "kind": "entry",
         "module_id": "main",
         "imports": [],
@@ -2479,7 +2480,7 @@ fn x07_run_os_sandboxed_allows_write_under_write_root() {
     write_bytes(
         &dir.join("main.x07.json"),
         br#"{
-  "schema_version": "x07.x07ast@0.3.0",
+  "schema_version": "x07.x07ast@0.4.0",
   "kind": "entry",
   "module_id": "main",
   "imports": [],
@@ -2789,6 +2790,84 @@ fn x07_ast_get_extracts_json_pointer() {
 }
 
 #[test]
+fn x07_ast_validate_reports_quickfix_for_unsupported_schema_version() {
+    let root = repo_root();
+    let program_path = root.join("target/tmp_x07_ast_validate_bad_schema.json");
+    let diag_path = root.join("target/tmp_x07_ast_validate_bad_schema.x07diag.json");
+    if program_path.exists() {
+        std::fs::remove_file(&program_path).expect("remove old program");
+    }
+    if diag_path.exists() {
+        std::fs::remove_file(&diag_path).expect("remove old x07diag");
+    }
+
+    let mut doc = serde_json::json!({
+        "schema_version": "x07.x07ast@999.0.0",
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": ["bytes.alloc", 0]
+    });
+    write_bytes(
+        &program_path,
+        serde_json::to_string(&doc).expect("encode doc").as_bytes(),
+    );
+
+    let out = run_x07(&[
+        "ast",
+        "validate",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--x07diag",
+        diag_path.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let diag_doc: Value = serde_json::from_slice(&std::fs::read(&diag_path).expect("read x07diag"))
+        .expect("parse x07diag");
+    let diags = diag_doc["diagnostics"].as_array().expect("diagnostics[]");
+    let diag = diags
+        .iter()
+        .find(|d| d["code"] == "X07-SCHEMA-0002")
+        .expect("expected X07-SCHEMA-0002");
+    let q = diag["quickfix"]
+        .as_object()
+        .expect("expected quickfix object");
+    assert_eq!(q["kind"], "json_patch");
+
+    let patch_ops: Vec<x07c::diagnostics::PatchOp> =
+        serde_json::from_value(q["patch"].clone()).expect("parse patch ops");
+    json_patch::apply_patch(&mut doc, &patch_ops).expect("apply patch");
+    write_bytes(
+        &program_path,
+        serde_json::to_string(&doc)
+            .expect("encode patched doc")
+            .as_bytes(),
+    );
+
+    let out2 = run_x07(&[
+        "ast",
+        "validate",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--x07diag",
+        diag_path.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out2.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out2.stderr)
+    );
+}
+
+#[test]
 fn x07_ast_schema_json_schema_matches_embedded_bytes() {
     let root = repo_root();
     let out = run_x07(&["ast", "schema"]);
@@ -2800,6 +2879,28 @@ fn x07_ast_schema_json_schema_matches_embedded_bytes() {
     );
 
     let mut expected = std::fs::read(root.join("spec/x07ast.schema.json")).expect("read schema");
+    if expected.last() != Some(&b'\n') {
+        expected.push(b'\n');
+    }
+    assert_eq!(
+        out.stdout, expected,
+        "schema output must be byte-for-byte stable"
+    );
+}
+
+#[test]
+fn x07_ast_schema_can_emit_v0_3_snapshot() {
+    let root = repo_root();
+    let out = run_x07(&["ast", "schema", "--schema-version", "x07.x07ast@0.3.0"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let mut expected =
+        std::fs::read(root.join("spec/x07ast.v0.3.0.schema.json")).expect("read schema");
     if expected.last() != Some(&b'\n') {
         expected.push(b'\n');
     }
@@ -2875,7 +2976,7 @@ fn x07_ast_grammar_cfg_emits_bundle_and_materializes_out_dir() {
 
     let bundle = parse_json_stdout(&out);
     assert_eq!(bundle["schema_version"], "x07.ast.grammar_bundle@0.1.0");
-    assert_eq!(bundle["x07ast_schema_version"], "x07.x07ast@0.3.0");
+    assert_eq!(bundle["x07ast_schema_version"], "x07.x07ast@0.4.0");
     assert_eq!(bundle["format"], "gbnf_v1");
 
     let variants = bundle["variants"].as_array().expect("variants[]");
@@ -2975,7 +3076,7 @@ fn x07_ast_grammar_cfg_emits_bundle_and_materializes_out_dir() {
     assert_eq!(manifest["schema_version"], "x07.genpack.manifest@0.1.0");
     assert_eq!(manifest["pack"], "x07-genpack-x07ast");
     assert_eq!(manifest["pack_version"], "0.1.0");
-    assert_eq!(manifest["x07ast_schema_version"], "x07.x07ast@0.3.0");
+    assert_eq!(manifest["x07ast_schema_version"], "x07.x07ast@0.4.0");
     let artifacts = manifest["artifacts"].as_array().expect("artifacts[]");
     assert_eq!(artifacts.len(), 4);
     let get_sha = |name: &str| {
@@ -3257,7 +3358,7 @@ fn x07_trust_report_outputs_expected_schema_and_flags() {
 
     let entry_path = dir.join("src/main.x07.json");
     let entry_doc = serde_json::json!({
-      "schema_version": "x07.x07ast@0.3.0",
+      "schema_version": X07AST_SCHEMA_VERSION,
       "kind": "entry",
       "module_id": "main",
       "imports": [],

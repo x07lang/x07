@@ -105,10 +105,11 @@ fn handle_machine_request(
                 ));
             }
         } else if parsed.report_out.is_some() || parsed.quiet_json {
+            let msg = "--report-out/--quiet-json requires --json";
             diags.push(reporting::diag_error(
                 "X07-TOOL-ARGS-0001",
                 diagnostics::Stage::Parse,
-                "--report-out/--quiet-json requires --json",
+                msg,
             ));
         } else {
             return Ok(None);
@@ -215,11 +216,8 @@ fn wrapped_report(
     if out.internal_failure {
         exit_code = 3;
         diagnostics.clear();
-        let mut diag = reporting::diag_error(
-            "X07-INTERNAL-0001",
-            diagnostics::Stage::Run,
-            "internal tool failure",
-        );
+        let msg = "internal tool failure";
+        let mut diag = reporting::diag_error("X07-INTERNAL-0001", diagnostics::Stage::Run, msg);
         if let Ok(text) = String::from_utf8(out.stderr.clone()) {
             let trimmed = text.trim();
             if !trimmed.is_empty() {
@@ -619,11 +617,8 @@ fn internal_error_report(
     started: Instant,
     message: &str,
 ) -> reporting::ToolReport<ToolResultPayload> {
-    let mut diag = reporting::diag_error(
-        "X07-INTERNAL-0001",
-        diagnostics::Stage::Run,
-        "internal tool failure",
-    );
+    let msg = "internal tool failure";
+    let mut diag = reporting::diag_error("X07-INTERNAL-0001", diagnostics::Stage::Run, msg);
     if !message.trim().is_empty() {
         diag.data.insert(
             "panic".to_string(),

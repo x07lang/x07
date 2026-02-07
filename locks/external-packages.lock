@@ -8136,6 +8136,40 @@
       "version": "0.1.5"
     },
     {
+      "determinism_tier": "mixed",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.streams.fs.tests",
+          "path": "packages/ext/x07-ext-streams/0.1.6/modules/ext/streams/fs/tests.x07.json",
+          "sha256": "9fdb9c5f507048351a47394581331c5b99763586efed301888d38c0bfd189a0e",
+          "size_bytes": 578
+        },
+        {
+          "module_id": "ext.streams.fs",
+          "path": "packages/ext/x07-ext-streams/0.1.6/modules/ext/streams/fs.x07.json",
+          "sha256": "0474dc7cf065fa010b691f76e9c69a57b6f463b4c40300ee2c6007ba35695453",
+          "size_bytes": 316
+        },
+        {
+          "module_id": "ext.streams.tests",
+          "path": "packages/ext/x07-ext-streams/0.1.6/modules/ext/streams/tests.x07.json",
+          "sha256": "f3d91ff9ed551b2f8608cb816fbbe200cf772456afcb78c4399115e5000eca3b",
+          "size_bytes": 4483
+        },
+        {
+          "module_id": "ext.streams",
+          "path": "packages/ext/x07-ext-streams/0.1.6/modules/ext/streams.x07.json",
+          "sha256": "1129f6cbc04680e23062ea3ddfb5102be0f567a6034cd2a5f3cbb29e56361754",
+          "size_bytes": 1658
+        }
+      ],
+      "name": "ext-streams",
+      "package_manifest_sha256": "e3adb72115b11b8c4616a2257042815dd6b174e013db7e75a434f39629568d9d",
+      "path": "packages/ext/x07-ext-streams/0.1.6",
+      "version": "0.1.6"
+    },
+    {
       "determinism_tier": "pure",
       "import_mode": "x07import",
       "modules": [
@@ -10579,6 +10613,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "c6a1a306ca8e1be2ff7a70aab7251b9f38fd66816d025035c46e4450517d670a",
+  "packages_hash": "1850c3c5b1807f0d2eacc390b9a1df918c42a8fddaa6f366351796226e607008",
   "packages_root": "packages/ext"
 }

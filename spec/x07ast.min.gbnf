@@ -1,7 +1,7 @@
 root ::= entry-doc | module-doc
 
-entry-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"entry\"" ws entry-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.3.0\"" ws "," ws "\"solve\"" ws ":" ws sexpr ws "}"
-module-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"module\"" ws module-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.3.0\"" ws "}"
+entry-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"entry\"" ws entry-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.4.0\"" ws "," ws "\"solve\"" ws ":" ws sexpr ws "}"
+module-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"module\"" ws module-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.4.0\"" ws "}"
 
 entry-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
 module-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
@@ -16,13 +16,20 @@ decl-list-tail ::= "" | ws "," ws decl decl-list-tail
 
 decl ::= decl-defn | decl-defasync | decl-export | decl-extern
 
-decl-defn ::= "{" ws "\"body\"" ws ":" ws sexpr ws "," ws "\"kind\"" ws ":" ws "\"defn\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-name decl-result-brand-opt ws "}"
-decl-defasync ::= "{" ws "\"body\"" ws ":" ws sexpr ws "," ws "\"kind\"" ws ":" ws "\"defasync\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-name decl-result-brand-opt ws "}"
-decl-result-brand-opt ::= "" | ws "," ws "\"result_brand\"" ws ":" ws symbol
+decl-defn ::= "{" ws "\"body\"" ws ":" ws sexpr ws "," ws "\"kind\"" ws ":" ws "\"defn\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-ref decl-defn-tail ws "}"
+decl-defasync ::= "{" ws "\"body\"" ws ":" ws sexpr ws "," ws "\"kind\"" ws ":" ws "\"defasync\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-ref decl-defasync-tail ws "}"
+decl-defn-tail ::= "" | decl-defn-tail-type-params | decl-defn-tail-result-brand | decl-defn-tail-both
+decl-defn-tail-type-params ::= ws "," ws "\"type_params\"" ws ":" ws type-param-array
+decl-defn-tail-result-brand ::= ws "," ws "\"result_brand\"" ws ":" ws symbol
+decl-defn-tail-both ::= ws "," ws "\"result_brand\"" ws ":" ws symbol ws "," ws "\"type_params\"" ws ":" ws type-param-array
+decl-defasync-tail ::= "" | decl-defasync-tail-type-params | decl-defasync-tail-result-brand | decl-defasync-tail-both
+decl-defasync-tail-type-params ::= ws "," ws "\"type_params\"" ws ":" ws type-param-array
+decl-defasync-tail-result-brand ::= ws "," ws "\"result_brand\"" ws ":" ws symbol
+decl-defasync-tail-both ::= ws "," ws "\"result_brand\"" ws ":" ws symbol ws "," ws "\"type_params\"" ws ":" ws type-param-array
 
 decl-export ::= "{" ws "\"kind\"" ws ":" ws "\"export\"" ws "," ws "\"names\"" ws ":" ws symbol-array-non-empty ws "}"
 
-decl-extern ::= "{" ws "\"abi\"" ws ":" ws "\"C\"" ws "," ws "\"kind\"" ws ":" ws "\"extern\"" decl-extern-link-name-opt ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-name ws "}"
+decl-extern ::= "{" ws "\"abi\"" ws ":" ws "\"C\"" ws "," ws "\"kind\"" ws ":" ws "\"extern\"" decl-extern-link-name-opt ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-ref ws "}"
 decl-extern-link-name-opt ::= "" | ws "," ws "\"link_name\"" ws ":" ws local-name
 
 param-array ::= "[" ws param-list-opt ws "]"
@@ -30,8 +37,15 @@ param-list-opt ::= "" | param param-list-tail
 param-list-tail ::= "" | ws "," ws param param-list-tail
 
 param ::= param-with-brand | param-without-brand
-param-with-brand ::= "{" ws "\"brand\"" ws ":" ws symbol ws "," ws "\"name\"" ws ":" ws local-name ws "," ws "\"ty\"" ws ":" ws type-name ws "}"
-param-without-brand ::= "{" ws "\"name\"" ws ":" ws local-name ws "," ws "\"ty\"" ws ":" ws type-name ws "}"
+param-with-brand ::= "{" ws "\"brand\"" ws ":" ws symbol ws "," ws "\"name\"" ws ":" ws local-name ws "," ws "\"ty\"" ws ":" ws type-ref ws "}"
+param-without-brand ::= "{" ws "\"name\"" ws ":" ws local-name ws "," ws "\"ty\"" ws ":" ws type-ref ws "}"
+
+type-param-array ::= "[" ws type-param-list-opt ws "]"
+type-param-list-opt ::= "" | type-param type-param-list-tail
+type-param-list-tail ::= "" | ws "," ws type-param type-param-list-tail
+type-param ::= type-param-with-bound | type-param-without-bound
+type-param-with-bound ::= "{" ws "\"bound\"" ws ":" ws bound-name ws "," ws "\"name\"" ws ":" ws tparam-name ws "}"
+type-param-without-bound ::= "{" ws "\"name\"" ws ":" ws tparam-name ws "}"
 
 symbol-array-non-empty ::= "[" ws symbol symbol-array-tail ws "]"
 symbol-array-tail ::= "" | ws "," ws symbol symbol-array-tail
@@ -50,6 +64,13 @@ module-id-rest ::= "." ident-segment
 symbol ::= module-id
 local-name ::= "\"" local-first local-rest* "\""
 type-name ::= "\"" type-first type-rest* "\""
+tparam-name ::= "\"" tparam-first tparam-rest* "\""
+bound-name ::= "\"any\"" | "\"bytes_like\"" | "\"num_like\"" | "\"hashable\"" | "\"orderable\""
+type-ref ::= type-name | type-expr
+type-expr ::= type-var | type-app
+type-var ::= "[" ws "\"t\"" ws "," ws tparam-name ws "]"
+type-app ::= "[" ws type-name ws "," ws type-ref type-ref-tail ws "]"
+type-ref-tail ::= "" | ws "," ws type-ref type-ref-tail
 
 ident-segment ::= ident-first ident-rest*
 ident-first ::= [A-Za-z_]
@@ -60,6 +81,9 @@ local-rest ::= [A-Za-z0-9_]
 
 type-first ::= [a-z]
 type-rest ::= [a-z0-9_]
+
+tparam-first ::= [A-Z]
+tparam-rest ::= [A-Za-z0-9_]
 
 json-value ::= json-object | json-array | string | number | "true" | "false" | "null"
 json-object ::= "{" ws json-members-opt ws "}"

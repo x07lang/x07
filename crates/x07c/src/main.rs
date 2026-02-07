@@ -69,6 +69,8 @@ enum Cmd {
         project: PathBuf,
         #[arg(long)]
         out: Option<PathBuf>,
+        #[arg(long, value_name = "PATH")]
+        emit_mono_map: Option<PathBuf>,
         #[arg(long)]
         emit_c_header: Option<PathBuf>,
         #[arg(long)]
@@ -85,6 +87,8 @@ enum Cmd {
         module_root: Vec<PathBuf>,
         #[arg(long)]
         out: Option<PathBuf>,
+        #[arg(long, value_name = "PATH")]
+        emit_mono_map: Option<PathBuf>,
         #[arg(long)]
         emit_c_header: Option<PathBuf>,
         #[arg(long)]
@@ -561,7 +565,8 @@ fn try_main() -> Result<std::process::ExitCode> {
         }
         Cmd::Build {
             project: project_path,
-            out,
+            out: out_path,
+            emit_mono_map,
             emit_c_header,
             freestanding,
             max_c_bytes,
@@ -601,20 +606,28 @@ fn try_main() -> Result<std::process::ExitCode> {
                 options.emit_main = false;
             }
 
-            let c = compile::compile_program_to_c(&program_bytes, &options)
+            let compile_out = compile::compile_program_to_c_with_meta(&program_bytes, &options)
                 .map_err(|e| anyhow::anyhow!("compile failed: {:?}: {}", e.kind, e.message))?;
-            match out {
+            match out_path {
                 Some(path) => {
                     if let Some(parent) = path.parent() {
                         std::fs::create_dir_all(parent)
                             .with_context(|| format!("create output dir: {}", parent.display()))?;
                     }
-                    std::fs::write(&path, c.as_bytes())
+                    std::fs::write(&path, compile_out.c_src.as_bytes())
                         .with_context(|| format!("write: {}", path.display()))?;
                 }
                 None => {
-                    print!("{c}");
+                    print!("{}", compile_out.c_src);
                 }
+            }
+
+            if let Some(path) = emit_mono_map {
+                let mono_map = compile_out.mono_map.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!("internal error: compile output missing mono_map")
+                })?;
+                write_canon_json_file(&path, mono_map)
+                    .with_context(|| format!("write mono map: {}", path.display()))?;
             }
 
             if let Some(path) = emit_c_header {
@@ -634,7 +647,8 @@ fn try_main() -> Result<std::process::ExitCode> {
             program,
             world,
             module_root,
-            out,
+            out: out_path,
+            emit_mono_map,
             emit_c_header,
             freestanding,
             max_c_bytes,
@@ -654,20 +668,28 @@ fn try_main() -> Result<std::process::ExitCode> {
             } else if emit_c_header.is_some() {
                 options.emit_main = false;
             }
-            let c = compile::compile_program_to_c(&program_bytes, &options)
+            let compile_out = compile::compile_program_to_c_with_meta(&program_bytes, &options)
                 .map_err(|e| anyhow::anyhow!("compile failed: {:?}: {}", e.kind, e.message))?;
-            match out {
+            match out_path {
                 Some(path) => {
                     if let Some(parent) = path.parent() {
                         std::fs::create_dir_all(parent)
                             .with_context(|| format!("create output dir: {}", parent.display()))?;
                     }
-                    std::fs::write(&path, c.as_bytes())
+                    std::fs::write(&path, compile_out.c_src.as_bytes())
                         .with_context(|| format!("write: {}", path.display()))?;
                 }
                 None => {
-                    print!("{c}");
+                    print!("{}", compile_out.c_src);
                 }
+            }
+
+            if let Some(path) = emit_mono_map {
+                let mono_map = compile_out.mono_map.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!("internal error: compile output missing mono_map")
+                })?;
+                write_canon_json_file(&path, mono_map)
+                    .with_context(|| format!("write mono map: {}", path.display()))?;
             }
 
             if let Some(path) = emit_c_header {
@@ -688,6 +710,19 @@ fn try_main() -> Result<std::process::ExitCode> {
 
 fn print_json<T: Serialize>(value: &T) -> Result<()> {
     println!("{}", serde_json::to_string(value)?);
+    Ok(())
+}
+
+fn write_canon_json_file(path: &Path, value: &impl Serialize) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create output dir: {}", parent.display()))?;
+    }
+
+    let mut v = serde_json::to_value(value)?;
+    x07ast::canon_value_jcs(&mut v);
+    let out = serde_json::to_string(&v)? + "\n";
+    std::fs::write(path, out.as_bytes()).with_context(|| format!("write: {}", path.display()))?;
     Ok(())
 }
 

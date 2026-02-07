@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07ast.schema.json",
-  "title": "X07 x07AST v0.3.0",
+  "title": "X07 x07AST v0.4.0",
   "description": "Canonical, JSON-based AST carrier for LLM-first X07 program generation and repair. Expressions are encoded as JSON S-expressions (json-sexpr).",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "kind", "module_id", "imports", "decls"],
   "properties": {
-    "schema_version": { "const": "x07.x07ast@0.3.0" },
+    "schema_version": { "const": "x07.x07ast@0.4.0" },
     "kind": {
       "type": "string",
       "enum": ["entry", "module"],
@@ -69,6 +69,53 @@
       "pattern": "^[a-z][a-z0-9_]*$",
       "description": "Type name token (e.g., i32, bytes, bytes_view, vec_u8, iface)."
     },
+    "tparam_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[A-Z][A-Za-z0-9_]*$",
+      "description": "Type parameter identifier (e.g., A, K, V)."
+    },
+    "bound_name": {
+      "type": "string",
+      "enum": ["any", "bytes_like", "num_like", "hashable", "orderable"],
+      "description": "Canonical type parameter bound."
+    },
+    "type_param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "#/$defs/tparam_name" },
+        "bound": { "$ref": "#/$defs/bound_name" }
+      }
+    },
+    "type_params": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/type_param" },
+      "default": []
+    },
+    "type_var": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [{ "const": "t" }, { "$ref": "#/$defs/tparam_name" }]
+    },
+    "type_app": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 32,
+      "prefixItems": [{ "$ref": "#/$defs/type_name" }],
+      "items": { "$ref": "#/$defs/type_ref" }
+    },
+    "type_expr": {
+      "description": "Structured type expression list. [\"t\",\"A\"] declares a type variable; other lists are type application: [head, arg1, ...].",
+      "oneOf": [{ "$ref": "#/$defs/type_var" }, { "$ref": "#/$defs/type_app" }]
+    },
+    "type_ref": {
+      "description": "Type reference: either legacy concrete type token or structured type expression.",
+      "oneOf": [{ "$ref": "#/$defs/type_name" }, { "$ref": "#/$defs/type_expr" }]
+    },
     "i32": {
       "type": "integer",
       "minimum": -2147483648,
@@ -118,7 +165,7 @@
       "required": ["name", "ty"],
       "properties": {
         "name": { "$ref": "#/$defs/local_name" },
-        "ty": { "$ref": "#/$defs/type_name" },
+        "ty": { "$ref": "#/$defs/type_ref" },
         "brand": { "$ref": "#/$defs/symbol" }
       }
     },
@@ -129,12 +176,13 @@
       "properties": {
         "kind": { "const": "defn" },
         "name": { "$ref": "#/$defs/symbol" },
+        "type_params": { "$ref": "#/$defs/type_params" },
         "params": {
           "type": "array",
           "items": { "$ref": "#/$defs/param" },
           "default": []
         },
-        "result": { "$ref": "#/$defs/type_name" },
+        "result": { "$ref": "#/$defs/type_ref" },
         "result_brand": { "$ref": "#/$defs/symbol" },
         "body": { "$ref": "#/$defs/sexpr" }
       }
@@ -146,12 +194,13 @@
       "properties": {
         "kind": { "const": "defasync" },
         "name": { "$ref": "#/$defs/symbol" },
+        "type_params": { "$ref": "#/$defs/type_params" },
         "params": {
           "type": "array",
           "items": { "$ref": "#/$defs/param" },
           "default": []
         },
-        "result": { "$ref": "#/$defs/type_name" },
+        "result": { "$ref": "#/$defs/type_ref" },
         "result_brand": { "$ref": "#/$defs/symbol" },
         "body": { "$ref": "#/$defs/sexpr" }
       }
@@ -187,7 +236,7 @@
           "items": { "$ref": "#/$defs/param" },
           "default": []
         },
-        "result": { "$ref": "#/$defs/type_name" }
+        "result": { "$ref": "#/$defs/type_ref" }
       }
     },
     "decl": {

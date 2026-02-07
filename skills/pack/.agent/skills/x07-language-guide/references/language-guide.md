@@ -4,12 +4,12 @@ IMPORTANT:
 - Output ONLY one JSON object (no preamble).
 - Do NOT wrap the JSON in Markdown code fences.
 - Do NOT output extra prose.
-- Must satisfy x07AST schema_version `x07.x07ast@0.3.0`.
+- Must satisfy x07AST schema_version `x07.x07ast@0.4.0`.
 
 Program encoding: UTF-8 JSON text.
 
 Entry program object fields:
-- `schema_version`: `x07.x07ast@0.3.0`
+- `schema_version`: `x07.x07ast@0.4.0`
 - `kind`: `entry`
 - `module_id`: `main`
 - `imports`: array of module IDs (e.g. `std.bytes`)
@@ -69,7 +69,7 @@ Move rules (critical):
 
 Echo (returns input):
 ```json
-{"schema_version":"x07.x07ast@0.3.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
+{"schema_version":"x07.x07ast@0.4.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
 ```
 
 Arity reminder:

@@ -546,12 +546,33 @@ fn gen_machine_module(
         Value::String(spec_jcs_sha256_hex.to_string()),
     );
 
+    let functions: Vec<x07c::x07ast::AstFunctionDef> = vec![init, helper, step]
+        .into_iter()
+        .map(|f| x07c::x07ast::AstFunctionDef {
+            name: f.name,
+            type_params: Vec::new(),
+            params: f
+                .params
+                .into_iter()
+                .map(|p| x07c::x07ast::AstFunctionParam {
+                    name: p.name,
+                    ty: x07c::x07ast::TypeRef::Named(x07c::x07ast::ty_to_name(p.ty).to_string()),
+                    brand: p.brand,
+                })
+                .collect(),
+            result: x07c::x07ast::TypeRef::Named(x07c::x07ast::ty_to_name(f.ret_ty).to_string()),
+            result_brand: f.ret_brand,
+            body: f.body,
+        })
+        .collect();
+
     let mut file = X07AstFile {
+        schema_version: x07_contracts::X07AST_SCHEMA_VERSION.to_string(),
         kind: X07AstKind::Module,
         module_id: module_id.to_string(),
         imports,
         exports,
-        functions: vec![init, helper, step],
+        functions,
         async_functions: Vec::new(),
         extern_functions: Vec::new(),
         solve: None,
@@ -609,7 +630,28 @@ fn gen_tests_module(
         Value::String(spec_jcs_sha256_hex.to_string()),
     );
 
+    let functions: Vec<x07c::x07ast::AstFunctionDef> = functions
+        .into_iter()
+        .map(|f| x07c::x07ast::AstFunctionDef {
+            name: f.name,
+            type_params: Vec::new(),
+            params: f
+                .params
+                .into_iter()
+                .map(|p| x07c::x07ast::AstFunctionParam {
+                    name: p.name,
+                    ty: x07c::x07ast::TypeRef::Named(x07c::x07ast::ty_to_name(p.ty).to_string()),
+                    brand: p.brand,
+                })
+                .collect(),
+            result: x07c::x07ast::TypeRef::Named(x07c::x07ast::ty_to_name(f.ret_ty).to_string()),
+            result_brand: f.ret_brand,
+            body: f.body,
+        })
+        .collect();
+
     let mut file = X07AstFile {
+        schema_version: x07_contracts::X07AST_SCHEMA_VERSION.to_string(),
         kind: X07AstKind::Module,
         module_id: tests_module_id.to_string(),
         imports,

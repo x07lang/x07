@@ -185,7 +185,7 @@ Create `modules/ext/hex/tests.x07.json`:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.3.0",
+  "schema_version": "x07.x07ast@0.4.0",
   "kind": "module",
   "module_id": "ext.hex.tests",
   "imports": ["ext.hex", "std.test"],

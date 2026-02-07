@@ -68,7 +68,7 @@ Notes:
 
 ## Stdlib helpers
 
-See `stdlib/std/0.1.1/modules/std/text/slices.x07.json`:
+See `stdlib/std/0.1.2/modules/std/text/slices.x07.json`:
 
 - Builder:
   - `std.text.slices.builder_new_v1(cap_hint)`
