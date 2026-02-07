@@ -266,6 +266,13 @@
       "title": "Language Guide (x07AST JSON)"
     },
     {
+      "kind": "markdown",
+      "path": "docs/spec/spec-index.md",
+      "spec_id": "",
+      "status": "",
+      "title": "Published Spec Manifest"
+    },
+    {
       "kind": "schema",
       "path": "docs/spec/schemas/x07-arch.archive.index.schema.json",
       "schema_id": "https://x07.io/spec/x07-arch.archive.index.schema.json",
