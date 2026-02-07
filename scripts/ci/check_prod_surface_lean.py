@@ -58,6 +58,7 @@ ALLOWED_TRACKED_ROOT_ENTRIES = {
     "schemas",
     "scripts",
     "skills",
+    "sdk",
     "spec",
     "stdlib",
     "tests",
