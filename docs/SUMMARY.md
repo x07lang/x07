@@ -67,7 +67,7 @@
 - [ABI v1](spec/abi/abi-v1.md)
 - [ABI v2](spec/abi/abi-v2.md)
 - [ABI stability policy](spec/abi/stability-policy.md)
-- [Published spec manifest](spec/spec-index.json)
+- [Published spec manifest](spec/spec-index.md)
 
 ## Packages
 - [Packages & workspaces](packages/index.md)
