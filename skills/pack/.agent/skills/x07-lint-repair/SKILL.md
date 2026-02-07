@@ -16,15 +16,15 @@ Note: `x07 run`, `x07 build`, and `x07 bundle` run the same auto-repair loop by 
 ## Canonical converge loop
 
 1. Lint (machine-readable JSON report):
-   - `x07 lint --input src/main.x07.json --report-json`
+   - `x07 lint --input src/main.x07.json --json`
 
 2. Apply tool-provided quickfixes (when diagnostics include JSON Patch quickfixes):
-   - `x07 fix --input src/main.x07.json --write --report-json`
+   - `x07 fix --input src/main.x07.json --write --json`
 
 3. If a custom fix is needed, apply an explicit JSON Patch (RFC 6902):
    - `x07 ast apply-patch --in src/main.x07.json --patch /tmp/repair.patch.json --validate`
 
 4. Canonicalize after patching:
-   - `x07 fmt --input src/main.x07.json --write --report-json`
+   - `x07 fmt --input src/main.x07.json --write --json`
 
 Repeat (max 3 iterations). If still failing, stop and change strategy (reduce scope, regenerate the x07AST cleanly, or ask for clarification).

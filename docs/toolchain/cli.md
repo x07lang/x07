@@ -296,8 +296,6 @@ Compatibility mode is still available for existing automation:
 
 Notes:
 
-Notes:
-
 - `x07 lint` without `--json` prints the raw diagnostics report (`x07diag`, see `spec/x07diag.schema.json`).
 - `x07 fix` without `--json` prints the fixed x07AST JSON to stdout unless `--write` is set.
 

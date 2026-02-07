@@ -44,7 +44,7 @@ cat >"$program" <<'JSON'
 JSON
 
 set +e
-lint_out="$("$x07_bin" lint --input "$program" --world solve-pure --report-json)"
+lint_out="$("$x07_bin" lint --input "$program" --world solve-pure --json)"
 lint_code="$?"
 set -e
 
@@ -93,4 +93,3 @@ PY
 "$x07_bin" lint --input "$program" --world solve-pure >/dev/null
 
 echo "ok: repair loop"
-

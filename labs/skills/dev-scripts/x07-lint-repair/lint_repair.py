@@ -58,7 +58,7 @@ def x07diag_error(code: str, stage: str, message: str, ptr: Optional[str] = None
 
 
 def run_x07_lint(x07: str, world: str, path: Path) -> Tuple[int, str, str]:
-    cmd = [x07, "lint", "--input", str(path), "--world", world, "--report-json"]
+    cmd = [x07, "lint", "--input", str(path), "--world", world, "--json"]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError:
@@ -70,7 +70,7 @@ def tool_report_to_x07diag(tool_report: Dict[str, Any]) -> Dict[str, Any]:
     diagnostics = tool_report.get("diagnostics")
     ok = tool_report.get("ok")
     if not isinstance(diagnostics, list) or not isinstance(ok, bool):
-        return x07diag_error("X07LINT_BAD_JSON", "lint", "x07 lint --report-json returned unexpected JSON")
+        return x07diag_error("X07LINT_BAD_JSON", "lint", "x07 lint --json returned unexpected JSON")
     meta = {
         "tool": "x07",
         "tool_schema_version": tool_report.get("schema_version"),
@@ -174,7 +174,7 @@ def main() -> int:
             if isinstance(tool_report, dict):
                 out["diagnostics"] = tool_report_to_x07diag(tool_report)
             else:
-                out["diagnostics"] = x07diag_error("X07LINT_BAD_JSON", "lint", "x07 lint --report-json returned non-object JSON")
+                out["diagnostics"] = x07diag_error("X07LINT_BAD_JSON", "lint", "x07 lint --json returned non-object JSON")
     else:
         msg = stderr.strip() or f"x07 lint emitted empty stdout; exit_code={exit_code}"
         out["diagnostics"] = x07diag_error("X07LINT_EMPTY_STDOUT", "lint", msg)

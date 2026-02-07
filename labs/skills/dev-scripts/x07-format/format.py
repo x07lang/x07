@@ -53,7 +53,7 @@ def iter_x07_files(paths: list[Path]) -> list[Path]:
 
 
 def run_fmt(x07: str, file_path: Path, mode: str) -> tuple[int, dict[str, Any]]:
-    cmd = [x07, "fmt", "--input", str(file_path), f"--{mode}", "--report-json"]
+    cmd = [x07, "fmt", "--input", str(file_path), f"--{mode}", "--json"]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if proc.returncode == 0:
         return 0, {}

@@ -14,10 +14,10 @@ Use this skill to keep x07AST JSON canonical (stable ordering + trailing newline
 ## Canonical commands
 
 - Check a file:
-  - `x07 fmt --input src/main.x07.json --check --report-json`
+  - `x07 fmt --input src/main.x07.json --check --json`
 
 - Rewrite a file:
-  - `x07 fmt --input src/main.x07.json --write --report-json`
+  - `x07 fmt --input src/main.x07.json --write --json`
 
 ## Notes
 

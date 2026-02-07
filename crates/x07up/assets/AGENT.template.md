@@ -32,13 +32,13 @@ If any of the above are missing, run:
 When something fails (compile/run/test), follow this loop *without asking for help first*:
 
 1) Format:
-- `x07 fmt --input <FILE> --write --report-json > .x07/fmt.last.json || true`
+- `x07 fmt --input <FILE> --write --json > .x07/fmt.last.json || true`
 
 2) Lint:
-- `x07 lint --input <FILE> --report-json > .x07/lint.last.json || true`
+- `x07 lint --input <FILE> --json > .x07/lint.last.json || true`
 
 3) Quickfix:
-- `x07 fix --input <FILE> --write --report-json > .x07/fix.last.json || true`
+- `x07 fix --input <FILE> --write --json > .x07/fix.last.json || true`
 
 4) Re-run the failing command with a wrapped report:
 - `x07 run --report wrapped --report-out .x07/run.last.json ...`
