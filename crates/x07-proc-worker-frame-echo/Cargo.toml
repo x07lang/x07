@@ -1,6 +1,7 @@
 [package]
 name = "x07-proc-worker-frame-echo"
-version = "0.0.96"
+version = "0.0.97"
+
 
 
 
