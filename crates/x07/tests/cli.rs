@@ -5,7 +5,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use serde_json::Value;
 use x07_contracts::{
     X07TEST_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
-    X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION,
+    X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_REVIEW_DIFF_SCHEMA_VERSION,
+    X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
 };
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -72,6 +73,32 @@ fn fresh_os_tmp_dir(name: &str) -> PathBuf {
     let pid = std::process::id();
     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     std::env::temp_dir().join(format!("{name}_{pid}_{n}"))
+}
+
+fn fixtures_root() -> PathBuf {
+    let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    crate_dir.join("tests").join("fixtures")
+}
+
+fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) {
+    if dst.exists() {
+        std::fs::remove_dir_all(dst).expect("remove old dst dir");
+    }
+    std::fs::create_dir_all(dst).expect("create dst dir");
+
+    for entry in walkdir::WalkDir::new(src).into_iter().flatten() {
+        let path = entry.path();
+        let rel = path.strip_prefix(src).expect("strip prefix");
+        let out = dst.join(rel);
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(&out).expect("create nested dir");
+        } else if entry.file_type().is_file() {
+            if let Some(parent) = out.parent() {
+                std::fs::create_dir_all(parent).expect("create parent");
+            }
+            std::fs::copy(path, &out).expect("copy fixture file");
+        }
+    }
 }
 
 #[test]
@@ -309,6 +336,28 @@ fn x07_cli_specrows_includes_nested_subcommands() {
     assert!(
         has_arch_check,
         "missing arch.check in --cli-specrows output"
+    );
+
+    let has_review_diff = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("review.diff")
+    });
+    assert!(
+        has_review_diff,
+        "missing review.diff in --cli-specrows output"
+    );
+
+    let has_trust_report = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("trust.report")
+    });
+    assert!(
+        has_trust_report,
+        "missing trust.report in --cli-specrows output"
     );
 }
 
@@ -2736,4 +2785,350 @@ fn x07_run_auto_adds_missing_external_package() {
     );
 
     std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_review_diff_reports_high_signal_changes_and_is_deterministic() {
+    let root = repo_root();
+    let fixtures = fixtures_root().join("review");
+    let before = fixtures.join("before");
+    let after = fixtures.join("after");
+    assert!(before.is_dir(), "missing {}", before.display());
+    assert!(after.is_dir(), "missing {}", after.display());
+
+    let work = fresh_tmp_dir(&root, "tmp_x07_review_diff");
+    let before_copy = work.join("before");
+    let after_copy = work.join("after");
+    copy_dir_recursive(&before, &before_copy);
+    copy_dir_recursive(&after, &after_copy);
+
+    let json_out_1 = work.join("review-1.json");
+    let html_out_1 = work.join("review-1.html");
+    let json_out_2 = work.join("review-2.json");
+    let html_out_2 = work.join("review-2.html");
+
+    let out = run_x07(&[
+        "review",
+        "diff",
+        "--from",
+        before_copy.to_str().unwrap(),
+        "--to",
+        after_copy.to_str().unwrap(),
+        "--mode",
+        "project",
+        "--json-out",
+        json_out_1.to_str().unwrap(),
+        "--html-out",
+        html_out_1.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report: Value =
+        serde_json::from_slice(&std::fs::read(&json_out_1).expect("read review json"))
+            .expect("parse review json");
+    assert_eq!(report["schema_version"], X07_REVIEW_DIFF_SCHEMA_VERSION);
+    assert!(
+        report["highlights"]["world_changes"]
+            .as_array()
+            .expect("world_changes[]")
+            .iter()
+            .any(|c| c["kind"] == "project_profile_world" || c["kind"] == "arch_node_world"),
+        "expected world changes in highlights"
+    );
+    assert!(
+        !report["highlights"]["budget_changes"]
+            .as_array()
+            .expect("budget_changes[]")
+            .is_empty(),
+        "expected budget changes in highlights"
+    );
+    assert!(
+        !report["highlights"]["policy_changes"]
+            .as_array()
+            .expect("policy_changes[]")
+            .is_empty(),
+        "expected policy changes in highlights"
+    );
+    assert!(
+        report["highlights"]["policy_changes"]
+            .as_array()
+            .expect("policy_changes[]")
+            .iter()
+            .any(|c| c["kind"] == "policy_allowlist"),
+        "expected policy allowlist changes in highlights"
+    );
+    assert!(
+        !report["highlights"]["capability_changes"]
+            .as_array()
+            .expect("capability_changes[]")
+            .is_empty(),
+        "expected capability changes in highlights"
+    );
+    assert!(
+        report["files"]
+            .as_array()
+            .expect("files[]")
+            .iter()
+            .filter(|f| f["kind"] == "x07ast")
+            .flat_map(|f| {
+                f["module"]["decls_changed"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .cloned()
+                    .collect::<Vec<Value>>()
+            })
+            .flat_map(|d| {
+                d["body"]["ops"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .cloned()
+                    .collect::<Vec<Value>>()
+            })
+            .any(|op| op["op"] == "move"),
+        "expected at least one decl move operation"
+    );
+
+    let out = run_x07(&[
+        "review",
+        "diff",
+        "--from",
+        before_copy.to_str().unwrap(),
+        "--to",
+        after_copy.to_str().unwrap(),
+        "--mode",
+        "project",
+        "--json-out",
+        json_out_2.to_str().unwrap(),
+        "--html-out",
+        html_out_2.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let json_1 = std::fs::read(&json_out_1).expect("read review-1 json");
+    let json_2 = std::fs::read(&json_out_2).expect("read review-2 json");
+    assert_eq!(json_1, json_2, "review json output must be deterministic");
+
+    let html_1 = std::fs::read(&html_out_1).expect("read review-1 html");
+    let html_2 = std::fs::read(&html_out_2).expect("read review-2 html");
+    assert_eq!(html_1, html_2, "review html output must be deterministic");
+    assert!(
+        String::from_utf8_lossy(&html_1).contains("risk summary:"),
+        "expected risk summary strip in HTML"
+    );
+}
+
+#[test]
+fn x07_review_diff_fail_on_allow_unsafe_returns_20() {
+    let root = repo_root();
+    let fixtures = fixtures_root().join("review");
+    let before = fixtures.join("before");
+    let after = fixtures.join("after");
+
+    let work = fresh_tmp_dir(&root, "tmp_x07_review_diff_fail_on");
+    let before_copy = work.join("before");
+    let after_copy = work.join("after");
+    copy_dir_recursive(&before, &before_copy);
+    copy_dir_recursive(&after, &after_copy);
+
+    let json_out = work.join("review.json");
+    let html_out = work.join("review.html");
+
+    let out = run_x07(&[
+        "review",
+        "diff",
+        "--from",
+        before_copy.to_str().unwrap(),
+        "--to",
+        after_copy.to_str().unwrap(),
+        "--mode",
+        "project",
+        "--json-out",
+        json_out.to_str().unwrap(),
+        "--html-out",
+        html_out.to_str().unwrap(),
+        "--fail-on",
+        "allow-unsafe",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(json_out.is_file(), "missing {}", json_out.display());
+    assert!(html_out.is_file(), "missing {}", html_out.display());
+}
+
+#[test]
+fn x07_trust_report_outputs_expected_schema_and_flags() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_report");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(&dir, &["policy", "init", "--template", "http-client"]);
+    assert_eq!(out.status.code(), Some(0));
+    std::fs::copy(root.join("stdlib.lock"), dir.join("stdlib.lock")).expect("copy stdlib.lock");
+
+    let project_path = dir.join("x07.json");
+    let mut project_doc: Value =
+        serde_json::from_slice(&std::fs::read(&project_path).unwrap()).expect("parse x07.json");
+    project_doc["profiles"]["sandbox"] = serde_json::json!({
+      "world": "run-os-sandboxed",
+      "policy": ".x07/policies/base/http-client.sandbox.base.policy.json",
+      "solve_fuel": 4096,
+      "max_memory_bytes": 8388608
+    });
+    project_doc["default_profile"] = Value::String("sandbox".to_string());
+    write_json(&project_path, &project_doc);
+
+    let entry_path = dir.join("src/main.x07.json");
+    let entry_doc = serde_json::json!({
+      "schema_version": "x07.x07ast@0.3.0",
+      "kind": "entry",
+      "module_id": "main",
+      "imports": [],
+      "decls": [],
+      "solve": [
+        "begin",
+        [
+          "budget.scope_v1",
+          {
+            "label": "sandbox",
+            "mode": "strict",
+            "limits": {
+              "fuel": 32
+            }
+          }
+        ],
+        ["std.os.time.now_unix_ms_v1"],
+        ["bytes.lit", "ok"]
+      ]
+    });
+    write_json(&entry_path, &entry_doc);
+
+    let policy_path = dir.join(".x07/policies/base/http-client.sandbox.base.policy.json");
+    let mut policy_doc: Value =
+        serde_json::from_slice(&std::fs::read(&policy_path).unwrap()).expect("parse policy");
+    policy_doc["language"]["allow_unsafe"] = Value::Bool(true);
+    policy_doc["language"]["allow_ffi"] = Value::Bool(true);
+    policy_doc["net"]["enabled"] = Value::Bool(true);
+    policy_doc["process"]["enabled"] = Value::Bool(true);
+    policy_doc["time"]["allow_wall_clock"] = Value::Bool(true);
+    write_json(&policy_path, &policy_doc);
+
+    let trust_json = dir.join("trust.json");
+    let trust_html = dir.join("trust.html");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "report",
+            "--project",
+            "x07.json",
+            "--profile",
+            "sandbox",
+            "--out",
+            trust_json.to_str().unwrap(),
+            "--html-out",
+            trust_html.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(trust_json.is_file(), "missing {}", trust_json.display());
+    assert!(trust_html.is_file(), "missing {}", trust_html.display());
+
+    let report: Value =
+        serde_json::from_slice(&std::fs::read(&trust_json).expect("read trust report"))
+            .expect("parse trust report");
+    assert_eq!(report["schema_version"], X07_TRUST_REPORT_SCHEMA_VERSION);
+    assert_eq!(report["project"]["world"], "run-os-sandboxed");
+    assert!(
+        report["budgets"]["scopes"]
+            .as_array()
+            .expect("scopes[]")
+            .iter()
+            .any(|s| s["kind"] == "inline_v1"),
+        "expected budget.scope_v1 detection"
+    );
+    assert!(
+        report["capabilities"]["used"]["namespaces"]
+            .as_array()
+            .expect("namespaces[]")
+            .iter()
+            .any(|v| v == "std.os.time."),
+        "expected std.os.time namespace detection"
+    );
+    let flags = report["nondeterminism"]["flags"]
+        .as_array()
+        .expect("flags[]");
+    assert!(
+        flags.iter().any(|f| f["kind"] == "allow_unsafe"),
+        "expected allow_unsafe flag"
+    );
+    assert!(
+        flags.iter().any(|f| f["kind"] == "allow_ffi"),
+        "expected allow_ffi flag"
+    );
+    assert!(
+        flags.iter().any(|f| f["kind"] == "net_enabled"),
+        "expected net_enabled flag"
+    );
+    assert!(
+        flags.iter().any(|f| f["kind"] == "process_enabled"),
+        "expected process_enabled flag"
+    );
+    assert!(
+        report["sbom"]["components"]
+            .as_array()
+            .expect("components[]")
+            .iter()
+            .any(|c| c["kind"] == "stdlib"),
+        "expected stdlib sbom components from stdlib.lock"
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "report",
+            "--project",
+            "x07.json",
+            "--profile",
+            "sandbox",
+            "--out",
+            trust_json.to_str().unwrap(),
+            "--fail-on",
+            "net-enabled",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }

@@ -1,0 +1,38 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "app.main",
+  "imports": [],
+  "decls": [
+    { "kind": "export", "names": ["app.main.run"] },
+    {
+      "kind": "defn",
+      "name": "app.main.helper",
+      "params": [],
+      "result": "i32",
+      "body": ["i32.add", 2, 3]
+    },
+    {
+      "kind": "defn",
+      "name": "app.main.run",
+      "params": [],
+      "result": "i32",
+      "body": [
+        "begin",
+        [
+          "budget.scope_v1",
+          {
+            "label": "limited",
+            "mode": "strict",
+            "limits": {
+              "fuel": 16,
+              "alloc_bytes": 128
+            }
+          }
+        ],
+        ["std.os.time.now_unix_ms_v1"],
+        1
+      ]
+    }
+  ]
+}

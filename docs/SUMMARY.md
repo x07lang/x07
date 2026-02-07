@@ -44,6 +44,7 @@
 - [Repair loop](toolchain/repair-loop.md)
 - [Diagnostics & repair](toolchain/diagnostics-repair.md)
 - [Diagnostic codes](toolchain/diagnostic-codes.md)
+- [Review & trust artifacts](toolchain/review-trust.md)
 - [Testing](toolchain/testing.md)
 - [Test manifest](toolchain/tests-manifest.md)
 - [Testing by example](toolchain/testing-by-example.md)

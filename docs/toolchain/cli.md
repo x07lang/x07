@@ -43,6 +43,27 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 See: [Architecture check](arch-check.md).
 
+### Review artifacts (semantic diff)
+
+- `x07 review diff --from <path> --to <path> --html-out <path>`
+- `x07 review diff --from <path> --to <path> --html-out <path> --json-out <path>`
+  - Produces an intent-level semantic diff for x07AST/project/arch/policy changes.
+  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi`.
+  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.1.0"`).
+
+See: [Review & trust artifacts](review-trust.md).
+
+### Trust artifacts (CI security posture summary)
+
+- `x07 trust report --project x07.json --out <path>`
+- `x07 trust report --project x07.json --profile sandbox --out <path> --html-out <path>`
+  - Emits a machine-readable trust summary (budgets/caps, declared+used capabilities, nondeterminism flags, SBOM placeholders).
+  - Supports observed merges via `--run-report`, `--bundle-report`, `--x07test`.
+  - Supports CI gates via `--strict` and `--fail-on ...`.
+  - JSON schema: `spec/x07-trust.report.schema.json` (`schema_version: "x07.trust.report@0.1.0"`).
+
+See: [Review & trust artifacts](review-trust.md).
+
 ### Diagnostics catalog / coverage
 
 - `x07 diag catalog --catalog catalog/diagnostics.json --format both`
@@ -181,6 +202,11 @@ Commands that emit structured outputs must guarantee:
 - valid JSON
 - schema-valid output
 - stable ordering (canonical JSON writer)
+
+Review/trust artifact commands also follow this contract:
+
+- `x07 review diff`
+- `x07 trust report`
 
 For machine-first discovery and debugging:
 

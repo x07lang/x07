@@ -19,3 +19,7 @@ Runtime validation (runner):
 
 - Pre-run gate + runtime validation: `crates/x07-host-runner` (`run_artifact_file`, `parse_native_stdout`, `parse_metrics_fuel_used`).
 - Toolchain availability: `./scripts/ci/check_tools.sh`.
+- Review + trust artifact generation:
+  - `x07 review diff ...`
+  - `x07 trust report ...`
+  - These are intended to be uploaded as CI artifacts for human review.

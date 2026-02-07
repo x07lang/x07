@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.arch.budgets.index@0.1.0",
+  "profiles": [
+    {
+      "id": "default",
+      "profile_path": "arch/budgets/profiles/default.budget.json",
+      "enforce": "error",
+      "selectors": [],
+      "worlds_allowed": ["solve-pure", "run-os-sandboxed"]
+    }
+  ]
+}

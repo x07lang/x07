@@ -1,0 +1,26 @@
+{
+  "schema_version": "x07.arch.manifest@0.1.0",
+  "repo": { "id": "fixture", "root": "." },
+  "externals": { "allowed_import_prefixes": ["std.", "ext."], "allowed_exact": [] },
+  "nodes": [
+    {
+      "id": "app",
+      "match": { "module_prefixes": ["app."], "path_globs": [] },
+      "world": "run-os-sandboxed",
+      "visibility": { "mode": "public", "visible_to": [] },
+      "imports": { "deny_prefixes": [], "allow_prefixes": ["std.", "app."] }
+    }
+  ],
+  "rules": [],
+  "checks": {
+    "deny_cycles": false,
+    "deny_orphans": false,
+    "enforce_visibility": false,
+    "enforce_world_caps": false
+  },
+  "tool_budgets": {
+    "max_modules": 1000,
+    "max_edges": 1000,
+    "max_diags": 1000
+  }
+}

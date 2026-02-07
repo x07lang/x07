@@ -25,6 +25,10 @@ X07 builds and runs native solver artifacts from generated C, so the only extern
 - Stdlib lockfile checks: `./scripts/ci/check_stdlib_lock.sh`
 - External packages lockfile checks: `./scripts/ci/check_external_packages_lock.sh`
 - Architecture manifest checks (when `arch/manifest.x07arch.json` is present): `x07 arch check`
+- Review artifact generation:
+  - `x07 review diff --from <baseline> --to <candidate> --html-out target/review/diff.html --json-out target/review/diff.json`
+- Trust artifact generation:
+  - `x07 trust report --project x07.json --out target/trust/trust.json --html-out target/trust/trust.html`
 - Benchmark harness smoke:
   - `x07 bench validate --suite labs/x07bench/suites/core_v0/suite.json`
   - `x07 bench eval --suite labs/x07bench/suites/core_v0/suite.json --oracle`

@@ -1,0 +1,582 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-review.diff.schema.json",
+  "title": "x07.review.diff@0.1.0",
+  "description": "Machine-readable semantic diff model emitted by `x07 review diff` (JSON backing model for the HTML intent-level diff viewer).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "mode",
+    "from",
+    "to",
+    "summary",
+    "highlights",
+    "files",
+    "diags"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.review.diff@0.1.0" },
+
+    "mode": {
+      "type": "string",
+      "enum": ["project", "ast-only"]
+    },
+
+    "from": { "$ref": "#/$defs/snapshot" },
+    "to": { "$ref": "#/$defs/snapshot" },
+
+    "summary": { "$ref": "#/$defs/summary" },
+
+    "highlights": { "$ref": "#/$defs/highlights" },
+
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file_diff" },
+      "default": []
+    },
+
+    "diags": {
+      "type": "array",
+      "items": { "$ref": "x07diag.schema.json#/$defs/diagnostic" },
+      "default": []
+    },
+
+    "meta": { "type": "object", "additionalProperties": true, "default": {} }
+  },
+
+  "$defs": {
+    "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+
+    "json_value": {
+      "description": "Any JSON value.",
+      "type": ["null", "boolean", "number", "string", "array", "object"]
+    },
+
+    "review_severity": {
+      "type": "string",
+      "enum": ["info", "warn", "high"]
+    },
+
+    "world": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256_hex"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["file", "dir"] },
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256_hex": {
+          "anyOf": [{ "$ref": "#/$defs/sha256_hex" }, { "type": "null" }]
+        },
+        "note": { "type": "string", "maxLength": 1024, "default": "" }
+      }
+    },
+
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files_total",
+        "files_changed",
+        "modules_changed",
+        "decls_added",
+        "decls_removed",
+        "decls_changed",
+        "high_severity_changes",
+        "truncated"
+      ],
+      "properties": {
+        "files_total": { "type": "integer", "minimum": 0 },
+        "files_changed": { "type": "integer", "minimum": 0 },
+        "modules_changed": { "type": "integer", "minimum": 0 },
+        "decls_added": { "type": "integer", "minimum": 0 },
+        "decls_removed": { "type": "integer", "minimum": 0 },
+        "decls_changed": { "type": "integer", "minimum": 0 },
+        "high_severity_changes": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      }
+    },
+
+    "highlights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_changes",
+        "budget_changes",
+        "policy_changes",
+        "capability_changes"
+      ],
+      "properties": {
+        "world_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/world_change" },
+          "default": []
+        },
+        "budget_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/budget_change" },
+          "default": []
+        },
+        "policy_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/policy_change" },
+          "default": []
+        },
+        "capability_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capability_change" },
+          "default": []
+        }
+      }
+    },
+
+    "world_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "subject", "path", "before", "after"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "project_profile_world",
+            "arch_node_world",
+            "module_world"
+          ]
+        },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "before": { "anyOf": [{ "$ref": "#/$defs/world" }, { "type": "null" }] },
+        "after": { "anyOf": [{ "$ref": "#/$defs/world" }, { "type": "null" }] },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        }
+      }
+    },
+
+    "budget_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "subject", "path", "before", "after"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["run_cap", "policy_limit", "scope", "arch_profile"]
+        },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "ptr_before": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+        "ptr_after": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+        "before": { "$ref": "#/$defs/json_value" },
+        "after": { "$ref": "#/$defs/json_value" },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        }
+      }
+    },
+
+    "policy_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "subject", "path", "before", "after"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "policy_field",
+            "policy_allowlist",
+            "policy_limit",
+            "policy_language_toggle"
+          ]
+        },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "ptr_before": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+        "ptr_after": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+        "before": { "$ref": "#/$defs/json_value" },
+        "after": { "$ref": "#/$defs/json_value" },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        }
+      }
+    },
+
+    "capability_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "severity",
+        "subject",
+        "path",
+        "added",
+        "removed"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["declared_policy", "used_namespace"]
+        },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "added": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 256 },
+          "default": []
+        },
+        "removed": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 256 },
+          "default": []
+        },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        }
+      }
+    },
+
+    "file_kind": {
+      "type": "string",
+      "enum": ["x07ast", "project", "arch", "policy", "json", "text"]
+    },
+
+    "file_status": {
+      "type": "string",
+      "enum": ["added", "removed", "changed", "unchanged"]
+    },
+
+    "file_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "status", "changes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "kind": { "$ref": "#/$defs/file_kind" },
+        "status": { "$ref": "#/$defs/file_status" },
+
+        "before_sha256_hex": {
+          "anyOf": [{ "$ref": "#/$defs/sha256_hex" }, { "type": "null" }]
+        },
+        "after_sha256_hex": {
+          "anyOf": [{ "$ref": "#/$defs/sha256_hex" }, { "type": "null" }]
+        },
+
+        "changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/change" },
+          "default": []
+        },
+
+        "module": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/module_diff" }]
+        },
+
+        "truncated": { "type": "boolean", "default": false }
+      }
+    },
+
+    "change_kind": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_.-]*$"
+    },
+
+    "entity_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "module_id": { "type": "string", "maxLength": 256 },
+        "decl_kind": { "type": "string", "maxLength": 64 },
+        "decl_name": { "type": "string", "maxLength": 256 },
+        "symbol": { "type": "string", "maxLength": 256 },
+        "profile": { "type": "string", "maxLength": 128 },
+        "arch_node_id": { "type": "string", "maxLength": 128 }
+      },
+      "default": {}
+    },
+
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "title"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/change_kind" },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+
+        "entity": { "$ref": "#/$defs/entity_ref" },
+
+        "ptr_before": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+        "ptr_after": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+
+        "before": { "$ref": "#/$defs/json_value" },
+        "after": { "$ref": "#/$defs/json_value" },
+
+        "ops": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ast_edit" },
+          "default": []
+        },
+
+        "notes": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        },
+
+        "meta": { "type": "object", "additionalProperties": true, "default": {} }
+      }
+    },
+
+    "ast_edit_op": {
+      "type": "string",
+      "enum": ["insert", "delete", "move", "update"]
+    },
+
+    "ast_edit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "summary", "before_ptr", "after_ptr"],
+      "properties": {
+        "op": { "$ref": "#/$defs/ast_edit_op" },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "before_ptr": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+        "after_ptr": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+        "meta": { "type": "object", "additionalProperties": true, "default": {} }
+      }
+    },
+
+    "module_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)*$"
+    },
+
+    "param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ty"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "ty": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      }
+    },
+
+    "sig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["params", "result"],
+      "properties": {
+        "params": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/param" },
+          "default": []
+        },
+        "result": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      }
+    },
+
+    "sig_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["before", "after"],
+      "properties": {
+        "before": { "anyOf": [{ "$ref": "#/$defs/sig" }, { "type": "null" }] },
+        "after": { "anyOf": [{ "$ref": "#/$defs/sig" }, { "type": "null" }] }
+      }
+    },
+
+    "lenses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signature", "effects", "budgets", "capabilities"],
+      "properties": {
+        "signature": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        },
+        "effects": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        },
+        "budgets": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2048 },
+          "default": []
+        }
+      }
+    },
+
+    "decl_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+
+    "decl_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "sig", "body", "lenses"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+
+        "ptr_before": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+        "ptr_after": {
+          "anyOf": [
+            { "$ref": "x07diag.schema.json#/$defs/json_pointer" },
+            { "type": "null" }
+          ]
+        },
+
+        "sig": { "$ref": "#/$defs/sig_diff" },
+        "body": { "$ref": "#/$defs/body_diff" },
+        "lenses": { "$ref": "#/$defs/lenses" }
+      }
+    },
+
+    "body_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changed", "ops", "truncated"],
+      "properties": {
+        "changed": { "type": "boolean" },
+        "ops": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ast_edit" },
+          "default": []
+        },
+        "truncated": { "type": "boolean" }
+      }
+    },
+
+    "module_diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_id",
+        "status",
+        "decls_added",
+        "decls_removed",
+        "decls_changed"
+      ],
+      "properties": {
+        "module_id": { "$ref": "#/$defs/module_id" },
+        "status": { "$ref": "#/$defs/file_status" },
+
+        "decls_added": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/decl_ref" },
+          "default": []
+        },
+        "decls_removed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/decl_ref" },
+          "default": []
+        },
+        "decls_changed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/decl_diff" },
+          "default": []
+        }
+      }
+    }
+  }
+}

@@ -638,6 +638,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-review.diff.schema.json",
+      "schema_id": "https://x07.io/spec/x07-review.diff.schema.json",
+      "schema_version": "x07.review.diff@0.1.0",
+      "title": "x07.review.diff@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-run.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-run.report.schema.json",
       "schema_version": "x07.run.report@0.1.0",
@@ -656,6 +663,13 @@
       "schema_id": "https://x07.io/spec/x07-spec.index.schema.json",
       "schema_version": "x07.spec.index@0.1.0",
       "title": "x07.spec.index@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-trust.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-trust.report.schema.json",
+      "schema_version": "x07.trust.report@0.1.0",
+      "title": "X07 x07 trust report v0.1.0"
     },
     {
       "kind": "schema",

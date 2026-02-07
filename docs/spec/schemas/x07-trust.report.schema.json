@@ -1,0 +1,490 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-trust.report.schema.json",
+  "title": "X07 x07 trust report v0.1.0",
+  "description": "CI-friendly trust artifact summarizing budgets/caps, world capabilities, nondeterminism signals, and SBOM placeholder fields for an X07 project/build.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "invocation",
+    "project",
+    "budgets",
+    "capabilities",
+    "nondeterminism",
+    "sbom"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.trust.report@0.1.0" },
+
+    "tool": { "$ref": "#/$defs/tool_info" },
+    "invocation": { "$ref": "#/$defs/invocation" },
+
+    "project": { "$ref": "#/$defs/project" },
+
+    "budgets": { "$ref": "#/$defs/budgets" },
+    "capabilities": { "$ref": "#/$defs/capabilities" },
+    "nondeterminism": { "$ref": "#/$defs/nondeterminism" },
+
+    "sbom": { "$ref": "#/$defs/sbom" }
+  },
+
+  "$defs": {
+    "tool_info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "const": "x07" },
+        "version": { "type": "string" },
+        "build": { "type": "string" }
+      }
+    },
+
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "cwd", "started_at_unix_ms"],
+      "properties": {
+        "argv": { "type": "array", "items": { "type": "string" } },
+        "cwd": { "type": "string" },
+        "started_at_unix_ms": { "type": "integer", "minimum": 0 },
+
+        "project_path": { "type": ["string", "null"] },
+        "profile": { "type": ["string", "null"] }
+      }
+    },
+
+    "world": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "world", "runner", "module_roots"],
+      "properties": {
+        "root": { "type": "string" },
+
+        "world": { "$ref": "#/$defs/world" },
+        "runner": { "type": "string", "enum": ["host", "os"] },
+
+        "profile": { "type": ["string", "null"] },
+
+        "manifest_path": { "type": ["string", "null"] },
+        "lockfile_path": { "type": ["string", "null"] },
+        "stdlib_lock_path": { "type": ["string", "null"] },
+
+        "module_roots": { "type": "array", "items": { "type": "string" } },
+
+        "arch_root": { "type": ["string", "null"] },
+        "arch_manifest_path": { "type": ["string", "null"] },
+
+        "policy_base_path": { "type": ["string", "null"] },
+        "policy_effective_path": { "type": ["string", "null"] }
+      }
+    },
+
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caps", "scopes"],
+      "properties": {
+        "caps": { "$ref": "#/$defs/budget_caps" },
+        "scopes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/budget_scope" },
+          "default": []
+        },
+        "arch_profiles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/arch_budget_profile_ref" },
+          "default": []
+        },
+        "observed": {
+          "type": ["object", "null"],
+          "description": "Optional observed usage merged from x07 run/x07test reports.",
+          "additionalProperties": false,
+          "required": ["fuel_used", "heap_used", "mem_stats"],
+          "properties": {
+            "fuel_used": { "type": "integer", "minimum": 0 },
+            "heap_used": { "type": "integer", "minimum": 0 },
+            "mem_stats": { "$ref": "#/$defs/mem_stats" }
+          }
+        }
+      }
+    },
+
+    "budget_caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_profile"],
+      "properties": {
+        "run_profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["solve_fuel", "max_memory_bytes"],
+          "properties": {
+            "solve_fuel": { "type": "integer", "minimum": 0 },
+            "max_memory_bytes": { "type": "integer", "minimum": 0 },
+            "max_output_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "cpu_time_limit_seconds": { "type": ["integer", "null"], "minimum": 0 }
+          }
+        },
+        "policy_limits": {
+          "type": ["object", "null"],
+          "description": "Present when world is run-os-sandboxed and a policy is resolved.",
+          "additionalProperties": false,
+          "required": ["cpu_ms", "wall_ms", "mem_bytes", "fds", "procs"],
+          "properties": {
+            "cpu_ms": { "type": "integer", "minimum": 0 },
+            "wall_ms": { "type": "integer", "minimum": 0 },
+            "mem_bytes": { "type": "integer", "minimum": 0 },
+            "fds": { "type": "integer", "minimum": 0 },
+            "procs": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+
+    "budget_scope_kind": { "type": "string", "enum": ["inline_v1", "from_arch_v1"] },
+
+    "budget_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "module_id", "fn", "ptr"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/budget_scope_kind" },
+
+        "module_id": { "type": "string" },
+        "fn": { "type": "string" },
+
+        "ptr": {
+          "type": "string",
+          "description": "JSON Pointer to the scope form within the function body."
+        },
+
+        "label": { "type": ["string", "null"] },
+
+        "mode": { "type": ["string", "null"] },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fuel": { "type": ["integer", "null"], "minimum": 0 },
+            "alloc_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "alloc_calls": { "type": ["integer", "null"], "minimum": 0 },
+            "realloc_calls": { "type": ["integer", "null"], "minimum": 0 },
+            "free_calls": { "type": ["integer", "null"], "minimum": 0 },
+            "memcpy_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "sched_ticks": { "type": ["integer", "null"], "minimum": 0 }
+          },
+          "default": {}
+        },
+
+        "arch_profile_id": {
+          "type": ["string", "null"],
+          "description": "If kind=from_arch_v1, the referenced arch budget profile id."
+        }
+      }
+    },
+
+    "arch_budget_profile_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "enforce", "worlds_allowed"],
+      "properties": {
+        "id": { "type": "string" },
+        "enforce": { "type": "string", "enum": ["error", "warn", "off"] },
+        "worlds_allowed": { "type": "array", "items": { "$ref": "#/$defs/world" } }
+      }
+    },
+
+    "mem_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alloc_calls",
+        "realloc_calls",
+        "free_calls",
+        "bytes_alloc_total",
+        "bytes_freed_total",
+        "live_bytes",
+        "peak_live_bytes",
+        "live_allocs",
+        "peak_live_allocs",
+        "memcpy_bytes"
+      ],
+      "properties": {
+        "alloc_calls": { "type": "integer", "minimum": 0 },
+        "realloc_calls": { "type": "integer", "minimum": 0 },
+        "free_calls": { "type": "integer", "minimum": 0 },
+        "bytes_alloc_total": { "type": "integer", "minimum": 0 },
+        "bytes_freed_total": { "type": "integer", "minimum": 0 },
+        "live_bytes": { "type": "integer", "minimum": 0 },
+        "peak_live_bytes": { "type": "integer", "minimum": 0 },
+        "live_allocs": { "type": "integer", "minimum": 0 },
+        "peak_live_allocs": { "type": "integer", "minimum": 0 },
+        "memcpy_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world", "declared", "used"],
+      "properties": {
+        "world": { "$ref": "#/$defs/world" },
+
+        "declared": { "$ref": "#/$defs/declared_caps" },
+        "used": { "$ref": "#/$defs/used_caps" },
+
+        "observed": {
+          "type": ["object", "null"],
+          "description": "Optional observed capability usage merged from runner reports.",
+          "additionalProperties": true
+        }
+      }
+    },
+
+    "declared_caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policy": {
+          "type": ["object", "null"],
+          "description": "Subset of run-os policy fields relevant to review.",
+          "additionalProperties": false,
+          "properties": {
+            "fs": { "$ref": "#/$defs/policy_fs" },
+            "net": { "$ref": "#/$defs/policy_net" },
+            "env": { "$ref": "#/$defs/policy_env" },
+            "time": { "$ref": "#/$defs/policy_time" },
+            "process": { "$ref": "#/$defs/policy_process" },
+            "language": { "$ref": "#/$defs/policy_language" }
+          }
+        },
+        "arch_world_assignments": {
+          "type": "array",
+          "description": "Optional list of arch manifest node world assignments.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["node_id", "world"],
+            "properties": {
+              "node_id": { "type": "string" },
+              "world": { "$ref": "#/$defs/world" }
+            }
+          },
+          "default": []
+        }
+      },
+      "default": {}
+    },
+
+    "policy_fs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "read_roots": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "write_roots": { "type": "array", "items": { "type": "string" }, "default": [] }
+      }
+    },
+
+    "policy_net": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "allow_dns": { "type": ["boolean", "null"] },
+        "allow_tcp": { "type": ["boolean", "null"] },
+        "allow_udp": { "type": ["boolean", "null"] },
+        "allow_hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["host", "ports"],
+            "properties": {
+              "host": { "type": "string" },
+              "ports": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 65535 } }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+
+    "policy_env": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "allow_keys": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "deny_keys": { "type": "array", "items": { "type": "string" }, "default": [] }
+      }
+    },
+
+    "policy_time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "allow_monotonic": { "type": ["boolean", "null"] },
+        "allow_wall_clock": { "type": ["boolean", "null"] },
+        "allow_sleep": { "type": ["boolean", "null"] },
+        "max_sleep_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "allow_local_tzid": { "type": ["boolean", "null"] }
+      }
+    },
+
+    "policy_process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "allow_spawn": { "type": ["boolean", "null"] },
+        "allow_exec": { "type": ["boolean", "null"] },
+        "allow_exit": { "type": ["boolean", "null"] },
+        "allow_execs": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "allow_exec_prefixes": { "type": "array", "items": { "type": "string" }, "default": [] }
+      }
+    },
+
+    "policy_language": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow_unsafe": { "type": ["boolean", "null"] },
+        "allow_ffi": { "type": ["boolean", "null"] }
+      },
+      "default": {}
+    },
+
+    "used_caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespaces"],
+      "properties": {
+        "namespaces": {
+          "type": "array",
+          "description": "Capability-sensitive namespaces detected in code (static scan).",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "details": {
+          "type": "object",
+          "description": "Optional structured scan results (counts per op).",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    },
+
+    "nondeterminism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flags"],
+      "properties": {
+        "flags": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nondet_flag" },
+          "default": []
+        }
+      }
+    },
+
+    "nondet_severity": { "type": "string", "enum": ["info", "warn", "high"] },
+
+    "nondet_flag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "summary"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "world_non_deterministic",
+            "rr_recording",
+            "os_time",
+            "os_env",
+            "net_enabled",
+            "process_enabled",
+            "allow_unsafe",
+            "allow_ffi"
+          ]
+        },
+        "severity": { "$ref": "#/$defs/nondet_severity" },
+        "summary": { "type": "string" },
+        "details": { "type": "object", "additionalProperties": true, "default": {} }
+      }
+    },
+
+    "sbom_format": { "type": "string", "enum": ["none", "cyclonedx", "spdx"] },
+
+    "sbom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "generated", "path", "components"],
+      "properties": {
+        "format": { "$ref": "#/$defs/sbom_format" },
+        "generated": { "type": "boolean" },
+        "path": { "type": ["string", "null"] },
+
+        "cyclonedx": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "spec_version": { "type": "string" }
+          }
+        },
+
+        "spdx": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "spec_version": { "type": "string" }
+          }
+        },
+
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sbom_component" },
+          "default": []
+        }
+      }
+    },
+
+    "component_kind": { "type": "string", "enum": ["stdlib", "package", "native", "toolchain"] },
+
+    "sbom_component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/component_kind" },
+        "name": { "type": "string" },
+        "version": { "type": ["string", "null"] },
+        "source": { "type": ["string", "null"] },
+        "purl": { "type": ["string", "null"] },
+        "license": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

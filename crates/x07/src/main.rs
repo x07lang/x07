@@ -31,11 +31,14 @@ mod pkg;
 mod policy;
 mod policy_overrides;
 mod repair;
+mod report_common;
+mod review;
 mod rr;
 mod run;
 mod schema;
 mod sm;
 mod toolchain;
+mod trust;
 mod util;
 
 #[derive(Parser, Debug)]
@@ -87,6 +90,10 @@ enum Command {
     Cli(cli::CliArgs),
     /// Manage packages and lockfiles.
     Pkg(pkg::PkgArgs),
+    /// Produce human review artifacts (semantic diffs).
+    Review(review::ReviewArgs),
+    /// Emit CI trust artifacts (budgets/caps, capabilities, nondeterminism, SBOM placeholders).
+    Trust(trust::TrustArgs),
     /// Inspect module exports and signatures.
     Doc(doc::DocArgs),
     /// Derive schema modules from x07schema JSON.
@@ -276,6 +283,14 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
                 Some(pkg::PkgCommand::Publish(_)) => vec!["pkg", "publish"],
             },
+            Some(Command::Review(args)) => match &args.cmd {
+                None => vec!["review"],
+                Some(review::ReviewCommand::Diff(_)) => vec!["review", "diff"],
+            },
+            Some(Command::Trust(args)) => match &args.cmd {
+                None => vec!["trust"],
+                Some(trust::TrustCommand::Report(_)) => vec!["trust", "report"],
+            },
             Some(Command::Doc(_)) => vec!["doc"],
             Some(Command::Schema(args)) => match &args.cmd {
                 None => vec!["schema"],
@@ -320,6 +335,8 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Build(args) => toolchain::cmd_build(args),
         Command::Cli(args) => cli::cmd_cli(args),
         Command::Pkg(args) => pkg::cmd_pkg(args),
+        Command::Review(args) => review::cmd_review(args),
+        Command::Trust(args) => trust::cmd_trust(args),
         Command::Doc(args) => doc::cmd_doc(args),
         Command::Schema(args) => schema::cmd_schema(args),
         Command::Sm(args) => sm::cmd_sm(args),
