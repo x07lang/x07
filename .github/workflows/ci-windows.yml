@@ -39,6 +39,7 @@ jobs:
             liblzma-dev
             pkg-config
             python3
+            python3-pip
             python3-venv
             xz-utils
             zlib1g-dev
@@ -68,4 +69,5 @@ jobs:
           cd /root/evolang-wsl
           git checkout "$sha"
 
+          bash ./scripts/ci/install_python_deps.sh
           bash ./scripts/ci/check_all.sh
