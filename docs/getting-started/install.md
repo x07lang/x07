@@ -90,7 +90,7 @@ Verify:
 Write `x07-toolchain.toml` in your repo root:
 
 ```bash
-x07up override set v0.1.0
+x07up override set v0.1.1
 ```
 
 This makes toolchain selection deterministic for agents and CI.

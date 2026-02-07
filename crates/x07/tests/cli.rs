@@ -3,6 +3,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use x07_contracts::{
     X07TEST_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
     X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_REVIEW_DIFF_SCHEMA_VERSION,
@@ -73,6 +74,12 @@ fn fresh_os_tmp_dir(name: &str) -> PathBuf {
     let pid = std::process::id();
     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     std::env::temp_dir().join(format!("{name}_{pid}_{n}"))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut h = Sha256::new();
+    h.update(bytes);
+    format!("{:x}", h.finalize())
 }
 
 fn fixtures_root() -> PathBuf {
@@ -358,6 +365,28 @@ fn x07_cli_specrows_includes_nested_subcommands() {
     assert!(
         has_trust_report,
         "missing trust.report in --cli-specrows output"
+    );
+
+    let has_ast_schema = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("ast.schema")
+    });
+    assert!(
+        has_ast_schema,
+        "missing ast.schema in --cli-specrows output"
+    );
+
+    let has_ast_grammar = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("ast.grammar")
+    });
+    assert!(
+        has_ast_grammar,
+        "missing ast.grammar in --cli-specrows output"
     );
 }
 
@@ -2738,6 +2767,215 @@ fn x07_ast_get_extracts_json_pointer() {
     assert_eq!(v["ok"], true);
     assert_eq!(v["ptr"], "/a/2/b");
     assert_eq!(v["value"], "c");
+}
+
+#[test]
+fn x07_ast_schema_json_schema_matches_embedded_bytes() {
+    let root = repo_root();
+    let out = run_x07(&["ast", "schema", "--json-schema"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let mut expected = std::fs::read(root.join("spec/x07ast.schema.json")).expect("read schema");
+    if expected.last() != Some(&b'\n') {
+        expected.push(b'\n');
+    }
+    assert_eq!(
+        out.stdout, expected,
+        "schema output must be byte-for-byte stable"
+    );
+}
+
+#[test]
+fn x07_ast_schema_pretty_writes_json_document() {
+    let root = repo_root();
+    let out_path = root.join("target/tmp_x07_ast_schema_pretty.json");
+    if out_path.exists() {
+        std::fs::remove_file(&out_path).expect("remove old out");
+    }
+
+    let out = run_x07(&[
+        "ast",
+        "schema",
+        "--json-schema",
+        "--pretty",
+        "--out",
+        out_path.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stdout.is_empty(),
+        "stdout should stay empty when --out is used"
+    );
+
+    let written = std::fs::read(&out_path).expect("read pretty schema");
+    let pretty_doc: Value = serde_json::from_slice(&written).expect("parse pretty schema");
+    let canonical_doc: Value = serde_json::from_slice(
+        &std::fs::read(root.join("spec/x07ast.schema.json")).expect("read embedded schema"),
+    )
+    .expect("parse embedded schema");
+    assert_eq!(
+        pretty_doc, canonical_doc,
+        "pretty output must preserve schema content"
+    );
+    assert!(
+        String::from_utf8_lossy(&written).contains('\n'),
+        "expected multiline pretty JSON"
+    );
+}
+
+#[test]
+fn x07_ast_grammar_cfg_emits_bundle_and_materializes_out_dir() {
+    let root = repo_root();
+    let out_dir = fresh_tmp_dir(&root, "tmp_x07_ast_grammar_bundle");
+    if out_dir.exists() {
+        std::fs::remove_dir_all(&out_dir).expect("remove old out dir");
+    }
+
+    let out = run_x07(&[
+        "ast",
+        "grammar",
+        "--cfg",
+        "--out-dir",
+        out_dir.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let bundle = parse_json_stdout(&out);
+    assert_eq!(bundle["schema_version"], "x07.ast.grammar_bundle@0.1.0");
+    assert_eq!(bundle["x07ast_schema_version"], "x07.x07ast@0.3.0");
+    assert_eq!(bundle["format"], "gbnf_v1");
+
+    let variants = bundle["variants"].as_array().expect("variants[]");
+    assert_eq!(variants.len(), 2, "expected min+pretty variants");
+    let min_cfg = variants
+        .iter()
+        .find(|v| v.get("name").and_then(Value::as_str) == Some("min"))
+        .and_then(|v| v.get("cfg"))
+        .and_then(Value::as_str)
+        .expect("min cfg");
+    let pretty_cfg = variants
+        .iter()
+        .find(|v| v.get("name").and_then(Value::as_str) == Some("pretty"))
+        .and_then(|v| v.get("cfg"))
+        .and_then(Value::as_str)
+        .expect("pretty cfg");
+    assert!(
+        min_cfg.contains("root ::="),
+        "min cfg must include root rule"
+    );
+    assert!(
+        pretty_cfg.contains("root ::="),
+        "pretty cfg must include root rule"
+    );
+
+    let schema_path = out_dir.join("x07ast.schema.json");
+    let min_path = out_dir.join("x07ast.min.gbnf");
+    let pretty_path = out_dir.join("x07ast.pretty.gbnf");
+    let semantic_path = out_dir.join("x07ast.semantic.json");
+    let manifest_path = out_dir.join("manifest.json");
+
+    for path in [
+        &schema_path,
+        &min_path,
+        &pretty_path,
+        &semantic_path,
+        &manifest_path,
+    ] {
+        assert!(path.is_file(), "missing {}", path.display());
+    }
+
+    let mut expected_schema = std::fs::read(root.join("spec/x07ast.schema.json")).expect("schema");
+    if expected_schema.last() != Some(&b'\n') {
+        expected_schema.push(b'\n');
+    }
+    let mut expected_min = std::fs::read(root.join("spec/x07ast.min.gbnf")).expect("min gbnf");
+    if expected_min.last() != Some(&b'\n') {
+        expected_min.push(b'\n');
+    }
+    let mut expected_pretty =
+        std::fs::read(root.join("spec/x07ast.pretty.gbnf")).expect("pretty gbnf");
+    if expected_pretty.last() != Some(&b'\n') {
+        expected_pretty.push(b'\n');
+    }
+    let mut expected_semantic =
+        std::fs::read(root.join("spec/x07ast.semantic.json")).expect("semantic supplement");
+    if expected_semantic.last() != Some(&b'\n') {
+        expected_semantic.push(b'\n');
+    }
+
+    let written_schema = std::fs::read(&schema_path).expect("read materialized schema");
+    let written_min = std::fs::read(&min_path).expect("read materialized min grammar");
+    let written_pretty = std::fs::read(&pretty_path).expect("read materialized pretty grammar");
+    let written_semantic = std::fs::read(&semantic_path).expect("read materialized semantic");
+    assert_eq!(written_schema, expected_schema);
+    assert_eq!(written_min, expected_min);
+    assert_eq!(written_pretty, expected_pretty);
+    assert_eq!(written_semantic, expected_semantic);
+
+    assert_eq!(
+        bundle["sha256"]["min_cfg"],
+        sha256_hex(min_cfg.as_bytes()),
+        "bundle min sha should match variant bytes"
+    );
+    assert_eq!(
+        bundle["sha256"]["pretty_cfg"],
+        sha256_hex(pretty_cfg.as_bytes()),
+        "bundle pretty sha should match variant bytes"
+    );
+    assert_eq!(
+        bundle["sha256"]["semantic_supplement"],
+        sha256_hex(&written_semantic),
+        "bundle semantic sha should match semantic bytes"
+    );
+
+    let semantic_from_bundle = bundle["semantic_supplement"].clone();
+    let semantic_from_file: Value =
+        serde_json::from_slice(&written_semantic).expect("parse semantic from file");
+    assert_eq!(
+        semantic_from_bundle, semantic_from_file,
+        "bundle semantic object should match materialized semantic file"
+    );
+
+    let manifest: Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).expect("read manifest"))
+            .expect("parse manifest");
+    assert_eq!(manifest["schema_version"], "x07.genpack.manifest@0.1.0");
+    assert_eq!(manifest["pack"], "x07-genpack-x07ast");
+    assert_eq!(manifest["pack_version"], "0.1.0");
+    assert_eq!(manifest["x07ast_schema_version"], "x07.x07ast@0.3.0");
+    let artifacts = manifest["artifacts"].as_array().expect("artifacts[]");
+    assert_eq!(artifacts.len(), 4);
+    let get_sha = |name: &str| {
+        artifacts
+            .iter()
+            .find(|a| a.get("name").and_then(Value::as_str) == Some(name))
+            .and_then(|a| a.get("sha256"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
+    assert_eq!(get_sha("x07ast.schema.json"), sha256_hex(&written_schema));
+    assert_eq!(get_sha("x07ast.min.gbnf"), sha256_hex(&written_min));
+    assert_eq!(get_sha("x07ast.pretty.gbnf"), sha256_hex(&written_pretty));
+    assert_eq!(
+        get_sha("x07ast.semantic.json"),
+        sha256_hex(&written_semantic)
+    );
 }
 
 #[test]

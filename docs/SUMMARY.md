@@ -50,6 +50,11 @@
 - [Testing by example](toolchain/testing-by-example.md)
 - [Performance comparisons](dev/perf-compare.md)
 
+## Genpack
+- [Overview](genpack/index.md)
+- [XGrammar cookbook](genpack/xgrammar.md)
+- [Outlines cookbook](genpack/outlines.md)
+
 ## Spec
 - [Spec index](spec/index.md)
 - [Spec changelog](spec/changelog.md)

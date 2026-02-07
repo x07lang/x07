@@ -1,0 +1,85 @@
+root ::= entry-doc | module-doc
+
+entry-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"entry\"" ws entry-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.3.0\"" ws "," ws "\"solve\"" ws ":" ws sexpr ws "}"
+module-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"module\"" ws module-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.3.0\"" ws "}"
+
+entry-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
+module-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
+
+imports-array ::= "[" ws module-id-list-opt ws "]"
+module-id-list-opt ::= "" | module-id module-id-list-tail
+module-id-list-tail ::= "" | ws "," ws module-id module-id-list-tail
+
+decl-array ::= "[" ws decl-list-opt ws "]"
+decl-list-opt ::= "" | decl decl-list-tail
+decl-list-tail ::= "" | ws "," ws decl decl-list-tail
+
+decl ::= decl-defn | decl-defasync | decl-export | decl-extern
+
+decl-defn ::= "{" ws "\"body\"" ws ":" ws sexpr ws "," ws "\"kind\"" ws ":" ws "\"defn\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-name decl-result-brand-opt ws "}"
+decl-defasync ::= "{" ws "\"body\"" ws ":" ws sexpr ws "," ws "\"kind\"" ws ":" ws "\"defasync\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-name decl-result-brand-opt ws "}"
+decl-result-brand-opt ::= "" | ws "," ws "\"result_brand\"" ws ":" ws symbol
+
+decl-export ::= "{" ws "\"kind\"" ws ":" ws "\"export\"" ws "," ws "\"names\"" ws ":" ws symbol-array-non-empty ws "}"
+
+decl-extern ::= "{" ws "\"abi\"" ws ":" ws "\"C\"" ws "," ws "\"kind\"" ws ":" ws "\"extern\"" decl-extern-link-name-opt ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-name ws "}"
+decl-extern-link-name-opt ::= "" | ws "," ws "\"link_name\"" ws ":" ws local-name
+
+param-array ::= "[" ws param-list-opt ws "]"
+param-list-opt ::= "" | param param-list-tail
+param-list-tail ::= "" | ws "," ws param param-list-tail
+
+param ::= param-with-brand | param-without-brand
+param-with-brand ::= "{" ws "\"brand\"" ws ":" ws symbol ws "," ws "\"name\"" ws ":" ws local-name ws "," ws "\"ty\"" ws ":" ws type-name ws "}"
+param-without-brand ::= "{" ws "\"name\"" ws ":" ws local-name ws "," ws "\"ty\"" ws ":" ws type-name ws "}"
+
+symbol-array-non-empty ::= "[" ws symbol symbol-array-tail ws "]"
+symbol-array-tail ::= "" | ws "," ws symbol symbol-array-tail
+
+sexpr ::= i32 | atom | sexpr-list
+sexpr-list ::= bytes-lit-list | general-sexp-list
+bytes-lit-list ::= "[" ws "\"bytes.lit\"" ws "," ws text ws "]"
+general-sexp-list ::= "[" ws atom sexpr-tail ws "]"
+sexpr-tail ::= "" | ws "," ws sexpr sexpr-tail
+
+atom ::= string
+text ::= string
+
+module-id ::= "\"" ident-segment module-id-rest* "\""
+module-id-rest ::= "." ident-segment
+symbol ::= module-id
+local-name ::= "\"" local-first local-rest* "\""
+type-name ::= "\"" type-first type-rest* "\""
+
+ident-segment ::= ident-first ident-rest*
+ident-first ::= [A-Za-z_]
+ident-rest ::= [A-Za-z0-9_-]
+
+local-first ::= [A-Za-z_]
+local-rest ::= [A-Za-z0-9_]
+
+type-first ::= [a-z]
+type-rest ::= [a-z0-9_]
+
+json-value ::= json-object | json-array | string | number | "true" | "false" | "null"
+json-object ::= "{" ws json-members-opt ws "}"
+json-members-opt ::= "" | json-member json-members-tail
+json-members-tail ::= "" | ws "," ws json-member json-members-tail
+json-member ::= string ws ":" ws json-value
+json-array ::= "[" ws json-elements-opt ws "]"
+json-elements-opt ::= "" | json-value json-elements-tail
+json-elements-tail ::= "" | ws "," ws json-value json-elements-tail
+
+i32 ::= "-"? int
+number ::= "-"? int frac? exp?
+int ::= "0" | [1-9] digit*
+frac ::= "." digit+
+exp ::= [eE] [+-]? digit+
+digit ::= [0-9]
+
+string ::= "\"" char* "\""
+char ::= [^"\\\x00-\x1F] | "\\" escape
+escape ::= ["\\/bfnrt] | "u" hex hex hex hex
+hex ::= [0-9A-Fa-f]
+
+ws ::= [ \t\n\r]*

@@ -1,0 +1,55 @@
+{
+  "constraints": [
+    {
+      "details": "Applies to decl kinds: defn, defasync, extern.",
+      "fix_hint": "Rename duplicates or merge declarations.",
+      "id": "decl.name_unique",
+      "level": "error",
+      "summary": "Declaration names must be unique within a file."
+    },
+    {
+      "fix_hint": "Export only names declared in the same file.",
+      "id": "export.names_resolve",
+      "level": "error",
+      "summary": "Every exported name must match a declaration in the same file."
+    },
+    {
+      "fix_hint": "Deduplicate imports before running x07 lint/fix.",
+      "id": "imports.unique",
+      "level": "error",
+      "summary": "Imports list must not contain duplicates."
+    },
+    {
+      "fix_hint": "Set kind=entry or add a solve expression for entry modules.",
+      "id": "entry.solve_required",
+      "level": "error",
+      "summary": "kind=entry documents must include solve."
+    },
+    {
+      "fix_hint": "Use kind=entry if solve is needed.",
+      "id": "module.solve_forbidden",
+      "level": "error",
+      "summary": "kind=module documents must not include solve."
+    },
+    {
+      "details": "\"i32\" range bounds are checked by compiler validation, not by the grammar.",
+      "fix_hint": "Keep integer literals in [-2147483648, 2147483647].",
+      "id": "sexpr.i32_range",
+      "level": "warn",
+      "summary": "Integer sexpr literals should stay within i32 bounds."
+    },
+    {
+      "details": "The grammar accepts general JSON strings for atoms; whitespace-free atoms are enforced semantically.",
+      "fix_hint": "Avoid whitespace in atom heads and atom values.",
+      "id": "sexpr.atom_no_whitespace",
+      "level": "warn",
+      "summary": "Atom strings should not contain whitespace."
+    }
+  ],
+  "generation_hints": {
+    "preferred_key_order": "jcs",
+    "preferred_whitespace": "min"
+  },
+  "schema_version": "x07.x07ast.semantic@0.1.0",
+  "x07ast_schema_version": "x07.x07ast@0.3.0"
+}

@@ -84,6 +84,31 @@ See: [Review & trust artifacts](review-trust.md).
 
 - `x07 ast apply-patch --in <path> --patch <patch.json> --out <path> --validate`
 
+### x07AST schema + grammar generation pack
+
+- `x07 ast schema --json-schema`
+  - Emits the canonical `x07ast.schema.json` document on stdout (raw JSON bytes + trailing newline).
+- `x07 ast schema --json-schema --out <path> --pretty`
+  - Writes a pretty-printed schema document to file.
+- `x07 ast grammar --cfg`
+  - Emits a machine-readable grammar bundle JSON:
+    - `schema_version: "x07.ast.grammar_bundle@0.1.0"`
+    - `variants[]` (`min`, `pretty`) with GBNF content
+    - `semantic_supplement`
+    - per-artifact sha256 hashes
+- `x07 ast grammar --cfg --out-dir <dir>`
+  - Materializes:
+    - `x07ast.schema.json`
+    - `x07ast.min.gbnf`
+    - `x07ast.pretty.gbnf`
+    - `x07ast.semantic.json`
+    - `manifest.json`
+
+Cookbook integrations:
+
+- [XGrammar recipe](../genpack/xgrammar.md)
+- [Outlines recipe](../genpack/outlines.md)
+
 ### Testing (`x07test` JSON)
 
 - `x07 test --manifest tests/tests.json`

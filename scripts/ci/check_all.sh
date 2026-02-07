@@ -48,6 +48,17 @@ step "release manifest (check)"
 step "published spec sync"
 "$python_bin" scripts/sync_published_spec.py --check
 
+step "genpack error-codes completeness"
+"$python_bin" scripts/check_genpack_error_codes.py --check
+
+if [[ "${X07_ENABLE_GENPACK_SDK_CHECKS:-0}" == "1" ]]; then
+  step "genpack sdk integration"
+  ./scripts/ci/check_genpack_sdk.sh
+else
+  echo
+  echo "==> genpack sdk integration (skipped; set X07_ENABLE_GENPACK_SDK_CHECKS=1 to enable)"
+fi
+
 step "cargo fmt --check"
 cargo fmt --check
 

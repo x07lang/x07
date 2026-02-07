@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07ast.semantic.schema.json",
+  "title": "X07 x07AST semantic supplement v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "constraints",
+    "generation_hints",
+    "schema_version",
+    "x07ast_schema_version"
+  ],
+  "properties": {
+    "constraints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/constraint"
+      },
+      "minItems": 1
+    },
+    "generation_hints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preferred_key_order", "preferred_whitespace"],
+      "properties": {
+        "preferred_key_order": {
+          "type": "string",
+          "enum": ["jcs"]
+        },
+        "preferred_whitespace": {
+          "type": "string",
+          "enum": ["min", "pretty"]
+        }
+      }
+    },
+    "schema_version": {
+      "const": "x07.x07ast.semantic@0.1.0"
+    },
+    "x07ast_schema_version": {
+      "const": "x07.x07ast@0.3.0"
+    }
+  },
+  "$defs": {
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "level", "summary"],
+      "properties": {
+        "details": {
+          "type": "string"
+        },
+        "fix_hint": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_.-]{3,128}$"
+        },
+        "level": {
+          "type": "string",
+          "enum": ["error", "warn"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    }
+  }
+}

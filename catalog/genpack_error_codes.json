@@ -1,0 +1,177 @@
+{
+  "schema_version": "x07.genpack.error_codes@0.1.0",
+  "package": "x07-genpack",
+  "version": "0.1.0",
+  "codes": [
+    {
+      "code": "X07_GENPACK_E_BUNDLE_SHAPE_INVALID",
+      "severity": "error",
+      "summary": "Grammar bundle JSON did not have the required fields or had invalid types.",
+      "retryable": false,
+      "data_fields": ["missing_fields"],
+      "hints": [
+        "Treat this as an x07 tooling regression if the bundle schema_version appears correct.",
+        "Capture the full bundle JSON and file an issue."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_CACHE_IO",
+      "severity": "error",
+      "summary": "Failed to read/write the SDK cache directory.",
+      "retryable": true,
+      "data_fields": ["cache_dir", "io_error"],
+      "hints": [
+        "Disable caching or choose a writable cache directory."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_DIR_MISSING_ARTIFACT",
+      "severity": "error",
+      "summary": "Directory source is missing one or more required artifacts.",
+      "retryable": false,
+      "data_fields": ["dir", "missing_paths"],
+      "hints": [
+        "Recreate the directory using: x07 ast grammar --cfg --out-dir <DIR>."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_DIR_READ_FAILED",
+      "severity": "error",
+      "summary": "Failed to read an artifact from the directory source.",
+      "retryable": true,
+      "data_fields": ["path", "io_error"],
+      "hints": [
+        "Verify file permissions and that the artifact files are not being concurrently modified."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_GRAMMAR_BUNDLE_JSON_PARSE",
+      "severity": "error",
+      "summary": "Failed to parse grammar bundle output as JSON.",
+      "retryable": false,
+      "data_fields": ["argv", "stdout_prefix"],
+      "hints": [
+        "Ensure x07 ast grammar --cfg prints raw JSON only (no logs).",
+        "If you see mixed output, ensure stderr/stdout are not being merged."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_GRAMMAR_BUNDLE_VERSION_MISMATCH",
+      "severity": "error",
+      "summary": "Grammar bundle output did not match the expected bundle schema_version.",
+      "retryable": false,
+      "data_fields": ["expected", "actual"],
+      "hints": [
+        "Pin x07 toolchain version or upgrade the SDK to match the new bundle contract."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_HASH_MISMATCH",
+      "severity": "error",
+      "summary": "Artifact content hash did not match the declared sha256 in the bundle/manifest.",
+      "retryable": false,
+      "data_fields": ["path", "expected_sha256", "actual_sha256"],
+      "hints": [
+        "Assume artifact corruption; regenerate artifacts with x07 and avoid editing outputs."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_MATERIALIZE_IO",
+      "severity": "error",
+      "summary": "Failed to materialize generation-pack artifacts to an output directory.",
+      "retryable": true,
+      "data_fields": ["out_dir", "io_error"],
+      "hints": [
+        "Verify the output directory is writable.",
+        "If running concurrently, use distinct output directories."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_SCHEMA_JSON_PARSE",
+      "severity": "error",
+      "summary": "Failed to parse JSON Schema output as JSON.",
+      "retryable": false,
+      "data_fields": ["argv", "stdout_prefix"],
+      "hints": [
+        "Ensure x07 ast schema --json-schema prints raw JSON schema only (no logs).",
+        "If you see mixed output, ensure stderr/stdout are not being merged."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_SCHEMA_VERSION_MISMATCH",
+      "severity": "error",
+      "summary": "Schema output did not match the expected schema contract.",
+      "retryable": false,
+      "data_fields": ["expected", "actual"],
+      "hints": [
+        "Pin x07 toolchain version or disable strict checks only if you control both sides.",
+        "Regenerate or upgrade the SDK if x07 changed the schema contract."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_SEMANTIC_SUPPLEMENT_VERSION_MISMATCH",
+      "severity": "error",
+      "summary": "Semantic supplement schema_version did not match the expected contract.",
+      "retryable": false,
+      "data_fields": ["expected", "actual"],
+      "hints": [
+        "Upgrade the SDK if x07 bumped the semantic supplement contract."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_STDOUT_NOT_UTF8",
+      "severity": "error",
+      "summary": "The x07 subprocess stdout was not valid UTF-8.",
+      "retryable": false,
+      "data_fields": ["argv"],
+      "hints": [
+        "This indicates toolchain corruption or a bug in x07 output emission.",
+        "Run the command manually and file an issue with the raw bytes if possible."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_SUBPROCESS_FAILED",
+      "severity": "error",
+      "summary": "The x07 subprocess returned a non-zero exit code.",
+      "retryable": true,
+      "data_fields": ["argv", "exit_code", "stderr"],
+      "hints": [
+        "Inspect stderr for the underlying x07 error.",
+        "If this happens only on one machine, verify the x07 toolchain install and permissions."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_SUBPROCESS_TIMEOUT",
+      "severity": "error",
+      "summary": "The x07 subprocess did not complete before the timeout.",
+      "retryable": true,
+      "data_fields": ["argv", "timeout_s"],
+      "hints": [
+        "Increase the timeout in GenpackClient options.",
+        "If x07 is hanging, run the command manually to reproduce and capture logs."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_VARIANT_MISSING",
+      "severity": "error",
+      "summary": "Requested grammar variant was not present in the grammar bundle.",
+      "retryable": false,
+      "data_fields": ["variant", "available_variants"],
+      "hints": [
+        "Use an available variant from the bundle.",
+        "If you expected it to exist, verify x07 tooling version."
+      ]
+    },
+    {
+      "code": "X07_GENPACK_E_X07_NOT_FOUND",
+      "severity": "error",
+      "summary": "Could not locate the x07 executable.",
+      "retryable": false,
+      "data_fields": ["x07_path", "path_env"],
+      "hints": [
+        "Install x07 and ensure it is available on PATH.",
+        "Or pass an explicit x07Path (SDK option) pointing to the x07 binary."
+      ]
+    }
+  ]
+}

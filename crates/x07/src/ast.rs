@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::io::Write as _;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -14,6 +15,17 @@ use x07c::json_patch;
 use crate::util;
 
 const X07AST_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.schema.json");
+const X07AST_MIN_GBNF_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.min.gbnf");
+const X07AST_PRETTY_GBNF_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.pretty.gbnf");
+const X07AST_SEMANTIC_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.semantic.json");
+const X07AST_SEMANTIC_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07ast.semantic.schema.json");
+
+const X07_AST_GRAMMAR_BUNDLE_SCHEMA_VERSION: &str = "x07.ast.grammar_bundle@0.1.0";
+const X07_AST_SEMANTIC_SCHEMA_VERSION: &str = "x07.x07ast.semantic@0.1.0";
+const X07_GENPACK_MANIFEST_SCHEMA_VERSION: &str = "x07.genpack.manifest@0.1.0";
+const X07_GENPACK_NAME: &str = "x07-genpack-x07ast";
+const X07_GENPACK_VERSION: &str = "0.1.0";
 
 #[derive(Debug, Clone, Args)]
 #[command(subcommand_required = false)]
@@ -34,6 +46,10 @@ pub enum AstCommand {
     Validate(AstValidateArgs),
     /// Canonicalize an x07AST JSON file (JCS ordering).
     Canon(AstCanonArgs),
+    /// Emit the canonical x07AST JSON Schema document.
+    Schema(AstSchemaArgs),
+    /// Emit the x07AST grammar bundle for constrained decoding runtimes.
+    Grammar(AstGrammarArgs),
 }
 
 #[derive(Debug, Clone, Args)]
@@ -100,6 +116,27 @@ pub struct AstCanonArgs {
     pub out: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, Args)]
+pub struct AstSchemaArgs {
+    #[arg(long, required = true)]
+    pub json_schema: bool,
+
+    #[arg(long, value_name = "PATH")]
+    pub out: Option<PathBuf>,
+
+    #[arg(long)]
+    pub pretty: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AstGrammarArgs {
+    #[arg(long, required = true)]
+    pub cfg: bool,
+
+    #[arg(long, value_name = "DIR")]
+    pub out_dir: Option<PathBuf>,
+}
+
 pub fn cmd_ast(args: AstArgs) -> Result<std::process::ExitCode> {
     let Some(cmd) = args.cmd else {
         anyhow::bail!("missing subcommand (try --help)");
@@ -111,6 +148,8 @@ pub fn cmd_ast(args: AstArgs) -> Result<std::process::ExitCode> {
         AstCommand::ApplyPatch(args) => cmd_apply_patch(args),
         AstCommand::Validate(args) => cmd_validate(args),
         AstCommand::Canon(args) => cmd_canon(args),
+        AstCommand::Schema(args) => cmd_schema(args),
+        AstCommand::Grammar(args) => cmd_grammar(args),
     }
 }
 
@@ -513,8 +552,161 @@ fn cmd_canon(args: AstCanonArgs) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
+#[derive(Debug, Serialize)]
+struct GrammarVariant {
+    name: String,
+    cfg: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GrammarSha256 {
+    min_cfg: String,
+    pretty_cfg: String,
+    semantic_supplement: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GrammarBundle {
+    schema_version: String,
+    x07ast_schema_version: String,
+    format: String,
+    variants: Vec<GrammarVariant>,
+    semantic_supplement: Value,
+    sha256: GrammarSha256,
+}
+
+#[derive(Debug, Serialize)]
+struct GenpackManifestArtifact {
+    name: String,
+    sha256: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GenpackManifest {
+    schema_version: String,
+    pack: String,
+    pack_version: String,
+    x07ast_schema_version: String,
+    artifacts: Vec<GenpackManifestArtifact>,
+}
+
+fn cmd_schema(args: AstSchemaArgs) -> Result<std::process::ExitCode> {
+    let out_bytes = if args.pretty {
+        let doc: Value =
+            serde_json::from_slice(X07AST_SCHEMA_BYTES).context("parse spec/x07ast.schema.json")?;
+        with_trailing_newline(serde_json::to_string_pretty(&doc)?.into_bytes())
+    } else {
+        with_trailing_newline(X07AST_SCHEMA_BYTES.to_vec())
+    };
+
+    if let Some(out_path) = &args.out {
+        util::write_atomic(out_path, &out_bytes)
+            .with_context(|| format!("write: {}", out_path.display()))?;
+    } else {
+        write_stdout_bytes(&out_bytes)?;
+    }
+
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn cmd_grammar(args: AstGrammarArgs) -> Result<std::process::ExitCode> {
+    let min_cfg_bytes = with_trailing_newline(X07AST_MIN_GBNF_BYTES.to_vec());
+    let pretty_cfg_bytes = with_trailing_newline(X07AST_PRETTY_GBNF_BYTES.to_vec());
+    let semantic_supplement_bytes = with_trailing_newline(X07AST_SEMANTIC_BYTES.to_vec());
+    let schema_bytes = with_trailing_newline(X07AST_SCHEMA_BYTES.to_vec());
+
+    let semantic_supplement: Value = serde_json::from_slice(&semantic_supplement_bytes)
+        .context("parse spec/x07ast.semantic.json")?;
+    validate_semantic_supplement_doc(&semantic_supplement)?;
+
+    let min_cfg = embedded_utf8_string(&min_cfg_bytes, "spec/x07ast.min.gbnf")?;
+    let pretty_cfg = embedded_utf8_string(&pretty_cfg_bytes, "spec/x07ast.pretty.gbnf")?;
+
+    let bundle = GrammarBundle {
+        schema_version: X07_AST_GRAMMAR_BUNDLE_SCHEMA_VERSION.to_string(),
+        x07ast_schema_version: X07AST_SCHEMA_VERSION.to_string(),
+        format: "gbnf_v1".to_string(),
+        variants: vec![
+            GrammarVariant {
+                name: "min".to_string(),
+                cfg: min_cfg,
+            },
+            GrammarVariant {
+                name: "pretty".to_string(),
+                cfg: pretty_cfg,
+            },
+        ],
+        semantic_supplement,
+        sha256: GrammarSha256 {
+            min_cfg: sha256_hex(&min_cfg_bytes),
+            pretty_cfg: sha256_hex(&pretty_cfg_bytes),
+            semantic_supplement: sha256_hex(&semantic_supplement_bytes),
+        },
+    };
+
+    let bundle_bytes = with_trailing_newline(serde_json::to_vec(&bundle)?);
+    write_stdout_bytes(&bundle_bytes)?;
+
+    if let Some(out_dir) = &args.out_dir {
+        std::fs::create_dir_all(out_dir)
+            .with_context(|| format!("create out-dir: {}", out_dir.display()))?;
+
+        let schema_path = out_dir.join("x07ast.schema.json");
+        let min_cfg_path = out_dir.join("x07ast.min.gbnf");
+        let pretty_cfg_path = out_dir.join("x07ast.pretty.gbnf");
+        let semantic_path = out_dir.join("x07ast.semantic.json");
+        let manifest_path = out_dir.join("manifest.json");
+
+        util::write_atomic(&schema_path, &schema_bytes)
+            .with_context(|| format!("write: {}", schema_path.display()))?;
+        util::write_atomic(&min_cfg_path, &min_cfg_bytes)
+            .with_context(|| format!("write: {}", min_cfg_path.display()))?;
+        util::write_atomic(&pretty_cfg_path, &pretty_cfg_bytes)
+            .with_context(|| format!("write: {}", pretty_cfg_path.display()))?;
+        util::write_atomic(&semantic_path, &semantic_supplement_bytes)
+            .with_context(|| format!("write: {}", semantic_path.display()))?;
+
+        let manifest = GenpackManifest {
+            schema_version: X07_GENPACK_MANIFEST_SCHEMA_VERSION.to_string(),
+            pack: X07_GENPACK_NAME.to_string(),
+            pack_version: X07_GENPACK_VERSION.to_string(),
+            x07ast_schema_version: X07AST_SCHEMA_VERSION.to_string(),
+            artifacts: vec![
+                GenpackManifestArtifact {
+                    name: "x07ast.schema.json".to_string(),
+                    sha256: sha256_hex(&schema_bytes),
+                },
+                GenpackManifestArtifact {
+                    name: "x07ast.min.gbnf".to_string(),
+                    sha256: sha256_hex(&min_cfg_bytes),
+                },
+                GenpackManifestArtifact {
+                    name: "x07ast.pretty.gbnf".to_string(),
+                    sha256: sha256_hex(&pretty_cfg_bytes),
+                },
+                GenpackManifestArtifact {
+                    name: "x07ast.semantic.json".to_string(),
+                    sha256: sha256_hex(&semantic_supplement_bytes),
+                },
+            ],
+        };
+        let manifest_bytes = with_trailing_newline(serde_json::to_vec(&manifest)?);
+        util::write_atomic(&manifest_path, &manifest_bytes)
+            .with_context(|| format!("write: {}", manifest_path.display()))?;
+    }
+
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
 fn print_json<T: Serialize>(value: &T) -> Result<()> {
     println!("{}", serde_json::to_string(value)?);
+    Ok(())
+}
+
+fn write_stdout_bytes(bytes: &[u8]) -> Result<()> {
+    let mut stdout = std::io::stdout().lock();
+    stdout.write_all(bytes)?;
+    stdout.flush()?;
     Ok(())
 }
 
@@ -644,6 +836,38 @@ fn validate_x07ast_doc(doc: &Value) -> Result<Vec<diagnostics::Diagnostic>> {
     Ok(out)
 }
 
+fn validate_semantic_supplement_doc(doc: &Value) -> Result<()> {
+    let semantic_schema: Value = serde_json::from_slice(X07AST_SEMANTIC_SCHEMA_BYTES)
+        .context("parse spec/x07ast.semantic.schema.json")?;
+    let validator = jsonschema::options()
+        .with_draft(Draft::Draft202012)
+        .build(&semantic_schema)
+        .context("build x07ast semantic supplement schema validator")?;
+
+    let mut errors = validator.iter_errors(doc).peekable();
+    if let Some(first) = errors.next() {
+        anyhow::bail!(
+            "semantic supplement is invalid at {}: {}",
+            first.instance_path(),
+            first
+        );
+    }
+
+    let actual_version = doc
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if actual_version != X07_AST_SEMANTIC_SCHEMA_VERSION {
+        anyhow::bail!(
+            "semantic supplement schema_version mismatch: expected {}, got {}",
+            X07_AST_SEMANTIC_SCHEMA_VERSION,
+            actual_version
+        );
+    }
+
+    Ok(())
+}
+
 fn canonicalize_x07ast_bytes_to_value(bytes: &[u8]) -> Result<Value> {
     let mut file = x07c::x07ast::parse_x07ast_json(bytes).map_err(|e| anyhow::anyhow!("{e}"))?;
     x07c::x07ast::canonicalize_x07ast_file(&mut file);
@@ -653,4 +877,20 @@ fn canonicalize_x07ast_bytes_to_value(bytes: &[u8]) -> Result<Value> {
 fn exit_with_error(err: impl std::fmt::Display) -> std::process::ExitCode {
     eprintln!("{err}");
     std::process::ExitCode::from(2)
+}
+
+fn embedded_utf8_string(bytes: &[u8], label: &str) -> Result<String> {
+    String::from_utf8(bytes.to_vec()).with_context(|| format!("decode UTF-8: {label}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_semantic_supplement_is_schema_valid() {
+        let doc: Value =
+            serde_json::from_slice(X07AST_SEMANTIC_BYTES).expect("parse spec/x07ast.semantic.json");
+        validate_semantic_supplement_doc(&doc).expect("validate semantic supplement");
+    }
 }

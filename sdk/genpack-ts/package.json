@@ -1,0 +1,58 @@
+{
+  "name": "@x07/genpack",
+  "version": "0.1.0",
+  "description": "Tiny SDK for retrieving X07 x07AST generation-pack artifacts (JSON Schema + CFG bundle + semantic supplement).",
+  "license": "(MIT OR Apache-2.0)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./error-codes": {
+      "types": "./dist/errorCodes.d.ts",
+      "import": "./dist/errorCodes.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/x07lang/x07.git",
+    "directory": "sdk/genpack-ts"
+  },
+  "bugs": {
+    "url": "https://github.com/x07lang/x07/issues"
+  },
+  "homepage": "https://x07lang.org",
+  "keywords": [
+    "x07",
+    "x07ast",
+    "structured-output",
+    "json-schema",
+    "constrained-decoding",
+    "grammar",
+    "agentic-coding"
+  ],
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run clean && npm run lint && npm run build && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "rimraf": "^6.1.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

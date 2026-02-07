@@ -64,6 +64,7 @@ When you need real OS resources (real network, real disk, real time), you switch
   - [OS worlds & sandbox policy](worlds/os-worlds.md)
 - Toolchain:
   - [CLI](toolchain/cli.md)
+  - [Generation pack](genpack/index.md)
   - [Benchmarks](toolchain/benchmarks.md)
   - [Running programs](toolchain/running-programs.md)
   - [Repair loop](toolchain/repair-loop.md)

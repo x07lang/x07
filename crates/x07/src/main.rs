@@ -258,6 +258,8 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(ast::AstCommand::ApplyPatch(_)) => vec!["ast", "apply-patch"],
                 Some(ast::AstCommand::Validate(_)) => vec!["ast", "validate"],
                 Some(ast::AstCommand::Canon(_)) => vec!["ast", "canon"],
+                Some(ast::AstCommand::Schema(_)) => vec!["ast", "schema"],
+                Some(ast::AstCommand::Grammar(_)) => vec!["ast", "grammar"],
             },
             Some(Command::Fmt(_)) => vec!["fmt"],
             Some(Command::Lint(_)) => vec!["lint"],
