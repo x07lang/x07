@@ -21,6 +21,15 @@ pub fn builtin_module_source(module_id: &str) -> Option<&'static str> {
         "std.prng" => Some(include_str!(
             "../../../stdlib/std/0.1.2/modules/std/prng.x07.json"
         )),
+        "std.pbt.case_v1" => Some(include_str!(
+            "../../../stdlib/std/0.1.2/modules/std/pbt/case_v1.x07.json"
+        )),
+        "std.pbt.gen_v1" => Some(include_str!(
+            "../../../stdlib/std/0.1.2/modules/std/pbt/gen_v1.x07.json"
+        )),
+        "std.pbt.shrink_v1" => Some(include_str!(
+            "../../../stdlib/std/0.1.2/modules/std/pbt/shrink_v1.x07.json"
+        )),
         "std.bit" => Some(include_str!(
             "../../../stdlib/std/0.1.2/modules/std/bit.x07.json"
         )),
@@ -139,6 +148,9 @@ pub fn builtin_module_ids() -> &'static [&'static str] {
         "std.parse",
         "std.fmt",
         "std.prng",
+        "std.pbt.case_v1",
+        "std.pbt.gen_v1",
+        "std.pbt.shrink_v1",
         "std.bit",
         "std.text.ascii",
         "std.text.slices",

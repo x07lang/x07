@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.pbt.repro@0.1.0.schema.json",
+  "title": "X07 PBT Repro v0.1.0",
+  "description": "Property-based testing counterexample artifact emitted by x07 test --pbt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "test",
+    "suite_seed_u64",
+    "effective_seed_u64",
+    "cases",
+    "shrinking",
+    "failure",
+    "counterexample",
+    "budget"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.pbt.repro@0.1.0" },
+    "tool": { "$ref": "#/$defs/tool" },
+    "test": { "$ref": "#/$defs/test" },
+    "suite_seed_u64": { "$ref": "#/$defs/u64" },
+    "effective_seed_u64": { "$ref": "#/$defs/u64" },
+    "cases": { "$ref": "#/$defs/cases" },
+    "shrinking": { "$ref": "#/$defs/shrinking" },
+    "failure": { "$ref": "#/$defs/failure" },
+    "counterexample": { "$ref": "#/$defs/counterexample" },
+    "budget": { "$ref": "#/$defs/budget" }
+  },
+  "$defs": {
+    "u64": { "type": "integer", "minimum": 0 },
+    "u32": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "world": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x07_version", "x07c_version"],
+      "properties": {
+        "x07_version": { "type": "string" },
+        "x07c_version": { "type": "string" },
+        "git_sha": { "type": "string", "pattern": "^[0-9a-fA-F]{7,40}$" }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "entry", "world"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "world": { "$ref": "#/$defs/world" }
+      }
+    },
+    "cases": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempted", "configured"],
+      "properties": {
+        "attempted": { "type": "integer", "minimum": 0 },
+        "configured": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "shrinking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempted", "limit", "result"],
+      "properties": {
+        "attempted": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 0 },
+        "result": { "type": "string", "enum": ["minimal_found", "limit_hit"] }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fuel", "timeout_ms", "max_mem_bytes", "max_output_bytes"],
+      "properties": {
+        "fuel": { "$ref": "#/$defs/u64" },
+        "timeout_ms": { "$ref": "#/$defs/u64" },
+        "max_mem_bytes": { "$ref": "#/$defs/u64" },
+        "max_output_bytes": { "$ref": "#/$defs/u64" }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["assert", "trap", "timeout", "fuel", "nondeterminism"]
+        },
+        "assert_code_u32": { "$ref": "#/$defs/u32" },
+        "trap_id": { "type": "string", "maxLength": 128 },
+        "trap_message": { "type": "string", "maxLength": 16384 }
+      }
+    },
+    "counterexample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["params", "case_bytes_b64"],
+      "properties": {
+        "params": {
+          "$ref": "https://x07.io/spec/x07.pbt.params@0.1.0.schema.json"
+        },
+        "case_bytes_b64": { "type": "string", "minLength": 0, "maxLength": 16777216 }
+      }
+    }
+  }
+}
+

@@ -1897,7 +1897,7 @@ fn package_tests_manifest_bytes(test_entry: &str) -> Result<Vec<u8>> {
         [
             (
                 "schema_version".to_string(),
-                Value::String("x07.tests_manifest@0.1.0".to_string()),
+                Value::String("x07.tests_manifest@0.2.0".to_string()),
             ),
             (
                 "tests".to_string(),
@@ -1929,7 +1929,7 @@ fn tests_manifest_bytes() -> Result<Vec<u8>> {
         [
             (
                 "schema_version".to_string(),
-                Value::String("x07.tests_manifest@0.1.0".to_string()),
+                Value::String("x07.tests_manifest@0.2.0".to_string()),
             ),
             (
                 "tests".to_string(),

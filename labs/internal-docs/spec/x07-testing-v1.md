@@ -12,10 +12,11 @@ Tests are declared in a JSON manifest (default: `tests/tests.json`):
 
 ```json
 {
-  "schema_version": "x07.tests_manifest@0.1.0",
+  "schema_version": "x07.tests_manifest@0.2.0",
   "tests": [
     {"id":"smoke/pure_i32_eq", "world":"solve-pure", "entry":"smoke_pure.pure_i32_eq"},
-    {"id":"smoke/fs_read_hello", "world":"solve-fs", "entry":"smoke_fs.fs_read_hello", "fixture_root":"fixtures/fs_smoke/root"}
+    {"id":"smoke/fs_read_hello", "world":"solve-fs", "entry":"smoke_fs.fs_read_hello", "fixture_root":"fixtures/fs_smoke/root"},
+    {"id":"smoke/os_smoke", "world":"run-os", "entry":"smoke_os.check"}
   ]
 }
 ```
@@ -23,12 +24,16 @@ Tests are declared in a JSON manifest (default: `tests/tests.json`):
 Each test entry:
 
 - `id` (string, REQUIRED): stable identifier (ASCII printable, unique)
-- `world` (string, REQUIRED): `solve-pure` or `solve-fs` (v1)
+- `world` (string, REQUIRED): one of:
+  - deterministic fixture worlds: `solve-pure`, `solve-fs`, `solve-rr`, `solve-kv`, `solve-full`
+  - OS worlds: `run-os`, `run-os-sandboxed`
 - `entry` (string, REQUIRED): fully-qualified function name (example: `smoke_pure.pure_i32_eq`)
 - `expect` (string, OPTIONAL): `pass` (default), `fail` (XFAIL), `skip`
 - `fixture_root` (string, OPTIONAL): required when `world == "solve-fs"`; relative to the manifest directory
 - `returns` (string, OPTIONAL): `result_i32` (default) or `bytes_status_v1`
 - `timeout_ms` (int, OPTIONAL): rounded up to seconds for the runner wall/CPU gate
+- `input_b64` / `input_path` (OPTIONAL, `x07.tests_manifest@0.2.0` only): raw input bytes for deterministic `solve-*` worlds
+- `pbt` (OPTIONAL): property-based testing config (runs only with `x07 test --pbt` / `--all`)
 
 ### Test entry return contract
 
@@ -62,6 +67,9 @@ Key flags:
 - `--manifest PATH` (default `tests/tests.json`)
 - `--module-root DIR` (default: manifest directory)
 - `--filter SUBSTR` / `--exact`
+- `--pbt` (run property-based tests only)
+- `--all` (run unit tests + property-based tests)
+- `--pbt-repro PATH` (replay one counterexample; requires `--pbt`)
 - `--list`
 - `--repeat N` (determinism gate: outputs + metrics must match)
 - `--jobs N` (requires `--no-fail-fast`)

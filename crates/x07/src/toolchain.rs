@@ -31,8 +31,24 @@ pub struct LintArgs {
 
 #[derive(Debug, Clone, Args)]
 pub struct FixArgs {
-    #[arg(long)]
-    pub input: PathBuf,
+    #[arg(long, value_name = "PATH", required_unless_present = "from_pbt")]
+    pub input: Option<PathBuf>,
+    /// Convert a PBT repro artifact into a deterministic regression test (writes wrapper module + manifest entry).
+    #[arg(
+        long,
+        value_name = "PATH",
+        conflicts_with = "input",
+        conflicts_with = "suggest_generics"
+    )]
+    pub from_pbt: Option<PathBuf>,
+    /// Tests manifest to patch in `--from-pbt` mode.
+    #[arg(long, value_name = "PATH", default_value = "tests/tests.json")]
+    pub tests_manifest: PathBuf,
+    /// Output dir for wrapper/repro files in `--from-pbt` mode.
+    ///
+    /// If relative, it is resolved relative to the tests manifest directory.
+    #[arg(long, value_name = "DIR", default_value = "repro/pbt")]
+    pub out_dir: PathBuf,
     /// Fix world gating (advanced; the public surface defaults to `run-os`).
     #[arg(long, value_enum, default_value_t = WorldId::RunOs, hide = true)]
     pub world: WorldId,
@@ -138,18 +154,65 @@ pub fn cmd_fix(
     machine: &crate::reporting::MachineArgs,
     args: FixArgs,
 ) -> Result<std::process::ExitCode> {
-    if args.write && machine.out.is_some() {
-        anyhow::bail!("--out cannot be combined with --write");
-    }
     if args.suggest_generics && args.write {
         anyhow::bail!("--suggest-generics cannot be combined with --write");
     }
 
-    let bytes = std::fs::read(&args.input)
-        .with_context(|| format!("read input: {}", args.input.display()))?;
+    if args.from_pbt.is_some() {
+        let repro_path = args.from_pbt.as_ref().context("from_pbt")?;
+
+        let out_dir = if args.out_dir.is_absolute() {
+            args.out_dir.clone()
+        } else {
+            let base = args
+                .tests_manifest
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."));
+            base.join(&args.out_dir)
+        };
+
+        let (report_bytes, exit_code) = match crate::pbt_fix::cmd_fix_from_pbt(
+            repro_path,
+            &args.tests_manifest,
+            &out_dir,
+            args.write,
+        ) {
+            Ok(outcome) => (
+                crate::pbt_fix::fix_from_pbt_report_bytes(&outcome).context("encode report")?,
+                0u8,
+            ),
+            Err(err) => {
+                if let Some(known) = err.downcast_ref::<crate::pbt_fix::FixFromPbtError>() {
+                    (
+                        crate::pbt_fix::fix_from_pbt_error_report_bytes(repro_path, known)
+                            .context("encode error report")?,
+                        known.exit_code(),
+                    )
+                } else {
+                    return Err(err).context("fix-from-pbt");
+                }
+            }
+        };
+
+        if let Some(path) = machine.out.as_deref() {
+            crate::reporting::write_bytes(path, &report_bytes)?;
+        } else {
+            std::io::Write::write_all(&mut std::io::stdout(), &report_bytes)
+                .context("write stdout")?;
+        }
+
+        return Ok(std::process::ExitCode::from(exit_code));
+    }
+
+    if args.write && machine.out.is_some() {
+        anyhow::bail!("--out cannot be combined with --write");
+    }
+
+    let input = args.input.as_ref().context("input")?;
+    let bytes = std::fs::read(input).with_context(|| format!("read input: {}", input.display()))?;
 
     if args.suggest_generics {
-        let patchset = crate::fix_suggest::suggest_generics_patchset(&args.input, &bytes)
+        let patchset = crate::fix_suggest::suggest_generics_patchset(input, &bytes)
             .context("suggest-generics")?;
         let mut out = crate::util::canonical_jcs_bytes(&patchset)?;
         if out.last() != Some(&b'\n') {
@@ -169,7 +232,7 @@ pub fn cmd_fix(
     let mut doc: serde_json::Value = match serde_json::from_slice(&bytes) {
         Ok(doc) => doc,
         Err(err) => {
-            return Err(err).with_context(|| format!("parse JSON: {}", args.input.display()));
+            return Err(err).with_context(|| format!("parse JSON: {}", input.display()));
         }
     };
 
@@ -196,8 +259,8 @@ pub fn cmd_fix(
     }
 
     if args.write {
-        std::fs::write(&args.input, formatted.as_bytes())
-            .with_context(|| format!("write: {}", args.input.display()))?;
+        std::fs::write(input, formatted.as_bytes())
+            .with_context(|| format!("write: {}", input.display()))?;
     } else {
         match machine.out.as_deref() {
             Some(path) => crate::reporting::write_bytes(path, formatted.as_bytes())?,

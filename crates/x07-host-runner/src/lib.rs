@@ -374,21 +374,13 @@ pub fn compile_program_with_options(
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("create dir: {}", parent.display()))?;
         }
-        std::fs::copy(&exe, out_path).with_context(|| {
+        copy_executable_atomic(&exe, out_path).with_context(|| {
             format!(
                 "copy compiled artifact from {} to {}",
                 exe.display(),
                 out_path.display()
             )
         })?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt as _;
-            let src_mode = std::fs::metadata(&exe)
-                .map(|m| m.permissions().mode())
-                .unwrap_or(0o755);
-            let _ = std::fs::set_permissions(out_path, std::fs::Permissions::from_mode(src_mode));
-        }
         out_path.to_path_buf()
     } else {
         exe
@@ -410,6 +402,75 @@ pub fn compile_program_with_options(
         fuel_used: Some(compile_stats.fuel_used),
         trap: None,
     })
+}
+
+fn copy_executable_atomic(src: &Path, dst: &Path) -> Result<()> {
+    static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    let parent = dst
+        .parent()
+        .context("internal error: executable output path has no parent")?;
+    std::fs::create_dir_all(parent).with_context(|| format!("create dir: {}", parent.display()))?;
+
+    let pid = std::process::id();
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let tmp_path = parent.join(format!(".x07_tmp_exe_{pid}_{n}"));
+
+    let _ = std::fs::remove_file(&tmp_path);
+    let _cleanup_tmp = CleanupFile {
+        path: tmp_path.clone(),
+    };
+
+    let mut src_file =
+        std::fs::File::open(src).with_context(|| format!("open src exe: {}", src.display()))?;
+    let mut tmp_file = std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&tmp_path)
+        .with_context(|| format!("create tmp exe: {}", tmp_path.display()))?;
+    std::io::copy(&mut src_file, &mut tmp_file).with_context(|| {
+        format!(
+            "copy exe bytes from {} to {}",
+            src.display(),
+            tmp_path.display()
+        )
+    })?;
+    let _ = tmp_file.flush();
+    let _ = tmp_file.sync_all();
+    drop(tmp_file);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let src_mode = std::fs::metadata(src)
+            .map(|m| m.permissions().mode())
+            .unwrap_or(0o755);
+        let _ = std::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(src_mode));
+    }
+
+    #[cfg(windows)]
+    if dst.exists() {
+        let _ = std::fs::remove_file(dst);
+    }
+    std::fs::rename(&tmp_path, dst).with_context(|| {
+        format!(
+            "rename executable into place from {} to {}",
+            tmp_path.display(),
+            dst.display()
+        )
+    })?;
+
+    Ok(())
+}
+
+struct CleanupFile {
+    path: PathBuf,
+}
+
+impl Drop for CleanupFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
 }
 
 fn maybe_add_linux_libm_for_sqlite(
@@ -1263,21 +1324,13 @@ pub fn compile_bundle_exe(
         std::fs::create_dir_all(parent)
             .with_context(|| format!("create dir: {}", parent.display()))?;
     }
-    std::fs::copy(&exe, compiled_out).with_context(|| {
+    copy_executable_atomic(&exe, compiled_out).with_context(|| {
         format!(
             "copy compiled artifact from {} to {}",
             exe.display(),
             compiled_out.display()
         )
     })?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        let src_mode = std::fs::metadata(&exe)
-            .map(|m| m.permissions().mode())
-            .unwrap_or(0o755);
-        let _ = std::fs::set_permissions(compiled_out, std::fs::Permissions::from_mode(src_mode));
-    }
 
     let exe_size = std::fs::metadata(compiled_out).map(|m| m.len()).ok();
 

@@ -34,6 +34,10 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Prints an `x07diag` JSON report to stdout.
 - `x07 fix --input <path> --write`
   - Applies quickfixes (JSON Patch) and rewrites the file deterministically.
+- `x07 fix --from-pbt <repro.json> --write`
+  - Converts a PBT repro artifact into a deterministic regression test (wrapper module + manifest entry).
+
+See: [PBT repro → regression test](pbt-fix-from-repro.md).
 
 ### Architecture check (repo contracts)
 
@@ -119,6 +123,14 @@ Cookbook integrations:
 - `x07 test --manifest tests/tests.json`
   - Runs each test in its declared world.
   - Prints an `x07test` JSON report (or writes it with `--report-out`).
+- `x07 test --pbt --manifest tests/tests.json`
+  - Runs property-based tests only (entries where `pbt` is set).
+- `x07 test --all --manifest tests/tests.json`
+  - Runs both unit tests and property-based tests.
+- `x07 test --pbt --pbt-repro <repro.json> --manifest tests/tests.json`
+  - Replays exactly one counterexample artifact (single test + single case).
+
+See: [Property-based testing](pbt.md).
 
 ### Agent correctness benchmarks (`x07bench` JSON)
 

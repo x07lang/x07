@@ -1,13 +1,14 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use x07_contracts::{
-    X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
-    X07_PATCHSET_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
-    X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
+    X07AST_SCHEMA_VERSION, X07C_REPORT_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
+    X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_PATCHSET_SCHEMA_VERSION,
+    X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_REVIEW_DIFF_SCHEMA_VERSION,
+    X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
 };
 use x07c::json_patch;
 
@@ -27,7 +28,7 @@ fn run_x07(args: &[&str]) -> std::process::Output {
     Command::new(exe).args(args).output().expect("run x07")
 }
 
-fn run_x07_in_dir(dir: &PathBuf, args: &[&str]) -> std::process::Output {
+fn run_x07_in_dir(dir: &Path, args: &[&str]) -> std::process::Output {
     let exe = env!("CARGO_BIN_EXE_x07");
     Command::new(exe)
         .current_dir(dir)
@@ -40,7 +41,28 @@ fn parse_json_stdout(out: &std::process::Output) -> Value {
     serde_json::from_slice(&out.stdout).expect("parse stdout JSON")
 }
 
-fn write_bytes(path: &PathBuf, bytes: &[u8]) {
+fn assert_x07c_report_error(out: &std::process::Output, expected_code: &str) {
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(out);
+    assert_eq!(v["schema_version"], X07C_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["exit_code"], 1);
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert_eq!(diags.len(), 1);
+    assert_eq!(diags[0]["code"], expected_code);
+}
+
+fn write_bytes(path: &Path, bytes: &[u8]) {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).expect("create parent dir");
     }
@@ -88,7 +110,7 @@ fn fixtures_root() -> PathBuf {
     crate_dir.join("tests").join("fixtures")
 }
 
-fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) {
+fn copy_dir_recursive(src: &Path, dst: &Path) {
     if dst.exists() {
         std::fs::remove_dir_all(dst).expect("remove old dst dir");
     }
@@ -107,6 +129,134 @@ fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) {
             std::fs::copy(path, &out).expect("copy fixture file");
         }
     }
+}
+
+fn write_pbt_fixture_first_byte_zero(dir: &Path) -> (PathBuf, String) {
+    let test_id = "prop/first_byte_zero".to_string();
+    let module = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "app",
+        "imports": ["std.test"],
+        "decls": [
+            { "kind": "export", "names": ["app.prop_first_byte_zero"] },
+            {
+                "kind": "defn",
+                "name": "app.prop_first_byte_zero",
+                "params": [{ "name": "b", "ty": "bytes" }],
+                "result": "bytes",
+                "body": [
+                    "begin",
+                    ["let", "v", ["bytes.view", "b"]],
+                    [
+                        "if",
+                        ["=", ["view.len", "v"], 0],
+                        ["std.test.status_ok"],
+                        [
+                            "if",
+                            ["=", ["view.get_u8", "v", 0], 0],
+                            ["std.test.status_ok"],
+                            ["std.test.status_fail", 1]
+                        ]
+                    ]
+                ]
+            }
+        ]
+    });
+    write_bytes(
+        &dir.join("app.x07.json"),
+        serde_json::to_string_pretty(&module).unwrap().as_bytes(),
+    );
+
+    let manifest_path = dir.join("tests.json");
+    let manifest = serde_json::json!({
+        "schema_version": "x07.tests_manifest@0.2.0",
+        "tests": [
+            {
+                "id": test_id,
+                "world": "solve-pure",
+                "entry": "app.prop_first_byte_zero",
+                "expect": "pass",
+                "pbt": {
+                    "cases": 25,
+                    "max_shrinks": 256,
+                    "params": [
+                        { "name": "b", "gen": { "kind": "bytes", "max_len": 16 } }
+                    ],
+                    "case_budget": {
+                        "fuel": 200000,
+                        "timeout_ms": 250,
+                        "max_mem_bytes": 67108864,
+                        "max_output_bytes": 1048576
+                    }
+                }
+            }
+        ]
+    });
+    write_bytes(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap().as_bytes(),
+    );
+
+    (manifest_path, test_id)
+}
+
+fn write_pbt_fixture_budget_scope_alloc_bytes_trap(dir: &Path) -> (PathBuf, String) {
+    let test_id = "prop/budget_scope_alloc_bytes".to_string();
+    let module = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "app",
+        "imports": ["std.test"],
+        "decls": [
+            { "kind": "export", "names": ["app.prop_budget_scope_alloc_bytes"] },
+            {
+                "kind": "defn",
+                "name": "app.prop_budget_scope_alloc_bytes",
+                "params": [{ "name": "b", "ty": "bytes" }],
+                "result": "bytes",
+                "body": [
+                    "begin",
+                    ["let", "_b", "b"],
+                    ["let", "_alloc", ["bytes.alloc", 2]],
+                    ["std.test.status_ok"]
+                ]
+            }
+        ]
+    });
+    write_bytes(
+        &dir.join("app.x07.json"),
+        serde_json::to_string_pretty(&module).unwrap().as_bytes(),
+    );
+
+    let manifest_path = dir.join("tests.json");
+    let manifest = serde_json::json!({
+        "schema_version": "x07.tests_manifest@0.2.0",
+        "tests": [
+            {
+                "id": test_id,
+                "world": "solve-pure",
+                "entry": "app.prop_budget_scope_alloc_bytes",
+                "expect": "pass",
+                "pbt": {
+                    "cases": 1,
+                    "max_shrinks": 1,
+                    "params": [
+                        { "name": "b", "gen": { "kind": "bytes", "max_len": 0 } }
+                    ],
+                    "budget_scope": {
+                        "alloc_bytes": 1
+                    }
+                }
+            }
+        ]
+    });
+    write_bytes(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap().as_bytes(),
+    );
+
+    (manifest_path, test_id)
 }
 
 #[test]
@@ -233,6 +383,569 @@ fn x07_test_smoke_suite() {
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+#[test]
+fn x07_test_manifest_input_b64_affects_run() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_manifest_input_b64");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let module = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "app",
+        "imports": ["std.test"],
+        "decls": [
+            { "kind": "export", "names": ["app.check_input_len"] },
+            {
+                "kind": "defn",
+                "name": "app.check_input_len",
+                "params": [],
+                "result": "bytes",
+                "body": ["if", ["=", ["view.len", "input"], 3], ["std.test.status_ok"], ["std.test.status_fail", 123]]
+            }
+        ]
+    });
+    write_bytes(
+        &dir.join("app.x07.json"),
+        serde_json::to_string_pretty(&module).unwrap().as_bytes(),
+    );
+
+    let manifest_path = dir.join("tests.json");
+    let mk_manifest = |input_b64: &str| {
+        serde_json::json!({
+            "schema_version": "x07.tests_manifest@0.2.0",
+            "tests": [
+                {
+                    "id": "smoke/input_b64",
+                    "world": "solve-pure",
+                    "entry": "app.check_input_len",
+                    "returns": "bytes_status_v1",
+                    "expect": "pass",
+                    "input_b64": input_b64
+                }
+            ]
+        })
+    };
+
+    write_bytes(
+        &manifest_path,
+        serde_json::to_string_pretty(&mk_manifest("YWJj"))
+            .unwrap()
+            .as_bytes(),
+    );
+    let out = run_x07(&["test", "--manifest", manifest_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
+    assert_eq!(v["summary"]["passed"], 1);
+    assert_eq!(v["summary"]["failed"], 0);
+
+    write_bytes(
+        &manifest_path,
+        serde_json::to_string_pretty(&mk_manifest(""))
+            .unwrap()
+            .as_bytes(),
+    );
+    let out = run_x07(&["test", "--manifest", manifest_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(10));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["summary"]["passed"], 0);
+    assert_eq!(v["summary"]["failed"], 1);
+}
+
+#[test]
+fn x07_test_pbt_emits_repro_and_replays() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_pbt_e2e");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let (manifest_path, test_id) = write_pbt_fixture_first_byte_zero(&dir);
+
+    let artifact_dir = dir.join("artifacts");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "test",
+            "--pbt",
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--artifact-dir",
+            artifact_dir.to_str().unwrap(),
+            "--keep-artifacts",
+            "--repeat",
+            "2",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(10),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
+    assert_eq!(v["summary"]["failed"], 1);
+    assert!(
+        v["tests"][0]["diags"]
+            .as_array()
+            .expect("diags[]")
+            .iter()
+            .any(|d| d["code"] == "X07T_EPBT_FAIL"),
+        "expected X07T_EPBT_FAIL diag"
+    );
+
+    let repro_path = artifact_dir
+        .join("pbt")
+        .join(format!("id_{}", sha256_hex(test_id.as_bytes())))
+        .join("repro.json");
+    assert!(repro_path.is_file(), "missing {}", repro_path.display());
+    let repro_bytes_1 = std::fs::read(&repro_path).expect("read repro.json");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "test",
+            "--pbt",
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--artifact-dir",
+            artifact_dir.to_str().unwrap(),
+            "--keep-artifacts",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(10));
+    let repro_bytes_2 = std::fs::read(&repro_path).expect("read repro.json");
+    assert_eq!(repro_bytes_2, repro_bytes_1);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "test",
+            "--pbt",
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--artifact-dir",
+            artifact_dir.to_str().unwrap(),
+            "--keep-artifacts",
+            "--pbt-repro",
+            repro_path.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(out.status.code(), Some(10));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["summary"]["failed"], 1);
+}
+
+#[test]
+fn x07_test_pbt_budget_scope_wraps_property_and_fix_preserves_scope() {
+    use base64::Engine as _;
+
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_pbt_budget_scope");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let (manifest_path, test_id) = write_pbt_fixture_budget_scope_alloc_bytes_trap(&dir);
+    let artifact_dir = dir.join("artifacts");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "test",
+            "--pbt",
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--artifact-dir",
+            artifact_dir.to_str().unwrap(),
+            "--keep-artifacts",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(12),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out_dir = artifact_dir
+        .join("pbt")
+        .join(format!("id_{}", sha256_hex(test_id.as_bytes())));
+    let driver_path = out_dir.join("driver.x07.json");
+    assert!(driver_path.is_file(), "missing {}", driver_path.display());
+    let driver_text = std::fs::read_to_string(&driver_path).expect("read driver");
+    assert!(
+        driver_text.contains("budget.scope_v1"),
+        "expected budget.scope_v1 in driver"
+    );
+
+    let repro_path = out_dir.join("repro.json");
+    assert!(repro_path.is_file(), "missing {}", repro_path.display());
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_path.to_str().unwrap(),
+            "--tests-manifest",
+            manifest_path.to_str().unwrap(),
+            "--write",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let repro_doc: Value = serde_json::from_slice(&std::fs::read(&repro_path).expect("read repro"))
+        .expect("parse repro JSON");
+    let case_b64 = repro_doc["counterexample"]["case_bytes_b64"]
+        .as_str()
+        .expect("case_bytes_b64")
+        .to_string();
+    let case_bytes = base64::engine::general_purpose::STANDARD
+        .decode(case_b64.as_bytes())
+        .expect("decode case bytes");
+    let case_tag = format!("c{}", &sha256_hex(&case_bytes)[0..12]);
+
+    let wrapper_path = dir
+        .join("repro")
+        .join("pbt")
+        .join(format!("{case_tag}.x07.json"));
+    assert!(wrapper_path.is_file(), "missing {}", wrapper_path.display());
+    let wrapper_text = std::fs::read_to_string(&wrapper_path).expect("read wrapper");
+    assert!(
+        wrapper_text.contains("budget.scope_v1"),
+        "expected budget.scope_v1 in wrapper"
+    );
+}
+
+#[test]
+fn x07_fix_from_pbt_generates_regression_test() {
+    use base64::Engine as _;
+
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_fix_from_pbt");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let (manifest_path, test_id) = write_pbt_fixture_first_byte_zero(&dir);
+    let artifact_dir = dir.join("artifacts");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "test",
+            "--pbt",
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--artifact-dir",
+            artifact_dir.to_str().unwrap(),
+            "--keep-artifacts",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(10),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let repro_path = artifact_dir
+        .join("pbt")
+        .join(format!("id_{}", sha256_hex(test_id.as_bytes())))
+        .join("repro.json");
+    assert!(repro_path.is_file(), "missing {}", repro_path.display());
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_path.to_str().unwrap(),
+            "--tests-manifest",
+            manifest_path.to_str().unwrap(),
+            "--write",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let repro_doc: Value = serde_json::from_slice(&std::fs::read(&repro_path).expect("read repro"))
+        .expect("parse repro JSON");
+    let case_b64 = repro_doc["counterexample"]["case_bytes_b64"]
+        .as_str()
+        .expect("case_bytes_b64")
+        .to_string();
+
+    let manifest_doc: Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).expect("read manifest after fix"))
+            .expect("parse manifest after fix");
+    let tests = manifest_doc["tests"].as_array().expect("tests[]");
+    assert_eq!(tests.len(), 2);
+    let new_test = tests
+        .iter()
+        .find(|t| {
+            t["id"]
+                .as_str()
+                .is_some_and(|id| id.starts_with("pbt_repro/"))
+        })
+        .expect("new test entry");
+
+    assert_eq!(new_test["expect"], "pass");
+    assert_eq!(new_test["returns"], "bytes_status_v1");
+    assert_eq!(new_test["input_b64"], case_b64);
+
+    let entry = new_test["entry"].as_str().expect("entry");
+    assert!(
+        entry.starts_with("repro.pbt.c") && entry.ends_with(".run"),
+        "unexpected entry: {entry}"
+    );
+    let case_bytes = base64::engine::general_purpose::STANDARD
+        .decode(case_b64.as_bytes())
+        .expect("decode case bytes");
+    let case_tag = format!("c{}", &sha256_hex(&case_bytes)[0..12]);
+    assert_eq!(entry, format!("repro.pbt.{case_tag}.run"));
+
+    let wrapper_path = dir
+        .join("repro")
+        .join("pbt")
+        .join(format!("{case_tag}.x07.json"));
+    assert!(wrapper_path.is_file(), "missing {}", wrapper_path.display());
+    let copied_repro_path = dir
+        .join("repro")
+        .join("pbt")
+        .join(format!("{case_tag}.repro.json"));
+    assert!(
+        copied_repro_path.is_file(),
+        "missing {}",
+        copied_repro_path.display()
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &["test", "--manifest", manifest_path.to_str().unwrap()],
+    );
+    assert_eq!(out.status.code(), Some(10));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["summary"]["failed"], 1);
+}
+
+#[test]
+fn x07_fix_from_pbt_emits_structured_error_diagnostics_for_repro_and_args() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_fix_from_pbt_error_diags_repro");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let tests_manifest = dir.join("tests.json");
+    write_bytes(
+        &tests_manifest,
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schema_version": "x07.tests_manifest@0.2.0",
+            "tests": []
+        }))
+        .unwrap()
+        .as_bytes(),
+    );
+
+    let repro_missing = dir.join("missing.repro.json");
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_missing.to_str().unwrap(),
+            "--tests-manifest",
+            tests_manifest.to_str().unwrap(),
+        ],
+    );
+    assert_x07c_report_error(&out, "X07-PBT-FIX-ARGS-0001");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_missing.to_str().unwrap(),
+            "--tests-manifest",
+            tests_manifest.to_str().unwrap(),
+            "--write",
+        ],
+    );
+    assert_x07c_report_error(&out, "X07-PBT-REPRO-READ-0001");
+
+    let repro_invalid_json = dir.join("invalid.repro.json");
+    write_bytes(&repro_invalid_json, b"not json\n");
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_invalid_json.to_str().unwrap(),
+            "--tests-manifest",
+            tests_manifest.to_str().unwrap(),
+            "--write",
+        ],
+    );
+    assert_x07c_report_error(&out, "X07-PBT-REPRO-PARSE-0001");
+
+    let repro_wrong_schema = dir.join("wrong_schema.repro.json");
+    write_bytes(
+        &repro_wrong_schema,
+        b"{\"schema_version\":\"x07.pbt.repro@0.0.0\"}\n",
+    );
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_wrong_schema.to_str().unwrap(),
+            "--tests-manifest",
+            tests_manifest.to_str().unwrap(),
+            "--write",
+        ],
+    );
+    assert_x07c_report_error(&out, "X07-PBT-REPRO-SCHEMA-0001");
+}
+
+#[test]
+fn x07_fix_from_pbt_emits_structured_error_diagnostics_for_manifest_and_conflicts() {
+    use base64::Engine as _;
+
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_fix_from_pbt_error_diags_manifest");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let (manifest_path, test_id) = write_pbt_fixture_first_byte_zero(&dir);
+    let artifact_dir = dir.join("artifacts");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "test",
+            "--pbt",
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--artifact-dir",
+            artifact_dir.to_str().unwrap(),
+            "--keep-artifacts",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(10),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let repro_path = artifact_dir
+        .join("pbt")
+        .join(format!("id_{}", sha256_hex(test_id.as_bytes())))
+        .join("repro.json");
+    assert!(repro_path.is_file(), "missing {}", repro_path.display());
+
+    let missing_manifest = dir.join("missing_tests.json");
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_path.to_str().unwrap(),
+            "--tests-manifest",
+            missing_manifest.to_str().unwrap(),
+            "--write",
+        ],
+    );
+    assert_x07c_report_error(&out, "X07-PBT-FIX-MANIFEST-0001");
+
+    let manifest_missing_test = dir.join("tests_missing_test.json");
+    write_bytes(
+        &manifest_missing_test,
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schema_version": "x07.tests_manifest@0.2.0",
+            "tests": []
+        }))
+        .unwrap()
+        .as_bytes(),
+    );
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_path.to_str().unwrap(),
+            "--tests-manifest",
+            manifest_missing_test.to_str().unwrap(),
+            "--write",
+        ],
+    );
+    assert_x07c_report_error(&out, "X07-PBT-FIX-TEST-NOT-FOUND-0001");
+
+    let manifest_conflict = dir.join("tests_conflict.json");
+    write_bytes(
+        &manifest_conflict,
+        &std::fs::read(&manifest_path).expect("read manifest for copy"),
+    );
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_path.to_str().unwrap(),
+            "--tests-manifest",
+            manifest_conflict.to_str().unwrap(),
+            "--write",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let repro_doc: Value = serde_json::from_slice(&std::fs::read(&repro_path).expect("read repro"))
+        .expect("parse repro JSON");
+    let case_b64 = repro_doc["counterexample"]["case_bytes_b64"]
+        .as_str()
+        .expect("case_bytes_b64")
+        .to_string();
+    let case_bytes = base64::engine::general_purpose::STANDARD
+        .decode(case_b64.as_bytes())
+        .expect("decode case bytes");
+    let case_tag = format!("c{}", &sha256_hex(&case_bytes)[0..12]);
+    let wrapper_path = dir
+        .join("repro")
+        .join("pbt")
+        .join(format!("{case_tag}.x07.json"));
+    assert!(wrapper_path.is_file(), "missing {}", wrapper_path.display());
+
+    write_bytes(&wrapper_path, b"not a wrapper module\n");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "fix",
+            "--from-pbt",
+            repro_path.to_str().unwrap(),
+            "--tests-manifest",
+            manifest_conflict.to_str().unwrap(),
+            "--write",
+        ],
+    );
+    assert_x07c_report_error(&out, "X07-PBT-FIX-CONFLICT-0001");
 }
 
 #[test]
@@ -391,7 +1104,7 @@ fn x07_cli_specrows_includes_nested_subcommands() {
     );
 }
 
-fn write_json(path: &PathBuf, doc: &Value) {
+fn write_json(path: &Path, doc: &Value) {
     let bytes = serde_json::to_vec_pretty(doc).expect("serialize JSON");
     write_bytes(path, &bytes);
 }
@@ -1078,7 +1791,7 @@ fn x07_arch_check_is_deterministic() {
     std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
 }
 
-fn run_schema_derive_smoke(fixture: &PathBuf) {
+fn run_schema_derive_smoke(fixture: &Path) {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_schema_derive");
     if dir.exists() {

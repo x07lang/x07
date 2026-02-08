@@ -20,5 +20,7 @@ pub mod validate;
 pub mod world_config;
 pub mod x07ast;
 
+pub const X07C_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 mod fingerprint;
 pub mod unify;

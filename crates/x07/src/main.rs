@@ -29,6 +29,8 @@ mod fix_suggest;
 mod guide;
 mod init;
 mod patch;
+mod pbt;
+mod pbt_fix;
 mod pkg;
 mod policy;
 mod policy_overrides;
@@ -132,7 +134,7 @@ impl Expect {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TestReturns {
     ResultI32,
     BytesStatusV1,
@@ -145,6 +147,8 @@ struct TestDecl {
     entry: String,
     expect: Expect,
     returns: TestReturns,
+    pbt: Option<pbt::PbtDecl>,
+    input: Option<Vec<u8>>,
     fixture_root: Option<PathBuf>,
     policy_json: Option<PathBuf>,
     timeout_ms: Option<u64>,
@@ -176,6 +180,46 @@ struct TestArgs {
 
     #[arg(long)]
     exact: bool,
+
+    /// Run property-based tests only (tests where `pbt` is set in the manifest).
+    #[arg(long)]
+    pbt: bool,
+
+    /// Run both unit tests and property-based tests.
+    #[arg(long)]
+    all: bool,
+
+    /// Override the PBT suite seed (default: 0).
+    #[arg(long, value_name = "U64")]
+    pbt_seed: Option<u64>,
+
+    /// Override per-test generated case count.
+    #[arg(long, value_name = "N")]
+    pbt_cases: Option<u32>,
+
+    /// Override per-test max shrink attempts.
+    #[arg(long, value_name = "N")]
+    pbt_max_shrinks: Option<u32>,
+
+    /// Override per-case fuel cap.
+    #[arg(long, value_name = "FUEL")]
+    pbt_case_fuel: Option<u64>,
+
+    /// Override per-case timeout cap (milliseconds; rounded up to seconds).
+    #[arg(long, value_name = "MS")]
+    pbt_case_timeout_ms: Option<u64>,
+
+    /// Override per-case memory cap (bytes).
+    #[arg(long, value_name = "BYTES")]
+    pbt_case_mem_bytes: Option<u64>,
+
+    /// Override per-case output cap (bytes).
+    #[arg(long, value_name = "BYTES")]
+    pbt_case_output_bytes: Option<u64>,
+
+    /// Replay exactly one counterexample artifact (runs the single failing case only).
+    #[arg(long, value_name = "PATH")]
+    pbt_repro: Option<PathBuf>,
 
     #[arg(long)]
     list: bool,
@@ -363,6 +407,15 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
     let started = Instant::now();
 
     let mut args = args;
+    if args.pbt && args.all {
+        anyhow::bail!("--pbt and --all are mutually exclusive");
+    }
+    if args.pbt_repro.is_some() && !args.pbt {
+        anyhow::bail!("--pbt-repro requires --pbt");
+    }
+    if args.pbt_repro.is_some() && args.all {
+        anyhow::bail!("--pbt-repro cannot be combined with --all");
+    }
     args.manifest = util::resolve_existing_path_upwards(&args.manifest);
 
     let validated = match validate_manifest_json(&args.manifest) {
@@ -394,6 +447,19 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
             tests.retain(|t| t.id.contains(filter));
         }
     }
+
+    if args.pbt {
+        tests.retain(|t| t.pbt.is_some());
+    } else if !args.all {
+        tests.retain(|t| t.pbt.is_none());
+    }
+
+    if let Some(repro_path) = args.pbt_repro.as_deref() {
+        let bytes = std::fs::read(repro_path)
+            .with_context(|| format!("read PBT repro: {}", repro_path.display()))?;
+        let id = pbt::test_id_from_repro(&bytes)?;
+        tests.retain(|t| t.id == id);
+    }
     tests.sort_by(|a, b| a.id.cmp(&b.id));
 
     if args.list {
@@ -407,6 +473,12 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
             );
         }
         return Ok(std::process::ExitCode::SUCCESS);
+    }
+
+    if args.pbt_repro.is_some() && tests.is_empty() {
+        anyhow::bail!(
+            "--pbt-repro: referenced test id was not found in the manifest (after filters)"
+        );
     }
 
     let stdlib_lock_raw = args.stdlib_lock.clone();
@@ -703,6 +775,10 @@ fn run_one_test(
         });
     }
 
+    if test.pbt.is_some() {
+        return run_one_pbt_test(args, module_roots, test, start);
+    }
+
     let driver_src = build_test_driver_x07ast_json(test)?;
 
     if !test.world.is_eval_world() {
@@ -784,11 +860,13 @@ fn run_one_test(
         .as_deref()
         .context("internal error: compile ok but missing compiled_exe")?;
 
+    let input: &[u8] = test.input.as_deref().unwrap_or(&[]);
+
     let mut first_obs: Option<ObservedRun> = None;
     let mut last_run: Option<RunnerResult> = None;
 
     for rep in 0..args.repeat {
-        let run_res = run_artifact_file(&runner_config, exe, &[])?;
+        let run_res = run_artifact_file(&runner_config, exe, input)?;
         let obs = ObservedRun::from_runner_result(&run_res);
         if let Some(first) = &first_obs {
             if first != &obs {
@@ -838,6 +916,267 @@ fn run_one_test(
         if args.verbose {
             eprintln!("driver: {}", driver_path.display());
         }
+    }
+
+    Ok(result)
+}
+
+fn run_one_pbt_test(
+    args: &TestArgs,
+    module_roots: &[PathBuf],
+    test: &TestDecl,
+    start: Instant,
+) -> Result<TestCaseResult> {
+    let pbt_decl = test
+        .pbt
+        .as_ref()
+        .context("internal error: missing pbt decl")?;
+
+    let mut budget = pbt_decl.case_budget;
+    if args.pbt_case_fuel.is_some() {
+        budget.fuel = args.pbt_case_fuel.context("pbt_case_fuel")?;
+    }
+    if args.pbt_case_timeout_ms.is_some() {
+        budget.timeout_ms = args.pbt_case_timeout_ms.context("pbt_case_timeout_ms")?;
+    }
+    if args.pbt_case_mem_bytes.is_some() {
+        budget.max_mem_bytes = args.pbt_case_mem_bytes.context("pbt_case_mem_bytes")?;
+    }
+    if args.pbt_case_output_bytes.is_some() {
+        budget.max_output_bytes = args
+            .pbt_case_output_bytes
+            .context("pbt_case_output_bytes")?;
+    }
+
+    let suite_seed_u64 = args.pbt_seed.unwrap_or(0);
+    let cases = args.pbt_cases.unwrap_or(pbt_decl.cases);
+    let max_shrinks = args.pbt_max_shrinks.unwrap_or(pbt_decl.max_shrinks);
+
+    let repro_mode = args.pbt_repro.is_some();
+    let repro = if let Some(path) = args.pbt_repro.as_deref() {
+        let bytes =
+            std::fs::read(path).with_context(|| format!("read PBT repro: {}", path.display()))?;
+        let repro = pbt::parse_repro_json(&bytes)?;
+        pbt::validate_repro_test_matches_manifest(&repro, &test.id, &test.entry)?;
+        Some(repro)
+    } else {
+        None
+    };
+
+    let tys: Vec<pbt::PbtTy> = if let Some(repro) = repro.as_ref() {
+        pbt::counterexample_tys(repro)
+    } else {
+        pbt_decl.params.iter().map(|p| p.gen.ty()).collect()
+    };
+
+    let driver_src = pbt::build_case_driver_x07ast_json(&test.entry, &tys, pbt_decl.budget_scope)?;
+
+    let out_dir = args
+        .artifact_dir
+        .join("pbt")
+        .join(safe_artifact_dir_name(&test.id));
+    if args.keep_artifacts {
+        std::fs::create_dir_all(&out_dir)
+            .with_context(|| format!("create artifact dir: {}", out_dir.display()))?;
+        let driver_path = out_dir.join("driver.x07.json");
+        std::fs::write(&driver_path, &driver_src)
+            .with_context(|| format!("write driver: {}", driver_path.display()))?;
+    }
+
+    let exe_out_path = if args.keep_artifacts {
+        Some(out_dir.join("solver"))
+    } else {
+        None
+    };
+
+    let mut compile_options =
+        x07c::world_config::compile_options_for_world(test.world, module_roots.to_vec());
+    compile_options.arch_root = infer_arch_root_from_manifest(&args.manifest)
+        .or_else(|| args.manifest.parent().map(|p| p.to_path_buf()))
+        .or_else(|| std::env::current_dir().ok());
+
+    let runner_config = runner_config_for_test(test)?;
+    let compiled_out = exe_out_path.as_deref();
+    let compile_res = x07_host_runner::compile_program_with_options(
+        &driver_src,
+        &runner_config,
+        compiled_out,
+        &compile_options,
+        &[],
+    )?;
+
+    let mut result = TestCaseResult {
+        id: test.id.clone(),
+        world: test.world.as_str().to_string(),
+        expect: test.expect.as_str().to_string(),
+        status: "error".to_string(),
+        duration_ms: 0,
+        entry: Some(test.entry.clone()),
+        fixture_root: test.fixture_root.as_ref().map(display_path),
+        compile: Some(CompileSection {
+            ok: compile_res.ok,
+            exit_code: Some(compile_res.exit_status),
+            compiler_diags: Vec::new(),
+            artifact_path: compiled_out.map(display_path),
+            c_bytes: Some(compile_res.c_source_size as u64),
+        }),
+        run: None,
+        diags: Vec::new(),
+    };
+
+    if !compile_res.ok {
+        if let Some(msg) = compile_res.compile_error.as_ref() {
+            result.diags.push(Diag::new("ETEST_COMPILE", msg));
+        } else {
+            result
+                .diags
+                .push(Diag::new("ETEST_COMPILE", "compile failed"));
+        }
+        result.duration_ms = start.elapsed().as_millis() as u64;
+        return Ok(result);
+    }
+
+    if args.no_run {
+        result.status = "skip".to_string();
+        result.duration_ms = start.elapsed().as_millis() as u64;
+        return Ok(result);
+    }
+
+    let exe = compile_res
+        .compiled_exe
+        .as_deref()
+        .context("internal error: compile ok but missing compiled_exe")?;
+
+    if repro_mode {
+        let repro = repro.context("internal error: missing repro doc")?;
+        let case_bytes = pbt::counterexample_case_bytes(&repro)?;
+
+        let mut case_cfg = runner_config.clone();
+        case_cfg.solve_fuel = repro.budget.fuel;
+        case_cfg.max_memory_bytes = repro.budget.max_mem_bytes as usize;
+        case_cfg.max_output_bytes = repro.budget.max_output_bytes as usize;
+        case_cfg.cpu_time_limit_seconds = ms_to_ceiling_seconds(repro.budget.timeout_ms)?;
+
+        let mut first_obs: Option<ObservedRun> = None;
+        let mut last_run: Option<RunnerResult> = None;
+
+        for rep in 0..args.repeat {
+            let run_res = run_artifact_file(&case_cfg, exe, &case_bytes)?;
+            let obs = ObservedRun::from_runner_result(&run_res);
+            if let Some(first) = &first_obs {
+                if first != &obs {
+                    result.diags.push(Diag::new(
+                        "EDETERMINISM",
+                        format!("nondeterminism detected at repeat {}", rep + 1),
+                    ));
+                    result.run = Some(RunSection::from_runner_result(&run_res));
+                    result.status = "error".to_string();
+                    result.duration_ms = start.elapsed().as_millis() as u64;
+                    return Ok(result);
+                }
+            } else {
+                first_obs = Some(obs);
+            }
+            last_run = Some(run_res);
+        }
+
+        let run_res = last_run.context("internal error: missing run result")?;
+        result.run = Some(RunSection::from_runner_result(&run_res));
+
+        if !run_res.ok {
+            result.diags.push(
+                Diag::new("X07T_EPBT_FAIL", "repro case failed (runner trap)")
+                    .with_details(pbt::repro_to_details_value(&repro)?),
+            );
+            result.status = "error".to_string();
+            result.duration_ms = start.elapsed().as_millis() as u64;
+            return Ok(result);
+        }
+
+        let (tag, code_u32) = parse_evtest_status_v1(&run_res.solve_output)?;
+        if let Some(run) = result.run.as_mut() {
+            run.failure_code_u32 = Some(code_u32 as u64);
+        }
+        result.status = compute_status(test.expect, tag);
+        result.duration_ms = start.elapsed().as_millis() as u64;
+
+        if tag == 1 {
+            result.diags.push(Diag::new(
+                "X07T_EPBT_REPRO_NONREPRO",
+                "repro no longer reproduces (property passed)",
+            ));
+        } else {
+            result.diags.push(
+                Diag::new("X07T_EPBT_FAIL", "repro case failed")
+                    .with_details(pbt::repro_to_details_value(&repro)?),
+            );
+        }
+
+        return Ok(result);
+    }
+
+    let mut first_obs: Option<(pbt::PbtObservation, Option<u8>, Option<u32>)> = None;
+    let mut last_suite: Option<pbt::PbtSuiteRun> = None;
+
+    for rep in 0..args.repeat {
+        let (suite, obs) = pbt::run_pbt_suite(pbt::RunPbtSuiteArgs {
+            exe,
+            base_cfg: &runner_config,
+            test_id: &test.id,
+            entry: &test.entry,
+            world: test.world,
+            params: &pbt_decl.params,
+            budget: &budget,
+            suite_seed_u64,
+            cases,
+            max_shrinks,
+        })?;
+        let cur = (obs, suite.status_tag, suite.status_code_u32);
+        if let Some(first) = &first_obs {
+            if first != &cur {
+                result.diags.push(Diag::new(
+                    "EDETERMINISM",
+                    format!("nondeterminism detected at repeat {}", rep + 1),
+                ));
+                result.run = Some(RunSection::from_runner_result(&suite.final_run));
+                result.status = "error".to_string();
+                result.duration_ms = start.elapsed().as_millis() as u64;
+                return Ok(result);
+            }
+        } else {
+            first_obs = Some(cur);
+        }
+        last_suite = Some(suite);
+    }
+
+    let suite = last_suite.context("internal error: missing suite result")?;
+
+    result.run = Some(RunSection::from_runner_result(&suite.final_run));
+    if let (Some(tag), Some(code_u32)) = (suite.status_tag, suite.status_code_u32) {
+        if let Some(run) = result.run.as_mut() {
+            run.failure_code_u32 = Some(code_u32 as u64);
+        }
+        result.status = compute_status(test.expect, tag);
+    } else {
+        result.status = "error".to_string();
+    }
+
+    if let Some(repro) = suite.repro.as_ref() {
+        std::fs::create_dir_all(&out_dir)
+            .with_context(|| format!("create artifact dir: {}", out_dir.display()))?;
+        let repro_path = out_dir.join("repro.json");
+        util::write_atomic(&repro_path, &pbt::repro_to_pretty_canon_bytes(repro)?)
+            .with_context(|| format!("write repro: {}", repro_path.display()))?;
+        result.diags.push(
+            Diag::new("X07T_EPBT_FAIL", "property failed")
+                .with_details(pbt::repro_to_details_value(repro)?),
+        );
+    }
+
+    result.duration_ms = start.elapsed().as_millis() as u64;
+
+    if args.verbose && args.keep_artifacts {
+        eprintln!("artifacts: {}", out_dir.display());
     }
 
     Ok(result)
@@ -1345,6 +1684,12 @@ struct TestRaw {
     world: String,
     entry: String,
     #[serde(default)]
+    input_b64: Option<String>,
+    #[serde(default)]
+    input_path: Option<String>,
+    #[serde(default)]
+    pbt: Option<pbt::PbtDeclRaw>,
+    #[serde(default)]
     expect: Option<String>,
     #[serde(default)]
     returns: Option<String>,
@@ -1396,11 +1741,18 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
         }
     };
 
-    if raw.schema_version != "x07.tests_manifest@0.1.0" {
+    let allows_input = match raw.schema_version.as_str() {
+        "x07.tests_manifest@0.1.0" => false,
+        "x07.tests_manifest@0.2.0" => true,
+        _ => false,
+    };
+    if raw.schema_version != "x07.tests_manifest@0.1.0"
+        && raw.schema_version != "x07.tests_manifest@0.2.0"
+    {
         diags.push(ManifestDiag {
             code: "ETEST_SCHEMA_VERSION",
             message: format!(
-                "schema_version must be x07.tests_manifest@0.1.0, got {}",
+                "schema_version must be x07.tests_manifest@0.1.0 or x07.tests_manifest@0.2.0, got {}",
                 raw.schema_version
             ),
             path: "/schema_version".to_string(),
@@ -1467,6 +1819,84 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
             }
         };
 
+        let input = if t.input_b64.is_some() || t.input_path.is_some() {
+            if !allows_input {
+                diags.push(ManifestDiag {
+                    code: "ETEST_INPUT_NOT_ALLOWED_V010",
+                    message: "input_b64/input_path is only allowed in x07.tests_manifest@0.2.0"
+                        .to_string(),
+                    path: format!("{base}/input_b64"),
+                });
+                None
+            } else if !world.is_eval_world() {
+                diags.push(ManifestDiag {
+                    code: "ETEST_INPUT_UNSUPPORTED_WORLD",
+                    message: format!(
+                        "input_b64/input_path is not supported for world {}",
+                        world.as_str()
+                    ),
+                    path: format!("{base}/world"),
+                });
+                None
+            } else if t.input_b64.is_some() && t.input_path.is_some() {
+                diags.push(ManifestDiag {
+                    code: "ETEST_INPUT_CONFLICT",
+                    message: "at most one of input_b64 or input_path may be set".to_string(),
+                    path: format!("{base}/input_b64"),
+                });
+                None
+            } else if let Some(s) = t.input_b64.as_deref() {
+                let b64 = base64::engine::general_purpose::STANDARD;
+                match b64.decode(s.as_bytes()) {
+                    Ok(bytes) => Some(bytes),
+                    Err(err) => {
+                        diags.push(ManifestDiag {
+                            code: "ETEST_INPUT_B64_INVALID",
+                            message: format!("invalid base64 input_b64: {err}"),
+                            path: format!("{base}/input_b64"),
+                        });
+                        None
+                    }
+                }
+            } else if let Some(p) = t.input_path.as_deref() {
+                if p.contains('\\') {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_INPUT_UNSAFE_PATH",
+                        message: format!("input_path must not contain '\\\\': {p}"),
+                        path: format!("{base}/input_path"),
+                    });
+                    None
+                } else {
+                    let rel = Path::new(p);
+                    if let Err(err) = x07_host_runner::ensure_safe_rel_path(rel) {
+                        diags.push(ManifestDiag {
+                            code: "ETEST_INPUT_UNSAFE_PATH",
+                            message: format!("unsafe input_path: {err}"),
+                            path: format!("{base}/input_path"),
+                        });
+                        None
+                    } else {
+                        let abs = manifest_dir.join(rel);
+                        match std::fs::read(&abs) {
+                            Ok(bytes) => Some(bytes),
+                            Err(err) => {
+                                diags.push(ManifestDiag {
+                                    code: "ETEST_INPUT_PATH_READ_FAILED",
+                                    message: format!("failed to read input_path {p}: {err}"),
+                                    path: format!("{base}/input_path"),
+                                });
+                                None
+                            }
+                        }
+                    }
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         if !t.entry.contains('.') {
             diags.push(ManifestDiag {
                 code: "ETEST_ENTRY_INVALID",
@@ -1496,17 +1926,265 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
             }
         };
 
-        let returns = match parse_returns(t.returns.as_deref()) {
-            Some(r) => r,
-            None => {
-                diags.push(ManifestDiag {
-                    code: "ETEST_RETURNS_INVALID",
-                    message: format!("invalid returns: {:?}", t.returns),
-                    path: format!("{base}/returns"),
-                });
-                continue;
+        let is_pbt = t.pbt.is_some();
+        let returns = if is_pbt && t.returns.is_none() {
+            TestReturns::BytesStatusV1
+        } else {
+            match parse_returns(t.returns.as_deref()) {
+                Some(r) => r,
+                None => {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_RETURNS_INVALID",
+                        message: format!("invalid returns: {:?}", t.returns),
+                        path: format!("{base}/returns"),
+                    });
+                    continue;
+                }
             }
         };
+
+        if is_pbt && returns != TestReturns::BytesStatusV1 {
+            diags.push(ManifestDiag {
+                code: "X07T_EPBT_MANIFEST_INVALID",
+                message: "PBT tests must use returns=\"bytes_status_v1\"".to_string(),
+                path: format!("{base}/returns"),
+            });
+            continue;
+        }
+
+        if is_pbt && input.is_some() {
+            diags.push(ManifestDiag {
+                code: "X07T_EPBT_MANIFEST_INVALID",
+                message: "PBT tests must not set input_b64/input_path".to_string(),
+                path: format!("{base}/input_b64"),
+            });
+            continue;
+        }
+
+        let pbt_decl = if let Some(raw) = t.pbt.as_ref() {
+            if !world.is_eval_world() {
+                diags.push(ManifestDiag {
+                    code: "X07T_EPBT_UNSUPPORTED_WORLD",
+                    message: format!(
+                        "PBT tests are only supported for deterministic solve worlds, got {}",
+                        world.as_str()
+                    ),
+                    path: format!("{base}/world"),
+                });
+                None
+            } else if raw.params.is_empty() {
+                diags.push(ManifestDiag {
+                    code: "X07T_EPBT_PARAM_EMPTY",
+                    message: "pbt.params must be non-empty".to_string(),
+                    path: format!("{base}/pbt/params"),
+                });
+                None
+            } else {
+                let cases = raw.cases.unwrap_or(100);
+                if cases == 0 {
+                    diags.push(ManifestDiag {
+                        code: "X07T_EPBT_MANIFEST_INVALID",
+                        message: "pbt.cases must be >= 1".to_string(),
+                        path: format!("{base}/pbt/cases"),
+                    });
+                    None
+                } else {
+                    let max_shrinks = raw.max_shrinks.unwrap_or(4096);
+
+                    let mut params: Vec<pbt::PbtParam> = Vec::new();
+                    let mut seen_param_names: BTreeMap<String, usize> = BTreeMap::new();
+                    let mut ok = true;
+
+                    for (pi, p) in raw.params.iter().enumerate() {
+                        let pbase = format!("{base}/pbt/params/{pi}");
+
+                        if let Err(msg) = x07c::validate::validate_local_name(&p.name) {
+                            diags.push(ManifestDiag {
+                                code: "X07T_EPBT_MANIFEST_INVALID",
+                                message: format!("invalid param name: {msg}"),
+                                path: format!("{pbase}/name"),
+                            });
+                            ok = false;
+                            continue;
+                        }
+                        if p.name == "input" {
+                            diags.push(ManifestDiag {
+                                code: "X07T_EPBT_MANIFEST_INVALID",
+                                message: "param name \"input\" is reserved".to_string(),
+                                path: format!("{pbase}/name"),
+                            });
+                            ok = false;
+                            continue;
+                        }
+                        if let Some(prev) = seen_param_names.get(&p.name) {
+                            diags.push(ManifestDiag {
+                                code: "X07T_EPBT_MANIFEST_INVALID",
+                                message: format!(
+                                    "duplicate param name: {} (previous at index {})",
+                                    p.name, prev
+                                ),
+                                path: format!("{pbase}/name"),
+                            });
+                            ok = false;
+                            continue;
+                        }
+                        seen_param_names.insert(p.name.clone(), pi);
+
+                        let gen = match p.gen.kind.as_str() {
+                            "i32" => {
+                                let min = p.gen.min.unwrap_or(i32::MIN);
+                                let max = p.gen.max.unwrap_or(i32::MAX);
+                                if min > max {
+                                    diags.push(ManifestDiag {
+                                        code: "X07T_EPBT_MANIFEST_INVALID",
+                                        message: format!(
+                                            "i32 gen requires min <= max, got min={min} max={max}"
+                                        ),
+                                        path: format!("{pbase}/gen"),
+                                    });
+                                    ok = false;
+                                    continue;
+                                }
+                                pbt::PbtGen::I32 { min, max }
+                            }
+                            "bytes" => {
+                                let Some(max_len) = p.gen.max_len else {
+                                    diags.push(ManifestDiag {
+                                        code: "X07T_EPBT_MANIFEST_INVALID",
+                                        message: "bytes gen requires max_len".to_string(),
+                                        path: format!("{pbase}/gen/max_len"),
+                                    });
+                                    ok = false;
+                                    continue;
+                                };
+                                pbt::PbtGen::Bytes { max_len }
+                            }
+                            other => {
+                                diags.push(ManifestDiag {
+                                    code: "X07T_EPBT_UNKNOWN_GEN_KIND",
+                                    message: format!("unknown gen kind: {other:?}"),
+                                    path: format!("{pbase}/gen/kind"),
+                                });
+                                ok = false;
+                                continue;
+                            }
+                        };
+
+                        params.push(pbt::PbtParam {
+                            name: p.name.clone(),
+                            gen,
+                        });
+                    }
+
+                    let case_budget_raw = raw.case_budget.as_ref();
+                    let case_budget = pbt::PbtCaseBudget {
+                        fuel: case_budget_raw.and_then(|b| b.fuel).unwrap_or(200_000),
+                        timeout_ms: case_budget_raw.and_then(|b| b.timeout_ms).unwrap_or(250),
+                        max_mem_bytes: case_budget_raw
+                            .and_then(|b| b.max_mem_bytes)
+                            .unwrap_or(64 * 1024 * 1024),
+                        max_output_bytes: case_budget_raw
+                            .and_then(|b| b.max_output_bytes)
+                            .unwrap_or(1024 * 1024),
+                    };
+
+                    let budget_scope = if let Some(raw_scope) = raw.budget_scope.as_ref() {
+                        let mut scope_ok = true;
+                        let mut field_or_diag = |field: &'static str, value: Option<u64>| -> i32 {
+                            let Some(v) = value else {
+                                return 0;
+                            };
+                            match pbt::checked_u64_to_i32(field, v) {
+                                Ok(x) => x,
+                                Err(err) => {
+                                    diags.push(ManifestDiag {
+                                        code: "X07T_EPBT_MANIFEST_INVALID",
+                                        message: err.to_string(),
+                                        path: format!("{base}/pbt/budget_scope/{field}"),
+                                    });
+                                    scope_ok = false;
+                                    0
+                                }
+                            }
+                        };
+
+                        let scope = pbt::PbtBudgetScope {
+                            alloc_bytes: field_or_diag("alloc_bytes", raw_scope.alloc_bytes),
+                            alloc_calls: field_or_diag("alloc_calls", raw_scope.alloc_calls),
+                            realloc_calls: field_or_diag("realloc_calls", raw_scope.realloc_calls),
+                            memcpy_bytes: field_or_diag("memcpy_bytes", raw_scope.memcpy_bytes),
+                            sched_ticks: field_or_diag("sched_ticks", raw_scope.sched_ticks),
+                        };
+                        if scope_ok
+                            && (scope.alloc_bytes > 0
+                                || scope.alloc_calls > 0
+                                || scope.realloc_calls > 0
+                                || scope.memcpy_bytes > 0
+                                || scope.sched_ticks > 0)
+                        {
+                            Some(scope)
+                        } else {
+                            if !scope_ok {
+                                ok = false;
+                            }
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    if case_budget.fuel == 0 {
+                        diags.push(ManifestDiag {
+                            code: "X07T_EPBT_MANIFEST_INVALID",
+                            message: "pbt.case_budget.fuel must be >= 1".to_string(),
+                            path: format!("{base}/pbt/case_budget/fuel"),
+                        });
+                        ok = false;
+                    }
+                    if case_budget.timeout_ms == 0 {
+                        diags.push(ManifestDiag {
+                            code: "X07T_EPBT_MANIFEST_INVALID",
+                            message: "pbt.case_budget.timeout_ms must be >= 1".to_string(),
+                            path: format!("{base}/pbt/case_budget/timeout_ms"),
+                        });
+                        ok = false;
+                    }
+                    if case_budget.max_mem_bytes == 0 {
+                        diags.push(ManifestDiag {
+                            code: "X07T_EPBT_MANIFEST_INVALID",
+                            message: "pbt.case_budget.max_mem_bytes must be >= 1".to_string(),
+                            path: format!("{base}/pbt/case_budget/max_mem_bytes"),
+                        });
+                        ok = false;
+                    }
+                    if case_budget.max_output_bytes == 0 {
+                        diags.push(ManifestDiag {
+                            code: "X07T_EPBT_MANIFEST_INVALID",
+                            message: "pbt.case_budget.max_output_bytes must be >= 1".to_string(),
+                            path: format!("{base}/pbt/case_budget/max_output_bytes"),
+                        });
+                        ok = false;
+                    }
+
+                    if ok {
+                        Some(pbt::PbtDecl {
+                            cases,
+                            max_shrinks,
+                            params,
+                            case_budget,
+                            budget_scope,
+                        })
+                    } else {
+                        None
+                    }
+                }
+            }
+        } else {
+            None
+        };
+        if t.pbt.is_some() && pbt_decl.is_none() {
+            continue;
+        }
 
         if let Some(ms) = t.timeout_ms {
             if ms == 0 {
@@ -1697,6 +2375,8 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
             entry: t.entry.clone(),
             expect,
             returns,
+            pbt: pbt_decl,
+            input,
             fixture_root,
             policy_json,
             timeout_ms: t.timeout_ms,
@@ -1896,6 +2576,8 @@ struct Diag {
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<serde_json::Value>,
 }
 
 impl Diag {
@@ -1904,7 +2586,13 @@ impl Diag {
             code: code.into(),
             message: message.into(),
             path: None,
+            details: None,
         }
+    }
+
+    fn with_details(mut self, details: serde_json::Value) -> Self {
+        self.details = Some(details);
+        self
     }
 }
 

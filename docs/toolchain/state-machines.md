@@ -46,7 +46,7 @@ Example spec (copy/paste):
 - `gen/sm/.../<machine_tail>_v<version>/tests.x07.json`
   - module id: `gen.sm.<machine_id>_v<version>.tests`
 - `tests.manifest.json`
-  - schema: `x07.tests_manifest@0.1.0`
+  - schema: `x07.tests_manifest@0.2.0`
 
 Example (`machine_id="app.minimal_fsm"`, `--out gen/sm`):
 

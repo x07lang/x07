@@ -46,6 +46,8 @@
 - [Diagnostic codes](toolchain/diagnostic-codes.md)
 - [Review & trust artifacts](toolchain/review-trust.md)
 - [Testing](toolchain/testing.md)
+- [Property-based testing](toolchain/pbt.md)
+- [PBT repro → regression test](toolchain/pbt-fix-from-repro.md)
 - [Test manifest](toolchain/tests-manifest.md)
 - [Testing by example](toolchain/testing-by-example.md)
 - [Performance comparisons](dev/perf-compare.md)

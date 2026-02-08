@@ -16,7 +16,7 @@ use x07c::x07ast::{X07AstFile, X07AstKind};
 use crate::util;
 
 const X07_SM_SPEC_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07-sm.spec.schema.json");
-const X07_TESTS_MANIFEST_SCHEMA_VERSION: &str = "x07.tests_manifest@0.1.0";
+const X07_TESTS_MANIFEST_SCHEMA_VERSION: &str = "x07.tests_manifest@0.2.0";
 
 // Stable error codes for generated v1 machines.
 const SM_ERR_INVALID_SNAPSHOT_V1: i32 = 1;

@@ -6,7 +6,7 @@ This page is a hands-on tutorial for the built-in test harness.
 
 - a single canonical command
 - stable, machine-readable JSON report output (`x07.x07test@0.2.0`)
-- runs inside OS worlds (`run-os` / `run-os-sandboxed`)
+- runs in declared worlds (`solve-*`, `run-os`, `run-os-sandboxed`)
 
 Companion example (in the `x07` repo):
 
@@ -73,7 +73,7 @@ Replace `tests/tests.json` with:
 
 ```json
 {
-  "schema_version": "x07.tests_manifest@0.1.0",
+  "schema_version": "x07.tests_manifest@0.2.0",
   "tests": [
     { "id": "pure_add", "world": "run-os", "entry": "smoke.pure_add", "expect": "pass" }
   ]

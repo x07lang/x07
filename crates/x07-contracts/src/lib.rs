@@ -13,6 +13,7 @@ pub const X07AST_SCHEMA_VERSION: &str = X07AST_SCHEMA_VERSION_V0_4_0;
 pub const X07AST_SCHEMA_VERSIONS_SUPPORTED: &[&str] =
     &[X07AST_SCHEMA_VERSION_V0_3_0, X07AST_SCHEMA_VERSION_V0_4_0];
 pub const X07_MONO_MAP_SCHEMA_VERSION: &str = "x07.mono.map@0.1.0";
+pub const X07_PBT_REPRO_SCHEMA_VERSION: &str = "x07.pbt.repro@0.1.0";
 pub const X07DIAG_SCHEMA_VERSION: &str = "x07.x07diag@0.1.0";
 pub const X07TEST_SCHEMA_VERSION: &str = "x07.x07test@0.2.0";
 pub const X07_DIAG_CATALOG_SCHEMA_VERSION: &str = "x07.diag.catalog@0.1.0";

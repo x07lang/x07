@@ -1937,7 +1937,7 @@ fn generate_tests_manifest(_pkg: &str, types: &[TypeDef]) -> Result<GeneratedOut
     }
 
     let doc = TestManifest {
-        schema_version: "x07.tests_manifest@0.1.0",
+        schema_version: "x07.tests_manifest@0.2.0",
         tests,
     };
     let mut bytes = serde_json::to_vec_pretty(&doc)?;

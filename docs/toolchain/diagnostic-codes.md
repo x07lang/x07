@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 130
-- quickfix support (`sometimes` or `always`): 108
-- quickfix coverage: 83.08%
+- total codes: 149
+- quickfix support (`sometimes` or `always`): 127
+- quickfix coverage: 85.23%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -23,6 +23,12 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `ETEST_ID_DUPLICATE` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_ID_DUPLICATE`. |
 | `ETEST_ID_EMPTY` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_ID_EMPTY`. |
 | `ETEST_ID_NON_ASCII` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_ID_NON_ASCII`. |
+| `ETEST_INPUT_B64_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_INPUT_B64_INVALID`. |
+| `ETEST_INPUT_CONFLICT` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_INPUT_CONFLICT`. |
+| `ETEST_INPUT_NOT_ALLOWED_V010` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_INPUT_NOT_ALLOWED_V010`. |
+| `ETEST_INPUT_PATH_READ_FAILED` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_INPUT_PATH_READ_FAILED`. |
+| `ETEST_INPUT_UNSAFE_PATH` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_INPUT_UNSAFE_PATH`. |
+| `ETEST_INPUT_UNSUPPORTED_WORLD` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_INPUT_UNSUPPORTED_WORLD`. |
 | `ETEST_MANIFEST_IO` | x07 / run / error | never | Diagnostic code `ETEST_MANIFEST_IO`. |
 | `ETEST_MANIFEST_JSON` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_MANIFEST_JSON`. |
 | `ETEST_POLICY_FORBIDDEN` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_POLICY_FORBIDDEN`. |
@@ -54,6 +60,15 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-INTERNAL-0001` | x07 / run / error | never | Internal tool failure `X07-INTERNAL-0001`. |
 | `X07-MOVE-0001` | x07c / lint / error | always | `bytes.concat` uses the same identifier on both sides (use-after-move risk). |
 | `X07-MOVE-0002` | x07c / lint / error | always | `if` condition and branch both borrow `bytes.view` from the same owner. |
+| `X07-PBT-FIX-ARGS-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-ARGS-0001`. |
+| `X07-PBT-FIX-CONFLICT-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-CONFLICT-0001`. |
+| `X07-PBT-FIX-INFO-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-INFO-0001`. |
+| `X07-PBT-FIX-MANIFEST-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-MANIFEST-0001`. |
+| `X07-PBT-FIX-TEST-NOT-FOUND-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-TEST-NOT-FOUND-0001`. |
+| `X07-PBT-FIX-UNSUPPORTED-TY-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-UNSUPPORTED-TY-0001`. |
+| `X07-PBT-REPRO-PARSE-0001` | x07 / parse / error | sometimes | Core lint/schema diagnostic `X07-PBT-REPRO-PARSE-0001`. |
+| `X07-PBT-REPRO-READ-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-REPRO-READ-0001`. |
+| `X07-PBT-REPRO-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-REPRO-SCHEMA-0001`. |
 | `X07-POLICY-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-POLICY-SCHEMA-0001`. |
 | `X07-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-SCHEMA-0001`. |
 | `X07-SCHEMA-0002` | x07 / parse / error | always | Unsupported x07AST schema_version. |
@@ -117,6 +132,10 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07RR_LATENCY_OUT_OF_RANGE` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_LATENCY_OUT_OF_RANGE`. |
 | `X07RR_OP_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_OP_EMPTY`. |
 | `X07RR_URL_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_URL_EMPTY`. |
+| `X07T_EPBT_MANIFEST_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_MANIFEST_INVALID`. |
+| `X07T_EPBT_PARAM_EMPTY` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`. |
+| `X07T_EPBT_UNKNOWN_GEN_KIND` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNKNOWN_GEN_KIND`. |
+| `X07T_EPBT_UNSUPPORTED_WORLD` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNSUPPORTED_WORLD`. |
 | `X7I0001` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0001`. |
 | `X7I0100` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0100`. |
 | `X7I0110` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0110`. |
@@ -421,6 +440,126 @@ Agent strategy:
 ## `ETEST_ID_NON_ASCII`
 
 Summary: Test manifest validation diagnostic `ETEST_ID_NON_ASCII`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_INPUT_B64_INVALID`
+
+Summary: Test manifest validation diagnostic `ETEST_INPUT_B64_INVALID`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_INPUT_CONFLICT`
+
+Summary: Test manifest validation diagnostic `ETEST_INPUT_CONFLICT`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_INPUT_NOT_ALLOWED_V010`
+
+Summary: Test manifest validation diagnostic `ETEST_INPUT_NOT_ALLOWED_V010`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_INPUT_PATH_READ_FAILED`
+
+Summary: Test manifest validation diagnostic `ETEST_INPUT_PATH_READ_FAILED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_INPUT_UNSAFE_PATH`
+
+Summary: Test manifest validation diagnostic `ETEST_INPUT_UNSAFE_PATH`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
+
+Agent strategy:
+
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_INPUT_UNSUPPORTED_WORLD`
+
+Summary: Test manifest validation diagnostic `ETEST_INPUT_UNSUPPORTED_WORLD`.
 
 Origins:
 - x07 (stage: run, severity: error)
@@ -1064,6 +1203,186 @@ Agent strategy:
 - Apply quickfix.
 - Validate condition logic still matches intent.
 - Re-run lint/build.
+
+
+## `X07-PBT-FIX-ARGS-0001`
+
+Summary: Core lint/schema diagnostic `X07-PBT-FIX-ARGS-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-PBT-FIX-CONFLICT-0001`
+
+Summary: Core lint/schema diagnostic `X07-PBT-FIX-CONFLICT-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-PBT-FIX-INFO-0001`
+
+Summary: Core lint/schema diagnostic `X07-PBT-FIX-INFO-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-PBT-FIX-MANIFEST-0001`
+
+Summary: Core lint/schema diagnostic `X07-PBT-FIX-MANIFEST-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-PBT-FIX-TEST-NOT-FOUND-0001`
+
+Summary: Core lint/schema diagnostic `X07-PBT-FIX-TEST-NOT-FOUND-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-PBT-FIX-UNSUPPORTED-TY-0001`
+
+Summary: Core lint/schema diagnostic `X07-PBT-FIX-UNSUPPORTED-TY-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-PBT-REPRO-PARSE-0001`
+
+Summary: Core lint/schema diagnostic `X07-PBT-REPRO-PARSE-0001`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-PBT-REPRO-READ-0001`
+
+Summary: Core lint/schema diagnostic `X07-PBT-REPRO-READ-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-PBT-REPRO-SCHEMA-0001`
+
+Summary: Core lint/schema diagnostic `X07-PBT-REPRO-SCHEMA-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-POLICY-SCHEMA-0001`
@@ -2335,6 +2654,86 @@ Agent strategy:
 - Validate RR entry fields (key/url/kind/op/latency).
 - Regenerate or edit fixtures deterministically.
 - Re-run `x07 rr` operation.
+
+
+## `X07T_EPBT_MANIFEST_INVALID`
+
+Summary: Core lint/schema diagnostic `X07T_EPBT_MANIFEST_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07T_EPBT_PARAM_EMPTY`
+
+Summary: Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07T_EPBT_UNKNOWN_GEN_KIND`
+
+Summary: Core lint/schema diagnostic `X07T_EPBT_UNKNOWN_GEN_KIND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07T_EPBT_UNSUPPORTED_WORLD`
+
+Summary: Core lint/schema diagnostic `X07T_EPBT_UNSUPPORTED_WORLD`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X7I0001`

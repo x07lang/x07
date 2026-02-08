@@ -4,7 +4,9 @@ X07 includes a built-in test harness designed for agents.
 
 ## Test command
 
-- `x07 test`
+- `x07 test` (unit tests; manifest entries where `pbt` is not set)
+- `x07 test --pbt` (property-based tests only)
+- `x07 test --all` (unit + property-based)
 
 Each test declares an execution world (typically `run-os`).
 
@@ -18,6 +20,8 @@ See also:
 
 - [Test manifest](tests-manifest.md)
 - [Testing by example](testing-by-example.md)
+- [Property-based testing](pbt.md)
+- [PBT repro → regression test](pbt-fix-from-repro.md)
 - [Diagnostic codes](diagnostic-codes.md)
 - [Benchmarks](benchmarks.md)
 

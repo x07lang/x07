@@ -1149,6 +1149,20 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07.pbt.params@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.pbt.params@0.1.0.schema.json",
+      "schema_version": "",
+      "title": "X07 PBT Params v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07.pbt.repro@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.pbt.repro@0.1.0.schema.json",
+      "schema_version": "x07.pbt.repro@0.1.0",
+      "title": "X07 PBT Repro v0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07ast.schema.json",
       "schema_id": "https://x07.io/spec/x07ast.schema.json",
       "schema_version": "x07.x07ast@0.4.0",

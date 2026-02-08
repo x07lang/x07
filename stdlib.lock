@@ -479,6 +479,54 @@
       "version": "0.1.2"
     },
     {
+      "name": "std.pbt.case_v1",
+      "path": "stdlib/std/0.1.1/modules/std/pbt/case_v1.x07.json",
+      "relpath": "std/0.1.1/modules/std/pbt/case_v1.x07.json",
+      "sha256": "c8a72c802baf55b38525c18ca26bb1fa6f52e6afd866eb28d302896daa2d2d3f",
+      "size_bytes": 2442,
+      "version": "0.1.1"
+    },
+    {
+      "name": "std.pbt.case_v1",
+      "path": "stdlib/std/0.1.2/modules/std/pbt/case_v1.x07.json",
+      "relpath": "std/0.1.2/modules/std/pbt/case_v1.x07.json",
+      "sha256": "c8a72c802baf55b38525c18ca26bb1fa6f52e6afd866eb28d302896daa2d2d3f",
+      "size_bytes": 2442,
+      "version": "0.1.2"
+    },
+    {
+      "name": "std.pbt.gen_v1",
+      "path": "stdlib/std/0.1.1/modules/std/pbt/gen_v1.x07.json",
+      "relpath": "std/0.1.1/modules/std/pbt/gen_v1.x07.json",
+      "sha256": "48ab2f24b269e0ec62c531db6fec93b452869a282065fbd8128fdba4dc4ea9cd",
+      "size_bytes": 2503,
+      "version": "0.1.1"
+    },
+    {
+      "name": "std.pbt.gen_v1",
+      "path": "stdlib/std/0.1.2/modules/std/pbt/gen_v1.x07.json",
+      "relpath": "std/0.1.2/modules/std/pbt/gen_v1.x07.json",
+      "sha256": "48ab2f24b269e0ec62c531db6fec93b452869a282065fbd8128fdba4dc4ea9cd",
+      "size_bytes": 2503,
+      "version": "0.1.2"
+    },
+    {
+      "name": "std.pbt.shrink_v1",
+      "path": "stdlib/std/0.1.1/modules/std/pbt/shrink_v1.x07.json",
+      "relpath": "std/0.1.1/modules/std/pbt/shrink_v1.x07.json",
+      "sha256": "17842d6fa7c3e9eacf8fe55ee23d908d77527c17f04047bccd7c9164cf4795f4",
+      "size_bytes": 3978,
+      "version": "0.1.1"
+    },
+    {
+      "name": "std.pbt.shrink_v1",
+      "path": "stdlib/std/0.1.2/modules/std/pbt/shrink_v1.x07.json",
+      "relpath": "std/0.1.2/modules/std/pbt/shrink_v1.x07.json",
+      "sha256": "17842d6fa7c3e9eacf8fe55ee23d908d77527c17f04047bccd7c9164cf4795f4",
+      "size_bytes": 3978,
+      "version": "0.1.2"
+    },
+    {
       "name": "std.prng",
       "path": "stdlib/std/0.1.0/modules/std/prng.x07.json",
       "relpath": "std/0.1.0/modules/std/prng.x07.json",
@@ -841,6 +889,6 @@
       "version": "0.1.2"
     }
   ],
-  "stdlib_hash": "f0788f1d62c85e71242eb0a96d6040cb1bd7ac2df124d6ebc3574e643c5fabce",
+  "stdlib_hash": "6cb4ed5a8842c6053e5d2d13318ad4299d4cf884ccf2893bdc4dc94bdafb4cad",
   "stdlib_root": "stdlib/std"
 }
