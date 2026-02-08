@@ -4,6 +4,11 @@
 
 It evaluates whether a candidate patch actually resolves an instance, with deterministic artifacts and machine-readable reports.
 
+Related benchmark surfaces:
+
+- Performance regression canaries are tracked in CI (internal).
+- `x07-perf-compare`: cross-language performance comparisons (X07 vs C vs Rust).
+
 ## Commands
 
 - `x07 bench list --suite <suite.json>`

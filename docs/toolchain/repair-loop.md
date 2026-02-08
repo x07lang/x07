@@ -41,6 +41,7 @@ Notes:
 
 - `x07 fix` applies any `diagnostic.quickfix` entries that are `kind: "json_patch"` (RFC 6902) and then re-lints the result.
 - `--write` controls whether fixes are applied to disk; `--json` controls machine report output.
+- `x07 fix --suggest-generics` emits a suggested `x07.patchset@0.1.0` (no file edits) that rewrites near-identical type-suffixed functions (for example `_u32`, `_i32`) into a single generic base plus typed wrappers. Apply it with `x07 patch apply --in <patchset.json> --write`.
 
 ### 4) Apply an explicit patch (when required)
 

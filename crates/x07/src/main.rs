@@ -25,6 +25,7 @@ mod cli;
 mod diag;
 mod doc;
 mod doctor;
+mod fix_suggest;
 mod guide;
 mod init;
 mod patch;

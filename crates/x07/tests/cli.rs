@@ -6,8 +6,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use x07_contracts::{
     X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
-    X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_REVIEW_DIFF_SCHEMA_VERSION,
-    X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
+    X07_PATCHSET_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
+    X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
 };
 use x07c::json_patch;
 
@@ -1285,6 +1285,127 @@ fn x07_fix_applies_multiple_borrow_quickfixes() {
         lint_report["ok"], true,
         "expected lint to be green after fix"
     );
+}
+
+#[test]
+fn x07_fix_suggest_generics_emits_patchset_and_applies() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_fix_suggest_generics");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            { "kind": "export", "names": ["main.id_u32", "main.id_i32"] },
+            {
+                "kind": "defn",
+                "name": "main.id_u32",
+                "params": [{ "name": "x", "ty": "u32" }],
+                "result": "u32",
+                "body": "x"
+            },
+            {
+                "kind": "defn",
+                "name": "main.id_i32",
+                "params": [{ "name": "x", "ty": "i32" }],
+                "result": "i32",
+                "body": "x"
+            }
+        ]
+    }))
+    .expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program);
+
+    let patchset_path = dir.join("suggest.patchset.json");
+    let out = run_x07(&[
+        "fix",
+        "--input",
+        program_path.to_str().unwrap(),
+        "--suggest-generics",
+        "--out",
+        patchset_path.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], "x07.tool.fix.report@0.1.0");
+    assert_eq!(v["command"], "x07.fix");
+    assert_eq!(v["ok"], true);
+
+    let patch_bytes = std::fs::read(&patchset_path).expect("read patchset");
+    let patch_doc: Value = serde_json::from_slice(&patch_bytes).expect("parse patchset JSON");
+    assert_eq!(patch_doc["schema_version"], X07_PATCHSET_SCHEMA_VERSION);
+    assert_eq!(patch_doc["patches"].as_array().expect("patches[]").len(), 1);
+
+    let out = run_x07(&[
+        "patch",
+        "apply",
+        "--in",
+        patchset_path.to_str().unwrap(),
+        "--repo-root",
+        root.to_str().unwrap(),
+        "--write",
+        "--json",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let patched_bytes = std::fs::read(&program_path).expect("read patched x07AST");
+    let file = x07c::x07ast::parse_x07ast_json(&patched_bytes).expect("parse patched x07AST");
+    assert!(file.exports.contains("main.id"), "expected base export");
+
+    let base = file
+        .functions
+        .iter()
+        .find(|f| f.name == "main.id")
+        .expect("missing base defn");
+    assert_eq!(base.type_params.len(), 1);
+    assert_eq!(base.type_params[0].name, "A");
+
+    let w_u32 = file
+        .functions
+        .iter()
+        .find(|f| f.name == "main.id_u32")
+        .expect("missing u32 wrapper");
+    assert_eq!(
+        x07c::x07ast::expr_to_value(&w_u32.body),
+        serde_json::json!(["tapp", "main.id", "u32", "x"])
+    );
+    let w_i32 = file
+        .functions
+        .iter()
+        .find(|f| f.name == "main.id_i32")
+        .expect("missing i32 wrapper");
+    assert_eq!(
+        x07c::x07ast::expr_to_value(&w_i32.body),
+        serde_json::json!(["tapp", "main.id", "i32", "x"])
+    );
+
+    let out = run_x07(&["lint", "--input", program_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let lint_report = parse_json_stdout(&out);
+    assert_eq!(lint_report["ok"], true);
 }
 
 #[test]

@@ -1,0 +1,1 @@
+{"decls":[{"body":"x","kind":"defn","name":"main.id","params":[{"name":"x","ty":["t","A"]}],"result":["t","A"],"type_params":[{"bound":"any","name":"A"}]}],"imports":[],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.4.0","solve":["begin",["let","n",7],["let","m",["tapp","main.id","u32","n"]],["codec.write_u32_le","m"]]}

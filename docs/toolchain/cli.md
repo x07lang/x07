@@ -298,6 +298,7 @@ Notes:
 
 - `x07 lint` without `--json` prints the raw diagnostics report (`x07diag`, see `spec/x07diag.schema.json`).
 - `x07 fix` without `--json` prints the fixed x07AST JSON to stdout unless `--write` is set.
+- `x07 fix --suggest-generics` emits a suggested `x07.patchset@0.1.0` to stdout (or `--out <PATH>` in `--json` workflows).
 
 ## Agent bootstrap recipe
 

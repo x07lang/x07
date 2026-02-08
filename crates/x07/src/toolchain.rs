@@ -38,6 +38,10 @@ pub struct FixArgs {
     pub world: WorldId,
     #[arg(long)]
     pub write: bool,
+    /// Emit a suggested `x07.patchset@0.1.0` that migrates near-identical type-suffixed functions
+    /// into a single generic base plus typed wrappers.
+    #[arg(long)]
+    pub suggest_generics: bool,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -137,9 +141,30 @@ pub fn cmd_fix(
     if args.write && machine.out.is_some() {
         anyhow::bail!("--out cannot be combined with --write");
     }
+    if args.suggest_generics && args.write {
+        anyhow::bail!("--suggest-generics cannot be combined with --write");
+    }
 
     let bytes = std::fs::read(&args.input)
         .with_context(|| format!("read input: {}", args.input.display()))?;
+
+    if args.suggest_generics {
+        let patchset = crate::fix_suggest::suggest_generics_patchset(&args.input, &bytes)
+            .context("suggest-generics")?;
+        let mut out = crate::util::canonical_jcs_bytes(&patchset)?;
+        if out.last() != Some(&b'\n') {
+            out.push(b'\n');
+        }
+
+        match machine.out.as_deref() {
+            Some(path) => crate::reporting::write_bytes(path, &out)?,
+            None => {
+                std::io::Write::write_all(&mut std::io::stdout(), &out).context("write stdout")?
+            }
+        }
+
+        return Ok(std::process::ExitCode::SUCCESS);
+    }
 
     let mut doc: serde_json::Value = match serde_json::from_slice(&bytes) {
         Ok(doc) => doc,

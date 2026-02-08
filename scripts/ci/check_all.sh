@@ -80,6 +80,9 @@ cargo test
 step "monomorphization map determinism"
 "$python_bin" scripts/check_monomorphization_map.py
 
+step "generics intrinsics coherence"
+"$python_bin" scripts/check_generics_intrinsics.py --check
+
 step "cargo clippy --all-targets -- -D warnings"
 cargo clippy --all-targets -- -D warnings
 

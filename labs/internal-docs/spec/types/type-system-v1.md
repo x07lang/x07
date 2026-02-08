@@ -8,7 +8,9 @@ Phase H1 introduces a small, explicit set of concrete types with ABI-stable layo
 - `defasync` decl objects (Phase G2): `{"kind":"defasync","name":"main.f","params":[{"name":"arg1","ty":"ty1"}],"result":"bytes","body":<expr>}`
   - `defasync` return type is currently restricted to `bytes`.
 
-Type names are identifiers (no generics yet).
+In the v1 monomorphic ABI subset, type names are identifiers.
+
+As of `x07.x07ast@0.4.0`, signature types are `type_ref` (string or structured type expression), and `defn`/`defasync` may declare `type_params` for compile-time monomorphized generics.
 
 ## Supported types
 

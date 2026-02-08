@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import difflib
+import hashlib
 import json
 import os
 import subprocess
@@ -49,6 +51,27 @@ def _json_canon(x: Any) -> str:
 def _fail(msg: str) -> int:
     print(f"ERROR: {msg}", file=sys.stderr)
     return 2
+
+
+def _sha256_hex(b: bytes) -> str:
+    return hashlib.sha256(b).hexdigest()
+
+
+def _preview_diff(a: str, b: str, *, max_lines: int = 80) -> str:
+    diff = list(
+        difflib.unified_diff(
+            a.splitlines(),
+            b.splitlines(),
+            fromfile="first",
+            tofile="second",
+            lineterm="",
+        )
+    )
+    if not diff:
+        return ""
+    if len(diff) > max_lines:
+        diff = diff[:max_lines] + ["... (diff truncated)"]
+    return "\n".join(diff)
 
 
 def run_x07c_compile(*, program: Path, mono_map_out: Path, c_out: Path, x07c: Path | None, verbose: bool) -> None:
@@ -191,13 +214,23 @@ def main(argv: list[str]) -> int:
     with TemporaryDirectory(prefix="x07-mono-map-") as tmp:
         tmp_dir = Path(tmp)
         for fixture in fixtures:
-            mono_map_path = tmp_dir / f"{fixture.name}.mono_map.json"
-            c_out_path = tmp_dir / f"{fixture.name}.out.c"
             try:
+                mono_map_path_a = tmp_dir / f"{fixture.name}.a.mono_map.json"
+                mono_map_path_b = tmp_dir / f"{fixture.name}.b.mono_map.json"
+                c_out_path_a = tmp_dir / f"{fixture.name}.a.out.c"
+                c_out_path_b = tmp_dir / f"{fixture.name}.b.out.c"
+
                 run_x07c_compile(
                     program=fixture.program,
-                    mono_map_out=mono_map_path,
-                    c_out=c_out_path,
+                    mono_map_out=mono_map_path_a,
+                    c_out=c_out_path_a,
+                    x07c=args.x07c,
+                    verbose=args.verbose,
+                )
+                run_x07c_compile(
+                    program=fixture.program,
+                    mono_map_out=mono_map_path_b,
+                    c_out=c_out_path_b,
                     x07c=args.x07c,
                     verbose=args.verbose,
                 )
@@ -205,17 +238,38 @@ def main(argv: list[str]) -> int:
                 return _fail(str(e))
 
             try:
-                with mono_map_path.open("r", encoding="utf-8") as f:
-                    doc = json.load(f)
+                doc_a = json.loads(mono_map_path_a.read_text(encoding="utf-8"))
+                doc_b = json.loads(mono_map_path_b.read_text(encoding="utf-8"))
             except Exception as e:
                 return _fail(f"{fixture.name}: parse mono map JSON: {e}")
 
             try:
-                if not isinstance(doc, dict):
+                if not isinstance(doc_a, dict):
                     raise ValueError("top-level must be an object")
-                validate_mono_map(doc, fixture_name=fixture.name)
+                if not isinstance(doc_b, dict):
+                    raise ValueError("top-level must be an object")
+                validate_mono_map(doc_a, fixture_name=fixture.name)
+                validate_mono_map(doc_b, fixture_name=fixture.name)
             except Exception as e:
                 return _fail(str(e))
+
+            mono_a = mono_map_path_a.read_bytes()
+            mono_b = mono_map_path_b.read_bytes()
+            if mono_a != mono_b:
+                return _fail(
+                    f"{fixture.name}: mono_map output is not deterministic: "
+                    f"sha256(first)={_sha256_hex(mono_a)} sha256(second)={_sha256_hex(mono_b)}\n"
+                    f"{_preview_diff(mono_a.decode('utf-8', errors='replace'), mono_b.decode('utf-8', errors='replace'))}"
+                )
+
+            c_a = c_out_path_a.read_bytes()
+            c_b = c_out_path_b.read_bytes()
+            if c_a != c_b:
+                return _fail(
+                    f"{fixture.name}: emitted C output is not deterministic: "
+                    f"sha256(first)={_sha256_hex(c_a)} sha256(second)={_sha256_hex(c_b)}\n"
+                    f"{_preview_diff(c_a.decode('utf-8', errors='replace'), c_b.decode('utf-8', errors='replace'))}"
+                )
 
     return 0
 

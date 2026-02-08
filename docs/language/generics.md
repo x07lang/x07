@@ -42,6 +42,20 @@ Bounds are canonical and small:
 - `hashable`
 - `orderable`
 
+## Bounds (currently supported concrete types)
+
+<!-- x07-generics-bounds:begin -->
+```json
+{
+  "any": ["*"],
+  "bytes_like": ["bytes", "bytes_view"],
+  "num_like": ["i32", "u32"],
+  "hashable": ["i32", "u32"],
+  "orderable": ["i32", "u32"]
+}
+```
+<!-- x07-generics-bounds:end -->
+
 ## `tapp` (generic instantiation at call sites)
 
 Form:
@@ -57,6 +71,22 @@ Examples:
 ["tapp","std.heap.push","u32","h",7]
 ["tapp","std.vec.with_capacity",["t","A"],"cap"]
 ```
+
+## Examples
+
+- `docs/examples/16_generics_identity.x07.json`
+- `docs/examples/17_generics_containers.x07.json`
+
+## Migration pattern (generic base + wrappers)
+
+To migrate existing concrete-only APIs without breaking callers:
+
+- Introduce a new generic base function (for example `pkg.foo` with `type_params: [{ "name": "A" }]`).
+- Keep existing concrete entrypoints as thin wrappers that call the base via `tapp` (for example `pkg.foo_u32` → `["tapp","pkg.foo","u32", ...]`).
+
+Tooling support:
+
+- `x07 fix --suggest-generics` emits a suggested `x07.patchset@0.1.0` for converting near-identical type-suffixed functions into a generic base plus wrappers.
 
 ## `ty.*` intrinsics (type-dependent ops inside generic bodies)
 
