@@ -1385,7 +1385,7 @@ fn x07_fix_suggest_generics_emits_patchset_and_applies() {
         .expect("missing u32 wrapper");
     assert_eq!(
         x07c::x07ast::expr_to_value(&w_u32.body),
-        serde_json::json!(["tapp", "main.id", "u32", "x"])
+        serde_json::json!(["tapp", "main.id", ["tys", "u32"], "x"])
     );
     let w_i32 = file
         .functions
@@ -1394,7 +1394,7 @@ fn x07_fix_suggest_generics_emits_patchset_and_applies() {
         .expect("missing i32 wrapper");
     assert_eq!(
         x07c::x07ast::expr_to_value(&w_i32.body),
-        serde_json::json!(["tapp", "main.id", "i32", "x"])
+        serde_json::json!(["tapp", "main.id", ["tys", "i32"], "x"])
     );
 
     let out = run_x07(&["lint", "--input", program_path.to_str().unwrap()]);
@@ -1406,6 +1406,141 @@ fn x07_fix_suggest_generics_emits_patchset_and_applies() {
     );
     let lint_report = parse_json_stdout(&out);
     assert_eq!(lint_report["ok"], true);
+}
+
+#[test]
+fn x07_e2e_fix_inserts_tapp_then_build_succeeds() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_e2e_fix_tapp_build");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    // 1) Scaffold a minimal project (gives us x07.json + x07.lock.json layout).
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // 2) Overwrite src/main.x07.json with a v0.4.0 entry that has:
+    //    - a generic defn main.id<A>(x:A)->A
+    //    - a call in solve that omits tapp (build --repair off must fail)
+    let program_bytes = serde_json::to_vec(&serde_json::json!({
+        "schema_version": "x07.x07ast@0.4.0",
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.id",
+                "type_params": [
+                    { "name": "A" }
+                ],
+                "params": [
+                    { "name": "x", "ty": ["t", "A"] }
+                ],
+                "result": ["t", "A"],
+                "body": "x"
+            }
+        ],
+        "solve": ["main.id", ["bytes.lit", "hello"]]
+    }))
+    .expect("serialize x07AST v0.4.0");
+
+    let entry_path = dir.join("src/main.x07.json");
+    write_bytes(&entry_path, &program_bytes);
+
+    // 3) Build with repair OFF must fail (missing tapp).
+    let out_c = dir.join("target/out.c");
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "--out",
+            out_c.to_str().unwrap(),
+            "build",
+            "--project",
+            "x07.json",
+            "--repair",
+            "off",
+        ],
+    );
+    assert!(
+        !out.status.success(),
+        "expected build failure without tapp; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // 4) x07 fix should insert tapp via JSON Patch quickfix.
+    let out = run_x07_in_dir(
+        &dir,
+        &["fix", "--input", "src/main.x07.json", "--write", "--json"],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], "x07.tool.fix.report@0.1.0");
+    assert_eq!(v["command"], "x07.fix");
+    assert_eq!(v["ok"], true);
+    assert!(
+        v["diagnostics"]
+            .as_array()
+            .expect("diagnostics[]")
+            .is_empty(),
+        "expected fix report to be clean"
+    );
+
+    // 5) Verify the file was actually rewritten to tapp(...) form.
+    let fixed_bytes = std::fs::read(&entry_path).expect("read fixed entry");
+    let fixed_doc: serde_json::Value =
+        serde_json::from_slice(&fixed_bytes).expect("parse fixed entry JSON");
+
+    let solve = fixed_doc["solve"].as_array().expect("solve must be array");
+    assert_eq!(solve.first().and_then(|v| v.as_str()), Some("tapp"));
+    assert_eq!(solve.get(1).and_then(|v| v.as_str()), Some("main.id"));
+
+    let tys = solve
+        .get(2)
+        .and_then(|v| v.as_array())
+        .expect("tapp type args must be array");
+    assert_eq!(tys.first().and_then(|v| v.as_str()), Some("tys"));
+    assert_eq!(tys.get(1).and_then(|v| v.as_str()), Some("bytes"));
+
+    // 6) Build again with repair OFF must now succeed.
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "--out",
+            out_c.to_str().unwrap(),
+            "build",
+            "--project",
+            "x07.json",
+            "--repair",
+            "off",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out_c.is_file(),
+        "expected out.c to exist after successful build"
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
 }
 
 #[test]

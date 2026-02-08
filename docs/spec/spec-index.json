@@ -1128,6 +1128,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-typecheck.diagdata@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07-typecheck.diagdata@0.1.0.schema.json",
+      "schema_version": "",
+      "title": "X07 Typecheck Diagnostic Data v0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-website.package-index.schema.json",
       "schema_id": "https://x07.io/spec/x07-website.package-index.schema.json",
       "schema_version": "x07.website.package-index@0.2.0",

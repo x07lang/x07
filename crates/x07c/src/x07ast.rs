@@ -940,6 +940,46 @@ pub fn canonicalize_x07ast_file(file: &mut X07AstFile) {
     file.functions.sort_by(|a, b| a.name.cmp(&b.name));
     file.async_functions.sort_by(|a, b| a.name.cmp(&b.name));
     file.extern_functions.sort_by(|a, b| a.name.cmp(&b.name));
+    reptr_x07ast_file(file);
+}
+
+fn reptr_x07ast_file(file: &mut X07AstFile) {
+    if let Some(solve) = &mut file.solve {
+        reptr_expr(solve, "/solve");
+    }
+
+    let export_slots = if file.kind == X07AstKind::Module && !file.exports.is_empty() {
+        1usize
+    } else {
+        0usize
+    };
+    let extern_slots = file.extern_functions.len();
+    let defn_base = export_slots + extern_slots;
+
+    for (idx, f) in file.functions.iter_mut().enumerate() {
+        let decl_idx = defn_base + idx;
+        reptr_expr(&mut f.body, &format!("/decls/{decl_idx}/body"));
+    }
+    let sync_fns_count = file.functions.len();
+    for (idx, f) in file.async_functions.iter_mut().enumerate() {
+        let decl_idx = defn_base + sync_fns_count + idx;
+        reptr_expr(&mut f.body, &format!("/decls/{decl_idx}/body"));
+    }
+}
+
+fn reptr_expr(expr: &mut Expr, ptr: &str) {
+    match expr {
+        Expr::Int { ptr: p, .. } | Expr::Ident { ptr: p, .. } => {
+            *p = ptr.to_string();
+        }
+        Expr::List { items, ptr: p } => {
+            *p = ptr.to_string();
+            for (idx, item) in items.iter_mut().enumerate() {
+                let item_ptr = format!("{ptr}/{idx}");
+                reptr_expr(item, &item_ptr);
+            }
+        }
+    }
 }
 
 fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
@@ -1009,6 +1049,41 @@ pub fn type_ref_to_value(tr: &TypeRef) -> Value {
                 items.push(type_ref_to_value(a));
             }
             Value::Array(items)
+        }
+    }
+}
+
+pub fn type_ref_from_expr(e: &Expr) -> Result<TypeRef, String> {
+    match e {
+        Expr::Ident { name, .. } => Ok(TypeRef::Named(name.clone())),
+        Expr::Int { .. } => Err("type expression must be a string or a list".to_string()),
+        Expr::List { items, .. } => {
+            if items.is_empty() {
+                return Err("type expression list must not be empty".to_string());
+            }
+            let head = items[0]
+                .as_ident()
+                .ok_or_else(|| "type expression head must be a string".to_string())?;
+            if head == "t" {
+                if items.len() != 2 {
+                    return Err("type var expression must be [\"t\", <name>]".to_string());
+                }
+                let name = items[1]
+                    .as_ident()
+                    .ok_or_else(|| "type var name must be a string".to_string())?;
+                return Ok(TypeRef::Var(name.to_string()));
+            }
+            if items.len() < 2 {
+                return Err("type application must have at least 1 argument".to_string());
+            }
+            let mut args: Vec<TypeRef> = Vec::with_capacity(items.len().saturating_sub(1));
+            for item in items.iter().skip(1) {
+                args.push(type_ref_from_expr(item)?);
+            }
+            Ok(TypeRef::App {
+                head: head.to_string(),
+                args,
+            })
         }
     }
 }

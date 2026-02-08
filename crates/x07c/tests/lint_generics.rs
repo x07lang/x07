@@ -21,11 +21,11 @@ fn lint_rejects_undefined_type_var_in_signature() {
                 "name": "main.bad",
                 "type_params": [{"name":"A"}],
                 "params": [{"name":"x","ty":["t","B"]}],
-                "result": ["t","A"],
+                "result": ["t","B"],
                 "body": "x"
             }
         ],
-        "solve": ["main.bad", 0]
+        "solve": ["bytes.alloc", 0]
     });
     let bytes = serde_json::to_vec(&doc).expect("encode x07AST");
 
@@ -74,7 +74,7 @@ fn lint_warns_on_unused_type_param() {
                 "body": "x"
             }
         ],
-        "solve": ["main.unused", 0]
+        "solve": ["bytes.alloc", 0]
     });
     let bytes = serde_json::to_vec(&doc).expect("encode x07AST");
 

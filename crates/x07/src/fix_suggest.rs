@@ -322,6 +322,23 @@ fn expr_tag_uses_supported(expr: &Expr, tag: &str, in_type_pos: bool) -> bool {
             };
             let head_name = head.as_ident().unwrap_or("");
             if head_name == "tapp" {
+                if items.len() >= 3 {
+                    if let Expr::List { items: tys, .. } = &items[2] {
+                        if tys.first().and_then(Expr::as_ident) == Some("tys") {
+                            let mut ok = expr_tag_uses_supported(&items[0], tag, false);
+                            ok &= expr_tag_uses_supported(&items[1], tag, false);
+                            ok &= expr_tag_uses_supported(&tys[0], tag, false);
+                            for item in tys.iter().skip(1) {
+                                ok &= expr_tag_uses_supported(item, tag, true);
+                            }
+                            for item in items.iter().skip(3) {
+                                ok &= expr_tag_uses_supported(item, tag, false);
+                            }
+                            return ok;
+                        }
+                    }
+                }
+
                 let mut ok = true;
                 let mut tapp_type_prefix = true;
                 for (idx, item) in items.iter().enumerate() {
@@ -437,6 +454,44 @@ fn rewrite_expr_tag_to_typevar(expr: &Expr, tag: &str, var: &str) -> Result<Expr
             };
             let head_name = head.as_ident().unwrap_or("");
             if head_name == "tapp" {
+                if items.len() >= 3 {
+                    if let Expr::List {
+                        items: tys,
+                        ptr: tys_ptr,
+                    } = &items[2]
+                    {
+                        if tys.first().and_then(Expr::as_ident) == Some("tys") {
+                            let mut out_items = Vec::with_capacity(items.len());
+                            out_items.push(items[0].clone());
+                            out_items.push(items[1].clone());
+
+                            let mut out_tys = Vec::with_capacity(tys.len());
+                            out_tys.push(tys[0].clone());
+                            for ty_arg in tys.iter().skip(1) {
+                                if let Expr::Ident { name, ptr: tptr } = ty_arg {
+                                    if name == tag {
+                                        out_tys.push(type_var_expr(var, tptr));
+                                        continue;
+                                    }
+                                }
+                                out_tys.push(ty_arg.clone());
+                            }
+                            out_items.push(Expr::List {
+                                items: out_tys,
+                                ptr: tys_ptr.clone(),
+                            });
+
+                            for item in items.iter().skip(3) {
+                                out_items.push(rewrite_expr_tag_to_typevar(item, tag, var)?);
+                            }
+                            return Ok(Expr::List {
+                                items: out_items,
+                                ptr: ptr.clone(),
+                            });
+                        }
+                    }
+                }
+
                 if items.len() < 3 {
                     return Ok(expr.clone());
                 }
@@ -518,8 +573,17 @@ fn build_wrapper(def: &AstFunctionDef, base: &str, tag: &str) -> AstFunctionDef 
         name: base.to_string(),
         ptr: def.body.ptr().to_string(),
     });
-    items.push(Expr::Ident {
-        name: tag.to_string(),
+    items.push(Expr::List {
+        items: vec![
+            Expr::Ident {
+                name: "tys".to_string(),
+                ptr: def.body.ptr().to_string(),
+            },
+            Expr::Ident {
+                name: tag.to_string(),
+                ptr: def.body.ptr().to_string(),
+            },
+        ],
         ptr: def.body.ptr().to_string(),
     });
     for p in &def.params {

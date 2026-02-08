@@ -11,8 +11,8 @@ use crate::program::{
 };
 use crate::types::Ty;
 use crate::x07ast::{
-    canon_value_jcs, type_ref_to_value, AstAsyncFunctionDef, AstExternFunctionDecl, AstFunctionDef,
-    AstFunctionParam, TypeParam, TypeRef,
+    canon_value_jcs, type_ref_from_expr, type_ref_to_value, AstAsyncFunctionDef,
+    AstExternFunctionDecl, AstFunctionDef, AstFunctionParam, TypeParam, TypeRef,
 };
 
 pub const MONO_NAME_MARKER: &str = "__x07_mono_v1__";
@@ -958,18 +958,41 @@ fn lower_tapp(
 
     let arity = sig.type_params.len();
 
-    if items.len() < 2 + arity {
-        return Err(CompilerError::new(
-            CompileErrorKind::Typing,
-            format!("X07-TY-0105: tapp arity mismatch for {callee:?}: expected {arity} type args"),
-        ));
-    }
-    let type_arg_exprs = items[2..2 + arity].to_vec();
-    let value_arg_exprs = items[2 + arity..].to_vec();
+    let (type_arg_exprs, value_arg_exprs) = match items.get(2) {
+        Some(Expr::List { items: tys, .. })
+            if tys.first().and_then(Expr::as_ident) == Some("tys") =>
+        {
+            let type_arg_exprs = tys.iter().skip(1).cloned().collect::<Vec<_>>();
+            if type_arg_exprs.len() != arity {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "X07-TY-0105: tapp arity mismatch for {callee:?}: expected {arity} type args got {}",
+                        type_arg_exprs.len()
+                    ),
+                ));
+            }
+            (type_arg_exprs, items[3..].to_vec())
+        }
+        _ => {
+            if items.len() < 2 + arity {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "X07-TY-0105: tapp arity mismatch for {callee:?}: expected {arity} type args"
+                    ),
+                ));
+            }
+            let type_arg_exprs = items[2..2 + arity].to_vec();
+            let value_arg_exprs = items[2 + arity..].to_vec();
+            (type_arg_exprs, value_arg_exprs)
+        }
+    };
 
     let mut type_args: Vec<TypeRef> = Vec::with_capacity(arity);
     for e in type_arg_exprs {
-        let mut tr = type_ref_from_expr(&e)?;
+        let mut tr =
+            type_ref_from_expr(&e).map_err(|m| CompilerError::new(CompileErrorKind::Parse, m))?;
         if let Some(subst) = subst {
             tr = subst_type_ref(&tr, subst)?;
         }
@@ -1151,7 +1174,8 @@ fn lower_ty_intrinsic(
         ));
     }
 
-    let mut tr = type_ref_from_expr(&items[1])?;
+    let mut tr = type_ref_from_expr(&items[1])
+        .map_err(|m| CompilerError::new(CompileErrorKind::Parse, m))?;
     if let Some(subst) = subst {
         tr = subst_type_ref(&tr, subst)?;
     }
@@ -1613,58 +1637,5 @@ fn lower_ty_intrinsic(
             CompileErrorKind::Typing,
             format!("X07-TY-0102: unknown ty intrinsic: {other:?}"),
         )),
-    }
-}
-
-fn type_ref_from_expr(e: &Expr) -> Result<TypeRef, CompilerError> {
-    match e {
-        Expr::Ident { name, .. } => Ok(TypeRef::Named(name.clone())),
-        Expr::Int { .. } => Err(CompilerError::new(
-            CompileErrorKind::Parse,
-            "type expression must be a string or a list".to_string(),
-        )),
-        Expr::List { items, .. } => {
-            if items.is_empty() {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Parse,
-                    "type expression list must not be empty".to_string(),
-                ));
-            }
-            let head = items[0].as_ident().ok_or_else(|| {
-                CompilerError::new(
-                    CompileErrorKind::Parse,
-                    "type expression head must be a string".to_string(),
-                )
-            })?;
-            if head == "t" {
-                if items.len() != 2 {
-                    return Err(CompilerError::new(
-                        CompileErrorKind::Parse,
-                        "type var expression must be [\"t\", <name>]".to_string(),
-                    ));
-                }
-                let name = items[1].as_ident().ok_or_else(|| {
-                    CompilerError::new(
-                        CompileErrorKind::Parse,
-                        "type var name must be a string".to_string(),
-                    )
-                })?;
-                return Ok(TypeRef::Var(name.to_string()));
-            }
-            if items.len() < 2 {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Parse,
-                    "type application must have at least 1 argument".to_string(),
-                ));
-            }
-            let mut args: Vec<TypeRef> = Vec::with_capacity(items.len().saturating_sub(1));
-            for item in items.iter().skip(1) {
-                args.push(type_ref_from_expr(item)?);
-            }
-            Ok(TypeRef::App {
-                head: head.to_string(),
-                args,
-            })
-        }
     }
 }

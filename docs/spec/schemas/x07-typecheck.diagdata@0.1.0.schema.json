@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-typecheck.diagdata@0.1.0.schema.json",
+  "title": "X07 Typecheck Diagnostic Data v0.1.0",
+  "description": "Schemas for diagnostics.data payloads emitted by the local type inference/typecheck pass (3.2). Used by CI to enforce diagnostic completeness and stable machine interfaces.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "data"],
+  "properties": {
+    "code": { "type": "string" },
+    "data": { "type": "object" }
+  },
+  "allOf": [
+    { "if": { "properties": { "code": { "const": "X07-TYPE-CALL-0001" } } }, "then": { "$ref": "#/$defs/type_call_unknown" } },
+    { "if": { "properties": { "code": { "const": "X07-TYPE-CALL-0002" } } }, "then": { "$ref": "#/$defs/type_call_arg_mismatch" } },
+    { "if": { "properties": { "code": { "const": "X07-TYPE-CALL-0003" } } }, "then": { "$ref": "#/$defs/type_call_arity_mismatch" } },
+    { "if": { "properties": { "code": { "const": "X07-TYPE-RET-0001" } } }, "then": { "$ref": "#/$defs/type_return_mismatch" } },
+    { "if": { "properties": { "code": { "const": "X07-TYPE-IF-0001" } } }, "then": { "$ref": "#/$defs/type_if_cond_mismatch" } },
+    { "if": { "properties": { "code": { "const": "X07-TYPE-IF-0002" } } }, "then": { "$ref": "#/$defs/type_if_branch_mismatch" } },
+    { "if": { "properties": { "code": { "const": "X07-TYPE-SET-0001" } } }, "then": { "$ref": "#/$defs/type_set_unknown" } },
+    { "if": { "properties": { "code": { "const": "X07-TYPE-SET-0002" } } }, "then": { "$ref": "#/$defs/type_set_mismatch" } },
+    { "if": { "properties": { "code": { "const": "X07-TAPP-INFER-0001" } } }, "then": { "$ref": "#/$defs/tapp_infer_failed" } },
+    { "if": { "properties": { "code": { "const": "X07-TAPP-ELAB-0001" } } }, "then": { "$ref": "#/$defs/tapp_elab" } },
+    { "if": { "properties": { "code": { "const": "X07-TYPE-UNIFY-0001" } } }, "then": { "$ref": "#/$defs/type_unify_failed" } }
+  ],
+  "$defs": {
+    "type_like": {
+      "description": "Type-like value. Uses x07 type_ref syntax (string or structured list) plus ['meta', N] for unsolved metas (debug-only).",
+      "anyOf": [
+        { "type": "string" },
+        { "type": "array" },
+        {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [{ "const": "meta" }, { "type": "integer", "minimum": 0 }]
+        }
+      ]
+    },
+
+    "type_call_unknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TYPE-CALL-0001" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["callee"],
+          "properties": {
+            "callee": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "type_call_arity_mismatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TYPE-CALL-0003" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["callee", "want", "got"],
+          "properties": {
+            "callee": { "type": "string" },
+            "want": { "type": "integer", "minimum": 0 },
+            "got": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+
+    "type_call_arg_mismatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TYPE-CALL-0002" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["callee", "arg_index", "expected", "got"],
+          "properties": {
+            "callee": { "type": "string" },
+            "arg_index": { "type": "integer", "minimum": 0 },
+            "expected": { "$ref": "#/$defs/type_like" },
+            "got": { "$ref": "#/$defs/type_like" }
+          }
+        }
+      }
+    },
+
+    "type_return_mismatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TYPE-RET-0001" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["expected", "got"],
+          "properties": {
+            "expected": { "$ref": "#/$defs/type_like" },
+            "got": { "$ref": "#/$defs/type_like" }
+          }
+        }
+      }
+    },
+
+    "type_if_cond_mismatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TYPE-IF-0001" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["got"],
+          "properties": {
+            "got": { "$ref": "#/$defs/type_like" }
+          }
+        }
+      }
+    },
+
+    "type_if_branch_mismatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TYPE-IF-0002" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["then", "else"],
+          "properties": {
+            "then": { "$ref": "#/$defs/type_like" },
+            "else": { "$ref": "#/$defs/type_like" }
+          }
+        }
+      }
+    },
+
+    "type_set_unknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TYPE-SET-0001" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["local"],
+          "properties": {
+            "local": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "type_set_mismatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TYPE-SET-0002" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["local", "expected", "got"],
+          "properties": {
+            "local": { "type": "string" },
+            "expected": { "$ref": "#/$defs/type_like" },
+            "got": { "$ref": "#/$defs/type_like" }
+          }
+        }
+      }
+    },
+
+    "tapp_infer_failed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TAPP-INFER-0001" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["callee", "unresolved_type_params"],
+          "properties": {
+            "callee": { "type": "string" },
+            "unresolved_type_params": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": []
+            }
+          }
+        }
+      }
+    },
+
+    "tapp_elab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TAPP-ELAB-0001" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["callee", "type_args"],
+          "properties": {
+            "callee": { "type": "string" },
+            "type_args": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/type_like" },
+              "default": []
+            }
+          }
+        }
+      }
+    },
+
+    "type_unify_failed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data"],
+      "properties": {
+        "code": { "const": "X07-TYPE-UNIFY-0001" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lhs", "rhs", "reason"],
+          "properties": {
+            "lhs": { "$ref": "#/$defs/type_like" },
+            "rhs": { "$ref": "#/$defs/type_like" },
+            "reason": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

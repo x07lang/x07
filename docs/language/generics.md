@@ -61,16 +61,22 @@ Bounds are canonical and small:
 Form:
 
 ```jsonc
-["tapp", "<callee_symbol>", <type_arg_0>, <type_arg_1>, ..., <value_arg_0>, ...]
+["tapp", "<callee_symbol>", ["tys", <type_arg_0>, <type_arg_1>, ...], <value_arg_0>, ...]
 ```
 
 Examples:
 
 ```jsonc
-["tapp","std.heap.with_capacity","u32",16]
-["tapp","std.heap.push","u32","h",7]
-["tapp","std.vec.with_capacity",["t","A"],"cap"]
+["tapp","std.heap.with_capacity",["tys","u32"],16]
+["tapp","std.heap.push",["tys","u32"],"h",7]
+["tapp","std.vec.with_capacity",["tys",["t","A"]],"cap"]
 ```
+
+## Local type inference + `tapp` elaboration (inside bodies)
+
+When a call targets a generic function but omits `tapp`, `x07 lint` can infer the missing type arguments from local usage and emit a JSON Patch quickfix that rewrites the call into the canonical `tapp` form.
+
+Use `x07 fix --write` to apply these rewrites.
 
 ## Examples
 
@@ -82,7 +88,7 @@ Examples:
 To migrate existing concrete-only APIs without breaking callers:
 
 - Introduce a new generic base function (for example `pkg.foo` with `type_params: [{ "name": "A" }]`).
-- Keep existing concrete entrypoints as thin wrappers that call the base via `tapp` (for example `pkg.foo_u32` → `["tapp","pkg.foo","u32", ...]`).
+- Keep existing concrete entrypoints as thin wrappers that call the base via `tapp` (for example `pkg.foo_u32` → `["tapp","pkg.foo",["tys","u32"], ...]`).
 
 Tooling support:
 

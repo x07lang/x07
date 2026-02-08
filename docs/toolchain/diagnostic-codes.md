@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 118
-- quickfix support (`sometimes` or `always`): 107
-- quickfix coverage: 90.68%
+- total codes: 130
+- quickfix support (`sometimes` or `always`): 108
+- quickfix coverage: 83.08%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -57,8 +57,20 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-POLICY-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-POLICY-SCHEMA-0001`. |
 | `X07-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-SCHEMA-0001`. |
 | `X07-SCHEMA-0002` | x07 / parse / error | always | Unsupported x07AST schema_version. |
+| `X07-TAPP-ELAB-0001` | x07c / rewrite / error | always | Typechecker inferred generic type arguments and proposes inserting an explicit `tapp`. |
+| `X07-TAPP-INFER-0001` | x07c / type / info | never | Typechecker cannot infer generic type arguments; explicit `tapp` is required. |
 | `X07-TOOL-ARGS-0001` | x07 / parse / error | never | Tool wrapper argument error `X07-TOOL-ARGS-0001`. |
 | `X07-TOOL-EXEC-0001` | x07 / run / error | never | Tool wrapper execution error `X07-TOOL-EXEC-0001`. |
+| `X07-TYPE-0001` | x07c / type / info | never | Unknown identifier during local typechecking. |
+| `X07-TYPE-CALL-0001` | x07c / type / info | never | Call refers to an unknown callee during local typechecking. |
+| `X07-TYPE-CALL-0002` | x07c / type / info | never | Call argument type mismatch during local typechecking. |
+| `X07-TYPE-CALL-0003` | x07c / type / info | never | Call arity mismatch during local typechecking. |
+| `X07-TYPE-IF-0001` | x07c / type / info | never | `if` condition must be an `i32` (boolean-as-i32) during local typechecking. |
+| `X07-TYPE-IF-0002` | x07c / type / info | never | `if` branches have incompatible types during local typechecking. |
+| `X07-TYPE-RET-0001` | x07c / type / info | never | Return expression type does not match the function result type. |
+| `X07-TYPE-SET-0001` | x07c / type / info | never | `set` references an unknown local during local typechecking. |
+| `X07-TYPE-SET-0002` | x07c / type / info | never | `set` assignment type mismatch during local typechecking. |
+| `X07-TYPE-UNIFY-0001` | x07c / type / info | never | Type unification failed during local inference. |
 | `X07-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-UNSAFE-0001`. |
 | `X07-WORLD-0001` | x07c / lint / error | always | Program imports capabilities not allowed by the selected world flags. |
 | `X07-WORLD-FFI-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-FFI-0001`. |
@@ -1117,6 +1129,46 @@ Agent strategy:
 - Re-run `x07 ast validate` (or `x07 fmt` / `x07 lint`).
 
 
+## `X07-TAPP-ELAB-0001`
+
+Summary: Typechecker inferred generic type arguments and proposes inserting an explicit `tapp`.
+
+Origins:
+- x07c (stage: rewrite, severity: error)
+
+Quickfix support: `always`
+Quickfix kinds: `json_patch`
+
+Details:
+
+The local typecheck pass inferred concrete type arguments for a generic call that omitted `tapp`. Applying the quickfix rewrites the call into the canonical `tapp` form so later compiler stages see an explicit specialization.
+
+Agent strategy:
+
+- Run `x07 fix --write` to apply the JSON Patch quickfix.
+- Re-run `x07 lint` or `x07 build` to confirm the rewrite eliminated the diagnostic.
+
+
+## `X07-TAPP-INFER-0001`
+
+Summary: Typechecker cannot infer generic type arguments; explicit `tapp` is required.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires choosing explicit type arguments; cannot be inferred deterministically from local constraints.
+
+Details:
+
+The local type inference pass could not determine one or more type arguments for a generic call from the available argument and expected-result constraints.
+
+Agent strategy:
+
+- Add an explicit `tapp` with concrete type arguments.
+- Or rewrite the code to provide additional constraints so inference can resolve the type parameters deterministically.
+
+
 ## `X07-TOOL-ARGS-0001`
 
 Summary: Tool wrapper argument error `X07-TOOL-ARGS-0001`.
@@ -1155,6 +1207,206 @@ Agent strategy:
 
 - Inspect `diagnostics[].message` and any captured stderr/stdout fields in the report.
 - Fix the underlying failure and re-run the command.
+
+
+## `X07-TYPE-0001`
+
+Summary: Unknown identifier during local typechecking.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires a semantic choice (rename vs introduce a binding).
+
+Details:
+
+A referenced identifier was not found in the local environment (parameters or `let` bindings).
+
+Agent strategy:
+
+- Check spelling and scope.
+- If the name is intended to be a local, introduce it with `let` before use.
+
+
+## `X07-TYPE-CALL-0001`
+
+Summary: Call refers to an unknown callee during local typechecking.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires selecting the intended callee symbol or updating imports/exports.
+
+Details:
+
+The typechecker could not find a signature for the callee symbol and cannot typecheck the call.
+
+Agent strategy:
+
+- Check the callee name and module prefix.
+- Ensure the defining module is imported and the symbol is exported.
+
+
+## `X07-TYPE-CALL-0002`
+
+Summary: Call argument type mismatch during local typechecking.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires changing program semantics; no single deterministic patch applies.
+
+Details:
+
+An argument did not match the expected parameter type for the callee signature.
+
+Agent strategy:
+
+- Adjust the argument expression so its inferred type matches the parameter.
+- Or call a different function whose signature matches the provided arguments.
+
+
+## `X07-TYPE-CALL-0003`
+
+Summary: Call arity mismatch during local typechecking.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires selecting the correct argument list for the intended call.
+
+Details:
+
+The number of arguments at a call site does not match the callee signature.
+
+Agent strategy:
+
+- Add or remove arguments to match the function signature.
+- Or switch to a different callee with the intended arity.
+
+
+## `X07-TYPE-IF-0001`
+
+Summary: `if` condition must be an `i32` (boolean-as-i32) during local typechecking.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires choosing the intended condition semantics.
+
+Details:
+
+The condition expression of an `if` was inferred to a non-`i32` type.
+
+Agent strategy:
+
+- Rewrite the condition to produce an `i32` (for example, comparisons yield `i32`).
+- Or adjust the condition expression so it matches boolean-as-i32 conventions.
+
+
+## `X07-TYPE-IF-0002`
+
+Summary: `if` branches have incompatible types during local typechecking.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires changing program structure or semantics to align branch result types.
+
+Details:
+
+The then/else branches could not be unified to a single result type for the `if` expression.
+
+Agent strategy:
+
+- Make both branches produce the same type.
+- Or add an explicit structure that normalizes types (for example, return in one branch and a value in the other).
+
+
+## `X07-TYPE-RET-0001`
+
+Summary: Return expression type does not match the function result type.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires deciding whether to change the expression or the function signature.
+
+Details:
+
+A `return` expression was inferred to a type that does not match the declared function result type.
+
+Agent strategy:
+
+- Adjust the returned expression to match the function result type.
+- Or update the function signature if the intended return type is different.
+
+
+## `X07-TYPE-SET-0001`
+
+Summary: `set` references an unknown local during local typechecking.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires choosing whether to introduce a new binding or rename the target.
+
+Details:
+
+A `set` attempted to assign to a local name that is not currently bound in the environment.
+
+Agent strategy:
+
+- Introduce the local with `let` before `set`.
+- Or correct the target name to an existing binding.
+
+
+## `X07-TYPE-SET-0002`
+
+Summary: `set` assignment type mismatch during local typechecking.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Requires changing program semantics (assignment or variable structure).
+
+Details:
+
+The assigned expression type does not match the previously inferred type of the target local.
+
+Agent strategy:
+
+- Keep locals monomorphic: assign the same type across all `set` uses.
+- If a new value of a different type is needed, introduce a new local with `let`.
+
+
+## `X07-TYPE-UNIFY-0001`
+
+Summary: Type unification failed during local inference.
+
+Origins:
+- x07c (stage: type, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Unification failures are context-dependent and do not have a single deterministic fix.
+
+Details:
+
+The local type inference engine encountered an unsatisfiable constraint while unifying types.
+
+Agent strategy:
+
+- Inspect the diagnostic data payload for the conflicting types.
+- Rewrite the expression(s) at the reported ptr so the inferred types unify.
 
 
 ## `X07-UNSAFE-0001`

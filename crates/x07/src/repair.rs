@@ -100,6 +100,12 @@ pub fn repair_x07ast_file_doc(
         let doc_bytes = serde_json::to_vec(doc)?;
         let mut file = x07ast::parse_x07ast_json(&doc_bytes).map_err(|e| anyhow::anyhow!("{e}"))?;
         x07ast::canonicalize_x07ast_file(&mut file);
+
+        // Keep the document in canonical form so diagnostic ptrs and quickfix paths
+        // refer to a stable layout across repair iterations.
+        *doc = x07ast::x07ast_file_to_value(&file);
+        x07ast::canon_value_jcs(doc);
+
         let report = lint::lint_file(&file, lint_options);
 
         if report.ok {

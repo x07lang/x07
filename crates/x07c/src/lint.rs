@@ -5,6 +5,7 @@ use crate::diagnostics::{
     Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Report, Severity, Stage,
 };
 use crate::x07ast::{self, X07AstFile, X07AstKind};
+use x07_contracts::X07AST_SCHEMA_VERSION_V0_4_0;
 
 fn expr_ident(name: impl Into<String>) -> Expr {
     Expr::Ident {
@@ -169,6 +170,11 @@ pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
             &LintCtx::default(),
             &mut diagnostics,
         );
+    }
+
+    if file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0 {
+        let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
+        diagnostics.extend(tc.diagnostics);
     }
 
     Report::ok().with_diagnostics(diagnostics)
