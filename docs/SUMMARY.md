@@ -4,6 +4,7 @@
 - [Why X07](why-x07.md)
 
 ## Getting started
+- [Agent initial prompt](getting-started/agent-initial-prompt.md)
 - [Agent quickstart](getting-started/agent-quickstart.md)
 - [Available skills](getting-started/available-skills.md)
 - [Install](getting-started/install.md)

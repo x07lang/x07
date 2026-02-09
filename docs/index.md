@@ -20,6 +20,7 @@ Programs are stored and exchanged in a **structured AST format** (x07AST JSON). 
 ## Start here
 
 - [Why X07 (trust story + evidence pack)](why-x07.md)
+- [Agent initial prompt (copy/paste)](getting-started/agent-initial-prompt.md)
 - [Agent quickstart (learn X07 from scratch)](getting-started/agent-quickstart.md)
 - [Install X07](getting-started/install.md)
 - [Your first project](getting-started/first-project.md)
@@ -51,6 +52,7 @@ When you need real OS resources (real network, real disk, real time), you switch
 ## Documentation map (human)
 
 - Getting started:
+  - [Agent initial prompt](getting-started/agent-initial-prompt.md)
   - [Agent quickstart](getting-started/agent-quickstart.md)
   - [Install](getting-started/install.md)
   - [First project](getting-started/first-project.md)

@@ -2,6 +2,8 @@
 
 This page is a single entry point for LLM agents. Use the published agent portal endpoints as the canonical source of schemas/skills/examples (see [Agent contracts](../agent/contract.md)).
 
+If you want a single copy/paste prompt to bootstrap a new project, use: [Agent initial prompt](agent-initial-prompt.md).
+
 If you find a documentation gap, check the toolchain source directly in GitHub:
 
 - https://github.com/x07lang/x07
