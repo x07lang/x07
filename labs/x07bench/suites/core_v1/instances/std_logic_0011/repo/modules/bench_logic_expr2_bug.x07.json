@@ -1,0 +1,46 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "bench_logic_expr2_bug",
+  "imports": [
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "bench_logic_expr2_bug.check_expr2"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "bench_logic_expr2_bug.check_expr2",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "try",
+          [
+            "std.test.assert_true",
+            [
+              "=",
+              [
+                "+",
+                3,
+                4
+              ],
+              8
+            ],
+            [
+              "std.test.code_assert_true"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ]
+    }
+  ]
+}

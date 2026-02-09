@@ -1,0 +1,52 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "bench_math_sum3_bug",
+  "imports": [
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "bench_math_sum3_bug.check_sum3"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "bench_math_sum3_bug.check_sum3",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "x",
+          [
+            "+",
+            [
+              "+",
+              1,
+              2
+            ],
+            3
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            "x",
+            7,
+            [
+              "std.test.code_assert_i32_eq"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ]
+    }
+  ]
+}

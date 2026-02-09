@@ -151,11 +151,11 @@ Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verif
 
 ### Agent correctness benchmarks (`x07bench` JSON)
 
-- `x07 bench list --suite labs/x07bench/suites/core_v0/suite.json`
-- `x07 bench validate --suite labs/x07bench/suites/core_v0/suite.json`
-- `x07 bench eval --suite labs/x07bench/suites/core_v0/suite.json --predictions <predictions.jsonl>`
-- `x07 bench eval --suite labs/x07bench/suites/core_v0/suite.json --oracle`
-- `x07 bench eval --suite labs/x07bench/suites/core_v0/suite.json --oracle --runner docker`
+- `x07 bench list --suite labs/x07bench/suites/core_v1/suite.json`
+- `x07 bench validate --suite labs/x07bench/suites/core_v1/suite.json`
+- `x07 bench eval --suite labs/x07bench/suites/core_v1/suite.json --predictions <predictions.jsonl>`
+- `x07 bench eval --suite labs/x07bench/suites/core_v1/suite.json --oracle`
+- `x07 bench eval --suite labs/x07bench/suites/core_v1/suite.json --oracle --runner docker`
 
 Reports use `schema_version: "x07.bench.report@0.1.0"`.
 

@@ -1,0 +1,47 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "bench_logic_expected_bug",
+  "imports": [
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "bench_logic_expected_bug.check_eq"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "bench_logic_expected_bug.check_eq",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "x",
+          7
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_true",
+            [
+              "=",
+              "x",
+              8
+            ],
+            [
+              "std.test.code_assert_true"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ]
+    }
+  ]
+}

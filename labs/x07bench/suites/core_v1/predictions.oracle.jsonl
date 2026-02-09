@@ -1,0 +1,12 @@
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_math_0001","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_math_0001/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_logic_0002","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_logic_0002/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_math_0003","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_math_0003/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_math_0004","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_math_0004/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_math_0005","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_math_0005/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_math_0006","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_math_0006/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_math_0007","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_math_0007/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_logic_0008","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_logic_0008/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_logic_0009","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_logic_0009/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_logic_0010","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_logic_0010/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_logic_0011","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_logic_0011/oracle.patchset.json"}
+{"schema_version":"x07.bench.prediction@0.1.0","instance_id":"std_math_0012","model_name_or_path":"oracle","patch_kind":"x07-arch-patchset-json","patch_path":"instances/std_math_0012/oracle.patchset.json"}

@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "bench/logic_expr2",
+      "world": "solve-pure",
+      "entry": "bench_logic_expr2_bug.check_expr2",
+      "expect": "pass"
+    }
+  ]
+}

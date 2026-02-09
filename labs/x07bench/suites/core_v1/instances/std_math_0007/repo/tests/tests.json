@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "bench/math_expected",
+      "world": "solve-pure",
+      "entry": "bench_math_expected_bug.check_expected",
+      "expect": "pass"
+    }
+  ]
+}

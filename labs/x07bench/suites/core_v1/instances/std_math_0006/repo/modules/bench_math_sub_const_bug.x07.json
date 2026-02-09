@@ -1,0 +1,48 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "bench_math_sub_const_bug",
+  "imports": [
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "bench_math_sub_const_bug.check_sub"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "bench_math_sub_const_bug.check_sub",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "x",
+          [
+            "-",
+            10,
+            3
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            "x",
+            8,
+            [
+              "std.test.code_assert_i32_eq"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "bench_math_mul_bug",
+  "imports": [
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "bench_math_mul_bug.check_mul"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "bench_math_mul_bug.check_mul",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "x",
+          [
+            "+",
+            3,
+            4
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            "x",
+            12,
+            [
+              "std.test.code_assert_i32_eq"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ]
+    }
+  ]
+}

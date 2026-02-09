@@ -36,9 +36,9 @@ X07 builds and runs native solver artifacts from generated C, so the only extern
   - `x07 <scope> --json-schema`
   - `x07 <scope> --json --report-out <path> --quiet-json`
 - Benchmark harness smoke:
-  - `x07 bench validate --suite labs/x07bench/suites/core_v0/suite.json`
-  - `x07 bench eval --suite labs/x07bench/suites/core_v0/suite.json --oracle`
-  - `x07 bench eval --suite labs/x07bench/suites/core_v0/suite.json --oracle --runner docker` (requires Docker)
+  - `x07 bench validate --suite labs/x07bench/suites/core_v1/suite.json`
+  - `x07 bench eval --suite labs/x07bench/suites/core_v1/suite.json --oracle`
+  - `x07 bench eval --suite labs/x07bench/suites/core_v1/suite.json --oracle --runner docker` (requires Docker)
 
 ## Phase E projects
 

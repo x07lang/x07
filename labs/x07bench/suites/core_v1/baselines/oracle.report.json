@@ -1,0 +1,560 @@
+{
+  "env": {
+    "platform": "macos-aarch64",
+    "runner": "local"
+  },
+  "instances": [
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 24,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_74a75d3720b45c87901c86a179ca7ce6fc940caef34c0d12c3a19c3cf2b2e9e9/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_74a75d3720b45c87901c86a179ca7ce6fc940caef34c0d12c3a19c3cf2b2e9e9",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 27,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_74a75d3720b45c87901c86a179ca7ce6fc940caef34c0d12c3a19c3cf2b2e9e9/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_logic_0002",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=stdlib,logic,bugfix",
+        "Fix wrong comparison target in std.test.assert_true."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "9440287feb8055de795bd80f3daab14466a0fba0cbd2e5f64c80973d2b7ea5a7",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_bf6ad89d5b6c83a0583dfa5ef7d5fae9cb22c9af815b63a6e16e25838cda13c7/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_bf6ad89d5b6c83a0583dfa5ef7d5fae9cb22c9af815b63a6e16e25838cda13c7",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 24,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_bf6ad89d5b6c83a0583dfa5ef7d5fae9cb22c9af815b63a6e16e25838cda13c7/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_logic_0008",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=logic,let,bugfix",
+        "Fix the let-bound value so the equality holds."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "d850382ffef396c3d9dbb34254a939502ff736c5b490091434f19a0352f26f99",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_52c098a1f3aed255a12d10c3bbe72f4857558513ebc3cf71b695af239914fe73/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_52c098a1f3aed255a12d10c3bbe72f4857558513ebc3cf71b695af239914fe73",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_52c098a1f3aed255a12d10c3bbe72f4857558513ebc3cf71b695af239914fe73/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_logic_0009",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=logic,expected,bugfix",
+        "Fix the equality constant so the guard is true."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "f45e871fd5cdf23ef4d8cfcaa3d00cd865e97b44caeb87a5d272a2e0e7f3aabc",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_c795f21c691849010f0f13c80fe50c946440b6b57f2939a5905771ada5c21f1d/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_c795f21c691849010f0f13c80fe50c946440b6b57f2939a5905771ada5c21f1d",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_c795f21c691849010f0f13c80fe50c946440b6b57f2939a5905771ada5c21f1d/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_logic_0010",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=logic,expr,bugfix",
+        "Fix the expected value so (2+2) equals 4."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "addb695b5511bd05a84b037b4b7889577f522108c83ac6e10710bcc370a60923",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_77fa4650716009fa5812280d0e32434d99dabe1ca05bedb4efa300fe714a5df6/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_77fa4650716009fa5812280d0e32434d99dabe1ca05bedb4efa300fe714a5df6",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 24,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_77fa4650716009fa5812280d0e32434d99dabe1ca05bedb4efa300fe714a5df6/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_logic_0011",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=logic,expr,bugfix",
+        "Fix the expected value so (3+4) equals 7."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "7c8f9f655aa4ed3c65bffad43ef95204788326965ed4c99a7a514caf83084417",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_937e617d7c1f71a34ddf8c3463cbb9fe7a72faa9967a8192915667c00af5bef6/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_937e617d7c1f71a34ddf8c3463cbb9fe7a72faa9967a8192915667c00af5bef6",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 24,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_937e617d7c1f71a34ddf8c3463cbb9fe7a72faa9967a8192915667c00af5bef6/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_math_0001",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=stdlib,math,bugfix",
+        "Fix off-by-one expected constant in std.test.assert_i32_eq."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "10086d2e727f571484bb1343c2c153f34fa5d6fc16f4cf6cf2c5332f04daa6ec",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_98181ea94f857e245b599adbb5221886f86c0a8934a7732fe19c9d47d3cc67a3/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_98181ea94f857e245b599adbb5221886f86c0a8934a7732fe19c9d47d3cc67a3",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_98181ea94f857e245b599adbb5221886f86c0a8934a7732fe19c9d47d3cc67a3/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_math_0003",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=math,operator,bugfix",
+        "Replace `+` with `*` in the computation."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "744f3785de17b4145b265b9c01363aca86adc456a88c76311437caab73b8c726",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 22,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_b6c1470f35117c62a065009dc594cc1a7e5a21cb7858979bacf77828d5fe4f3b/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_b6c1470f35117c62a065009dc594cc1a7e5a21cb7858979bacf77828d5fe4f3b",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_b6c1470f35117c62a065009dc594cc1a7e5a21cb7858979bacf77828d5fe4f3b/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_math_0004",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=math,nested,bugfix",
+        "Fix the multiplier so (2+3)*4 = 20."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "dc92f205e42eb0c4f0b7dbdba2161d6373dca2d141c1506fd45c3d4ff56c1c12",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_4f3e453447966b3d2cfa8a554f82524bd4f0a0e37e63399caea32e4a4e8a2e90/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_4f3e453447966b3d2cfa8a554f82524bd4f0a0e37e63399caea32e4a4e8a2e90",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 24,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_4f3e453447966b3d2cfa8a554f82524bd4f0a0e37e63399caea32e4a4e8a2e90/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_math_0005",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=math,constants,bugfix",
+        "Fix the constant so 40 + 2 = 42."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "281cb880424e65856f54d9a905a060b5f88127046a0d3923d92a8ecd821390e3",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5f11c1007e13756e0d884eba503cd0fb396bd83be7e7c68da355bd8e92ac164b/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5f11c1007e13756e0d884eba503cd0fb396bd83be7e7c68da355bd8e92ac164b",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 24,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5f11c1007e13756e0d884eba503cd0fb396bd83be7e7c68da355bd8e92ac164b/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_math_0006",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=math,constants,bugfix",
+        "Fix the constant so 10 - 2 = 8."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "5ffc867359dd2dc2c30d2ec719b98cda868f991cb4c815eceac29ba7061740c8",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5c8c5924771579ed99e6f03e8ec612f6d6c3c11931fc77887e64d0d8a356bbaa/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5c8c5924771579ed99e6f03e8ec612f6d6c3c11931fc77887e64d0d8a356bbaa",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 24,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5c8c5924771579ed99e6f03e8ec612f6d6c3c11931fc77887e64d0d8a356bbaa/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_math_0007",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=math,expected,bugfix",
+        "Fix the expected value for 6*7."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "1c326e3469e2f5cf42ad1f731c9c2289662269ea47d934c49bdb5f3909c346ee",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    },
+    {
+      "after_patch": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 0,
+        "failed": 0,
+        "ok": true,
+        "passed": 1,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_7aa485c5c3be88378d903812558379f70355109ebc46b74b17ec00a298a86d1e/after_patch.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_7aa485c5c3be88378d903812558379f70355109ebc46b74b17ec00a298a86d1e",
+      "baseline": {
+        "compile_failures": 0,
+        "duration_ms": 23,
+        "errors": 0,
+        "exit_code": 10,
+        "failed": 1,
+        "ok": false,
+        "passed": 0,
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_7aa485c5c3be88378d903812558379f70355109ebc46b74b17ec00a298a86d1e/baseline.x07test.report.json",
+        "run_failures": 0,
+        "skipped": 0
+      },
+      "instance_id": "std_math_0012",
+      "model_name_or_path": "oracle",
+      "notes": [
+        "tags=math,nested,bugfix",
+        "Fix the expected sum for 1+2+3."
+      ],
+      "patch_kind": "x07-arch-patchset-json",
+      "patch_sha256_hex": "6c98e7f27606daad52742d54e2cbd25b8bbaf17e955042bc79868224f58b1154",
+      "repair": {
+        "applied_ops_count": 0,
+        "iterations": 1,
+        "last_lint_ok": true,
+        "mode": "write"
+      },
+      "status": "resolved"
+    }
+  ],
+  "invocation": {
+    "argv": [
+      "target/debug/x07",
+      "bench",
+      "eval",
+      "--suite",
+      "labs/x07bench/suites/core_v1/suite.json",
+      "--predictions",
+      "labs/x07bench/suites/core_v1/predictions.oracle.jsonl",
+      "--artifact-dir",
+      "target/x07bench-core_v1-eval",
+      "--format",
+      "json",
+      "--out",
+      "labs/x07bench/suites/core_v1/baselines/oracle.report.json"
+    ],
+    "artifact_dir": "target/x07bench-core_v1-eval",
+    "cwd": "/Users/webik/projects/x07lang/x07",
+    "exact": false,
+    "jobs": 1,
+    "keep_artifacts": false,
+    "oracle": false,
+    "predictions_path": "labs/x07bench/suites/core_v1/predictions.oracle.jsonl",
+    "repair_mode": "write",
+    "runner": "local",
+    "started_at_unix_ms": 1770672299438,
+    "suite_path": "/Users/webik/projects/x07lang/x07/labs/x07bench/suites/core_v1/suite.json"
+  },
+  "schema_version": "x07.bench.report@0.1.0",
+  "suite": {
+    "suite_id": "core_v1",
+    "suite_jcs_sha256_hex": "cf01a97a128377a89788aedba548d7cb0c65af7434c4016c0e22756f5e047d83",
+    "suite_path": "/Users/webik/projects/x07lang/x07/labs/x07bench/suites/core_v1/suite.json"
+  },
+  "summary": {
+    "avg_repair_applied_ops": 0.0,
+    "avg_repair_iterations": 1.0,
+    "duration_ms": 1215,
+    "errors": 0,
+    "instances_total": 12,
+    "resolved": 12,
+    "skipped": 0,
+    "unresolved": 0
+  },
+  "tool": {
+    "name": "x07",
+    "version": "0.1.9"
+  }
+}

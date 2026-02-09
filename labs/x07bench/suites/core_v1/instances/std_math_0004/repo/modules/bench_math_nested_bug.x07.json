@@ -1,0 +1,52 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "bench_math_nested_bug",
+  "imports": [
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "bench_math_nested_bug.check_nested"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "bench_math_nested_bug.check_nested",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "x",
+          [
+            "*",
+            [
+              "+",
+              2,
+              3
+            ],
+            3
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            "x",
+            20,
+            [
+              "std.test.code_assert_i32_eq"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ]
+    }
+  ]
+}

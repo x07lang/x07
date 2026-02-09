@@ -13,4 +13,7 @@ Canonical command surface:
 - `x07 bench validate`
 - `x07 bench eval`
 
-See `suites/core_v0/README.md` for the seed suite.
+Seed suites:
+
+- `suites/core_v0/` (minimal)
+- `suites/core_v1/` (expanded; recommended)
