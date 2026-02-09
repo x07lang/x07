@@ -4,10 +4,12 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::Value;
-use x07_contracts::{X07AST_SCHEMA_VERSION_V0_4_0, X07_PATCHSET_SCHEMA_VERSION};
+use x07_contracts::{
+    X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07_PATCHSET_SCHEMA_VERSION,
+};
 use x07c::ast::Expr;
 use x07c::diagnostics;
-use x07c::x07ast::{self, AstFunctionDef, TypeParam, TypeRef, X07AstKind};
+use x07c::x07ast::{self, AstFunctionDef, ContractClauseAst, TypeParam, TypeRef, X07AstKind};
 
 const SUPPORTED_TAGS: [&str; 4] = ["bytes", "bytes_view", "i32", "u32"];
 const TYPE_PARAM_NAME: &str = "A";
@@ -150,7 +152,11 @@ pub(crate) fn suggest_generics_patchset(input_path: &Path, bytes: &[u8]) -> Resu
     }
 
     if any_change {
-        file.schema_version = X07AST_SCHEMA_VERSION_V0_4_0.to_string();
+        file.schema_version = if original_version == X07AST_SCHEMA_VERSION_V0_5_0 {
+            X07AST_SCHEMA_VERSION_V0_5_0.to_string()
+        } else {
+            X07AST_SCHEMA_VERSION_V0_4_0.to_string()
+        };
     } else {
         file.schema_version = original_version;
     }
@@ -192,13 +198,29 @@ pub(crate) fn suggest_generics_patchset(input_path: &Path, bytes: &[u8]) -> Resu
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct NormalizedDef {
+    requires: Vec<NormalizedClause>,
+    ensures: Vec<NormalizedClause>,
+    invariant: Vec<NormalizedClause>,
     params: Vec<(String, Option<String>, TypeRef)>,
     result: TypeRef,
     result_brand: Option<String>,
     body: Expr,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NormalizedClause {
+    id: Option<String>,
+    expr: Expr,
+    witness: Vec<Expr>,
+}
+
 fn normalize_def(def: &AstFunctionDef, tag: &str) -> NormalizedDef {
+    let normalize_clause = |c: &ContractClauseAst| NormalizedClause {
+        id: c.id.clone(),
+        expr: normalize_expr(&c.expr, tag),
+        witness: c.witness.iter().map(|w| normalize_expr(w, tag)).collect(),
+    };
+
     let params = def
         .params
         .iter()
@@ -211,6 +233,9 @@ fn normalize_def(def: &AstFunctionDef, tag: &str) -> NormalizedDef {
         })
         .collect();
     NormalizedDef {
+        requires: def.requires.iter().map(normalize_clause).collect(),
+        ensures: def.ensures.iter().map(normalize_clause).collect(),
+        invariant: def.invariant.iter().map(normalize_clause).collect(),
         params,
         result: normalize_type_ref(&def.result, tag),
         result_brand: def.result_brand.clone(),
@@ -300,6 +325,36 @@ fn def_tag_uses_supported(def: &AstFunctionDef, tag: &str) -> bool {
     }
     if !type_ref_uses_supported(&def.result) {
         return false;
+    }
+    for c in &def.requires {
+        if !expr_tag_uses_supported(&c.expr, tag, false) {
+            return false;
+        }
+        for w in &c.witness {
+            if !expr_tag_uses_supported(w, tag, false) {
+                return false;
+            }
+        }
+    }
+    for c in &def.ensures {
+        if !expr_tag_uses_supported(&c.expr, tag, false) {
+            return false;
+        }
+        for w in &c.witness {
+            if !expr_tag_uses_supported(w, tag, false) {
+                return false;
+            }
+        }
+    }
+    for c in &def.invariant {
+        if !expr_tag_uses_supported(&c.expr, tag, false) {
+            return false;
+        }
+        for w in &c.witness {
+            if !expr_tag_uses_supported(w, tag, false) {
+                return false;
+            }
+        }
     }
     expr_tag_uses_supported(&def.body, tag, false)
 }
@@ -395,6 +450,24 @@ fn build_generic_base(def: &AstFunctionDef, base: &str, tag: &str) -> Result<Ast
         p.ty = replace_type_named_with_var(&p.ty, tag, TYPE_PARAM_NAME);
     }
     out.result = replace_type_named_with_var(&out.result, tag, TYPE_PARAM_NAME);
+    for c in &mut out.requires {
+        c.expr = rewrite_expr_tag_to_typevar(&c.expr, tag, TYPE_PARAM_NAME)?;
+        for w in &mut c.witness {
+            *w = rewrite_expr_tag_to_typevar(w, tag, TYPE_PARAM_NAME)?;
+        }
+    }
+    for c in &mut out.ensures {
+        c.expr = rewrite_expr_tag_to_typevar(&c.expr, tag, TYPE_PARAM_NAME)?;
+        for w in &mut c.witness {
+            *w = rewrite_expr_tag_to_typevar(w, tag, TYPE_PARAM_NAME)?;
+        }
+    }
+    for c in &mut out.invariant {
+        c.expr = rewrite_expr_tag_to_typevar(&c.expr, tag, TYPE_PARAM_NAME)?;
+        for w in &mut c.witness {
+            *w = rewrite_expr_tag_to_typevar(w, tag, TYPE_PARAM_NAME)?;
+        }
+    }
     out.body = rewrite_expr_tag_to_typevar(&out.body, tag, TYPE_PARAM_NAME)?;
     Ok(out)
 }
@@ -564,6 +637,9 @@ fn rewrite_expr_tag_to_typevar(expr: &Expr, tag: &str, var: &str) -> Result<Expr
 fn build_wrapper(def: &AstFunctionDef, base: &str, tag: &str) -> AstFunctionDef {
     let mut out = def.clone();
     out.type_params = Vec::new();
+    out.requires = Vec::new();
+    out.ensures = Vec::new();
+    out.invariant = Vec::new();
     let mut items: Vec<Expr> = Vec::with_capacity(def.params.len() + 3);
     items.push(Expr::Ident {
         name: "tapp".to_string(),

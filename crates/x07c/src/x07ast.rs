@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
 
 use serde_json::Value;
-use x07_contracts::X07AST_SCHEMA_VERSIONS_SUPPORTED;
+use x07_contracts::{X07AST_SCHEMA_VERSIONS_SUPPORTED, X07AST_SCHEMA_VERSION_V0_5_0};
 
 use crate::ast::Expr;
 use crate::types::Ty;
@@ -123,9 +123,19 @@ pub struct AstFunctionParam {
 }
 
 #[derive(Debug, Clone)]
+pub struct ContractClauseAst {
+    pub id: Option<String>,
+    pub expr: Expr,
+    pub witness: Vec<Expr>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AstFunctionDef {
     pub name: String,
     pub type_params: Vec<TypeParam>,
+    pub requires: Vec<ContractClauseAst>,
+    pub ensures: Vec<ContractClauseAst>,
+    pub invariant: Vec<ContractClauseAst>,
     pub params: Vec<AstFunctionParam>,
     pub result: TypeRef,
     pub result_brand: Option<String>,
@@ -136,6 +146,9 @@ pub struct AstFunctionDef {
 pub struct AstAsyncFunctionDef {
     pub name: String,
     pub type_params: Vec<TypeParam>,
+    pub requires: Vec<ContractClauseAst>,
+    pub ensures: Vec<ContractClauseAst>,
+    pub invariant: Vec<ContractClauseAst>,
     pub params: Vec<AstFunctionParam>,
     pub result: TypeRef,
     pub result_brand: Option<String>,
@@ -212,6 +225,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
             ptr: "/schema_version".to_string(),
         });
     }
+    let allow_contracts = schema_version == X07AST_SCHEMA_VERSION_V0_5_0;
 
     let kind = get_required_string(root_obj, "/kind", "kind")?;
     let kind = match kind.trim() {
@@ -292,7 +306,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 }
             }
             "defn" => {
-                let parsed = parse_def_like(dobj, &dptr, &module_id, false)?;
+                let parsed = parse_def_like(dobj, &dptr, &module_id, false, allow_contracts)?;
                 if !function_names.insert(parsed.name.clone()) {
                     return Err(X07AstError {
                         message: format!("duplicate function name: {:?}", parsed.name),
@@ -302,6 +316,9 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 functions.push(AstFunctionDef {
                     name: parsed.name,
                     type_params: parsed.type_params,
+                    requires: parsed.requires,
+                    ensures: parsed.ensures,
+                    invariant: parsed.invariant,
                     params: parsed.params,
                     result: parsed.result,
                     result_brand: parsed.result_brand,
@@ -309,7 +326,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 });
             }
             "defasync" => {
-                let parsed = parse_def_like(dobj, &dptr, &module_id, true)?;
+                let parsed = parse_def_like(dobj, &dptr, &module_id, true, allow_contracts)?;
                 if !function_names.insert(parsed.name.clone()) {
                     return Err(X07AstError {
                         message: format!("duplicate function name: {:?}", parsed.name),
@@ -319,6 +336,9 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                 async_functions.push(AstAsyncFunctionDef {
                     name: parsed.name,
                     type_params: parsed.type_params,
+                    requires: parsed.requires,
+                    ensures: parsed.ensures,
+                    invariant: parsed.invariant,
                     params: parsed.params,
                     result: parsed.result,
                     result_brand: parsed.result_brand,
@@ -377,6 +397,9 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
 struct ParsedDefLike {
     name: String,
     type_params: Vec<TypeParam>,
+    requires: Vec<ContractClauseAst>,
+    ensures: Vec<ContractClauseAst>,
+    invariant: Vec<ContractClauseAst>,
     params: Vec<AstFunctionParam>,
     result: TypeRef,
     result_brand: Option<String>,
@@ -388,6 +411,7 @@ fn parse_def_like(
     ptr: &str,
     module_id: &str,
     is_async: bool,
+    allow_contracts: bool,
 ) -> Result<ParsedDefLike, X07AstError> {
     let kind_label = if is_async { "defasync" } else { "defn" };
 
@@ -405,6 +429,21 @@ fn parse_def_like(
     }
 
     let type_params = parse_type_params(dobj, ptr)?;
+
+    if !allow_contracts {
+        for field in ["requires", "ensures", "invariant"] {
+            if dobj.contains_key(field) {
+                return Err(X07AstError {
+                    message: format!("{field} is only supported in {X07AST_SCHEMA_VERSION_V0_5_0}"),
+                    ptr: format!("{ptr}/{field}"),
+                });
+            }
+        }
+    }
+
+    let requires = parse_contract_clauses(dobj, ptr, "requires")?;
+    let ensures = parse_contract_clauses(dobj, ptr, "ensures")?;
+    let invariant = parse_contract_clauses(dobj, ptr, "invariant")?;
 
     let params = parse_params(dobj, ptr, kind_label)?;
 
@@ -446,11 +485,73 @@ fn parse_def_like(
     Ok(ParsedDefLike {
         name,
         type_params,
+        requires,
+        ensures,
+        invariant,
         params,
         result,
         result_brand,
         body,
     })
+}
+
+fn parse_contract_clauses(
+    dobj: &serde_json::Map<String, Value>,
+    ptr: &str,
+    field: &str,
+) -> Result<Vec<ContractClauseAst>, X07AstError> {
+    let Some(v) = dobj.get(field) else {
+        return Ok(Vec::new());
+    };
+
+    let arr = v.as_array().ok_or_else(|| X07AstError {
+        message: format!("{field} must be an array"),
+        ptr: format!("{ptr}/{field}"),
+    })?;
+
+    let mut out: Vec<ContractClauseAst> = Vec::with_capacity(arr.len());
+    for (idx, item) in arr.iter().enumerate() {
+        let cptr = format!("{ptr}/{field}/{idx}");
+        let obj = item.as_object().ok_or_else(|| X07AstError {
+            message: format!("{field} clause must be an object"),
+            ptr: cptr.clone(),
+        })?;
+
+        let id = if let Some(v) = obj.get("id") {
+            let s = v.as_str().ok_or_else(|| X07AstError {
+                message: "id must be a string".to_string(),
+                ptr: format!("{cptr}/id"),
+            })?;
+            Some(s.to_string())
+        } else {
+            None
+        };
+
+        let expr_v = obj.get("expr").ok_or_else(|| X07AstError {
+            message: "missing required field: expr".to_string(),
+            ptr: cptr.clone(),
+        })?;
+        let expr = expr_from_json_sexpr(expr_v, &format!("{cptr}/expr"))?;
+
+        let witness = if let Some(w) = obj.get("witness") {
+            let w_arr = w.as_array().ok_or_else(|| X07AstError {
+                message: "witness must be an array".to_string(),
+                ptr: format!("{cptr}/witness"),
+            })?;
+            let mut w_out: Vec<Expr> = Vec::with_capacity(w_arr.len());
+            for (widx, witem) in w_arr.iter().enumerate() {
+                let wptr = format!("{cptr}/witness/{widx}");
+                w_out.push(expr_from_json_sexpr(witem, &wptr)?);
+            }
+            w_out
+        } else {
+            Vec::new()
+        };
+
+        out.push(ContractClauseAst { id, expr, witness });
+    }
+
+    Ok(out)
 }
 
 fn parse_type_params(
@@ -958,12 +1059,27 @@ fn reptr_x07ast_file(file: &mut X07AstFile) {
 
     for (idx, f) in file.functions.iter_mut().enumerate() {
         let decl_idx = defn_base + idx;
+        reptr_contract_clauses(&mut f.requires, &format!("/decls/{decl_idx}/requires"));
+        reptr_contract_clauses(&mut f.ensures, &format!("/decls/{decl_idx}/ensures"));
+        reptr_contract_clauses(&mut f.invariant, &format!("/decls/{decl_idx}/invariant"));
         reptr_expr(&mut f.body, &format!("/decls/{decl_idx}/body"));
     }
     let sync_fns_count = file.functions.len();
     for (idx, f) in file.async_functions.iter_mut().enumerate() {
         let decl_idx = defn_base + sync_fns_count + idx;
+        reptr_contract_clauses(&mut f.requires, &format!("/decls/{decl_idx}/requires"));
+        reptr_contract_clauses(&mut f.ensures, &format!("/decls/{decl_idx}/ensures"));
+        reptr_contract_clauses(&mut f.invariant, &format!("/decls/{decl_idx}/invariant"));
         reptr_expr(&mut f.body, &format!("/decls/{decl_idx}/body"));
+    }
+}
+
+fn reptr_contract_clauses(clauses: &mut [ContractClauseAst], base_ptr: &str) {
+    for (cidx, clause) in clauses.iter_mut().enumerate() {
+        reptr_expr(&mut clause.expr, &format!("{base_ptr}/{cidx}/expr"));
+        for (widx, w) in clause.witness.iter_mut().enumerate() {
+            reptr_expr(w, &format!("{base_ptr}/{cidx}/witness/{widx}"));
+        }
     }
 }
 
@@ -996,6 +1112,9 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
             "defn",
             &f.name,
             &f.type_params,
+            &f.requires,
+            &f.ensures,
+            &f.invariant,
             &f.params,
             &f.result,
             f.result_brand.as_deref(),
@@ -1007,6 +1126,9 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
             "defasync",
             &f.name,
             &f.type_params,
+            &f.requires,
+            &f.ensures,
+            &f.invariant,
             &f.params,
             &f.result,
             f.result_brand.as_deref(),
@@ -1088,10 +1210,14 @@ pub fn type_ref_from_expr(e: &Expr) -> Result<TypeRef, String> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn def_decl_value(
     kind: &str,
     name: &str,
     type_params: &[TypeParam],
+    requires: &[ContractClauseAst],
+    ensures: &[ContractClauseAst],
+    invariant: &[ContractClauseAst],
     params: &[AstFunctionParam],
     result: &TypeRef,
     result_brand: Option<&str>,
@@ -1105,6 +1231,25 @@ fn def_decl_value(
         m.insert(
             "type_params".to_string(),
             Value::Array(type_params.iter().map(type_param_to_value).collect()),
+        );
+    }
+
+    if !requires.is_empty() {
+        m.insert(
+            "requires".to_string(),
+            Value::Array(requires.iter().map(contract_clause_to_value).collect()),
+        );
+    }
+    if !ensures.is_empty() {
+        m.insert(
+            "ensures".to_string(),
+            Value::Array(ensures.iter().map(contract_clause_to_value).collect()),
+        );
+    }
+    if !invariant.is_empty() {
+        m.insert(
+            "invariant".to_string(),
+            Value::Array(invariant.iter().map(contract_clause_to_value).collect()),
         );
     }
 
@@ -1131,6 +1276,21 @@ fn def_decl_value(
     }
     m.insert("body".to_string(), expr_to_value(body));
     m
+}
+
+fn contract_clause_to_value(c: &ContractClauseAst) -> Value {
+    let mut m = serde_json::Map::new();
+    m.insert("expr".to_string(), expr_to_value(&c.expr));
+    if let Some(id) = &c.id {
+        m.insert("id".to_string(), Value::String(id.clone()));
+    }
+    if !c.witness.is_empty() {
+        m.insert(
+            "witness".to_string(),
+            Value::Array(c.witness.iter().map(expr_to_value).collect()),
+        );
+    }
+    Value::Object(m)
 }
 
 fn extern_decl_value(f: &AstExternFunctionDecl) -> serde_json::Map<String, Value> {

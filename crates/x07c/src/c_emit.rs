@@ -3,7 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 
 use crate::ast::Expr;
-use crate::compile::{CompileErrorKind, CompileOptions, CompilerError};
+use crate::compile::{CompileErrorKind, CompileOptions, CompilerError, ContractMode};
+use crate::contracts_elab::{clause_id_or_hash, ContractClauseKind};
 use crate::language;
 use crate::native;
 use crate::native::NativeBackendReq;
@@ -429,14 +430,368 @@ fn program_uses_head(program: &Program, head: &str) -> bool {
         if expr_uses_head(&f.body, head) {
             return true;
         }
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            if expr_uses_head(&c.expr, head) {
+                return true;
+            }
+            for w in &c.witness {
+                if expr_uses_head(w, head) {
+                    return true;
+                }
+            }
+        }
     }
     for f in &program.async_functions {
         if expr_uses_head(&f.body, head) {
             return true;
         }
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            if expr_uses_head(&c.expr, head) {
+                return true;
+            }
+            for w in &c.witness {
+                if expr_uses_head(w, head) {
+                    return true;
+                }
+            }
+        }
     }
     false
 }
+
+fn program_uses_contracts(program: &Program) -> bool {
+    program
+        .functions
+        .iter()
+        .any(|f| !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty())
+        || program
+            .async_functions
+            .iter()
+            .any(|f| !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty())
+}
+
+const CONTRACT_FUEL: u64 = 50_000;
+const CONTRACT_ALLOC_BYTES: u64 = 1024 * 1024;
+const CONTRACT_WITNESS_MAX_BYTES: u32 = 256;
+
+#[derive(Debug, Clone, Copy)]
+struct ContractWitnessC<'a> {
+    ty: Ty,
+    c_name: &'a str,
+}
+
+fn emit_contract_witness_json_v1(
+    mut emit: impl FnMut(String),
+    ty: Ty,
+    c_name: &str,
+    max_bytes: u32,
+) -> Result<(), CompilerError> {
+    match ty {
+        Ty::I32 => {
+            emit("fputs(\"{\\\"ty\\\":\\\"i32\\\",\\\"value_i32\\\":\", stderr);".to_string());
+            emit(format!("fprintf(stderr, \"%d\", (int32_t){});", c_name));
+            emit("fputs(\"}\", stderr);".to_string());
+            Ok(())
+        }
+        Ty::Bytes => {
+            emit("fputs(\"{\\\"ty\\\":\\\"bytes\\\",\\\"len\\\":\", stderr);".to_string());
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.len);",
+                c_name
+            ));
+            emit("fputs(\",\\\"hex\\\":\\\"\", stderr);".to_string());
+            emit(format!(
+                "rt_x07_write_hex_trunc(stderr, {}.ptr, {}.len, UINT32_C({max_bytes}));",
+                c_name, c_name
+            ));
+            emit(format!(
+                "fprintf(stderr, \"\\\",\\\"truncated\\\":%u}}\", (unsigned)({}.len > UINT32_C({max_bytes})));",
+                c_name
+            ));
+            Ok(())
+        }
+        Ty::BytesView => {
+            emit("fputs(\"{\\\"ty\\\":\\\"bytes_view\\\",\\\"len\\\":\", stderr);".to_string());
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.len);",
+                c_name
+            ));
+            emit("fputs(\",\\\"hex\\\":\\\"\", stderr);".to_string());
+            emit(format!(
+                "rt_x07_write_hex_trunc(stderr, {}.ptr, {}.len, UINT32_C({max_bytes}));",
+                c_name, c_name
+            ));
+            emit(format!(
+                "fprintf(stderr, \"\\\",\\\"truncated\\\":%u}}\", (unsigned)({}.len > UINT32_C({max_bytes})));",
+                c_name
+            ));
+            Ok(())
+        }
+        Ty::ResultI32 => {
+            emit(format!("if ({}.tag == UINT32_C(1)) {{", c_name));
+            emit(
+                "fputs(\"{\\\"ty\\\":\\\"result_i32\\\",\\\"tag\\\":\\\"ok\\\",\\\"ok_i32\\\":\", stderr);".to_string(),
+            );
+            emit(format!(
+                "fprintf(stderr, \"%d\", (int32_t){}.payload.ok);",
+                c_name
+            ));
+            emit("fputs(\"}\", stderr);".to_string());
+            emit("} else {".to_string());
+            emit(
+                "fputs(\"{\\\"ty\\\":\\\"result_i32\\\",\\\"tag\\\":\\\"err\\\",\\\"err_code_u32\\\":\", stderr);".to_string(),
+            );
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.payload.err);",
+                c_name
+            ));
+            emit("fputs(\"}\", stderr);".to_string());
+            emit("}".to_string());
+            Ok(())
+        }
+        Ty::ResultBytes => {
+            emit(format!("if ({}.tag == UINT32_C(1)) {{", c_name));
+            emit(
+                "fputs(\"{\\\"ty\\\":\\\"result_bytes\\\",\\\"tag\\\":\\\"ok\\\",\\\"ok\\\":{\\\"len\\\":\", stderr);".to_string(),
+            );
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.payload.ok.len);",
+                c_name
+            ));
+            emit("fputs(\",\\\"hex\\\":\\\"\", stderr);".to_string());
+            emit(format!(
+                "rt_x07_write_hex_trunc(stderr, {}.payload.ok.ptr, {}.payload.ok.len, UINT32_C({max_bytes}));",
+                c_name, c_name
+            ));
+            emit(format!(
+                "fprintf(stderr, \"\\\",\\\"truncated\\\":%u}}}}\", (unsigned)({}.payload.ok.len > UINT32_C({max_bytes})));",
+                c_name
+            ));
+            emit("} else {".to_string());
+            emit(
+                "fputs(\"{\\\"ty\\\":\\\"result_bytes\\\",\\\"tag\\\":\\\"err\\\",\\\"err_code_u32\\\":\", stderr);".to_string(),
+            );
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.payload.err);",
+                c_name
+            ));
+            emit("fputs(\"}\", stderr);".to_string());
+            emit("}".to_string());
+            Ok(())
+        }
+        Ty::ResultBytesView => {
+            emit(format!("if ({}.tag == UINT32_C(1)) {{", c_name));
+            emit(
+                "fputs(\"{\\\"ty\\\":\\\"result_bytes_view\\\",\\\"tag\\\":\\\"ok\\\",\\\"ok\\\":{\\\"len\\\":\", stderr);".to_string(),
+            );
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.payload.ok.len);",
+                c_name
+            ));
+            emit("fputs(\",\\\"hex\\\":\\\"\", stderr);".to_string());
+            emit(format!(
+                "rt_x07_write_hex_trunc(stderr, {}.payload.ok.ptr, {}.payload.ok.len, UINT32_C({max_bytes}));",
+                c_name, c_name
+            ));
+            emit(format!(
+                "fprintf(stderr, \"\\\",\\\"truncated\\\":%u}}}}\", (unsigned)({}.payload.ok.len > UINT32_C({max_bytes})));",
+                c_name
+            ));
+            emit("} else {".to_string());
+            emit(
+                "fputs(\"{\\\"ty\\\":\\\"result_bytes_view\\\",\\\"tag\\\":\\\"err\\\",\\\"err_code_u32\\\":\", stderr);".to_string(),
+            );
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.payload.err);",
+                c_name
+            ));
+            emit("fputs(\"}\", stderr);".to_string());
+            emit("}".to_string());
+            Ok(())
+        }
+        Ty::ResultResultBytes => {
+            emit(format!("if ({}.tag == UINT32_C(1)) {{", c_name));
+            emit(format!("if ({}.payload.ok.tag == UINT32_C(1)) {{", c_name));
+            emit(
+                "fputs(\"{\\\"ty\\\":\\\"result_result_bytes\\\",\\\"tag\\\":\\\"ok\\\",\\\"ok\\\":{\\\"tag\\\":\\\"ok\\\",\\\"ok\\\":{\\\"len\\\":\", stderr);".to_string(),
+            );
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.payload.ok.payload.ok.len);",
+                c_name
+            ));
+            emit("fputs(\",\\\"hex\\\":\\\"\", stderr);".to_string());
+            emit(format!(
+                "rt_x07_write_hex_trunc(stderr, {}.payload.ok.payload.ok.ptr, {}.payload.ok.payload.ok.len, UINT32_C({max_bytes}));",
+                c_name, c_name
+            ));
+            emit(format!(
+                "fprintf(stderr, \"\\\",\\\"truncated\\\":%u}}}}}}\", (unsigned)({}.payload.ok.payload.ok.len > UINT32_C({max_bytes})));",
+                c_name
+            ));
+            emit("} else {".to_string());
+            emit(
+                "fputs(\"{\\\"ty\\\":\\\"result_result_bytes\\\",\\\"tag\\\":\\\"ok\\\",\\\"ok\\\":{\\\"tag\\\":\\\"err\\\",\\\"err_code_u32\\\":\", stderr);".to_string(),
+            );
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.payload.ok.payload.err);",
+                c_name
+            ));
+            emit("fputs(\"}}\", stderr);".to_string());
+            emit("}".to_string());
+            emit("} else {".to_string());
+            emit(
+                "fputs(\"{\\\"ty\\\":\\\"result_result_bytes\\\",\\\"tag\\\":\\\"err\\\",\\\"err_code_u32\\\":\", stderr);".to_string(),
+            );
+            emit(format!(
+                "fprintf(stderr, \"%u\", (unsigned){}.payload.err);",
+                c_name
+            ));
+            emit("fputs(\"}\", stderr);".to_string());
+            emit("}".to_string());
+            Ok(())
+        }
+        _ => Err(CompilerError::new(
+            CompileErrorKind::Internal,
+            format!("internal error: unsupported contract witness ty: {ty:?}"),
+        )),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_contract_trap_payload_v1(
+    mut emit: impl FnMut(String),
+    contract_kind: &str,
+    fn_name: &str,
+    clause_id: &str,
+    clause_index: usize,
+    clause_ptr: &str,
+    witnesses: &[ContractWitnessC<'_>],
+    max_bytes: u32,
+) -> Result<(), CompilerError> {
+    let fn_bytes = fn_name.as_bytes();
+    let fn_escaped = c_escape_string(fn_bytes);
+    let id_bytes = clause_id.as_bytes();
+    let id_escaped = c_escape_string(id_bytes);
+    let ptr_bytes = clause_ptr.as_bytes();
+    let ptr_escaped = c_escape_string(ptr_bytes);
+
+    emit(format!(
+        "fputs(\"X07T_CONTRACT_V1 {{\\\"contract_kind\\\":\\\"{contract_kind}\\\",\\\"fn\\\":\\\"\", stderr);"
+    ));
+    emit(format!(
+        "rt_x07_write_json_escaped_bytes(stderr, (const uint8_t*)\"{fn_escaped}\", UINT32_C({}));",
+        fn_bytes.len()
+    ));
+    emit("fputs(\"\\\",\\\"clause_id\\\":\\\"\", stderr);".to_string());
+    emit(format!(
+        "rt_x07_write_json_escaped_bytes(stderr, (const uint8_t*)\"{id_escaped}\", UINT32_C({}));",
+        id_bytes.len()
+    ));
+    emit(format!(
+        "fprintf(stderr, \"\\\",\\\"clause_index\\\":%u,\\\"clause_ptr\\\":\\\"\", (unsigned)UINT32_C({}));",
+        clause_index as u32
+    ));
+    emit(format!(
+        "rt_x07_write_json_escaped_bytes(stderr, (const uint8_t*)\"{ptr_escaped}\", UINT32_C({}));",
+        ptr_bytes.len()
+    ));
+    emit("fputs(\"\\\",\\\"witness\\\":[\", stderr);".to_string());
+
+    for (idx, w) in witnesses.iter().enumerate() {
+        if idx != 0 {
+            emit("fputc(',', stderr);".to_string());
+        }
+        emit_contract_witness_json_v1(&mut emit, w.ty, w.c_name, max_bytes)?;
+    }
+
+    emit("fputs(\"]}\\n\", stderr);".to_string());
+    emit("(void)fflush(stderr);".to_string());
+    emit("rt_trap(NULL);".to_string());
+    Ok(())
+}
+
+fn contract_payload_json_v1(
+    contract_kind: &str,
+    fn_name: &str,
+    clause_id: &str,
+    clause_index: usize,
+    clause_ptr: &str,
+) -> Result<String, CompilerError> {
+    let payload = serde_json::json!({
+        "contract_kind": contract_kind,
+        "fn": fn_name,
+        "clause_id": clause_id,
+        "clause_index": clause_index,
+        "clause_ptr": clause_ptr,
+        "witness": [],
+    });
+    let json = serde_json::to_string(&payload).map_err(|err| {
+        CompilerError::new(
+            CompileErrorKind::Internal,
+            format!("internal error: serialize contract payload JSON: {err}"),
+        )
+    })?;
+    Ok(format!("X07T_CONTRACT_V1 {json}"))
+}
+
+const CONTRACT_RUNTIME_HELPERS_C: &str = r#"
+
+static void rt_x07_write_hex_trunc(FILE* f, const uint8_t* p, uint32_t len, uint32_t max) {
+  static const char hex[] = "0123456789abcdef";
+  uint32_t n = len;
+  if (n > max) n = max;
+  for (uint32_t i = 0; i < n; i++) {
+    uint8_t b = p[i];
+    (void)fputc(hex[b >> 4], f);
+    (void)fputc(hex[b & 0x0f], f);
+  }
+}
+
+static void rt_x07_write_json_escaped_bytes(FILE* f, const uint8_t* p, uint32_t len) {
+  for (uint32_t i = 0; i < len; i++) {
+    uint8_t b = p[i];
+    switch (b) {
+      case '\"':
+        (void)fputc('\\', f);
+        (void)fputc('\"', f);
+        break;
+      case '\\':
+        (void)fputc('\\', f);
+        (void)fputc('\\', f);
+        break;
+      case '\n':
+        (void)fputc('\\', f);
+        (void)fputc('n', f);
+        break;
+      case '\r':
+        (void)fputc('\\', f);
+        (void)fputc('r', f);
+        break;
+      case '\t':
+        (void)fputc('\\', f);
+        (void)fputc('t', f);
+        break;
+      default:
+        if (b < 0x20) {
+          (void)fprintf(f, "\\u%04x", (unsigned)b);
+        } else {
+          (void)fputc((int)b, f);
+        }
+    }
+  }
+}
+
+"#;
 
 fn expr_uses_stream_xf_plugin_json_jcs(expr: &Expr) -> bool {
     match expr {
@@ -617,6 +972,7 @@ struct Emitter<'a> {
     fn_option_bytes_view_return_arg: BTreeMap<String, Option<usize>>,
     fn_result_bytes_view_return_arg: BTreeMap<String, Option<usize>>,
     fn_ret_ty: Ty,
+    fn_contracts: FnContractsV1,
     allow_async_ops: bool,
     unsafe_depth: usize,
     current_fn_name: Option<String>,
@@ -628,6 +984,19 @@ struct Emitter<'a> {
 struct NativeReqAcc {
     abi_major: u32,
     features: BTreeSet<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct FnContractsV1 {
+    requires: Vec<crate::x07ast::ContractClauseAst>,
+    ensures: Vec<crate::x07ast::ContractClauseAst>,
+    invariant: Vec<crate::x07ast::ContractClauseAst>,
+}
+
+impl FnContractsV1 {
+    fn has_any(&self) -> bool {
+        !self.requires.is_empty() || !self.ensures.is_empty() || !self.invariant.is_empty()
+    }
 }
 
 impl<'a> Emitter<'a> {
@@ -668,6 +1037,7 @@ impl<'a> Emitter<'a> {
             current_fn_name: None,
             current_ptr: None,
             native_requires: BTreeMap::new(),
+            fn_contracts: FnContractsV1::default(),
         }
     }
 
@@ -2652,6 +3022,16 @@ impl<'a> Emitter<'a> {
             }
 
             self.push_str(&preamble);
+            if program_uses_contracts(self.program)
+                && self.options.contract_mode == ContractMode::RuntimeTrap
+            {
+                self.push_str(CONTRACT_RUNTIME_HELPERS_C);
+            }
+            if self.options.contract_mode == ContractMode::VerifyBmc {
+                self.push_str(
+                    "\nvoid __CPROVER_assume(int);\nvoid __CPROVER_assert(int, const char*);\n",
+                );
+            }
             return Ok(());
         }
 
@@ -2688,6 +3068,16 @@ impl<'a> Emitter<'a> {
         self.push_str(RUNTIME_C_PURE_STUBS);
         self.push_str(FIXTURE_END);
         self.push_str(tail);
+        if program_uses_contracts(self.program)
+            && self.options.contract_mode == ContractMode::RuntimeTrap
+        {
+            self.push_str(CONTRACT_RUNTIME_HELPERS_C);
+        }
+        if self.options.contract_mode == ContractMode::VerifyBmc {
+            self.push_str(
+                "\nvoid __CPROVER_assume(int);\nvoid __CPROVER_assert(int, const char*);\n",
+            );
+        }
         Ok(())
     }
 
@@ -10959,6 +11349,189 @@ impl<'a> Emitter<'a> {
                 self.cleanup_scopes = cleanup_scopes_snapshot;
                 Ok(())
             }
+
+            fn emit_contract_entry_checks(
+                &mut self,
+                state: usize,
+                cont: usize,
+                requires: &[crate::x07ast::ContractClauseAst],
+                invariant: &[crate::x07ast::ContractClauseAst],
+            ) -> Result<(), CompilerError> {
+                let mut clauses: Vec<(
+                    &'static str,
+                    ContractClauseKind,
+                    usize,
+                    &crate::x07ast::ContractClauseAst,
+                )> = Vec::new();
+                for (idx, c) in requires.iter().enumerate() {
+                    clauses.push(("requires", ContractClauseKind::Requires, idx, c));
+                }
+                for (idx, c) in invariant.iter().enumerate() {
+                    clauses.push(("invariant_entry", ContractClauseKind::Invariant, idx, c));
+                }
+
+                let mut next = cont;
+                for (kind, id_kind, idx, clause) in clauses.into_iter().rev() {
+                    let st = self.new_state();
+                    self.emit_contract_clause_check(st, next, kind, id_kind, idx, clause)?;
+                    next = st;
+                }
+                self.line(state, format!("goto st_{next};"));
+                Ok(())
+            }
+
+            fn emit_contract_exit_checks(
+                &mut self,
+                state: usize,
+                cont: usize,
+                ensures: &[crate::x07ast::ContractClauseAst],
+                invariant: &[crate::x07ast::ContractClauseAst],
+            ) -> Result<(), CompilerError> {
+                let mut clauses: Vec<(
+                    &'static str,
+                    ContractClauseKind,
+                    usize,
+                    &crate::x07ast::ContractClauseAst,
+                )> = Vec::new();
+                for (idx, c) in ensures.iter().enumerate() {
+                    clauses.push(("ensures", ContractClauseKind::Ensures, idx, c));
+                }
+                for (idx, c) in invariant.iter().enumerate() {
+                    clauses.push(("invariant_exit", ContractClauseKind::Invariant, idx, c));
+                }
+
+                let mut next = cont;
+                for (kind, id_kind, idx, clause) in clauses.into_iter().rev() {
+                    let st = self.new_state();
+                    self.emit_contract_clause_check(st, next, kind, id_kind, idx, clause)?;
+                    next = st;
+                }
+                self.line(state, format!("goto st_{next};"));
+                Ok(())
+            }
+
+            fn emit_contract_clause_check(
+                &mut self,
+                state: usize,
+                cont: usize,
+                contract_kind: &str,
+                id_kind: ContractClauseKind,
+                clause_index: usize,
+                clause: &crate::x07ast::ContractClauseAst,
+            ) -> Result<(), CompilerError> {
+                let clause_id = clause_id_or_hash(
+                    &self.fn_name,
+                    id_kind,
+                    clause_index,
+                    &clause.expr,
+                    clause.id.as_deref(),
+                );
+                let clause_ptr = clause.expr.ptr().to_string();
+
+                if self.options.contract_mode == ContractMode::VerifyBmc {
+                    let msg = contract_payload_json_v1(
+                        contract_kind,
+                        &self.fn_name,
+                        &clause_id,
+                        clause_index,
+                        &clause_ptr,
+                    )?;
+                    let msg_escaped = c_escape_c_string(&msg);
+
+                    let cond = self.alloc_local("t_contract_cond_", Ty::I32)?;
+                    let check_state = self.new_state();
+                    self.emit_expr_entry(state, &clause.expr, cond.clone(), check_state)?;
+
+                    if contract_kind == "requires" {
+                        self.line(
+                            check_state,
+                            format!(
+                                "__CPROVER_assume({} != UINT32_C(0)); goto st_{cont};",
+                                cond.c_name
+                            ),
+                        );
+                    } else {
+                        self.line(
+                            check_state,
+                            format!(
+                                "__CPROVER_assert({} != UINT32_C(0), \"{}\"); goto st_{cont};",
+                                cond.c_name, msg_escaped
+                            ),
+                        );
+                    }
+                    return Ok(());
+                }
+
+                let budget = self.alloc_local("t_contract_budget_", Ty::BudgetScopeV1)?;
+                self.line(state, format!(
+                    "rt_budget_scope_init(ctx, &{}, RT_BUDGET_MODE_TRAP, (const uint8_t*)\"contract\", UINT32_C(8), UINT64_C({}), UINT64_C(0), UINT64_C(0), UINT64_C(0), UINT64_C(0), UINT64_C({}));",
+                    budget.c_name, CONTRACT_ALLOC_BYTES, CONTRACT_FUEL,
+                ));
+
+                let cond = self.alloc_local("t_contract_cond_", Ty::I32)?;
+                let check_state = self.new_state();
+                self.emit_expr_entry(state, &clause.expr, cond.clone(), check_state)?;
+
+                let fail_state = self.new_state();
+                self.line(
+                    check_state,
+                    format!("if ({} == UINT32_C(0)) goto st_{fail_state};", cond.c_name),
+                );
+                self.line(
+                    check_state,
+                    format!("rt_budget_scope_exit_block(ctx, &{});", budget.c_name),
+                );
+                self.line(check_state, format!("goto st_{cont};"));
+
+                let print_state = self.new_state();
+                let mut witness_vars: Vec<AsyncVarRef> = Vec::new();
+
+                if clause.witness.is_empty() {
+                    self.line(fail_state, format!("goto st_{print_state};"));
+                } else {
+                    witness_vars = Vec::with_capacity(clause.witness.len());
+                    for w in &clause.witness {
+                        let tyinfo = self.infer_expr(w)?;
+                        let mut v = self.alloc_local("t_contract_witness_", tyinfo.ty)?;
+                        v.brand = tyinfo.brand;
+                        witness_vars.push(v);
+                    }
+
+                    let mut cur_state = fail_state;
+                    for (idx, (w_expr, w_var)) in
+                        clause.witness.iter().zip(witness_vars.iter()).enumerate()
+                    {
+                        let next_state = if idx + 1 < clause.witness.len() {
+                            self.new_state()
+                        } else {
+                            print_state
+                        };
+                        self.emit_expr_entry(cur_state, w_expr, w_var.clone(), next_state)?;
+                        cur_state = next_state;
+                    }
+                }
+
+                let witnesses: Vec<ContractWitnessC<'_>> = witness_vars
+                    .iter()
+                    .map(|w| ContractWitnessC {
+                        ty: w.ty,
+                        c_name: w.c_name.as_str(),
+                    })
+                    .collect();
+                let fn_name = self.fn_name.clone();
+                emit_contract_trap_payload_v1(
+                    |s| self.line(print_state, s),
+                    contract_kind,
+                    &fn_name,
+                    &clause_id,
+                    clause_index,
+                    &clause_ptr,
+                    &witnesses,
+                    CONTRACT_WITNESS_MAX_BYTES,
+                )?;
+
+                Ok(())
+            }
         }
 
         let mut machine = Machine {
@@ -11005,22 +11578,69 @@ impl<'a> Emitter<'a> {
             );
         }
 
-        let start = machine.new_state();
-        let ret_state = machine.new_state();
-        machine.ret_state = ret_state;
+        let has_contracts =
+            !(f.requires.is_empty() && f.ensures.is_empty() && f.invariant.is_empty());
 
-        machine.emit_expr_entry(
-            start,
-            &f.body,
-            AsyncVarRef {
-                ty: f.ret_ty,
-                brand: TyBrand::None,
-                c_name: "f->ret".to_string(),
-                moved: false,
-                moved_ptr: None,
-            },
-            ret_state,
-        )?;
+        let out_state = if has_contracts {
+            let entry_state = machine.new_state();
+            let body_state = machine.new_state();
+            let exit_state = machine.new_state();
+            let out_state = machine.new_state();
+            machine.ret_state = exit_state;
+
+            machine.emit_contract_entry_checks(
+                entry_state,
+                body_state,
+                &f.requires,
+                &f.invariant,
+            )?;
+
+            machine.emit_expr_entry(
+                body_state,
+                &f.body,
+                AsyncVarRef {
+                    ty: f.ret_ty,
+                    brand: TyBrand::None,
+                    c_name: "f->ret".to_string(),
+                    moved: false,
+                    moved_ptr: None,
+                },
+                exit_state,
+            )?;
+
+            machine.push_scope();
+            machine.bind(
+                "__result".to_string(),
+                AsyncVarRef {
+                    ty: f.ret_ty,
+                    brand: ty_brand_from_opt(&f.ret_brand),
+                    c_name: "f->ret".to_string(),
+                    moved: false,
+                    moved_ptr: None,
+                },
+            );
+            machine.emit_contract_exit_checks(exit_state, out_state, &f.ensures, &f.invariant)?;
+            machine.pop_scope();
+            out_state
+        } else {
+            let start = machine.new_state();
+            let out_state = machine.new_state();
+            machine.ret_state = out_state;
+
+            machine.emit_expr_entry(
+                start,
+                &f.body,
+                AsyncVarRef {
+                    ty: f.ret_ty,
+                    brand: TyBrand::None,
+                    c_name: "f->ret".to_string(),
+                    moved: false,
+                    moved_ptr: None,
+                },
+                out_state,
+            )?;
+            out_state
+        };
 
         for (backend_id, acc) in machine.native_requires.iter() {
             for feature in acc.features.iter() {
@@ -11030,15 +11650,15 @@ impl<'a> Emitter<'a> {
 
         match f.ret_ty {
             Ty::Bytes => {
-                machine.line(ret_state, "out->kind = RT_TASK_OUT_KIND_BYTES;");
-                machine.line(ret_state, "out->payload.bytes = f->ret;");
-                machine.line(ret_state, "f->ret = rt_bytes_empty(ctx);");
+                machine.line(out_state, "out->kind = RT_TASK_OUT_KIND_BYTES;");
+                machine.line(out_state, "out->payload.bytes = f->ret;");
+                machine.line(out_state, "f->ret = rt_bytes_empty(ctx);");
             }
             Ty::ResultBytes => {
-                machine.line(ret_state, "out->kind = RT_TASK_OUT_KIND_RESULT_BYTES;");
-                machine.line(ret_state, "out->payload.result_bytes = f->ret;");
-                machine.line(ret_state, "f->ret.tag = UINT32_C(0);");
-                machine.line(ret_state, "f->ret.payload.err = UINT32_C(0);");
+                machine.line(out_state, "out->kind = RT_TASK_OUT_KIND_RESULT_BYTES;");
+                machine.line(out_state, "out->payload.result_bytes = f->ret;");
+                machine.line(out_state, "f->ret.tag = UINT32_C(0);");
+                machine.line(out_state, "f->ret.payload.err = UINT32_C(0);");
             }
             _ => {
                 return Err(CompilerError::new(
@@ -11050,7 +11670,7 @@ impl<'a> Emitter<'a> {
                 ));
             }
         }
-        machine.line(ret_state, "return UINT32_C(1);");
+        machine.line(out_state, "return UINT32_C(1);");
 
         self.line("typedef struct {");
         self.indent += 1;
@@ -11130,6 +11750,11 @@ impl<'a> Emitter<'a> {
         self.reset_fn_state();
         self.current_fn_name = Some(f.name.clone());
         self.fn_ret_ty = f.ret_ty;
+        self.fn_contracts = FnContractsV1 {
+            requires: f.requires.clone(),
+            ensures: f.ensures.clone(),
+            invariant: f.invariant.clone(),
+        };
         self.allow_async_ops = false;
         self.emit_source_line_for_symbol(&f.name);
 
@@ -11165,6 +11790,8 @@ impl<'a> Emitter<'a> {
             self.bind(p.name.clone(), v);
         }
 
+        self.emit_contract_entry_checks()?;
+
         let result_ty = self.infer_expr_in_new_scope(&f.body)?;
         let want_ret_ty = TyInfo {
             ty: f.ret_ty,
@@ -11187,6 +11814,11 @@ impl<'a> Emitter<'a> {
             c_zero(f.ret_ty)
         ));
         self.emit_expr_to(&f.body, f.ret_ty, "out")?;
+
+        let mut out_var = self.make_var_ref(f.ret_ty, "out".to_string(), false);
+        out_var.brand = ty_brand_from_opt(&f.ret_brand);
+        self.emit_contract_exit_checks(&out_var)?;
+
         for (ty, c_name) in self.live_owned_drop_list(None) {
             self.emit_drop_var(ty, &c_name);
         }
@@ -11225,6 +11857,199 @@ impl<'a> Emitter<'a> {
         Ok(())
     }
 
+    fn emit_contract_entry_checks(&mut self) -> Result<(), CompilerError> {
+        if !self.fn_contracts.has_any() {
+            return Ok(());
+        }
+        if self.fn_contracts.requires.is_empty() && self.fn_contracts.invariant.is_empty() {
+            return Ok(());
+        }
+
+        let base_scope = self.scopes.first().cloned().unwrap_or_default();
+        let requires = self.fn_contracts.requires.clone();
+        let invariant = self.fn_contracts.invariant.clone();
+        self.with_contract_scope(base_scope, None, move |this| {
+            for (idx, c) in requires.iter().enumerate() {
+                this.emit_contract_clause_check("requires", ContractClauseKind::Requires, idx, c)?;
+            }
+            for (idx, c) in invariant.iter().enumerate() {
+                this.emit_contract_clause_check(
+                    "invariant_entry",
+                    ContractClauseKind::Invariant,
+                    idx,
+                    c,
+                )?;
+            }
+            Ok(())
+        })
+    }
+
+    fn emit_contract_exit_checks(&mut self, result: &VarRef) -> Result<(), CompilerError> {
+        if !self.fn_contracts.has_any() {
+            return Ok(());
+        }
+        if self.fn_contracts.ensures.is_empty() && self.fn_contracts.invariant.is_empty() {
+            return Ok(());
+        }
+
+        let base_scope = self.scopes.first().cloned().unwrap_or_default();
+        let mut result = result.clone();
+        result.ty = self.fn_ret_ty;
+        let ensures = self.fn_contracts.ensures.clone();
+        let invariant = self.fn_contracts.invariant.clone();
+        self.with_contract_scope(base_scope, Some(result), move |this| {
+            for (idx, c) in ensures.iter().enumerate() {
+                this.emit_contract_clause_check("ensures", ContractClauseKind::Ensures, idx, c)?;
+            }
+            for (idx, c) in invariant.iter().enumerate() {
+                this.emit_contract_clause_check(
+                    "invariant_exit",
+                    ContractClauseKind::Invariant,
+                    idx,
+                    c,
+                )?;
+            }
+            Ok(())
+        })
+    }
+
+    fn with_contract_scope<T>(
+        &mut self,
+        base_scope: BTreeMap<String, VarRef>,
+        result: Option<VarRef>,
+        f: impl FnOnce(&mut Self) -> Result<T, CompilerError>,
+    ) -> Result<T, CompilerError> {
+        let saved_scopes = self.scopes.clone();
+        self.scopes.clear();
+        self.scopes.push(base_scope);
+        if let Some(result) = result {
+            self.bind("__result".to_string(), result);
+        }
+        let out = f(self);
+        self.scopes = saved_scopes;
+        out
+    }
+
+    fn emit_contract_clause_check(
+        &mut self,
+        contract_kind: &str,
+        id_kind: ContractClauseKind,
+        clause_index: usize,
+        clause: &crate::x07ast::ContractClauseAst,
+    ) -> Result<(), CompilerError> {
+        let fn_name = self
+            .current_fn_name
+            .clone()
+            .unwrap_or_else(|| "<unknown_fn>".to_string());
+        let clause_id = clause_id_or_hash(
+            &fn_name,
+            id_kind,
+            clause_index,
+            &clause.expr,
+            clause.id.as_deref(),
+        );
+        let clause_ptr = clause.expr.ptr().to_string();
+
+        if self.options.contract_mode == ContractMode::VerifyBmc {
+            let msg = contract_payload_json_v1(
+                contract_kind,
+                &fn_name,
+                &clause_id,
+                clause_index,
+                &clause_ptr,
+            )?;
+            let msg_escaped = c_escape_c_string(&msg);
+
+            self.push_scope();
+            self.open_block();
+
+            let cond = self.emit_expr(&clause.expr)?;
+            if cond.ty != Ty::I32 {
+                return Err(self.err(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "contract clause expr must evaluate to i32 (got {:?})",
+                        cond.ty
+                    ),
+                ));
+            }
+
+            if contract_kind == "requires" {
+                self.line(&format!(
+                    "__CPROVER_assume({} != UINT32_C(0));",
+                    cond.c_name
+                ));
+            } else {
+                self.line(&format!(
+                    "__CPROVER_assert({} != UINT32_C(0), \"{}\");",
+                    cond.c_name, msg_escaped
+                ));
+            }
+
+            self.pop_scope()?;
+            self.close_block();
+            return Ok(());
+        }
+
+        self.push_scope();
+        self.open_block();
+
+        let scope_name = self.alloc_local("t_contract_budget_")?;
+        self.decl_local(Ty::BudgetScopeV1, &scope_name);
+
+        self.line(&format!(
+            "rt_budget_scope_init(ctx, &{scope_name}, RT_BUDGET_MODE_TRAP, (const uint8_t*)\"contract\", UINT32_C(8), UINT64_C({}), UINT64_C(0), UINT64_C(0), UINT64_C(0), UINT64_C(0), UINT64_C({}));",
+            CONTRACT_ALLOC_BYTES,
+            CONTRACT_FUEL,
+        ));
+
+        let cond = self.emit_expr(&clause.expr)?;
+        if cond.ty != Ty::I32 {
+            return Err(self.err(
+                CompileErrorKind::Typing,
+                format!(
+                    "contract clause expr must evaluate to i32 (got {:?})",
+                    cond.ty
+                ),
+            ));
+        }
+
+        self.line(&format!("if ({} == UINT32_C(0)) {{", cond.c_name));
+        self.indent += 1;
+
+        let witness_vals = clause
+            .witness
+            .iter()
+            .map(|w| self.emit_expr(w))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let witnesses: Vec<ContractWitnessC<'_>> = witness_vals
+            .iter()
+            .map(|w| ContractWitnessC {
+                ty: w.ty,
+                c_name: w.c_name.as_str(),
+            })
+            .collect();
+        emit_contract_trap_payload_v1(
+            |s| self.line(&s),
+            contract_kind,
+            &fn_name,
+            &clause_id,
+            clause_index,
+            &clause_ptr,
+            &witnesses,
+            CONTRACT_WITNESS_MAX_BYTES,
+        )?;
+        self.indent -= 1;
+        self.line("}");
+
+        self.line(&format!("rt_budget_scope_exit_block(ctx, &{scope_name});"));
+
+        self.pop_scope()?;
+        self.close_block();
+        Ok(())
+    }
+
     fn reset_fn_state(&mut self) {
         self.indent = 0;
         self.tmp_counter = 0;
@@ -11232,9 +12057,12 @@ impl<'a> Emitter<'a> {
         self.scopes.clear();
         self.scopes.push(BTreeMap::new());
         self.task_scopes.clear();
+        self.cleanup_scopes.clear();
         self.allow_async_ops = false;
         self.unsafe_depth = 0;
         self.current_fn_name = None;
+        self.current_ptr = None;
+        self.fn_contracts = FnContractsV1::default();
     }
 
     fn emit_source_line_for_symbol(&mut self, sym: &str) {
@@ -12758,6 +13586,9 @@ impl<'a> Emitter<'a> {
         for scope in cleanup_scopes_snapshot.iter().rev() {
             self.emit_unwind_cleanup_scope(scope, v.ty, &v.c_name);
         }
+
+        self.emit_contract_exit_checks(&v)?;
+
         for (ty, c_name) in self.live_owned_drop_list(Some(&v.c_name)) {
             self.emit_drop_var(ty, &c_name);
         }
@@ -22889,6 +23720,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 for scope in cleanup_scopes_snapshot.iter().rev() {
                     self.emit_unwind_cleanup_scope(scope, self.fn_ret_ty, ret_c_name);
                 }
+
+                let ret = self.make_var_ref(self.fn_ret_ty, ret_c_name.to_string(), false);
+                self.emit_contract_exit_checks(&ret)?;
+
                 for (ty, c_name) in self.live_owned_drop_list(Some(&res.c_name)) {
                     self.emit_drop_var(ty, &c_name);
                 }
@@ -22927,6 +23762,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 for scope in cleanup_scopes_snapshot.iter().rev() {
                     self.emit_unwind_cleanup_scope(scope, self.fn_ret_ty, ret_c_name);
                 }
+
+                let ret = self.make_var_ref(self.fn_ret_ty, ret_c_name.to_string(), false);
+                self.emit_contract_exit_checks(&ret)?;
+
                 for (ty, c_name) in self.live_owned_drop_list(Some(&res.c_name)) {
                     self.emit_drop_var(ty, &c_name);
                 }
@@ -22969,6 +23808,10 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 for scope in cleanup_scopes_snapshot.iter().rev() {
                     self.emit_unwind_cleanup_scope(scope, self.fn_ret_ty, ret_c_name);
                 }
+
+                let ret = self.make_var_ref(self.fn_ret_ty, ret_c_name.to_string(), false);
+                self.emit_contract_exit_checks(&ret)?;
+
                 for (ty, c_name) in self.live_owned_drop_list(None) {
                     self.emit_drop_var(ty, &c_name);
                 }
@@ -29771,6 +30614,8 @@ void* memcpy(void* dst, const void* src, size_t n);
 void* memmove(void* dst, const void* src, size_t n);
 void* memset(void* dst, int c, size_t n);
 int memcmp(const void* a, const void* b, size_t n);
+char* getenv(const char* name);
+int snprintf(char* s, size_t n, const char* fmt, ...);
 #endif
 
 #ifndef X07_MEM_CAP
@@ -31786,10 +32631,10 @@ static uint32_t rt_sched_step(ctx_t* ctx) {
         (void)snprintf(
           msg,
           sizeof(msg),
-          "task pending without block (task_id=%" PRIu32 " poll=%p state=%" PRIu32 ")",
-          task_id,
+          "task pending without block (task_id=%u poll=%p state=%u)",
+          (unsigned)task_id,
           (void*)t->poll,
-          st
+          (unsigned)st
         );
         rt_trap(msg);
       }
@@ -31797,8 +32642,8 @@ static uint32_t rt_sched_step(ctx_t* ctx) {
       (void)snprintf(
         msg,
         sizeof(msg),
-        "task pending without block (task_id=%" PRIu32 ")",
-        task_id
+        "task pending without block (task_id=%u)",
+        (unsigned)task_id
       );
       rt_trap(msg);
     }

@@ -1106,6 +1106,7 @@ mod tests {
             arch_root: None,
             emit_main: true,
             freestanding: false,
+            contract_mode: compile::ContractMode::RuntimeTrap,
             allow_unsafe: None,
             allow_ffi: None,
         };

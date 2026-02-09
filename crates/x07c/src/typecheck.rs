@@ -6,8 +6,8 @@ use crate::ast::Expr;
 use crate::diagnostics::{Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Severity, Stage};
 use crate::unify::{unify, Subst, TyInfoTerm, TyTerm, UnifyError};
 use crate::x07ast::{
-    expr_to_value, ty_to_name, type_ref_from_expr, type_ref_to_value, TypeParam, TypeRef,
-    X07AstFile,
+    expr_to_value, ty_to_name, type_ref_from_expr, type_ref_to_value, ContractClauseAst, TypeParam,
+    TypeRef, X07AstFile,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -50,6 +50,7 @@ enum ConstraintOrigin {
     SetAssign {
         name: String,
     },
+    ContractExpr,
     ExprCheck,
 }
 
@@ -61,6 +62,7 @@ impl ConstraintOrigin {
             ConstraintOrigin::IfCond => "if_cond",
             ConstraintOrigin::IfBranch => "if_branch",
             ConstraintOrigin::SetAssign { .. } => "set_assign",
+            ConstraintOrigin::ContractExpr => "contract_expr",
             ConstraintOrigin::ExprCheck => "expr_check",
         }
     }
@@ -169,6 +171,19 @@ impl<'a> InferState<'a> {
             return;
         }
         self.add_constraint(got.ty, want.clone(), expr.ptr().to_string(), origin);
+    }
+
+    fn check_contract_expr(&mut self, expr: &Expr, want: &TyTerm) {
+        let got = self.infer_expr(expr, None);
+        if matches!(got.ty, TyTerm::Never) {
+            return;
+        }
+        self.add_constraint(
+            got.ty,
+            want.clone(),
+            expr.ptr().to_string(),
+            ConstraintOrigin::ContractExpr,
+        );
     }
 
     fn infer_expr(&mut self, expr: &Expr, want: Option<&TyTerm>) -> TyInfoTerm {
@@ -920,6 +935,23 @@ fn diag_for_unify_error(c: &Constraint, err: &UnifyError) -> Diagnostic {
                 quickfix: None,
             }
         }
+        ConstraintOrigin::ContractExpr => {
+            data.insert("expected".to_string(), ty_term_to_value_like(&err.rhs));
+            data.insert("got".to_string(), ty_term_to_value_like(&err.lhs));
+            Diagnostic {
+                code: "X07-CONTRACT-0001".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Type,
+                message: "contract clause must typecheck to i32".to_string(),
+                loc: Some(Location::X07Ast {
+                    ptr: c.blame_ptr.clone(),
+                }),
+                notes: Vec::new(),
+                related: Vec::new(),
+                data,
+                quickfix: None,
+            }
+        }
     }
 }
 
@@ -932,15 +964,33 @@ fn collect_expr_values(expr: &Expr, out: &mut BTreeMap<String, Value>) {
     }
 }
 
+fn collect_contract_clause_expr_values(
+    clauses: &[ContractClauseAst],
+    out: &mut BTreeMap<String, Value>,
+) {
+    for c in clauses {
+        collect_expr_values(&c.expr, out);
+        for w in &c.witness {
+            collect_expr_values(w, out);
+        }
+    }
+}
+
 fn file_expr_values(file: &X07AstFile) -> BTreeMap<String, Value> {
     let mut out = BTreeMap::new();
     if let Some(solve) = &file.solve {
         collect_expr_values(solve, &mut out);
     }
     for f in &file.functions {
+        collect_contract_clause_expr_values(&f.requires, &mut out);
+        collect_contract_clause_expr_values(&f.ensures, &mut out);
+        collect_contract_clause_expr_values(&f.invariant, &mut out);
         collect_expr_values(&f.body, &mut out);
     }
     for f in &file.async_functions {
+        collect_contract_clause_expr_values(&f.requires, &mut out);
+        collect_contract_clause_expr_values(&f.ensures, &mut out);
+        collect_contract_clause_expr_values(&f.invariant, &mut out);
         collect_expr_values(&f.body, &mut out);
     }
     out
@@ -1353,11 +1403,219 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
     );
 }
 
+fn contract_has_clauses(
+    requires: &[ContractClauseAst],
+    ensures: &[ContractClauseAst],
+    invariant: &[ContractClauseAst],
+) -> bool {
+    !(requires.is_empty() && ensures.is_empty() && invariant.is_empty())
+}
+
+fn contract_collect_ident_ptrs(expr: &Expr, needle: &str, out: &mut Vec<String>) {
+    match expr {
+        Expr::Ident { name, .. } if name == needle => out.push(expr.ptr().to_string()),
+        Expr::List { items, .. } => {
+            for item in items {
+                contract_collect_ident_ptrs(item, needle, out);
+            }
+        }
+        Expr::Int { .. } => {}
+        Expr::Ident { .. } => {}
+    }
+}
+
+fn contract_collect_binding_ptrs(expr: &Expr, out: &mut Vec<(String, String)>) {
+    let Expr::List { items, .. } = expr else {
+        return;
+    };
+    let Some(head) = items.first().and_then(Expr::as_ident) else {
+        for item in items {
+            contract_collect_binding_ptrs(item, out);
+        }
+        return;
+    };
+
+    match head {
+        "let" => {
+            if let Some(name) = items.get(1).and_then(Expr::as_ident) {
+                if let Some(name_expr) = items.get(1) {
+                    out.push((name.to_string(), name_expr.ptr().to_string()));
+                }
+            }
+            if let Some(init) = items.get(2) {
+                contract_collect_binding_ptrs(init, out);
+            }
+        }
+        "for" => {
+            if let Some(name) = items.get(1).and_then(Expr::as_ident) {
+                if let Some(name_expr) = items.get(1) {
+                    out.push((name.to_string(), name_expr.ptr().to_string()));
+                }
+            }
+            for item in items.iter().skip(2) {
+                contract_collect_binding_ptrs(item, out);
+            }
+        }
+        "begin" | "if" | "unsafe" | "return" | "try" | "tapp" | "set" => {
+            for item in items.iter().skip(1) {
+                contract_collect_binding_ptrs(item, out);
+            }
+        }
+        _ => {
+            for item in items.iter().skip(1) {
+                contract_collect_binding_ptrs(item, out);
+            }
+        }
+    }
+}
+
+fn diag_contract_err(code: &str, ptr: String, message: String) -> Diagnostic {
+    Diagnostic {
+        code: code.to_string(),
+        severity: Severity::Error,
+        stage: Stage::Type,
+        message,
+        loc: Some(Location::X07Ast { ptr }),
+        notes: Vec::new(),
+        related: Vec::new(),
+        data: BTreeMap::new(),
+        quickfix: None,
+    }
+}
+
+fn contract_pure_call_head(head: &str) -> bool {
+    matches!(
+        head,
+        "+" | "-"
+            | "*"
+            | "/"
+            | "%"
+            | "="
+            | "!="
+            | "<"
+            | "<="
+            | ">"
+            | ">="
+            | "<u"
+            | "<=u"
+            | ">u"
+            | ">=u"
+            | "<<u"
+            | ">>u"
+            | "&"
+            | "|"
+            | "^"
+            | "bytes.lit"
+            | "i32.lit"
+            | "bytes.view"
+            | "bytes.subview"
+            | "bytes.len"
+            | "bytes.get_u8"
+            | "bytes.eq"
+            | "bytes.cmp_range"
+            | "view.len"
+            | "view.get_u8"
+            | "view.slice"
+            | "view.to_bytes"
+    ) || head.starts_with("option_")
+        || head.starts_with("result_")
+}
+
+fn contract_collect_impurity(expr: &Expr, out: &mut Vec<(String, String)>) {
+    let Expr::List { items, ptr } = expr else {
+        return;
+    };
+    let list_ptr = ptr.to_string();
+    let Some(head) = items.first().and_then(Expr::as_ident) else {
+        out.push((
+            list_ptr.clone(),
+            "contract expression is not pure: list head must be an identifier".to_string(),
+        ));
+        for item in items {
+            contract_collect_impurity(item, out);
+        }
+        return;
+    };
+
+    match head {
+        "begin" => {
+            for item in items.iter().skip(1) {
+                contract_collect_impurity(item, out);
+            }
+        }
+        "let" => {
+            if let Some(init) = items.get(2) {
+                contract_collect_impurity(init, out);
+            }
+        }
+        "if" => {
+            for item in items.iter().skip(1) {
+                contract_collect_impurity(item, out);
+            }
+        }
+        "tapp" => {
+            let callee = items.get(1).and_then(Expr::as_ident).unwrap_or("");
+            if !contract_pure_call_head(callee) {
+                out.push((
+                    list_ptr.clone(),
+                    format!("contract expression is not pure: disallowed callee {callee:?}"),
+                ));
+            }
+            for item in items.iter().skip(3) {
+                contract_collect_impurity(item, out);
+            }
+        }
+        "unsafe" | "set" | "for" | "return" | "try" => {
+            out.push((
+                list_ptr.clone(),
+                format!("contract expression is not pure: disallowed form {head:?}"),
+            ));
+        }
+        _ => {
+            if !contract_pure_call_head(head) {
+                out.push((
+                    list_ptr.clone(),
+                    format!("contract expression is not pure: disallowed call {head:?}"),
+                ));
+            }
+            for item in items.iter().skip(1) {
+                contract_collect_impurity(item, out);
+            }
+        }
+    }
+}
+
+fn contract_witness_ty_allowed(tt: &TyTerm) -> bool {
+    match tt {
+        TyTerm::Named(s) => {
+            s == "i32" || s == "bytes" || s == "bytes_view" || s.starts_with("result_")
+        }
+        TyTerm::Never | TyTerm::TParam(_) | TyTerm::Meta(_) | TyTerm::App { .. } => false,
+    }
+}
+
+fn contract_ty_brief(tt: &TyTerm) -> String {
+    match tt {
+        TyTerm::Named(s) => s.clone(),
+        TyTerm::Never => "never".to_string(),
+        TyTerm::TParam(name) => name.clone(),
+        TyTerm::Meta(id) => format!("?{id}"),
+        TyTerm::App { head, .. } => head.clone(),
+    }
+}
+
 pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> TypecheckReport {
     let sigs = collect_sigs(file);
     let expr_values = file_expr_values(file);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
     let mut tapp_rewrites: BTreeMap<String, TappRewrite> = BTreeMap::new();
+    let export_slots = if file.kind == crate::x07ast::X07AstKind::Module && !file.exports.is_empty()
+    {
+        1usize
+    } else {
+        0usize
+    };
+    let defn_base = export_slots + file.extern_functions.len();
 
     if let Some(solve) = &file.solve {
         let mut infer = InferState::new(&sigs, &file.module_id, TyTerm::Named("bytes".to_string()));
@@ -1373,7 +1631,8 @@ pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> Type
         diagnostics.append(&mut infer.diagnostics);
     }
 
-    for f in &file.functions {
+    for (idx, f) in file.functions.iter().enumerate() {
+        let decl_idx = defn_base + idx;
         let mut infer = InferState::new(&sigs, &file.module_id, type_ref_to_term(&f.result));
         for p in &f.params {
             infer.bind(
@@ -1385,9 +1644,157 @@ pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> Type
                 },
             );
         }
+        let mut witness_types: Vec<(String, TyTerm)> = Vec::new();
+
+        if contract_has_clauses(&f.requires, &f.ensures, &f.invariant) {
+            for (pidx, p) in f.params.iter().enumerate() {
+                if p.name == "__result" {
+                    let ptr = format!("/decls/{decl_idx}/params/{pidx}/name");
+                    let msg = "reserved name is not allowed here: \"__result\"".to_string();
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0004", ptr, msg));
+                }
+            }
+
+            let mut bindings: Vec<(String, String)> = Vec::new();
+            contract_collect_binding_ptrs(&f.body, &mut bindings);
+            for c in &f.requires {
+                contract_collect_binding_ptrs(&c.expr, &mut bindings);
+                for w in &c.witness {
+                    contract_collect_binding_ptrs(w, &mut bindings);
+                }
+            }
+            for c in &f.ensures {
+                contract_collect_binding_ptrs(&c.expr, &mut bindings);
+                for w in &c.witness {
+                    contract_collect_binding_ptrs(w, &mut bindings);
+                }
+            }
+            for c in &f.invariant {
+                contract_collect_binding_ptrs(&c.expr, &mut bindings);
+                for w in &c.witness {
+                    contract_collect_binding_ptrs(w, &mut bindings);
+                }
+            }
+
+            for (name, ptr) in bindings {
+                if name == "__result" {
+                    let msg = "reserved name is not allowed here: \"__result\"".to_string();
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0004", ptr, msg));
+                }
+            }
+
+            let want_bool = TyTerm::Named("i32".to_string());
+            for c in &f.requires {
+                let mut impure: Vec<(String, String)> = Vec::new();
+                contract_collect_impurity(&c.expr, &mut impure);
+                for w in &c.witness {
+                    contract_collect_impurity(w, &mut impure);
+                }
+                for (ptr, msg) in impure {
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0002", ptr, msg));
+                }
+
+                let mut ptrs: Vec<String> = Vec::new();
+                contract_collect_ident_ptrs(&c.expr, "__result", &mut ptrs);
+                for w in &c.witness {
+                    contract_collect_ident_ptrs(w, "__result", &mut ptrs);
+                }
+                for ptr in ptrs {
+                    let msg = "\"__result\" is only available in ensures clauses".to_string();
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0003", ptr, msg));
+                }
+
+                infer.check_contract_expr(&c.expr, &want_bool);
+                for w in &c.witness {
+                    let ty = infer.infer_expr(w, None).ty;
+                    witness_types.push((w.ptr().to_string(), ty));
+                }
+            }
+
+            infer.push_scope();
+            infer.bind(
+                "__result".to_string(),
+                TyInfoTerm {
+                    ty: type_ref_to_term(&f.result),
+                    brand: f.result_brand.clone(),
+                    view_full: false,
+                },
+            );
+            for c in &f.ensures {
+                let mut impure: Vec<(String, String)> = Vec::new();
+                contract_collect_impurity(&c.expr, &mut impure);
+                for w in &c.witness {
+                    contract_collect_impurity(w, &mut impure);
+                }
+                for (ptr, msg) in impure {
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0002", ptr, msg));
+                }
+
+                infer.check_contract_expr(&c.expr, &want_bool);
+                for w in &c.witness {
+                    let ty = infer.infer_expr(w, None).ty;
+                    witness_types.push((w.ptr().to_string(), ty));
+                }
+            }
+            infer.pop_scope();
+
+            for c in &f.invariant {
+                let mut impure: Vec<(String, String)> = Vec::new();
+                contract_collect_impurity(&c.expr, &mut impure);
+                for w in &c.witness {
+                    contract_collect_impurity(w, &mut impure);
+                }
+                for (ptr, msg) in impure {
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0002", ptr, msg));
+                }
+
+                let mut ptrs: Vec<String> = Vec::new();
+                contract_collect_ident_ptrs(&c.expr, "__result", &mut ptrs);
+                for w in &c.witness {
+                    contract_collect_ident_ptrs(w, "__result", &mut ptrs);
+                }
+                for ptr in ptrs {
+                    let msg = "\"__result\" is only available in ensures clauses".to_string();
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0003", ptr, msg));
+                }
+
+                infer.check_contract_expr(&c.expr, &want_bool);
+                for w in &c.witness {
+                    let ty = infer.infer_expr(w, None).ty;
+                    witness_types.push((w.ptr().to_string(), ty));
+                }
+            }
+        }
+
         let want = infer.fn_ret.clone();
         let _ = infer.infer_expr(&f.body, Some(&want));
         infer.solve_constraints();
+        for (ptr, ty) in std::mem::take(&mut witness_types) {
+            let resolved = infer.subst.resolve(&ty);
+            if !contract_witness_ty_allowed(&resolved) {
+                let msg = format!(
+                    "contract witness has unsupported type: {} (allowed: i32, bytes, bytes_view, result_*)",
+                    contract_ty_brief(&resolved)
+                );
+                infer
+                    .diagnostics
+                    .push(diag_contract_err("X07-CONTRACT-0005", ptr, msg));
+            }
+        }
         drain_pending_tapp(
             std::mem::take(&mut infer.pending_tapp),
             &infer.subst,
@@ -1398,7 +1805,8 @@ pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> Type
         diagnostics.append(&mut infer.diagnostics);
     }
 
-    for f in &file.async_functions {
+    for (idx, f) in file.async_functions.iter().enumerate() {
+        let decl_idx = defn_base + file.functions.len() + idx;
         let mut infer = InferState::new(&sigs, &file.module_id, type_ref_to_term(&f.result));
         for p in &f.params {
             infer.bind(
@@ -1410,9 +1818,157 @@ pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> Type
                 },
             );
         }
+        let mut witness_types: Vec<(String, TyTerm)> = Vec::new();
+
+        if contract_has_clauses(&f.requires, &f.ensures, &f.invariant) {
+            for (pidx, p) in f.params.iter().enumerate() {
+                if p.name == "__result" {
+                    let ptr = format!("/decls/{decl_idx}/params/{pidx}/name");
+                    let msg = "reserved name is not allowed here: \"__result\"".to_string();
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0004", ptr, msg));
+                }
+            }
+
+            let mut bindings: Vec<(String, String)> = Vec::new();
+            contract_collect_binding_ptrs(&f.body, &mut bindings);
+            for c in &f.requires {
+                contract_collect_binding_ptrs(&c.expr, &mut bindings);
+                for w in &c.witness {
+                    contract_collect_binding_ptrs(w, &mut bindings);
+                }
+            }
+            for c in &f.ensures {
+                contract_collect_binding_ptrs(&c.expr, &mut bindings);
+                for w in &c.witness {
+                    contract_collect_binding_ptrs(w, &mut bindings);
+                }
+            }
+            for c in &f.invariant {
+                contract_collect_binding_ptrs(&c.expr, &mut bindings);
+                for w in &c.witness {
+                    contract_collect_binding_ptrs(w, &mut bindings);
+                }
+            }
+
+            for (name, ptr) in bindings {
+                if name == "__result" {
+                    let msg = "reserved name is not allowed here: \"__result\"".to_string();
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0004", ptr, msg));
+                }
+            }
+
+            let want_bool = TyTerm::Named("i32".to_string());
+            for c in &f.requires {
+                let mut impure: Vec<(String, String)> = Vec::new();
+                contract_collect_impurity(&c.expr, &mut impure);
+                for w in &c.witness {
+                    contract_collect_impurity(w, &mut impure);
+                }
+                for (ptr, msg) in impure {
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0002", ptr, msg));
+                }
+
+                let mut ptrs: Vec<String> = Vec::new();
+                contract_collect_ident_ptrs(&c.expr, "__result", &mut ptrs);
+                for w in &c.witness {
+                    contract_collect_ident_ptrs(w, "__result", &mut ptrs);
+                }
+                for ptr in ptrs {
+                    let msg = "\"__result\" is only available in ensures clauses".to_string();
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0003", ptr, msg));
+                }
+
+                infer.check_contract_expr(&c.expr, &want_bool);
+                for w in &c.witness {
+                    let ty = infer.infer_expr(w, None).ty;
+                    witness_types.push((w.ptr().to_string(), ty));
+                }
+            }
+
+            infer.push_scope();
+            infer.bind(
+                "__result".to_string(),
+                TyInfoTerm {
+                    ty: type_ref_to_term(&f.result),
+                    brand: f.result_brand.clone(),
+                    view_full: false,
+                },
+            );
+            for c in &f.ensures {
+                let mut impure: Vec<(String, String)> = Vec::new();
+                contract_collect_impurity(&c.expr, &mut impure);
+                for w in &c.witness {
+                    contract_collect_impurity(w, &mut impure);
+                }
+                for (ptr, msg) in impure {
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0002", ptr, msg));
+                }
+
+                infer.check_contract_expr(&c.expr, &want_bool);
+                for w in &c.witness {
+                    let ty = infer.infer_expr(w, None).ty;
+                    witness_types.push((w.ptr().to_string(), ty));
+                }
+            }
+            infer.pop_scope();
+
+            for c in &f.invariant {
+                let mut impure: Vec<(String, String)> = Vec::new();
+                contract_collect_impurity(&c.expr, &mut impure);
+                for w in &c.witness {
+                    contract_collect_impurity(w, &mut impure);
+                }
+                for (ptr, msg) in impure {
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0002", ptr, msg));
+                }
+
+                let mut ptrs: Vec<String> = Vec::new();
+                contract_collect_ident_ptrs(&c.expr, "__result", &mut ptrs);
+                for w in &c.witness {
+                    contract_collect_ident_ptrs(w, "__result", &mut ptrs);
+                }
+                for ptr in ptrs {
+                    let msg = "\"__result\" is only available in ensures clauses".to_string();
+                    infer
+                        .diagnostics
+                        .push(diag_contract_err("X07-CONTRACT-0003", ptr, msg));
+                }
+
+                infer.check_contract_expr(&c.expr, &want_bool);
+                for w in &c.witness {
+                    let ty = infer.infer_expr(w, None).ty;
+                    witness_types.push((w.ptr().to_string(), ty));
+                }
+            }
+        }
+
         let want = infer.fn_ret.clone();
         let _ = infer.infer_expr(&f.body, Some(&want));
         infer.solve_constraints();
+        for (ptr, ty) in std::mem::take(&mut witness_types) {
+            let resolved = infer.subst.resolve(&ty);
+            if !contract_witness_ty_allowed(&resolved) {
+                let msg = format!(
+                    "contract witness has unsupported type: {} (allowed: i32, bytes, bytes_view, result_*)",
+                    contract_ty_brief(&resolved)
+                );
+                infer
+                    .diagnostics
+                    .push(diag_contract_err("X07-CONTRACT-0005", ptr, msg));
+            }
+        }
         drain_pending_tapp(
             std::mem::take(&mut infer.pending_tapp),
             &infer.subst,

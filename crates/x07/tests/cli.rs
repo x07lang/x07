@@ -6,9 +6,10 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use x07_contracts::{
     X07AST_SCHEMA_VERSION, X07C_REPORT_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
-    X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_PATCHSET_SCHEMA_VERSION,
-    X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_REVIEW_DIFF_SCHEMA_VERSION,
-    X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
+    X07_CONTRACT_REPRO_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
+    X07_PATCHSET_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
+    X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
+    X07_VERIFY_REPORT_SCHEMA_VERSION,
 };
 use x07c::json_patch;
 
@@ -458,6 +459,124 @@ fn x07_test_manifest_input_b64_affects_run() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["summary"]["passed"], 0);
     assert_eq!(v["summary"]["failed"], 1);
+}
+
+#[test]
+fn x07_test_contract_violation_emits_repro_and_report_fields() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_contract_repro");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let module = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "contracts_fixture",
+        "imports": ["std.test"],
+        "decls": [
+            { "kind": "export", "names": ["contracts_fixture.contract_fail"] },
+            {
+                "kind": "defn",
+                "name": "contracts_fixture.contract_fail",
+                "params": [],
+                "result": "result_i32",
+                "requires": [{ "id": "req1", "expr": 0, "witness": [42] }],
+                "body": ["std.test.pass"]
+            }
+        ]
+    });
+    write_bytes(
+        &dir.join("contracts_fixture.x07.json"),
+        serde_json::to_string_pretty(&module).unwrap().as_bytes(),
+    );
+
+    let manifest = serde_json::json!({
+        "schema_version": "x07.tests_manifest@0.2.0",
+        "tests": [
+            {
+                "id": "contracts/requires_violation",
+                "world": "solve-pure",
+                "entry": "contracts_fixture.contract_fail",
+                "expect": "pass"
+            }
+        ]
+    });
+    let manifest_path = dir.join("tests.json");
+    write_bytes(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap().as_bytes(),
+    );
+
+    let artifact_dir = dir.join("artifacts");
+    let stdlib_lock = root.join("stdlib.lock");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "test",
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--artifact-dir",
+            artifact_dir.to_str().unwrap(),
+            "--stdlib-lock",
+            stdlib_lock.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(12),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
+    assert_eq!(v["summary"]["run_failures"], 1);
+    assert_eq!(v["tests"].as_array().expect("tests[]").len(), 1);
+
+    let t = &v["tests"][0];
+    assert_eq!(t["status"], "error");
+    assert_eq!(t["failure_kind"], "contract_violation");
+
+    let expected_repro_path = artifact_dir
+        .join("contract")
+        .join(format!("id_{}", sha256_hex("req1".as_bytes())))
+        .join("repro.json");
+    let expected_repro_path_str = expected_repro_path.display().to_string();
+    assert_eq!(
+        t["contract_repro_path"]
+            .as_str()
+            .expect("contract_repro_path"),
+        expected_repro_path_str
+    );
+    assert!(
+        expected_repro_path.is_file(),
+        "missing {}",
+        expected_repro_path.display()
+    );
+
+    let repro_bytes = std::fs::read(&expected_repro_path).expect("read repro.json");
+    let repro: Value = serde_json::from_slice(&repro_bytes).expect("parse repro.json");
+    assert_eq!(repro["schema_version"], X07_CONTRACT_REPRO_SCHEMA_VERSION);
+    assert_eq!(repro["world"], "solve-pure");
+    assert_eq!(repro["source"]["mode"], "x07test");
+    assert_eq!(repro["source"]["test_id"], "contracts/requires_violation");
+    assert_eq!(
+        repro["source"]["test_entry"],
+        "contracts_fixture.contract_fail"
+    );
+    assert_eq!(repro["runner"]["solve_fuel"], 50_000_000);
+    assert_eq!(repro["runner"]["max_memory_bytes"], 64 * 1024 * 1024);
+    assert_eq!(repro["runner"]["max_output_bytes"], 1024 * 1024);
+    assert_eq!(repro["runner"]["cpu_time_limit_seconds"], 5);
+    assert_eq!(repro["contract"]["contract_kind"], "requires");
+    assert_eq!(repro["contract"]["fn"], "contracts_fixture.contract_fail");
+    assert_eq!(repro["contract"]["clause_id"], "req1");
+    assert_eq!(repro["input_bytes_b64"], "");
 }
 
 #[test]
@@ -975,6 +1094,143 @@ fn x07_run_project_accepts_dir_path() {
 
     let v = parse_json_stdout(&out);
     assert_eq!(v["schema_version"], X07_RUN_REPORT_SCHEMA_VERSION);
+}
+
+#[test]
+fn x07_run_contract_violation_emits_repro() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_contract_repro");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": ["std.test"],
+        "decls": [
+            { "kind": "export", "names": ["main.contract_fail"] },
+            {
+                "kind": "defn",
+                "name": "main.contract_fail",
+                "params": [],
+                "result": "result_i32",
+                "requires": [{ "id": "req1", "expr": 0, "witness": [42] }],
+                "body": ["std.test.pass"]
+            }
+        ],
+        "solve": ["begin", ["main.contract_fail"], ["bytes.alloc", 0]]
+    }))
+    .expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "run",
+            "--program",
+            program_path.to_str().unwrap(),
+            "--world",
+            "solve-pure",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let repro_path = dir
+        .join(".x07")
+        .join("artifacts")
+        .join("contract")
+        .join(format!("id_{}", sha256_hex("req1".as_bytes())))
+        .join("repro.json");
+    assert!(repro_path.is_file(), "missing {}", repro_path.display());
+
+    let repro_bytes = std::fs::read(&repro_path).expect("read repro.json");
+    let repro: Value = serde_json::from_slice(&repro_bytes).expect("parse repro.json");
+    assert_eq!(repro["schema_version"], X07_CONTRACT_REPRO_SCHEMA_VERSION);
+    assert_eq!(repro["world"], "solve-pure");
+    assert_eq!(repro["source"]["mode"], "x07run");
+    assert_eq!(repro["source"]["target_kind"], "program");
+    assert_eq!(repro["contract"]["contract_kind"], "requires");
+    assert_eq!(repro["contract"]["clause_id"], "req1");
+}
+
+#[test]
+fn x07_verify_bmc_missing_cbmc_emits_tool_missing_report() {
+    let dir = fresh_os_tmp_dir("x07_verify_bmc_missing_cbmc");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    let module = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "verify_fixture",
+        "imports": [],
+        "decls": [
+            {"kind":"export", "names":["verify_fixture.f"]},
+            {
+                "kind": "defn",
+                "name": "verify_fixture.f",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "requires": [{"id":"r0","expr":["=","x","x"]}],
+                "body": "x"
+            }
+        ]
+    }))
+    .expect("serialize x07AST module");
+    write_bytes(&dir.join("verify_fixture.x07.json"), &module);
+
+    let empty_path = dir.join("empty_path");
+    std::fs::create_dir_all(&empty_path).expect("create empty PATH dir");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env("PATH", empty_path.to_str().unwrap())
+        .args(["verify", "--bmc", "--entry", "verify_fixture.f"])
+        .output()
+        .expect("run x07 verify");
+
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["mode"], "bmc");
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"]["kind"], "tool_missing");
+    assert_eq!(v["diagnostics_count"], 1);
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert_eq!(diags[0]["code"], "X07V_ECBMC_MISSING");
+    assert!(
+        v["artifacts"]["driver_path"].as_str().is_some(),
+        "expected artifacts.driver_path"
+    );
+    assert!(
+        v["artifacts"]["c_path"].as_str().is_some(),
+        "expected artifacts.c_path"
+    );
 }
 
 #[test]
@@ -2109,6 +2365,178 @@ fn x07_fix_suggest_generics_emits_patchset_and_applies() {
         x07c::x07ast::expr_to_value(&w_i32.body),
         serde_json::json!(["tapp", "main.id", ["tys", "i32"], "x"])
     );
+
+    let out = run_x07(&["lint", "--input", program_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let lint_report = parse_json_stdout(&out);
+    assert_eq!(lint_report["ok"], true);
+}
+
+#[test]
+fn x07_fix_suggest_generics_does_not_merge_different_contracts() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_fix_suggest_generics_contracts_mismatch");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            { "kind": "export", "names": ["main.id_u32", "main.id_i32"] },
+            {
+                "kind": "defn",
+                "name": "main.id_u32",
+                "requires": [{ "expr": 1 }],
+                "params": [{ "name": "x", "ty": "u32" }],
+                "result": "u32",
+                "body": "x"
+            },
+            {
+                "kind": "defn",
+                "name": "main.id_i32",
+                "requires": [{ "expr": 0 }],
+                "params": [{ "name": "x", "ty": "i32" }],
+                "result": "i32",
+                "body": "x"
+            }
+        ]
+    }))
+    .expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program);
+
+    let patchset_path = dir.join("suggest.patchset.json");
+    let out = run_x07(&[
+        "fix",
+        "--input",
+        program_path.to_str().unwrap(),
+        "--suggest-generics",
+        "--out",
+        patchset_path.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let patch_bytes = std::fs::read(&patchset_path).expect("read patchset");
+    let patch_doc: Value = serde_json::from_slice(&patch_bytes).expect("parse patchset JSON");
+    assert_eq!(patch_doc["schema_version"], X07_PATCHSET_SCHEMA_VERSION);
+    assert_eq!(patch_doc["patches"].as_array().expect("patches[]").len(), 0);
+}
+
+#[test]
+fn x07_fix_suggest_generics_moves_contracts_to_base_and_keeps_schema() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_fix_suggest_generics_contracts_preserve");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            { "kind": "export", "names": ["main.id_u32", "main.id_i32"] },
+            {
+                "kind": "defn",
+                "name": "main.id_u32",
+                "requires": [{ "expr": 1 }],
+                "ensures": [{ "expr": 1 }],
+                "invariant": [{ "expr": 1 }],
+                "params": [{ "name": "x", "ty": "u32" }],
+                "result": "u32",
+                "body": "x"
+            },
+            {
+                "kind": "defn",
+                "name": "main.id_i32",
+                "requires": [{ "expr": 1 }],
+                "ensures": [{ "expr": 1 }],
+                "invariant": [{ "expr": 1 }],
+                "params": [{ "name": "x", "ty": "i32" }],
+                "result": "i32",
+                "body": "x"
+            }
+        ]
+    }))
+    .expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program);
+
+    let patchset_path = dir.join("suggest.patchset.json");
+    let out = run_x07(&[
+        "fix",
+        "--input",
+        program_path.to_str().unwrap(),
+        "--suggest-generics",
+        "--out",
+        patchset_path.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07(&[
+        "patch",
+        "apply",
+        "--in",
+        patchset_path.to_str().unwrap(),
+        "--repo-root",
+        root.to_str().unwrap(),
+        "--write",
+        "--json",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let patched_bytes = std::fs::read(&program_path).expect("read patched x07AST");
+    let file = x07c::x07ast::parse_x07ast_json(&patched_bytes).expect("parse patched x07AST");
+    assert_eq!(file.schema_version, X07AST_SCHEMA_VERSION);
+
+    let base = file
+        .functions
+        .iter()
+        .find(|f| f.name == "main.id")
+        .expect("missing base defn");
+    assert_eq!(base.requires.len(), 1);
+    assert_eq!(base.ensures.len(), 1);
+    assert_eq!(base.invariant.len(), 1);
+
+    for wrapper_name in ["main.id_u32", "main.id_i32"] {
+        let w = file
+            .functions
+            .iter()
+            .find(|f| f.name == wrapper_name)
+            .unwrap_or_else(|| panic!("missing wrapper {wrapper_name:?}"));
+        assert!(w.requires.is_empty(), "expected wrapper requires cleared");
+        assert!(w.ensures.is_empty(), "expected wrapper ensures cleared");
+        assert!(w.invariant.is_empty(), "expected wrapper invariant cleared");
+    }
 
     let out = run_x07(&["lint", "--input", program_path.to_str().unwrap()]);
     assert_eq!(
@@ -3945,7 +4373,7 @@ fn x07_ast_grammar_cfg_emits_bundle_and_materializes_out_dir() {
 
     let bundle = parse_json_stdout(&out);
     assert_eq!(bundle["schema_version"], "x07.ast.grammar_bundle@0.1.0");
-    assert_eq!(bundle["x07ast_schema_version"], "x07.x07ast@0.4.0");
+    assert_eq!(bundle["x07ast_schema_version"], "x07.x07ast@0.5.0");
     assert_eq!(bundle["format"], "gbnf_v1");
 
     let variants = bundle["variants"].as_array().expect("variants[]");
@@ -4045,7 +4473,7 @@ fn x07_ast_grammar_cfg_emits_bundle_and_materializes_out_dir() {
     assert_eq!(manifest["schema_version"], "x07.genpack.manifest@0.1.0");
     assert_eq!(manifest["pack"], "x07-genpack-x07ast");
     assert_eq!(manifest["pack_version"], "0.1.0");
-    assert_eq!(manifest["x07ast_schema_version"], "x07.x07ast@0.4.0");
+    assert_eq!(manifest["x07ast_schema_version"], "x07.x07ast@0.5.0");
     let artifacts = manifest["artifacts"].as_array().expect("artifacts[]");
     assert_eq!(artifacts.len(), 4);
     let get_sha = |name: &str| {

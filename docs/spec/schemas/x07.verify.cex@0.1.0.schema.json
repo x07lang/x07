@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.verify.cex@0.1.0.schema.json",
+  "title": "X07 Verify Counterexample v0.1.0",
+  "description": "Counterexample artifact emitted by `x07 verify --bmc`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "entry",
+    "bounds",
+    "input_bytes_b64",
+    "contract",
+    "cbmc"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.verify.cex@0.1.0" },
+    "tool": { "$ref": "#/$defs/tool" },
+    "entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "bounds": { "$ref": "#/$defs/bounds" },
+    "input_bytes_b64": { "type": "string", "minLength": 0, "maxLength": 16777216 },
+    "contract": { "$ref": "#/$defs/contract_payload" },
+    "cbmc": { "$ref": "#/$defs/cbmc" }
+  },
+  "$defs": {
+    "u64": { "type": "integer", "minimum": 0 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x07_version", "x07c_version"],
+      "properties": {
+        "x07_version": { "type": "string" },
+        "x07c_version": { "type": "string" },
+        "git_sha": { "type": "string", "pattern": "^[0-9a-fA-F]{7,40}$" }
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unwind", "max_bytes_len", "input_len_bytes"],
+      "properties": {
+        "unwind": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "max_bytes_len": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "input_len_bytes": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      }
+    },
+    "cbmc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "exit_code", "stdout_json_path", "stdout_json_sha256"],
+      "properties": {
+        "version": { "type": "string", "maxLength": 2048 },
+        "argv": { "type": "array", "items": { "type": "string" } },
+        "exit_code": { "type": "integer" },
+        "stdout_json_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "stdout_json_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "contract_witness": {
+      "type": "object",
+      "required": ["ty"],
+      "properties": { "ty": { "type": "string" } },
+      "additionalProperties": true
+    },
+    "contract_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_kind",
+        "fn",
+        "clause_id",
+        "clause_index",
+        "clause_ptr",
+        "witness"
+      ],
+      "properties": {
+        "contract_kind": {
+          "type": "string",
+          "enum": ["requires", "ensures", "invariant_entry", "invariant_exit"]
+        },
+        "fn": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "clause_id": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "clause_index": { "type": "integer", "minimum": 0 },
+        "clause_ptr": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "witness": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/contract_witness" }
+        }
+      }
+    }
+  }
+}

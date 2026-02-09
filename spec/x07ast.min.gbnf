@@ -1,7 +1,7 @@
 root ::= entry-doc | module-doc
 
-entry-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"entry\"" ws entry-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.4.0\"" ws "," ws "\"solve\"" ws ":" ws sexpr ws "}"
-module-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"module\"" ws module-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.4.0\"" ws "}"
+entry-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"entry\"" ws entry-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.5.0\"" ws "," ws "\"solve\"" ws ":" ws sexpr ws "}"
+module-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"module\"" ws module-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.5.0\"" ws "}"
 
 entry-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
 module-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
@@ -16,8 +16,18 @@ decl-list-tail ::= "" | ws "," ws decl decl-list-tail
 
 decl ::= decl-defn | decl-defasync | decl-export | decl-extern
 
-decl-defn ::= "{" ws "\"body\"" ws ":" ws sexpr ws "," ws "\"kind\"" ws ":" ws "\"defn\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-ref decl-defn-tail ws "}"
-decl-defasync ::= "{" ws "\"body\"" ws ":" ws sexpr ws "," ws "\"kind\"" ws ":" ws "\"defasync\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array ws "," ws "\"result\"" ws ":" ws type-ref decl-defasync-tail ws "}"
+decl-defn ::= "{" ws "\"body\"" ws ":" ws sexpr decl-defn-pre-constraints ws "," ws "\"kind\"" ws ":" ws "\"defn\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array decl-defn-requires-opt ws "," ws "\"result\"" ws ":" ws type-ref decl-defn-tail ws "}"
+decl-defasync ::= "{" ws "\"body\"" ws ":" ws sexpr decl-defasync-pre-constraints ws "," ws "\"kind\"" ws ":" ws "\"defasync\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array decl-defasync-requires-opt ws "," ws "\"result\"" ws ":" ws type-ref decl-defasync-tail ws "}"
+decl-defn-pre-constraints ::= "" | decl-defn-pre-constraints-ensures | decl-defn-pre-constraints-invariant
+decl-defn-pre-constraints-ensures ::= ws "," ws "\"ensures\"" ws ":" ws contract-clause-array decl-defn-pre-constraints-ensures-tail
+decl-defn-pre-constraints-ensures-tail ::= "" | ws "," ws "\"invariant\"" ws ":" ws contract-clause-array
+decl-defn-pre-constraints-invariant ::= ws "," ws "\"invariant\"" ws ":" ws contract-clause-array
+decl-defn-requires-opt ::= "" | ws "," ws "\"requires\"" ws ":" ws contract-clause-array
+decl-defasync-pre-constraints ::= "" | decl-defasync-pre-constraints-ensures | decl-defasync-pre-constraints-invariant
+decl-defasync-pre-constraints-ensures ::= ws "," ws "\"ensures\"" ws ":" ws contract-clause-array decl-defasync-pre-constraints-ensures-tail
+decl-defasync-pre-constraints-ensures-tail ::= "" | ws "," ws "\"invariant\"" ws ":" ws contract-clause-array
+decl-defasync-pre-constraints-invariant ::= ws "," ws "\"invariant\"" ws ":" ws contract-clause-array
+decl-defasync-requires-opt ::= "" | ws "," ws "\"requires\"" ws ":" ws contract-clause-array
 decl-defn-tail ::= "" | decl-defn-tail-type-params | decl-defn-tail-result-brand | decl-defn-tail-both
 decl-defn-tail-type-params ::= ws "," ws "\"type_params\"" ws ":" ws type-param-array
 decl-defn-tail-result-brand ::= ws "," ws "\"result_brand\"" ws ":" ws symbol
@@ -39,6 +49,18 @@ param-list-tail ::= "" | ws "," ws param param-list-tail
 param ::= param-with-brand | param-without-brand
 param-with-brand ::= "{" ws "\"brand\"" ws ":" ws symbol ws "," ws "\"name\"" ws ":" ws local-name ws "," ws "\"ty\"" ws ":" ws type-ref ws "}"
 param-without-brand ::= "{" ws "\"name\"" ws ":" ws local-name ws "," ws "\"ty\"" ws ":" ws type-ref ws "}"
+
+contract-clause-array ::= "[" ws contract-clause-list-opt ws "]"
+contract-clause-list-opt ::= "" | contract-clause contract-clause-list-tail
+contract-clause-list-tail ::= "" | ws "," ws contract-clause contract-clause-list-tail
+contract-clause ::= contract-clause-expr-only | contract-clause-expr-id | contract-clause-expr-witness | contract-clause-expr-id-witness
+contract-clause-expr-only ::= "{" ws "\"expr\"" ws ":" ws sexpr ws "}"
+contract-clause-expr-id ::= "{" ws "\"expr\"" ws ":" ws sexpr ws "," ws "\"id\"" ws ":" ws string ws "}"
+contract-clause-expr-witness ::= "{" ws "\"expr\"" ws ":" ws sexpr ws "," ws "\"witness\"" ws ":" ws contract-witness-array ws "}"
+contract-clause-expr-id-witness ::= "{" ws "\"expr\"" ws ":" ws sexpr ws "," ws "\"id\"" ws ":" ws string ws "," ws "\"witness\"" ws ":" ws contract-witness-array ws "}"
+contract-witness-array ::= "[" ws contract-witness-list-opt ws "]"
+contract-witness-list-opt ::= "" | sexpr contract-witness-list-tail
+contract-witness-list-tail ::= "" | ws "," ws sexpr contract-witness-list-tail
 
 type-param-array ::= "[" ws type-param-list-opt ws "]"
 type-param-list-opt ::= "" | type-param type-param-list-tail

@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use crate::builtin_modules;
 use crate::c_emit;
+use crate::diagnostics::{Location, Severity};
 use crate::generics;
 use crate::guide;
 use crate::language;
@@ -14,7 +15,16 @@ use crate::stream_pipe;
 use crate::types::Ty;
 use crate::validate;
 use crate::x07ast;
-use x07_contracts::NATIVE_REQUIRES_SCHEMA_VERSION;
+use x07_contracts::{NATIVE_REQUIRES_SCHEMA_VERSION, X07AST_SCHEMA_VERSION_V0_5_0};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ContractMode {
+    /// Runtime contract checks trap with a structured payload (default).
+    #[default]
+    RuntimeTrap,
+    /// Verification mode: contracts lower to `__CPROVER_assume` / `__CPROVER_assert`.
+    VerifyBmc,
+}
 
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
@@ -26,6 +36,7 @@ pub struct CompileOptions {
     pub arch_root: Option<std::path::PathBuf>,
     pub emit_main: bool,
     pub freestanding: bool,
+    pub contract_mode: ContractMode,
     pub allow_unsafe: Option<bool>,
     pub allow_ffi: Option<bool>,
 }
@@ -41,6 +52,7 @@ impl Default for CompileOptions {
             arch_root: None,
             emit_main: true,
             freestanding: false,
+            contract_mode: ContractMode::default(),
             allow_unsafe: None,
             allow_ffi: None,
         }
@@ -180,6 +192,7 @@ pub fn compile_program_to_c_with_meta(
 
     let file = x07ast::parse_x07ast_json(program)
         .map_err(|e| CompilerError::new(CompileErrorKind::Parse, format!("main: {e}")))?;
+    enforce_contract_typecheck("main", &file)?;
     fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
     let main = parse_main_file_x07ast(file)?;
     forbid_internal_only_heads_in_entry("main", &main)?;
@@ -290,16 +303,33 @@ pub fn compile_program_to_c_with_meta(
     validate_program_visibility(&parsed_program, &module_infos)?;
     forbid_internal_only_heads_in_non_builtin_code(&parsed_program, &module_infos)?;
 
+    let contract_nodes = |clauses: &[crate::x07ast::ContractClauseAst]| -> usize {
+        clauses
+            .iter()
+            .map(|c| c.expr.node_count() + c.witness.iter().map(|w| w.node_count()).sum::<usize>())
+            .sum()
+    };
+
     let total_nodes: usize = parsed_program.solve.node_count()
         + parsed_program
             .functions
             .iter()
-            .map(|f| f.body.node_count())
+            .map(|f| {
+                f.body.node_count()
+                    + contract_nodes(&f.requires)
+                    + contract_nodes(&f.ensures)
+                    + contract_nodes(&f.invariant)
+            })
             .sum::<usize>()
         + parsed_program
             .async_functions
             .iter()
-            .map(|f| f.body.node_count())
+            .map(|f| {
+                f.body.node_count()
+                    + contract_nodes(&f.requires)
+                    + contract_nodes(&f.ensures)
+                    + contract_nodes(&f.invariant)
+            })
             .sum::<usize>();
     let max_ast_nodes = language::limits::max_ast_nodes();
     if total_nodes > max_ast_nodes {
@@ -441,6 +471,27 @@ fn forbid_internal_only_heads_in_entry(
                 format!("{label}: internal-only builtin is not allowed here: {head}"),
             ));
         }
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            if let Some(head) = find_internal_only_head(&c.expr) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Unsupported,
+                    format!("{label}: internal-only builtin is not allowed here: {head}"),
+                ));
+            }
+            for w in &c.witness {
+                if let Some(head) = find_internal_only_head(w) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Unsupported,
+                        format!("{label}: internal-only builtin is not allowed here: {head}"),
+                    ));
+                }
+            }
+        }
     }
     for f in &main.async_functions {
         if let Some(head) = find_internal_only_head(&f.body) {
@@ -448,6 +499,27 @@ fn forbid_internal_only_heads_in_entry(
                 CompileErrorKind::Unsupported,
                 format!("{label}: internal-only builtin is not allowed here: {head}"),
             ));
+        }
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            if let Some(head) = find_internal_only_head(&c.expr) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Unsupported,
+                    format!("{label}: internal-only builtin is not allowed here: {head}"),
+                ));
+            }
+            for w in &c.witness {
+                if let Some(head) = find_internal_only_head(w) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Unsupported,
+                        format!("{label}: internal-only builtin is not allowed here: {head}"),
+                    ));
+                }
+            }
         }
     }
     Ok(())
@@ -464,6 +536,27 @@ fn forbid_internal_only_heads_in_module(
                 format!("{module_id:?}: internal-only builtin is not allowed here: {head}"),
             ));
         }
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            if let Some(head) = find_internal_only_head(&c.expr) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Unsupported,
+                    format!("{module_id:?}: internal-only builtin is not allowed here: {head}"),
+                ));
+            }
+            for w in &c.witness {
+                if let Some(head) = find_internal_only_head(w) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Unsupported,
+                        format!("{module_id:?}: internal-only builtin is not allowed here: {head}"),
+                    ));
+                }
+            }
+        }
     }
     for f in &module.async_functions {
         if let Some(head) = find_internal_only_head(&f.body) {
@@ -471,6 +564,27 @@ fn forbid_internal_only_heads_in_module(
                 CompileErrorKind::Unsupported,
                 format!("{module_id:?}: internal-only builtin is not allowed here: {head}"),
             ));
+        }
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            if let Some(head) = find_internal_only_head(&c.expr) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Unsupported,
+                    format!("{module_id:?}: internal-only builtin is not allowed here: {head}"),
+                ));
+            }
+            for w in &c.witness {
+                if let Some(head) = find_internal_only_head(w) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Unsupported,
+                        format!("{module_id:?}: internal-only builtin is not allowed here: {head}"),
+                    ));
+                }
+            }
         }
     }
     Ok(())
@@ -521,6 +635,33 @@ fn forbid_internal_only_heads_in_non_builtin_code(
                 ),
             ));
         }
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            if let Some(head) = find_internal_only_head(&c.expr) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Unsupported,
+                    format!(
+                        "{:?}: internal-only builtin is not allowed here: {head}",
+                        f.name
+                    ),
+                ));
+            }
+            for w in &c.witness {
+                if let Some(head) = find_internal_only_head(w) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Unsupported,
+                        format!(
+                            "{:?}: internal-only builtin is not allowed here: {head}",
+                            f.name
+                        ),
+                    ));
+                }
+            }
+        }
     }
 
     for f in &program.async_functions {
@@ -556,6 +697,33 @@ fn forbid_internal_only_heads_in_non_builtin_code(
                     f.name
                 ),
             ));
+        }
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            if let Some(head) = find_internal_only_head(&c.expr) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Unsupported,
+                    format!(
+                        "{:?}: internal-only builtin is not allowed here: {head}",
+                        f.name
+                    ),
+                ));
+            }
+            for w in &c.witness {
+                if let Some(head) = find_internal_only_head(w) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Unsupported,
+                        format!(
+                            "{:?}: internal-only builtin is not allowed here: {head}",
+                            f.name
+                        ),
+                    ));
+                }
+            }
         }
     }
 
@@ -707,6 +875,7 @@ fn load_module_recursive(
 
     let file = x07ast::parse_x07ast_json(src.as_bytes())
         .map_err(|e| CompilerError::new(CompileErrorKind::Parse, format!("{module_id:?}: {e}")))?;
+    enforce_contract_typecheck(module_id, &file)?;
     *fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
     let (m, mut info) = parse_module_file_x07ast(module_id, file)?;
     info.is_builtin = is_builtin;
@@ -782,14 +951,90 @@ fn x07ast_node_count(file: &x07ast::X07AstFile) -> u64 {
     let mut n: u64 = 0;
     for f in &file.functions {
         n = n.saturating_add(f.body.node_count() as u64);
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            n = n.saturating_add(c.expr.node_count() as u64);
+            for w in &c.witness {
+                n = n.saturating_add(w.node_count() as u64);
+            }
+        }
     }
     for f in &file.async_functions {
         n = n.saturating_add(f.body.node_count() as u64);
+        for c in f
+            .requires
+            .iter()
+            .chain(f.ensures.iter())
+            .chain(f.invariant.iter())
+        {
+            n = n.saturating_add(c.expr.node_count() as u64);
+            for w in &c.witness {
+                n = n.saturating_add(w.node_count() as u64);
+            }
+        }
     }
     if let Some(solve) = &file.solve {
         n = n.saturating_add(solve.node_count() as u64);
     }
     n
+}
+
+fn file_has_contracts(file: &x07ast::X07AstFile) -> bool {
+    file.functions
+        .iter()
+        .any(|f| !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty())
+        || file
+            .async_functions
+            .iter()
+            .any(|f| !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty())
+}
+
+fn enforce_contract_typecheck(label: &str, file: &x07ast::X07AstFile) -> Result<(), CompilerError> {
+    if file.schema_version != X07AST_SCHEMA_VERSION_V0_5_0 {
+        return Ok(());
+    }
+    if !file_has_contracts(file) {
+        return Ok(());
+    }
+
+    let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
+    let errors = tc
+        .diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect::<Vec<_>>();
+    if errors.is_empty() {
+        return Ok(());
+    }
+
+    let mut summary: Vec<String> = Vec::new();
+    for d in errors.iter().take(8) {
+        let ptr = d
+            .loc
+            .as_ref()
+            .and_then(|loc| match loc {
+                Location::X07Ast { ptr } => Some(ptr.as_str()),
+                _ => None,
+            })
+            .unwrap_or("");
+        if ptr.is_empty() {
+            summary.push(format!("{}: {}", d.code, d.message));
+        } else {
+            summary.push(format!("{}: {} (ptr={})", d.code, d.message, ptr));
+        }
+    }
+    if errors.len() > 8 {
+        summary.push(format!("... and {} more", errors.len() - 8));
+    }
+
+    Err(CompilerError::new(
+        CompileErrorKind::Typing,
+        format!("{label}: typecheck failed: {}", summary.join("; ")),
+    ))
 }
 
 fn validate_program_visibility(
@@ -914,10 +1159,40 @@ fn validate_program_world_caps(
             if expr_uses_head(&f.body, head) {
                 return true;
             }
+            for c in f
+                .requires
+                .iter()
+                .chain(f.ensures.iter())
+                .chain(f.invariant.iter())
+            {
+                if expr_uses_head(&c.expr, head) {
+                    return true;
+                }
+                for w in &c.witness {
+                    if expr_uses_head(w, head) {
+                        return true;
+                    }
+                }
+            }
         }
         for f in &program.async_functions {
             if expr_uses_head(&f.body, head) {
                 return true;
+            }
+            for c in f
+                .requires
+                .iter()
+                .chain(f.ensures.iter())
+                .chain(f.invariant.iter())
+            {
+                if expr_uses_head(&c.expr, head) {
+                    return true;
+                }
+                for w in &c.witness {
+                    if expr_uses_head(w, head) {
+                        return true;
+                    }
+                }
             }
         }
         false
@@ -996,6 +1271,18 @@ fn validate_program_world_caps(
 }
 
 fn dead_code_eliminate(program: &mut Program) {
+    fn collect_call_heads_contracts(
+        clauses: &[crate::x07ast::ContractClauseAst],
+        out: &mut Vec<String>,
+    ) {
+        for c in clauses {
+            collect_call_heads(&c.expr, out);
+            for w in &c.witness {
+                collect_call_heads(w, out);
+            }
+        }
+    }
+
     let fn_index: BTreeMap<String, usize> = program
         .functions
         .iter()
@@ -1024,13 +1311,21 @@ fn dead_code_eliminate(program: &mut Program) {
     while let Some(name) = worklist.pop() {
         if let Some(&idx) = fn_index.get(&name) {
             if reachable_fns.insert(name.clone()) {
-                collect_call_heads(&program.functions[idx].body, &mut worklist);
+                let f = &program.functions[idx];
+                collect_call_heads(&f.body, &mut worklist);
+                collect_call_heads_contracts(&f.requires, &mut worklist);
+                collect_call_heads_contracts(&f.ensures, &mut worklist);
+                collect_call_heads_contracts(&f.invariant, &mut worklist);
             }
             continue;
         }
         if let Some(&idx) = async_index.get(&name) {
             if reachable_async.insert(name.clone()) {
-                collect_call_heads(&program.async_functions[idx].body, &mut worklist);
+                let f = &program.async_functions[idx];
+                collect_call_heads(&f.body, &mut worklist);
+                collect_call_heads_contracts(&f.requires, &mut worklist);
+                collect_call_heads_contracts(&f.ensures, &mut worklist);
+                collect_call_heads_contracts(&f.invariant, &mut worklist);
             }
             continue;
         }

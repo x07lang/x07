@@ -220,6 +220,9 @@ fn pipe_elaboration_injects_async_helper_and_rewrites_call_site_to_await() {
         functions: Vec::new(),
         async_functions: vec![AsyncFunctionDef {
             name: "main.mapper".to_string(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: vec![
                 x07c::program::FunctionParam {
                     name: "ctx".to_string(),
@@ -382,6 +385,9 @@ fn pipe_elaboration_rejects_concurrency_pipes_inside_defn() {
     let mut program = Program {
         functions: vec![FunctionDef {
             name: "main.f".to_string(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: Vec::new(),
             ret_ty: Ty::Bytes,
             ret_brand: None,
@@ -389,6 +395,9 @@ fn pipe_elaboration_rejects_concurrency_pipes_inside_defn() {
         }],
         async_functions: vec![AsyncFunctionDef {
             name: "main.mapper".to_string(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: vec![
                 x07c::program::FunctionParam {
                     name: "ctx".to_string(),
@@ -501,6 +510,9 @@ fn pipe_elaboration_is_per_module() {
     let mut program = Program {
         functions: vec![FunctionDef {
             name: "foo.test".to_string(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: Vec::new(),
             ret_ty: Ty::Bytes,
             ret_brand: None,

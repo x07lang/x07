@@ -88,7 +88,13 @@ Exit codes:
 
 `x07 test` emits a JSON report with stable ordering by `id`.
 
-Schema: `spec/x07test.schema.json` (`schema_version = x07.x07test@0.2.0`).
+Schema: `spec/x07test.schema.json` (`schema_version = x07.x07test@0.3.0`).
+
+Contract violations:
+
+- If a test fails due to a runtime contract violation, the per-test result includes:
+  - `failure_kind: "contract_violation"`
+  - `contract_repro_path` (path to an `x07.contract.repro@0.1.0` JSON artifact)
 
 ## Stdlib: `std.test`
 

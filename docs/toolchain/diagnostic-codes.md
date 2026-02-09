@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 149
-- quickfix support (`sometimes` or `always`): 127
-- quickfix coverage: 85.23%
+- total codes: 175
+- quickfix support (`sometimes` or `always`): 152
+- quickfix coverage: 86.86%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -55,6 +55,11 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
 | `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
+| `X07-CONTRACT-0001` | x07c / type / error | sometimes | Contract clause must typecheck to i32. |
+| `X07-CONTRACT-0002` | x07c / type / error | sometimes | Contract expression is not contract-pure. |
+| `X07-CONTRACT-0003` | x07c / type / error | sometimes | Reserved identifier `__result` is only available in ensures. |
+| `X07-CONTRACT-0004` | x07c / type / error | sometimes | Reserved name collision with `__result`. |
+| `X07-CONTRACT-0005` | x07c / type / error | sometimes | Contract witness has an unsupported type. |
 | `X07-GENERICS-0001` | x07c / lint / error | sometimes | Type variable is not declared in type_params. |
 | `X07-GENERICS-0002` | x07c / lint / warning | always | Unused type parameter. |
 | `X07-INTERNAL-0001` | x07 / run / error | never | Internal tool failure `X07-INTERNAL-0001`. |
@@ -136,6 +141,27 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07T_EPBT_PARAM_EMPTY` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`. |
 | `X07T_EPBT_UNKNOWN_GEN_KIND` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNKNOWN_GEN_KIND`. |
 | `X07T_EPBT_UNSUPPORTED_WORLD` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNSUPPORTED_WORLD`. |
+| `X07V_EARGS` | x07 / run / error | sometimes | Invalid `x07 verify` arguments. |
+| `X07V_ECBMC_ERROR` | x07 / run / error | sometimes | CBMC reported an error. |
+| `X07V_ECBMC_FAILURE` | x07 / run / error | sometimes | CBMC reported a failing property that is not a contract. |
+| `X07V_ECBMC_JSON_PARSE` | x07 / run / error | sometimes | Failed to parse CBMC JSON output. |
+| `X07V_ECBMC_MISSING` | x07 / run / error | sometimes | CBMC is missing. |
+| `X07V_ECBMC_SMT2` | x07 / run / error | sometimes | CBMC failed to emit SMT2. |
+| `X07V_ECBMC_STDERR` | x07 / run / error | sometimes | CBMC wrote unexpected stderr output. |
+| `X07V_EMODULE_ROOTS` | x07 / run / error | sometimes | Could not resolve module roots for `x07 verify`. |
+| `X07V_EPROJECT` | x07 / run / error | sometimes | Could not resolve project manifest for `x07 verify`. |
+| `X07V_ETARGET` | x07 / run / error | sometimes | Verification target could not be loaded. |
+| `X07V_EZ3_MISSING` | x07 / run / error | sometimes | Z3 is missing. |
+| `X07V_EZ3_RUN` | x07 / run / error | sometimes | Z3 failed to run. |
+| `X07V_INTERNAL` | x07 / run / error | never | Internal `x07 verify` error. |
+| `X07V_NO_CONTRACTS` | x07 / run / error | sometimes | Target has no contracts to verify. |
+| `X07V_SMT_SAT` | x07 / run / error | sometimes | SMT solver returned SAT (counterexample found). |
+| `X07V_SMT_UNKNOWN` | x07 / run / error | sometimes | SMT solver returned an unknown status. |
+| `X07V_UNSUPPORTED_ASYNC` | x07 / run / error | sometimes | `x07 verify` does not support `defasync` targets. |
+| `X07V_UNSUPPORTED_FOR_BOUNDS` | x07 / run / error | sometimes | `for` loop bounds must be literal for `x07 verify` v0.1. |
+| `X07V_UNSUPPORTED_PARAM` | x07 / run / error | sometimes | Unsupported parameter type for `x07 verify`. |
+| `X07V_UNSUPPORTED_RECURSION` | x07 / run / error | sometimes | Recursive targets are not supported by `x07 verify` v0.1. |
+| `X07V_UNWIND_INCOMPLETE` | x07 / run / error | sometimes | CBMC unwinding is incomplete. |
 | `X7I0001` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0001`. |
 | `X7I0100` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0100`. |
 | `X7I0110` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0110`. |
@@ -1099,6 +1125,106 @@ Agent strategy:
 - Prefer binding owner expressions to locals before `bytes.view`/`bytes.subview`/`vec_u8.as_view`.
 - Apply quickfix when present.
 - If quickfix is absent, perform equivalent manual rewrite and re-run lint.
+
+
+## `X07-CONTRACT-0001`
+
+Summary: Contract clause must typecheck to i32.
+
+Origins:
+- x07c (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Contract expressions in `requires[]`, `ensures[]`, and `invariant[]` must typecheck to `i32` (x07 uses `i32` as a boolean: `0` = false, non-zero = true).
+
+Agent strategy:
+
+- Locate the reported clause expression and ensure it evaluates to an `i32` predicate.
+- Add an explicit comparison (for example `i32.eq`, `i32.lt`, etc.) when the expression currently returns a non-`i32` value.
+- Re-run `x07 lint` / `x07 test` to confirm the contract typechecks.
+
+
+## `X07-CONTRACT-0002`
+
+Summary: Contract expression is not contract-pure.
+
+Origins:
+- x07c (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Contract clause expressions (and witness expressions) must be contract-pure so they do not change program semantics. Disallowed operations include `world.*`, `task.*`, mutation forms (for example `set`, `unsafe`), and other impure/nondeterministic constructs.
+
+Agent strategy:
+
+- Replace the impure subexpression with a pure computation (compute in the main body and reference the pure value in the contract).
+- If the clause needs external state, move that check into program logic/tests instead of a contract.
+- Re-run `x07 lint` to confirm the impurity is gone.
+
+
+## `X07-CONTRACT-0003`
+
+Summary: Reserved identifier `__result` is only available in ensures.
+
+Origins:
+- x07c (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`__result` is reserved for postconditions: it is bound to the function return value only while checking `ensures[]`. It is an error to reference `__result` in `requires[]`, `invariant[]`, or their witnesses.
+
+Agent strategy:
+
+- If you need the return value, move the clause to `ensures[]`.
+- Otherwise, remove/replace the `__result` reference with an expression over parameters/locals available at the clause site.
+- Re-run `x07 lint` to confirm the contract is valid.
+
+
+## `X07-CONTRACT-0004`
+
+Summary: Reserved name collision with `__result`.
+
+Origins:
+- x07c (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+When a function has contracts, `__result` is reserved for the postcondition binding used in `ensures[]`. It is an error for a parameter or local binding to be named `__result`.
+
+Agent strategy:
+
+- Rename the parameter/local to a non-reserved name.
+- If you need a local alias of the return value, use a different identifier and reference `__result` only inside `ensures[]`.
+- Re-run `x07 lint` to confirm there are no remaining collisions.
+
+
+## `X07-CONTRACT-0005`
+
+Summary: Contract witness has an unsupported type.
+
+Origins:
+- x07c (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Witness expressions are evaluated only on contract failure and are recorded in the failure payload. In v0.1, witnesses are restricted to simple, serializable types (currently `i32`, `bytes`, `bytes_view`, and `result_*`).
+
+Agent strategy:
+
+- Change the witness expression to an allowed type (for example witness `view.len` as `i32`, or include a `bytes_view` slice).
+- If you need richer context, encode it into `bytes`/`bytes_view` explicitly.
+- Re-run `x07 lint` to confirm witness types are accepted.
 
 
 ## `X07-GENERICS-0001`
@@ -2734,6 +2860,421 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07V_EARGS`
+
+Summary: Invalid `x07 verify` arguments.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 verify` requires selecting exactly one verification mode.
+
+Agent strategy:
+
+- Pass exactly one of `--bmc` or `--smt`.
+- Re-run the command with the corrected flags.
+
+
+## `X07V_ECBMC_ERROR`
+
+Summary: CBMC reported an error.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+CBMC reported one or more `ERROR` messages while running the verification.
+
+Agent strategy:
+
+- Inspect the saved `cbmc.json` artifact (when present) for the reported error messages.
+- Adjust bounds or simplify the target to stay within the supported subset.
+- Re-run `x07 verify`.
+
+
+## `X07V_ECBMC_FAILURE`
+
+Summary: CBMC reported a failing property that is not a contract.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 verify` expects verification failures to correspond to X07 contract assertions. This diagnostic indicates CBMC reported a failing property that could not be mapped to a contract clause.
+
+Agent strategy:
+
+- Inspect `cbmc.json` and the generated `verify.c` harness to identify the failing property.
+- Simplify the target program and retry.
+- If the failure is reproducible, file a toolchain issue with the artifacts.
+
+
+## `X07V_ECBMC_JSON_PARSE`
+
+Summary: Failed to parse CBMC JSON output.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+CBMC did not produce valid JSON output under `--json-ui`.
+
+Agent strategy:
+
+- Check the installed CBMC version supports `--json-ui`.
+- Re-run with the same bounds and inspect the raw stdout.
+- If the output is not JSON, upgrade/downgrade CBMC and retry.
+
+
+## `X07V_ECBMC_MISSING`
+
+Summary: CBMC is missing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 verify` uses CBMC for `--bmc` and to emit SMT2 for `--smt`.
+
+Agent strategy:
+
+- Install CBMC (for example `brew install cbmc`) and ensure `cbmc` is on `PATH`.
+- Re-run `x07 verify`.
+
+
+## `X07V_ECBMC_SMT2`
+
+Summary: CBMC failed to emit SMT2.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+CBMC returned a non-zero status while emitting an SMT-LIB2 formula (`--smt2`).
+
+Agent strategy:
+
+- Re-run `x07 verify --smt` and inspect CBMC output.
+- Check the installed CBMC version and upgrade/downgrade if needed.
+- Keep the target within the supported subset.
+
+
+## `X07V_ECBMC_STDERR`
+
+Summary: CBMC wrote unexpected stderr output.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+In JSON UI mode, `x07 verify` expects CBMC to write its report to stdout. Stderr output is treated as an error to avoid silently ignoring tool issues.
+
+Agent strategy:
+
+- Re-run the same command and capture stderr.
+- Check the installed CBMC version and consider upgrading/downgrading.
+- If reproducible, file a toolchain issue with the stderr and the generated `verify.c` artifact.
+
+
+## `X07V_EMODULE_ROOTS`
+
+Summary: Could not resolve module roots for `x07 verify`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+When `--module-root` is not provided, `x07 verify` attempts to infer module roots from the project manifest and lockfile. This diagnostic indicates that inference failed (for example due to a missing/invalid lockfile).
+
+Agent strategy:
+
+- Provide explicit `--module-root` directories.
+- Or ensure the project has a valid lockfile (`x07.lock.json`) by running `x07 pkg lock`.
+- Re-run `x07 verify`.
+
+
+## `X07V_EPROJECT`
+
+Summary: Could not resolve project manifest for `x07 verify`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 verify` resolves module roots from a project manifest (`x07.json`) when available. This diagnostic indicates the `--project` path is invalid or a manifest could not be found.
+
+Agent strategy:
+
+- Pass `--project <path-to-x07.json>` (or a directory containing it).
+- If running outside a project, pass one or more `--module-root <dir>` values.
+- Re-run `x07 verify`.
+
+
+## `X07V_ETARGET`
+
+Summary: Verification target could not be loaded.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The `--entry` symbol could not be resolved to a `defn` in the module roots (module file not found, function not found, or module JSON invalid).
+
+Agent strategy:
+
+- Ensure `--entry` is a fully qualified name with a module separator (`mod.fn`).
+- Ensure the module file exists at `<module-root>/<module-id>.x07.json`.
+- Re-run `x07 verify` after fixing the module roots or entry name.
+
+
+## `X07V_EZ3_MISSING`
+
+Summary: Z3 is missing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+In `--smt` mode, `x07 verify` can emit SMT2 even without Z3 installed, but solving requires Z3.
+
+Agent strategy:
+
+- Install Z3 (for example `brew install z3`) and ensure `z3` is on `PATH`.
+- Re-run `x07 verify --smt`, or consume the emitted SMT2 artifact with another solver.
+
+
+## `X07V_EZ3_RUN`
+
+Summary: Z3 failed to run.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Z3 returned a non-zero exit status while solving the emitted SMT2 formula.
+
+Agent strategy:
+
+- Inspect the saved `verify.smt2` and `z3.out.txt` artifacts.
+- Check the installed Z3 version and retry.
+- If the solver crashes, simplify the target or reduce bounds.
+
+
+## `X07V_INTERNAL`
+
+Summary: Internal `x07 verify` error.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Internal tool failure; requires toolchain fix.
+
+Details:
+
+`x07 verify` encountered an unexpected internal error.
+
+Agent strategy:
+
+- Capture the full error text and the generated artifacts under `.x07/artifacts/verify/...`.
+- Minimize a repro (smallest program + bounds).
+- File a toolchain issue; this typically requires a toolchain fix.
+
+
+## `X07V_NO_CONTRACTS`
+
+Summary: Target has no contracts to verify.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 verify` requires at least one `requires[]`, `ensures[]`, or `invariant[]` clause on the target function.
+
+Agent strategy:
+
+- Add at least one contract clause to the target `defn`.
+- Re-run `x07 verify` in the desired mode.
+
+
+## `X07V_SMT_SAT`
+
+Summary: SMT solver returned SAT (counterexample found).
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The SMT solver found a satisfying model, which indicates a counterexample within the current bounds.
+
+Agent strategy:
+
+- Treat the result as a counterexample: tighten contracts or fix the function logic.
+- If needed, reduce the search space by strengthening `requires[]` or adding `invariant[]` clauses.
+- Re-run `x07 verify` to confirm the fix.
+
+
+## `X07V_SMT_UNKNOWN`
+
+Summary: SMT solver returned an unknown status.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The SMT solver did not return `sat` or `unsat` (for example `unknown`). The result is inconclusive.
+
+Agent strategy:
+
+- Treat the result as inconclusive: adjust bounds or simplify the target.
+- If available, use a different solver or solver version.
+- Keep the function within the supported subset and retry.
+
+
+## `X07V_UNSUPPORTED_ASYNC`
+
+Summary: `x07 verify` does not support `defasync` targets.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07 verify` v0.1 only supports verifying `defn` targets.
+
+Agent strategy:
+
+- Verify a `defn` wrapper around the async logic (or refactor the core logic into a `defn` helper).
+- Keep the verified function within the supported subset (no async/concurrency).
+- Re-run `x07 verify`.
+
+
+## `X07V_UNSUPPORTED_FOR_BOUNDS`
+
+Summary: `for` loop bounds must be literal for `x07 verify` v0.1.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The verification subset supports `for` loops only when bounds are statically known (literal) so CBMC unwinding is well-defined.
+
+Agent strategy:
+
+- Replace variable bounds with a literal bound and add a contract that relates the literal bound to input sizes.
+- Or restructure the logic so loops are statically bounded.
+- Re-run `x07 verify`.
+
+
+## `X07V_UNSUPPORTED_PARAM`
+
+Summary: Unsupported parameter type for `x07 verify`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The verification subset currently supports only `i32`, `u32`, `bytes`, and `bytes_view` parameters.
+
+Agent strategy:
+
+- Introduce a `defn` wrapper that encodes unsupported types into supported types (for example into `bytes`).
+- Keep the verified target within the supported subset.
+- Re-run `x07 verify`.
+
+
+## `X07V_UNSUPPORTED_RECURSION`
+
+Summary: Recursive targets are not supported by `x07 verify` v0.1.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The verification subset currently rejects recursion.
+
+Agent strategy:
+
+- Refactor recursion into an iterative loop with a statically bounded `for`, or split the function into a non-recursive helper.
+- Re-run `x07 verify`.
+
+
+## `X07V_UNWIND_INCOMPLETE`
+
+Summary: CBMC unwinding is incomplete.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+CBMC reported an unwinding assertion failure, which means the verification result is inconclusive at the current `--unwind` bound.
+
+Agent strategy:
+
+- Increase `--unwind` until unwinding assertions no longer fail.
+- If the function needs unbounded iteration, refactor it to a statically bounded form for v0.1 verification.
 
 
 ## `X7I0001`

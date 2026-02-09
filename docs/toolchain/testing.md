@@ -14,6 +14,7 @@ Output is an `x07test` JSON report including:
 
 - pass/fail summary
 - failures with diagnostic codes
+- failure classification (`failure_kind`, for example `contract_violation`)
 - optional `mem_stats` / `sched_stats`
 
 See also:

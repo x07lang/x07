@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use serde_json::Value;
 use x07_contracts::{PROJECT_LOCKFILE_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION};
-use x07_host_runner::CcProfile;
+use x07_host_runner::{CcProfile, RunnerConfig};
 use x07_worlds::WorldId;
 use x07c::project;
 
@@ -309,6 +309,9 @@ pub fn cmd_run(
 
     let (input_flag, temp_input) = prepare_input_flag(&cwd, &args, profile_input)?;
     let _temp_input_guard = temp_input;
+    let input_path_for_repro = input_flag
+        .as_ref()
+        .and_then(|flag| extract_input_path_arg(flag));
 
     let policy_overrides = crate::policy_overrides::PolicyOverrides {
         allow_host: args.allow_host.clone(),
@@ -353,6 +356,11 @@ pub fn cmd_run(
     if !args.module_root.is_empty() && target_kind != TargetKind::Program {
         anyhow::bail!("--module-root is only valid with --program");
     }
+
+    let fixtures = match runner {
+        RunnerKind::Host => resolve_fixtures(world, &args, project_root.as_deref())?,
+        RunnerKind::Os => ResolvedFixtures::default(),
+    };
 
     let mut staged_program: Option<PathBuf> = None;
     let repair = match target_kind {
@@ -470,28 +478,27 @@ pub fn cmd_run(
                 argv.push("--debug-borrow-checks".to_string());
             }
 
-            let fixtures = resolve_fixtures(world, &args, project_root.as_deref())?;
-            if let Some(dir) = fixtures.fs_dir {
+            if let Some(dir) = fixtures.fs_dir.as_ref() {
                 argv.push("--fixture-fs-dir".to_string());
                 argv.push(dir.display().to_string());
             }
-            if let Some(root) = fixtures.fs_root {
+            if let Some(root) = fixtures.fs_root.as_ref() {
                 argv.push("--fixture-fs-root".to_string());
                 argv.push(root.display().to_string());
             }
-            if let Some(idx) = fixtures.fs_latency_index {
+            if let Some(idx) = fixtures.fs_latency_index.as_ref() {
                 argv.push("--fixture-fs-latency-index".to_string());
                 argv.push(idx.display().to_string());
             }
-            if let Some(dir) = fixtures.rr_dir {
+            if let Some(dir) = fixtures.rr_dir.as_ref() {
                 argv.push("--fixture-rr-dir".to_string());
                 argv.push(dir.display().to_string());
             }
-            if let Some(dir) = fixtures.kv_dir {
+            if let Some(dir) = fixtures.kv_dir.as_ref() {
                 argv.push("--fixture-kv-dir".to_string());
                 argv.push(dir.display().to_string());
             }
-            if let Some(seed) = fixtures.kv_seed {
+            if let Some(seed) = fixtures.kv_seed.as_ref() {
                 argv.push("--fixture-kv-seed".to_string());
                 argv.push(seed.display().to_string());
             }
@@ -646,6 +653,58 @@ pub fn cmd_run(
     }
 
     std::io::Write::write_all(&mut std::io::stderr(), &output.stderr).context("write stderr")?;
+
+    if exit_code != 0 {
+        if let Ok(report) = serde_json::from_slice::<Value>(&output.stdout) {
+            if let Some(trap) = extract_trap_from_runner_report(&report) {
+                if let Ok(Some(info)) = crate::contract_repro::try_parse_contract_trap(trap) {
+                    let input_bytes =
+                        read_input_bytes_for_repro(&cwd, input_path_for_repro.as_deref())
+                            .unwrap_or_default();
+                    let max_output_bytes_effective = max_output_bytes.unwrap_or(1024 * 1024);
+                    let cpu_time_limit_seconds_effective = cpu_time_limit_seconds.unwrap_or(5);
+
+                    let runner_cfg = RunnerConfig {
+                        world,
+                        fixture_fs_dir: fixtures.fs_dir.clone(),
+                        fixture_fs_root: fixtures.fs_root.clone(),
+                        fixture_fs_latency_index: fixtures.fs_latency_index.clone(),
+                        fixture_rr_dir: fixtures.rr_dir.clone(),
+                        fixture_kv_dir: fixtures.kv_dir.clone(),
+                        fixture_kv_seed: fixtures.kv_seed.clone(),
+                        solve_fuel,
+                        max_memory_bytes,
+                        max_output_bytes: max_output_bytes_effective,
+                        cpu_time_limit_seconds: cpu_time_limit_seconds_effective,
+                        debug_borrow_checks: args.debug_borrow_checks,
+                    };
+
+                    let repro_root = project_root
+                        .as_deref()
+                        .unwrap_or(&cwd)
+                        .join(".x07")
+                        .join("artifacts");
+                    let source = crate::contract_repro::SourceInfo {
+                        mode: "x07run".to_string(),
+                        tests_manifest_path: None,
+                        test_id: None,
+                        test_entry: None,
+                        target_kind: Some(target_kind.as_str().to_string()),
+                        target_path: Some(target_path.display().to_string()),
+                    };
+                    let _ = crate::contract_repro::write_repro(
+                        &repro_root,
+                        world.as_str(),
+                        &runner_cfg,
+                        &input_bytes,
+                        info.payload,
+                        source,
+                        &info.clause_id,
+                    );
+                }
+            }
+        }
+    }
 
     let runner_stdout = output.stdout;
 
@@ -1385,6 +1444,38 @@ fn append_unique(into: &mut Vec<PathBuf>, extra: Vec<PathBuf>) {
 
 fn default_os_module_roots_best_effort(runner_bin: &Path) -> Vec<PathBuf> {
     x07_runner_common::os_paths::default_os_module_roots_best_effort_from_exe(Some(runner_bin))
+}
+
+fn extract_input_path_arg(flag: &[String]) -> Option<PathBuf> {
+    if flag.len() != 2 {
+        return None;
+    }
+    if flag[0] != "--input" {
+        return None;
+    }
+    Some(PathBuf::from(flag[1].as_str()))
+}
+
+fn read_input_bytes_for_repro(cwd: &Path, input_path: Option<&Path>) -> Result<Vec<u8>> {
+    let Some(path) = input_path else {
+        return Ok(Vec::new());
+    };
+    let abs = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        cwd.join(path)
+    };
+    std::fs::read(&abs).with_context(|| format!("read input bytes for repro: {}", abs.display()))
+}
+
+fn extract_trap_from_runner_report(report: &Value) -> Option<&str> {
+    if let Some(trap) = report.get("trap").and_then(Value::as_str) {
+        return Some(trap);
+    }
+    report
+        .get("solve")
+        .and_then(|s| s.get("trap"))
+        .and_then(Value::as_str)
 }
 
 fn parse_compile_error_from_runner_stdout(stdout: &[u8]) -> Option<String> {

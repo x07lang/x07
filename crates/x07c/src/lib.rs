@@ -3,6 +3,7 @@ pub mod builtin_modules;
 pub mod c_emit;
 pub mod cli_specrows;
 pub mod compile;
+pub mod contracts_elab;
 pub mod diagnostics;
 pub mod generics;
 pub mod guide;

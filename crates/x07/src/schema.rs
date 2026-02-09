@@ -2209,6 +2209,9 @@ fn generate_runtime_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Resul
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
             type_params: Vec::new(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: f
                 .params
                 .into_iter()
@@ -2387,6 +2390,9 @@ fn generate_runtime_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
             type_params: Vec::new(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: f
                 .params
                 .into_iter()
@@ -2466,6 +2472,9 @@ fn generate_tests_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Result<
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
             type_params: Vec::new(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: f
                 .params
                 .into_iter()
@@ -2538,6 +2547,9 @@ fn generate_tests_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<Ve
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
             type_params: Vec::new(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: f
                 .params
                 .into_iter()
@@ -2589,6 +2601,9 @@ fn add_export_defn(
     add_export_name(td, &name, exports);
     functions.push(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty,
         ret_brand: None,
@@ -2765,6 +2780,9 @@ fn gen_cmp_bytes_range(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::I32,
         ret_brand: None,
@@ -2775,6 +2793,9 @@ fn gen_cmp_bytes_range(td: &TypeDef) -> Result<FunctionDef> {
 fn gen_is_canon_uint_ascii_v1(td: &TypeDef) -> Result<FunctionDef> {
     Ok(FunctionDef {
         name: format!("{}._is_canon_uint_ascii_v1", td.module_id),
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: vec![
             FunctionParam {
                 name: "v".to_string(),
@@ -2848,6 +2869,9 @@ fn gen_is_canon_uint_ascii_v1(td: &TypeDef) -> Result<FunctionDef> {
 fn gen_is_canon_int_ascii_v1(td: &TypeDef) -> Result<FunctionDef> {
     Ok(FunctionDef {
         name: format!("{}._is_canon_int_ascii_v1", td.module_id),
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: vec![
             FunctionParam {
                 name: "v".to_string(),
@@ -3007,6 +3031,9 @@ fn gen_add_entry(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::VecU8,
         ret_brand: None,
@@ -3054,6 +3081,9 @@ fn gen_validate_doc(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::ResultI32,
         ret_brand: None,
@@ -3259,6 +3289,9 @@ fn gen_validate_value(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDe
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::ResultI32,
         ret_brand: None,
@@ -3840,6 +3873,9 @@ fn gen_encode_doc(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::ResultBytes,
         ret_brand: Some(td.brand_id.clone()),
@@ -3850,6 +3886,9 @@ fn gen_encode_doc(td: &TypeDef) -> Result<FunctionDef> {
 fn gen_cast_doc_view(td: &TypeDef) -> Result<FunctionDef> {
     Ok(FunctionDef {
         name: format!("{}.cast_doc_view_v1", td.module_id),
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
@@ -3972,6 +4011,9 @@ fn gen_encode_value(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::ResultBytes,
         ret_brand: Some(td.brand_id.clone()),
@@ -4704,6 +4746,9 @@ fn gen_field_accessors(td: &TypeDef, f: &FieldDef) -> Result<Vec<FunctionDef>> {
     let full_getter_name = format!("{}.{}", td.module_id, getter_name);
     out.push(FunctionDef {
         name: full_getter_name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
@@ -4718,6 +4763,9 @@ fn gen_field_accessors(td: &TypeDef, f: &FieldDef) -> Result<Vec<FunctionDef>> {
         let has_name = format!("{}.has_{}_v1", td.module_id, f.name);
         out.push(FunctionDef {
             name: has_name,
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: vec![FunctionParam {
                 name: "doc".to_string(),
                 ty: Ty::BytesView,
@@ -5081,6 +5129,9 @@ fn gen_enum_tag_view_at(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::BytesView,
         ret_brand: None,
@@ -5173,6 +5224,9 @@ fn gen_enum_payload_value_view_at(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::BytesView,
         ret_brand: None,
@@ -5183,6 +5237,9 @@ fn gen_enum_payload_value_view_at(td: &TypeDef) -> Result<FunctionDef> {
 fn gen_enum_get_tag_view(td: &TypeDef) -> Result<FunctionDef> {
     Ok(FunctionDef {
         name: format!("{}.get_tag_view_v1", td.module_id),
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
@@ -5200,6 +5257,9 @@ fn gen_enum_get_tag_view(td: &TypeDef) -> Result<FunctionDef> {
 fn gen_enum_get_payload_value_view(td: &TypeDef) -> Result<FunctionDef> {
     Ok(FunctionDef {
         name: format!("{}.get_payload_value_view_v1", td.module_id),
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: vec![FunctionParam {
             name: "doc".to_string(),
             ty: Ty::BytesView,
@@ -5850,6 +5910,9 @@ fn gen_enum_validate_doc(type_index: &TypeIndex, td: &TypeDef) -> Result<Functio
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::ResultI32,
         ret_brand: None,
@@ -6493,6 +6556,9 @@ fn gen_enum_validate_value(type_index: &TypeIndex, td: &TypeDef) -> Result<Funct
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::ResultI32,
         ret_brand: None,
@@ -6536,6 +6602,9 @@ fn gen_enum_encode_doc(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::ResultBytes,
         ret_brand: None,
@@ -7123,6 +7192,9 @@ fn gen_enum_encode_value(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params,
         ret_ty: Ty::ResultBytes,
         ret_brand: None,
@@ -7410,6 +7482,9 @@ fn gen_golden_doc(type_index: &TypeIndex, td: &TypeDef, ex: &ExampleDef) -> Resu
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: Vec::new(),
         ret_ty: Ty::ResultBytes,
         ret_brand: None,
@@ -7558,6 +7633,9 @@ fn gen_golden_doc_enum(
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: Vec::new(),
         ret_ty: Ty::ResultBytes,
         ret_brand: None,
@@ -8230,6 +8308,9 @@ fn gen_test_negative(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: Vec::new(),
         ret_ty: Ty::ResultI32,
         ret_brand: None,
@@ -8494,6 +8575,9 @@ fn gen_test_negative_enum(td: &TypeDef) -> Result<FunctionDef> {
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: Vec::new(),
         ret_ty: Ty::ResultI32,
         ret_brand: None,
@@ -8961,6 +9045,9 @@ fn gen_test_vectors(type_index: &TypeIndex, td: &TypeDef) -> Result<FunctionDef>
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: Vec::new(),
         ret_ty: Ty::ResultI32,
         ret_brand: None,
@@ -9142,6 +9229,9 @@ fn gen_test_vectors_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<Functio
 
     Ok(FunctionDef {
         name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: Vec::new(),
         ret_ty: Ty::ResultI32,
         ret_brand: None,

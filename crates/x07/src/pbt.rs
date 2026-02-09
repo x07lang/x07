@@ -10,6 +10,8 @@ use x07_host_runner::{run_artifact_file, RunnerConfig, RunnerResult};
 use x07_worlds::WorldId;
 use x07c::x07ast;
 
+use crate::repro::ToolInfo;
+
 const X07_PBT_REPRO_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07.pbt.repro@0.1.0.schema.json");
 const X07_PBT_PARAMS_SCHEMA_BYTES: &[u8] =
@@ -422,14 +424,6 @@ pub(crate) struct PbtRepro {
     pub failure: FailureInfo,
     pub counterexample: CounterexampleInfo,
     pub budget: PbtCaseBudget,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ToolInfo {
-    pub x07_version: String,
-    pub x07c_version: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub git_sha: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -948,11 +942,7 @@ pub(crate) fn run_pbt_suite(args: RunPbtSuiteArgs<'_>) -> Result<(PbtSuiteRun, P
 
     let repro = PbtRepro {
         schema_version: X07_PBT_REPRO_SCHEMA_VERSION.to_string(),
-        tool: ToolInfo {
-            x07_version: env!("CARGO_PKG_VERSION").to_string(),
-            x07c_version: x07c::X07C_VERSION.to_string(),
-            git_sha: std::env::var("X07_GIT_SHA").ok(),
-        },
+        tool: crate::repro::tool_info(),
         test: TestInfo {
             id: test_id.to_string(),
             entry: entry.to_string(),

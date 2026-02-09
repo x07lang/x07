@@ -6,16 +6,21 @@
 
 pub const X07AST_SCHEMA_VERSION_V0_3_0: &str = "x07.x07ast@0.3.0";
 pub const X07AST_SCHEMA_VERSION_V0_4_0: &str = "x07.x07ast@0.4.0";
+pub const X07AST_SCHEMA_VERSION_V0_5_0: &str = "x07.x07ast@0.5.0";
 
 /// The default x07AST schema version emitted by current tooling.
-pub const X07AST_SCHEMA_VERSION: &str = X07AST_SCHEMA_VERSION_V0_4_0;
+pub const X07AST_SCHEMA_VERSION: &str = X07AST_SCHEMA_VERSION_V0_5_0;
 
-pub const X07AST_SCHEMA_VERSIONS_SUPPORTED: &[&str] =
-    &[X07AST_SCHEMA_VERSION_V0_3_0, X07AST_SCHEMA_VERSION_V0_4_0];
+pub const X07AST_SCHEMA_VERSIONS_SUPPORTED: &[&str] = &[
+    X07AST_SCHEMA_VERSION_V0_3_0,
+    X07AST_SCHEMA_VERSION_V0_4_0,
+    X07AST_SCHEMA_VERSION_V0_5_0,
+];
 pub const X07_MONO_MAP_SCHEMA_VERSION: &str = "x07.mono.map@0.1.0";
 pub const X07_PBT_REPRO_SCHEMA_VERSION: &str = "x07.pbt.repro@0.1.0";
+pub const X07_CONTRACT_REPRO_SCHEMA_VERSION: &str = "x07.contract.repro@0.1.0";
 pub const X07DIAG_SCHEMA_VERSION: &str = "x07.x07diag@0.1.0";
-pub const X07TEST_SCHEMA_VERSION: &str = "x07.x07test@0.2.0";
+pub const X07TEST_SCHEMA_VERSION: &str = "x07.x07test@0.3.0";
 pub const X07_DIAG_CATALOG_SCHEMA_VERSION: &str = "x07.diag.catalog@0.1.0";
 pub const X07_DIAG_COVERAGE_SCHEMA_VERSION: &str = "x07.diag.coverage@0.1.0";
 
@@ -25,6 +30,8 @@ pub const X07_OS_RUNNER_REPORT_SCHEMA_VERSION: &str = "x07-os-runner.report@0.3.
 pub const X07_RUN_REPORT_SCHEMA_VERSION: &str = "x07.run.report@0.1.0";
 pub const X07_BUNDLE_REPORT_SCHEMA_VERSION: &str = "x07.bundle.report@0.1.0";
 pub const X07_DOC_REPORT_SCHEMA_VERSION: &str = "x07.doc.report@0.1.0";
+pub const X07_VERIFY_REPORT_SCHEMA_VERSION: &str = "x07.verify.report@0.1.0";
+pub const X07_VERIFY_CEX_SCHEMA_VERSION: &str = "x07.verify.cex@0.1.0";
 pub const X07_BENCH_SUITE_SCHEMA_VERSION: &str = "x07.bench.suite@0.1.0";
 pub const X07_BENCH_INSTANCE_SCHEMA_VERSION: &str = "x07.bench.instance@0.1.0";
 pub const X07_BENCH_REPORT_SCHEMA_VERSION: &str = "x07.bench.report@0.1.0";

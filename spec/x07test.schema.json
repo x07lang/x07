@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07test.schema.json",
-  "title": "X07 x07Test v0.2.0",
+  "title": "X07 x07Test v0.3.0",
   "description": "Deterministic test report format for the built-in X07 test harness (manifest-driven; stable ordering; JSON-first).",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "tool", "invocation", "summary", "tests"],
   "properties": {
-    "schema_version": { "const": "x07.x07test@0.2.0" },
+    "schema_version": { "const": "x07.x07test@0.3.0" },
     "tool": { "$ref": "#/$defs/tool_info" },
     "invocation": { "$ref": "#/$defs/invocation" },
     "summary": { "$ref": "#/$defs/summary" },
@@ -212,6 +212,13 @@
         "expect": { "$ref": "#/$defs/expect" },
         "status": { "$ref": "#/$defs/test_status" },
         "duration_ms": { "type": "integer", "minimum": 0 },
+        "failure_kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "contract_repro_path": { "type": "string" },
         "entry": { "type": "string" },
         "fixture_root": { "type": "string" },
         "compile": { "$ref": "#/$defs/compile_section" },

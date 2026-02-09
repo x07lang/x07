@@ -1,5 +1,6 @@
 use crate::ast::Expr;
 use crate::types::Ty;
+use crate::x07ast::ContractClauseAst;
 
 #[derive(Debug, Clone)]
 pub struct FunctionParam {
@@ -11,6 +12,9 @@ pub struct FunctionParam {
 #[derive(Debug, Clone)]
 pub struct FunctionDef {
     pub name: String,
+    pub requires: Vec<ContractClauseAst>,
+    pub ensures: Vec<ContractClauseAst>,
+    pub invariant: Vec<ContractClauseAst>,
     pub params: Vec<FunctionParam>,
     pub ret_ty: Ty,
     pub ret_brand: Option<String>,
@@ -20,6 +24,9 @@ pub struct FunctionDef {
 #[derive(Debug, Clone)]
 pub struct AsyncFunctionDef {
     pub name: String,
+    pub requires: Vec<ContractClauseAst>,
+    pub ensures: Vec<ContractClauseAst>,
+    pub invariant: Vec<ContractClauseAst>,
     pub params: Vec<FunctionParam>,
     pub ret_ty: Ty,
     pub ret_brand: Option<String>,

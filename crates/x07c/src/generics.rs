@@ -240,12 +240,55 @@ pub fn monomorphize(
 
     for mut f in non_generic_fn_defs {
         let caller_module = symbol_module_id(&f.name)?;
+        let ctx = RewriteCtx {
+            caller: f.name.clone(),
+            caller_module: caller_module.to_string(),
+        };
         f.body = rewrite_expr(
             f.body,
-            &RewriteCtx {
-                caller: f.name.clone(),
-                caller_module: caller_module.to_string(),
-            },
+            &ctx,
+            &sigs,
+            &generic_symbols,
+            module_exports,
+            &extern_symbols,
+            None,
+            &mut instances,
+            &mut pending,
+            &mut tapp_sites_total,
+            max_specializations,
+            max_type_depth,
+        )?;
+        rewrite_contract_clauses(
+            &mut f.requires,
+            &ctx,
+            &sigs,
+            &generic_symbols,
+            module_exports,
+            &extern_symbols,
+            None,
+            &mut instances,
+            &mut pending,
+            &mut tapp_sites_total,
+            max_specializations,
+            max_type_depth,
+        )?;
+        rewrite_contract_clauses(
+            &mut f.ensures,
+            &ctx,
+            &sigs,
+            &generic_symbols,
+            module_exports,
+            &extern_symbols,
+            None,
+            &mut instances,
+            &mut pending,
+            &mut tapp_sites_total,
+            max_specializations,
+            max_type_depth,
+        )?;
+        rewrite_contract_clauses(
+            &mut f.invariant,
+            &ctx,
             &sigs,
             &generic_symbols,
             module_exports,
@@ -270,12 +313,55 @@ pub fn monomorphize(
 
     for mut f in non_generic_async_defs {
         let caller_module = symbol_module_id(&f.name)?;
+        let ctx = RewriteCtx {
+            caller: f.name.clone(),
+            caller_module: caller_module.to_string(),
+        };
         f.body = rewrite_expr(
             f.body,
-            &RewriteCtx {
-                caller: f.name.clone(),
-                caller_module: caller_module.to_string(),
-            },
+            &ctx,
+            &sigs,
+            &generic_symbols,
+            module_exports,
+            &extern_symbols,
+            None,
+            &mut instances,
+            &mut pending,
+            &mut tapp_sites_total,
+            max_specializations,
+            max_type_depth,
+        )?;
+        rewrite_contract_clauses(
+            &mut f.requires,
+            &ctx,
+            &sigs,
+            &generic_symbols,
+            module_exports,
+            &extern_symbols,
+            None,
+            &mut instances,
+            &mut pending,
+            &mut tapp_sites_total,
+            max_specializations,
+            max_type_depth,
+        )?;
+        rewrite_contract_clauses(
+            &mut f.ensures,
+            &ctx,
+            &sigs,
+            &generic_symbols,
+            module_exports,
+            &extern_symbols,
+            None,
+            &mut instances,
+            &mut pending,
+            &mut tapp_sites_total,
+            max_specializations,
+            max_type_depth,
+        )?;
+        rewrite_contract_clauses(
+            &mut f.invariant,
+            &ctx,
             &sigs,
             &generic_symbols,
             module_exports,
@@ -349,12 +435,55 @@ pub fn monomorphize(
                     })
                     .collect::<Result<Vec<_>, CompilerError>>()?;
                 g.result = subst_type_ref(&g.result, &subst)?;
+                let ctx = RewriteCtx {
+                    caller: specialized_name.clone(),
+                    caller_module: def_module.clone(),
+                };
                 g.body = rewrite_expr(
                     g.body,
-                    &RewriteCtx {
-                        caller: specialized_name.clone(),
-                        caller_module: def_module.clone(),
-                    },
+                    &ctx,
+                    &sigs,
+                    &generic_symbols,
+                    module_exports,
+                    &extern_symbols,
+                    Some(&subst),
+                    &mut instances,
+                    &mut pending,
+                    &mut tapp_sites_total,
+                    max_specializations,
+                    max_type_depth,
+                )?;
+                rewrite_contract_clauses(
+                    &mut g.requires,
+                    &ctx,
+                    &sigs,
+                    &generic_symbols,
+                    module_exports,
+                    &extern_symbols,
+                    Some(&subst),
+                    &mut instances,
+                    &mut pending,
+                    &mut tapp_sites_total,
+                    max_specializations,
+                    max_type_depth,
+                )?;
+                rewrite_contract_clauses(
+                    &mut g.ensures,
+                    &ctx,
+                    &sigs,
+                    &generic_symbols,
+                    module_exports,
+                    &extern_symbols,
+                    Some(&subst),
+                    &mut instances,
+                    &mut pending,
+                    &mut tapp_sites_total,
+                    max_specializations,
+                    max_type_depth,
+                )?;
+                rewrite_contract_clauses(
+                    &mut g.invariant,
+                    &ctx,
                     &sigs,
                     &generic_symbols,
                     module_exports,
@@ -396,12 +525,55 @@ pub fn monomorphize(
                     })
                     .collect::<Result<Vec<_>, CompilerError>>()?;
                 g.result = subst_type_ref(&g.result, &subst)?;
+                let ctx = RewriteCtx {
+                    caller: specialized_name.clone(),
+                    caller_module: def_module.clone(),
+                };
                 g.body = rewrite_expr(
                     g.body,
-                    &RewriteCtx {
-                        caller: specialized_name.clone(),
-                        caller_module: def_module.clone(),
-                    },
+                    &ctx,
+                    &sigs,
+                    &generic_symbols,
+                    module_exports,
+                    &extern_symbols,
+                    Some(&subst),
+                    &mut instances,
+                    &mut pending,
+                    &mut tapp_sites_total,
+                    max_specializations,
+                    max_type_depth,
+                )?;
+                rewrite_contract_clauses(
+                    &mut g.requires,
+                    &ctx,
+                    &sigs,
+                    &generic_symbols,
+                    module_exports,
+                    &extern_symbols,
+                    Some(&subst),
+                    &mut instances,
+                    &mut pending,
+                    &mut tapp_sites_total,
+                    max_specializations,
+                    max_type_depth,
+                )?;
+                rewrite_contract_clauses(
+                    &mut g.ensures,
+                    &ctx,
+                    &sigs,
+                    &generic_symbols,
+                    module_exports,
+                    &extern_symbols,
+                    Some(&subst),
+                    &mut instances,
+                    &mut pending,
+                    &mut tapp_sites_total,
+                    max_specializations,
+                    max_type_depth,
+                )?;
+                rewrite_contract_clauses(
+                    &mut g.invariant,
+                    &ctx,
                     &sigs,
                     &generic_symbols,
                     module_exports,
@@ -505,6 +677,9 @@ fn lower_defn(f: AstFunctionDef) -> Result<FunctionDef, CompilerError> {
     }
     Ok(FunctionDef {
         name: f.name,
+        requires: f.requires,
+        ensures: f.ensures,
+        invariant: f.invariant,
         params: f
             .params
             .into_iter()
@@ -528,6 +703,9 @@ fn lower_defasync(f: AstAsyncFunctionDef) -> Result<AsyncFunctionDef, CompilerEr
     }
     Ok(AsyncFunctionDef {
         name: f.name,
+        requires: f.requires,
+        ensures: f.ensures,
+        invariant: f.invariant,
         params: f
             .params
             .into_iter()
@@ -777,6 +955,58 @@ fn assert_no_generic_syntax(expr: &Expr) -> Result<(), CompilerError> {
             CompileErrorKind::Internal,
             format!("internal error: generics syntax not eliminated: {hit:?}"),
         ));
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn rewrite_contract_clauses(
+    clauses: &mut [crate::x07ast::ContractClauseAst],
+    ctx: &RewriteCtx,
+    sigs: &BTreeMap<String, FnSig>,
+    generic_symbols: &BTreeSet<String>,
+    module_exports: &BTreeMap<String, BTreeSet<String>>,
+    extern_symbols: &BTreeSet<String>,
+    subst: Option<&BTreeMap<String, TypeRef>>,
+    instances: &mut BTreeMap<InstantiationKey, InstanceRecord>,
+    pending: &mut BTreeSet<InstantiationKey>,
+    tapp_sites_total: &mut usize,
+    max_specializations: usize,
+    max_type_depth: usize,
+) -> Result<(), CompilerError> {
+    for c in clauses {
+        c.expr = rewrite_expr(
+            c.expr.clone(),
+            ctx,
+            sigs,
+            generic_symbols,
+            module_exports,
+            extern_symbols,
+            subst,
+            instances,
+            pending,
+            tapp_sites_total,
+            max_specializations,
+            max_type_depth,
+        )?;
+        assert_no_generic_syntax(&c.expr)?;
+        for w in &mut c.witness {
+            *w = rewrite_expr(
+                w.clone(),
+                ctx,
+                sigs,
+                generic_symbols,
+                module_exports,
+                extern_symbols,
+                subst,
+                instances,
+                pending,
+                tapp_sites_total,
+                max_specializations,
+                max_type_depth,
+            )?;
+            assert_no_generic_syntax(w)?;
+        }
     }
     Ok(())
 }

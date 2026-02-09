@@ -494,6 +494,9 @@ fn gen_machine_module(
 
     let init = FunctionDef {
         name: init_name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: Vec::new(),
         ret_ty: Ty::Bytes,
         ret_brand: None,
@@ -501,6 +504,9 @@ fn gen_machine_module(
     };
     let helper = FunctionDef {
         name: helper_name.clone(),
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: vec![
             FunctionParam {
                 name: "to_state".to_string(),
@@ -519,6 +525,9 @@ fn gen_machine_module(
     };
     let step = FunctionDef {
         name: step_name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: vec![
             FunctionParam {
                 name: "snapshot".to_string(),
@@ -551,6 +560,9 @@ fn gen_machine_module(
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
             type_params: Vec::new(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: f
                 .params
                 .into_iter()
@@ -602,6 +614,9 @@ fn gen_tests_module(
         exports.insert(fn_name.clone());
         functions.push(FunctionDef {
             name: fn_name,
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: Vec::new(),
             ret_ty: Ty::ResultI32,
             ret_brand: None,
@@ -614,6 +629,9 @@ fn gen_tests_module(
     exports.insert(init_test_name.clone());
     functions.push(FunctionDef {
         name: init_test_name,
+        requires: Vec::new(),
+        ensures: Vec::new(),
+        invariant: Vec::new(),
         params: Vec::new(),
         ret_ty: Ty::ResultI32,
         ret_brand: None,
@@ -635,6 +653,9 @@ fn gen_tests_module(
         .map(|f| x07c::x07ast::AstFunctionDef {
             name: f.name,
             type_params: Vec::new(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
             params: f
                 .params
                 .into_iter()

@@ -44,8 +44,10 @@ fuzz_target!(|data: &[u8]| {
         enable_rr: false,
         enable_kv: false,
         module_roots: Vec::new(),
+        arch_root: None,
         emit_main: false,
         freestanding: false,
+        contract_mode: compile::ContractMode::RuntimeTrap,
         allow_unsafe: None,
         allow_ffi: None,
     };

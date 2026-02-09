@@ -4,7 +4,7 @@ This repository was renamed to **X07** for legal reasons.
 
 Canonical naming in the codebase:
 
-- Source files: `*.x07.json` (x07AST JSON), schema `x07.x07ast@0.4.0` (legacy `x07.x07ast@0.3.0` accepted)
+- Source files: `*.x07.json` (x07AST JSON), schema `x07.x07ast@0.5.0` (legacy `x07.x07ast@0.3.0` / `x07.x07ast@0.4.0` accepted)
 - Environment variables: `X07_*`
 - Protocol/fixture magics: `X7??` (4-byte tags)
 - Tooling: `x07import`, `x07test`

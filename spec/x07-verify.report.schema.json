@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-verify.report.schema.json",
+  "title": "X07 x07 verify report v0.1.0",
+  "description": "Machine-readable report emitted by `x07 verify`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "mode",
+    "ok",
+    "entry",
+    "bounds",
+    "result",
+    "diagnostics_count",
+    "exit_code"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.verify.report@0.1.0" },
+    "mode": { "type": "string", "enum": ["bmc", "smt"] },
+    "ok": { "type": "boolean" },
+    "entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "bounds": { "$ref": "#/$defs/bounds" },
+    "result": { "$ref": "#/$defs/result" },
+    "artifacts": { "$ref": "#/$defs/artifacts" },
+    "diagnostics_count": { "type": "integer", "minimum": 0 },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/diagnostic" },
+      "default": []
+    },
+    "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 }
+  },
+  "$defs": {
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unwind", "max_bytes_len", "input_len_bytes"],
+      "properties": {
+        "unwind": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "max_bytes_len": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "input_len_bytes": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "verified_within_bounds",
+            "counterexample_found",
+            "inconclusive",
+            "tool_missing",
+            "error"
+          ]
+        },
+        "contract": { "$ref": "#/$defs/contract_payload" },
+        "details": { "type": "string", "maxLength": 65536 }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "driver_path": { "type": "string" },
+        "c_path": { "type": "string" },
+        "cbmc_json_path": { "type": "string" },
+        "cex_path": { "type": "string" },
+        "smt2_path": { "type": "string" },
+        "z3_out_path": { "type": "string" }
+      }
+    },
+    "contract_witness": {
+      "type": "object",
+      "required": ["ty"],
+      "properties": { "ty": { "type": "string" } },
+      "additionalProperties": true
+    },
+    "contract_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_kind",
+        "fn",
+        "clause_id",
+        "clause_index",
+        "clause_ptr",
+        "witness"
+      ],
+      "properties": {
+        "contract_kind": {
+          "type": "string",
+          "enum": ["requires", "ensures", "invariant_entry", "invariant_exit"]
+        },
+        "fn": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "clause_id": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "clause_index": { "type": "integer", "minimum": 0 },
+        "clause_ptr": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "witness": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/contract_witness" }
+        }
+      }
+    }
+  }
+}

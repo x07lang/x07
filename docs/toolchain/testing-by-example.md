@@ -5,7 +5,7 @@ This page is a hands-on tutorial for the built-in test harness.
 `x07 test` is designed for agents:
 
 - a single canonical command
-- stable, machine-readable JSON report output (`x07.x07test@0.2.0`)
+- stable, machine-readable JSON report output (`x07.x07test@0.3.0`)
 - runs in declared worlds (`solve-*`, `run-os`, `run-os-sandboxed`)
 
 Companion example (in the `x07` repo):
@@ -46,7 +46,7 @@ Replace `tests/smoke.x07.json` with:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.4.0",
+  "schema_version": "x07.x07ast@0.5.0",
   "kind": "module",
   "module_id": "smoke",
   "imports": ["std.test"],
@@ -94,6 +94,11 @@ x07 test --manifest tests/tests.json
 
 - `summary` (counts + duration)
 - `tests[]` entries with per-test `status`, plus optional `compile` / `run` sections
+
+Contract failures:
+
+- If a test fails due to a runtime contract violation, the report includes `failure_kind: "contract_violation"` and `contract_repro_path`.
+- The repro JSON is written under `.x07/artifacts/contract/<clause_id>/repro.json` (default artifact dir).
 
 List failing test IDs:
 

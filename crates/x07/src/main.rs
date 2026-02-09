@@ -9,7 +9,6 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::{Args, Parser};
-use sha2::{Digest, Sha256};
 use x07_contracts::{
     PROJECT_LOCKFILE_SCHEMA_VERSION, X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
 };
@@ -22,6 +21,7 @@ mod ast;
 mod bench;
 mod bundle;
 mod cli;
+mod contract_repro;
 mod diag;
 mod doc;
 mod doctor;
@@ -37,6 +37,7 @@ mod policy_overrides;
 mod repair;
 mod report_common;
 mod reporting;
+mod repro;
 mod review;
 mod rr;
 mod run;
@@ -47,6 +48,7 @@ mod tool_report_schemas;
 mod toolchain;
 mod trust;
 mod util;
+mod verify;
 
 #[derive(Parser, Debug)]
 #[command(name = "x07")]
@@ -115,6 +117,8 @@ enum Command {
     /// Record RR fixtures.
     #[command(hide = true)]
     Rr(rr::RrArgs),
+    /// Verify contracts within bounds (BMC / SMT).
+    Verify(verify::VerifyArgs),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -363,6 +367,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 None => vec!["rr"],
                 Some(rr::RrCommand::Record(_)) => vec!["rr", "record"],
             },
+            Some(Command::Verify(_)) => vec!["verify"],
         };
 
         let node = x07c::cli_specrows::find_command(&root, &path).unwrap_or(&root);
@@ -400,6 +405,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Schema(args) => schema::cmd_schema(&cli.machine, args),
         Command::Sm(args) => sm::cmd_sm(&cli.machine, args),
         Command::Rr(args) => rr::cmd_rr(&cli.machine, args),
+        Command::Verify(args) => verify::cmd_verify(&cli.machine, args),
     }
 }
 
@@ -767,6 +773,8 @@ fn run_one_test(
             expect: test.expect.as_str().to_string(),
             status: "skip".to_string(),
             duration_ms: start.elapsed().as_millis() as u64,
+            failure_kind: None,
+            contract_repro_path: None,
             entry: Some(test.entry.clone()),
             fixture_root: test.fixture_root.as_ref().map(display_path),
             compile: None,
@@ -789,7 +797,7 @@ fn run_one_test(
         let out_dir = args
             .artifact_dir
             .join("tests")
-            .join(safe_artifact_dir_name(&test.id));
+            .join(util::safe_artifact_dir_name(&test.id));
         std::fs::create_dir_all(&out_dir)
             .with_context(|| format!("create artifact dir: {}", out_dir.display()))?;
         let driver_path = out_dir.join("driver.x07.json");
@@ -824,6 +832,8 @@ fn run_one_test(
         expect: test.expect.as_str().to_string(),
         status: "error".to_string(),
         duration_ms: 0,
+        failure_kind: None,
+        contract_repro_path: None,
         entry: Some(test.entry.clone()),
         fixture_root: test.fixture_root.as_ref().map(display_path),
         compile: Some(CompileSection {
@@ -886,6 +896,58 @@ fn run_one_test(
     }
 
     let run_res = last_run.context("internal error: missing run result")?;
+
+    if !run_res.ok {
+        if let Some(trap) = run_res.trap.as_deref() {
+            match contract_repro::try_parse_contract_trap(trap) {
+                Ok(Some(info)) => {
+                    let source = contract_repro::SourceInfo {
+                        mode: "x07test".to_string(),
+                        tests_manifest_path: Some(display_path(&args.manifest)),
+                        test_id: Some(test.id.clone()),
+                        test_entry: Some(test.entry.clone()),
+                        target_kind: None,
+                        target_path: None,
+                    };
+
+                    match contract_repro::write_repro(
+                        &args.artifact_dir,
+                        test.world.as_str(),
+                        &runner_config,
+                        input,
+                        info.payload,
+                        source,
+                        &info.clause_id,
+                    ) {
+                        Ok(path) => {
+                            result.failure_kind = Some("contract_violation".to_string());
+                            result.contract_repro_path = Some(display_path(&path));
+                        }
+                        Err(err) => {
+                            result
+                                .diags
+                                .push(Diag::new("X07T_ECONTRACT_REPRO_WRITE", err.to_string()));
+                        }
+                    }
+
+                    result.run = Some(RunSection::from_runner_result(&run_res));
+                    result.status = "error".to_string();
+                    result.duration_ms = start.elapsed().as_millis() as u64;
+                    return Ok(result);
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    result
+                        .diags
+                        .push(Diag::new("X07T_ECONTRACT_TRAP_PARSE", err.to_string()));
+                    result.run = Some(RunSection::from_runner_result(&run_res));
+                    result.status = "error".to_string();
+                    result.duration_ms = start.elapsed().as_millis() as u64;
+                    return Ok(result);
+                }
+            }
+        }
+    }
 
     let status_bytes = run_res.solve_output.clone();
     let (tag, code_u32) = match parse_evtest_status_v1(&status_bytes) {
@@ -974,7 +1036,7 @@ fn run_one_pbt_test(
     let out_dir = args
         .artifact_dir
         .join("pbt")
-        .join(safe_artifact_dir_name(&test.id));
+        .join(util::safe_artifact_dir_name(&test.id));
     if args.keep_artifacts {
         std::fs::create_dir_all(&out_dir)
             .with_context(|| format!("create artifact dir: {}", out_dir.display()))?;
@@ -1011,6 +1073,8 @@ fn run_one_pbt_test(
         expect: test.expect.as_str().to_string(),
         status: "error".to_string(),
         duration_ms: 0,
+        failure_kind: None,
+        contract_repro_path: None,
         entry: Some(test.entry.clone()),
         fixture_root: test.fixture_root.as_ref().map(display_path),
         compile: Some(CompileSection {
@@ -1211,6 +1275,8 @@ struct OsRunnerSolveRaw {
     mem_stats: Option<x07_host_runner::MemStats>,
     #[serde(default)]
     sched_stats: Option<x07_host_runner::SchedStats>,
+    #[serde(default)]
+    trap: Option<String>,
 }
 
 static X07TEST_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1249,6 +1315,8 @@ fn run_one_test_os(
             expect: test.expect.as_str().to_string(),
             status: "error".to_string(),
             duration_ms: start.elapsed().as_millis() as u64,
+            failure_kind: None,
+            contract_repro_path: None,
             entry: Some(test.entry.clone()),
             fixture_root: None,
             compile: None,
@@ -1264,7 +1332,7 @@ fn run_one_test_os(
         let out_dir = args
             .artifact_dir
             .join("tests")
-            .join(safe_artifact_dir_name(&test.id));
+            .join(util::safe_artifact_dir_name(&test.id));
         std::fs::create_dir_all(&out_dir)
             .with_context(|| format!("create artifact dir: {}", out_dir.display()))?;
         (out_dir, false)
@@ -1381,6 +1449,8 @@ fn run_one_test_os(
         expect: test.expect.as_str().to_string(),
         status: "error".to_string(),
         duration_ms: 0,
+        failure_kind: None,
+        contract_repro_path: None,
         entry: Some(test.entry.clone()),
         fixture_root: None,
         compile: None,
@@ -1457,6 +1527,74 @@ fn run_one_test_os(
     });
 
     if !solve.ok || solve.exit_status != 0 {
+        if let Some(trap) = solve.trap.as_deref() {
+            match contract_repro::try_parse_contract_trap(trap) {
+                Ok(Some(info)) => {
+                    let source = contract_repro::SourceInfo {
+                        mode: "x07test".to_string(),
+                        tests_manifest_path: Some(display_path(&args.manifest)),
+                        test_id: Some(test.id.clone()),
+                        test_entry: Some(test.entry.clone()),
+                        target_kind: None,
+                        target_path: None,
+                    };
+                    let runner_cfg = RunnerConfig {
+                        world: test.world,
+                        fixture_fs_dir: None,
+                        fixture_fs_root: None,
+                        fixture_fs_latency_index: None,
+                        fixture_rr_dir: None,
+                        fixture_kv_dir: None,
+                        fixture_kv_seed: None,
+                        solve_fuel: 50_000_000,
+                        max_memory_bytes: 64 * 1024 * 1024,
+                        max_output_bytes: 1024 * 1024,
+                        cpu_time_limit_seconds,
+                        debug_borrow_checks: false,
+                    };
+
+                    match contract_repro::write_repro(
+                        &args.artifact_dir,
+                        test.world.as_str(),
+                        &runner_cfg,
+                        &[],
+                        info.payload,
+                        source,
+                        &info.clause_id,
+                    ) {
+                        Ok(path) => {
+                            result.failure_kind = Some("contract_violation".to_string());
+                            result.contract_repro_path = Some(display_path(&path));
+                        }
+                        Err(err) => {
+                            result
+                                .diags
+                                .push(Diag::new("X07T_ECONTRACT_REPRO_WRITE", err.to_string()));
+                        }
+                    }
+
+                    result.status = "error".to_string();
+                    result.duration_ms = start.elapsed().as_millis() as u64;
+                    if cleanup_dir {
+                        rm_rf(&out_dir);
+                    }
+                    return Ok(result);
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    result
+                        .diags
+                        .push(Diag::new("X07T_ECONTRACT_TRAP_PARSE", err.to_string()));
+                    result.status = "error".to_string();
+                    result.duration_ms = start.elapsed().as_millis() as u64;
+                    if cleanup_dir {
+                        rm_rf(&out_dir);
+                    }
+                    return Ok(result);
+                }
+            }
+        }
+
         result.diags.push(Diag::new(
             "ETEST_RUN",
             format!(
@@ -2489,6 +2627,10 @@ struct TestCaseResult {
     status: String,
     duration_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    failure_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contract_repro_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     entry: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     fixture_root: Option<String>,
@@ -2508,6 +2650,8 @@ impl TestCaseResult {
             expect: test.expect.as_str().to_string(),
             status: "skip".to_string(),
             duration_ms: 0,
+            failure_kind: None,
+            contract_repro_path: None,
             entry: Some(test.entry.clone()),
             fixture_root: test.fixture_root.as_ref().map(display_path),
             compile: None,
@@ -2788,13 +2932,6 @@ fn write_report_and_exit(
     }
 
     Ok(std::process::ExitCode::from(exit_code))
-}
-
-fn safe_artifact_dir_name(id: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(id.as_bytes());
-    let hex = util::hex_lower(&hasher.finalize());
-    format!("id_{hex}")
 }
 
 fn display_path<P: AsRef<Path>>(p: P) -> String {

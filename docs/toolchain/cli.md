@@ -132,6 +132,23 @@ Cookbook integrations:
 
 See: [Property-based testing](pbt.md).
 
+### Verification (contracts)
+
+- `x07 verify --bmc --entry <sym>`
+- `x07 verify --smt --entry <sym>`
+  - `--project <path>` (or one/more `--module-root <dir>`)
+  - `--unwind <n>` (CBMC loop unwinding bound)
+  - `--max-bytes-len <n>` (bound for `bytes` / `bytes_view` params)
+
+Notes:
+
+- v0.1 verifies only a selected subset: `defn` targets only (no `defasync`), no recursion, and `for` loops must have literal bounds.
+- v0.1 supports params: `i32`, `u32`, `bytes`, `bytes_view` (use a wrapper if you need other types).
+- `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant`) on the target function.
+- Artifacts are written under `.x07/artifacts/verify/<mode>/<entry>/` (driver module, emitted C, CBMC output, counterexample/SMT artifacts when present).
+
+Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.1.0"`).
+
 ### Agent correctness benchmarks (`x07bench` JSON)
 
 - `x07 bench list --suite labs/x07bench/suites/core_v0/suite.json`

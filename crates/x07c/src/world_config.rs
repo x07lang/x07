@@ -86,6 +86,7 @@ pub fn compile_options_for_world(
         arch_root: None,
         emit_main: true,
         freestanding: false,
+        contract_mode: compile::ContractMode::RuntimeTrap,
         allow_unsafe: features.allow_unsafe,
         allow_ffi: features.allow_ffi,
     }

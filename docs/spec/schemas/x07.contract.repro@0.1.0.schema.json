@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07.contract.repro@0.1.0.schema.json",
+  "title": "X07 Contract Repro v0.1.0",
+  "description": "Contract violation repro artifact emitted by x07 test and x07 run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "source",
+    "world",
+    "runner",
+    "input_bytes_b64",
+    "contract"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.contract.repro@0.1.0" },
+    "tool": { "$ref": "#/$defs/tool" },
+    "source": { "$ref": "#/$defs/source" },
+    "world": { "$ref": "#/$defs/world" },
+    "runner": { "$ref": "#/$defs/runner" },
+    "input_bytes_b64": { "type": "string", "minLength": 0, "maxLength": 16777216 },
+    "contract": { "$ref": "#/$defs/contract_payload" }
+  },
+  "$defs": {
+    "u64": { "type": "integer", "minimum": 0 },
+    "world": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x07_version", "x07c_version"],
+      "properties": {
+        "x07_version": { "type": "string" },
+        "x07c_version": { "type": "string" },
+        "git_sha": { "type": "string", "pattern": "^[0-9a-fA-F]{7,40}$" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["x07test", "x07run"] },
+        "tests_manifest_path": { "type": "string" },
+        "test_id": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "test_entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "target_kind": { "type": "string", "enum": ["project", "program", "artifact"] },
+        "target_path": { "type": "string" }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "solve_fuel",
+        "max_memory_bytes",
+        "max_output_bytes",
+        "cpu_time_limit_seconds",
+        "debug_borrow_checks"
+      ],
+      "properties": {
+        "solve_fuel": { "$ref": "#/$defs/u64" },
+        "max_memory_bytes": { "$ref": "#/$defs/u64" },
+        "max_output_bytes": { "$ref": "#/$defs/u64" },
+        "cpu_time_limit_seconds": { "$ref": "#/$defs/u64" },
+        "debug_borrow_checks": { "type": "boolean" },
+        "fixture_fs_dir": { "type": "string" },
+        "fixture_fs_root": { "type": "string" },
+        "fixture_fs_latency_index": { "type": "string" },
+        "fixture_rr_dir": { "type": "string" },
+        "fixture_kv_dir": { "type": "string" },
+        "fixture_kv_seed": { "type": "string" }
+      }
+    },
+    "contract_witness": {
+      "type": "object",
+      "required": ["ty"],
+      "properties": { "ty": { "type": "string" } },
+      "additionalProperties": true
+    },
+    "contract_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_kind",
+        "fn",
+        "clause_id",
+        "clause_index",
+        "clause_ptr",
+        "witness"
+      ],
+      "properties": {
+        "contract_kind": {
+          "type": "string",
+          "enum": ["requires", "ensures", "invariant_entry", "invariant_exit"]
+        },
+        "fn": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "clause_id": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "clause_index": { "type": "integer", "minimum": 0 },
+        "clause_ptr": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "witness": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/contract_witness" }
+        }
+      }
+    }
+  }
+}
+

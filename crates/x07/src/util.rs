@@ -12,6 +12,10 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     hex_lower(&hasher.finalize())
 }
 
+pub(crate) fn safe_artifact_dir_name(id: &str) -> String {
+    format!("id_{}", sha256_hex(id.as_bytes()))
+}
+
 pub fn resolve_existing_path_upwards(path: &Path) -> PathBuf {
     if path.is_absolute() {
         return path.to_path_buf();

@@ -207,6 +207,9 @@ impl Elaborator<'_> {
                 PipeHelperKind::Defn => {
                     self.new_helpers.push(FunctionDef {
                         name: helper_full.clone(),
+                        requires: Vec::new(),
+                        ensures: Vec::new(),
+                        invariant: Vec::new(),
                         params: parsed
                             .params
                             .iter()
@@ -225,6 +228,9 @@ impl Elaborator<'_> {
                 PipeHelperKind::Defasync => {
                     self.new_async_helpers.push(AsyncFunctionDef {
                         name: helper_full.clone(),
+                        requires: Vec::new(),
+                        ensures: Vec::new(),
+                        invariant: Vec::new(),
                         params: parsed
                             .params
                             .iter()

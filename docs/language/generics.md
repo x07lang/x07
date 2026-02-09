@@ -1,13 +1,14 @@
 # Generics (monomorphization)
 
-As of x07AST `schema_version` **`x07.x07ast@0.4.0`**, X07 supports bounded generics via **compile-time monomorphization**.
+As of x07AST `schema_version` **`x07.x07ast@0.4.0`** (and later), X07 supports bounded generics via **compile-time monomorphization**.
 
 - Generics are compile-time only: each `tapp` instantiation produces a specialized copy.
 - The program given to the existing optimizer + C backend is fully monomorphic (no `tapp` / `ty.*` remains).
 
 ## Schema + compatibility
 
-- Use `x07.x07ast@0.4.0` for files that use any of: `type_params`, structured `type_ref`, `tapp`, `ty.*`.
+- Use `x07.x07ast@0.5.0` for new files (including any use of: `type_params`, structured `type_ref`, `tapp`, `ty.*`).
+- The toolchain also accepts legacy `x07.x07ast@0.4.0` for generics-only programs (no contracts).
 - The toolchain still accepts legacy `x07.x07ast@0.3.0` for concrete-only programs.
 
 ## `type_ref` (structured type expressions)

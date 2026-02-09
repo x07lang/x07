@@ -37,9 +37,12 @@ The root JSON object must include `schema_version`.
 
 Current schema version:
 
-- `x07.x07ast@0.4.0`
+- `x07.x07ast@0.5.0`
 
-The toolchain also accepts legacy `x07.x07ast@0.3.0` for concrete-only programs.
+The toolchain also accepts legacy schema versions:
+
+- `x07.x07ast@0.4.0` (programs without contracts)
+- `x07.x07ast@0.3.0` (concrete-only programs)
 
 Tooling (`x07 ast init`, `x07 fmt`, `x07 lint`) keeps the AST compatible with the current schema.
 
@@ -53,6 +56,24 @@ x07AST v0.4 adds:
 - `ty.*` intrinsics for type-dependent ops inside generic bodies
 
 See [Generics](generics.md).
+
+## Contracts (v0.5)
+
+x07AST v0.5 adds first-class function contracts:
+
+- Optional fields on `defn` / `defasync` declarations:
+  - `requires`: array of preconditions
+  - `ensures`: array of postconditions
+  - `invariant`: array of function-level invariants
+- Each clause is an object:
+  - `id` (optional string)
+  - `expr` (expression; must typecheck to `i32`)
+  - `witness` (optional array of expressions; evaluated only on failure)
+
+Notes:
+
+- Contract expressions and witnesses must be contract-pure (no `world.*`, `task.*`, mutation forms, etc.).
+- `__result` is reserved and is only available inside `ensures` expressions.
 
 ## Branded bytes annotations
 

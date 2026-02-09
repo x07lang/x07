@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07ast.schema.json",
-  "title": "X07 x07AST v0.4.0",
+  "title": "X07 x07AST v0.5.0",
   "description": "Canonical, JSON-based AST carrier for LLM-first X07 program generation and repair. Expressions are encoded as JSON S-expressions (json-sexpr).",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "kind", "module_id", "imports", "decls"],
   "properties": {
-    "schema_version": { "const": "x07.x07ast@0.4.0" },
+    "schema_version": { "const": "x07.x07ast@0.5.0" },
     "kind": {
       "type": "string",
       "enum": ["entry", "module"],
@@ -169,6 +169,16 @@
         "brand": { "$ref": "#/$defs/symbol" }
       }
     },
+    "contract_clause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expr"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 4096 },
+        "expr": { "$ref": "#/$defs/sexpr" },
+        "witness": { "type": "array", "items": { "$ref": "#/$defs/sexpr" } }
+      }
+    },
     "decl_defn": {
       "type": "object",
       "additionalProperties": false,
@@ -177,6 +187,9 @@
         "kind": { "const": "defn" },
         "name": { "$ref": "#/$defs/symbol" },
         "type_params": { "$ref": "#/$defs/type_params" },
+        "requires": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
+        "ensures": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
+        "invariant": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
         "params": {
           "type": "array",
           "items": { "$ref": "#/$defs/param" },
@@ -195,6 +208,9 @@
         "kind": { "const": "defasync" },
         "name": { "$ref": "#/$defs/symbol" },
         "type_params": { "$ref": "#/$defs/type_params" },
+        "requires": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
+        "ensures": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
+        "invariant": { "type": "array", "items": { "$ref": "#/$defs/contract_clause" } },
         "params": {
           "type": "array",
           "items": { "$ref": "#/$defs/param" },

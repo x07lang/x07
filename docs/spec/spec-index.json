@@ -1107,6 +1107,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-verify.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-verify.report.schema.json",
+      "schema_version": "x07.tool.verify.report@0.1.0",
+      "title": "x07.tool.verify.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool.events.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool.events.schema.json",
       "schema_version": "x07.tool.events@0.1.0",
@@ -1135,10 +1142,24 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-verify.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-verify.report.schema.json",
+      "schema_version": "x07.verify.report@0.1.0",
+      "title": "X07 x07 verify report v0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-website.package-index.schema.json",
       "schema_id": "https://x07.io/spec/x07-website.package-index.schema.json",
       "schema_version": "x07.website.package-index@0.2.0",
       "title": "x07.website.package-index@0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07.contract.repro@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.contract.repro@0.1.0.schema.json",
+      "schema_version": "x07.contract.repro@0.1.0",
+      "title": "X07 Contract Repro v0.1.0"
     },
     {
       "kind": "schema",
@@ -1163,10 +1184,17 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07.verify.cex@0.1.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.verify.cex@0.1.0.schema.json",
+      "schema_version": "x07.verify.cex@0.1.0",
+      "title": "X07 Verify Counterexample v0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07ast.schema.json",
       "schema_id": "https://x07.io/spec/x07ast.schema.json",
-      "schema_version": "x07.x07ast@0.4.0",
-      "title": "X07 x07AST v0.4.0"
+      "schema_version": "x07.x07ast@0.5.0",
+      "title": "X07 x07AST v0.5.0"
     },
     {
       "kind": "schema",
@@ -1188,6 +1216,13 @@
       "schema_id": "https://x07.io/spec/x07ast.v0.4.0.schema.json",
       "schema_version": "x07.x07ast@0.4.0",
       "title": "X07 x07AST v0.4.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07ast.v0.5.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07ast.v0.5.0.schema.json",
+      "schema_version": "x07.x07ast@0.5.0",
+      "title": "X07 x07AST v0.5.0"
     },
     {
       "kind": "schema",
@@ -1221,8 +1256,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07test.schema.json",
       "schema_id": "https://x07.io/spec/x07test.schema.json",
-      "schema_version": "x07.x07test@0.2.0",
-      "title": "X07 x07Test v0.2.0"
+      "schema_version": "x07.x07test@0.3.0",
+      "title": "X07 x07Test v0.3.0"
     }
   ],
   "schema_version": "x07.spec.index@0.1.0"

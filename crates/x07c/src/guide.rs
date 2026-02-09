@@ -96,6 +96,18 @@ pub fn guide_md() -> String {
     out.push_str(
         "- `{\"kind\":\"export\",\"names\":[\"std.foo.bar\", ...]}` (module files only)\n\n",
     );
+    out.push_str("Contracts (optional fields on `defn` / `defasync` in v0.5):\n\n");
+    out.push_str("- `requires`: array of preconditions\n");
+    out.push_str("- `ensures`: array of postconditions\n");
+    out.push_str("- `invariant`: array of function-level invariants\n\n");
+    out.push_str("Each clause is an object:\n\n");
+    out.push_str("- `id` (optional string)\n");
+    out.push_str("- `expr` (expression; must typecheck to `i32`)\n");
+    out.push_str("- `witness` (optional array of expressions; evaluated only on failure)\n\n");
+    out.push_str("Reserved name:\n\n");
+    out.push_str(
+        "- `__result` is reserved and is only available inside `ensures` expressions.\n\n",
+    );
     out.push_str("Module IDs are dot-separated identifiers like `app.rle` or `std.bytes`.\n\n");
     out.push_str("Module resolution is deterministic:\n\n");
     out.push_str(

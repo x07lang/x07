@@ -5,7 +5,7 @@ use crate::diagnostics::{
     Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Report, Severity, Stage,
 };
 use crate::x07ast::{self, X07AstFile, X07AstKind};
-use x07_contracts::X07AST_SCHEMA_VERSION_V0_4_0;
+use x07_contracts::{X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0};
 
 fn expr_ident(name: impl Into<String>) -> Expr {
     Expr::Ident {
@@ -151,33 +151,98 @@ pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
     let extern_slots = file.extern_functions.len();
     let defn_base = export_slots + extern_slots;
 
+    let ctx = LintCtx::default();
+
     for (idx, f) in file.functions.iter().enumerate() {
-        let ptr = format!("/decls/{}/body", defn_base + idx);
-        lint_expr(
-            &f.body,
-            &ptr,
+        let decl_idx = defn_base + idx;
+        lint_contract_clauses(
+            &f.requires,
+            &format!("/decls/{decl_idx}/requires"),
             options,
-            &LintCtx::default(),
+            &ctx,
             &mut diagnostics,
         );
+        lint_contract_clauses(
+            &f.ensures,
+            &format!("/decls/{decl_idx}/ensures"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
+        lint_contract_clauses(
+            &f.invariant,
+            &format!("/decls/{decl_idx}/invariant"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
+
+        let ptr = format!("/decls/{decl_idx}/body");
+        lint_expr(&f.body, &ptr, options, &ctx, &mut diagnostics);
     }
     for (idx, f) in file.async_functions.iter().enumerate() {
-        let ptr = format!("/decls/{}/body", defn_base + file.functions.len() + idx);
-        lint_expr(
-            &f.body,
-            &ptr,
+        let decl_idx = defn_base + file.functions.len() + idx;
+        lint_contract_clauses(
+            &f.requires,
+            &format!("/decls/{decl_idx}/requires"),
             options,
-            &LintCtx::default(),
+            &ctx,
             &mut diagnostics,
         );
+        lint_contract_clauses(
+            &f.ensures,
+            &format!("/decls/{decl_idx}/ensures"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
+        lint_contract_clauses(
+            &f.invariant,
+            &format!("/decls/{decl_idx}/invariant"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
+
+        let ptr = format!("/decls/{decl_idx}/body");
+        lint_expr(&f.body, &ptr, options, &ctx, &mut diagnostics);
     }
 
-    if file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0 {
+    if file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0
+        || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0
+    {
         let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
         diagnostics.extend(tc.diagnostics);
     }
 
     Report::ok().with_diagnostics(diagnostics)
+}
+
+fn lint_contract_clauses(
+    clauses: &[x07ast::ContractClauseAst],
+    base_ptr: &str,
+    options: LintOptions,
+    ctx: &LintCtx,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for (cidx, clause) in clauses.iter().enumerate() {
+        lint_expr(
+            &clause.expr,
+            &format!("{base_ptr}/{cidx}/expr"),
+            options,
+            ctx,
+            diagnostics,
+        );
+        for (widx, w) in clause.witness.iter().enumerate() {
+            lint_expr(
+                w,
+                &format!("{base_ptr}/{cidx}/witness/{widx}"),
+                options,
+                ctx,
+                diagnostics,
+            );
+        }
+    }
 }
 
 fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
@@ -207,11 +272,16 @@ fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
         let decl_idx = defn_base + idx;
         lint_type_params_usage(
             decl_idx,
-            &f.name,
-            &f.type_params,
-            &f.params,
-            Some(&f.result),
-            Some(&f.body),
+            FnDeclRefs {
+                name: &f.name,
+                type_params: &f.type_params,
+                params: &f.params,
+                result: Some(&f.result),
+                requires: &f.requires,
+                ensures: &f.ensures,
+                invariant: &f.invariant,
+                body: Some(&f.body),
+            },
             diagnostics,
         );
     }
@@ -220,59 +290,93 @@ fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
         let decl_idx = defn_base + file.functions.len() + idx;
         lint_type_params_usage(
             decl_idx,
-            &f.name,
-            &f.type_params,
-            &f.params,
-            Some(&f.result),
-            Some(&f.body),
+            FnDeclRefs {
+                name: &f.name,
+                type_params: &f.type_params,
+                params: &f.params,
+                result: Some(&f.result),
+                requires: &f.requires,
+                ensures: &f.ensures,
+                invariant: &f.invariant,
+                body: Some(&f.body),
+            },
             diagnostics,
         );
     }
 }
 
+#[derive(Clone, Copy)]
+struct FnDeclRefs<'a> {
+    name: &'a str,
+    type_params: &'a [x07ast::TypeParam],
+    params: &'a [x07ast::AstFunctionParam],
+    result: Option<&'a x07ast::TypeRef>,
+    requires: &'a [x07ast::ContractClauseAst],
+    ensures: &'a [x07ast::ContractClauseAst],
+    invariant: &'a [x07ast::ContractClauseAst],
+    body: Option<&'a Expr>,
+}
+
 fn lint_type_params_usage(
     decl_idx: usize,
-    func_name: &str,
-    type_params: &[x07ast::TypeParam],
-    params: &[x07ast::AstFunctionParam],
-    result: Option<&x07ast::TypeRef>,
-    body: Option<&Expr>,
+    decl: FnDeclRefs<'_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let mut declared: BTreeSet<&str> = BTreeSet::new();
-    for tp in type_params {
+    for tp in decl.type_params {
         declared.insert(tp.name.as_str());
     }
 
     let mut quickfixed_undefined: BTreeSet<String> = BTreeSet::new();
     let mut quickfix_ctx = UndefinedVarQuickfixCtx {
         decl_idx,
-        type_params_len: type_params.len(),
+        type_params_len: decl.type_params.len(),
         quickfixed_undefined: &mut quickfixed_undefined,
     };
 
     lint_type_ref_for_undefined_vars(
         &declared,
-        func_name,
-        params,
-        result,
+        decl.name,
+        decl.params,
+        decl.result,
         decl_idx,
         Some(&mut quickfix_ctx),
         diagnostics,
     );
 
     let mut used: BTreeSet<String> = BTreeSet::new();
-    for p in params {
+    for p in decl.params {
         collect_type_vars_from_type_ref(&p.ty, &mut used);
     }
-    if let Some(result) = result {
+    if let Some(result) = decl.result {
         collect_type_vars_from_type_ref(result, &mut used);
     }
-    if let Some(body) = body {
+    collect_type_vars_from_contract_clauses(
+        decl.requires,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.ensures,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.invariant,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    if let Some(body) = decl.body {
         collect_type_vars_from_expr(body, &declared, &mut used, &mut quickfix_ctx, diagnostics);
     }
 
-    for (tp_idx, tp) in type_params.iter().enumerate() {
+    for (tp_idx, tp) in decl.type_params.iter().enumerate() {
         if used.contains(&tp.name) {
             continue;
         }
@@ -297,6 +401,21 @@ fn lint_type_params_usage(
                 note: Some("Remove unused type param".to_string()),
             }),
         });
+    }
+}
+
+fn collect_type_vars_from_contract_clauses(
+    clauses: &[x07ast::ContractClauseAst],
+    declared: &BTreeSet<&str>,
+    used: &mut BTreeSet<String>,
+    quickfix_ctx: &mut UndefinedVarQuickfixCtx<'_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for clause in clauses {
+        collect_type_vars_from_expr(&clause.expr, declared, used, quickfix_ctx, diagnostics);
+        for w in &clause.witness {
+            collect_type_vars_from_expr(w, declared, used, quickfix_ctx, diagnostics);
+        }
     }
 }
 

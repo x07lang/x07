@@ -7,8 +7,25 @@ pub fn entry(imports: &[&str], solve: Value) -> Vec<u8> {
 }
 
 pub fn entry_with_decls(imports: &[&str], decls: Vec<Value>, solve: Value) -> Vec<u8> {
+    entry_with_schema_version("x07.x07ast@0.3.0", imports, decls, solve)
+}
+
+pub fn entry_v0_5(imports: &[&str], solve: Value) -> Vec<u8> {
+    entry_v0_5_with_decls(imports, Vec::new(), solve)
+}
+
+pub fn entry_v0_5_with_decls(imports: &[&str], decls: Vec<Value>, solve: Value) -> Vec<u8> {
+    entry_with_schema_version("x07.x07ast@0.5.0", imports, decls, solve)
+}
+
+pub fn entry_with_schema_version(
+    schema_version: &str,
+    imports: &[&str],
+    decls: Vec<Value>,
+    solve: Value,
+) -> Vec<u8> {
     serde_json::to_vec(&json!({
-        "schema_version": "x07.x07ast@0.3.0",
+        "schema_version": schema_version,
         "kind": "entry",
         "module_id": "main",
         "imports": imports,
