@@ -17,6 +17,8 @@ Some high-level concepts that make those goals practical:
 - [Record/replay](worlds/record-replay.md) (`std.rr`) for OS → deterministic cassettes
 - [Budget scopes](language/budget-scopes.md) (`budget.scope_v1`) for local cost contracts
 - Contracts tooling: [architecture check](toolchain/arch-check.md), [schema derive](toolchain/schema-derive.md), [state machines](toolchain/state-machines.md)
+- Property-based testing: [PBT](toolchain/pbt.md) (`x07 test --pbt`) with repro → regression promotion (`x07 fix --from-pbt`)
+- Human review artifacts: [Review & trust](toolchain/review-trust.md) (`x07 review diff`, `x07 trust report`)
 
 X07 is open-source, with direction guided through:
 

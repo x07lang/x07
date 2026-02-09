@@ -20,6 +20,9 @@ High-level primitives to learn early (the “one whole system”):
 - Record/replay: [`std.rr` + rr scopes](../worlds/record-replay.md) (OS → deterministic cassette)
 - Budget scopes: [`budget.scope_v1`](../language/budget-scopes.md) (localize cost contracts; arch-driven budgets)
 - Contracts tooling: `x07 arch check`, `x07 schema derive`, `x07 sm gen` (pinned contracts → deterministic checks/generation)
+- Property-based testing: `x07 test --pbt` + `x07 fix --from-pbt` (counterexample → deterministic regression)
+- Function contracts + verification: `requires` / `ensures` / `invariant` + `x07 verify --bmc|--smt` (bounded proof artifacts)
+- Review + trust artifacts: `x07 review diff` + `x07 trust report` (human reviewable “intent-level” diff + trust report)
 
 ## 1) Install and verify the toolchain
 
@@ -128,6 +131,20 @@ Run the deterministic harness (repo-defined suites):
 x07 test --manifest tests/tests.json
 ```
 
+If the suite includes property-based tests, run:
+
+```bash
+x07 test --all --manifest tests/tests.json
+```
+
+If PBT finds a counterexample, convert it into a committable regression test:
+
+```bash
+x07 fix --from-pbt target/x07test/pbt/<...>/repro.json --write
+```
+
+See: [Property-based testing](../toolchain/pbt.md) and [PBT repro → regression test](../toolchain/pbt-fix-from-repro.md).
+
 ## 4) Repairs: quickfixes and patches
 
 Two canonical repair mechanisms:
@@ -146,6 +163,13 @@ x07 lint --input src/main.x07.json
 ```
 
 See: [Repair loop](../toolchain/repair-loop.md).
+
+If you need a human-reviewable artifact for an agent patchset, use:
+
+- `x07 review diff` (semantic diff; HTML)
+- `x07 trust report` (budgets/worlds/nondeterminism summary)
+
+See: [Review & trust artifacts](../toolchain/review-trust.md).
 
 ## 5) Learn the language
 

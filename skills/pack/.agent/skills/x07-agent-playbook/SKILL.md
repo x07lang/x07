@@ -32,6 +32,8 @@ Canonical docs:
 - https://x07lang.org/docs/toolchain/arch-check/
 - https://x07lang.org/docs/toolchain/schema-derive/
 - https://x07lang.org/docs/toolchain/state-machines/
+- https://x07lang.org/docs/toolchain/pbt/
+- https://x07lang.org/docs/toolchain/review-trust/
 
 ## Single canonical agent loop (edit → run → test)
 
@@ -65,6 +67,21 @@ Keep each iteration small and checkable; if a repair loop does not converge quic
 
 Note: paths above assume a project scaffold (`x07 init`). In a publishable package repo (`x07 init --package`), format/lint the
 module files under `modules/` and run tests via `x07 test --manifest tests/tests.json`.
+
+## Correctness + review artifacts (canonical)
+
+- Property-based testing:
+  - `x07 test --pbt --manifest tests/tests.json` (PBT only)
+  - `x07 test --all --manifest tests/tests.json` (unit + PBT)
+  - `x07 fix --from-pbt <repro.json> --write` (counterexample → deterministic regression test)
+
+- Semantic diff + trust report (for human review / CI artifacts):
+  - `x07 review diff --from . --to . --html-out target/review/diff.html --json-out target/review/diff.json`
+  - `x07 trust report --project x07.json --out target/trust/trust.json --html-out target/trust/trust.html`
+
+- Function contracts + bounded verification artifacts:
+  - add `requires` / `ensures` / `invariant` clauses on a `defn`
+  - run `x07 verify --bmc|--smt --entry <sym>` (subset supported in v0.1)
 
 ## Recommended project layout (single canonical shape)
 

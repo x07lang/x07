@@ -18,6 +18,11 @@ This skill provides the single canonical way to run tests for an X07 project usi
 ## Notes
 
 - By default, `x07 test` prints JSON to stdout; use `--report-out <path>` to write a report file.
+- Property-based tests (PBT):
+  - `x07 test --pbt --manifest tests/tests.json` runs PBT entries only.
+  - `x07 test --all --manifest tests/tests.json` runs unit + PBT.
+  - `x07 test --pbt --pbt-repro <repro.json> --manifest tests/tests.json` replays exactly one counterexample.
+  - If PBT finds a counterexample, use `x07 fix --from-pbt <repro.json> --write` to convert it into a deterministic regression test (wrapper module + manifest entry).
 - `x07 test` resolves `stdlib.lock` by searching upward from the manifest directory, then upward from the `x07` executable location. Override with `--stdlib-lock <path>`.
 - New projects created with `x07 init` include `tests/tests.json` plus a minimal `tests/smoke.x07.json`.
 - Publishable package repos created with `x07 init --package` include `tests/tests.json` and publishable modules under `modules/` (no `tests/smoke.x07.json`).

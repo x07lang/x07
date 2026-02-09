@@ -1,6 +1,7 @@
 # X07 Documentation
 
 - [Home](index.md)
+- [Why X07](why-x07.md)
 
 ## Getting started
 - [Agent quickstart](getting-started/agent-quickstart.md)
@@ -21,6 +22,7 @@
 ## Language
 - [Overview](language/overview.md)
 - [Syntax & x07AST](language/syntax-x07ast.md)
+- [Generics](language/generics.md)
 - [Types & memory model](language/types-memory.md)
 - [Concurrency & multiprocessing](language/concurrency-multiprocessing.md)
 - [Streaming pipes](language/stream-pipes.md)

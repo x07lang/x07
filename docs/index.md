@@ -19,6 +19,7 @@ Programs are stored and exchanged in a **structured AST format** (x07AST JSON). 
 
 ## Start here
 
+- [Why X07 (trust story + evidence pack)](why-x07.md)
 - [Agent quickstart (learn X07 from scratch)](getting-started/agent-quickstart.md)
 - [Install X07](getting-started/install.md)
 - [Your first project](getting-started/first-project.md)
@@ -57,6 +58,7 @@ When you need real OS resources (real network, real disk, real time), you switch
 - Language:
   - [Overview](language/overview.md)
   - [Syntax & x07AST](language/syntax-x07ast.md)
+  - [Generics](language/generics.md)
   - [Types & memory model](language/types-memory.md)
   - [Concurrency & multiprocessing](language/concurrency-multiprocessing.md)
 - Worlds:
@@ -70,6 +72,8 @@ When you need real OS resources (real network, real disk, real time), you switch
   - [Repair loop](toolchain/repair-loop.md)
   - [Diagnostics & repair](toolchain/diagnostics-repair.md)
   - [Testing](toolchain/testing.md)
+  - [Property-based testing](toolchain/pbt.md)
+  - [Review & trust artifacts](toolchain/review-trust.md)
 - Packages:
   - [Workspaces, packages, lockfiles](packages/index.md)
   - [Publishing](packages/publishing.md)

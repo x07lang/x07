@@ -41,6 +41,37 @@ Use [Record/replay](worlds/record-replay.md) (`std.rr`) to record real interacti
 
 Use [Budget scopes](language/budget-scopes.md) to localize resource contracts, and enforce repo-wide invariants with [`x07 arch check`](toolchain/arch-check.md).
 
+## How do I run property-based tests?
+
+Use the built-in test harness:
+
+- `x07 test --pbt --manifest tests/tests.json` (property-based tests only)
+- `x07 test --all --manifest tests/tests.json` (unit + property-based)
+
+When a counterexample is found, convert it into a deterministic regression test:
+
+- `x07 fix --from-pbt <path/to/repro.json> --write`
+
+See: [Property-based testing](toolchain/pbt.md).
+
+## How do I use function contracts and verification?
+
+x07AST v0.5 supports `requires` / `ensures` / `invariant` on `defn`/`defasync` declarations.
+
+- Runtime contract violations show up in `x07 test` reports as `failure_kind: "contract_violation"` with a repro artifact path.
+- For bounded proof artifacts, run `x07 verify --bmc|--smt --entry <sym>` (subset supported in v0.1; see CLI docs).
+
+See: [Syntax & x07AST](language/syntax-x07ast.md) and [CLI](toolchain/cli.md).
+
+## How do humans review agent patches?
+
+Use the toolchain’s semantic diff + trust report artifacts:
+
+- `x07 review diff` (intent-level HTML diff)
+- `x07 trust report` (budgets, worlds, nondeterminism summary)
+
+See: [Review & trust artifacts](toolchain/review-trust.md).
+
 ## How do I integrate multiple subsystems (pipes + RR + budgets + contracts)?
 
 Start from the readiness-check examples under `docs/examples/` — they combine real subsystems end-to-end. For the common patterns that trip up agents (bytes/view friction, assertion ownership, fixture paths), see [Agent patterns](recipes/agent-patterns.md).
