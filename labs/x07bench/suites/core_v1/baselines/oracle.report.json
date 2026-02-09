@@ -13,20 +13,20 @@
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_74a75d3720b45c87901c86a179ca7ce6fc940caef34c0d12c3a19c3cf2b2e9e9/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_74a75d3720b45c87901c86a179ca7ce6fc940caef34c0d12c3a19c3cf2b2e9e9/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_74a75d3720b45c87901c86a179ca7ce6fc940caef34c0d12c3a19c3cf2b2e9e9",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_74a75d3720b45c87901c86a179ca7ce6fc940caef34c0d12c3a19c3cf2b2e9e9",
       "baseline": {
         "compile_failures": 0,
-        "duration_ms": 27,
+        "duration_ms": 84,
         "errors": 0,
         "exit_code": 10,
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_74a75d3720b45c87901c86a179ca7ce6fc940caef34c0d12c3a19c3cf2b2e9e9/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_74a75d3720b45c87901c86a179ca7ce6fc940caef34c0d12c3a19c3cf2b2e9e9/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -55,20 +55,20 @@
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_bf6ad89d5b6c83a0583dfa5ef7d5fae9cb22c9af815b63a6e16e25838cda13c7/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_bf6ad89d5b6c83a0583dfa5ef7d5fae9cb22c9af815b63a6e16e25838cda13c7/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_bf6ad89d5b6c83a0583dfa5ef7d5fae9cb22c9af815b63a6e16e25838cda13c7",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_bf6ad89d5b6c83a0583dfa5ef7d5fae9cb22c9af815b63a6e16e25838cda13c7",
       "baseline": {
         "compile_failures": 0,
-        "duration_ms": 24,
+        "duration_ms": 22,
         "errors": 0,
         "exit_code": 10,
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_bf6ad89d5b6c83a0583dfa5ef7d5fae9cb22c9af815b63a6e16e25838cda13c7/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_bf6ad89d5b6c83a0583dfa5ef7d5fae9cb22c9af815b63a6e16e25838cda13c7/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -91,17 +91,17 @@
     {
       "after_patch": {
         "compile_failures": 0,
-        "duration_ms": 23,
+        "duration_ms": 22,
         "errors": 0,
         "exit_code": 0,
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_52c098a1f3aed255a12d10c3bbe72f4857558513ebc3cf71b695af239914fe73/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_52c098a1f3aed255a12d10c3bbe72f4857558513ebc3cf71b695af239914fe73/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_52c098a1f3aed255a12d10c3bbe72f4857558513ebc3cf71b695af239914fe73",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_52c098a1f3aed255a12d10c3bbe72f4857558513ebc3cf71b695af239914fe73",
       "baseline": {
         "compile_failures": 0,
         "duration_ms": 23,
@@ -110,7 +110,7 @@
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_52c098a1f3aed255a12d10c3bbe72f4857558513ebc3cf71b695af239914fe73/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_52c098a1f3aed255a12d10c3bbe72f4857558513ebc3cf71b695af239914fe73/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -139,11 +139,11 @@
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_c795f21c691849010f0f13c80fe50c946440b6b57f2939a5905771ada5c21f1d/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_c795f21c691849010f0f13c80fe50c946440b6b57f2939a5905771ada5c21f1d/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_c795f21c691849010f0f13c80fe50c946440b6b57f2939a5905771ada5c21f1d",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_c795f21c691849010f0f13c80fe50c946440b6b57f2939a5905771ada5c21f1d",
       "baseline": {
         "compile_failures": 0,
         "duration_ms": 23,
@@ -152,7 +152,7 @@
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_c795f21c691849010f0f13c80fe50c946440b6b57f2939a5905771ada5c21f1d/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_c795f21c691849010f0f13c80fe50c946440b6b57f2939a5905771ada5c21f1d/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -175,26 +175,26 @@
     {
       "after_patch": {
         "compile_failures": 0,
-        "duration_ms": 23,
+        "duration_ms": 22,
         "errors": 0,
         "exit_code": 0,
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_77fa4650716009fa5812280d0e32434d99dabe1ca05bedb4efa300fe714a5df6/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_77fa4650716009fa5812280d0e32434d99dabe1ca05bedb4efa300fe714a5df6/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_77fa4650716009fa5812280d0e32434d99dabe1ca05bedb4efa300fe714a5df6",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_77fa4650716009fa5812280d0e32434d99dabe1ca05bedb4efa300fe714a5df6",
       "baseline": {
         "compile_failures": 0,
-        "duration_ms": 24,
+        "duration_ms": 23,
         "errors": 0,
         "exit_code": 10,
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_77fa4650716009fa5812280d0e32434d99dabe1ca05bedb4efa300fe714a5df6/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_77fa4650716009fa5812280d0e32434d99dabe1ca05bedb4efa300fe714a5df6/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -223,11 +223,11 @@
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_937e617d7c1f71a34ddf8c3463cbb9fe7a72faa9967a8192915667c00af5bef6/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_937e617d7c1f71a34ddf8c3463cbb9fe7a72faa9967a8192915667c00af5bef6/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_937e617d7c1f71a34ddf8c3463cbb9fe7a72faa9967a8192915667c00af5bef6",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_937e617d7c1f71a34ddf8c3463cbb9fe7a72faa9967a8192915667c00af5bef6",
       "baseline": {
         "compile_failures": 0,
         "duration_ms": 24,
@@ -236,7 +236,7 @@
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_937e617d7c1f71a34ddf8c3463cbb9fe7a72faa9967a8192915667c00af5bef6/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_937e617d7c1f71a34ddf8c3463cbb9fe7a72faa9967a8192915667c00af5bef6/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -265,11 +265,11 @@
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_98181ea94f857e245b599adbb5221886f86c0a8934a7732fe19c9d47d3cc67a3/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_98181ea94f857e245b599adbb5221886f86c0a8934a7732fe19c9d47d3cc67a3/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_98181ea94f857e245b599adbb5221886f86c0a8934a7732fe19c9d47d3cc67a3",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_98181ea94f857e245b599adbb5221886f86c0a8934a7732fe19c9d47d3cc67a3",
       "baseline": {
         "compile_failures": 0,
         "duration_ms": 23,
@@ -278,7 +278,7 @@
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_98181ea94f857e245b599adbb5221886f86c0a8934a7732fe19c9d47d3cc67a3/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_98181ea94f857e245b599adbb5221886f86c0a8934a7732fe19c9d47d3cc67a3/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -301,17 +301,17 @@
     {
       "after_patch": {
         "compile_failures": 0,
-        "duration_ms": 22,
+        "duration_ms": 23,
         "errors": 0,
         "exit_code": 0,
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_b6c1470f35117c62a065009dc594cc1a7e5a21cb7858979bacf77828d5fe4f3b/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_b6c1470f35117c62a065009dc594cc1a7e5a21cb7858979bacf77828d5fe4f3b/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_b6c1470f35117c62a065009dc594cc1a7e5a21cb7858979bacf77828d5fe4f3b",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_b6c1470f35117c62a065009dc594cc1a7e5a21cb7858979bacf77828d5fe4f3b",
       "baseline": {
         "compile_failures": 0,
         "duration_ms": 23,
@@ -320,7 +320,7 @@
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_b6c1470f35117c62a065009dc594cc1a7e5a21cb7858979bacf77828d5fe4f3b/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_b6c1470f35117c62a065009dc594cc1a7e5a21cb7858979bacf77828d5fe4f3b/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -349,20 +349,20 @@
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_4f3e453447966b3d2cfa8a554f82524bd4f0a0e37e63399caea32e4a4e8a2e90/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_4f3e453447966b3d2cfa8a554f82524bd4f0a0e37e63399caea32e4a4e8a2e90/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_4f3e453447966b3d2cfa8a554f82524bd4f0a0e37e63399caea32e4a4e8a2e90",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_4f3e453447966b3d2cfa8a554f82524bd4f0a0e37e63399caea32e4a4e8a2e90",
       "baseline": {
         "compile_failures": 0,
-        "duration_ms": 24,
+        "duration_ms": 23,
         "errors": 0,
         "exit_code": 10,
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_4f3e453447966b3d2cfa8a554f82524bd4f0a0e37e63399caea32e4a4e8a2e90/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_4f3e453447966b3d2cfa8a554f82524bd4f0a0e37e63399caea32e4a4e8a2e90/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -385,26 +385,26 @@
     {
       "after_patch": {
         "compile_failures": 0,
-        "duration_ms": 23,
+        "duration_ms": 22,
         "errors": 0,
         "exit_code": 0,
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5f11c1007e13756e0d884eba503cd0fb396bd83be7e7c68da355bd8e92ac164b/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5f11c1007e13756e0d884eba503cd0fb396bd83be7e7c68da355bd8e92ac164b/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5f11c1007e13756e0d884eba503cd0fb396bd83be7e7c68da355bd8e92ac164b",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5f11c1007e13756e0d884eba503cd0fb396bd83be7e7c68da355bd8e92ac164b",
       "baseline": {
         "compile_failures": 0,
-        "duration_ms": 24,
+        "duration_ms": 25,
         "errors": 0,
         "exit_code": 10,
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5f11c1007e13756e0d884eba503cd0fb396bd83be7e7c68da355bd8e92ac164b/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5f11c1007e13756e0d884eba503cd0fb396bd83be7e7c68da355bd8e92ac164b/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -433,20 +433,20 @@
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5c8c5924771579ed99e6f03e8ec612f6d6c3c11931fc77887e64d0d8a356bbaa/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5c8c5924771579ed99e6f03e8ec612f6d6c3c11931fc77887e64d0d8a356bbaa/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5c8c5924771579ed99e6f03e8ec612f6d6c3c11931fc77887e64d0d8a356bbaa",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5c8c5924771579ed99e6f03e8ec612f6d6c3c11931fc77887e64d0d8a356bbaa",
       "baseline": {
         "compile_failures": 0,
-        "duration_ms": 24,
+        "duration_ms": 22,
         "errors": 0,
         "exit_code": 10,
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5c8c5924771579ed99e6f03e8ec612f6d6c3c11931fc77887e64d0d8a356bbaa/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_5c8c5924771579ed99e6f03e8ec612f6d6c3c11931fc77887e64d0d8a356bbaa/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -475,11 +475,11 @@
         "failed": 0,
         "ok": true,
         "passed": 1,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_7aa485c5c3be88378d903812558379f70355109ebc46b74b17ec00a298a86d1e/after_patch.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_7aa485c5c3be88378d903812558379f70355109ebc46b74b17ec00a298a86d1e/after_patch.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
-      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_7aa485c5c3be88378d903812558379f70355109ebc46b74b17ec00a298a86d1e",
+      "artifacts_dir": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_7aa485c5c3be88378d903812558379f70355109ebc46b74b17ec00a298a86d1e",
       "baseline": {
         "compile_failures": 0,
         "duration_ms": 23,
@@ -488,7 +488,7 @@
         "failed": 1,
         "ok": false,
         "passed": 0,
-        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench-core_v1-eval/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_7aa485c5c3be88378d903812558379f70355109ebc46b74b17ec00a298a86d1e/baseline.x07test.report.json",
+        "report_path": "/Users/webik/projects/x07lang/x07/target/x07bench_baseline_v0_1_10/suites/id_f45081bc02099778b5d1261835a9ad41a0688dd2e9fc20822daf87d7bd5b18bd/instances/id_7aa485c5c3be88378d903812558379f70355109ebc46b74b17ec00a298a86d1e/baseline.x07test.report.json",
         "run_failures": 0,
         "skipped": 0
       },
@@ -519,13 +519,13 @@
       "--predictions",
       "labs/x07bench/suites/core_v1/predictions.oracle.jsonl",
       "--artifact-dir",
-      "target/x07bench-core_v1-eval",
+      "target/x07bench_baseline_v0_1_10",
       "--format",
       "json",
       "--out",
       "labs/x07bench/suites/core_v1/baselines/oracle.report.json"
     ],
-    "artifact_dir": "target/x07bench-core_v1-eval",
+    "artifact_dir": "target/x07bench_baseline_v0_1_10",
     "cwd": "/Users/webik/projects/x07lang/x07",
     "exact": false,
     "jobs": 1,
@@ -534,7 +534,7 @@
     "predictions_path": "labs/x07bench/suites/core_v1/predictions.oracle.jsonl",
     "repair_mode": "write",
     "runner": "local",
-    "started_at_unix_ms": 1770672299438,
+    "started_at_unix_ms": 1770676140184,
     "suite_path": "/Users/webik/projects/x07lang/x07/labs/x07bench/suites/core_v1/suite.json"
   },
   "schema_version": "x07.bench.report@0.1.0",
@@ -546,7 +546,7 @@
   "summary": {
     "avg_repair_applied_ops": 0.0,
     "avg_repair_iterations": 1.0,
-    "duration_ms": 1215,
+    "duration_ms": 1248,
     "errors": 0,
     "instances_total": 12,
     "resolved": 12,
@@ -555,6 +555,6 @@
   },
   "tool": {
     "name": "x07",
-    "version": "0.1.9"
+    "version": "0.1.10"
   }
 }
