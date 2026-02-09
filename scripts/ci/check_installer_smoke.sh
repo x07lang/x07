@@ -261,7 +261,7 @@ x07 test --manifest tests/tests.json >"$tmp/x07test.report.json"
 import json, sys
 from pathlib import Path
 doc = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-if doc.get("schema_version") != "x07.x07test@0.2.0":
+if doc.get("schema_version") != "x07.x07test@0.3.0":
     raise SystemExit("ERROR: x07test schema_version mismatch")
 summary = doc.get("summary") or {}
 if summary.get("passed") != 1:
