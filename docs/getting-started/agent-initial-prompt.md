@@ -14,13 +14,14 @@ Constraints:
 Environment:
 - repo root: {REPO_ROOT}
 - project directory (to create): {PROJECT_DIR}
-- target world profile: {TARGET_WORLD_PROFILE}  (example: solve-pure | run-os | run-os-sandboxed)
+- end-user world: {END_USER_WORLD}  (run-os | run-os-sandboxed)
+- deterministic eval world: {EVAL_WORLD}  (example: solve-pure)
 - network policy: {NETWORK_POLICY}  (example: offline | allow registry index | allow full network)
 
 Non-negotiable X07 principles (one canonical way):
 - Canonical source is x07AST JSON (`*.x07.json`). Do not invent a separate text syntax.
-- Keep correctness loops deterministic: do most work in `solve-*` worlds. Use `run-os*` only when required by {PROJECT_GOAL}/{CONSTRAINTS}.
-- If `run-os*` is required, make it replayable: record real OS interactions via `std.rr` and re-run them in deterministic fixture worlds when possible.
+- Keep correctness loops deterministic in `{EVAL_WORLD}` (a `solve-*` world). Treat `{END_USER_WORLD}` as the only end-user execution world.
+- For `{END_USER_WORLD}` workflows, make effects replayable: record real OS interactions via `std.rr` and re-run them in deterministic fixture worlds when possible.
 - Prefer canonical composition primitives:
   - streaming: `std.stream.pipe_v1` (+ `std.io` / `std.io.bufread`)
   - concurrency: `task.scope_v1` (structured concurrency; no orphan tasks)
@@ -62,4 +63,3 @@ Optional: agent-loop evaluation (only if requested)
 - If asked to benchmark an agent loop, evaluate a suite with `x07 bench eval` and keep the report JSON. Derive a score with:
   `python3 labs/x07bench/scripts/score_report.py --in <bench.report.json>`.
 ```
-
