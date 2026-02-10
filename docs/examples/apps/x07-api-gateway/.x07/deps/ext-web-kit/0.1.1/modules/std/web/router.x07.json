@@ -1,0 +1,212 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.web.router",
+  "imports": [
+    "ext.data_model",
+    "ext.json.data_model",
+    "std.bytes",
+    "std.fs",
+    "std.web.core"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.web.router.compile_from_arch_v1",
+        "std.web.router.route_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.router._read_index_doc_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "path", ["bytes.lit", "arch/web/index.x07web.json"]],
+        ["let", "raw", ["std.fs.read", ["bytes.view", "path"]]],
+        ["ext.json.data_model.parse", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.router._find_api_path_v1",
+      "params": [
+        { "name": "index_doc", "ty": "bytes_view" },
+        { "name": "api_id", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "root", ["ext.data_model.root_offset", "index_doc"]],
+        ["let", "k_apis", ["bytes.lit", "apis"]],
+        ["let", "apis_off", ["ext.data_model.map_find", "index_doc", "root", ["bytes.view", "k_apis"]]],
+        ["if", ["<", "apis_off", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "count", ["ext.data_model.seq_len", "index_doc", "apis_off"]],
+        ["if", ["<", "count", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "k_id", ["bytes.lit", "id"]],
+        ["let", "k_api_path", ["bytes.lit", "api_path"]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "ref_off", ["ext.data_model.seq_get", "index_doc", "apis_off", "i"]],
+            ["if", ["<", "ref_off", 0], 0, ["begin",
+              ["let", "id_off", ["ext.data_model.map_find", "index_doc", "ref_off", ["bytes.view", "k_id"]]],
+              ["if", ["<", "id_off", 0], 0, ["begin",
+                ["let", "id_b", ["ext.data_model.string_get", "index_doc", "id_off"]],
+                ["if", ["=", ["std.bytes.eq", ["bytes.view", "id_b"], "api_id"], 1],
+                  ["begin",
+                    ["let", "path_off", ["ext.data_model.map_find", "index_doc", "ref_off", ["bytes.view", "k_api_path"]]],
+                    ["if", ["<", "path_off", 0], ["return", ["bytes.alloc", 0]], 0],
+                    ["return", ["ext.data_model.string_get", "index_doc", "path_off"]]
+                  ],
+                  0
+                ]
+              ]]
+            ]],
+            0
+          ]
+        ],
+        ["bytes.alloc", 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.router.compile_from_arch_v1",
+      "params": [{ "name": "api_id", "ty": "bytes_view" }],
+      "result": "result_bytes",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "web_core_v1"],
+        [
+          "begin",
+          ["let", "index_doc", ["std.web.router._read_index_doc_v1"]],
+          ["let", "idxv", ["bytes.view", "index_doc"]],
+          ["if", ["=", ["ext.data_model.doc_is_err", "idxv"], 1], ["return", ["result_bytes.err", 9001]], 0],
+          ["let", "api_path", ["std.web.router._find_api_path_v1", "idxv", "api_id"]],
+          ["if", ["=", ["bytes.len", "api_path"], 0], ["return", ["result_bytes.err", 9002]], 0],
+          ["let", "raw_api", ["std.fs.read", ["bytes.view", "api_path"]]],
+          ["let", "api_doc", ["ext.json.data_model.parse", ["bytes.view", "raw_api"]]],
+          ["if", ["=", ["ext.data_model.doc_is_err", ["bytes.view", "api_doc"]], 1], ["return", ["result_bytes.err", 9003]], 0],
+          ["result_bytes.ok", "api_doc"]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.router._req_method_path_v1",
+      "params": [{ "name": "req", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "req"]],
+        ["if", ["=", "n", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "space", ["bytes.lit", " "]],
+        ["let", "sp0", ["std.bytes.find_u8", "req", 32]],
+        ["let", "nl0", ["std.bytes.find_u8", "req", 10]],
+        ["let", "end0", ["if", ["<", "nl0", 0], "n", "nl0"]],
+        [
+          "if",
+          ["<", "sp0", 0],
+          [
+            "begin",
+            ["let", "method", ["bytes.lit", "GET"]],
+            ["let", "path", ["view.to_bytes", ["view.slice", "req", 0, "end0"]]],
+            ["let", "out", ["std.bytes.concat", ["bytes.view", "method"], ["bytes.view", "space"]]],
+            ["std.bytes.concat", ["bytes.view", "out"], ["bytes.view", "path"]]
+          ],
+          [
+            "begin",
+            ["if", ["<u", "end0", ["+", "sp0", 2]], ["return", ["bytes.alloc", 0]], 0],
+            ["let", "method", ["view.to_bytes", ["view.slice", "req", 0, "sp0"]]],
+            ["let", "rest", ["view.slice", "req", ["+", "sp0", 1], ["-", "end0", ["+", "sp0", 1]]]],
+            ["let", "sp1", ["std.bytes.find_u8", "rest", 32]],
+            ["if", ["<", "sp1", 0], ["return", ["bytes.alloc", 0]], 0],
+            ["let", "path", ["view.to_bytes", ["view.slice", "rest", 0, "sp1"]]],
+            ["let", "out", ["std.bytes.concat", ["bytes.view", "method"], ["bytes.view", "space"]]],
+            ["std.bytes.concat", ["bytes.view", "out"], ["bytes.view", "path"]]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.router.route_v1",
+      "params": [
+        { "name": "api_doc", "ty": "bytes_view" },
+        { "name": "req_bytes", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "begin",
+        ["let", "mp", ["std.web.router._req_method_path_v1", "req_bytes"]],
+        ["if", ["=", ["bytes.len", "mp"], 0], ["return", ["result_bytes.err", 1]], 0],
+        ["let", "mpv", ["bytes.view", "mp"]],
+        ["let", "sp", ["std.bytes.find_u8", "mpv", 32]],
+        ["if", ["<", "sp", 0], ["return", ["result_bytes.err", 1]], 0],
+        ["let", "method", ["view.slice", "mpv", 0, "sp"]],
+        ["let", "path0", ["view.slice", "mpv", ["+", "sp", 1], ["-", ["view.len", "mpv"], ["+", "sp", 1]]]],
+        ["let", "q", ["std.bytes.find_u8", "path0", 63]],
+        ["let", "path", ["if", ["<", "q", 0], "path0", ["view.slice", "path0", 0, "q"]]],
+        ["let", "root", ["ext.data_model.root_offset", "api_doc"]],
+        ["let", "k_endpoints", ["bytes.lit", "endpoints"]],
+        ["let", "eps_off", ["ext.data_model.map_find", "api_doc", "root", ["bytes.view", "k_endpoints"]]],
+        ["if", ["<", "eps_off", 0], ["return", ["result_bytes.err", 3]], 0],
+        ["let", "count", ["ext.data_model.seq_len", "api_doc", "eps_off"]],
+        ["if", ["<", "count", 0], ["return", ["result_bytes.err", 3]], 0],
+        ["let", "k_id", ["bytes.lit", "id"]],
+        ["let", "k_method", ["bytes.lit", "method"]],
+        ["let", "k_path", ["bytes.lit", "path"]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "ep_off", ["ext.data_model.seq_get", "api_doc", "eps_off", "i"]],
+            [
+              "if",
+              ["<", "ep_off", 0],
+              0,
+              [
+                "begin",
+                ["let", "m_off", ["ext.data_model.map_find", "api_doc", "ep_off", ["bytes.view", "k_method"]]],
+                ["if", ["<", "m_off", 0], 0, [
+                  "begin",
+                  ["let", "p_off", ["ext.data_model.map_find", "api_doc", "ep_off", ["bytes.view", "k_path"]]],
+                  ["if", ["<", "p_off", 0], 0, [
+                    "begin",
+                    ["let", "m_b", ["ext.data_model.string_get", "api_doc", "m_off"]],
+                    ["let", "p_b", ["ext.data_model.string_get", "api_doc", "p_off"]],
+                    [
+                      "if",
+                      ["if", ["=", ["std.bytes.eq", ["bytes.view", "m_b"], "method"], 1], ["=", ["std.bytes.eq", ["bytes.view", "p_b"], "path"], 1], 0],
+                      [
+                        "begin",
+                        ["let", "id_off", ["ext.data_model.map_find", "api_doc", "ep_off", ["bytes.view", "k_id"]]],
+                        ["if", ["<", "id_off", 0], ["return", ["result_bytes.err", 3]], 0],
+                        ["return", ["result_bytes.ok", ["ext.data_model.string_get", "api_doc", "id_off"]]]
+                      ],
+                      0
+                    ],
+                    0
+                  ]],
+                  0
+                ]],
+                0
+              ]
+            ],
+            0
+          ]
+        ],
+        ["result_bytes.err", 2]
+      ]
+    }
+  ]
+}

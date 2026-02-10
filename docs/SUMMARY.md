@@ -15,6 +15,7 @@
 ## Agent
 - [Agent contracts](agent/contract.md)
 - [Readiness checks](agent/readiness-checks.md)
+- [Roadmap apps](agent/apps.md)
 
 ## Recipes
 - [Patch-based recipes](recipes/index.md)

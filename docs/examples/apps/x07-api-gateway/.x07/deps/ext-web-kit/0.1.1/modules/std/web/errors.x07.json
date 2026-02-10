@@ -1,0 +1,67 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.web.errors",
+  "imports": [
+    "ext.data_model",
+    "ext.data_model.json",
+    "std.fmt",
+    "std.web.core",
+    "std.codec",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.web.errors.encode_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.errors.encode_v1",
+      "params": [{ "name": "err_code", "ty": "i32" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "stable_id", ["if", ["=", "err_code", 1], ["bytes.lit", "bad_request_v1"], ["if", ["=", "err_code", 2], ["bytes.lit", "not_found_v1"], ["if", ["=", "err_code", 3], ["bytes.lit", "internal_v1"], ["bytes.lit", "unknown_v1"]]]]],
+        ["let", "http_status", ["if", ["=", "err_code", 1], 400, ["if", ["=", "err_code", 2], 404, ["if", ["=", "err_code", 3], 500, 500]]]],
+        ["let", "code_dec", ["std.fmt.u32_to_dec", "err_code"]],
+        ["let", "status_dec", ["std.fmt.u32_to_dec", "http_status"]],
+        ["let", "k_code", ["bytes.lit", "code"]],
+        ["let", "k_http_status", ["bytes.lit", "http_status"]],
+        ["let", "k_stable_id", ["bytes.lit", "stable_id"]],
+        ["let", "v_code", ["ext.data_model.value_number", ["bytes.view", "code_dec"]]],
+        ["let", "v_http_status", ["ext.data_model.value_number", ["bytes.view", "status_dec"]]],
+        ["let", "v_stable_id", ["ext.data_model.value_string", ["bytes.view", "stable_id"]]],
+        ["let", "entries", ["std.vec.with_capacity", 128]],
+        ["let", "b_entries_n", ["std.codec.write_u32_le", 3]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "b_entries_n"]]],
+        ["let", "b_k_code_len", ["std.codec.write_u32_le", ["bytes.len", "k_code"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "b_k_code_len"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "k_code"]]],
+        ["let", "b_v_code_len", ["std.codec.write_u32_le", ["bytes.len", "v_code"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "b_v_code_len"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "v_code"]]],
+        ["let", "b_k_http_status_len", ["std.codec.write_u32_le", ["bytes.len", "k_http_status"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "b_k_http_status_len"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "k_http_status"]]],
+        ["let", "b_v_http_status_len", ["std.codec.write_u32_le", ["bytes.len", "v_http_status"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "b_v_http_status_len"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "v_http_status"]]],
+        ["let", "b_k_stable_id_len", ["std.codec.write_u32_le", ["bytes.len", "k_stable_id"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "b_k_stable_id_len"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "k_stable_id"]]],
+        ["let", "b_v_stable_id_len", ["std.codec.write_u32_le", ["bytes.len", "v_stable_id"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "b_v_stable_id_len"]]],
+        ["set", "entries", ["std.vec.extend_bytes", "entries", ["bytes.view", "v_stable_id"]]],
+        ["let", "entries_b", ["std.vec.as_bytes", "entries"]],
+        ["let", "root_val", ["ext.data_model.value_map_from_entries", ["bytes.view", "entries_b"]]],
+        ["if", ["=", ["bytes.len", "root_val"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "doc", ["ext.data_model.doc_ok", ["bytes.view", "root_val"]]],
+        ["let", "json_doc", ["ext.data_model.json.emit_canon", ["bytes.view", "doc"]]],
+        ["std.web.core.doc_get_bytes_v1", ["bytes.view", "json_doc"]]
+      ]
+    }
+  ]
+}

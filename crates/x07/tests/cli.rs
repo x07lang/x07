@@ -6,9 +6,10 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use x07_contracts::{
     X07AST_SCHEMA_VERSION, X07C_REPORT_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
-    X07_CONTRACT_REPRO_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
-    X07_PATCHSET_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
-    X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
+    X07_ARCH_REPORT_SCHEMA_VERSION, X07_CONTRACT_REPRO_SCHEMA_VERSION,
+    X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_PATCHSET_SCHEMA_VERSION,
+    X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_REVIEW_DIFF_SCHEMA_VERSION,
+    X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
     X07_VERIFY_REPORT_SCHEMA_VERSION,
 };
 use x07c::json_patch;
@@ -130,6 +131,275 @@ fn copy_dir_recursive(src: &Path, dst: &Path) {
             std::fs::copy(path, &out).expect("copy fixture file");
         }
     }
+}
+
+#[test]
+fn arch_check_suggests_and_applies_patches_for_rr_sorting_and_sanitizer_defaults() {
+    let root = fresh_tmp_dir(&repo_root(), "arch_check_suggest");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let manifest = r#"{
+  "schema_version": "x07.arch.manifest@0.1.0",
+  "repo": { "id": "tmp_arch_check", "root": "." },
+  "externals": { "allowed_import_prefixes": ["std.", "ext."], "allowed_exact": [] },
+  "nodes": [],
+  "rules": [],
+  "checks": {
+    "deny_cycles": false,
+    "deny_orphans": false,
+    "enforce_visibility": false,
+    "enforce_world_caps": false
+  },
+  "tool_budgets": {
+    "max_modules": 5000,
+    "max_edges": 50000,
+    "max_diags": 2000,
+    "contracts_budgets": { "max_contract_files": 2000, "max_contract_bytes": 67108864 }
+  },
+  "contracts_v1": {
+    "rr": {
+      "index_path": "arch/rr/index.x07rr.json",
+      "gen_dir": "arch/rr",
+      "require_policy_for_os_calls": true
+    },
+    "canonical_json": { "mode": "jcs_rfc8785_v1" }
+  }
+}
+"#;
+    write_bytes(
+        &root.join("arch/manifest.x07arch.json"),
+        manifest.as_bytes(),
+    );
+
+    let rr_index = r#"{
+  "schema_version": "x07.arch.rr.index@0.1.0",
+  "policies": [
+    {
+      "id": "p1",
+      "policy_path": "arch/rr/policies/p1.policy.json",
+      "sanitize_id": "sanitize_none_v1",
+      "sanitize_path": "arch/rr/sanitizers/sanitize_none_v1.sanitize.json",
+      "worlds_allowed": ["solve-rr", "run-os"],
+      "kinds_allowed": ["rr", "http"],
+      "ops_allowed": ["std.rr.fetch_v1", "std.net.http.fetch_v1"],
+      "cassette_brand": "std.rr.cassette_v1"
+    }
+  ],
+  "defaults": {
+    "record_modes_allowed": ["off", "record_missing_v1", "record_v1", "replay_v1", "rewrite_v1"]
+  }
+}
+"#;
+    write_bytes(&root.join("arch/rr/index.x07rr.json"), rr_index.as_bytes());
+
+    let policy = r#"{
+  "schema_version": "x07.arch.rr.policy@0.1.0",
+  "id": "p1",
+  "v": 1,
+  "mode_default": "replay_v1",
+  "match_mode": "lookup_v1",
+  "budgets": {
+    "max_cassette_bytes": 1024,
+    "max_entries": 16,
+    "max_req_bytes": 1024,
+    "max_resp_bytes": 1024,
+    "max_key_bytes": 256
+  }
+}
+"#;
+    write_bytes(
+        &root.join("arch/rr/policies/p1.policy.json"),
+        policy.as_bytes(),
+    );
+
+    let sanitizer_missing_fields = r#"{
+  "schema_version": "x07.arch.rr.sanitize@0.1.0",
+  "id": "sanitize_none_v1"
+}
+"#;
+    write_bytes(
+        &root.join("arch/rr/sanitizers/sanitize_none_v1.sanitize.json"),
+        sanitizer_missing_fields.as_bytes(),
+    );
+
+    let out = run_x07_in_dir(
+        &root,
+        &["arch", "check", "--manifest", "arch/manifest.x07arch.json"],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07_ARCH_REPORT_SCHEMA_VERSION);
+    let patches = v["suggested_patches"]
+        .as_array()
+        .expect("suggested_patches[]");
+    assert!(
+        patches
+            .iter()
+            .any(|p| p["path"] == "arch/rr/index.x07rr.json"),
+        "missing index patch; got: {patches:?}"
+    );
+    assert!(
+        patches
+            .iter()
+            .any(|p| p["path"] == "arch/rr/sanitizers/sanitize_none_v1.sanitize.json"),
+        "missing sanitizer patch; got: {patches:?}"
+    );
+
+    let out2 = run_x07_in_dir(
+        &root,
+        &[
+            "arch",
+            "check",
+            "--manifest",
+            "arch/manifest.x07arch.json",
+            "--write",
+        ],
+    );
+    assert_eq!(
+        out2.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out2.stderr)
+    );
+
+    let index_doc: Value = serde_json::from_slice(
+        &std::fs::read(root.join("arch/rr/index.x07rr.json")).expect("read index"),
+    )
+    .expect("parse index json");
+    assert_eq!(
+        index_doc["policies"][0]["worlds_allowed"],
+        serde_json::json!(["run-os", "solve-rr"])
+    );
+    assert_eq!(
+        index_doc["policies"][0]["kinds_allowed"],
+        serde_json::json!(["http", "rr"])
+    );
+    assert_eq!(
+        index_doc["policies"][0]["ops_allowed"],
+        serde_json::json!(["std.net.http.fetch_v1", "std.rr.fetch_v1"])
+    );
+
+    let sanitize_doc: Value = serde_json::from_slice(
+        &std::fs::read(root.join("arch/rr/sanitizers/sanitize_none_v1.sanitize.json"))
+            .expect("read sanitizer"),
+    )
+    .expect("parse sanitizer json");
+    assert_eq!(sanitize_doc["v"], 1);
+    assert_eq!(sanitize_doc["redact_headers"], serde_json::json!([]));
+    assert_eq!(sanitize_doc["redact_token"], "");
+}
+
+#[test]
+fn arch_check_rr_sanitizer_schema_version_diag_includes_expected_and_got() {
+    let root = fresh_tmp_dir(&repo_root(), "arch_check_sanitize_schema");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let manifest = r#"{
+  "schema_version": "x07.arch.manifest@0.1.0",
+  "repo": { "id": "tmp_arch_check", "root": "." },
+  "externals": { "allowed_import_prefixes": ["std.", "ext."], "allowed_exact": [] },
+  "nodes": [],
+  "rules": [],
+  "checks": {
+    "deny_cycles": false,
+    "deny_orphans": false,
+    "enforce_visibility": false,
+    "enforce_world_caps": false
+  },
+  "tool_budgets": {
+    "max_modules": 5000,
+    "max_edges": 50000,
+    "max_diags": 2000,
+    "contracts_budgets": { "max_contract_files": 2000, "max_contract_bytes": 67108864 }
+  },
+  "contracts_v1": {
+    "rr": {
+      "index_path": "arch/rr/index.x07rr.json",
+      "gen_dir": "arch/rr",
+      "require_policy_for_os_calls": true
+    },
+    "canonical_json": { "mode": "jcs_rfc8785_v1" }
+  }
+}
+"#;
+    write_bytes(
+        &root.join("arch/manifest.x07arch.json"),
+        manifest.as_bytes(),
+    );
+
+    let rr_index = r#"{
+  "schema_version": "x07.arch.rr.index@0.1.0",
+  "policies": [
+    {
+      "id": "p1",
+      "policy_path": "arch/rr/policies/p1.policy.json",
+      "sanitize_id": "sanitize_none_v1",
+      "sanitize_path": "arch/rr/sanitizers/sanitize_none_v1.sanitize.json",
+      "worlds_allowed": ["run-os", "solve-rr"],
+      "kinds_allowed": ["rr"],
+      "ops_allowed": ["std.rr.fetch_v1"],
+      "cassette_brand": "std.rr.cassette_v1"
+    }
+  ],
+  "defaults": {
+    "record_modes_allowed": ["off", "record_missing_v1", "record_v1", "replay_v1", "rewrite_v1"]
+  }
+}
+"#;
+    write_bytes(&root.join("arch/rr/index.x07rr.json"), rr_index.as_bytes());
+
+    let policy = r#"{
+  "schema_version": "x07.arch.rr.policy@0.1.0",
+  "id": "p1",
+  "v": 1,
+  "mode_default": "replay_v1",
+  "match_mode": "lookup_v1",
+  "budgets": {
+    "max_cassette_bytes": 1024,
+    "max_entries": 16,
+    "max_req_bytes": 1024,
+    "max_resp_bytes": 1024,
+    "max_key_bytes": 256
+  }
+}
+"#;
+    write_bytes(
+        &root.join("arch/rr/policies/p1.policy.json"),
+        policy.as_bytes(),
+    );
+
+    let sanitizer_wrong_schema = r#"{
+  "schema_version": "x07.arch.rr.sanitizer@0.1.0",
+  "id": "sanitize_none_v1",
+  "v": 1,
+  "redact_headers": [],
+  "redact_token": ""
+}
+"#;
+    write_bytes(
+        &root.join("arch/rr/sanitizers/sanitize_none_v1.sanitize.json"),
+        sanitizer_wrong_schema.as_bytes(),
+    );
+
+    let out = run_x07_in_dir(
+        &root,
+        &["arch", "check", "--manifest", "arch/manifest.x07arch.json"],
+    );
+    assert_eq!(out.status.code(), Some(2));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07_ARCH_REPORT_SCHEMA_VERSION);
+    let diags = v["diags"].as_array().expect("diags[]");
+    let d = diags
+        .iter()
+        .find(|d| d["code"] == "E_ARCH_RR_SANITIZER_SCHEMA_VERSION")
+        .expect("schema mismatch diag");
+    assert_eq!(d["data"]["expected"], "x07.arch.rr.sanitize@0.1.0");
+    assert_eq!(d["data"]["got"], "x07.arch.rr.sanitizer@0.1.0");
 }
 
 fn write_pbt_fixture_first_byte_zero(dir: &Path) -> (PathBuf, String) {

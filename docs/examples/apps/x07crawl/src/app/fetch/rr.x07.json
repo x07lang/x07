@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["app.fetch.rr.replay_v1"]},{"body":["std.crawl.fetch.replay_rr_v1","plan_doc"],"kind":"defn","name":"app.fetch.rr.replay_v1","params":[{"name":"plan_doc","ty":"bytes_view"}],"result":"result_bytes"}],"imports":["std.crawl.fetch"],"kind":"module","module_id":"app.fetch.rr","schema_version":"x07.x07ast@0.5.0"}

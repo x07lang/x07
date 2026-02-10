@@ -1,0 +1,19 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.unicode.segment",
+  "imports": ["ext.unicode"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["ext.unicode.segment.grapheme_slices_v1"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.segment.grapheme_slices_v1",
+      "params": [{ "name": "utf8", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["ext.unicode.unicode_grapheme_slices", "utf8"]
+    }
+  ]
+}

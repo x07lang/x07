@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "gw_upstream_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "result_err_v1",
+    "label": "gw.upstream.v1",
+    "alloc_bytes": 33554432,
+    "alloc_calls": 100000,
+    "realloc_calls": 30000,
+    "memcpy_bytes": 134217728,
+    "sched_ticks": 500000,
+    "fuel": 0
+  }
+}

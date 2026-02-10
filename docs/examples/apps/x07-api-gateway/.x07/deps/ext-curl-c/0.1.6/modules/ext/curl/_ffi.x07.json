@@ -1,0 +1,150 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.curl._ffi",
+  "imports": [],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.curl._ffi.curl_easy_init",
+        "ext.curl._ffi.curl_easy_cleanup",
+        "ext.curl._ffi.curl_easy_setopt_long",
+        "ext.curl._ffi.curl_easy_setopt_ptr",
+        "ext.curl._ffi.curl_easy_perform",
+        "ext.curl._ffi.curl_easy_getinfo_long",
+        "ext.curl._ffi.curl_global_init",
+        "ext.curl._ffi.curl_global_cleanup",
+        "ext.curl._ffi.http_request_alloc",
+        "ext.curl._ffi.buf_len",
+        "ext.curl._ffi.buf_ptr",
+        "ext.curl._ffi.buf_free"
+      ]
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.curl_global_init",
+      "link_name": "x07_ext_curl_global_init",
+      "params": [
+        {"name": "flags", "ty": "i32"}
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.curl_global_cleanup",
+      "link_name": "x07_ext_curl_global_cleanup",
+      "params": [],
+      "result": "void"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.curl_easy_init",
+      "link_name": "x07_ext_curl_easy_init",
+      "params": [],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.curl_easy_cleanup",
+      "link_name": "x07_ext_curl_easy_cleanup",
+      "params": [
+        {"name": "handle", "ty": "i32"}
+      ],
+      "result": "void"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.curl_easy_setopt_long",
+      "link_name": "x07_ext_curl_easy_setopt_long",
+      "params": [
+        {"name": "handle", "ty": "i32"},
+        {"name": "option", "ty": "i32"},
+        {"name": "value", "ty": "i32"}
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.curl_easy_setopt_ptr",
+      "link_name": "x07_ext_curl_easy_setopt_ptr",
+      "params": [
+        {"name": "handle", "ty": "i32"},
+        {"name": "option", "ty": "i32"},
+        {"name": "value", "ty": "ptr_const_void"}
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.curl_easy_perform",
+      "link_name": "x07_ext_curl_easy_perform",
+      "params": [
+        {"name": "handle", "ty": "i32"}
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.curl_easy_getinfo_long",
+      "link_name": "x07_ext_curl_easy_getinfo_long",
+      "params": [
+        {"name": "handle", "ty": "i32"},
+        {"name": "info", "ty": "i32"},
+        {"name": "out", "ty": "ptr_mut_i32"}
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.http_request_alloc",
+      "link_name": "x07_ext_curl_http_request_alloc",
+      "params": [
+        {"name": "req", "ty": "ptr_const_u8"},
+        {"name": "req_len", "ty": "i32"},
+        {"name": "max_body_bytes", "ty": "i32"},
+        {"name": "out_handle", "ty": "ptr_mut_i32"}
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.buf_len",
+      "link_name": "x07_ext_curl_buf_len",
+      "params": [
+        {"name": "handle", "ty": "i32"}
+      ],
+      "result": "i32"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.buf_ptr",
+      "link_name": "x07_ext_curl_buf_ptr",
+      "params": [
+        {"name": "handle", "ty": "i32"}
+      ],
+      "result": "ptr_const_u8"
+    },
+    {
+      "kind": "extern",
+      "abi": "C",
+      "name": "ext.curl._ffi.buf_free",
+      "link_name": "x07_ext_curl_buf_free",
+      "params": [
+        {"name": "handle", "ty": "i32"}
+      ],
+      "result": "void"
+    }
+  ]
+}

@@ -19,8 +19,12 @@ pub enum RrCommand {
 
 #[derive(Debug, Args)]
 pub struct RecordArgs {
-    /// Cassette file path relative to --out.
-    #[arg(long, value_name = "PATH", default_value = "cassette.rrbin")]
+    /// Cassette file path (safe relative path).
+    #[arg(
+        long,
+        value_name = "PATH",
+        default_value = "fixtures/rr/cassette.rrbin"
+    )]
     pub cassette: PathBuf,
 
     /// Entry kind (defaults to `rr`).
@@ -361,7 +365,7 @@ fn read_exact_or_eof(r: &mut impl std::io::Read, buf: &mut [u8]) -> Result<bool>
 }
 
 fn cmd_rr_record(
-    machine: &crate::reporting::MachineArgs,
+    _machine: &crate::reporting::MachineArgs,
     args: RecordArgs,
 ) -> Result<std::process::ExitCode> {
     let key = args.key.trim();
@@ -465,16 +469,14 @@ fn cmd_rr_record(
     }
 
     ensure_safe_rel_path(&args.cassette).context("validate --cassette")?;
-
-    let out_dir = machine
-        .out
-        .clone()
-        .unwrap_or_else(|| PathBuf::from("fixtures/rr"));
-    let cassette_path = out_dir.join(&args.cassette);
+    let cassette_path = args.cassette.clone();
     if let Some(parent) = cassette_path.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("create dir: {}", parent.display()))?;
     }
+    let out_dir = cassette_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
 
     let kind_b = kind.as_bytes();
     let op_b = op.as_bytes();
@@ -586,7 +588,7 @@ fn cmd_rr_record(
             command: "rr.record",
             result: Some(RecordResult {
                 out_dir: out_dir.display().to_string(),
-                cassette: args.cassette.display().to_string(),
+                cassette: cassette_path.display().to_string(),
                 kind: kind.to_string(),
                 op: op.to_string(),
                 key: key.to_string(),
@@ -624,7 +626,7 @@ fn cmd_rr_record(
         command: "rr.record",
         result: Some(RecordResult {
             out_dir: out_dir.display().to_string(),
-            cassette: args.cassette.display().to_string(),
+            cassette: cassette_path.display().to_string(),
             kind: kind.to_string(),
             op: op.to_string(),
             key: key.to_string(),

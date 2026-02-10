@@ -1,0 +1,629 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "module_id": "std.auth.jwt",
+  "kind": "module",
+  "imports": [
+    "ext.base64",
+    "ext.data_model",
+    "ext.data_model.json",
+    "ext.json.canon",
+    "ext.json.data_model",
+    "std.crypto.ed25519",
+    "std.text.ascii"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["std.auth.jwt.sign_from_arch_v1", "std.auth.jwt.verify_from_arch_v1"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt._b64url_encode_nopad_v1",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "b64", ["ext.base64.base64_encode", "b"]],
+        ["let", "n", ["bytes.len", "b64"]],
+        ["let", "out", ["vec_u8.with_capacity", "n"]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "c", ["bytes.get_u8", "b64", "i"]],
+            [
+              "if",
+              ["=", "c", 61],
+              0,
+              [
+                "begin",
+                [
+                  "let",
+                  "m",
+                  [
+                    "if",
+                    ["=", "c", 43],
+                    45,
+                    ["if", ["=", "c", 47], 95, "c"]
+                  ]
+                ],
+                ["set", "out", ["vec_u8.push", "out", "m"]],
+                0
+              ]
+            ]
+          ]
+        ],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt._b64url_decode_nopad_v1",
+      "params": [{ "name": "b", "ty": "bytes_view" }],
+      "result": "result_bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["let", "rem", ["%", "n", 4]],
+        ["if", ["=", "rem", 1], ["return", ["result_bytes.err", 7101]], 0],
+        ["let", "pad", ["if", ["=", "rem", 0], 0, ["-", 4, "rem"]]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", "n", "pad"]]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "c0", ["view.get_u8", "b", "i"]],
+            [
+              "let",
+              "c",
+              [
+                "if",
+                ["=", "c0", 45],
+                43,
+                ["if", ["=", "c0", 95], 47, "c0"]
+              ]
+            ],
+            ["set", "out", ["vec_u8.push", "out", "c"]]
+          ]
+        ],
+        [
+          "for",
+          "_",
+          0,
+          "pad",
+          ["set", "out", ["vec_u8.push", "out", 61]]
+        ],
+        ["let", "std_b64", ["vec_u8.into_bytes", "out"]],
+        ["let", "doc", ["ext.base64.base64_decode", ["bytes.view", "std_b64"]]],
+        ["let", "dv", ["bytes.view", "doc"]],
+        [
+          "if",
+          ["=", ["ext.base64.base64_is_err", "dv"], 1],
+          ["return", ["result_bytes.err", ["ext.base64.base64_err_code", "dv"]]],
+          0
+        ],
+        ["result_bytes.ok", ["ext.base64.base64_get_bytes", "dv"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt._read_json_doc_v1",
+      "params": [{ "name": "path", "ty": "bytes" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "b", ["os.fs.read_file", "path"]],
+        ["ext.json.data_model.parse", ["bytes.view", "b"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt._find_profile_off_v1",
+      "params": [
+        { "name": "jp", "ty": "bytes_view" },
+        { "name": "profile_id", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "pid", ["view.to_bytes", "profile_id"]],
+        ["let", "root", ["ext.data_model.root_offset", "jp"]],
+        ["let", "k_profiles", ["bytes.lit", "profiles"]],
+        ["let", "profiles_off", ["ext.data_model.map_find", "jp", "root", ["bytes.view", "k_profiles"]]],
+        ["if", ["<", "profiles_off", 0], ["return", ["-", 0, 1]], 0],
+        ["let", "n", ["ext.data_model.seq_len", "jp", "profiles_off"]],
+        ["if", ["<", "n", 0], ["return", ["-", 0, 1]], 0],
+        ["let", "found", ["-", 0, 1]],
+        ["let", "k_id_key", ["bytes.lit", "id"]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "if",
+            ["<", "found", 0],
+            [
+              "begin",
+              ["let", "p_off", ["ext.data_model.seq_get", "jp", "profiles_off", "i"]],
+              [
+                "if",
+                ["<", "p_off", 0],
+                0,
+                [
+                  "begin",
+                  ["let", "id_off", ["ext.data_model.map_find", "jp", "p_off", ["bytes.view", "k_id_key"]]],
+                  [
+                    "if",
+                    ["<", "id_off", 0],
+                    0,
+                    [
+                      "begin",
+                      ["let", "id", ["ext.data_model.string_get", "jp", "id_off"]],
+                      ["if", ["bytes.eq", "id", "pid"], ["set", "found", "p_off"], 0],
+                      0
+                    ]
+                  ],
+                  0
+                ]
+              ],
+              0
+            ],
+            0
+          ]
+        ],
+        "found"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt._map_string_or_empty_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" },
+        { "name": "obj_off", "ty": "i32" },
+        { "name": "key", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "off", ["ext.data_model.map_find", "doc", "obj_off", "key"]],
+        ["if", ["<", "off", 0], ["bytes.alloc", 0], ["ext.data_model.string_get", "doc", "off"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt._map_seq_off_or_neg1_v1",
+      "params": [
+        { "name": "doc", "ty": "bytes_view" },
+        { "name": "obj_off", "ty": "i32" },
+        { "name": "key", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "off", ["ext.data_model.map_find", "doc", "obj_off", "key"]],
+        ["if", ["<", "off", 0], ["-", 0, 1], ["if", ["=", ["ext.data_model.kind_at", "doc", "off"], 4], "off", ["-", 0, 1]]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt._find_key_material_path_v1",
+      "params": [
+        { "name": "idx", "ty": "bytes_view" },
+        { "name": "key_id", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "kid", ["view.to_bytes", "key_id"]],
+        ["let", "root", ["ext.data_model.root_offset", "idx"]],
+        ["let", "k_keys", ["bytes.lit", "keys"]],
+        ["let", "keys_off", ["ext.data_model.map_find", "idx", "root", ["bytes.view", "k_keys"]]],
+        ["if", ["<", "keys_off", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "n", ["ext.data_model.seq_len", "idx", "keys_off"]],
+        ["if", ["<", "n", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "k_id_key", ["bytes.lit", "id"]],
+        ["let", "k_path_key", ["bytes.lit", "material_path"]],
+        ["let", "found_path", ["bytes.alloc", 0]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "if",
+            ["=", ["bytes.len", "found_path"], 0],
+            [
+              "begin",
+              ["let", "k_off", ["ext.data_model.seq_get", "idx", "keys_off", "i"]],
+              [
+                "if",
+                ["<", "k_off", 0],
+                0,
+                [
+                  "begin",
+                  ["let", "id_off", ["ext.data_model.map_find", "idx", "k_off", ["bytes.view", "k_id_key"]]],
+                  [
+                    "if",
+                    ["<", "id_off", 0],
+                    0,
+                    [
+                      "begin",
+                      ["let", "id", ["ext.data_model.string_get", "idx", "id_off"]],
+                      [
+                        "if",
+                        ["bytes.eq", "id", "kid"],
+                        [
+                          "set",
+                          "found_path",
+                          [
+                            "std.auth.jwt._map_string_or_empty_v1",
+                            "idx",
+                            "k_off",
+                            ["bytes.view", "k_path_key"]
+                          ]
+                        ],
+                        0
+                      ],
+                      0
+                    ]
+                  ],
+                  0
+                ]
+              ],
+              0
+            ],
+            0
+          ]
+        ],
+        "found_path"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt._claims_require_key_v1",
+      "params": [
+        { "name": "claims", "ty": "bytes_view" },
+        { "name": "key", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "root", ["ext.data_model.root_offset", "claims"]],
+        ["let", "off", ["ext.data_model.map_find", "claims", "root", "key"]],
+        ["if", [">=", "off", 0], 1, 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt._claims_require_string_eq_v1",
+      "params": [
+        { "name": "claims", "ty": "bytes_view" },
+        { "name": "k", "ty": "bytes_view" },
+        { "name": "expected", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "root", ["ext.data_model.root_offset", "claims"]],
+        ["let", "off", ["ext.data_model.map_find", "claims", "root", "k"]],
+        ["if", ["<", "off", 0], ["return", 0], 0],
+        ["if", ["!=", ["ext.data_model.kind_at", "claims", "off"], 3], ["return", 0], 0],
+        ["let", "v", ["ext.data_model.string_get", "claims", "off"]],
+        ["bytes.eq", "v", ["view.to_bytes", "expected"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt.sign_from_arch_v1",
+      "params": [
+        { "name": "profile_id", "ty": "bytes_view" },
+        { "name": "claims_doc", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "crypto_jwt_v1"],
+        [
+          "begin",
+        ["let", "jp_doc", ["std.auth.jwt._read_json_doc_v1", ["bytes.lit", "arch/crypto/jwt_profiles.x07jwt.json"]]],
+        ["let", "jpv", ["bytes.view", "jp_doc"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "jpv"], 1], ["return", ["result_bytes.err", 7201]], 0],
+        ["let", "prof_off", ["std.auth.jwt._find_profile_off_v1", "jpv", "profile_id"]],
+        ["if", ["<", "prof_off", 0], ["return", ["result_bytes.err", 7202]], 0],
+        ["let", "k_issuer", ["bytes.lit", "issuer"]],
+        ["let", "k_audience", ["bytes.lit", "audience"]],
+        ["let", "k_key_id", ["bytes.lit", "key_id"]],
+        ["let", "k_required_claims", ["bytes.lit", "required_claims"]],
+        ["let", "issuer", ["std.auth.jwt._map_string_or_empty_v1", "jpv", "prof_off", ["bytes.view", "k_issuer"]]],
+        ["let", "audience", ["std.auth.jwt._map_string_or_empty_v1", "jpv", "prof_off", ["bytes.view", "k_audience"]]],
+        ["let", "key_id", ["std.auth.jwt._map_string_or_empty_v1", "jpv", "prof_off", ["bytes.view", "k_key_id"]]],
+        ["if", ["=", ["bytes.len", "key_id"], 0], ["return", ["result_bytes.err", 7203]], 0],
+        ["let", "req_off", ["std.auth.jwt._map_seq_off_or_neg1_v1", "jpv", "prof_off", ["bytes.view", "k_required_claims"]]],
+        ["let", "idx_doc", ["std.auth.jwt._read_json_doc_v1", ["bytes.lit", "arch/crypto/index.x07crypto.json"]]],
+        ["let", "idxv", ["bytes.view", "idx_doc"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "idxv"], 1], ["return", ["result_bytes.err", 7204]], 0],
+        ["let", "material_path", ["std.auth.jwt._find_key_material_path_v1", "idxv", ["bytes.view", "key_id"]]],
+        ["if", ["=", ["bytes.len", "material_path"], 0], ["return", ["result_bytes.err", 7205]], 0],
+        ["let", "key_b64_raw", ["os.fs.read_file", "material_path"]],
+        ["let", "key_b64", ["std.text.ascii.normalize_lines", ["bytes.view", "key_b64_raw"]]],
+        ["let", "key_doc", ["ext.base64.base64_decode", ["bytes.view", "key_b64"]]],
+        ["let", "kdv", ["bytes.view", "key_doc"]],
+        ["if", ["=", ["ext.base64.base64_is_err", "kdv"], 1], ["return", ["result_bytes.err", 7206]], 0],
+        ["let", "sk_seed", ["ext.base64.base64_get_bytes", "kdv"]],
+        ["if", ["!=", ["bytes.len", "sk_seed"], 32], ["return", ["result_bytes.err", 7207]], 0],
+        ["if", ["=", ["ext.data_model.doc_is_err", "claims_doc"], 1], ["return", ["result_bytes.err", 7208]], 0],
+        ["if", ["!=", ["ext.data_model.root_kind", "claims_doc"], 5], ["return", ["result_bytes.err", 7208]], 0],
+        [
+          "if",
+          ["=", "req_off", ["-", 0, 1]],
+          0,
+          [
+            "begin",
+            ["let", "rn", ["ext.data_model.seq_len", "jpv", "req_off"]],
+            [
+              "for",
+              "i",
+              0,
+              "rn",
+              [
+                "begin",
+                ["let", "c_off", ["ext.data_model.seq_get", "jpv", "req_off", "i"]],
+                ["let", "c_name", ["ext.data_model.string_get", "jpv", "c_off"]],
+                [
+                  "if",
+                  ["=", ["std.auth.jwt._claims_require_key_v1", "claims_doc", ["bytes.view", "c_name"]], 0],
+                  ["return", ["result_bytes.err", 7209]],
+                  0
+                ]
+              ]
+            ],
+            0
+          ]
+        ],
+        ["let", "k_iss", ["bytes.lit", "iss"]],
+        ["let", "k_aud", ["bytes.lit", "aud"]],
+        [
+          "if",
+          ["=", ["std.auth.jwt._claims_require_string_eq_v1", "claims_doc", ["bytes.view", "k_iss"], ["bytes.view", "issuer"]], 0],
+          ["return", ["result_bytes.err", 7210]],
+          0
+        ],
+        [
+          "if",
+          ["=", ["std.auth.jwt._claims_require_string_eq_v1", "claims_doc", ["bytes.view", "k_aud"], ["bytes.view", "audience"]], 0],
+          ["return", ["result_bytes.err", 7211]],
+          0
+        ],
+        ["let", "emit_doc", ["ext.data_model.json.emit_canon", "claims_doc"]],
+        ["let", "emitv", ["bytes.view", "emit_doc"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "emitv"], 1], ["return", ["result_bytes.err", 7212]], 0],
+        ["let", "emit_len", ["view.len", "emitv"]],
+        ["if", ["<", "emit_len", 1], ["return", ["result_bytes.err", 7212]], 0],
+        ["let", "payload_v", ["view.slice", "emitv", 1, ["-", "emit_len", 1]]],
+        ["let", "payload", ["view.to_bytes", "payload_v"]],
+        ["let", "hdr_prefix", ["bytes.lit", "{\"alg\":\"EdDSA\",\"kid\":\""]],
+        ["let", "hdr_suffix", ["bytes.lit", "\"}"]],
+        [
+          "let",
+          "hdr_vec",
+          [
+            "vec_u8.with_capacity",
+            ["+", ["+", ["bytes.len", "hdr_prefix"], ["bytes.len", "key_id"]], ["bytes.len", "hdr_suffix"]]
+          ]
+        ],
+        ["set", "hdr_vec", ["vec_u8.extend_bytes", "hdr_vec", "hdr_prefix"]],
+        ["set", "hdr_vec", ["vec_u8.extend_bytes", "hdr_vec", "key_id"]],
+        ["set", "hdr_vec", ["vec_u8.extend_bytes", "hdr_vec", "hdr_suffix"]],
+        ["let", "header_json", ["vec_u8.into_bytes", "hdr_vec"]],
+        ["let", "h_b64", ["std.auth.jwt._b64url_encode_nopad_v1", ["bytes.view", "header_json"]]],
+        ["let", "p_b64", ["std.auth.jwt._b64url_encode_nopad_v1", ["bytes.view", "payload"]]],
+        [
+          "let",
+          "msg_vec",
+          ["vec_u8.with_capacity", ["+", ["+", ["bytes.len", "h_b64"], 1], ["bytes.len", "p_b64"]]]
+        ],
+        ["set", "msg_vec", ["vec_u8.extend_bytes", "msg_vec", "h_b64"]],
+        ["set", "msg_vec", ["vec_u8.push", "msg_vec", 46]],
+        ["set", "msg_vec", ["vec_u8.extend_bytes", "msg_vec", "p_b64"]],
+        ["let", "msg", ["vec_u8.into_bytes", "msg_vec"]],
+        ["let", "sig_res", ["std.crypto.ed25519.sign_seed_v1", ["bytes.view", "sk_seed"], ["bytes.view", "msg"]]],
+        ["if", ["!=", ["result_bytes.err_code", "sig_res"], 0], ["return", ["result_bytes.err", 7213]], 0],
+        ["let", "sig", ["result_bytes.unwrap_or", "sig_res", ["bytes.alloc", 0]]],
+        ["let", "sig_b64", ["std.auth.jwt._b64url_encode_nopad_v1", ["bytes.view", "sig"]]],
+        [
+          "let",
+          "tok_vec",
+          ["vec_u8.with_capacity", ["+", ["+", ["bytes.len", "msg"], 1], ["bytes.len", "sig_b64"]]]
+        ],
+        ["set", "tok_vec", ["vec_u8.extend_bytes", "tok_vec", "msg"]],
+        ["set", "tok_vec", ["vec_u8.push", "tok_vec", 46]],
+        ["set", "tok_vec", ["vec_u8.extend_bytes", "tok_vec", "sig_b64"]],
+        ["result_bytes.ok", ["vec_u8.into_bytes", "tok_vec"]]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt.verify_from_arch_v1",
+      "params": [
+        { "name": "profile_id", "ty": "bytes_view" },
+        { "name": "token", "ty": "bytes_view" }
+      ],
+      "result": "result_i32",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "crypto_jwt_v1"],
+        [
+          "begin",
+        ["let", "jp_doc", ["std.auth.jwt._read_json_doc_v1", ["bytes.lit", "arch/crypto/jwt_profiles.x07jwt.json"]]],
+        ["let", "jpv", ["bytes.view", "jp_doc"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "jpv"], 1], ["return", ["result_i32.err", 7301]], 0],
+        ["let", "prof_off", ["std.auth.jwt._find_profile_off_v1", "jpv", "profile_id"]],
+        ["if", ["<", "prof_off", 0], ["return", ["result_i32.err", 7302]], 0],
+        ["let", "k_issuer", ["bytes.lit", "issuer"]],
+        ["let", "k_audience", ["bytes.lit", "audience"]],
+        ["let", "k_key_id", ["bytes.lit", "key_id"]],
+        ["let", "k_required_claims", ["bytes.lit", "required_claims"]],
+        ["let", "k_jcs", ["bytes.lit", "jcs_payload"]],
+        ["let", "issuer", ["std.auth.jwt._map_string_or_empty_v1", "jpv", "prof_off", ["bytes.view", "k_issuer"]]],
+        ["let", "audience", ["std.auth.jwt._map_string_or_empty_v1", "jpv", "prof_off", ["bytes.view", "k_audience"]]],
+        ["let", "key_id", ["std.auth.jwt._map_string_or_empty_v1", "jpv", "prof_off", ["bytes.view", "k_key_id"]]],
+        ["let", "req_off", ["std.auth.jwt._map_seq_off_or_neg1_v1", "jpv", "prof_off", ["bytes.view", "k_required_claims"]]],
+        ["let", "jcs_off", ["ext.data_model.map_find", "jpv", "prof_off", ["bytes.view", "k_jcs"]]],
+        [
+          "let",
+          "jcs_payload",
+          ["if", ["<", "jcs_off", 0], 1, ["ext.data_model.bool_get", "jpv", "jcs_off"]]
+        ],
+        ["let", "idx_doc", ["std.auth.jwt._read_json_doc_v1", ["bytes.lit", "arch/crypto/index.x07crypto.json"]]],
+        ["let", "idxv", ["bytes.view", "idx_doc"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "idxv"], 1], ["return", ["result_i32.err", 7303]], 0],
+        ["let", "material_path", ["std.auth.jwt._find_key_material_path_v1", "idxv", ["bytes.view", "key_id"]]],
+        ["if", ["=", ["bytes.len", "material_path"], 0], ["return", ["result_i32.err", 7304]], 0],
+        ["let", "key_b64_raw", ["os.fs.read_file", "material_path"]],
+        ["let", "key_b64", ["std.text.ascii.normalize_lines", ["bytes.view", "key_b64_raw"]]],
+        ["let", "key_doc", ["ext.base64.base64_decode", ["bytes.view", "key_b64"]]],
+        ["let", "kdv", ["bytes.view", "key_doc"]],
+        ["if", ["=", ["ext.base64.base64_is_err", "kdv"], 1], ["return", ["result_i32.err", 7305]], 0],
+        ["let", "sk_seed", ["ext.base64.base64_get_bytes", "kdv"]],
+        ["if", ["!=", ["bytes.len", "sk_seed"], 32], ["return", ["result_i32.err", 7306]], 0],
+        ["let", "n", ["view.len", "token"]],
+        ["let", "dot1", ["-", 0, 1]],
+        ["let", "dot2", ["-", 0, 1]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            [
+              "if",
+              ["=", ["view.get_u8", "token", "i"], 46],
+              [
+                "if",
+                ["<", "dot1", 0],
+                ["set", "dot1", "i"],
+                ["if", ["<", "dot2", 0], ["set", "dot2", "i"], 0]
+              ],
+              0
+            ]
+          ]
+        ],
+        [
+          "if",
+          ["if", ["<", "dot1", 1], 1, ["if", ["<", "dot2", ["+", "dot1", 2]], 1, [">=", "dot2", ["-", "n", 1]]]],
+          ["return", ["result_i32.err", 7307]],
+          0
+        ],
+        ["let", "h_b64", ["view.slice", "token", 0, "dot1"]],
+        ["let", "p_b64", ["view.slice", "token", ["+", "dot1", 1], ["-", "dot2", ["+", "dot1", 1]]]],
+        ["let", "s_b64", ["view.slice", "token", ["+", "dot2", 1], ["-", "n", ["+", "dot2", 1]]]],
+        ["let", "h_res", ["std.auth.jwt._b64url_decode_nopad_v1", "h_b64"]],
+        ["if", ["!=", ["result_bytes.err_code", "h_res"], 0], ["return", ["result_i32.err", 7308]], 0],
+        ["let", "h_json", ["result_bytes.unwrap_or", "h_res", ["bytes.alloc", 0]]],
+        ["let", "h_doc", ["ext.json.data_model.parse", ["bytes.view", "h_json"]]],
+        ["let", "hdv", ["bytes.view", "h_doc"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "hdv"], 1], ["return", ["result_i32.err", 7309]], 0],
+        ["if", ["!=", ["ext.data_model.root_kind", "hdv"], 5], ["return", ["result_i32.err", 7309]], 0],
+        ["let", "h_root", ["ext.data_model.root_offset", "hdv"]],
+        ["let", "k_alg", ["bytes.lit", "alg"]],
+        ["let", "alg_off", ["ext.data_model.map_find", "hdv", "h_root", ["bytes.view", "k_alg"]]],
+        ["if", ["<", "alg_off", 0], ["return", ["result_i32.err", 7310]], 0],
+        ["let", "alg", ["ext.data_model.string_get", "hdv", "alg_off"]],
+        ["if", ["=", ["bytes.eq", "alg", ["bytes.lit", "EdDSA"]], 0], ["return", ["result_i32.err", 7310]], 0],
+        ["let", "k_kid", ["bytes.lit", "kid"]],
+        ["let", "kid_off", ["ext.data_model.map_find", "hdv", "h_root", ["bytes.view", "k_kid"]]],
+        [
+          "if",
+          [">=", "kid_off", 0],
+          [
+            "begin",
+            ["let", "kid", ["ext.data_model.string_get", "hdv", "kid_off"]],
+            ["if", ["=", ["bytes.eq", "kid", "key_id"], 0], ["return", ["result_i32.err", 7310]], 0]
+          ],
+          0
+        ],
+        ["let", "p_res", ["std.auth.jwt._b64url_decode_nopad_v1", "p_b64"]],
+        ["if", ["!=", ["result_bytes.err_code", "p_res"], 0], ["return", ["result_i32.err", 7311]], 0],
+        ["let", "payload", ["result_bytes.unwrap_or", "p_res", ["bytes.alloc", 0]]],
+        [
+          "if",
+          ["=", "jcs_payload", 1],
+          [
+            "begin",
+            ["let", "canon", ["ext.json.canon.canonicalize", ["bytes.view", "payload"]]],
+            ["if", ["=", ["bytes.len", "canon"], 0], ["return", ["result_i32.err", 7312]], 0],
+            ["if", ["=", ["bytes.eq", "canon", "payload"], 0], ["return", ["result_i32.err", 7312]], 0]
+          ],
+          0
+        ],
+        ["let", "claims", ["ext.json.data_model.parse", ["bytes.view", "payload"]]],
+        ["let", "cv", ["bytes.view", "claims"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "cv"], 1], ["return", ["result_i32.err", 7313]], 0],
+        ["if", ["!=", ["ext.data_model.root_kind", "cv"], 5], ["return", ["result_i32.err", 7313]], 0],
+        [
+          "if",
+          ["=", "req_off", ["-", 0, 1]],
+          0,
+          [
+            "begin",
+            ["let", "rn", ["ext.data_model.seq_len", "jpv", "req_off"]],
+            [
+              "for",
+              "i",
+              0,
+              "rn",
+              [
+                "begin",
+                ["let", "c_off", ["ext.data_model.seq_get", "jpv", "req_off", "i"]],
+                ["let", "c_name", ["ext.data_model.string_get", "jpv", "c_off"]],
+                [
+                  "if",
+                  ["=", ["std.auth.jwt._claims_require_key_v1", "cv", ["bytes.view", "c_name"]], 0],
+                  ["return", ["result_i32.err", 7314]],
+                  0
+                ]
+              ]
+            ],
+            0
+          ]
+        ],
+        ["let", "k_iss", ["bytes.lit", "iss"]],
+        ["let", "k_aud", ["bytes.lit", "aud"]],
+        [
+          "if",
+          ["=", ["std.auth.jwt._claims_require_string_eq_v1", "cv", ["bytes.view", "k_iss"], ["bytes.view", "issuer"]], 0],
+          ["return", ["result_i32.err", 7315]],
+          0
+        ],
+        [
+          "if",
+          ["=", ["std.auth.jwt._claims_require_string_eq_v1", "cv", ["bytes.view", "k_aud"], ["bytes.view", "audience"]], 0],
+          ["return", ["result_i32.err", 7316]],
+          0
+        ],
+        ["let", "s_res", ["std.auth.jwt._b64url_decode_nopad_v1", "s_b64"]],
+        ["if", ["!=", ["result_bytes.err_code", "s_res"], 0], ["return", ["result_i32.err", 7317]], 0],
+        ["let", "sig", ["result_bytes.unwrap_or", "s_res", ["bytes.alloc", 0]]],
+        ["if", ["!=", ["bytes.len", "sig"], 64], ["return", ["result_i32.err", 7317]], 0],
+        ["let", "msg", ["view.slice", "token", 0, "dot2"]],
+        [
+          "if",
+          ["=", ["std.crypto.ed25519.verify_seed_v1", ["bytes.view", "sk_seed"], "msg", ["bytes.view", "sig"]], 0],
+          ["return", ["result_i32.err", 7318]],
+          0
+        ],
+        ["result_i32.ok", 0]
+        ]
+      ]
+    }
+  ]
+}

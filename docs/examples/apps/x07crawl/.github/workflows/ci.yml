@@ -1,0 +1,32 @@
+name: x07crawl CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install x07 toolchain
+        run: curl -fsSL https://x07lang.org/install.sh | bash
+
+      - name: Add x07 to PATH
+        run: echo "$HOME/.x07/bin" >> $GITHUB_PATH
+
+      - name: Telemetry (fmt/lint/tests)
+        run: bash ci/telemetry.sh
+
+      - name: Trust gates
+        run: bash ci/trust.sh
+
+      - name: Upload telemetry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telemetry
+          path: target/**

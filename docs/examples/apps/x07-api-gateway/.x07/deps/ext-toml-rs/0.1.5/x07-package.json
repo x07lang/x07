@@ -1,0 +1,26 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-toml-rs",
+  "description": "TOML parsing and serialization.",
+  "docs": "TOML parsing and serialization.\n\nModules:\n- ext.toml\n- ext.toml.data_model\n- ext.toml.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-toml-rs@0.1.5\n- Import the modules listed above.\n",
+  "version": "0.1.5",
+  "module_root": "modules",
+  "modules": [
+    "ext.toml",
+    "ext.toml.data_model",
+    "ext.toml.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "x07import"
+  }
+}

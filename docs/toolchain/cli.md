@@ -28,6 +28,8 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 fmt --input <path> --check`
 - `x07 fmt --input <path> --write`
 
+`--input` may be repeated. Each `<path>` may be a file or a directory; directory inputs are scanned recursively for `*.x07.json`.
+
 ### Linting + diagnostics (`x07diag` JSON)
 
 - `x07 lint --input <path>`

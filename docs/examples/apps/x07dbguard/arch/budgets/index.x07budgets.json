@@ -1,0 +1,32 @@
+{
+  "schema_version": "x07.arch.budgets.index@0.1.0",
+  "profiles": [
+    {
+      "id": "db_plan_v1",
+      "profile_path": "arch/budgets/profiles/db_plan_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "app.plan", "fn": "app.plan.run_v1" }
+      ],
+      "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"]
+    },
+    {
+      "id": "db_apply_v1",
+      "profile_path": "arch/budgets/profiles/db_apply_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "std.db.migrate", "fn": "apply_from_arch_v1" }
+      ],
+      "worlds_allowed": ["run-os", "run-os-sandboxed"]
+    },
+    {
+      "id": "db_verify_v1",
+      "profile_path": "arch/budgets/profiles/db_verify_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "app.verify", "fn": "app.verify.run_v1" }
+      ],
+      "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"]
+    }
+  ]
+}

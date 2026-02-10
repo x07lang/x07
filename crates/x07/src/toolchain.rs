@@ -1,7 +1,9 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Args;
+use walkdir::WalkDir;
 use x07_worlds::WorldId;
 use x07c::diagnostics;
 use x07c::lint;
@@ -10,10 +12,74 @@ use x07c::x07ast;
 
 use crate::repair::{RepairArgs, RepairMode};
 
+fn should_walk_dir_entry(entry: &walkdir::DirEntry) -> bool {
+    let name = entry.file_name().to_string_lossy();
+    if !entry.file_type().is_dir() {
+        return true;
+    }
+    !matches!(
+        name.as_ref(),
+        ".git" | ".x07" | "target" | ".agent" | ".claude"
+    )
+}
+
+fn collect_x07ast_inputs(inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
+    let mut out: Vec<PathBuf> = Vec::new();
+    let mut seen: HashSet<PathBuf> = HashSet::new();
+
+    for input in inputs {
+        if input.is_file() {
+            if seen.insert(input.clone()) {
+                out.push(input.clone());
+            }
+            continue;
+        }
+        if input.is_dir() {
+            let mut files: Vec<PathBuf> = Vec::new();
+            for entry in WalkDir::new(input)
+                .follow_links(false)
+                .into_iter()
+                .filter_entry(should_walk_dir_entry)
+                .flatten()
+            {
+                if !entry.file_type().is_file() {
+                    continue;
+                }
+                let path = entry.into_path();
+                if path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.ends_with(".x07.json"))
+                {
+                    files.push(path);
+                }
+            }
+            files.sort();
+            for file in files {
+                if seen.insert(file.clone()) {
+                    out.push(file);
+                }
+            }
+            continue;
+        }
+
+        anyhow::bail!(
+            "--input does not exist or is not a file/dir: {}",
+            input.display()
+        );
+    }
+
+    if out.is_empty() {
+        anyhow::bail!("no *.x07.json inputs found");
+    }
+
+    Ok(out)
+}
+
 #[derive(Debug, Clone, Args)]
 pub struct FmtArgs {
-    #[arg(long)]
-    pub input: PathBuf,
+    #[arg(long, value_name = "PATH", required = true)]
+    pub input: Vec<PathBuf>,
     #[arg(long)]
     pub check: bool,
     #[arg(long)]
@@ -22,8 +88,8 @@ pub struct FmtArgs {
 
 #[derive(Debug, Clone, Args)]
 pub struct LintArgs {
-    #[arg(long)]
-    pub input: PathBuf,
+    #[arg(long, value_name = "PATH", required = true)]
+    pub input: Vec<PathBuf>,
     /// Lint world gating (advanced; the public surface defaults to `run-os`).
     #[arg(long, value_enum, default_value_t = WorldId::RunOs, hide = true)]
     pub world: WorldId,
@@ -32,7 +98,7 @@ pub struct LintArgs {
 #[derive(Debug, Clone, Args)]
 pub struct FixArgs {
     #[arg(long, value_name = "PATH", required_unless_present = "from_pbt")]
-    pub input: Option<PathBuf>,
+    pub input: Vec<PathBuf>,
     /// Convert a PBT repro artifact into a deterministic regression test (writes wrapper module + manifest entry).
     #[arg(
         long,
@@ -90,29 +156,42 @@ pub fn cmd_fmt(
         anyhow::bail!("set exactly one of --check or --write");
     }
 
-    let bytes = std::fs::read(&args.input)
-        .with_context(|| format!("read input: {}", args.input.display()))?;
+    let inputs = collect_x07ast_inputs(&args.input).context("collect inputs")?;
+    let mut not_formatted: Vec<PathBuf> = Vec::new();
 
-    let mut file = match x07ast::parse_x07ast_json(&bytes) {
-        Ok(file) => file,
-        Err(err) => {
-            return Err(anyhow::anyhow!("{err}"));
+    for input in &inputs {
+        let bytes =
+            std::fs::read(input).with_context(|| format!("read input: {}", input.display()))?;
+
+        let mut file = match x07ast::parse_x07ast_json(&bytes) {
+            Ok(file) => file,
+            Err(err) => {
+                return Err(anyhow::anyhow!("{err}"))
+                    .with_context(|| format!("parse x07ast JSON: {}", input.display()));
+            }
+        };
+
+        x07ast::canonicalize_x07ast_file(&mut file);
+        let mut v = x07ast::x07ast_file_to_value(&file);
+        x07ast::canon_value_jcs(&mut v);
+        let formatted = serde_json::to_string(&v)? + "\n";
+
+        if args.check && bytes != formatted.as_bytes() {
+            not_formatted.push(input.clone());
+            continue;
         }
-    };
 
-    x07ast::canonicalize_x07ast_file(&mut file);
-    let mut v = x07ast::x07ast_file_to_value(&file);
-    x07ast::canon_value_jcs(&mut v);
-    let formatted = serde_json::to_string(&v)? + "\n";
-
-    if args.check && bytes != formatted.as_bytes() {
-        eprintln!("file is not formatted: {}", args.input.display());
-        return Ok(std::process::ExitCode::from(1));
+        if args.write && bytes != formatted.as_bytes() {
+            std::fs::write(input, formatted.as_bytes())
+                .with_context(|| format!("write: {}", input.display()))?;
+        }
     }
 
-    if args.write && bytes != formatted.as_bytes() {
-        std::fs::write(&args.input, formatted.as_bytes())
-            .with_context(|| format!("write: {}", args.input.display()))?;
+    if !not_formatted.is_empty() {
+        for p in not_formatted {
+            eprintln!("file is not formatted: {}", p.display());
+        }
+        return Ok(std::process::ExitCode::from(1));
     }
 
     Ok(std::process::ExitCode::SUCCESS)
@@ -122,19 +201,74 @@ pub fn cmd_lint(
     machine: &crate::reporting::MachineArgs,
     args: LintArgs,
 ) -> Result<std::process::ExitCode> {
-    let bytes = std::fs::read(&args.input)
-        .with_context(|| format!("read input: {}", args.input.display()))?;
+    let inputs = collect_x07ast_inputs(&args.input).context("collect inputs")?;
 
-    let mut file = match x07ast::parse_x07ast_json(&bytes) {
-        Ok(file) => file,
-        Err(err) => {
-            return Err(anyhow::anyhow!("{err}"));
-        }
-    };
-
-    x07ast::canonicalize_x07ast_file(&mut file);
     let lint_options = x07c::world_config::lint_options_for_world(args.world);
-    let report = lint::lint_file(&file, lint_options);
+    let mut all_diags: Vec<diagnostics::Diagnostic> = Vec::new();
+    let mut ok = true;
+
+    for input in &inputs {
+        let bytes =
+            std::fs::read(input).with_context(|| format!("read input: {}", input.display()))?;
+        let mut file = match x07ast::parse_x07ast_json(&bytes) {
+            Ok(file) => file,
+            Err(err) => {
+                return Err(anyhow::anyhow!("{err}"))
+                    .with_context(|| format!("parse x07ast JSON: {}", input.display()));
+            }
+        };
+
+        x07ast::canonicalize_x07ast_file(&mut file);
+        let report = lint::lint_file(&file, lint_options);
+        if !report.ok {
+            ok = false;
+        }
+        for mut d in report.diagnostics {
+            d.data.insert(
+                "file".to_string(),
+                serde_json::Value::String(input.display().to_string()),
+            );
+            all_diags.push(d);
+        }
+    }
+
+    all_diags.sort_by(|a, b| {
+        let ap = a.data.get("file").and_then(|v| v.as_str()).unwrap_or("");
+        let bp = b.data.get("file").and_then(|v| v.as_str()).unwrap_or("");
+        let a_ptr = a
+            .loc
+            .as_ref()
+            .and_then(|l| match l {
+                diagnostics::Location::X07Ast { ptr } => Some(ptr.as_str()),
+                diagnostics::Location::Text { .. } => None,
+            })
+            .unwrap_or("");
+        let b_ptr = b
+            .loc
+            .as_ref()
+            .and_then(|l| match l {
+                diagnostics::Location::X07Ast { ptr } => Some(ptr.as_str()),
+                diagnostics::Location::Text { .. } => None,
+            })
+            .unwrap_or("");
+        ap.cmp(bp)
+            .then_with(|| a_ptr.cmp(b_ptr))
+            .then_with(|| a.code.cmp(&b.code))
+            .then_with(|| a.message.cmp(&b.message))
+    });
+
+    let mut report = diagnostics::Report::ok();
+    report.ok = ok;
+    report.diagnostics = all_diags;
+    report.meta.insert(
+        "inputs".to_string(),
+        serde_json::Value::Array(
+            inputs
+                .iter()
+                .map(|p| serde_json::Value::String(p.display().to_string()))
+                .collect(),
+        ),
+    );
 
     let out = serde_json::to_string(&report)? + "\n";
     if let Some(path) = machine.out.as_deref() {
@@ -208,10 +342,17 @@ pub fn cmd_fix(
         anyhow::bail!("--out cannot be combined with --write");
     }
 
-    let input = args.input.as_ref().context("input")?;
-    let bytes = std::fs::read(input).with_context(|| format!("read input: {}", input.display()))?;
+    let inputs = collect_x07ast_inputs(&args.input).context("collect inputs")?;
 
     if args.suggest_generics {
+        if inputs.len() != 1 {
+            anyhow::bail!("--suggest-generics expects exactly one input file");
+        }
+
+        let input = inputs.first().context("input")?;
+        let bytes =
+            std::fs::read(input).with_context(|| format!("read input: {}", input.display()))?;
+
         let patchset = crate::fix_suggest::suggest_generics_patchset(input, &bytes)
             .context("suggest-generics")?;
         let mut out = crate::util::canonical_jcs_bytes(&patchset)?;
@@ -229,46 +370,59 @@ pub fn cmd_fix(
         return Ok(std::process::ExitCode::SUCCESS);
     }
 
-    let mut doc: serde_json::Value = match serde_json::from_slice(&bytes) {
-        Ok(doc) => doc,
-        Err(err) => {
-            return Err(err).with_context(|| format!("parse JSON: {}", input.display()));
-        }
-    };
+    if !args.write && inputs.len() != 1 {
+        anyhow::bail!("multiple inputs require --write");
+    }
 
     let repair_mode = if args.write {
         RepairMode::Write
     } else {
         RepairMode::Memory
     };
-    let repair_result = crate::repair::repair_x07ast_file_doc(&mut doc, args.world, 5, repair_mode)
-        .context("fix")?;
-    let formatted = repair_result.formatted;
-    let final_report = repair_result.final_report;
+    let mut ok = true;
 
-    let remaining_errors: usize = final_report
-        .diagnostics
-        .iter()
-        .filter(|d| d.severity == diagnostics::Severity::Error)
-        .count();
-    if remaining_errors > 0 {
-        eprintln!(
-            "x07 fix: {remaining_errors} error(s) remain after auto-fix. \
-             Run `x07 build` to see codegen-stage errors."
-        );
-    }
+    for input in &inputs {
+        let bytes =
+            std::fs::read(input).with_context(|| format!("read input: {}", input.display()))?;
+        let mut doc: serde_json::Value = match serde_json::from_slice(&bytes) {
+            Ok(doc) => doc,
+            Err(err) => {
+                return Err(err).with_context(|| format!("parse JSON: {}", input.display()));
+            }
+        };
 
-    if args.write {
-        std::fs::write(input, formatted.as_bytes())
-            .with_context(|| format!("write: {}", input.display()))?;
-    } else {
-        match machine.out.as_deref() {
-            Some(path) => crate::reporting::write_bytes(path, formatted.as_bytes())?,
-            None => print!("{formatted}"),
+        let repair_result =
+            crate::repair::repair_x07ast_file_doc(&mut doc, args.world, 5, repair_mode)
+                .with_context(|| format!("fix: {}", input.display()))?;
+        let formatted = repair_result.formatted;
+        let final_report = repair_result.final_report;
+
+        let remaining_errors: usize = final_report
+            .diagnostics
+            .iter()
+            .filter(|d| d.severity == diagnostics::Severity::Error)
+            .count();
+        if remaining_errors > 0 {
+            ok = false;
+            eprintln!(
+                "x07 fix: {remaining_errors} error(s) remain after auto-fix for {}. \
+                 Run `x07 build` to see codegen-stage errors.",
+                input.display()
+            );
+        }
+
+        if args.write {
+            std::fs::write(input, formatted.as_bytes())
+                .with_context(|| format!("write: {}", input.display()))?;
+        } else {
+            match machine.out.as_deref() {
+                Some(path) => crate::reporting::write_bytes(path, formatted.as_bytes())?,
+                None => print!("{formatted}"),
+            }
         }
     }
 
-    Ok(if final_report.ok {
+    Ok(if ok {
         std::process::ExitCode::SUCCESS
     } else {
         std::process::ExitCode::from(1)
@@ -348,4 +502,53 @@ pub fn cmd_build(
     }
 
     Ok(std::process::ExitCode::SUCCESS)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::collect_x07ast_inputs;
+
+    static TMP_N: AtomicUsize = AtomicUsize::new(0);
+
+    fn tmp_root(prefix: &str) -> PathBuf {
+        let pid = std::process::id();
+        let n = TMP_N.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("x07_{prefix}_{pid}_{n}"))
+    }
+
+    fn write_text(path: &std::path::Path, contents: &str) {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(path, contents.as_bytes()).unwrap();
+    }
+
+    #[test]
+    fn collect_x07ast_inputs_skips_common_dirs_and_sorts() {
+        let root = tmp_root("collect_inputs");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+
+        let a = root.join("src/a.x07.json");
+        let b = root.join("src/b.x07.json");
+        let skipped_target = root.join("target/c.x07.json");
+        let skipped_dot_x07 = root.join(".x07/d.x07.json");
+
+        let minimal = "{\"schema_version\":\"x07.x07ast@0.5.0\",\"kind\":\"module\",\"module_id\":\"m\",\"imports\":[],\"decls\":[]}\n";
+        write_text(&a, minimal);
+        write_text(&b, minimal);
+        write_text(&skipped_target, minimal);
+        write_text(&skipped_dot_x07, minimal);
+
+        let got = collect_x07ast_inputs(std::slice::from_ref(&root)).unwrap();
+        assert_eq!(got, vec![a.clone(), b.clone()]);
+
+        let got2 = collect_x07ast_inputs(&[root.clone(), a.clone()]).unwrap();
+        assert_eq!(got2, vec![a, b]);
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

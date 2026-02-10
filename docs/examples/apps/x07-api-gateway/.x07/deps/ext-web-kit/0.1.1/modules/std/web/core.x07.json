@@ -1,0 +1,109 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.web.core",
+  "imports": [
+    "std.bytes",
+    "std.codec",
+    "std.vec"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.web.core.doc_err_code_v1",
+        "std.web.core.doc_err_msg_v1",
+        "std.web.core.doc_err_v1",
+        "std.web.core.doc_get_bytes_v1",
+        "std.web.core.doc_is_err_v1",
+        "std.web.core.doc_ok_bytes_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.core.doc_is_err_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["<", ["view.len", "doc"], 1], ["return", 1], 0],
+        ["=", ["view.get_u8", "doc", 0], 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.core.doc_err_code_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["<", ["view.len", "doc"], 5], ["return", 0], 0],
+        ["if", ["!=", ["view.get_u8", "doc", 0], 0], ["return", 0], 0],
+        ["std.codec.read_u32_le", "doc", 1]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.core.doc_err_msg_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["<", "n", 9], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["!=", ["view.get_u8", "doc", 0], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "msg_len", ["std.codec.read_u32_le", "doc", 5]],
+        ["if", ["<", "n", ["+", 9, "msg_len"]], ["return", ["bytes.alloc", 0]], 0],
+        ["view.to_bytes", ["view.slice", "doc", 9, "msg_len"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.core.doc_ok_bytes_v1",
+      "params": [{ "name": "payload", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "payload"]],
+        ["let", "out", ["std.vec.with_capacity", ["+", 1, "n"]]],
+        ["set", "out", ["std.vec.push", "out", 1]],
+        ["set", "out", ["std.vec.extend_bytes", "out", "payload"]],
+        ["std.vec.as_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.core.doc_err_v1",
+      "params": [
+        { "name": "code", "ty": "i32" },
+        { "name": "msg", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "msg_len", ["view.len", "msg"]],
+        ["let", "out", ["std.vec.with_capacity", ["+", 9, "msg_len"]]],
+        ["set", "out", ["std.vec.push", "out", 0]],
+        ["let", "code_u32le", ["std.codec.write_u32_le", "code"]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "code_u32le"]]],
+        ["let", "msg_len_u32le", ["std.codec.write_u32_le", "msg_len"]],
+        ["set", "out", ["std.vec.extend_bytes", "out", ["bytes.view", "msg_len_u32le"]]],
+        ["set", "out", ["std.vec.extend_bytes", "out", "msg"]],
+        ["std.vec.as_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.core.doc_get_bytes_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["<", "n", 1], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["!=", ["view.get_u8", "doc", 0], 1], ["return", ["bytes.alloc", 0]], 0],
+        ["view.to_bytes", ["view.slice", "doc", 1, ["-", "n", 1]]]
+      ]
+    }
+  ]
+}

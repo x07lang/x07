@@ -1,0 +1,1 @@
+{"decls":[{"kind":"export","names":["std.math.f64","std.math.i32"]}],"imports":["std.math.f64","std.math.i32"],"kind":"module","meta":{"generated_by":"manual","package":"x07:ext-math@0.1.0"},"module_id":"std.math","schema_version":"x07.x07ast@0.3.0"}

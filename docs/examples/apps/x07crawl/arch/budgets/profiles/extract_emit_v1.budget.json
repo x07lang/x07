@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "extract_emit_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "trap_v1",
+    "label": "extract.emit.v1",
+    "alloc_bytes": 2097152,
+    "alloc_calls": 50000,
+    "realloc_calls": 10000,
+    "memcpy_bytes": 4194304,
+    "sched_ticks": 500000,
+    "fuel": 0
+  }
+}

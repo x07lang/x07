@@ -106,10 +106,10 @@ When using `std.rr.with_policy_v1`, rr policy/config comes from the repo’s `ar
 
 ## Fixture mode (test harness)
 
-When running rr tests through `x07 test` (the test harness), cassette path resolution changes:
+When running rr tests through `x07 test` (the test harness):
 
-- In the test manifest (`tests/tests.json`), `fixture_root` sets the base directory for fixture data.
-- Cassette paths in `std.rr.with_policy_v1` resolve relative to `fixture_root`'s `rr/` subdirectory — not relative to `.x07_rr/`.
+- In the test manifest (`tests/tests.json`), `fixture_root` is copied into the runner’s `.x07_rr/` directory before the program executes.
+- Cassette paths in `std.rr.with_policy_v1` still resolve relative to `.x07_rr/` (so the common case is just the filename).
 
 ### Canonical setup
 
@@ -133,7 +133,7 @@ In `tests/tests.json`:
       "world": "solve-rr",
       "entry": "app.rr_smoke_v1",
       "expect": "pass",
-      "fixture_root": "fixtures/replay"
+      "fixture_root": "fixtures/replay/rr"
     }
   ]
 }
@@ -154,7 +154,9 @@ This resolves to `tests/fixtures/replay/rr/smoke.rrbin`.
 
 ### Common mistake
 
-Using `fixture_root: "."` with `cassette_path: ".x07_rr/smoke.rrbin"` — this fails safety checks because the rr fixture resolver does not allow path traversal into `.x07_rr/`. Always use a dedicated fixture directory with cassettes copied under its `rr/` subdirectory.
+Using `fixture_root: "."` with `cassette_path: ".x07_rr/smoke.rrbin"` — this fails safety checks because the rr fixture resolver does not allow path traversal into `.x07_rr/`. Always use a dedicated fixture directory (for example `tests/fixtures/replay/rr/`) and keep cassettes under it.
+
+Note: In `solve-full`, `fixture_root` must contain an `rr/` directory (alongside `fs/` and/or `kv/` as needed). For `solve-rr`, `fixture_root` itself is treated as the rr fixture directory.
 
 ## Minimal `arch/rr/` example (copy/paste)
 

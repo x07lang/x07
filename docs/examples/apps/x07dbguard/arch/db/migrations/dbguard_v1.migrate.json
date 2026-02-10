@@ -1,0 +1,20 @@
+{
+  "schema_version": "x07.db.migrate.plan@0.1.0",
+  "id": "dbguard_v1",
+  "v": 1,
+  "lock_table": "__x07_migrations",
+  "steps": [
+    {
+      "id": "0001_init",
+      "up_sql_path": "arch/db/migrations/sql/0001_init.sql",
+      "up_sha256_hex": "a00ddb955c42bd09789110b36f10548f496856fbf7b7ae47e783b4e2b6dcef4b",
+      "description": "Initial schema: migrations lock table and projects table."
+    },
+    {
+      "id": "0002_add_drift_log",
+      "up_sql_path": "arch/db/migrations/sql/0002_add_drift_log.sql",
+      "up_sha256_hex": "863aab43bd771ac1b8ef1045c53f0da13328724f71931190f218ac884208080c",
+      "description": "Add drift_log table for schema drift detection."
+    }
+  ]
+}

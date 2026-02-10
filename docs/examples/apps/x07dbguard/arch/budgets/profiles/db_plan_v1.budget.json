@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "db_plan_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "result_err_v1",
+    "label": "db.plan.v1",
+    "alloc_bytes": 16777216,
+    "alloc_calls": 50000,
+    "realloc_calls": 10000,
+    "memcpy_bytes": 33554432,
+    "sched_ticks": 500000,
+    "fuel": 0
+  }
+}

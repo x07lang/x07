@@ -1,0 +1,44 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.u64.tests",
+  "imports": ["std.test", "ext.u64"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["ext.u64.tests.test_roundtrip_bytes_le"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.u64.tests.test_roundtrip_bytes_le",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "lo", 287454020],
+        ["let", "hi", 1432778632],
+        ["let", "b", ["ext.u64.to_bytes_le", "lo", "hi"]],
+        ["let", "bv", ["bytes.view", "b"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.u64.read_lo_le", "bv", 0],
+            "lo",
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.u64.read_hi_le", "bv", 0],
+            "hi",
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

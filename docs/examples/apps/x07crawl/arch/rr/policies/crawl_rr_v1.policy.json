@@ -1,0 +1,14 @@
+{
+  "schema_version": "x07.arch.rr.policy@0.1.0",
+  "id": "crawl_rr_v1",
+  "v": 1,
+  "mode_default": "replay_v1",
+  "match_mode": "lookup_v1",
+  "budgets": {
+    "max_cassette_bytes": 4194304,
+    "max_entries": 200,
+    "max_req_bytes": 4096,
+    "max_resp_bytes": 1048576,
+    "max_key_bytes": 512
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "default_profile": "os",
+  "dependencies": [
+    {
+      "name": "ext-auth-jwt",
+      "path": ".x07/deps/ext-auth-jwt/0.1.1",
+      "version": "0.1.1"
+    },
+    {
+      "name": "ext-base64-rs",
+      "path": ".x07/deps/ext-base64-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-csv-rs",
+      "path": ".x07/deps/ext-csv-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-curl-c",
+      "path": ".x07/deps/ext-curl-c/0.1.6",
+      "version": "0.1.6"
+    },
+    {
+      "name": "ext-data-model",
+      "path": ".x07/deps/ext-data-model/0.1.8",
+      "version": "0.1.8"
+    },
+    {
+      "name": "ext-hex-rs",
+      "path": ".x07/deps/ext-hex-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-ini-rs",
+      "path": ".x07/deps/ext-ini-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-json-rs",
+      "path": ".x07/deps/ext-json-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-math",
+      "path": ".x07/deps/ext-math/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-net",
+      "path": ".x07/deps/ext-net/0.1.8",
+      "version": "0.1.8"
+    },
+    {
+      "name": "ext-obs",
+      "path": ".x07/deps/ext-obs/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-openssl-c",
+      "path": ".x07/deps/ext-openssl-c/0.1.6",
+      "version": "0.1.6"
+    },
+    {
+      "name": "ext-pb-rs",
+      "path": ".x07/deps/ext-pb-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-sockets-c",
+      "path": ".x07/deps/ext-sockets-c/0.1.6",
+      "version": "0.1.6"
+    },
+    {
+      "name": "ext-toml-rs",
+      "path": ".x07/deps/ext-toml-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-unicode-rs",
+      "path": ".x07/deps/ext-unicode-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-url-rs",
+      "path": ".x07/deps/ext-url-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-web-kit",
+      "path": ".x07/deps/ext-web-kit/0.1.1",
+      "version": "0.1.1"
+    },
+    {
+      "name": "ext-xml-rs",
+      "path": ".x07/deps/ext-xml-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-yaml-rs",
+      "path": ".x07/deps/ext-yaml-rs/0.1.4",
+      "version": "0.1.4"
+    }
+  ],
+  "entry": "src/main.x07.json",
+  "lockfile": "x07.lock.json",
+  "module_roots": [
+    "src"
+  ],
+  "profiles": {
+    "os": {
+      "world": "run-os"
+    },
+    "sandbox": {
+      "policy": "policy/sandbox.base.json",
+      "world": "run-os-sandboxed"
+    }
+  },
+  "schema_version": "x07.project@0.2.0",
+  "world": "run-os"
+}

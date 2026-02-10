@@ -1,0 +1,200 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.base64.tests",
+  "imports": ["std.test", "ext.base64"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.base64.tests.test_encode_decode_roundtrip",
+        "ext.base64.tests.test_decode_invalid_len",
+        "ext.base64.tests.test_decode_invalid_char",
+        "ext.base64.tests.test_decode_invalid_padding"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.base64.tests.test_encode_decode_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src_bytes", ["bytes.lit", "hello"]],
+        [
+          "let",
+          "enc",
+          ["ext.base64.base64_encode", ["bytes.view", "src_bytes"]]
+        ],
+        ["let", "expected", ["bytes.lit", "aGVsbG8="]],
+        ["let", "enc_view", ["bytes.view", "enc"]],
+        ["let", "expected_view", ["bytes.view", "expected"]],
+        [
+          "try",
+          [
+            "std.test.assert_view_eq",
+            "enc_view",
+            "expected_view",
+            ["std.test.code_assert_view_eq"]
+          ]
+        ],
+        ["let", "doc", ["ext.base64.base64_decode", "enc_view"]],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.base64.base64_is_err", "doc_view"],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "decoded", ["ext.base64.base64_get_bytes", "doc_view"]],
+        [
+          "try",
+          [
+            "std.test.assert_bytes_eq",
+            "decoded",
+            "src_bytes",
+            ["std.test.code_assert_bytes_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.base64.tests.test_decode_invalid_len",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src", ["bytes.lit", "AAA"]],
+        ["let", "src_view", ["bytes.view", "src"]],
+        [
+          "let",
+          "doc",
+          ["ext.base64.base64_decode", "src_view"]
+        ],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.base64.base64_is_err", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.base64.base64_err_code", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.base64.tests.test_decode_invalid_char",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src", ["bytes.lit", "!!!!"]],
+        ["let", "src_view", ["bytes.view", "src"]],
+        [
+          "let",
+          "doc",
+          ["ext.base64.base64_decode", "src_view"]
+        ],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.base64.base64_is_err", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.base64.base64_err_code", "doc_view"],
+            2,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.base64.tests.test_decode_invalid_padding",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src1", ["bytes.lit", "AA=A"]],
+        ["let", "src1_view", ["bytes.view", "src1"]],
+        [
+          "let",
+          "doc1",
+          ["ext.base64.base64_decode", "src1_view"]
+        ],
+        ["let", "doc1_view", ["bytes.view", "doc1"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.base64.base64_is_err", "doc1_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.base64.base64_err_code", "doc1_view"],
+            3,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "src2", ["bytes.lit", "AB=="]],
+        ["let", "src2_view", ["bytes.view", "src2"]],
+        [
+          "let",
+          "doc2",
+          ["ext.base64.base64_decode", "src2_view"]
+        ],
+        ["let", "doc2_view", ["bytes.view", "doc2"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.base64.base64_is_err", "doc2_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.base64.base64_err_code", "doc2_view"],
+            3,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

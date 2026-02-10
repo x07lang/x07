@@ -1,0 +1,25 @@
+{
+  "files": {
+    "arch/budgets/profiles/gw_request_v1.budget.json": {
+      "jcs_sha256_hex": "1514b051257b57da2a461a337f62c23fae37fbbc06383bf4b97bb27e735dd23f"
+    },
+    "arch/budgets/profiles/gw_upstream_v1.budget.json": {
+      "jcs_sha256_hex": "57f5fc646d9d950a4ff05b7621a5ab20d5ae085db40df76f1c244674b767f6ed"
+    },
+    "arch/rr/policies/gw_rr_v1.policy.json": {
+      "jcs_sha256_hex": "008de07b0750e635e0c7598bb70b3d5c50645aef3978a1fd40fb18c99aca3980"
+    },
+    "arch/rr/sanitizers/sanitize_none_v1.sanitize.json": {
+      "jcs_sha256_hex": "aa6c0a1e92c1389ae442be8bf13ccb30872db3ece276ffc36c89c1a2207ed971"
+    }
+  },
+  "indexes": {
+    "arch/budgets/index.x07budgets.json": {
+      "jcs_sha256_hex": "aabf9d2b6f28efa6a912413eb53e667ba5364360943f241a6400b260ed5161dc"
+    },
+    "arch/rr/index.x07rr.json": {
+      "jcs_sha256_hex": "664f4f9fdaa2d30e789ef38c471885be43080e87ea34e23913432d8156223d3b"
+    }
+  },
+  "schema_version": "x07.arch.contracts.lock@0.1.0"
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.unicode.casefold",
+  "imports": ["ext.unicode"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["ext.unicode.casefold.casefold_basic_v1"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.casefold.casefold_basic_v1",
+      "params": [{ "name": "utf8", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "doc", ["ext.unicode.unicode_nfkc_basic", "utf8"]],
+        ["if", ["=", ["bytes.len", "doc"], 0], ["return", "doc"], 0],
+        ["if", ["=", ["bytes.get_u8", "doc", 0], 0], ["return", "doc"], 0],
+        ["let", "docv", ["bytes.view", "doc"]],
+        ["let", "raw", ["ext.unicode.unicode_get_bytes", "docv"]],
+        ["let", "n", ["bytes.len", "raw"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 1, "n"]]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "c", ["bytes.get_u8", "raw", "i"]],
+            [
+              "set",
+              "out",
+              [
+                "vec_u8.push",
+                "out",
+                [
+                  "if",
+                  ["if", [">=u", "c", 65], ["<u", "c", 91], 0],
+                  ["+", "c", 32],
+                  "c"
+                ]
+              ]
+            ],
+            0
+          ]
+        ],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    }
+  ]
+}

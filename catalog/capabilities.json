@@ -452,7 +452,7 @@
       "summary": "Deterministic DB migration plans and apply helpers (run-os*).",
       "canonical": {
         "name": "ext-db-migrate",
-        "version": "0.1.1"
+        "version": "0.1.2"
       },
       "worlds": [
         "run-os",

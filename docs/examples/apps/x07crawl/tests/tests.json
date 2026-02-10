@@ -1,0 +1,94 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "id": "pure/normalize_basic",
+      "world": "run-os",
+      "entry": "test_pure.normalize_basic",
+      "expect": "pass"
+    },
+    {
+      "id": "pure/normalize_trailing_slash",
+      "world": "run-os",
+      "entry": "test_pure.normalize_trailing_slash",
+      "expect": "pass"
+    },
+    {
+      "id": "pure/robots_empty_allows",
+      "world": "run-os",
+      "entry": "test_pure.robots_empty_allows",
+      "expect": "pass"
+    },
+    {
+      "id": "pure/plan_dedup",
+      "world": "run-os",
+      "entry": "test_pure.plan_dedup",
+      "expect": "pass"
+    },
+    {
+      "id": "pure/plan_max_pages",
+      "world": "run-os",
+      "entry": "test_pure.plan_max_pages",
+      "expect": "pass"
+    },
+    {
+      "id": "pure/canonical_json",
+      "world": "run-os",
+      "entry": "test_pure.canonical_json",
+      "expect": "pass"
+    },
+    {
+      "id": "pure/extract_title",
+      "world": "run-os",
+      "entry": "test_pure.extract_title",
+      "expect": "pass"
+    },
+    {
+      "id": "pure/bounded_queue",
+      "world": "run-os",
+      "entry": "test_pure.bounded_queue",
+      "expect": "pass"
+    },
+    {
+      "id": "pbt/normalize_idempotent",
+      "world": "solve-pure",
+      "entry": "test_pure.prop_normalize_idempotent",
+      "expect": "pass",
+      "returns": "bytes_status_v1",
+      "pbt": {
+        "cases": 200,
+        "max_shrinks": 4096,
+        "params": [
+          {"name": "b", "gen": {"kind": "bytes", "max_len": 64}}
+        ],
+        "case_budget": {
+          "fuel": 5000000,
+          "timeout_ms": 500,
+          "max_mem_bytes": 67108864,
+          "max_output_bytes": 1048576
+        }
+      }
+    },
+    {
+      "id": "rr/replay_fetch_example",
+      "world": "solve-rr",
+      "entry": "test_rr.replay_fetch_example",
+      "expect": "pass",
+      "fixture_root": "fixtures/replay/rr"
+    },
+    {
+      "id": "rr/replay_extract_title",
+      "world": "solve-rr",
+      "entry": "test_rr.replay_extract_title",
+      "expect": "pass",
+      "fixture_root": "fixtures/replay/rr"
+    },
+    {
+      "id": "rr/replay_plan_and_fetch",
+      "world": "solve-rr",
+      "entry": "test_rr.replay_plan_and_fetch",
+      "expect": "pass",
+      "fixture_root": "fixtures/replay/rr"
+    }
+  ]
+}

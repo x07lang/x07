@@ -1,0 +1,135 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.hex.tests",
+  "imports": ["std.test", "ext.hex"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.hex.tests.test_encode_decode_roundtrip",
+        "ext.hex.tests.test_decode_invalid_char",
+        "ext.hex.tests.test_decode_odd_length"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.hex.tests.test_encode_decode_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src_bytes", ["bytes.lit", "hello"]],
+        [
+          "let",
+          "hex_bytes",
+          ["ext.hex.hex_encode", ["bytes.view", "src_bytes"]]
+        ],
+        ["let", "expected_hex", ["bytes.lit", "68656c6c6f"]],
+        ["let", "hex_view", ["bytes.view", "hex_bytes"]],
+        ["let", "expected_hex_view", ["bytes.view", "expected_hex"]],
+        [
+          "try",
+          [
+            "std.test.assert_view_eq",
+            "hex_view",
+            "expected_hex_view",
+            ["std.test.code_assert_view_eq"]
+          ]
+        ],
+        ["let", "doc", ["ext.hex.hex_decode", "hex_view"]],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.hex.hex_is_err", "doc_view"],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "decoded", ["ext.hex.hex_get_bytes", "doc_view"]],
+        [
+          "try",
+          [
+            "std.test.assert_bytes_eq",
+            "decoded",
+            "src_bytes",
+            ["std.test.code_assert_bytes_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.hex.tests.test_decode_invalid_char",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src_bytes", ["bytes.lit", "zz"]],
+        [
+          "let",
+          "doc",
+          ["ext.hex.hex_decode", ["bytes.view", "src_bytes"]]
+        ],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.hex.hex_is_err", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.hex.hex_err_code", "doc_view"],
+            2,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.hex.tests.test_decode_odd_length",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src_bytes", ["bytes.lit", "0"]],
+        [
+          "let",
+          "doc",
+          ["ext.hex.hex_decode", ["bytes.view", "src_bytes"]]
+        ],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.hex.hex_is_err", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.hex.hex_err_code", "doc_view"],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

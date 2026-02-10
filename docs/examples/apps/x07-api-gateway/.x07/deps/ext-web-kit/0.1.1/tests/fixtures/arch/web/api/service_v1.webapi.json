@@ -1,0 +1,27 @@
+{
+  "schema_version": "x07.arch.web.api@0.1.0",
+  "id": "service",
+  "v": 1,
+  "endpoints": [
+    {
+      "id": "healthz",
+      "method": "GET",
+      "path": "/healthz",
+      "req_brand": "std.bytes.raw_v1",
+      "resp_brand": "std.bytes.raw_v1",
+      "error_space": "web",
+      "streaming_body": false
+    }
+  ],
+  "errors": [
+    {
+      "space": "web",
+      "codes": [
+        { "code": 1, "http_status": 400, "stable_id": "bad_request_v1" },
+        { "code": 2, "http_status": 404, "stable_id": "not_found_v1" },
+        { "code": 3, "http_status": 500, "stable_id": "internal_v1" }
+      ]
+    }
+  ]
+}
+

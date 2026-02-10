@@ -1,0 +1,154 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "module_id": "std.auth.jwt.tests",
+  "kind": "module",
+  "imports": [
+    "ext.base64",
+    "ext.data_model",
+    "ext.json.data_model",
+    "ext.openssl.ed25519",
+    "std.auth.jwt",
+    "std.crypto.ed25519",
+    "std.test",
+    "std.text.ascii"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.auth.jwt.tests.test_ed25519_rfc8032_vectors_v1",
+        "std.auth.jwt.tests.test_jwt_profile_roundtrip_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt.tests._b64_decode_v1",
+      "params": [{ "name": "b64", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "doc", ["ext.base64.base64_decode", "b64"]],
+        ["let", "dv", ["bytes.view", "doc"]],
+        ["if", ["=", ["ext.base64.base64_is_err", "dv"], 1], ["return", ["bytes.alloc", 0]], 0],
+        ["ext.base64.base64_get_bytes", "dv"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt.tests.test_ed25519_rfc8032_vectors_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "src",
+          [
+            "os.fs.read_file",
+            [
+              "bytes.lit",
+              "packages/ext/x07-ext-auth-jwt/0.1.1/tests/fixtures/ed25519/rfc8032_vectors.json"
+            ]
+          ]
+        ],
+        ["let", "doc", ["ext.json.data_model.parse", ["bytes.view", "src"]]],
+        ["let", "dv", ["bytes.view", "doc"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.data_model.doc_is_err", "dv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "root", ["ext.data_model.root_offset", "dv"]],
+        ["let", "k_vectors", ["bytes.lit", "vectors"]],
+        ["let", "vecs_off", ["ext.data_model.map_find", "dv", "root", ["bytes.view", "k_vectors"]]],
+        ["try", ["std.test.assert_true", [">=", "vecs_off", 0], ["std.test.code_assert_true"]]],
+        ["let", "v0", ["ext.data_model.seq_get", "dv", "vecs_off", 0]],
+        ["try", ["std.test.assert_true", [">=", "v0", 0], ["std.test.code_assert_true"]]],
+        ["let", "k_sk", ["bytes.lit", "sk_seed_b64"]],
+        ["let", "k_pk", ["bytes.lit", "pk_b64"]],
+        ["let", "k_msg", ["bytes.lit", "msg_b64"]],
+        ["let", "k_sig", ["bytes.lit", "sig_b64"]],
+        ["let", "sk_off", ["ext.data_model.map_find", "dv", "v0", ["bytes.view", "k_sk"]]],
+        ["let", "pk_off", ["ext.data_model.map_find", "dv", "v0", ["bytes.view", "k_pk"]]],
+        ["let", "msg_off", ["ext.data_model.map_find", "dv", "v0", ["bytes.view", "k_msg"]]],
+        ["let", "sig_off", ["ext.data_model.map_find", "dv", "v0", ["bytes.view", "k_sig"]]],
+        ["try", ["std.test.assert_true", [">=", "sk_off", 0], ["std.test.code_assert_true"]]],
+        ["try", ["std.test.assert_true", [">=", "pk_off", 0], ["std.test.code_assert_true"]]],
+        ["try", ["std.test.assert_true", [">=", "msg_off", 0], ["std.test.code_assert_true"]]],
+        ["try", ["std.test.assert_true", [">=", "sig_off", 0], ["std.test.code_assert_true"]]],
+        ["let", "sk_b64", ["ext.data_model.string_get", "dv", "sk_off"]],
+        ["let", "pk_b64", ["ext.data_model.string_get", "dv", "pk_off"]],
+        ["let", "msg_b64", ["ext.data_model.string_get", "dv", "msg_off"]],
+        ["let", "sig_b64", ["ext.data_model.string_get", "dv", "sig_off"]],
+        ["let", "sk", ["std.auth.jwt.tests._b64_decode_v1", ["bytes.view", "sk_b64"]]],
+        ["let", "pk", ["std.auth.jwt.tests._b64_decode_v1", ["bytes.view", "pk_b64"]]],
+        ["let", "msg", ["std.auth.jwt.tests._b64_decode_v1", ["bytes.view", "msg_b64"]]],
+        ["let", "expected_sig", ["std.auth.jwt.tests._b64_decode_v1", ["bytes.view", "sig_b64"]]],
+        ["try", ["std.test.assert_i32_eq", ["bytes.len", "sk"], 32, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["bytes.len", "pk"], 32, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["bytes.len", "expected_sig"], 64, ["std.test.code_assert_i32_eq"]]],
+        ["let", "sig_res", ["std.crypto.ed25519.sign_seed_v1", ["bytes.view", "sk"], ["bytes.view", "msg"]]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "sig_res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "sig", ["result_bytes.unwrap_or", "sig_res", ["bytes.alloc", 0]]],
+        ["try", ["std.test.assert_true", ["bytes.eq", "sig", "expected_sig"], ["std.test.code_assert_true"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["std.crypto.ed25519.verify_seed_v1", ["bytes.view", "sk"], ["bytes.view", "msg"], ["bytes.view", "sig"]],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.openssl.ed25519.verify_v1", ["bytes.view", "pk"], ["bytes.view", "msg"], ["bytes.view", "sig"]],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.auth.jwt.tests.test_jwt_profile_roundtrip_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "pid", ["bytes.lit", "dev_jwt_eddsa_v1"]],
+        [
+          "let",
+          "expected_raw",
+          [
+            "os.fs.read_file",
+            [
+              "bytes.lit",
+              "packages/ext/x07-ext-auth-jwt/0.1.1/tests/fixtures/jwt/token_eddsa.compact.txt"
+            ]
+          ]
+        ],
+        ["let", "expected_v", ["std.text.ascii.last_line_view", ["bytes.view", "expected_raw"]]],
+        ["let", "expected", ["view.to_bytes", "expected_v"]],
+        ["try", ["std.test.assert_true", [">", ["bytes.len", "expected"], 0], ["std.test.code_assert_true"]]],
+        [
+          "let",
+          "claims_json",
+          [
+            "bytes.lit",
+            "{\"sub\":\"u\",\"iss\":\"x07-dev\",\"aud\":\"x07-dev\"}"
+          ]
+        ],
+        ["let", "claims_doc", ["ext.json.data_model.parse", ["bytes.view", "claims_json"]]],
+        ["let", "cdv", ["bytes.view", "claims_doc"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.data_model.doc_is_err", "cdv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "token_res", ["std.auth.jwt.sign_from_arch_v1", ["bytes.view", "pid"], "cdv"]],
+        ["try", ["std.test.assert_i32_eq", ["result_bytes.err_code", "token_res"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "token", ["result_bytes.unwrap_or", "token_res", ["bytes.alloc", 0]]],
+        ["try", ["std.test.assert_true", ["bytes.eq", "token", "expected"], ["std.test.code_assert_true"]]],
+        ["let", "vres", ["std.auth.jwt.verify_from_arch_v1", ["bytes.view", "pid"], ["bytes.view", "token"]]],
+        ["try", ["std.test.assert_true", ["result_i32.is_ok", "vres"], ["std.test.code_assert_true"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

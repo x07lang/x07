@@ -1,0 +1,25 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-auth-jwt",
+  "version": "0.1.1",
+  "description": "Ed25519 + JWT (profiles pinned under arch/crypto). Deterministic token generation via canonical JSON payloads.",
+  "docs": "Ed25519 + JWT helpers pinned by arch/crypto contracts.\n\nModules:\n- std.crypto.ed25519\n- std.auth.jwt\n- std.auth.jwt.tests\n\nWorlds:\n- run-os / run-os-sandboxed only\n\nUsage:\n- Add dependency: x07 pkg add ext-auth-jwt@0.1.1\n- Use std.auth.jwt.sign_from_arch_v1 / verify_from_arch_v1 with profiles under arch/crypto.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.crypto.ed25519",
+    "std.auth.jwt",
+    "std.auth.jwt.tests"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": ["run-os", "run-os-sandboxed"],
+    "requires_packages": [
+      "ext-base64-rs@0.1.4",
+      "ext-data-model@0.1.8",
+      "ext-json-rs@0.1.4",
+      "ext-openssl-c@0.1.6"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

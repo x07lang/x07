@@ -1,0 +1,38 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "module_id": "std.crypto.ed25519",
+  "kind": "module",
+  "imports": ["ext.openssl.ed25519"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["std.crypto.ed25519.sign_seed_v1", "std.crypto.ed25519.verify_seed_v1"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.crypto.ed25519.sign_seed_v1",
+      "params": [
+        { "name": "sk_seed", "ty": "bytes_view" },
+        { "name": "msg", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "begin",
+        ["let", "sig", ["ext.openssl.ed25519.sign_seed_v1", "sk_seed", "msg"]],
+        ["if", ["!=", ["bytes.len", "sig"], 64], ["return", ["result_bytes.err", 7001]], 0],
+        ["result_bytes.ok", "sig"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.crypto.ed25519.verify_seed_v1",
+      "params": [
+        { "name": "sk_seed", "ty": "bytes_view" },
+        { "name": "msg", "ty": "bytes_view" },
+        { "name": "sig", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": ["ext.openssl.ed25519.verify_seed_v1", "sk_seed", "msg", "sig"]
+    }
+  ]
+}

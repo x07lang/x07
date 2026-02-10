@@ -3534,7 +3534,8 @@ fn check_contracts_v1(
                     .cloned()
                     .collect();
 
-                for p in &index_obj.policies {
+                let index_rel = display_relpath(repo_root, &index_path);
+                for (policy_idx, p) in index_obj.policies.iter().enumerate() {
                     if p.cassette_brand.trim() != "std.rr.cassette_v1" {
                         let mut data = BTreeMap::new();
                         data.insert("policy_id".to_string(), Value::String(p.id.clone()));
@@ -3561,6 +3562,19 @@ fn check_contracts_v1(
                             None,
                             data,
                         ));
+                        let entry = suggested
+                            .entry(index_rel.clone())
+                            .or_insert(ArchPatchTarget {
+                                path: index_rel.clone(),
+                                patch: Vec::new(),
+                                note: Some("Auto-sort RR index arrays.".to_string()),
+                            });
+                        entry.patch.push(diagnostics::PatchOp::Replace {
+                            path: format!("/policies/{policy_idx}/worlds_allowed"),
+                            value: Value::Array(
+                                worlds_sorted.into_iter().map(Value::String).collect(),
+                            ),
+                        });
                     }
 
                     let mut kinds_sorted = p.kinds_allowed.clone();
@@ -3574,6 +3588,19 @@ fn check_contracts_v1(
                             None,
                             data,
                         ));
+                        let entry = suggested
+                            .entry(index_rel.clone())
+                            .or_insert(ArchPatchTarget {
+                                path: index_rel.clone(),
+                                patch: Vec::new(),
+                                note: Some("Auto-sort RR index arrays.".to_string()),
+                            });
+                        entry.patch.push(diagnostics::PatchOp::Replace {
+                            path: format!("/policies/{policy_idx}/kinds_allowed"),
+                            value: Value::Array(
+                                kinds_sorted.into_iter().map(Value::String).collect(),
+                            ),
+                        });
                     }
 
                     let mut ops_sorted = p.ops_allowed.clone();
@@ -3587,6 +3614,19 @@ fn check_contracts_v1(
                             None,
                             data,
                         ));
+                        let entry = suggested
+                            .entry(index_rel.clone())
+                            .or_insert(ArchPatchTarget {
+                                path: index_rel.clone(),
+                                patch: Vec::new(),
+                                note: Some("Auto-sort RR index arrays.".to_string()),
+                            });
+                        entry.patch.push(diagnostics::PatchOp::Replace {
+                            path: format!("/policies/{policy_idx}/ops_allowed"),
+                            value: Value::Array(
+                                ops_sorted.into_iter().map(Value::String).collect(),
+                            ),
+                        });
                     }
 
                     for op in &p.ops_allowed {
@@ -3731,11 +3771,24 @@ fn check_contracts_v1(
                     if sanitize_doc.get("schema_version").and_then(Value::as_str)
                         != Some(X07_ARCH_RR_SANITIZE_SCHEMA_VERSION)
                     {
-                        diags.push(diag_parse_error(
+                        let got = sanitize_doc
+                            .get("schema_version")
+                            .and_then(Value::as_str)
+                            .map(|s| s.to_string());
+                        let mut d = diag_parse_error(
                             "E_ARCH_RR_SANITIZER_SCHEMA_VERSION",
                             "schema_version mismatch for RR sanitizer",
                             Some(&display_relpath(repo_root, &sanitize_path)),
-                        ));
+                        );
+                        d.data.insert(
+                            "expected".to_string(),
+                            Value::String(X07_ARCH_RR_SANITIZE_SCHEMA_VERSION.to_string()),
+                        );
+                        d.data.insert(
+                            "got".to_string(),
+                            got.map(Value::String).unwrap_or(Value::Null),
+                        );
+                        diags.push(d);
                     } else {
                         let schema_diags = validate_schema(
                             "E_ARCH_RR_SANITIZER_SCHEMA_INVALID",
@@ -3744,6 +3797,43 @@ fn check_contracts_v1(
                         )?;
                         for d in schema_diags {
                             diags.push(d);
+                        }
+
+                        let mut patch = Vec::new();
+                        if sanitize_doc.as_object().is_some() {
+                            if sanitize_doc.get("v").is_none() {
+                                patch.push(diagnostics::PatchOp::Add {
+                                    path: "/v".to_string(),
+                                    value: Value::Number(1u64.into()),
+                                });
+                            }
+                            if sanitize_doc.get("redact_headers").is_none() {
+                                patch.push(diagnostics::PatchOp::Add {
+                                    path: "/redact_headers".to_string(),
+                                    value: Value::Array(Vec::new()),
+                                });
+                            }
+                            if sanitize_doc.get("redact_token").is_none() {
+                                patch.push(diagnostics::PatchOp::Add {
+                                    path: "/redact_token".to_string(),
+                                    value: Value::String(String::new()),
+                                });
+                            }
+                        }
+                        if !patch.is_empty() {
+                            let sanitize_rel = display_relpath(repo_root, &sanitize_path);
+                            let entry =
+                                suggested
+                                    .entry(sanitize_rel.clone())
+                                    .or_insert(ArchPatchTarget {
+                                        path: sanitize_rel,
+                                        patch: Vec::new(),
+                                        note: Some(
+                                            "Fill required RR sanitizer fields with safe defaults."
+                                                .to_string(),
+                                        ),
+                                    });
+                            entry.patch.extend(patch);
                         }
                     }
 

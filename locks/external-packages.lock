@@ -3215,9 +3215,37 @@
         }
       ],
       "name": "ext-db-migrate",
-      "package_manifest_sha256": "dcdabbedca609165fdc0b8122c5d0f13da692d6fe6cb7312c14816be8b578d5e",
+      "package_manifest_sha256": "1dc92f1d948bebf665d605bbb4c975456f82f411aff6602598cd7e2bcdb6c95d",
       "path": "packages/ext/x07-ext-db-migrate/0.1.1",
       "version": "0.1.1"
+    },
+    {
+      "determinism_tier": "mixed",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.db.migrate.tests",
+          "path": "packages/ext/x07-ext-db-migrate/0.1.2/modules/std/db/migrate/tests.x07.json",
+          "sha256": "1277c15b7584269472df1bd74b674045265844a3b822d94548f3b98c2a8682ce",
+          "size_bytes": 2106
+        },
+        {
+          "module_id": "std.db.migrate",
+          "path": "packages/ext/x07-ext-db-migrate/0.1.2/modules/std/db/migrate.x07.json",
+          "sha256": "7be6fc5367cf26b5c869afde56b116882a9264218f8018a84c4bdb1ec2baef2c",
+          "size_bytes": 16874
+        },
+        {
+          "module_id": "std.db.rr",
+          "path": "packages/ext/x07-ext-db-migrate/0.1.2/modules/std/db/rr.x07.json",
+          "sha256": "424ee7a1bbda3ff9236ca1de0ed3eda932dd6de315c46630684d499c641771a6",
+          "size_bytes": 3119
+        }
+      ],
+      "name": "ext-db-migrate",
+      "package_manifest_sha256": "598ba25f529b422931f34983c1e1035c649894cd52330154e8997c7493bd2a7f",
+      "path": "packages/ext/x07-ext-db-migrate/0.1.2",
+      "version": "0.1.2"
     },
     {
       "determinism_tier": "os-world-only",
@@ -10613,6 +10641,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "1850c3c5b1807f0d2eacc390b9a1df918c42a8fddaa6f366351796226e607008",
+  "packages_hash": "954d3ae1c965d3f756987d834282bcabc81b09a764fdbda53f39ec498649e234",
   "packages_root": "packages/ext"
 }

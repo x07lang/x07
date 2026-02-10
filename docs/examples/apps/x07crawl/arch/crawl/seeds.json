@@ -1,0 +1,10 @@
+{
+  "schema_version": "x07.crawl.seeds@0.1.0",
+  "seeds": [
+    "https://example.com/",
+    "https://example.com/sitemap.xml",
+    "https://example.com/robots.txt"
+  ],
+  "max_pages": 3,
+  "user_agent": "x07crawl/0.1.0"
+}

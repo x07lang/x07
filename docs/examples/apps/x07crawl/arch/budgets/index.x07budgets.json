@@ -1,0 +1,32 @@
+{
+  "schema_version": "x07.arch.budgets.index@0.1.0",
+  "profiles": [
+    {
+      "id": "crawl_plan_v1",
+      "profile_path": "arch/budgets/profiles/crawl_plan_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "app.crawl.plan", "fn": "plan_crawl_v1" }
+      ],
+      "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"]
+    },
+    {
+      "id": "html_parse_v1",
+      "profile_path": "arch/budgets/profiles/html_parse_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "app.extract", "fn": "extract_records_v1" }
+      ],
+      "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"]
+    },
+    {
+      "id": "extract_emit_v1",
+      "profile_path": "arch/budgets/profiles/extract_emit_v1.budget.json",
+      "enforce": "error",
+      "selectors": [
+        { "module_prefix": "app.extract", "fn": "emit_canonical_json_v1" }
+      ],
+      "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"]
+    }
+  ]
+}

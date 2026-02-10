@@ -1,0 +1,546 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.unicode.tests",
+  "imports": [
+    "ext.unicode",
+    "ext.unicode.casefold",
+    "ext.unicode.normalize",
+    "ext.unicode.segment",
+    "std.codec",
+    "std.test",
+    "std.text.slices"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.unicode.tests.test_grapheme_slices_basic",
+        "ext.unicode.tests.test_latin1_decode",
+        "ext.unicode.tests.test_nfkc_basic",
+        "ext.unicode.tests.test_utf16le_roundtrip",
+        "ext.unicode.tests.test_utf8_u32le_roundtrip",
+        "ext.unicode.tests.test_windows1252_decode_and_error",
+        "ext.unicode.tests.test_normalize_nfkc_basic_v1",
+        "ext.unicode.tests.test_casefold_basic_v1",
+        "ext.unicode.tests.test_segment_grapheme_slices_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.tests.test_grapheme_slices_basic",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "s",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 3]],
+              ["set", "v", ["vec_u8.push", "v", 97]],
+              ["set", "v", ["vec_u8.push", "v", 204]],
+              ["set", "v", ["vec_u8.push", "v", 129]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc", ["ext.unicode.unicode_grapheme_slices", ["bytes.view", "s"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "payload", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc"]]],
+        [
+          "let",
+          "expected",
+          [
+            "std.text.slices.builder_finish_v1",
+            [
+              "std.text.slices.builder_push_v1",
+              ["std.text.slices.builder_new_v1", 1],
+              0,
+              3
+            ],
+            1
+          ]
+        ],
+        ["try", ["std.test.assert_bytes_eq", "payload", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.tests.test_latin1_decode",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "latin1",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 4]],
+              ["set", "v", ["vec_u8.push", "v", 99]],
+              ["set", "v", ["vec_u8.push", "v", 97]],
+              ["set", "v", ["vec_u8.push", "v", 102]],
+              ["set", "v", ["vec_u8.push", "v", 233]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc", ["ext.unicode.unicode_decode_latin1_to_utf8", ["bytes.view", "latin1"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "utf8", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc"]]],
+        [
+          "let",
+          "expected",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 5]],
+              ["set", "v", ["vec_u8.push", "v", 99]],
+              ["set", "v", ["vec_u8.push", "v", 97]],
+              ["set", "v", ["vec_u8.push", "v", 102]],
+              ["set", "v", ["vec_u8.push", "v", 195]],
+              ["set", "v", ["vec_u8.push", "v", 169]],
+              "v"
+            ]
+          ]
+        ],
+        ["try", ["std.test.assert_bytes_eq", "utf8", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.tests.test_nfkc_basic",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "fullwidth_abc",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 9]],
+              ["set", "v", ["vec_u8.push", "v", 239]],
+              ["set", "v", ["vec_u8.push", "v", 188]],
+              ["set", "v", ["vec_u8.push", "v", 161]],
+              ["set", "v", ["vec_u8.push", "v", 239]],
+              ["set", "v", ["vec_u8.push", "v", 188]],
+              ["set", "v", ["vec_u8.push", "v", 162]],
+              ["set", "v", ["vec_u8.push", "v", 239]],
+              ["set", "v", ["vec_u8.push", "v", 188]],
+              ["set", "v", ["vec_u8.push", "v", 163]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc", ["ext.unicode.unicode_nfkc_basic", ["bytes.view", "fullwidth_abc"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "out", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc"]]],
+        ["try", ["std.test.assert_bytes_eq", "out", ["bytes.lit", "ABC"], ["std.test.code_assert_bytes_eq"]]],
+        [
+          "let",
+          "spacey",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 5]],
+              ["set", "v", ["vec_u8.push", "v", 194]],
+              ["set", "v", ["vec_u8.push", "v", 160]],
+              ["set", "v", ["vec_u8.push", "v", 65]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc2", ["ext.unicode.unicode_nfkc_basic", ["bytes.view", "spacey"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc2"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "out2", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc2"]]],
+        [
+          "let",
+          "expected_space_a",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 2]],
+              ["set", "v", ["vec_u8.push", "v", 32]],
+              ["set", "v", ["vec_u8.push", "v", 65]],
+              "v"
+            ]
+          ]
+        ],
+        ["try", ["std.test.assert_bytes_eq", "out2", "expected_space_a", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.tests.test_utf16le_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "utf8",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 7]],
+              ["set", "v", ["vec_u8.push", "v", 65]],
+              ["set", "v", ["vec_u8.push", "v", 195]],
+              ["set", "v", ["vec_u8.push", "v", 169]],
+              ["set", "v", ["vec_u8.push", "v", 240]],
+              ["set", "v", ["vec_u8.push", "v", 159]],
+              ["set", "v", ["vec_u8.push", "v", 146]],
+              ["set", "v", ["vec_u8.push", "v", 169]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc_enc", ["ext.unicode.unicode_encode_utf8_to_utf16_le", ["bytes.view", "utf8"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc_enc"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "utf16le", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc_enc"]]],
+        ["let", "doc_dec", ["ext.unicode.unicode_decode_utf16_le_to_utf8", ["bytes.view", "utf16le"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc_dec"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "utf8_2", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc_dec"]]],
+        ["try", ["std.test.assert_bytes_eq", "utf8_2", "utf8", ["std.test.code_assert_bytes_eq"]]],
+        [
+          "let",
+          "bad_utf16le",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 2]],
+              ["set", "v", ["vec_u8.push", "v", 0]],
+              ["set", "v", ["vec_u8.push", "v", 216]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc_bad", ["ext.unicode.unicode_decode_utf16_le_to_utf8", ["bytes.view", "bad_utf16le"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc_bad"]],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_err_code", ["bytes.view", "doc_bad"]],
+            5,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.tests.test_utf8_u32le_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "v", ["vec_u8.with_capacity", 7]],
+        ["set", "v", ["vec_u8.push", "v", 65]],
+        ["set", "v", ["vec_u8.push", "v", 195]],
+        ["set", "v", ["vec_u8.push", "v", 169]],
+        ["set", "v", ["vec_u8.push", "v", 240]],
+        ["set", "v", ["vec_u8.push", "v", 159]],
+        ["set", "v", ["vec_u8.push", "v", 146]],
+        ["set", "v", ["vec_u8.push", "v", 169]],
+        ["let", "utf8", ["vec_u8.into_bytes", "v"]],
+        ["let", "doc1", ["ext.unicode.unicode_utf8_decode_u32le", ["bytes.view", "utf8"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc1"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "u32le", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc1"]]],
+        ["let", "doc2", ["ext.unicode.unicode_utf8_encode_u32le", ["bytes.view", "u32le"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc2"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "utf8_2", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc2"]]],
+        ["try", ["std.test.assert_bytes_eq", "utf8_2", "utf8", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.tests.test_windows1252_decode_and_error",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "b_ok",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 1]],
+              ["set", "v", ["vec_u8.push", "v", 128]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc_ok", ["ext.unicode.unicode_decode_windows1252_to_utf8", ["bytes.view", "b_ok"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc_ok"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "utf8_ok", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc_ok"]]],
+        [
+          "let",
+          "expected_ok",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 3]],
+              ["set", "v", ["vec_u8.push", "v", 226]],
+              ["set", "v", ["vec_u8.push", "v", 130]],
+              ["set", "v", ["vec_u8.push", "v", 172]],
+              "v"
+            ]
+          ]
+        ],
+        ["try", ["std.test.assert_bytes_eq", "utf8_ok", "expected_ok", ["std.test.code_assert_bytes_eq"]]],
+        [
+          "let",
+          "b_bad",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 1]],
+              ["set", "v", ["vec_u8.push", "v", 129]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc_bad", ["ext.unicode.unicode_decode_windows1252_to_utf8", ["bytes.view", "b_bad"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc_bad"]],
+            1,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_err_code", ["bytes.view", "doc_bad"]],
+            9,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.tests.test_normalize_nfkc_basic_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "fullwidth_abc",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 9]],
+              ["set", "v", ["vec_u8.push", "v", 239]],
+              ["set", "v", ["vec_u8.push", "v", 188]],
+              ["set", "v", ["vec_u8.push", "v", 161]],
+              ["set", "v", ["vec_u8.push", "v", 239]],
+              ["set", "v", ["vec_u8.push", "v", 188]],
+              ["set", "v", ["vec_u8.push", "v", 162]],
+              ["set", "v", ["vec_u8.push", "v", 239]],
+              ["set", "v", ["vec_u8.push", "v", 188]],
+              ["set", "v", ["vec_u8.push", "v", 163]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc", ["ext.unicode.normalize.nfkc_basic_v1", ["bytes.view", "fullwidth_abc"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "out", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc"]]],
+        ["try", ["std.test.assert_bytes_eq", "out", ["bytes.lit", "ABC"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.tests.test_casefold_basic_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "raw", ["bytes.lit", "ABC"]],
+        ["let", "doc", ["ext.unicode.casefold.casefold_basic_v1", ["bytes.view", "raw"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "out", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc"]]],
+        ["try", ["std.test.assert_bytes_eq", "out", ["bytes.lit", "abc"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.unicode.tests.test_segment_grapheme_slices_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "s",
+          [
+            "vec_u8.into_bytes",
+            [
+              "begin",
+              ["let", "v", ["vec_u8.with_capacity", 3]],
+              ["set", "v", ["vec_u8.push", "v", 97]],
+              ["set", "v", ["vec_u8.push", "v", 204]],
+              ["set", "v", ["vec_u8.push", "v", 129]],
+              "v"
+            ]
+          ]
+        ],
+        ["let", "doc", ["ext.unicode.segment.grapheme_slices_v1", ["bytes.view", "s"]]],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            ["ext.unicode.unicode_is_err", ["bytes.view", "doc"]],
+            0,
+            ["std.test.code_assert_i32_eq"]
+          ]
+        ],
+        ["let", "payload", ["ext.unicode.unicode_get_bytes", ["bytes.view", "doc"]]],
+        [
+          "let",
+          "expected",
+          [
+            "std.text.slices.builder_finish_v1",
+            [
+              "std.text.slices.builder_push_v1",
+              ["std.text.slices.builder_new_v1", 1],
+              0,
+              3
+            ],
+            1
+          ]
+        ],
+        ["try", ["std.test.assert_bytes_eq", "payload", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

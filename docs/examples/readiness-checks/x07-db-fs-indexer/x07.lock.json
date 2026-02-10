@@ -45,9 +45,9 @@
     },
     {
       "name": "ext-crypto-rs",
-      "version": "0.1.0",
-      "path": ".x07/deps/ext-crypto-rs/0.1.0",
-      "package_manifest_sha256": "e846d0262298dc2a79025d543ea04c40c3c49823a9578fcbb0c0672ea1638005",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-crypto-rs/0.1.4",
+      "package_manifest_sha256": "cb30d2d07904a314556841b1f609cfa363d2cb3462d868b6d57c7a03b6fb9e1f",
       "module_root": "modules",
       "modules_sha256": {
         "ext.crypto": "0468f27cefff8107f7b376675c4ca558cb3071922c301ff599be96e8b57f1045",
@@ -105,9 +105,9 @@
     },
     {
       "name": "ext-db-migrate",
-      "version": "0.1.1",
-      "path": ".x07/deps/ext-db-migrate/0.1.1",
-      "package_manifest_sha256": "dcdabbedca609165fdc0b8122c5d0f13da692d6fe6cb7312c14816be8b578d5e",
+      "version": "0.1.2",
+      "path": ".x07/deps/ext-db-migrate/0.1.2",
+      "package_manifest_sha256": "598ba25f529b422931f34983c1e1035c649894cd52330154e8997c7493bd2a7f",
       "module_root": "modules",
       "modules_sha256": {
         "std.db.migrate": "76fba6e980ffd4728c9c2c8c84a551d0a553d595aaedeb89787e4b92e2f39a2a",
@@ -214,9 +214,9 @@
     },
     {
       "name": "ext-hex-rs",
-      "version": "0.1.0",
-      "path": ".x07/deps/ext-hex-rs/0.1.0",
-      "package_manifest_sha256": "dd4e802cc911a3994ec33076a546708a0abb6a4efe26ef18ef1e15b11a37b52b",
+      "version": "0.1.4",
+      "path": ".x07/deps/ext-hex-rs/0.1.4",
+      "package_manifest_sha256": "1fbd669d3b2734c61a28c55efa014b40193b29c96bcdc6a0cc10a8a7ce4baaa5",
       "module_root": "modules",
       "modules_sha256": {
         "ext.hex": "511c9bade4d5d1d02633cda4a01596125845d90d4946ba03df6d27d5c5aed1d9",

@@ -1,0 +1,108 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.toml.tests",
+  "imports": ["std.test", "ext.toml"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.toml.tests.test_parse_simple",
+        "ext.toml.tests.test_parse_section",
+        "ext.toml.tests.test_get_string",
+        "ext.toml.tests.test_get_i32"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.toml.tests.test_parse_simple",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "v", ["vec_u8.with_capacity", 32]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "name=\"test\""]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "version=42"]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["let", "src_bytes", ["vec_u8.into_bytes", "v"]],
+        ["let", "doc", ["ext.toml.toml_parse", ["bytes.view", "src_bytes"]]],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.toml.toml_is_err", "doc_view"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.toml.tests.test_parse_section",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "v", ["vec_u8.with_capacity", 32]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "[package]"]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "name=\"myapp\""]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["let", "src_bytes", ["vec_u8.into_bytes", "v"]],
+        ["let", "doc", ["ext.toml.toml_parse", ["bytes.view", "src_bytes"]]],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.toml.toml_is_err", "doc_view"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "key", ["bytes.lit", "package.name"]],
+        ["let", "key_view", ["bytes.view", "key"]],
+        ["let", "name", ["ext.toml.toml_get_string", "doc_view", "key_view"]],
+        ["try", ["std.test.assert_bytes_eq", "name", ["bytes.lit", "myapp"], ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.toml.tests.test_get_string",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "v", ["vec_u8.with_capacity", 32]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "title=\"Hello"]]],
+        ["set", "v", ["vec_u8.push", "v", 32]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "World\""]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["let", "src_bytes", ["vec_u8.into_bytes", "v"]],
+        ["let", "doc", ["ext.toml.toml_parse", ["bytes.view", "src_bytes"]]],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        ["let", "key", ["bytes.lit", "title"]],
+        ["let", "key_view", ["bytes.view", "key"]],
+        ["let", "title", ["ext.toml.toml_get_string", "doc_view", "key_view"]],
+        ["let", "expected_v", ["vec_u8.with_capacity", 11]],
+        ["set", "expected_v", ["vec_u8.extend_bytes", "expected_v", ["bytes.lit", "Hello"]]],
+        ["set", "expected_v", ["vec_u8.push", "expected_v", 32]],
+        ["set", "expected_v", ["vec_u8.extend_bytes", "expected_v", ["bytes.lit", "World"]]],
+        ["let", "expected", ["vec_u8.into_bytes", "expected_v"]],
+        ["try", ["std.test.assert_bytes_eq", "title", "expected", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.toml.tests.test_get_i32",
+      "params": [],
+      "result": "result_i32",
+      "body": ["begin",
+        ["let", "v", ["vec_u8.with_capacity", 32]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "port=8080"]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["bytes.lit", "count=-5"]]],
+        ["set", "v", ["vec_u8.push", "v", 10]],
+        ["let", "src_bytes", ["vec_u8.into_bytes", "v"]],
+        ["let", "doc", ["ext.toml.toml_parse", ["bytes.view", "src_bytes"]]],
+        ["let", "doc_view", ["bytes.view", "doc"]],
+        ["let", "port_key", ["bytes.lit", "port"]],
+        ["let", "port_key_view", ["bytes.view", "port_key"]],
+        ["let", "port", ["ext.toml.toml_get_i32", "doc_view", "port_key_view"]],
+        ["try", ["std.test.assert_i32_eq", "port", 8080, ["std.test.code_assert_i32_eq"]]],
+        ["let", "count_key", ["bytes.lit", "count"]],
+        ["let", "count_key_view", ["bytes.view", "count_key"]],
+        ["let", "count", ["ext.toml.toml_get_i32", "doc_view", "count_key_view"]],
+        ["try", ["std.test.assert_i32_eq", "count", -5, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

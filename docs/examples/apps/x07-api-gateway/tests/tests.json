@@ -1,0 +1,93 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "id": "gw/canonicalize_header_lowercase",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_canonicalize_header_lowercase",
+      "expect": "pass"
+    },
+    {
+      "id": "gw/canonicalize_header_already_lower",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_canonicalize_header_already_lower",
+      "expect": "pass"
+    },
+    {
+      "id": "gw/normalize_path_add_slash",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_normalize_path_add_slash",
+      "expect": "pass"
+    },
+    {
+      "id": "gw/normalize_path_dedup_slashes",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_normalize_path_dedup_slashes",
+      "expect": "pass"
+    },
+    {
+      "id": "gw/normalize_request_json",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_normalize_request_json",
+      "expect": "pass"
+    },
+    {
+      "id": "gw/select_route_valid",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_select_route_valid",
+      "expect": "pass"
+    },
+    {
+      "id": "gw/select_route_err",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_select_route_err",
+      "expect": "pass"
+    },
+    {
+      "id": "gw/shape_response_200",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_shape_response_200",
+      "expect": "pass"
+    },
+    {
+      "id": "gw/build_error_response",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_build_error_response",
+      "expect": "pass"
+    },
+    {
+      "id": "gw/rr_fetch_upstream",
+      "world": "solve-rr",
+      "entry": "gateway_tests.test_rr_fetch_upstream",
+      "expect": "pass",
+      "fixture_root": "fixtures/replay/rr"
+    },
+    {
+      "id": "gw/rr_health_check",
+      "world": "solve-rr",
+      "entry": "gateway_tests.test_rr_health_check",
+      "expect": "pass",
+      "fixture_root": "fixtures/replay/rr"
+    },
+    {
+      "id": "gw/pbt_header_canonicalize",
+      "world": "solve-pure",
+      "entry": "gateway_tests.test_pbt_header_canonicalize",
+      "expect": "pass",
+      "returns": "bytes_status_v1",
+      "pbt": {
+        "cases": 100,
+        "max_shrinks": 50,
+        "params": [
+          { "name": "b", "gen": { "kind": "bytes", "max_len": 128 } }
+        ],
+        "case_budget": {
+          "fuel": 500000,
+          "timeout_ms": 500,
+          "max_mem_bytes": 16777216,
+          "max_output_bytes": 65536
+        }
+      }
+    }
+  ]
+}

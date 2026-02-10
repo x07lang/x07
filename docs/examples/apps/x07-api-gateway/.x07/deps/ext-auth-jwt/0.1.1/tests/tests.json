@@ -1,0 +1,19 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "std.crypto.ed25519/rfc8032_vectors_v1",
+      "world": "run-os-sandboxed",
+      "entry": "std.auth.jwt.tests.test_ed25519_rfc8032_vectors_v1",
+      "expect": "pass",
+      "policy_json": "policies/jwt_tests_v1.policy.json"
+    },
+    {
+      "id": "std.auth.jwt/encode_decode_profile_v1",
+      "world": "run-os-sandboxed",
+      "entry": "std.auth.jwt.tests.test_jwt_profile_roundtrip_v1",
+      "expect": "pass",
+      "policy_json": "policies/jwt_tests_v1.policy.json"
+    }
+  ]
+}

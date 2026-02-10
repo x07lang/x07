@@ -1,0 +1,85 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.data_model.csv",
+  "imports": ["ext.data_model"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["ext.data_model.csv.emit_canon"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.data_model.csv.emit_canon",
+      "params": [{"name": "doc", "ty": "bytes_view"}],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "msg_root_not_seq", ["bytes.lit", "data_model.csv:root_not_seq"]],
+        ["let", "msg_invalid_seq", ["bytes.lit", "data_model.csv:invalid_seq"]],
+        ["let", "msg_invalid_table", ["bytes.lit", "data_model.csv:invalid_table"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "doc"], 1], ["return", ["view.to_bytes", "doc"]], 0],
+        ["if", ["!=", ["ext.data_model.root_kind", "doc"], 4], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_root_not_seq"]]], 0],
+        ["let", "root_off", ["ext.data_model.root_offset", "doc"]],
+        ["if", ["<", "root_off", 0], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_seq"]]], 0],
+        ["let", "row_n", ["ext.data_model.seq_len", "doc", "root_off"]],
+        ["if", ["<", "row_n", 0], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_seq"]]], 0],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 16, ["view.len", "doc"]]]],
+        [
+          "for",
+          "i",
+          0,
+          "row_n",
+          [
+            "begin",
+            ["let", "row_off", ["ext.data_model.seq_get", "doc", "root_off", "i"]],
+            ["if", ["<", "row_off", 0], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_table"]]], 0],
+            ["if", ["!=", ["ext.data_model.kind_at", "doc", "row_off"], 4], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_table"]]], 0],
+            ["let", "col_n", ["ext.data_model.seq_len", "doc", "row_off"]],
+            ["if", ["<", "col_n", 0], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_table"]]], 0],
+            [
+              "for",
+              "j",
+              0,
+              "col_n",
+              [
+                "begin",
+                ["if", ["=", "j", 0], 0, ["set", "out", ["vec_u8.push", "out", 44]]],
+                ["let", "cell_off", ["ext.data_model.seq_get", "doc", "row_off", "j"]],
+                ["if", ["<", "cell_off", 0], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_table"]]], 0],
+                ["if", ["!=", ["ext.data_model.kind_at", "doc", "cell_off"], 3], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_table"]]], 0],
+                ["let", "s_b", ["ext.data_model.string_get", "doc", "cell_off"]],
+                ["let", "s", ["bytes.view", "s_b"]],
+                ["set", "out", ["vec_u8.push", "out", 34]],
+                ["let", "sn", ["view.len", "s"]],
+                [
+                  "for",
+                  "k",
+                  0,
+                  "sn",
+                  [
+                    "begin",
+                    ["let", "c", ["view.get_u8", "s", "k"]],
+                    [
+                      "if",
+                      ["=", "c", 34],
+                      ["begin", ["set", "out", ["vec_u8.push", "out", 34]], ["set", "out", ["vec_u8.push", "out", 34]], 0],
+                      ["set", "out", ["vec_u8.push", "out", "c"]]
+                    ],
+                    0
+                  ]
+                ],
+                ["set", "out", ["vec_u8.push", "out", 34]],
+                0
+              ]
+            ],
+            ["set", "out", ["vec_u8.push", "out", 10]],
+            0
+          ]
+        ],
+        ["let", "csv_bytes", ["vec_u8.into_bytes", "out"]],
+        ["ext.data_model.doc_ok", ["bytes.view", "csv_bytes"]]
+      ]
+    }
+  ]
+}

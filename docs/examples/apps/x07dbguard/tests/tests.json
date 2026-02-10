@@ -1,0 +1,93 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "id": "smoke/pass",
+      "entry": "smoke.pass",
+      "expect": "pass",
+      "world": "run-os"
+    },
+    {
+      "id": "unit/fingerprint_deterministic",
+      "entry": "unit.fingerprint_deterministic",
+      "expect": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "id": "unit/fingerprint_nonempty",
+      "entry": "unit.fingerprint_nonempty",
+      "expect": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "id": "unit/plan_outputs_json",
+      "entry": "unit.plan_outputs_json",
+      "expect": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "id": "unit/verify_no_drift",
+      "entry": "unit.verify_no_drift",
+      "expect": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "id": "unit/verify_drift_detected",
+      "entry": "unit.verify_drift_detected",
+      "expect": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "id": "unit/stable_unique_sorted",
+      "entry": "unit.stable_unique_sorted",
+      "expect": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "id": "unit/stable_unique_duplicate",
+      "entry": "unit.stable_unique_duplicate",
+      "expect": "pass",
+      "world": "solve-pure"
+    },
+    {
+      "id": "rr/verify_ok",
+      "entry": "rr_verify.replay_ok",
+      "expect": "pass",
+      "world": "solve-rr",
+      "fixture_root": "fixtures/replay"
+    },
+    {
+      "id": "rr/verify_drift",
+      "entry": "rr_verify.replay_drift",
+      "expect": "pass",
+      "world": "solve-rr",
+      "fixture_root": "fixtures/replay"
+    },
+    {
+      "id": "pbt/fingerprint_deterministic",
+      "entry": "pbt_fingerprint.deterministic",
+      "expect": "pass",
+      "world": "solve-pure",
+      "returns": "bytes_status_v1",
+      "pbt": {
+        "cases": 100,
+        "max_shrinks": 2048,
+        "params": [
+          {
+            "name": "b",
+            "gen": {
+              "kind": "bytes",
+              "max_len": 512
+            }
+          }
+        ],
+        "case_budget": {
+          "fuel": 100000,
+          "timeout_ms": 500,
+          "max_mem_bytes": 16777216,
+          "max_output_bytes": 65536
+        }
+      }
+    }
+  ]
+}

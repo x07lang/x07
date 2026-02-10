@@ -1,0 +1,43 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.data_model.xml.tests",
+  "imports": [
+    "ext.data_model",
+    "ext.data_model.json",
+    "ext.data_model.xml",
+    "ext.xml.data_model",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["ext.data_model.xml.tests.test_emit_canon_roundtrip"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.data_model.xml.tests.test_emit_canon_roundtrip",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "src", ["bytes.lit", "<root a=\"1\"><child>hi</child>there</root>"]],
+        ["let", "doc", ["ext.xml.data_model.parse", ["bytes.view", "src"]]],
+        ["let", "docv", ["bytes.view", "doc"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.data_model.doc_is_err", "docv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "emit", ["ext.data_model.xml.emit_canon", "docv"]],
+        ["let", "emitv", ["bytes.view", "emit"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.data_model.doc_is_err", "emitv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "payload", ["view.slice", "emitv", 1, ["-", ["view.len", "emitv"], 1]]],
+        ["try", ["std.test.assert_i32_eq", ["view.get_u8", "payload", 0], 60, ["std.test.code_assert_i32_eq"]]],
+        ["let", "parsed", ["ext.xml.data_model.parse", "payload"]],
+        ["let", "parsedv", ["bytes.view", "parsed"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.data_model.doc_is_err", "parsedv"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "canon", ["ext.data_model.json.emit_canon", "docv"]],
+        ["let", "canon2", ["ext.data_model.json.emit_canon", "parsedv"]],
+        ["try", ["std.test.assert_bytes_eq", "canon2", "canon", ["std.test.code_assert_bytes_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

@@ -31,7 +31,7 @@ See also: [Fixture formats](fixture-formats.md).
 To generate a minimal `solve-rr` fixture directory from a real HTTP response, use `x07 rr record`:
 
 ```bash
-x07 rr record --out fixtures/rr example.com https://example.com
+x07 rr record --cassette fixtures/rr/example.rrbin example.com https://example.com
 ```
 
 This appends an entry to a cassette file under `fixtures/rr/` (see [Fixture formats](fixture-formats.md)).

@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "html_parse_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "trap_v1",
+    "label": "html.parse.v1",
+    "alloc_bytes": 8388608,
+    "alloc_calls": 100000,
+    "realloc_calls": 20000,
+    "memcpy_bytes": 16777216,
+    "sched_ticks": 2000000,
+    "fuel": 0
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.budget.profile@0.1.0",
+  "id": "db_verify_v1",
+  "v": 1,
+  "cfg": {
+    "mode": "result_err_v1",
+    "label": "db.verify.v1",
+    "alloc_bytes": 67108864,
+    "alloc_calls": 200000,
+    "realloc_calls": 50000,
+    "memcpy_bytes": 268435456,
+    "sched_ticks": 2000000,
+    "fuel": 0
+  }
+}

@@ -218,6 +218,15 @@ pub fn compile_program_to_c_with_meta(
         )?;
     }
 
+    inject_implicit_imports_for_ty_intrinsics(
+        &main,
+        options,
+        &mut module_infos,
+        &mut modules,
+        &mut visiting,
+        &mut fuel_used,
+    )?;
+
     let ParsedMain {
         schema_version: main_schema_version,
         imports: _main_imports,
@@ -396,6 +405,134 @@ struct ModuleInfo {
     imports: BTreeSet<String>,
     exports: BTreeSet<String>,
     is_builtin: bool,
+}
+
+fn inject_implicit_imports_for_ty_intrinsics(
+    main: &ParsedMain,
+    options: &CompileOptions,
+    module_infos: &mut BTreeMap<String, ModuleInfo>,
+    modules: &mut BTreeMap<String, ParsedModule>,
+    visiting: &mut BTreeSet<String>,
+    fuel_used: &mut u64,
+) -> Result<(), CompilerError> {
+    let imports_by_module: BTreeMap<String, BTreeSet<&'static str>> = {
+        let mut imports_by_module: BTreeMap<String, BTreeSet<&'static str>> = BTreeMap::new();
+
+        let mut main_imports: BTreeSet<&'static str> = BTreeSet::new();
+        collect_ty_intrinsic_imports_in_expr(&main.solve, &mut main_imports);
+        for f in &main.functions {
+            collect_ty_intrinsic_imports_in_fn(f, &mut main_imports);
+        }
+        for f in &main.async_functions {
+            collect_ty_intrinsic_imports_in_async_fn(f, &mut main_imports);
+        }
+        imports_by_module.insert("main".to_string(), main_imports);
+
+        for (module_id, m) in modules.iter() {
+            let mut req: BTreeSet<&'static str> = BTreeSet::new();
+            for f in &m.functions {
+                collect_ty_intrinsic_imports_in_fn(f, &mut req);
+            }
+            for f in &m.async_functions {
+                collect_ty_intrinsic_imports_in_async_fn(f, &mut req);
+            }
+            imports_by_module.insert(module_id.clone(), req);
+        }
+
+        imports_by_module
+    };
+
+    let mut to_load: BTreeSet<String> = BTreeSet::new();
+    for (module_id, req) in imports_by_module {
+        if req.is_empty() {
+            continue;
+        }
+        let Some(info) = module_infos.get_mut(&module_id) else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Internal,
+                format!(
+                    "internal error: ty intrinsic scan references unknown module: {module_id:?}"
+                ),
+            ));
+        };
+        for imp in req {
+            let imp = imp.to_string();
+            if info.imports.insert(imp.clone()) {
+                to_load.insert(imp);
+            }
+        }
+    }
+
+    for module_id in to_load {
+        load_module_recursive(
+            &module_id,
+            options,
+            modules,
+            module_infos,
+            visiting,
+            fuel_used,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn collect_ty_intrinsic_imports_in_fn(
+    f: &x07ast::AstFunctionDef,
+    out: &mut BTreeSet<&'static str>,
+) {
+    collect_ty_intrinsic_imports_in_expr(&f.body, out);
+    for c in f
+        .requires
+        .iter()
+        .chain(f.ensures.iter())
+        .chain(f.invariant.iter())
+    {
+        collect_ty_intrinsic_imports_in_expr(&c.expr, out);
+        for w in &c.witness {
+            collect_ty_intrinsic_imports_in_expr(w, out);
+        }
+    }
+}
+
+fn collect_ty_intrinsic_imports_in_async_fn(
+    f: &x07ast::AstAsyncFunctionDef,
+    out: &mut BTreeSet<&'static str>,
+) {
+    collect_ty_intrinsic_imports_in_expr(&f.body, out);
+    for c in f
+        .requires
+        .iter()
+        .chain(f.ensures.iter())
+        .chain(f.invariant.iter())
+    {
+        collect_ty_intrinsic_imports_in_expr(&c.expr, out);
+        for w in &c.witness {
+            collect_ty_intrinsic_imports_in_expr(w, out);
+        }
+    }
+}
+
+fn collect_ty_intrinsic_imports_in_expr(expr: &crate::ast::Expr, out: &mut BTreeSet<&'static str>) {
+    match expr {
+        crate::ast::Expr::Int { .. } | crate::ast::Expr::Ident { .. } => {}
+        crate::ast::Expr::List { items, .. } => {
+            if let Some(head) = items.first().and_then(crate::ast::Expr::as_ident) {
+                match head {
+                    "ty.read_le_at" | "ty.write_le_at" | "ty.push_le" => {
+                        out.insert("std.u32");
+                    }
+                    "ty.hash32" => {
+                        out.insert("std.hash");
+                    }
+                    _ => {}
+                }
+            }
+            for item in items {
+                collect_ty_intrinsic_imports_in_expr(item, out);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

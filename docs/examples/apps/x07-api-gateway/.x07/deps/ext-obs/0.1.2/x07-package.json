@@ -1,0 +1,30 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-obs",
+  "version": "0.1.2",
+  "description": "Metrics snapshot + OpenMetrics + OTLP encoding/export (contracts-as-data under arch/obs).",
+  "docs": "Metrics snapshot + OpenMetrics rendering + OTLP encoding/export pinned by arch/obs contracts.\n\nModules:\n- std.obs.metrics\n- std.obs.openmetrics\n- std.obs.otlp\n- std.obs.export\n- std.obs.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-obs@0.1.2\n- For production export, use std.obs.export.otlp_http_export_from_arch_v1 with profiles under arch/obs.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.obs.metrics",
+    "std.obs.openmetrics",
+    "std.obs.otlp",
+    "std.obs.export",
+    "std.obs.tests"
+  ],
+  "meta": {
+    "determinism_tier": "mixed",
+    "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"],
+    "requires_packages": [
+      "ext-data-model@0.1.8",
+      "ext-hex-rs@0.1.4",
+      "ext-json-rs@0.1.4",
+      "ext-math@0.1.4",
+      "ext-net@0.1.8",
+      "ext-pb-rs@0.1.5",
+      "ext-u64-rs@0.1.0"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

@@ -1,0 +1,93 @@
+name: x07 CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  X07_VERSION: "0.1.11"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install x07 toolchain
+        run: |
+          curl -fsSL https://x07lang.org/install.sh | bash -s -- --version "$X07_VERSION"
+          echo "$HOME/.x07/bin" >> "$GITHUB_PATH"
+
+      - name: Restore packages
+        run: x07 pkg restore
+
+      - name: Format check
+        run: x07 fmt --check --input src --input tests
+
+      - name: Architecture check
+        run: x07 arch check
+
+      - name: Compile and run
+        run: x07 run --json
+
+      - name: Run tests
+        run: x07 test --json
+
+      - name: Determinism gate (repeat x2)
+        run: x07 test --repeat 2
+
+      - name: Property-based tests
+        run: x07 test --pbt
+
+      - name: Trust report
+        run: |
+          mkdir -p target/trust
+          x07 trust report --project x07.json --profile sandbox --out target/trust/trust.json --html-out target/trust/trust.html
+
+      - name: Upload trust artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trust-report
+          path: target/trust/
+
+  review-diff:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install x07 toolchain
+        run: |
+          curl -fsSL https://x07lang.org/install.sh | bash -s -- --version "$X07_VERSION"
+          echo "$HOME/.x07/bin" >> "$GITHUB_PATH"
+
+      - name: Restore packages
+        run: x07 pkg restore
+
+      - name: Checkout base branch
+        run: git checkout "${{ github.event.pull_request.base.sha }}" -- src/
+
+      - name: Snapshot baseline
+        run: cp -r src/ /tmp/baseline-src
+
+      - name: Restore head
+        run: git checkout "${{ github.sha }}" -- src/
+
+      - name: Semantic diff
+        run: |
+          mkdir -p target/review
+          x07 review diff \
+            --from /tmp/baseline-src \
+            --to src/ \
+            --html-out target/review/diff.html \
+            --json-out target/review/diff.json
+
+      - name: Upload review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-diff
+          path: target/review/

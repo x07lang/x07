@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {"id": "ext.xml/events_basic", "world": "solve-pure", "entry": "ext.xml.tests.test_events_basic", "expect": "pass"},
+    {"id": "ext.xml/tree_basic", "world": "solve-pure", "entry": "ext.xml.tests.test_tree_basic", "expect": "pass"},
+    {"id": "ext.xml/tree_nested", "world": "solve-pure", "entry": "ext.xml.tests.test_tree_nested", "expect": "pass"},
+    {"id": "ext.xml/entity_decode", "world": "solve-pure", "entry": "ext.xml.tests.test_entity_decode", "expect": "pass"},
+    {"id": "ext.xml/error_doc_layout", "world": "solve-pure", "entry": "ext.xml.tests.test_error_doc_layout", "expect": "pass"},
+    {"id": "ext.xml/mismatched_end_is_err", "world": "solve-pure", "entry": "ext.xml.tests.test_mismatched_end_is_err", "expect": "pass"},
+    {"id": "ext.xml/doctype_is_err", "world": "solve-pure", "entry": "ext.xml.tests.test_doctype_is_err", "expect": "pass"}
+  ]
+}

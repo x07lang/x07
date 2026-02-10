@@ -1,0 +1,86 @@
+{
+  "default_profile": "os",
+  "dependencies": [
+    {
+      "name": "ext-crypto-rs",
+      "path": ".x07/deps/ext-crypto-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-csv-rs",
+      "path": ".x07/deps/ext-csv-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-data-model",
+      "path": ".x07/deps/ext-data-model/0.1.8",
+      "version": "0.1.8"
+    },
+    {
+      "name": "ext-db-core",
+      "path": ".x07/deps/ext-db-core/0.1.9",
+      "version": "0.1.9"
+    },
+    {
+      "name": "ext-db-migrate",
+      "path": ".x07/deps/ext-db-migrate/0.1.2",
+      "version": "0.1.2"
+    },
+    {
+      "name": "ext-db-sqlite",
+      "path": ".x07/deps/ext-db-sqlite/0.1.9",
+      "version": "0.1.9"
+    },
+    {
+      "name": "ext-hex-rs",
+      "path": ".x07/deps/ext-hex-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-ini-rs",
+      "path": ".x07/deps/ext-ini-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-json-rs",
+      "path": ".x07/deps/ext-json-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-toml-rs",
+      "path": ".x07/deps/ext-toml-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-unicode-rs",
+      "path": ".x07/deps/ext-unicode-rs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
+      "name": "ext-xml-rs",
+      "path": ".x07/deps/ext-xml-rs/0.1.4",
+      "version": "0.1.4"
+    },
+    {
+      "name": "ext-yaml-rs",
+      "path": ".x07/deps/ext-yaml-rs/0.1.4",
+      "version": "0.1.4"
+    }
+  ],
+  "entry": "src/main.x07.json",
+  "lockfile": "x07.lock.json",
+  "module_roots": [
+    "src"
+  ],
+  "profiles": {
+    "os": {
+      "world": "run-os"
+    },
+    "sandbox": {
+      "policy": "policy/sandbox.base.json",
+      "world": "run-os-sandboxed"
+    }
+  },
+  "schema_version": "x07.project@0.2.0",
+  "world": "run-os"
+}
