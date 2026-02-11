@@ -20,6 +20,30 @@
       "expect": "fail"
     },
     {
+      "id": "smoke/value_containers_vec_bytes_basic",
+      "world": "solve-pure",
+      "entry": "smoke_value_containers.vec_bytes_basic_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/value_containers_hash_map_bytes_bytes_determinism",
+      "world": "solve-pure",
+      "entry": "smoke_value_containers.hash_map_bytes_bytes_determinism_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/value_containers_ty_clone_drop_bytes",
+      "world": "solve-pure",
+      "entry": "smoke_value_containers.ty_clone_drop_bytes_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "smoke/value_containers_ty_ops_bytes",
+      "world": "solve-pure",
+      "entry": "smoke_value_containers.ty_ops_bytes_v1",
+      "expect": "pass"
+    },
+    {
       "id": "smoke/stream_pipe_bytes_collect_identity",
       "world": "solve-pure",
       "entry": "smoke_stream_pipe.pipe_bytes_collect_identity",

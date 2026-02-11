@@ -105,7 +105,7 @@ Module IDs are dot-separated identifiers like `app.rle` or `std.bytes`.
 
 Module resolution is deterministic:
 
-- Built-in modules: `std.vec`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque`, `std.deque_u32`, `std.heap`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.rr`, `std.kv`, `std.path`
+- Built-in modules: `std.vec`, `std.vec_value`, `std.slice`, `std.bytes`, `std.codec`, `std.parse`, `std.fmt`, `std.prng`, `std.bit`, `std.text.ascii`, `std.text.utf8`, `std.test`, `std.regex-lite`, `std.json`, `std.csv`, `std.map`, `std.set`, `std.u32`, `std.small_map`, `std.small_set`, `std.hash`, `std.hash_map`, `std.hash_map_value`, `std.hash_set`, `std.btree_map`, `std.btree_set`, `std.deque`, `std.deque_u32`, `std.heap`, `std.heap_u32`, `std.bitset`, `std.slab`, `std.lru_cache`, `std.result`, `std.option`, `std.io`, `std.io.bufread`, `std.fs`, `std.world.fs`, `std.rr`, `std.kv`, `std.path`
 - Filesystem modules (standalone): `x07c compile --module-root <dir>` resolves `a.b` to `<dir>/a/b.x07.json`
 
 Standalone binding override:
@@ -277,6 +277,20 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
   - `["std.vec.reserve_exact","v","additional"]` -> vec_u8
   - `["std.vec.extend_bytes","v","b"]` -> vec_u8
   - `["std.vec.as_bytes","v"]` -> bytes
+- `std.vec_value` (generic; `T: value`)
+  - `["tapp","std.vec_value.with_capacity","bytes","cap"]` -> i32
+  - `["std.vec_value.len","v"]` -> i32
+  - `["std.vec_value.reserve_exact","v","additional"]` -> i32
+  - `["tapp","std.vec_value.push","bytes","v","x"]` -> i32
+  - `["tapp","std.vec_value.get_or","bytes","v","idx","default"]` -> bytes
+  - `["tapp","std.vec_value.set","bytes","v","idx","x"]` -> i32
+  - `["std.vec_value.pop","v"]` -> i32
+  - `["std.vec_value.clear","v"]` -> i32
+  - wrappers (bytes):
+    - `["std.vec_value.with_capacity_bytes","cap"]` -> i32
+    - `["std.vec_value.push_bytes","v","x"]` -> i32
+    - `["std.vec_value.get_bytes_or","v","idx","default"]` -> bytes
+    - `["std.vec_value.set_bytes","v","idx","x"]` -> i32
 - `std.slice`
   - `["std.slice.clamp","b","start","len"]` -> bytes
   - `["std.slice.cmp_bytes","a","b"]` -> i32 (-1/0/1)
@@ -373,6 +387,22 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
     - `["std.hash_map.get_u32_or","m","key","default"]` -> i32
     - `["std.hash_map.set_u32","m","key","val"]` -> i32
     - `["std.hash_map.emit_kv_u32le_u32le","m"]` -> bytes
+- `std.hash_map_value` (generic; `K: hashable`, `V: value`)
+  - `["tapp","std.hash_map_value.new","bytes","bytes","cap_pow2"]` -> i32
+  - `["tapp","std.hash_map_value.with_capacity","bytes","bytes","expected_len"]` -> i32
+  - `["std.hash_map_value.len","m"]` -> i32
+  - `["tapp","std.hash_map_value.contains","bytes","m","key"]` -> i32
+  - `["tapp","std.hash_map_value.get_or","bytes","bytes","m","key","default"]` -> bytes
+  - `["tapp","std.hash_map_value.set","bytes","bytes","m","key","val"]` -> i32
+  - `["tapp","std.hash_map_value.remove","bytes","m","key"]` -> i32
+  - `["std.hash_map_value.clear","m"]` -> i32
+  - wrappers (bytes keys/values):
+    - `["std.hash_map_value.new_bytes_bytes","cap_pow2"]` -> i32
+    - `["std.hash_map_value.with_capacity_bytes_bytes","expected_len"]` -> i32
+    - `["std.hash_map_value.contains_bytes","m","key"]` -> i32
+    - `["std.hash_map_value.get_bytes_bytes_or","m","key","default"]` -> bytes
+    - `["std.hash_map_value.set_bytes_bytes","m","key","val"]` -> i32
+    - `["std.hash_map_value.remove_bytes","m","key"]` -> i32
 - `std.hash_set` (generic; `A: hashable`)
   - `["std.hash_set.new","cap_pow2"]` -> i32
   - `["std.hash_set.len","s"]` -> i32

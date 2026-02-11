@@ -62,6 +62,11 @@
       "id": "std_math_0012",
       "path": "instances/std_math_0012",
       "enabled": true
+    },
+    {
+      "id": "std_collections_0001",
+      "path": "instances/std_collections_0001",
+      "enabled": true
     }
   ],
   "defaults": {

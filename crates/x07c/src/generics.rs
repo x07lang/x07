@@ -84,6 +84,7 @@ enum Bound {
     Any,
     BytesLike,
     NumLike,
+    Value,
     Hashable,
     Orderable,
 }
@@ -810,6 +811,7 @@ fn parse_bound(s: &str) -> Result<Bound, CompilerError> {
         "any" => Ok(Bound::Any),
         "bytes_like" => Ok(Bound::BytesLike),
         "num_like" => Ok(Bound::NumLike),
+        "value" => Ok(Bound::Value),
         "hashable" => Ok(Bound::Hashable),
         "orderable" => Ok(Bound::Orderable),
         other => Err(CompilerError::new(
@@ -878,8 +880,18 @@ fn type_satisfies_bound(ta: &TypeRef, bound: Bound) -> bool {
             TypeRef::Named(s) if s == "bytes" || s == "bytes_view"
         ),
         Bound::NumLike => matches!(ta, TypeRef::Named(s) if s == "i32" || s == "u32"),
-        Bound::Hashable => matches!(ta, TypeRef::Named(s) if s == "i32" || s == "u32"),
-        Bound::Orderable => matches!(ta, TypeRef::Named(s) if s == "i32" || s == "u32"),
+        Bound::Value => matches!(
+            ta,
+            TypeRef::Named(s) if s == "i32" || s == "u32" || s == "bytes" || s == "bytes_view"
+        ),
+        Bound::Hashable => matches!(
+            ta,
+            TypeRef::Named(s) if s == "i32" || s == "u32" || s == "bytes" || s == "bytes_view"
+        ),
+        Bound::Orderable => matches!(
+            ta,
+            TypeRef::Named(s) if s == "i32" || s == "u32" || s == "bytes" || s == "bytes_view"
+        ),
     }
 }
 
@@ -1173,6 +1185,334 @@ fn lower_tapp(
         ));
     }
 
+    // Builtin generic container intrinsics: lower directly to monomorphic builtins.
+    //
+    // These intrinsics intentionally bypass module export checks and do not generate
+    // monomorphized instances.
+    if let Some(builtin_arity) = match callee.as_str() {
+        "vec_value.with_capacity" | "vec_value.push" | "vec_value.get" | "vec_value.set" => {
+            Some(1usize)
+        }
+        "map_value.new" | "map_value.get" | "map_value.set" => Some(2usize),
+        "map_value.contains" | "map_value.remove" => Some(1usize),
+        _ => None,
+    } {
+        let (type_arg_exprs, value_arg_exprs) = match items.get(2) {
+            Some(Expr::List { items: tys, .. })
+                if tys.first().and_then(Expr::as_ident) == Some("tys") =>
+            {
+                let type_arg_exprs = tys.iter().skip(1).cloned().collect::<Vec<_>>();
+                if type_arg_exprs.len() != builtin_arity {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "X07-TY-0105: tapp arity mismatch for {callee:?}: expected {builtin_arity} type args got {}",
+                            type_arg_exprs.len()
+                        ),
+                    ));
+                }
+                (type_arg_exprs, items[3..].to_vec())
+            }
+            _ => {
+                if items.len() < 2 + builtin_arity {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "X07-TY-0105: tapp arity mismatch for {callee:?}: expected {builtin_arity} type args"
+                        ),
+                    ));
+                }
+                let type_arg_exprs = items[2..2 + builtin_arity].to_vec();
+                let value_arg_exprs = items[2 + builtin_arity..].to_vec();
+                (type_arg_exprs, value_arg_exprs)
+            }
+        };
+
+        let mut type_args: Vec<TypeRef> = Vec::with_capacity(builtin_arity);
+        for e in type_arg_exprs {
+            let mut tr = type_ref_from_expr(&e)
+                .map_err(|m| CompilerError::new(CompileErrorKind::Parse, m))?;
+            if let Some(subst) = subst {
+                tr = subst_type_ref(&tr, subst)?;
+            }
+            if !type_ref_is_concrete(&tr) {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("X07-TY-0107: non-concrete type arg in tapp to {callee:?}: {tr:?}"),
+                ));
+            }
+            if type_ref_max_depth(&tr) > max_type_depth {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Budget,
+                    format!(
+                        "X07-TY-0109: type expression too deep in tapp to {callee:?}: max_depth={max_type_depth}"
+                    ),
+                ));
+            }
+            type_args.push(tr);
+        }
+
+        fn require_named<'a>(callee: &str, tr: &'a TypeRef) -> Result<&'a str, CompilerError> {
+            match tr {
+                TypeRef::Named(s) => Ok(s),
+                _ => Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!(
+                        "X07-TY-0101: unsupported type expression in tapp to {callee:?}: {tr:?}"
+                    ),
+                )),
+            }
+        }
+        let value_ty_id = |type_name: &str| -> Result<i32, CompilerError> {
+            match type_name {
+                "i32" => Ok(1),
+                "u32" => Ok(2),
+                "bytes" => Ok(3),
+                "bytes_view" => Ok(4),
+                _ => Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("X07-TY-0101: unsupported type for {callee:?}: {type_name:?}"),
+                )),
+            }
+        };
+        let value_ty_suffix = |type_name: &str| -> Result<&'static str, CompilerError> {
+            match type_name {
+                "i32" | "u32" => Ok("i32"),
+                "bytes" => Ok("bytes"),
+                "bytes_view" => Ok("bytes_view"),
+                _ => Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("X07-TY-0101: unsupported type for {callee:?}: {type_name:?}"),
+                )),
+            }
+        };
+
+        let mut value_args: Vec<Expr> = Vec::with_capacity(value_arg_exprs.len());
+        for a in value_arg_exprs {
+            value_args.push(rewrite_expr(
+                a,
+                ctx,
+                sigs,
+                _generic_symbols,
+                module_exports,
+                extern_symbols,
+                subst,
+                instances,
+                pending,
+                tapp_sites_total,
+                max_specializations,
+                max_type_depth,
+            )?);
+        }
+
+        match callee.as_str() {
+            "vec_value.with_capacity" => {
+                if value_args.len() != 1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "vec_value.with_capacity expects 1 argument".to_string(),
+                    ));
+                }
+                let t = require_named(&callee, &type_args[0])?;
+                if !type_satisfies_bound(&type_args[0], Bound::Value) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "X07-TY-0104: bound unsatisfied for \"T\": expected {:?} got {:?}",
+                            Bound::Value,
+                            type_args[0],
+                        ),
+                    ));
+                }
+                let ty_id = value_ty_id(t)?;
+                return Ok(Expr::List {
+                    items: vec![
+                        Expr::Ident {
+                            name: "vec_value.with_capacity_v1".to_string(),
+                            ptr: head_ptr.clone(),
+                        },
+                        Expr::Int {
+                            value: ty_id,
+                            ptr: ptr.clone(),
+                        },
+                        value_args[0].clone(),
+                    ],
+                    ptr,
+                });
+            }
+            "vec_value.push" | "vec_value.get" | "vec_value.set" => {
+                if !type_satisfies_bound(&type_args[0], Bound::Value) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "X07-TY-0104: bound unsatisfied for \"T\": expected {:?} got {:?}",
+                            Bound::Value,
+                            type_args[0],
+                        ),
+                    ));
+                }
+                let t = require_named(&callee, &type_args[0])?;
+                let t_suffix = value_ty_suffix(t)?;
+
+                let (head, want_args) = match callee.as_str() {
+                    "vec_value.push" => (format!("vec_value.push_{t_suffix}_v1"), 2usize),
+                    "vec_value.get" => (format!("vec_value.get_{t_suffix}_v1"), 3usize),
+                    "vec_value.set" => (format!("vec_value.set_{t_suffix}_v1"), 3usize),
+                    _ => unreachable!("callee is known"),
+                };
+                if value_args.len() != want_args {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        format!("{callee:?} expects {want_args} arguments"),
+                    ));
+                }
+                let mut out_items: Vec<Expr> = Vec::with_capacity(1 + value_args.len());
+                out_items.push(Expr::Ident {
+                    name: head,
+                    ptr: head_ptr.clone(),
+                });
+                out_items.extend(value_args);
+                return Ok(Expr::List {
+                    items: out_items,
+                    ptr,
+                });
+            }
+            "map_value.new" => {
+                if value_args.len() != 1 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "map_value.new expects 1 argument".to_string(),
+                    ));
+                }
+                if !type_satisfies_bound(&type_args[0], Bound::Hashable) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "X07-TY-0104: bound unsatisfied for \"K\": expected {:?} got {:?}",
+                            Bound::Hashable,
+                            type_args[0],
+                        ),
+                    ));
+                }
+                if !type_satisfies_bound(&type_args[1], Bound::Value) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "X07-TY-0104: bound unsatisfied for \"V\": expected {:?} got {:?}",
+                            Bound::Value,
+                            type_args[1],
+                        ),
+                    ));
+                }
+                let k = require_named(&callee, &type_args[0])?;
+                let v = require_named(&callee, &type_args[1])?;
+                let k_id = value_ty_id(k)?;
+                let v_id = value_ty_id(v)?;
+                return Ok(Expr::List {
+                    items: vec![
+                        Expr::Ident {
+                            name: "map_value.new_v1".to_string(),
+                            ptr: head_ptr.clone(),
+                        },
+                        Expr::Int {
+                            value: k_id,
+                            ptr: ptr.clone(),
+                        },
+                        Expr::Int {
+                            value: v_id,
+                            ptr: ptr.clone(),
+                        },
+                        value_args[0].clone(),
+                    ],
+                    ptr,
+                });
+            }
+            "map_value.contains" | "map_value.remove" => {
+                if !type_satisfies_bound(&type_args[0], Bound::Hashable) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "X07-TY-0104: bound unsatisfied for \"K\": expected {:?} got {:?}",
+                            Bound::Hashable,
+                            type_args[0],
+                        ),
+                    ));
+                }
+                let k = require_named(&callee, &type_args[0])?;
+                let k_suffix = value_ty_suffix(k)?;
+                let (head, want_args) = match callee.as_str() {
+                    "map_value.contains" => (format!("map_value.contains_{k_suffix}_v1"), 2usize),
+                    "map_value.remove" => (format!("map_value.remove_{k_suffix}_v1"), 2usize),
+                    _ => unreachable!("callee is known"),
+                };
+                if value_args.len() != want_args {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        format!("{callee:?} expects {want_args} arguments"),
+                    ));
+                }
+                let mut out_items: Vec<Expr> = Vec::with_capacity(1 + value_args.len());
+                out_items.push(Expr::Ident {
+                    name: head,
+                    ptr: head_ptr.clone(),
+                });
+                out_items.extend(value_args);
+                return Ok(Expr::List {
+                    items: out_items,
+                    ptr,
+                });
+            }
+            "map_value.get" | "map_value.set" => {
+                if !type_satisfies_bound(&type_args[0], Bound::Hashable) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "X07-TY-0104: bound unsatisfied for \"K\": expected {:?} got {:?}",
+                            Bound::Hashable,
+                            type_args[0],
+                        ),
+                    ));
+                }
+                if !type_satisfies_bound(&type_args[1], Bound::Value) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!(
+                            "X07-TY-0104: bound unsatisfied for \"V\": expected {:?} got {:?}",
+                            Bound::Value,
+                            type_args[1],
+                        ),
+                    ));
+                }
+                let k = require_named(&callee, &type_args[0])?;
+                let v = require_named(&callee, &type_args[1])?;
+                let k_suffix = value_ty_suffix(k)?;
+                let v_suffix = value_ty_suffix(v)?;
+                let (head, want_args) = match callee.as_str() {
+                    "map_value.get" => (format!("map_value.get_{k_suffix}_{v_suffix}_v1"), 3usize),
+                    "map_value.set" => (format!("map_value.set_{k_suffix}_{v_suffix}_v1"), 3usize),
+                    _ => unreachable!("callee is known"),
+                };
+                if value_args.len() != want_args {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        format!("{callee:?} expects {want_args} arguments"),
+                    ));
+                }
+                let mut out_items: Vec<Expr> = Vec::with_capacity(1 + value_args.len());
+                out_items.push(Expr::Ident {
+                    name: head,
+                    ptr: head_ptr.clone(),
+                });
+                out_items.extend(value_args);
+                return Ok(Expr::List {
+                    items: out_items,
+                    ptr,
+                });
+            }
+            _ => {}
+        }
+    }
+
     let sig = sigs.get(&callee).ok_or_else(|| {
         CompilerError::new(
             CompileErrorKind::Typing,
@@ -1436,8 +1776,10 @@ fn lower_ty_intrinsic(
                     format!("{head:?} expects 1 argument"),
                 ));
             }
+            let ptr_bytes = std::mem::size_of::<usize>() as i32;
             let n = match type_name {
                 "i32" | "u32" => 4,
+                "bytes" | "bytes_view" => ptr_bytes * 2,
                 _ => {
                     return Err(CompilerError::new(
                         CompileErrorKind::Typing,
@@ -1628,16 +1970,6 @@ fn lower_ty_intrinsic(
                     format!("{head:?} expects 3 arguments"),
                 ));
             }
-            let op = match type_name {
-                "u32" => "<u",
-                "i32" => "<",
-                _ => {
-                    return Err(CompilerError::new(
-                        CompileErrorKind::Typing,
-                        format!("X07-TY-0101: unsupported type for {head:?}: {type_name:?}"),
-                    ));
-                }
-            };
             let a = rewrite_expr(
                 items[2].clone(),
                 ctx,
@@ -1666,6 +1998,160 @@ fn lower_ty_intrinsic(
                 max_specializations,
                 max_type_depth,
             )?;
+
+            if matches!(type_name, "bytes" | "bytes_view") {
+                let hash8 = sha256_hex8(ptr.as_bytes().to_vec());
+                let a_name = format!("_x07_lt_a_{hash8}");
+                let b_name = format!("_x07_lt_b_{hash8}");
+                let an_name = format!("_x07_lt_an_{hash8}");
+                let bn_name = format!("_x07_lt_bn_{hash8}");
+                return Ok(Expr::List {
+                    items: vec![
+                        Expr::Ident {
+                            name: "begin".to_string(),
+                            ptr: head_ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "let".to_string(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: a_name.clone(),
+                                    ptr: ptr.clone(),
+                                },
+                                a,
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "let".to_string(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: b_name.clone(),
+                                    ptr: ptr.clone(),
+                                },
+                                b,
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "let".to_string(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: an_name.clone(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::List {
+                                    items: vec![
+                                        Expr::Ident {
+                                            name: "bytes.len".to_string(),
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: a_name.clone(),
+                                            ptr: ptr.clone(),
+                                        },
+                                    ],
+                                    ptr: ptr.clone(),
+                                },
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "let".to_string(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: bn_name.clone(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::List {
+                                    items: vec![
+                                        Expr::Ident {
+                                            name: "bytes.len".to_string(),
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: b_name.clone(),
+                                            ptr: ptr.clone(),
+                                        },
+                                    ],
+                                    ptr: ptr.clone(),
+                                },
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "<".to_string(),
+                                    ptr: head_ptr,
+                                },
+                                Expr::List {
+                                    items: vec![
+                                        Expr::Ident {
+                                            name: "bytes.cmp_range".to_string(),
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: a_name,
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Int {
+                                            value: 0,
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: an_name,
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: b_name,
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Int {
+                                            value: 0,
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: bn_name,
+                                            ptr: ptr.clone(),
+                                        },
+                                    ],
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Int {
+                                    value: 0,
+                                    ptr: ptr.clone(),
+                                },
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                    ],
+                    ptr,
+                });
+            }
+
+            let op = match type_name {
+                "u32" => "<u",
+                "i32" => "<",
+                _ => {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("X07-TY-0101: unsupported type for {head:?}: {type_name:?}"),
+                    ));
+                }
+            };
             Ok(Expr::List {
                 items: vec![
                     Expr::Ident {
@@ -1713,10 +2199,20 @@ fn lower_ty_intrinsic(
                 max_specializations,
                 max_type_depth,
             )?;
+            let op = match type_name {
+                "i32" | "u32" => "=",
+                "bytes" | "bytes_view" => "bytes.eq",
+                _ => {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("X07-TY-0101: unsupported type for {head:?}: {type_name:?}"),
+                    ));
+                }
+            };
             Ok(Expr::List {
                 items: vec![
                     Expr::Ident {
-                        name: "=".to_string(),
+                        name: op.to_string(),
                         ptr: head_ptr,
                     },
                     a,
@@ -1730,12 +2226,6 @@ fn lower_ty_intrinsic(
                 return Err(CompilerError::new(
                     CompileErrorKind::Parse,
                     format!("{head:?} expects 2 arguments"),
-                ));
-            }
-            if !matches!(type_name, "i32" | "u32") {
-                return Err(CompilerError::new(
-                    CompileErrorKind::Typing,
-                    format!("X07-TY-0101: unsupported type for {head:?}: {type_name:?}"),
                 ));
             }
             let x = rewrite_expr(
@@ -1752,16 +2242,218 @@ fn lower_ty_intrinsic(
                 max_specializations,
                 max_type_depth,
             )?;
-            Ok(Expr::List {
-                items: vec![
-                    Expr::Ident {
-                        name: "std.hash.mix32".to_string(),
-                        ptr: head_ptr,
-                    },
-                    x,
-                ],
-                ptr,
-            })
+            match type_name {
+                "i32" | "u32" => Ok(Expr::List {
+                    items: vec![
+                        Expr::Ident {
+                            name: "std.hash.mix32".to_string(),
+                            ptr: head_ptr,
+                        },
+                        x,
+                    ],
+                    ptr,
+                }),
+                "bytes" | "bytes_view" => Ok(Expr::List {
+                    items: vec![
+                        Expr::Ident {
+                            name: "std.hash.mix32".to_string(),
+                            ptr: head_ptr,
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "std.hash.fnv1a32_view".to_string(),
+                                    ptr: ptr.clone(),
+                                },
+                                x,
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                    ],
+                    ptr,
+                }),
+                _ => Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("X07-TY-0101: unsupported type for {head:?}: {type_name:?}"),
+                )),
+            }
+        }
+        "ty.clone" => {
+            if items.len() != 3 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Parse,
+                    format!("{head:?} expects 2 arguments"),
+                ));
+            }
+            let x = rewrite_expr(
+                items[2].clone(),
+                ctx,
+                sigs,
+                generic_symbols,
+                module_exports,
+                extern_symbols,
+                subst,
+                instances,
+                pending,
+                tapp_sites_total,
+                max_specializations,
+                max_type_depth,
+            )?;
+
+            match type_name {
+                "i32" | "u32" | "bytes_view" => Ok(x),
+                "bytes" => match x {
+                    Expr::Ident { .. } => Ok(Expr::List {
+                        items: vec![
+                            Expr::Ident {
+                                name: "__internal.bytes.clone_v1".to_string(),
+                                ptr: head_ptr,
+                            },
+                            x,
+                        ],
+                        ptr,
+                    }),
+                    _ => {
+                        let hash8 = sha256_hex8(ptr.as_bytes().to_vec());
+                        let tmp_name = format!("_x07_clone_src_{hash8}");
+                        Ok(Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "begin".to_string(),
+                                    ptr: head_ptr.clone(),
+                                },
+                                Expr::List {
+                                    items: vec![
+                                        Expr::Ident {
+                                            name: "let".to_string(),
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: tmp_name.clone(),
+                                            ptr: ptr.clone(),
+                                        },
+                                        x,
+                                    ],
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::List {
+                                    items: vec![
+                                        Expr::Ident {
+                                            name: "__internal.bytes.clone_v1".to_string(),
+                                            ptr: head_ptr,
+                                        },
+                                        Expr::Ident {
+                                            name: tmp_name,
+                                            ptr: ptr.clone(),
+                                        },
+                                    ],
+                                    ptr: ptr.clone(),
+                                },
+                            ],
+                            ptr,
+                        })
+                    }
+                },
+                _ => Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("X07-TY-0101: unsupported type for {head:?}: {type_name:?}"),
+                )),
+            }
+        }
+        "ty.drop" => {
+            if items.len() != 3 {
+                return Err(CompilerError::new(
+                    CompileErrorKind::Parse,
+                    format!("{head:?} expects 2 arguments"),
+                ));
+            }
+            let x = rewrite_expr(
+                items[2].clone(),
+                ctx,
+                sigs,
+                generic_symbols,
+                module_exports,
+                extern_symbols,
+                subst,
+                instances,
+                pending,
+                tapp_sites_total,
+                max_specializations,
+                max_type_depth,
+            )?;
+
+            match type_name {
+                "i32" | "u32" | "bytes_view" => Ok(Expr::List {
+                    items: vec![
+                        Expr::Ident {
+                            name: "begin".to_string(),
+                            ptr: head_ptr,
+                        },
+                        x,
+                        Expr::Int {
+                            value: 0,
+                            ptr: ptr.clone(),
+                        },
+                    ],
+                    ptr,
+                }),
+                "bytes" => match x {
+                    Expr::Ident { .. } => Ok(Expr::List {
+                        items: vec![
+                            Expr::Ident {
+                                name: "__internal.bytes.drop_v1".to_string(),
+                                ptr: head_ptr,
+                            },
+                            x,
+                        ],
+                        ptr,
+                    }),
+                    _ => {
+                        let hash8 = sha256_hex8(ptr.as_bytes().to_vec());
+                        let tmp_name = format!("_x07_drop_src_{hash8}");
+                        Ok(Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "begin".to_string(),
+                                    ptr: head_ptr.clone(),
+                                },
+                                Expr::List {
+                                    items: vec![
+                                        Expr::Ident {
+                                            name: "let".to_string(),
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: tmp_name.clone(),
+                                            ptr: ptr.clone(),
+                                        },
+                                        x,
+                                    ],
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::List {
+                                    items: vec![
+                                        Expr::Ident {
+                                            name: "__internal.bytes.drop_v1".to_string(),
+                                            ptr: head_ptr,
+                                        },
+                                        Expr::Ident {
+                                            name: tmp_name,
+                                            ptr: ptr.clone(),
+                                        },
+                                    ],
+                                    ptr: ptr.clone(),
+                                },
+                            ],
+                            ptr,
+                        })
+                    }
+                },
+                _ => Err(CompilerError::new(
+                    CompileErrorKind::Typing,
+                    format!("X07-TY-0101: unsupported type for {head:?}: {type_name:?}"),
+                )),
+            }
         }
         "ty.cmp" => {
             if items.len() != 4 {
@@ -1770,16 +2462,6 @@ fn lower_ty_intrinsic(
                     format!("{head:?} expects 3 arguments"),
                 ));
             }
-            let lt_op = match type_name {
-                "u32" => "<u",
-                "i32" => "<",
-                _ => {
-                    return Err(CompilerError::new(
-                        CompileErrorKind::Typing,
-                        format!("X07-TY-0101: unsupported type for {head:?}: {type_name:?}"),
-                    ));
-                }
-            };
             let a = rewrite_expr(
                 items[2].clone(),
                 ctx,
@@ -1808,6 +2490,145 @@ fn lower_ty_intrinsic(
                 max_specializations,
                 max_type_depth,
             )?;
+            if matches!(type_name, "bytes" | "bytes_view") {
+                let hash8 = sha256_hex8(ptr.as_bytes().to_vec());
+                let a_name = format!("_x07_cmp_a_{hash8}");
+                let b_name = format!("_x07_cmp_b_{hash8}");
+                let an_name = format!("_x07_cmp_an_{hash8}");
+                let bn_name = format!("_x07_cmp_bn_{hash8}");
+                return Ok(Expr::List {
+                    items: vec![
+                        Expr::Ident {
+                            name: "begin".to_string(),
+                            ptr: head_ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "let".to_string(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: a_name.clone(),
+                                    ptr: ptr.clone(),
+                                },
+                                a,
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "let".to_string(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: b_name.clone(),
+                                    ptr: ptr.clone(),
+                                },
+                                b,
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "let".to_string(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: an_name.clone(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::List {
+                                    items: vec![
+                                        Expr::Ident {
+                                            name: "bytes.len".to_string(),
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: a_name.clone(),
+                                            ptr: ptr.clone(),
+                                        },
+                                    ],
+                                    ptr: ptr.clone(),
+                                },
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "let".to_string(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: bn_name.clone(),
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::List {
+                                    items: vec![
+                                        Expr::Ident {
+                                            name: "bytes.len".to_string(),
+                                            ptr: ptr.clone(),
+                                        },
+                                        Expr::Ident {
+                                            name: b_name.clone(),
+                                            ptr: ptr.clone(),
+                                        },
+                                    ],
+                                    ptr: ptr.clone(),
+                                },
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                        Expr::List {
+                            items: vec![
+                                Expr::Ident {
+                                    name: "bytes.cmp_range".to_string(),
+                                    ptr: head_ptr,
+                                },
+                                Expr::Ident {
+                                    name: a_name,
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Int {
+                                    value: 0,
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: an_name,
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: b_name,
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Int {
+                                    value: 0,
+                                    ptr: ptr.clone(),
+                                },
+                                Expr::Ident {
+                                    name: bn_name,
+                                    ptr: ptr.clone(),
+                                },
+                            ],
+                            ptr: ptr.clone(),
+                        },
+                    ],
+                    ptr,
+                });
+            }
+            let lt_op = match type_name {
+                "u32" => "<u",
+                "i32" => "<",
+                _ => {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("X07-TY-0101: unsupported type for {head:?}: {type_name:?}"),
+                    ));
+                }
+            };
             let lt_expr = Expr::List {
                 items: vec![
                     Expr::Ident {

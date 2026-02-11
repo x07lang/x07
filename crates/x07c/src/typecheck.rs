@@ -567,17 +567,129 @@ impl<'a> InferState<'a> {
         let tt = type_ref_to_term(&tr);
 
         let out = match head {
-            "ty.size_bytes" | "ty.size" => TyTerm::Named("i32".to_string()),
-            "ty.read_le_at" => tt.clone(),
-            "ty.write_le_at" => TyTerm::Named("bytes".to_string()),
-            "ty.push_le" => TyTerm::Named("vec_u8".to_string()),
-            "ty.lt" | "ty.eq" | "ty.cmp" | "ty.hash32" => TyTerm::Named("i32".to_string()),
-            _ => self.fresh_meta(),
+            "ty.size_bytes" | "ty.size" => {
+                for it in items.iter().skip(2) {
+                    let _ = self.infer_expr(it, None);
+                }
+                TyTerm::Named("i32".to_string())
+            }
+            "ty.read_le_at" => {
+                for it in items.iter().skip(2) {
+                    let _ = self.infer_expr(it, None);
+                }
+                tt.clone()
+            }
+            "ty.write_le_at" => {
+                for it in items.iter().skip(2) {
+                    let _ = self.infer_expr(it, None);
+                }
+                TyTerm::Named("bytes".to_string())
+            }
+            "ty.push_le" => {
+                for it in items.iter().skip(2) {
+                    let _ = self.infer_expr(it, None);
+                }
+                TyTerm::Named("vec_u8".to_string())
+            }
+            "ty.clone" => {
+                let want_arity = 2;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message: format!(
+                            "arity mismatch for {head:?}: expected {want_arity} args got {got_arity}"
+                        ),
+                        loc: Some(Location::X07Ast {
+                            ptr: list_ptr.to_string(),
+                        }),
+                        notes: Vec::new(),
+                        related: Vec::new(),
+                        data: BTreeMap::from([
+                            ("callee".to_string(), Value::String(head.to_string())),
+                            (
+                                "want".to_string(),
+                                Value::Number((want_arity as u64).into()),
+                            ),
+                            ("got".to_string(), Value::Number((got_arity as u64).into())),
+                        ]),
+                        quickfix: None,
+                    });
+                }
+                if let Some(x) = items.get(2) {
+                    self.check_expr(
+                        x,
+                        &tt,
+                        ConstraintOrigin::CallArg {
+                            callee: head.to_string(),
+                            arg_index: 1,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+                for it in items.iter().skip(3) {
+                    let _ = self.infer_expr(it, None);
+                }
+                tt.clone()
+            }
+            "ty.drop" => {
+                let want_arity = 2;
+                let got_arity = items.len().saturating_sub(1);
+                if got_arity != want_arity {
+                    self.diagnostics.push(Diagnostic {
+                        code: "X07-TYPE-CALL-0003".to_string(),
+                        severity: Severity::Error,
+                        stage: Stage::Type,
+                        message: format!(
+                            "arity mismatch for {head:?}: expected {want_arity} args got {got_arity}"
+                        ),
+                        loc: Some(Location::X07Ast {
+                            ptr: list_ptr.to_string(),
+                        }),
+                        notes: Vec::new(),
+                        related: Vec::new(),
+                        data: BTreeMap::from([
+                            ("callee".to_string(), Value::String(head.to_string())),
+                            (
+                                "want".to_string(),
+                                Value::Number((want_arity as u64).into()),
+                            ),
+                            ("got".to_string(), Value::Number((got_arity as u64).into())),
+                        ]),
+                        quickfix: None,
+                    });
+                }
+                if let Some(x) = items.get(2) {
+                    self.check_expr(
+                        x,
+                        &tt,
+                        ConstraintOrigin::CallArg {
+                            callee: head.to_string(),
+                            arg_index: 1,
+                            callee_decl_ptr: None,
+                        },
+                    );
+                }
+                for it in items.iter().skip(3) {
+                    let _ = self.infer_expr(it, None);
+                }
+                TyTerm::Named("i32".to_string())
+            }
+            "ty.lt" | "ty.eq" | "ty.cmp" | "ty.hash32" => {
+                for it in items.iter().skip(2) {
+                    let _ = self.infer_expr(it, None);
+                }
+                TyTerm::Named("i32".to_string())
+            }
+            _ => {
+                for it in items.iter().skip(2) {
+                    let _ = self.infer_expr(it, None);
+                }
+                self.fresh_meta()
+            }
         };
-
-        for it in items.iter().skip(2) {
-            let _ = self.infer_expr(it, None);
-        }
 
         if let Some(want) = want {
             self.add_constraint(

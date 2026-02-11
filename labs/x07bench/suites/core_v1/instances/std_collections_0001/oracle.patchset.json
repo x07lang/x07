@@ -1,0 +1,16 @@
+{
+  "schema_version": "x07.arch.patchset@0.1.0",
+  "patches": [
+    {
+      "path": "modules/bench_collections_value_map.x07.json",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/decls/1/body/4/1/2/1",
+          "value": "v"
+        }
+      ],
+      "note": "Fix expected bytes literal"
+    }
+  ]
+}

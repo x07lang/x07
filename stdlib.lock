@@ -255,6 +255,14 @@
       "version": "0.1.2"
     },
     {
+      "name": "std.hash_map_value",
+      "path": "stdlib/std/0.1.2/modules/std/hash_map_value.x07.json",
+      "relpath": "std/0.1.2/modules/std/hash_map_value.x07.json",
+      "sha256": "f9ba63fc380d5f6b487285a1f29d937ddb971128e0903bdd54b58aa3f24d4e98",
+      "size_bytes": 3874,
+      "version": "0.1.2"
+    },
+    {
       "name": "std.hash_set",
       "path": "stdlib/std/0.1.1/modules/std/hash_set.x07.json",
       "relpath": "std/0.1.1/modules/std/hash_set.x07.json",
@@ -873,6 +881,14 @@
       "version": "0.1.2"
     },
     {
+      "name": "std.vec_value",
+      "path": "stdlib/std/0.1.2/modules/std/vec_value.x07.json",
+      "relpath": "std/0.1.2/modules/std/vec_value.x07.json",
+      "sha256": "6c17de1e9ae88efa6e05fc6db8be97b01506098fe9c253c8eb18c80d72bf03a7",
+      "size_bytes": 2724,
+      "version": "0.1.2"
+    },
+    {
       "name": "std.world.fs",
       "path": "stdlib/std/0.1.1/modules/std/world/fs.x07.json",
       "relpath": "std/0.1.1/modules/std/world/fs.x07.json",
@@ -889,6 +905,6 @@
       "version": "0.1.2"
     }
   ],
-  "stdlib_hash": "6cb4ed5a8842c6053e5d2d13318ad4299d4cf884ccf2893bdc4dc94bdafb4cad",
+  "stdlib_hash": "f1ff6644adfbd35770cb0eaff90deec606c0aa014700d068e61c8cf922cf9bd2",
   "stdlib_root": "stdlib/std"
 }

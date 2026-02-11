@@ -3,6 +3,9 @@ pub fn builtin_module_source(module_id: &str) -> Option<&'static str> {
         "std.vec" => Some(include_str!(
             "../../../stdlib/std/0.1.2/modules/std/vec.x07.json"
         )),
+        "std.vec_value" => Some(include_str!(
+            "../../../stdlib/std/0.1.2/modules/std/vec_value.x07.json"
+        )),
         "std.slice" => Some(include_str!(
             "../../../stdlib/std/0.1.2/modules/std/slice.x07.json"
         )),
@@ -75,6 +78,9 @@ pub fn builtin_module_source(module_id: &str) -> Option<&'static str> {
         "std.hash_map" => Some(include_str!(
             "../../../stdlib/std/0.1.2/modules/std/hash_map.x07.json"
         )),
+        "std.hash_map_value" => Some(include_str!(
+            "../../../stdlib/std/0.1.2/modules/std/hash_map_value.x07.json"
+        )),
         "std.hash_set" => Some(include_str!(
             "../../../stdlib/std/0.1.2/modules/std/hash_set.x07.json"
         )),
@@ -142,6 +148,7 @@ pub fn builtin_module_source(module_id: &str) -> Option<&'static str> {
 pub fn builtin_module_ids() -> &'static [&'static str] {
     &[
         "std.vec",
+        "std.vec_value",
         "std.slice",
         "std.bytes",
         "std.codec",
@@ -166,6 +173,7 @@ pub fn builtin_module_ids() -> &'static [&'static str] {
         "std.small_set",
         "std.hash",
         "std.hash_map",
+        "std.hash_map_value",
         "std.hash_set",
         "std.btree_map",
         "std.btree_set",

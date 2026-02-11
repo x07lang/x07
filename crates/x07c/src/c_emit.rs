@@ -5221,6 +5221,38 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
+                    "__internal.bytes.clone_v1" => {
+                        if args.len() != 1 || dest.ty != Ty::Bytes || args[0].ty != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.bytes.clone_v1 expects bytes and returns bytes"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("{} = rt_bytes_clone(ctx, {});", dest.c_name, args[0].c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "__internal.bytes.drop_v1" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.bytes.drop_v1 expects bytes and returns i32"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(state, format!("rt_bytes_drop(ctx, &{});", args[0].c_name));
+                        self.line(
+                            state,
+                            format!("{} = {};", args[0].c_name, c_empty(Ty::Bytes)),
+                        );
+                        self.line(state, format!("{} = UINT32_C(0);", dest.c_name));
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
                     "bytes.empty" => {
                         if !args.is_empty() || dest.ty != Ty::Bytes {
                             return Err(CompilerError::new(
@@ -8991,6 +9023,455 @@ impl<'a> Emitter<'a> {
                             ),
                         );
                         self.line(state, format!("{} = UINT32_C(0);", dest.c_name));
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "vec_value.with_capacity_v1" => {
+                        if args.len() != 2
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::I32
+                            || args[1].ty != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.with_capacity_v1 expects (i32 ty_id, i32 cap)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_vec_value_with_capacity_v1(ctx, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "vec_value.len" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.len expects i32 handle".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_vec_value_len(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "vec_value.reserve_exact" => {
+                        if args.len() != 2
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::I32
+                            || args[1].ty != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.reserve_exact expects (i32 handle, i32 additional)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_vec_value_reserve_exact(ctx, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "vec_value.pop" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.pop expects i32 handle".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_vec_value_pop(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "vec_value.clear" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.clear expects i32 handle".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_vec_value_clear(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    h if h.starts_with("vec_value.push_") => {
+                        if args.len() != 2 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, x)"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "vec_value.push_")
+                        else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_x_ty = value_suffix_ty(suffix)
+                            .expect("suffix validated by parse_value_suffix");
+                        if args[1].ty != want_x_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects x ({want_x_ty:?})"),
+                            ));
+                        }
+                        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+                        self.line(
+                            state,
+                            format!(
+                                "{} = {rt_fn}(ctx, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        if want_x_ty == Ty::Bytes && dest.c_name != args[1].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[1].c_name, c_empty(Ty::Bytes)),
+                            );
+                        }
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    h if h.starts_with("vec_value.get_") => {
+                        if args.len() != 3 || args[0].ty != Ty::I32 || args[1].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, i32 idx, default)"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "vec_value.get_") else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_out_ty = value_suffix_ty(suffix)
+                            .expect("suffix validated by parse_value_suffix");
+                        if dest.ty != want_out_ty || args[2].ty != want_out_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects default ({want_out_ty:?})"),
+                            ));
+                        }
+                        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+                        self.line(
+                            state,
+                            format!(
+                                "{} = {rt_fn}(ctx, {}, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name, args[2].c_name
+                            ),
+                        );
+                        if want_out_ty == Ty::Bytes && dest.c_name != args[2].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[2].c_name, c_empty(Ty::Bytes)),
+                            );
+                        }
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    h if h.starts_with("vec_value.set_") => {
+                        if args.len() != 3
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::I32
+                            || args[1].ty != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, i32 idx, x)"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "vec_value.set_") else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_x_ty = value_suffix_ty(suffix)
+                            .expect("suffix validated by parse_value_suffix");
+                        if args[2].ty != want_x_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects x ({want_x_ty:?})"),
+                            ));
+                        }
+                        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+                        self.line(
+                            state,
+                            format!(
+                                "{} = {rt_fn}(ctx, {}, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name, args[2].c_name
+                            ),
+                        );
+                        if want_x_ty == Ty::Bytes && dest.c_name != args[2].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[2].c_name, c_empty(Ty::Bytes)),
+                            );
+                        }
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+
+                    "map_value.new_v1" => {
+                        if args.len() != 3
+                            || dest.ty != Ty::I32
+                            || args[0].ty != Ty::I32
+                            || args[1].ty != Ty::I32
+                            || args[2].ty != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "map_value.new_v1 expects (i32 k_id, i32 v_id, i32 cap_pow2)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_map_value_new_v1(ctx, {}, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name, args[2].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "map_value.len" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "map_value.len expects i32 handle".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_map_value_len(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "map_value.clear" => {
+                        if args.len() != 1 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "map_value.clear expects i32 handle".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = rt_map_value_clear(ctx, {});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    h if h.starts_with("map_value.contains_") => {
+                        if args.len() != 2 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, key)"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "map_value.contains_")
+                        else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_k_ty = value_suffix_ty(suffix)
+                            .expect("suffix validated by parse_value_suffix");
+                        if args[1].ty != want_k_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects key ({want_k_ty:?})"),
+                            ));
+                        }
+                        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+                        self.line(
+                            state,
+                            format!(
+                                "{} = {rt_fn}(ctx, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        if want_k_ty == Ty::Bytes && dest.c_name != args[1].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[1].c_name, c_empty(Ty::Bytes)),
+                            );
+                        }
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    h if h.starts_with("map_value.remove_") => {
+                        if args.len() != 2 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, key)"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "map_value.remove_")
+                        else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_k_ty = value_suffix_ty(suffix)
+                            .expect("suffix validated by parse_value_suffix");
+                        if args[1].ty != want_k_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects key ({want_k_ty:?})"),
+                            ));
+                        }
+                        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+                        self.line(
+                            state,
+                            format!(
+                                "{} = {rt_fn}(ctx, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        if want_k_ty == Ty::Bytes && dest.c_name != args[1].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[1].c_name, c_empty(Ty::Bytes)),
+                            );
+                        }
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    h if h.starts_with("map_value.get_") => {
+                        if args.len() != 3 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, key, default)"),
+                            ));
+                        }
+                        let Some((k_suffix, v_suffix)) =
+                            parse_value_suffix_pair(head, "map_value.get_")
+                        else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_k_ty = value_suffix_ty(k_suffix)
+                            .expect("suffix validated by parse_value_suffix");
+                        let want_v_ty = value_suffix_ty(v_suffix)
+                            .expect("suffix validated by parse_value_suffix");
+                        if args[1].ty != want_k_ty
+                            || args[2].ty != want_v_ty
+                            || dest.ty != want_v_ty
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, {want_k_ty:?} key, {want_v_ty:?} default)"),
+                            ));
+                        }
+                        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+                        self.line(
+                            state,
+                            format!(
+                                "{} = {rt_fn}(ctx, {}, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name, args[2].c_name
+                            ),
+                        );
+                        if want_k_ty == Ty::Bytes && dest.c_name != args[1].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[1].c_name, c_empty(Ty::Bytes)),
+                            );
+                        }
+                        if want_v_ty == Ty::Bytes && dest.c_name != args[2].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[2].c_name, c_empty(Ty::Bytes)),
+                            );
+                        }
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    h if h.starts_with("map_value.set_") => {
+                        if args.len() != 3 || dest.ty != Ty::I32 || args[0].ty != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, key, val)"),
+                            ));
+                        }
+                        let Some((k_suffix, v_suffix)) =
+                            parse_value_suffix_pair(head, "map_value.set_")
+                        else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_k_ty = value_suffix_ty(k_suffix)
+                            .expect("suffix validated by parse_value_suffix");
+                        let want_v_ty = value_suffix_ty(v_suffix)
+                            .expect("suffix validated by parse_value_suffix");
+                        if args[1].ty != want_k_ty || args[2].ty != want_v_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, {want_k_ty:?} key, {want_v_ty:?} val)"),
+                            ));
+                        }
+                        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+                        self.line(
+                            state,
+                            format!(
+                                "{} = {rt_fn}(ctx, {}, {}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name, args[2].c_name
+                            ),
+                        );
+                        if want_k_ty == Ty::Bytes && dest.c_name != args[1].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[1].c_name, c_empty(Ty::Bytes)),
+                            );
+                        }
+                        if want_v_ty == Ty::Bytes && dest.c_name != args[2].c_name {
+                            self.line(
+                                state,
+                                format!("{} = {};", args[2].c_name, c_empty(Ty::Bytes)),
+                            );
+                        }
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -12965,6 +13446,10 @@ impl<'a> Emitter<'a> {
             "__internal.bytes.alloc_aligned_v1" => {
                 self.emit_internal_bytes_alloc_aligned_v1_to(args, dest_ty, dest)
             }
+            "__internal.bytes.clone_v1" => {
+                self.emit_internal_bytes_clone_v1_to(args, dest_ty, dest)
+            }
+            "__internal.bytes.drop_v1" => self.emit_internal_bytes_drop_v1_to(args, dest_ty, dest),
             "__internal.stream_xf.plugin_init_v1" => {
                 self.emit_internal_stream_xf_plugin_init_v1_to(args, dest_ty, dest)
             }
@@ -13262,6 +13747,39 @@ impl<'a> Emitter<'a> {
             }
 
             "try" => self.emit_try_to(args, dest_ty, dest),
+
+            "vec_value.with_capacity_v1" => {
+                self.emit_vec_value_with_capacity_v1_to(args, dest_ty, dest)
+            }
+            "vec_value.len" => self.emit_vec_value_len_to(args, dest_ty, dest),
+            "vec_value.reserve_exact" => self.emit_vec_value_reserve_exact_to(args, dest_ty, dest),
+            "vec_value.pop" => self.emit_vec_value_pop_to(args, dest_ty, dest),
+            "vec_value.clear" => self.emit_vec_value_clear_to(args, dest_ty, dest),
+            h if h.starts_with("vec_value.push_") => {
+                self.emit_vec_value_push_v1_to(h, args, dest_ty, dest)
+            }
+            h if h.starts_with("vec_value.get_") => {
+                self.emit_vec_value_get_v1_to(h, args, dest_ty, dest)
+            }
+            h if h.starts_with("vec_value.set_") => {
+                self.emit_vec_value_set_v1_to(h, args, dest_ty, dest)
+            }
+
+            "map_value.new_v1" => self.emit_map_value_new_v1_to(args, dest_ty, dest),
+            "map_value.len" => self.emit_map_value_len_to(args, dest_ty, dest),
+            "map_value.clear" => self.emit_map_value_clear_to(args, dest_ty, dest),
+            h if h.starts_with("map_value.contains_") => {
+                self.emit_map_value_contains_v1_to(h, args, dest_ty, dest)
+            }
+            h if h.starts_with("map_value.remove_") => {
+                self.emit_map_value_remove_v1_to(h, args, dest_ty, dest)
+            }
+            h if h.starts_with("map_value.get_") => {
+                self.emit_map_value_get_v1_to(h, args, dest_ty, dest)
+            }
+            h if h.starts_with("map_value.set_") => {
+                self.emit_map_value_set_v1_to(h, args, dest_ty, dest)
+            }
 
             "map_u32.new" | "set_u32.new" => self.emit_map_u32_new_to(args, dest_ty, dest),
             "map_u32.len" => self.emit_map_u32_len_to(args, dest_ty, dest),
@@ -15423,6 +15941,793 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             "{dest} = rt_bytes_alloc_aligned(ctx, (uint32_t){}, (uint32_t){});",
             len.c_name, align.c_name
         ));
+        Ok(())
+    }
+
+    fn emit_internal_bytes_clone_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.bytes.clone_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.bytes.clone_v1 returns bytes".to_string(),
+            ));
+        }
+        match &args[0] {
+            Expr::Ident { name, .. } if name != "input" => {
+                let Some(var) = self.lookup(name).cloned() else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("unknown identifier: {name:?}"),
+                    ));
+                };
+                if var.moved {
+                    let moved_ptr = var
+                        .moved_ptr
+                        .as_deref()
+                        .filter(|p| !p.is_empty())
+                        .unwrap_or("<unknown>");
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                    ));
+                }
+                if var.ty != Ty::Bytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "__internal.bytes.clone_v1 expects bytes".to_string(),
+                    ));
+                }
+                self.line(&format!("{dest} = rt_bytes_clone(ctx, {});", var.c_name));
+                Ok(())
+            }
+            _ => {
+                let b = self.emit_expr(&args[0])?;
+                if b.ty != Ty::Bytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "__internal.bytes.clone_v1 expects bytes".to_string(),
+                    ));
+                }
+                self.line(&format!("{dest} = rt_bytes_clone(ctx, {});", b.c_name));
+                Ok(())
+            }
+        }
+    }
+
+    fn emit_internal_bytes_drop_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "__internal.bytes.drop_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "__internal.bytes.drop_v1 returns i32".to_string(),
+            ));
+        }
+
+        match &args[0] {
+            Expr::Ident { name, .. } => {
+                let Some(var) = self.lookup(name).cloned() else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("unknown identifier: {name:?}"),
+                    ));
+                };
+                if var.moved {
+                    let moved_ptr = var
+                        .moved_ptr
+                        .as_deref()
+                        .filter(|p| !p.is_empty())
+                        .unwrap_or("<unknown>");
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("use after move: {name:?} moved_ptr={moved_ptr}"),
+                    ));
+                }
+                if var.borrow_count != 0 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("__internal.bytes.drop_v1 while borrowed: {name:?}"),
+                    ));
+                }
+                if var.ty != Ty::Bytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "__internal.bytes.drop_v1 expects bytes".to_string(),
+                    ));
+                }
+                self.line(&format!("rt_bytes_drop(ctx, &{});", var.c_name));
+                self.line(&format!("{dest} = UINT32_C(0);"));
+                let moved_ptr = self.current_ptr.clone();
+                if let Some(v) = self.lookup_mut(name) {
+                    v.moved = true;
+                    v.moved_ptr = moved_ptr;
+                }
+                Ok(())
+            }
+            _ => {
+                let b = self.emit_expr(&args[0])?;
+                if b.ty != Ty::Bytes {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        "__internal.bytes.drop_v1 expects bytes".to_string(),
+                    ));
+                }
+                self.line(&format!("rt_bytes_drop(ctx, &{});", b.c_name));
+                self.line(&format!("{dest} = UINT32_C(0);"));
+                Ok(())
+            }
+        }
+    }
+
+    fn emit_vec_value_with_capacity_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "vec_value.with_capacity_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.with_capacity_v1 returns i32 handle".to_string(),
+            ));
+        }
+        let ty_id = self.emit_expr(&args[0])?;
+        let cap = self.emit_expr(&args[1])?;
+        if ty_id.ty != Ty::I32 || cap.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.with_capacity_v1 expects (i32 ty_id, i32 cap)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_vec_value_with_capacity_v1(ctx, {}, {});",
+            ty_id.c_name, cap.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_vec_value_len_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "vec_value.len expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.len returns i32".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.len expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_vec_value_len(ctx, {});", h.c_name));
+        Ok(())
+    }
+
+    fn emit_vec_value_reserve_exact_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "vec_value.reserve_exact expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.reserve_exact returns i32 handle".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        let additional = self.emit_expr(&args[1])?;
+        if h.ty != Ty::I32 || additional.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.reserve_exact expects (i32 handle, i32 additional)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_vec_value_reserve_exact(ctx, {}, {});",
+            h.c_name, additional.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_vec_value_pop_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "vec_value.pop expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.pop returns i32 handle".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.pop expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_vec_value_pop(ctx, {});", h.c_name));
+        Ok(())
+    }
+
+    fn emit_vec_value_clear_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "vec_value.clear expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.clear returns i32 handle".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "vec_value.clear expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_vec_value_clear(ctx, {});", h.c_name));
+        Ok(())
+    }
+
+    fn emit_vec_value_push_v1_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let Some(suffix) = parse_value_suffix_single(head, "vec_value.push_") else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("unsupported head: {head:?}"),
+            ));
+        };
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 2 args"),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns i32 handle"),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects i32 handle"),
+            ));
+        }
+        let want_x_ty = value_suffix_ty(suffix).expect("suffix validated by parse_value_suffix");
+        let x = self.emit_expr(&args[1])?;
+        if x.ty != want_x_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects ({want_x_ty:?})"),
+            ));
+        }
+        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+        self.line(&format!(
+            "{dest} = {rt_fn}(ctx, {}, {});",
+            h.c_name, x.c_name
+        ));
+        match want_x_ty {
+            Ty::Bytes => self.line(&format!("{} = {};", x.c_name, c_empty(Ty::Bytes))),
+            Ty::BytesView => self.release_temp_view_borrow(&x)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn emit_vec_value_get_v1_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let Some(suffix) = parse_value_suffix_single(head, "vec_value.get_") else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("unsupported head: {head:?}"),
+            ));
+        };
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 3 args"),
+            ));
+        }
+        let want_out_ty = value_suffix_ty(suffix).expect("suffix validated by parse_value_suffix");
+        if dest_ty != want_out_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns {want_out_ty:?}"),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        let idx = self.emit_expr(&args[1])?;
+        if h.ty != Ty::I32 || idx.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects (i32 handle, i32 idx, default)"),
+            ));
+        }
+        let default = self.emit_expr(&args[2])?;
+        if default.ty != want_out_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects default ({want_out_ty:?})"),
+            ));
+        }
+
+        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+        self.line(&format!(
+            "{dest} = {rt_fn}(ctx, {}, {}, {});",
+            h.c_name, idx.c_name, default.c_name
+        ));
+        match want_out_ty {
+            Ty::Bytes => {
+                if dest != default.c_name.as_str() {
+                    self.line(&format!("{} = {};", default.c_name, c_empty(Ty::Bytes)));
+                }
+            }
+            Ty::BytesView => self.release_temp_view_borrow(&default)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn emit_vec_value_set_v1_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let Some(suffix) = parse_value_suffix_single(head, "vec_value.set_") else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("unsupported head: {head:?}"),
+            ));
+        };
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 3 args"),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns i32 handle"),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        let idx = self.emit_expr(&args[1])?;
+        if h.ty != Ty::I32 || idx.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects (i32 handle, i32 idx, x)"),
+            ));
+        }
+        let want_x_ty = value_suffix_ty(suffix).expect("suffix validated by parse_value_suffix");
+        let x = self.emit_expr(&args[2])?;
+        if x.ty != want_x_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects x ({want_x_ty:?})"),
+            ));
+        }
+        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+        self.line(&format!(
+            "{dest} = {rt_fn}(ctx, {}, {}, {});",
+            h.c_name, idx.c_name, x.c_name
+        ));
+        match want_x_ty {
+            Ty::Bytes => self.line(&format!("{} = {};", x.c_name, c_empty(Ty::Bytes))),
+            Ty::BytesView => self.release_temp_view_borrow(&x)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn emit_map_value_new_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "map_value.new_v1 expects 3 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "map_value.new_v1 returns i32 handle".to_string(),
+            ));
+        }
+        let k_id = self.emit_expr(&args[0])?;
+        let v_id = self.emit_expr(&args[1])?;
+        let cap = self.emit_expr(&args[2])?;
+        if k_id.ty != Ty::I32 || v_id.ty != Ty::I32 || cap.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "map_value.new_v1 expects (i32 k_id, i32 v_id, i32 cap_pow2)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = rt_map_value_new_v1(ctx, {}, {}, {});",
+            k_id.c_name, v_id.c_name, cap.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_map_value_len_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "map_value.len expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "map_value.len returns i32".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "map_value.len expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_map_value_len(ctx, {});", h.c_name));
+        Ok(())
+    }
+
+    fn emit_map_value_clear_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "map_value.clear expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "map_value.clear returns i32 handle".to_string(),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "map_value.clear expects i32 handle".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = rt_map_value_clear(ctx, {});", h.c_name));
+        Ok(())
+    }
+
+    fn emit_map_value_contains_v1_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let Some(k_suffix) = parse_value_suffix_single(head, "map_value.contains_") else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("unsupported head: {head:?}"),
+            ));
+        };
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 2 args"),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns i32"),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects i32 handle"),
+            ));
+        }
+        let want_k_ty = value_suffix_ty(k_suffix).expect("suffix validated by parse_value_suffix");
+        let key = self.emit_expr(&args[1])?;
+        if key.ty != want_k_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects key ({want_k_ty:?})"),
+            ));
+        }
+        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+        self.line(&format!(
+            "{dest} = {rt_fn}(ctx, {}, {});",
+            h.c_name, key.c_name
+        ));
+        match want_k_ty {
+            Ty::Bytes => self.line(&format!("{} = {};", key.c_name, c_empty(Ty::Bytes))),
+            Ty::BytesView => self.release_temp_view_borrow(&key)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn emit_map_value_remove_v1_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let Some(k_suffix) = parse_value_suffix_single(head, "map_value.remove_") else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("unsupported head: {head:?}"),
+            ));
+        };
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 2 args"),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns i32 handle"),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects i32 handle"),
+            ));
+        }
+        let want_k_ty = value_suffix_ty(k_suffix).expect("suffix validated by parse_value_suffix");
+        let key = self.emit_expr(&args[1])?;
+        if key.ty != want_k_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects key ({want_k_ty:?})"),
+            ));
+        }
+        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+        self.line(&format!(
+            "{dest} = {rt_fn}(ctx, {}, {});",
+            h.c_name, key.c_name
+        ));
+        match want_k_ty {
+            Ty::Bytes => self.line(&format!("{} = {};", key.c_name, c_empty(Ty::Bytes))),
+            Ty::BytesView => self.release_temp_view_borrow(&key)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn emit_map_value_get_v1_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let Some((k_suffix, v_suffix)) = parse_value_suffix_pair(head, "map_value.get_") else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("unsupported head: {head:?}"),
+            ));
+        };
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 3 args"),
+            ));
+        }
+        let want_k_ty = value_suffix_ty(k_suffix).expect("suffix validated by parse_value_suffix");
+        let want_v_ty = value_suffix_ty(v_suffix).expect("suffix validated by parse_value_suffix");
+        if dest_ty != want_v_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns {want_v_ty:?}"),
+            ));
+        }
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects i32 handle"),
+            ));
+        }
+        let key = self.emit_expr(&args[1])?;
+        if key.ty != want_k_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects key ({want_k_ty:?})"),
+            ));
+        }
+        let default = self.emit_expr(&args[2])?;
+        if default.ty != want_v_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects default ({want_v_ty:?})"),
+            ));
+        }
+        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+        self.line(&format!(
+            "{dest} = {rt_fn}(ctx, {}, {}, {});",
+            h.c_name, key.c_name, default.c_name
+        ));
+        match want_k_ty {
+            Ty::Bytes => self.line(&format!("{} = {};", key.c_name, c_empty(Ty::Bytes))),
+            Ty::BytesView => self.release_temp_view_borrow(&key)?,
+            _ => {}
+        }
+        match want_v_ty {
+            Ty::Bytes => {
+                if dest != default.c_name.as_str() {
+                    self.line(&format!("{} = {};", default.c_name, c_empty(Ty::Bytes)));
+                }
+            }
+            Ty::BytesView => self.release_temp_view_borrow(&default)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn emit_map_value_set_v1_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        let Some((k_suffix, v_suffix)) = parse_value_suffix_pair(head, "map_value.set_") else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("unsupported head: {head:?}"),
+            ));
+        };
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 3 args"),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns i32 handle"),
+            ));
+        }
+        let want_k_ty = value_suffix_ty(k_suffix).expect("suffix validated by parse_value_suffix");
+        let want_v_ty = value_suffix_ty(v_suffix).expect("suffix validated by parse_value_suffix");
+        let h = self.emit_expr(&args[0])?;
+        if h.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects i32 handle"),
+            ));
+        }
+        let key = self.emit_expr(&args[1])?;
+        if key.ty != want_k_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects key ({want_k_ty:?})"),
+            ));
+        }
+        let val = self.emit_expr(&args[2])?;
+        if val.ty != want_v_ty {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects val ({want_v_ty:?})"),
+            ));
+        }
+        let rt_fn = format!("rt_{}", head.replace('.', "_"));
+        self.line(&format!(
+            "{dest} = {rt_fn}(ctx, {}, {}, {});",
+            h.c_name, key.c_name, val.c_name
+        ));
+        match want_k_ty {
+            Ty::Bytes => self.line(&format!("{} = {};", key.c_name, c_empty(Ty::Bytes))),
+            Ty::BytesView => self.release_temp_view_borrow(&key)?,
+            _ => {}
+        }
+        match want_v_ty {
+            Ty::Bytes => self.line(&format!("{} = {};", val.c_name, c_empty(Ty::Bytes))),
+            Ty::BytesView => self.release_temp_view_borrow(&val)?,
+            _ => {}
+        }
         Ok(())
     }
 
@@ -24230,6 +25535,36 @@ fn c_escape_c_string(s: &str) -> String {
     out
 }
 
+fn value_suffix_ty(suffix: &str) -> Option<Ty> {
+    match suffix {
+        "i32" => Some(Ty::I32),
+        "bytes" => Some(Ty::Bytes),
+        "bytes_view" => Some(Ty::BytesView),
+        _ => None,
+    }
+}
+
+fn parse_value_suffix_single<'a>(head: &'a str, prefix: &str) -> Option<&'a str> {
+    let suffix = head
+        .strip_prefix(prefix)?
+        .strip_suffix("_v1")
+        .filter(|s| value_suffix_ty(s).is_some())?;
+    Some(suffix)
+}
+
+fn parse_value_suffix_pair<'a>(head: &'a str, prefix: &str) -> Option<(&'a str, &'a str)> {
+    let rest = head.strip_prefix(prefix)?.strip_suffix("_v1")?;
+    for k in ["i32", "bytes", "bytes_view"] {
+        let Some(v) = rest.strip_prefix(k).and_then(|r| r.strip_prefix('_')) else {
+            continue;
+        };
+        if value_suffix_ty(v).is_some() {
+            return Some((k, v));
+        }
+    }
+    None
+}
+
 #[derive(Debug, Clone, Copy)]
 struct TaskScopeCfgV1 {
     max_children: u32,
@@ -29165,6 +30500,366 @@ impl InferCtx {
                         }
                         Ok(Ty::VecU8.into())
                     }
+                    "vec_value.with_capacity_v1" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "vec_value.with_capacity_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 || self.infer(&args[1])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.with_capacity_v1 expects (i32 ty_id, i32 cap)".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "vec_value.len" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "vec_value.len expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.len expects i32 handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "vec_value.reserve_exact" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "vec_value.reserve_exact expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 || self.infer(&args[1])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.reserve_exact expects (i32 handle, i32 additional)".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "vec_value.pop" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "vec_value.pop expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.pop expects i32 handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "vec_value.clear" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "vec_value.clear expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "vec_value.clear expects i32 handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    h if h.starts_with("vec_value.push_") => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 2 args"),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects i32 handle"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "vec_value.push_") else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_x_ty =
+                            value_suffix_ty(suffix).expect("suffix validated by parse_value_suffix");
+                        if self.infer(&args[1])? != want_x_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects ({want_x_ty:?})"),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    h if h.starts_with("vec_value.get_") => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 3 args"),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 || self.infer(&args[1])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, i32 idx, default)"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "vec_value.get_") else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_out_ty =
+                            value_suffix_ty(suffix).expect("suffix validated by parse_value_suffix");
+                        let default = self.infer(&args[2])?;
+                        if default != want_out_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects default ({want_out_ty:?})"),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: want_out_ty,
+                            brand: default.brand,
+                            view_full: false,
+                        })
+                    }
+                    h if h.starts_with("vec_value.set_") => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 3 args"),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 || self.infer(&args[1])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects (i32 handle, i32 idx, x)"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "vec_value.set_") else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_x_ty =
+                            value_suffix_ty(suffix).expect("suffix validated by parse_value_suffix");
+                        if self.infer(&args[2])? != want_x_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects x ({want_x_ty:?})"),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+
+                    "map_value.new_v1" => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "map_value.new_v1 expects 3 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32
+                            || self.infer(&args[1])? != Ty::I32
+                            || self.infer(&args[2])? != Ty::I32
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "map_value.new_v1 expects (i32 k_id, i32 v_id, i32 cap_pow2)".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "map_value.len" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "map_value.len expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "map_value.len expects i32 handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    "map_value.clear" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "map_value.clear expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "map_value.clear expects i32 handle".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    h if h.starts_with("map_value.contains_") => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 2 args"),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects i32 handle"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "map_value.contains_")
+                        else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_k_ty =
+                            value_suffix_ty(suffix).expect("suffix validated by parse_value_suffix");
+                        if self.infer(&args[1])? != want_k_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects key ({want_k_ty:?})"),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    h if h.starts_with("map_value.remove_") => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 2 args"),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects i32 handle"),
+                            ));
+                        }
+                        let Some(suffix) = parse_value_suffix_single(head, "map_value.remove_")
+                        else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_k_ty =
+                            value_suffix_ty(suffix).expect("suffix validated by parse_value_suffix");
+                        if self.infer(&args[1])? != want_k_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects key ({want_k_ty:?})"),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
+                    h if h.starts_with("map_value.get_") => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 3 args"),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects i32 handle"),
+                            ));
+                        }
+                        let Some((k_suffix, v_suffix)) =
+                            parse_value_suffix_pair(head, "map_value.get_")
+                        else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_k_ty =
+                            value_suffix_ty(k_suffix).expect("suffix validated by parse_value_suffix");
+                        let want_v_ty =
+                            value_suffix_ty(v_suffix).expect("suffix validated by parse_value_suffix");
+                        let key = self.infer(&args[1])?;
+                        if key != want_k_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects key ({want_k_ty:?})"),
+                            ));
+                        }
+                        let default = self.infer(&args[2])?;
+                        if default != want_v_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects default ({want_v_ty:?})"),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: want_v_ty,
+                            brand: default.brand,
+                            view_full: false,
+                        })
+                    }
+                    h if h.starts_with("map_value.set_") => {
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                format!("{head} expects 3 args"),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects i32 handle"),
+                            ));
+                        }
+                        let Some((k_suffix, v_suffix)) =
+                            parse_value_suffix_pair(head, "map_value.set_")
+                        else {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("unsupported head: {head:?}"),
+                            ));
+                        };
+                        let want_k_ty =
+                            value_suffix_ty(k_suffix).expect("suffix validated by parse_value_suffix");
+                        let want_v_ty =
+                            value_suffix_ty(v_suffix).expect("suffix validated by parse_value_suffix");
+                        if self.infer(&args[1])? != want_k_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects key ({want_k_ty:?})"),
+                            ));
+                        }
+                        if self.infer(&args[2])? != want_v_ty {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("{head} expects val ({want_v_ty:?})"),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
+                    }
                     "map_u32.new" | "set_u32.new" => {
                         if args.len() != 1 {
                             return Err(CompilerError::new(
@@ -29813,6 +31508,41 @@ impl InferCtx {
                             ));
                         }
                         Ok(Ty::Bytes.into())
+                    }
+                    "__internal.bytes.clone_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.bytes.clone_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        let b = self.infer(&args[0])?;
+                        if b != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.bytes.clone_v1 expects bytes".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: Ty::Bytes,
+                            brand: b.brand,
+                            view_full: false,
+                        })
+                    }
+                    "__internal.bytes.drop_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "__internal.bytes.drop_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "__internal.bytes.drop_v1 expects bytes".to_string(),
+                            ));
+                        }
+                        Ok(Ty::I32.into())
                     }
                     "__internal.stream_xf.plugin_init_v1" => {
                         if args.len() != 12 {
@@ -31020,6 +32750,14 @@ typedef struct {
   void** map_u32_items;
   uint32_t map_u32_len;
   uint32_t map_u32_cap;
+
+  void** vec_value_items;
+  uint32_t vec_value_len;
+  uint32_t vec_value_cap;
+
+  void** map_value_items;
+  uint32_t map_value_len;
+  uint32_t map_value_cap;
 
   // Phase G2 scheduler + concurrency (deterministic, single-thread cooperative).
   uint32_t sched_current_task;
@@ -38214,6 +39952,1069 @@ static bytes_t rt_map_u32_dump_kv_u32le_u32le(ctx_t* ctx, uint32_t handle) {
   return out;
 }
 
+static uint32_t rt_hash_mix32(uint32_t h) {
+  h ^= h >> 16;
+  h *= UINT32_C(2246822507);
+  h ^= h >> 13;
+  h *= UINT32_C(3266489909);
+  h ^= h >> 16;
+  return h;
+}
+
+static uint32_t rt_hash_fnv1a32_view(ctx_t* ctx, bytes_view_t v) {
+#ifdef X07_DEBUG_BORROW
+  (void)rt_dbg_borrow_check(ctx, v.bid, v.off_bytes, v.len);
+#else
+  (void)ctx;
+#endif
+  uint32_t h = UINT32_C(2166136261);
+  for (uint32_t i = 0; i < v.len; i++) {
+    h ^= (uint32_t)v.ptr[i];
+    h *= UINT32_C(16777619);
+  }
+  return h;
+}
+
+static int32_t rt_cmp_u32_to_i32(uint32_t x07_cmp) {
+  if (x07_cmp == UINT32_MAX) return -1;
+  if (x07_cmp == UINT32_C(1)) return 1;
+  return 0;
+}
+
+typedef struct {
+  uint32_t size;
+  uint32_t align;
+  void (*drop_in_place)(ctx_t* ctx, void* p);
+  void (*clone_into)(ctx_t* ctx, void* dst, const void* src);
+  uint32_t (*eq)(ctx_t* ctx, const void* a, const void* b);
+  uint32_t (*hash32)(ctx_t* ctx, const void* a);
+  int32_t (*cmp)(ctx_t* ctx, const void* a, const void* b);
+} rt_tyops_v1;
+
+static void rt_tyops_drop_nop(ctx_t* ctx, void* p) {
+  (void)ctx;
+  (void)p;
+}
+
+static void rt_tyops_clone_u32_into(ctx_t* ctx, void* dst, const void* src) {
+  (void)ctx;
+  *(uint32_t*)dst = *(const uint32_t*)src;
+}
+
+static uint32_t rt_tyops_eq_u32(ctx_t* ctx, const void* a, const void* b) {
+  (void)ctx;
+  return (*(const uint32_t*)a == *(const uint32_t*)b) ? UINT32_C(1) : UINT32_C(0);
+}
+
+static uint32_t rt_tyops_hash32_u32(ctx_t* ctx, const void* a) {
+  (void)ctx;
+  return rt_hash_mix32(*(const uint32_t*)a);
+}
+
+static int32_t rt_tyops_cmp_i32(ctx_t* ctx, const void* a, const void* b) {
+  (void)ctx;
+  int32_t aa = (int32_t)(*(const uint32_t*)a);
+  int32_t bb = (int32_t)(*(const uint32_t*)b);
+  if (aa < bb) return -1;
+  if (aa > bb) return 1;
+  return 0;
+}
+
+static int32_t rt_tyops_cmp_u32(ctx_t* ctx, const void* a, const void* b) {
+  (void)ctx;
+  uint32_t aa = *(const uint32_t*)a;
+  uint32_t bb = *(const uint32_t*)b;
+  if (aa < bb) return -1;
+  if (aa > bb) return 1;
+  return 0;
+}
+
+static void rt_tyops_drop_bytes(ctx_t* ctx, void* p) {
+  rt_bytes_drop(ctx, (bytes_t*)p);
+}
+
+static void rt_tyops_clone_bytes_into(ctx_t* ctx, void* dst, const void* src) {
+  bytes_t b = *(const bytes_t*)src;
+  *(bytes_t*)dst = rt_bytes_clone(ctx, b);
+}
+
+static uint32_t rt_tyops_eq_bytes(ctx_t* ctx, const void* a, const void* b) {
+  bytes_t ba = *(const bytes_t*)a;
+  bytes_t bb = *(const bytes_t*)b;
+  return rt_view_eq(ctx, rt_bytes_view(ctx, ba), rt_bytes_view(ctx, bb));
+}
+
+static uint32_t rt_tyops_hash32_bytes(ctx_t* ctx, const void* a) {
+  bytes_t b = *(const bytes_t*)a;
+  bytes_view_t v = rt_bytes_view(ctx, b);
+  return rt_hash_mix32(rt_hash_fnv1a32_view(ctx, v));
+}
+
+static int32_t rt_tyops_cmp_bytes(ctx_t* ctx, const void* a, const void* b) {
+  bytes_t ba = *(const bytes_t*)a;
+  bytes_t bb = *(const bytes_t*)b;
+  uint32_t r = rt_bytes_cmp_range(ctx, ba, 0, ba.len, bb, 0, bb.len);
+  return rt_cmp_u32_to_i32(r);
+}
+
+static void rt_tyops_clone_bytes_view_into(ctx_t* ctx, void* dst, const void* src) {
+  (void)ctx;
+  *(bytes_view_t*)dst = *(const bytes_view_t*)src;
+}
+
+static uint32_t rt_tyops_eq_bytes_view(ctx_t* ctx, const void* a, const void* b) {
+  bytes_view_t va = *(const bytes_view_t*)a;
+  bytes_view_t vb = *(const bytes_view_t*)b;
+  return rt_view_eq(ctx, va, vb);
+}
+
+static uint32_t rt_tyops_hash32_bytes_view(ctx_t* ctx, const void* a) {
+  bytes_view_t v = *(const bytes_view_t*)a;
+  return rt_hash_mix32(rt_hash_fnv1a32_view(ctx, v));
+}
+
+static int32_t rt_tyops_cmp_bytes_view(ctx_t* ctx, const void* a, const void* b) {
+  bytes_view_t va = *(const bytes_view_t*)a;
+  bytes_view_t vb = *(const bytes_view_t*)b;
+  uint32_t r = rt_view_cmp_range(ctx, va, 0, va.len, vb, 0, vb.len);
+  return rt_cmp_u32_to_i32(r);
+}
+
+static const rt_tyops_v1 RT_TYOPS_V1[5] = {
+  {0},
+  {
+    .size = UINT32_C(4),
+    .align = (uint32_t)_Alignof(uint32_t),
+    .drop_in_place = rt_tyops_drop_nop,
+    .clone_into = rt_tyops_clone_u32_into,
+    .eq = rt_tyops_eq_u32,
+    .hash32 = rt_tyops_hash32_u32,
+    .cmp = rt_tyops_cmp_i32,
+  },
+  {
+    .size = UINT32_C(4),
+    .align = (uint32_t)_Alignof(uint32_t),
+    .drop_in_place = rt_tyops_drop_nop,
+    .clone_into = rt_tyops_clone_u32_into,
+    .eq = rt_tyops_eq_u32,
+    .hash32 = rt_tyops_hash32_u32,
+    .cmp = rt_tyops_cmp_u32,
+  },
+  {
+    .size = (uint32_t)sizeof(bytes_t),
+    .align = (uint32_t)_Alignof(bytes_t),
+    .drop_in_place = rt_tyops_drop_bytes,
+    .clone_into = rt_tyops_clone_bytes_into,
+    .eq = rt_tyops_eq_bytes,
+    .hash32 = rt_tyops_hash32_bytes,
+    .cmp = rt_tyops_cmp_bytes,
+  },
+  {
+    .size = (uint32_t)sizeof(bytes_view_t),
+    .align = (uint32_t)_Alignof(bytes_view_t),
+    .drop_in_place = rt_tyops_drop_nop,
+    .clone_into = rt_tyops_clone_bytes_view_into,
+    .eq = rt_tyops_eq_bytes_view,
+    .hash32 = rt_tyops_hash32_bytes_view,
+    .cmp = rt_tyops_cmp_bytes_view,
+  },
+};
+
+static const rt_tyops_v1* rt_tyops_v1_get(ctx_t* ctx, uint32_t ty_id) {
+  (void)ctx;
+  if (ty_id == UINT32_C(1)
+      || ty_id == UINT32_C(2)
+      || ty_id == UINT32_C(3)
+      || ty_id == UINT32_C(4)) {
+    return &RT_TYOPS_V1[ty_id];
+  }
+  rt_trap("value ty_id invalid");
+}
+
+typedef struct {
+  uint32_t ty_id;
+  uint32_t len;
+  uint32_t cap;
+  const rt_tyops_v1* ops;
+  uint8_t* data;
+} vec_value_t;
+
+static vec_value_t* rt_vec_value_ptr(ctx_t* ctx, uint32_t handle) {
+  if (handle == 0 || handle > ctx->vec_value_len) rt_trap("vec_value invalid handle");
+  vec_value_t* v = (vec_value_t*)ctx->vec_value_items[handle - 1];
+  if (!v) rt_trap("vec_value invalid handle");
+  return v;
+}
+
+static void rt_vec_value_grow_exact(ctx_t* ctx, vec_value_t* v, uint32_t new_cap) {
+  if (new_cap <= v->cap) return;
+  uint32_t esz = v->ops->size;
+  uint32_t align = v->ops->align;
+  if (esz != 0 && new_cap > UINT32_MAX / esz) rt_trap("vec_value cap overflow");
+  uint32_t old_bytes_total = v->cap * esz;
+  uint32_t new_bytes_total = new_cap * esz;
+
+  uint8_t* old_data = v->cap ? v->data : NULL;
+  uint8_t* data = (uint8_t*)rt_alloc_realloc(ctx, old_data, old_bytes_total, new_bytes_total, align);
+  if (old_data && v->len) {
+    uint32_t bytes = v->len * esz;
+    memcpy(data, v->data, bytes);
+    rt_mem_on_memcpy(ctx, bytes);
+  }
+  if (old_data && old_bytes_total) {
+    rt_free(ctx, old_data, old_bytes_total, align);
+  }
+  v->data = data;
+  v->cap = new_cap;
+}
+
+static void rt_vec_value_reserve_exact_in_place(ctx_t* ctx, vec_value_t* v, uint32_t additional) {
+  if (additional > UINT32_MAX - v->len) rt_trap("vec_value.reserve_exact overflow");
+  uint32_t need = v->len + additional;
+  if (need <= v->cap) return;
+  rt_vec_value_grow_exact(ctx, v, need);
+}
+
+static void rt_vec_value_grow_for_push(ctx_t* ctx, vec_value_t* v, uint32_t need) {
+  uint32_t new_cap = v->cap ? v->cap : 1;
+  while (new_cap < need) {
+    if (new_cap > UINT32_MAX / 2) {
+      new_cap = need;
+      break;
+    }
+    new_cap *= 2;
+  }
+  rt_vec_value_grow_exact(ctx, v, new_cap);
+}
+
+static uint32_t rt_vec_value_push_raw(ctx_t* ctx, vec_value_t* v, const void* x) {
+  if (v->len == UINT32_MAX) rt_trap("vec_value.push overflow");
+  uint32_t need = v->len + 1;
+  if (need > v->cap) {
+    rt_vec_value_grow_for_push(ctx, v, need);
+  }
+  uint32_t esz = v->ops->size;
+  uint8_t* dst = v->data + (v->len * esz);
+  memcpy(dst, x, esz);
+  rt_mem_on_memcpy(ctx, esz);
+  v->len = need;
+  return UINT32_C(0);
+}
+
+static uint32_t rt_vec_value_with_capacity_v1(ctx_t* ctx, uint32_t ty_id, uint32_t cap) {
+  const rt_tyops_v1* ops = rt_tyops_v1_get(ctx, ty_id);
+
+  if (ctx->vec_value_len == ctx->vec_value_cap) {
+    void** old_items = ctx->vec_value_items;
+    uint32_t old_cap = ctx->vec_value_cap;
+    uint32_t old_bytes_total = old_cap * (uint32_t)sizeof(void*);
+    uint32_t new_cap = ctx->vec_value_cap ? (ctx->vec_value_cap * 2) : 8;
+    void** items = (void**)rt_alloc_realloc(
+      ctx,
+      old_items,
+      old_bytes_total,
+      new_cap * (uint32_t)sizeof(void*),
+      (uint32_t)_Alignof(void*)
+    );
+    if (old_items && ctx->vec_value_len) {
+      uint32_t bytes = ctx->vec_value_len * (uint32_t)sizeof(void*);
+      memcpy(items, old_items, bytes);
+      rt_mem_on_memcpy(ctx, bytes);
+    }
+    if (old_items && old_bytes_total) {
+      rt_free(ctx, old_items, old_bytes_total, (uint32_t)_Alignof(void*));
+    }
+    ctx->vec_value_items = items;
+    ctx->vec_value_cap = new_cap;
+  }
+
+  vec_value_t* v = (vec_value_t*)rt_alloc(
+    ctx,
+    (uint32_t)sizeof(vec_value_t),
+    (uint32_t)_Alignof(vec_value_t)
+  );
+  v->ty_id = ty_id;
+  v->ops = ops;
+  v->len = 0;
+  v->cap = cap;
+  if (cap == 0) {
+    v->data = ctx->heap.mem;
+  } else {
+    if (ops->size != 0 && cap > UINT32_MAX / ops->size) rt_trap("vec_value.with_capacity cap overflow");
+    uint32_t bytes_total = cap * ops->size;
+    v->data = (uint8_t*)rt_alloc(ctx, bytes_total, ops->align);
+  }
+
+  ctx->vec_value_items[ctx->vec_value_len++] = v;
+  return ctx->vec_value_len;
+}
+
+static uint32_t rt_vec_value_len(ctx_t* ctx, uint32_t handle) {
+  return rt_vec_value_ptr(ctx, handle)->len;
+}
+
+static uint32_t rt_vec_value_reserve_exact(ctx_t* ctx, uint32_t handle, uint32_t additional) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  rt_vec_value_reserve_exact_in_place(ctx, v, additional);
+  return handle;
+}
+
+static uint32_t rt_vec_value_push_i32_v1(ctx_t* ctx, uint32_t handle, uint32_t x) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (!(v->ty_id == UINT32_C(1) || v->ty_id == UINT32_C(2))) rt_trap("vec_value.push_i32_v1 ty mismatch");
+  (void)rt_vec_value_push_raw(ctx, v, &x);
+  return handle;
+}
+
+static uint32_t rt_vec_value_push_bytes_v1(ctx_t* ctx, uint32_t handle, bytes_t x) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (v->ty_id != UINT32_C(3)) rt_trap("vec_value.push_bytes_v1 ty mismatch");
+  (void)rt_vec_value_push_raw(ctx, v, &x);
+  return handle;
+}
+
+static uint32_t rt_vec_value_push_bytes_view_v1(ctx_t* ctx, uint32_t handle, bytes_view_t x) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (v->ty_id != UINT32_C(4)) rt_trap("vec_value.push_bytes_view_v1 ty mismatch");
+  (void)rt_vec_value_push_raw(ctx, v, &x);
+  return handle;
+}
+
+static uint32_t rt_vec_value_get_i32_v1(ctx_t* ctx, uint32_t handle, uint32_t idx, uint32_t default_) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (!(v->ty_id == UINT32_C(1) || v->ty_id == UINT32_C(2))) rt_trap("vec_value.get_i32_v1 ty mismatch");
+  if (idx >= v->len) return default_;
+  uint8_t* src = v->data + (idx * v->ops->size);
+  return *(uint32_t*)src;
+}
+
+static bytes_t rt_vec_value_get_bytes_v1(ctx_t* ctx, uint32_t handle, uint32_t idx, bytes_t default_) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (v->ty_id != UINT32_C(3)) rt_trap("vec_value.get_bytes_v1 ty mismatch");
+  if (idx >= v->len) return default_;
+  rt_bytes_drop(ctx, &default_);
+  bytes_t out = rt_bytes_empty(ctx);
+  uint8_t* src = v->data + (idx * v->ops->size);
+  v->ops->clone_into(ctx, &out, src);
+  return out;
+}
+
+static bytes_view_t rt_vec_value_get_bytes_view_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    uint32_t idx,
+    bytes_view_t default_
+) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (v->ty_id != UINT32_C(4)) rt_trap("vec_value.get_bytes_view_v1 ty mismatch");
+  if (idx >= v->len) return default_;
+  uint8_t* src = v->data + (idx * v->ops->size);
+  return *(bytes_view_t*)src;
+}
+
+static uint32_t rt_vec_value_set_i32_v1(ctx_t* ctx, uint32_t handle, uint32_t idx, uint32_t x) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (!(v->ty_id == UINT32_C(1) || v->ty_id == UINT32_C(2))) rt_trap("vec_value.set_i32_v1 ty mismatch");
+  if (idx >= v->len) rt_trap("vec_value.set oob");
+  uint8_t* dst = v->data + (idx * v->ops->size);
+  *(uint32_t*)dst = x;
+  return handle;
+}
+
+static uint32_t rt_vec_value_set_bytes_v1(ctx_t* ctx, uint32_t handle, uint32_t idx, bytes_t x) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (v->ty_id != UINT32_C(3)) rt_trap("vec_value.set_bytes_v1 ty mismatch");
+  if (idx >= v->len) rt_trap("vec_value.set oob");
+  uint8_t* dst = v->data + (idx * v->ops->size);
+  v->ops->drop_in_place(ctx, dst);
+  memcpy(dst, &x, v->ops->size);
+  rt_mem_on_memcpy(ctx, v->ops->size);
+  return handle;
+}
+
+static uint32_t rt_vec_value_set_bytes_view_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    uint32_t idx,
+    bytes_view_t x
+) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (v->ty_id != UINT32_C(4)) rt_trap("vec_value.set_bytes_view_v1 ty mismatch");
+  if (idx >= v->len) rt_trap("vec_value.set oob");
+  uint8_t* dst = v->data + (idx * v->ops->size);
+  *(bytes_view_t*)dst = x;
+  return handle;
+}
+
+static uint32_t rt_vec_value_pop(ctx_t* ctx, uint32_t handle) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  if (v->len == 0) return handle;
+  uint32_t idx = v->len - 1;
+  uint8_t* dst = v->data + (idx * v->ops->size);
+  v->ops->drop_in_place(ctx, dst);
+  v->len = idx;
+  return handle;
+}
+
+static uint32_t rt_vec_value_clear(ctx_t* ctx, uint32_t handle) {
+  vec_value_t* v = rt_vec_value_ptr(ctx, handle);
+  uint32_t esz = v->ops->size;
+  for (uint32_t i = 0; i < v->len; i++) {
+    v->ops->drop_in_place(ctx, v->data + (i * esz));
+  }
+  v->len = 0;
+  return handle;
+}
+
+typedef struct {
+  uint32_t cap;
+  uint32_t len;
+  uint32_t k_ty_id;
+  uint32_t v_ty_id;
+  const rt_tyops_v1* k_ops;
+  const rt_tyops_v1* v_ops;
+
+  uint8_t* ctrl;    // 0 empty, 1 filled, 2 tombstone
+  uint32_t* hashes; // cached hash32(key)
+  uint8_t* keys;    // raw key bytes
+  uint8_t* vals;    // raw val bytes
+} map_value_t;
+
+static map_value_t* rt_map_value_ptr(ctx_t* ctx, uint32_t handle) {
+  if (handle == 0 || handle > ctx->map_value_len) rt_trap("map_value invalid handle");
+  map_value_t* m = (map_value_t*)ctx->map_value_items[handle - 1];
+  if (!m) rt_trap("map_value invalid handle");
+  return m;
+}
+
+static void rt_map_value_alloc_arrays(ctx_t* ctx, map_value_t* m, uint32_t cap) {
+  if (cap == 0) rt_trap("map_value cap=0");
+  if (!rt_is_pow2_u32(cap)) rt_trap("map_value cap must be power of two");
+
+  m->cap = cap;
+  m->len = 0;
+
+  m->ctrl = (uint8_t*)rt_alloc(ctx, cap, 1);
+  memset(m->ctrl, 0, cap);
+
+  if (cap > UINT32_MAX / (uint32_t)sizeof(uint32_t)) rt_trap("map_value hashes overflow");
+  uint32_t hashes_bytes = cap * (uint32_t)sizeof(uint32_t);
+  m->hashes = (uint32_t*)rt_alloc(ctx, hashes_bytes, (uint32_t)_Alignof(uint32_t));
+  memset(m->hashes, 0, hashes_bytes);
+
+  uint32_t ksz = m->k_ops->size;
+  uint32_t vsz = m->v_ops->size;
+  if (ksz != 0 && cap > UINT32_MAX / ksz) rt_trap("map_value keys overflow");
+  if (vsz != 0 && cap > UINT32_MAX / vsz) rt_trap("map_value vals overflow");
+  m->keys = (uint8_t*)rt_alloc(ctx, cap * ksz, m->k_ops->align);
+  m->vals = (uint8_t*)rt_alloc(ctx, cap * vsz, m->v_ops->align);
+}
+
+static void rt_map_value_free_arrays(ctx_t* ctx, map_value_t* m) {
+  if (m->ctrl && m->cap) rt_free(ctx, m->ctrl, m->cap, 1);
+  if (m->hashes && m->cap) {
+    rt_free(
+      ctx,
+      m->hashes,
+      m->cap * (uint32_t)sizeof(uint32_t),
+      (uint32_t)_Alignof(uint32_t)
+    );
+  }
+  if (m->keys && m->cap) rt_free(ctx, m->keys, m->cap * m->k_ops->size, m->k_ops->align);
+  if (m->vals && m->cap) rt_free(ctx, m->vals, m->cap * m->v_ops->size, m->v_ops->align);
+
+  m->ctrl = NULL;
+  m->hashes = NULL;
+  m->keys = NULL;
+  m->vals = NULL;
+  m->cap = 0;
+  m->len = 0;
+}
+
+static uint8_t* rt_map_value_key_ptr(map_value_t* m, uint32_t idx) {
+  return m->keys + (idx * m->k_ops->size);
+}
+
+static uint8_t* rt_map_value_val_ptr(map_value_t* m, uint32_t idx) {
+  return m->vals + (idx * m->v_ops->size);
+}
+
+static uint32_t rt_map_value_lookup_idx(
+    ctx_t* ctx,
+    map_value_t* m,
+    const void* key,
+    uint32_t hash,
+    uint32_t* out_idx
+) {
+  if (m->cap == 0) return 0;
+  uint32_t mask = m->cap - 1;
+  uint32_t idx = hash & mask;
+  uint32_t start = idx;
+  for (;;) {
+    uint8_t c = m->ctrl[idx];
+    if (c == 0) return 0;
+    if (c == 1) {
+      if (m->hashes[idx] == hash) {
+        uint8_t* kptr = rt_map_value_key_ptr(m, idx);
+        if (m->k_ops->eq(ctx, kptr, key)) {
+          if (out_idx) *out_idx = idx;
+          return 1;
+        }
+      }
+    }
+    idx = (idx + 1) & mask;
+    if (idx == start) return 0;
+  }
+}
+
+static uint32_t rt_map_value_find_slot(
+    ctx_t* ctx,
+    map_value_t* m,
+    const void* key,
+    uint32_t hash,
+    uint32_t* out_idx,
+    uint32_t* out_found
+) {
+  if (m->cap == 0) rt_trap("map_value cap=0");
+  uint32_t mask = m->cap - 1;
+  uint32_t idx = hash & mask;
+  uint32_t start = idx;
+  uint32_t first_tomb = UINT32_MAX;
+  for (;;) {
+    uint8_t c = m->ctrl[idx];
+    if (c == 0) {
+      if (out_found) *out_found = 0;
+      if (out_idx) *out_idx = (first_tomb == UINT32_MAX) ? idx : first_tomb;
+      return 1;
+    }
+    if (c == 2) {
+      if (first_tomb == UINT32_MAX) first_tomb = idx;
+    } else if (c == 1) {
+      if (m->hashes[idx] == hash) {
+        uint8_t* kptr = rt_map_value_key_ptr(m, idx);
+        if (m->k_ops->eq(ctx, kptr, key)) {
+          if (out_found) *out_found = 1;
+          if (out_idx) *out_idx = idx;
+          return 1;
+        }
+      }
+    } else {
+      rt_trap("map_value ctrl corrupt");
+    }
+
+    idx = (idx + 1) & mask;
+    if (idx == start) {
+      if (first_tomb != UINT32_MAX) {
+        if (out_found) *out_found = 0;
+        if (out_idx) *out_idx = first_tomb;
+        return 1;
+      }
+      return 0;
+    }
+  }
+}
+
+static void rt_map_value_rehash(ctx_t* ctx, map_value_t* m, uint32_t new_cap) {
+  if (!rt_is_pow2_u32(new_cap)) rt_trap("map_value.rehash cap must be power of two");
+
+  map_value_t tmp = *m;
+  rt_map_value_alloc_arrays(ctx, &tmp, new_cap);
+
+  uint32_t ksz = m->k_ops->size;
+  uint32_t vsz = m->v_ops->size;
+
+  for (uint32_t i = 0; i < m->cap; i++) {
+    if (m->ctrl[i] != 1) continue;
+    uint32_t hash = m->hashes[i];
+
+    uint32_t mask = tmp.cap - 1;
+    uint32_t idx = hash & mask;
+    uint32_t start = idx;
+    for (;;) {
+      if (tmp.ctrl[idx] == 0) break;
+      idx = (idx + 1) & mask;
+      if (idx == start) rt_trap("map_value.rehash full");
+    }
+
+    tmp.ctrl[idx] = 1;
+    tmp.hashes[idx] = hash;
+    memcpy(rt_map_value_key_ptr(&tmp, idx), rt_map_value_key_ptr(m, i), ksz);
+    rt_mem_on_memcpy(ctx, ksz);
+    memcpy(rt_map_value_val_ptr(&tmp, idx), rt_map_value_val_ptr(m, i), vsz);
+    rt_mem_on_memcpy(ctx, vsz);
+    tmp.len += 1;
+  }
+
+  rt_map_value_free_arrays(ctx, m);
+  *m = tmp;
+}
+
+static void rt_map_value_ensure_room_for_insert(ctx_t* ctx, map_value_t* m) {
+  uint64_t lhs = ((uint64_t)m->len + 1ULL) * 10ULL;
+  uint64_t rhs = (uint64_t)m->cap * 7ULL;
+  if (lhs <= rhs) return;
+
+  if (m->cap > UINT32_MAX / 2) rt_trap("map_value cap overflow");
+  rt_map_value_rehash(ctx, m, m->cap * 2);
+}
+
+static uint32_t rt_map_value_set_raw(
+    ctx_t* ctx,
+    map_value_t* m,
+    const void* key,
+    const void* val,
+    uint32_t* out_replaced
+) {
+  rt_map_value_ensure_room_for_insert(ctx, m);
+
+  uint32_t hash = m->k_ops->hash32(ctx, key);
+  uint32_t idx = 0;
+  uint32_t found = 0;
+  if (!rt_map_value_find_slot(ctx, m, key, hash, &idx, &found)) {
+    if (m->cap > UINT32_MAX / 2) rt_trap("map_value cap overflow");
+    rt_map_value_rehash(ctx, m, m->cap * 2);
+    if (!rt_map_value_find_slot(ctx, m, key, hash, &idx, &found)) {
+      rt_trap("map_value.set no slot");
+    }
+  }
+
+  uint32_t ksz = m->k_ops->size;
+  uint32_t vsz = m->v_ops->size;
+  uint8_t* vptr = rt_map_value_val_ptr(m, idx);
+
+  if (found) {
+    if (out_replaced) *out_replaced = 1;
+    m->v_ops->drop_in_place(ctx, vptr);
+    memcpy(vptr, val, vsz);
+    rt_mem_on_memcpy(ctx, vsz);
+    return 0;
+  }
+
+  if (out_replaced) *out_replaced = 0;
+  m->ctrl[idx] = 1;
+  m->hashes[idx] = hash;
+  memcpy(rt_map_value_key_ptr(m, idx), key, ksz);
+  rt_mem_on_memcpy(ctx, ksz);
+  memcpy(vptr, val, vsz);
+  rt_mem_on_memcpy(ctx, vsz);
+  m->len += 1;
+  return 0;
+}
+
+static uint32_t rt_map_value_remove_raw(ctx_t* ctx, map_value_t* m, const void* key) {
+  uint32_t hash = m->k_ops->hash32(ctx, key);
+  uint32_t idx = 0;
+  if (!rt_map_value_lookup_idx(ctx, m, key, hash, &idx)) return 0;
+
+  uint8_t* kptr = rt_map_value_key_ptr(m, idx);
+  uint8_t* vptr = rt_map_value_val_ptr(m, idx);
+  m->k_ops->drop_in_place(ctx, kptr);
+  m->v_ops->drop_in_place(ctx, vptr);
+  m->ctrl[idx] = 2;
+  if (m->len == 0) rt_trap("map_value.remove len underflow");
+  m->len -= 1;
+  return 1;
+}
+
+static uint32_t rt_map_value_clear_in_place(ctx_t* ctx, map_value_t* m) {
+  for (uint32_t i = 0; i < m->cap; i++) {
+    if (m->ctrl[i] != 1) continue;
+    m->k_ops->drop_in_place(ctx, rt_map_value_key_ptr(m, i));
+    m->v_ops->drop_in_place(ctx, rt_map_value_val_ptr(m, i));
+  }
+  memset(m->ctrl, 0, m->cap);
+  memset(m->hashes, 0, m->cap * (uint32_t)sizeof(uint32_t));
+  m->len = 0;
+  return 0;
+}
+
+static uint32_t rt_map_value_new_v1(ctx_t* ctx, uint32_t k_ty_id, uint32_t v_ty_id, uint32_t cap) {
+  if (!rt_is_pow2_u32(cap)) rt_trap("map_value.new cap must be power of two");
+  const rt_tyops_v1* k_ops = rt_tyops_v1_get(ctx, k_ty_id);
+  const rt_tyops_v1* v_ops = rt_tyops_v1_get(ctx, v_ty_id);
+  if (!k_ops->eq || !k_ops->hash32) rt_trap("map_value.new key ops missing");
+
+  if (ctx->map_value_len == ctx->map_value_cap) {
+    void** old_items = ctx->map_value_items;
+    uint32_t old_cap = ctx->map_value_cap;
+    uint32_t old_bytes_total = old_cap * (uint32_t)sizeof(void*);
+    uint32_t new_cap = ctx->map_value_cap ? (ctx->map_value_cap * 2) : 8;
+    void** items = (void**)rt_alloc_realloc(
+      ctx,
+      old_items,
+      old_bytes_total,
+      new_cap * (uint32_t)sizeof(void*),
+      (uint32_t)_Alignof(void*)
+    );
+    if (old_items && ctx->map_value_len) {
+      uint32_t bytes = ctx->map_value_len * (uint32_t)sizeof(void*);
+      memcpy(items, old_items, bytes);
+      rt_mem_on_memcpy(ctx, bytes);
+    }
+    if (old_items && old_bytes_total) {
+      rt_free(ctx, old_items, old_bytes_total, (uint32_t)_Alignof(void*));
+    }
+    ctx->map_value_items = items;
+    ctx->map_value_cap = new_cap;
+  }
+
+  map_value_t* m = (map_value_t*)rt_alloc(
+    ctx,
+    (uint32_t)sizeof(map_value_t),
+    (uint32_t)_Alignof(map_value_t)
+  );
+  memset(m, 0, sizeof(map_value_t));
+  m->k_ty_id = k_ty_id;
+  m->v_ty_id = v_ty_id;
+  m->k_ops = k_ops;
+  m->v_ops = v_ops;
+  rt_map_value_alloc_arrays(ctx, m, cap);
+
+  ctx->map_value_items[ctx->map_value_len++] = m;
+  return ctx->map_value_len;
+}
+
+static uint32_t rt_map_value_len(ctx_t* ctx, uint32_t handle) {
+  return rt_map_value_ptr(ctx, handle)->len;
+}
+
+static uint32_t rt_map_value_clear(ctx_t* ctx, uint32_t handle) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  (void)rt_map_value_clear_in_place(ctx, m);
+  return handle;
+}
+
+static uint32_t rt_map_value_contains_i32_v1(ctx_t* ctx, uint32_t handle, uint32_t key) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (!(m->k_ty_id == UINT32_C(1) || m->k_ty_id == UINT32_C(2))) rt_trap("map_value.contains_i32_v1 key ty mismatch");
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  return rt_map_value_lookup_idx(ctx, m, &key, hash, NULL);
+}
+
+static uint32_t rt_map_value_contains_bytes_v1(ctx_t* ctx, uint32_t handle, bytes_t key) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(3)) rt_trap("map_value.contains_bytes_v1 key ty mismatch");
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t ok = rt_map_value_lookup_idx(ctx, m, &key, hash, NULL);
+  rt_bytes_drop(ctx, &key);
+  return ok;
+}
+
+static uint32_t rt_map_value_contains_bytes_view_v1(ctx_t* ctx, uint32_t handle, bytes_view_t key) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(4)) rt_trap("map_value.contains_bytes_view_v1 key ty mismatch");
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  return rt_map_value_lookup_idx(ctx, m, &key, hash, NULL);
+}
+
+static uint32_t rt_map_value_remove_i32_v1(ctx_t* ctx, uint32_t handle, uint32_t key) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (!(m->k_ty_id == UINT32_C(1) || m->k_ty_id == UINT32_C(2))) rt_trap("map_value.remove_i32_v1 key ty mismatch");
+  (void)rt_map_value_remove_raw(ctx, m, &key);
+  return handle;
+}
+
+static uint32_t rt_map_value_remove_bytes_v1(ctx_t* ctx, uint32_t handle, bytes_t key) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(3)) rt_trap("map_value.remove_bytes_v1 key ty mismatch");
+  (void)rt_map_value_remove_raw(ctx, m, &key);
+  rt_bytes_drop(ctx, &key);
+  return handle;
+}
+
+static uint32_t rt_map_value_remove_bytes_view_v1(ctx_t* ctx, uint32_t handle, bytes_view_t key) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(4)) rt_trap("map_value.remove_bytes_view_v1 key ty mismatch");
+  (void)rt_map_value_remove_raw(ctx, m, &key);
+  return handle;
+}
+
+static uint32_t rt_map_value_get_i32_i32_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    uint32_t key,
+    uint32_t default_
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (!(m->k_ty_id == UINT32_C(1) || m->k_ty_id == UINT32_C(2))) rt_trap("map_value.get key ty mismatch");
+  if (!(m->v_ty_id == UINT32_C(1) || m->v_ty_id == UINT32_C(2))) rt_trap("map_value.get val ty mismatch");
+
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t idx = 0;
+  if (!rt_map_value_lookup_idx(ctx, m, &key, hash, &idx)) return default_;
+  uint8_t* vptr = rt_map_value_val_ptr(m, idx);
+  return *(uint32_t*)vptr;
+}
+
+static bytes_t rt_map_value_get_i32_bytes_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    uint32_t key,
+    bytes_t default_
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (!(m->k_ty_id == UINT32_C(1) || m->k_ty_id == UINT32_C(2))) rt_trap("map_value.get key ty mismatch");
+  if (m->v_ty_id != UINT32_C(3)) rt_trap("map_value.get val ty mismatch");
+
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t idx = 0;
+  if (!rt_map_value_lookup_idx(ctx, m, &key, hash, &idx)) return default_;
+
+  rt_bytes_drop(ctx, &default_);
+  bytes_t out = rt_bytes_empty(ctx);
+  m->v_ops->clone_into(ctx, &out, rt_map_value_val_ptr(m, idx));
+  return out;
+}
+
+static bytes_view_t rt_map_value_get_i32_bytes_view_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    uint32_t key,
+    bytes_view_t default_
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (!(m->k_ty_id == UINT32_C(1) || m->k_ty_id == UINT32_C(2))) rt_trap("map_value.get key ty mismatch");
+  if (m->v_ty_id != UINT32_C(4)) rt_trap("map_value.get val ty mismatch");
+
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t idx = 0;
+  if (!rt_map_value_lookup_idx(ctx, m, &key, hash, &idx)) return default_;
+  return *(bytes_view_t*)rt_map_value_val_ptr(m, idx);
+}
+
+static uint32_t rt_map_value_get_bytes_i32_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_t key,
+    uint32_t default_
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(3)) rt_trap("map_value.get key ty mismatch");
+  if (!(m->v_ty_id == UINT32_C(1) || m->v_ty_id == UINT32_C(2))) rt_trap("map_value.get val ty mismatch");
+
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t idx = 0;
+  uint32_t found = rt_map_value_lookup_idx(ctx, m, &key, hash, &idx);
+  rt_bytes_drop(ctx, &key);
+  if (!found) return default_;
+  return *(uint32_t*)rt_map_value_val_ptr(m, idx);
+}
+
+static bytes_t rt_map_value_get_bytes_bytes_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_t key,
+    bytes_t default_
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(3)) rt_trap("map_value.get key ty mismatch");
+  if (m->v_ty_id != UINT32_C(3)) rt_trap("map_value.get val ty mismatch");
+
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t idx = 0;
+  uint32_t found = rt_map_value_lookup_idx(ctx, m, &key, hash, &idx);
+  rt_bytes_drop(ctx, &key);
+  if (!found) return default_;
+
+  rt_bytes_drop(ctx, &default_);
+  bytes_t out = rt_bytes_empty(ctx);
+  m->v_ops->clone_into(ctx, &out, rt_map_value_val_ptr(m, idx));
+  return out;
+}
+
+static bytes_view_t rt_map_value_get_bytes_bytes_view_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_t key,
+    bytes_view_t default_
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(3)) rt_trap("map_value.get key ty mismatch");
+  if (m->v_ty_id != UINT32_C(4)) rt_trap("map_value.get val ty mismatch");
+
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t idx = 0;
+  uint32_t found = rt_map_value_lookup_idx(ctx, m, &key, hash, &idx);
+  rt_bytes_drop(ctx, &key);
+  if (!found) return default_;
+  return *(bytes_view_t*)rt_map_value_val_ptr(m, idx);
+}
+
+static uint32_t rt_map_value_get_bytes_view_i32_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_view_t key,
+    uint32_t default_
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(4)) rt_trap("map_value.get key ty mismatch");
+  if (!(m->v_ty_id == UINT32_C(1) || m->v_ty_id == UINT32_C(2))) rt_trap("map_value.get val ty mismatch");
+
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t idx = 0;
+  if (!rt_map_value_lookup_idx(ctx, m, &key, hash, &idx)) return default_;
+  return *(uint32_t*)rt_map_value_val_ptr(m, idx);
+}
+
+static bytes_t rt_map_value_get_bytes_view_bytes_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_view_t key,
+    bytes_t default_
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(4)) rt_trap("map_value.get key ty mismatch");
+  if (m->v_ty_id != UINT32_C(3)) rt_trap("map_value.get val ty mismatch");
+
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t idx = 0;
+  if (!rt_map_value_lookup_idx(ctx, m, &key, hash, &idx)) return default_;
+
+  rt_bytes_drop(ctx, &default_);
+  bytes_t out = rt_bytes_empty(ctx);
+  m->v_ops->clone_into(ctx, &out, rt_map_value_val_ptr(m, idx));
+  return out;
+}
+
+static bytes_view_t rt_map_value_get_bytes_view_bytes_view_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_view_t key,
+    bytes_view_t default_
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(4)) rt_trap("map_value.get key ty mismatch");
+  if (m->v_ty_id != UINT32_C(4)) rt_trap("map_value.get val ty mismatch");
+
+  uint32_t hash = m->k_ops->hash32(ctx, &key);
+  uint32_t idx = 0;
+  if (!rt_map_value_lookup_idx(ctx, m, &key, hash, &idx)) return default_;
+  return *(bytes_view_t*)rt_map_value_val_ptr(m, idx);
+}
+
+static uint32_t rt_map_value_set_i32_i32_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    uint32_t key,
+    uint32_t val
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (!(m->k_ty_id == UINT32_C(1) || m->k_ty_id == UINT32_C(2))) rt_trap("map_value.set key ty mismatch");
+  if (!(m->v_ty_id == UINT32_C(1) || m->v_ty_id == UINT32_C(2))) rt_trap("map_value.set val ty mismatch");
+  (void)rt_map_value_set_raw(ctx, m, &key, &val, NULL);
+  return handle;
+}
+
+static uint32_t rt_map_value_set_i32_bytes_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    uint32_t key,
+    bytes_t val
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (!(m->k_ty_id == UINT32_C(1) || m->k_ty_id == UINT32_C(2))) rt_trap("map_value.set key ty mismatch");
+  if (m->v_ty_id != UINT32_C(3)) rt_trap("map_value.set val ty mismatch");
+  (void)rt_map_value_set_raw(ctx, m, &key, &val, NULL);
+  return handle;
+}
+
+static uint32_t rt_map_value_set_i32_bytes_view_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    uint32_t key,
+    bytes_view_t val
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (!(m->k_ty_id == UINT32_C(1) || m->k_ty_id == UINT32_C(2))) rt_trap("map_value.set key ty mismatch");
+  if (m->v_ty_id != UINT32_C(4)) rt_trap("map_value.set val ty mismatch");
+  (void)rt_map_value_set_raw(ctx, m, &key, &val, NULL);
+  return handle;
+}
+
+static uint32_t rt_map_value_set_bytes_i32_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_t key,
+    uint32_t val
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(3)) rt_trap("map_value.set key ty mismatch");
+  if (!(m->v_ty_id == UINT32_C(1) || m->v_ty_id == UINT32_C(2))) rt_trap("map_value.set val ty mismatch");
+  uint32_t replaced = 0;
+  (void)rt_map_value_set_raw(ctx, m, &key, &val, &replaced);
+  if (replaced) rt_bytes_drop(ctx, &key);
+  return handle;
+}
+
+static uint32_t rt_map_value_set_bytes_bytes_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_t key,
+    bytes_t val
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(3)) rt_trap("map_value.set key ty mismatch");
+  if (m->v_ty_id != UINT32_C(3)) rt_trap("map_value.set val ty mismatch");
+  uint32_t replaced = 0;
+  (void)rt_map_value_set_raw(ctx, m, &key, &val, &replaced);
+  if (replaced) rt_bytes_drop(ctx, &key);
+  return handle;
+}
+
+static uint32_t rt_map_value_set_bytes_bytes_view_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_t key,
+    bytes_view_t val
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(3)) rt_trap("map_value.set key ty mismatch");
+  if (m->v_ty_id != UINT32_C(4)) rt_trap("map_value.set val ty mismatch");
+  uint32_t replaced = 0;
+  (void)rt_map_value_set_raw(ctx, m, &key, &val, &replaced);
+  if (replaced) rt_bytes_drop(ctx, &key);
+  return handle;
+}
+
+static uint32_t rt_map_value_set_bytes_view_i32_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_view_t key,
+    uint32_t val
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(4)) rt_trap("map_value.set key ty mismatch");
+  if (!(m->v_ty_id == UINT32_C(1) || m->v_ty_id == UINT32_C(2))) rt_trap("map_value.set val ty mismatch");
+  (void)rt_map_value_set_raw(ctx, m, &key, &val, NULL);
+  return handle;
+}
+
+static uint32_t rt_map_value_set_bytes_view_bytes_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_view_t key,
+    bytes_t val
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(4)) rt_trap("map_value.set key ty mismatch");
+  if (m->v_ty_id != UINT32_C(3)) rt_trap("map_value.set val ty mismatch");
+  (void)rt_map_value_set_raw(ctx, m, &key, &val, NULL);
+  return handle;
+}
+
+static uint32_t rt_map_value_set_bytes_view_bytes_view_v1(
+    ctx_t* ctx,
+    uint32_t handle,
+    bytes_view_t key,
+    bytes_view_t val
+) {
+  map_value_t* m = rt_map_value_ptr(ctx, handle);
+  if (m->k_ty_id != UINT32_C(4)) rt_trap("map_value.set key ty mismatch");
+  if (m->v_ty_id != UINT32_C(4)) rt_trap("map_value.set val ty mismatch");
+  (void)rt_map_value_set_raw(ctx, m, &key, &val, NULL);
+  return handle;
+}
+
 static void rt_ctx_cleanup(ctx_t* ctx) {
 #ifdef X07_DEBUG_BORROW
   if (ctx->dbg_borrows && ctx->dbg_borrows_cap) {
@@ -38514,6 +41315,50 @@ static void rt_ctx_cleanup(ctx_t* ctx) {
   ctx->map_u32_items = NULL;
   ctx->map_u32_len = 0;
   ctx->map_u32_cap = 0;
+
+  for (uint32_t i = 0; i < ctx->vec_value_len; i++) {
+    vec_value_t* v = (vec_value_t*)ctx->vec_value_items[i];
+    if (!v) continue;
+    uint32_t esz = v->ops->size;
+    for (uint32_t j = 0; j < v->len; j++) {
+      v->ops->drop_in_place(ctx, v->data + (j * esz));
+    }
+    if (v->data && v->cap) {
+      if (esz != 0 && v->cap > UINT32_MAX / esz) rt_trap("vec_value.cleanup overflow");
+      rt_free(ctx, v->data, v->cap * esz, v->ops->align);
+    }
+    rt_free(ctx, v, (uint32_t)sizeof(vec_value_t), (uint32_t)_Alignof(vec_value_t));
+  }
+  if (ctx->vec_value_items && ctx->vec_value_cap) {
+    rt_free(
+      ctx,
+      ctx->vec_value_items,
+      ctx->vec_value_cap * (uint32_t)sizeof(void*),
+      (uint32_t)_Alignof(void*)
+    );
+  }
+  ctx->vec_value_items = NULL;
+  ctx->vec_value_len = 0;
+  ctx->vec_value_cap = 0;
+
+  for (uint32_t i = 0; i < ctx->map_value_len; i++) {
+    map_value_t* m = (map_value_t*)ctx->map_value_items[i];
+    if (!m) continue;
+    (void)rt_map_value_clear_in_place(ctx, m);
+    rt_map_value_free_arrays(ctx, m);
+    rt_free(ctx, m, (uint32_t)sizeof(map_value_t), (uint32_t)_Alignof(map_value_t));
+  }
+  if (ctx->map_value_items && ctx->map_value_cap) {
+    rt_free(
+      ctx,
+      ctx->map_value_items,
+      ctx->map_value_cap * (uint32_t)sizeof(void*),
+      (uint32_t)_Alignof(void*)
+    );
+  }
+  ctx->map_value_items = NULL;
+  ctx->map_value_len = 0;
+  ctx->map_value_cap = 0;
 }
 "#;
 

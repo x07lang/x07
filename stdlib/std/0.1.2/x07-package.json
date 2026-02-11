@@ -5,6 +5,7 @@
   "module_root": "modules",
   "modules": [
     "std.vec",
+    "std.vec_value",
     "std.slice",
     "std.bytes",
     "std.codec",
@@ -26,6 +27,7 @@
     "std.small_set",
     "std.hash",
     "std.hash_map",
+    "std.hash_map_value",
     "std.hash_set",
     "std.btree_map",
     "std.btree_set",

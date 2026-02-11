@@ -1,0 +1,83 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "bench_collections_value_map",
+  "imports": [
+    "std.hash_map_value",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "bench_collections_value_map.check_map_bytes_bytes"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "bench_collections_value_map.check_map_bytes_bytes",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "m",
+          [
+            "std.hash_map_value.with_capacity_bytes_bytes",
+            4
+          ]
+        ],
+        [
+          "set",
+          "m",
+          [
+            "std.hash_map_value.set_bytes_bytes",
+            "m",
+            [
+              "bytes.lit",
+              "k"
+            ],
+            [
+              "bytes.lit",
+              "v"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "got",
+          [
+            "std.hash_map_value.get_bytes_bytes_or",
+            "m",
+            [
+              "bytes.lit",
+              "k"
+            ],
+            [
+              "bytes.lit",
+              "d"
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_bytes_eq",
+            "got",
+            [
+              "bytes.lit",
+              "wrong"
+            ],
+            [
+              "std.test.code_assert_bytes_eq"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ]
+    }
+  ]
+}

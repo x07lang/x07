@@ -78,7 +78,7 @@
     },
     "bound_name": {
       "type": "string",
-      "enum": ["any", "bytes_like", "num_like", "hashable", "orderable"],
+      "enum": ["any", "bytes_like", "num_like", "value", "hashable", "orderable"],
       "description": "Canonical type parameter bound."
     },
     "type_param": {

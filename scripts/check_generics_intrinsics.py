@@ -20,8 +20,9 @@ EXPECTED_BOUNDS: dict[str, list[str]] = {
     "any": ["*"],
     "bytes_like": ["bytes", "bytes_view"],
     "num_like": ["i32", "u32"],
-    "hashable": ["i32", "u32"],
-    "orderable": ["i32", "u32"],
+    "value": ["i32", "u32", "bytes", "bytes_view"],
+    "hashable": ["i32", "u32", "bytes", "bytes_view"],
+    "orderable": ["i32", "u32", "bytes", "bytes_view"],
 }
 
 

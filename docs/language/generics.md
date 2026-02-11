@@ -40,6 +40,7 @@ Bounds are canonical and small:
 - `any` (no constraint)
 - `bytes_like`
 - `num_like`
+- `value`
 - `hashable`
 - `orderable`
 
@@ -51,8 +52,9 @@ Bounds are canonical and small:
   "any": ["*"],
   "bytes_like": ["bytes", "bytes_view"],
   "num_like": ["i32", "u32"],
-  "hashable": ["i32", "u32"],
-  "orderable": ["i32", "u32"]
+  "value": ["i32", "u32", "bytes", "bytes_view"],
+  "hashable": ["i32", "u32", "bytes", "bytes_view"],
+  "orderable": ["i32", "u32", "bytes", "bytes_view"]
 }
 ```
 <!-- x07-generics-bounds:end -->
@@ -105,10 +107,12 @@ Supported (v0.4 toolchain):
 - `ty.read_le_at(T, bytes_view, off)` → `std.u32.read_le_at(...)` (currently: `i32`/`u32` only)
 - `ty.write_le_at(T, bytes, off, x)` → `std.u32.write_le_at(...)` (currently: `i32`/`u32` only)
 - `ty.push_le(T, vec_u8, x)` → `std.u32.push_le(...)` (currently: `i32`/`u32` only)
-- `ty.lt(T, a, b)` → `<` or `<u` (currently: `i32`/`u32` only)
-- `ty.eq(T, a, b)` → `=`
-- `ty.cmp(T, a, b)` → `-1/0/+1` (currently: `i32`/`u32` only)
-- `ty.hash32(T, x)` → `std.hash.mix32(x)` (currently: `i32`/`u32` only)
+- `ty.clone(T, x)` → `T` (does not consume `x`; for `bytes` does a deep clone)
+- `ty.drop(T, x)` → `i32` (consumes `x`; for `bytes` runs an explicit drop)
+- `ty.lt(T, a, b)` → `<` or `<u` (`bytes`/`bytes_view` are lexicographic by contents)
+- `ty.eq(T, a, b)` → `i32` (`bytes`/`bytes_view` compare contents)
+- `ty.cmp(T, a, b)` → `i32` (`bytes`/`bytes_view` are lexicographic by contents)
+- `ty.hash32(T, x)` → `i32` (`bytes`/`bytes_view` hash contents via `std.hash.fnv1a32_view` + `std.hash.mix32`)
 
 ## Budgets / caps
 

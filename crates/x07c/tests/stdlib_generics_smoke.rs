@@ -223,3 +223,76 @@ fn compile_accepts_generic_stdlib_containers() {
     assert!(has("std.slab.new", vec![json!("u32")]));
     assert!(has("std.lru_cache.put", vec![json!("u32"), json!("u32")]));
 }
+
+#[test]
+fn compile_accepts_generic_stdlib_value_containers_bytes() {
+    let program = x07_program::entry(
+        &["std.vec_value", "std.hash_map_value"],
+        vec![],
+        json!([
+            "begin",
+            ["let", "v", ["std.vec_value.with_capacity_bytes", 4]],
+            [
+                "set",
+                "v",
+                ["std.vec_value.push_bytes", "v", ["bytes.lit", "a"]]
+            ],
+            [
+                "let",
+                "x",
+                ["std.vec_value.get_bytes_or", "v", 0, ["bytes.lit", "x"]]
+            ],
+            [
+                "let",
+                "m",
+                ["std.hash_map_value.with_capacity_bytes_bytes", 4]
+            ],
+            [
+                "set",
+                "m",
+                [
+                    "std.hash_map_value.set_bytes_bytes",
+                    "m",
+                    ["bytes.lit", "k"],
+                    ["bytes.lit", "v"]
+                ]
+            ],
+            [
+                "let",
+                "y",
+                [
+                    "std.hash_map_value.get_bytes_bytes_or",
+                    "m",
+                    ["bytes.lit", "k"],
+                    ["bytes.lit", "d"]
+                ]
+            ],
+            ["bytes.concat", "x", "y"]
+        ]),
+    );
+
+    let out = compile_program_to_c_with_meta(program.as_slice(), &CompileOptions::default())
+        .expect("program must compile");
+    let mono_map = out.mono_map.expect("mono map must be emitted");
+
+    let has = |generic: &str, type_args: Vec<serde_json::Value>| {
+        mono_map.items.iter().any(|it| {
+            it.generic == generic
+                && it.type_args == type_args
+                && it
+                    .specialized
+                    .starts_with(&format!("{generic}__x07_mono_v1__"))
+        })
+    };
+
+    assert!(has("std.vec_value.push", vec![json!("bytes")]));
+    assert!(has("std.vec_value.get_or", vec![json!("bytes")]));
+    assert!(has(
+        "std.hash_map_value.set",
+        vec![json!("bytes"), json!("bytes")]
+    ));
+    assert!(has(
+        "std.hash_map_value.get_or",
+        vec![json!("bytes"), json!("bytes")]
+    ));
+}
