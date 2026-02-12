@@ -7389,14 +7389,14 @@
         {
           "module_id": "std.os.rand.spec",
           "path": "packages/ext/x07-ext-rand/0.1.0/modules/std/os/rand/spec.x07.json",
-          "sha256": "c15a7c664309bfe23a6483bd2a8514343f358befda57716d5fa2e3712195ef41",
-          "size_bytes": 1977
+          "sha256": "85c815185c86e01239f79d5d1dd31b66c6e138bf010a2ab59c3a7a261dc7e8cc",
+          "size_bytes": 1976
         },
         {
           "module_id": "std.os.rand",
           "path": "packages/ext/x07-ext-rand/0.1.0/modules/std/os/rand.x07.json",
-          "sha256": "535cdbe55361d27b118dd24aba0bdff34d1593b76deb26dcb803714b2967b821",
-          "size_bytes": 490
+          "sha256": "2a6931e255fce31678fb0bcff6190a47b2a25887395435f7c49f4fd9a7c5003c",
+          "size_bytes": 489
         }
       ],
       "name": "ext-rand",
@@ -8048,14 +8048,14 @@
         {
           "module_id": "std.os.stdio.spec",
           "path": "packages/ext/x07-ext-stdio/0.1.0/modules/std/os/stdio/spec.x07.json",
-          "sha256": "38048c23d5c48b20738db39ef32e1d66d62b6ab4400f5502caae200413f984d4",
-          "size_bytes": 2436
+          "sha256": "2ce4c1141aef53a4cdb1f61fa7055ae2171c849d63ee68747507d9cd9829ffc0",
+          "size_bytes": 2435
         },
         {
           "module_id": "std.os.stdio",
           "path": "packages/ext/x07-ext-stdio/0.1.0/modules/std/os/stdio.x07.json",
-          "sha256": "c2a76f9052043bdb6538f4b826631b31415f5e1c923e3b772c66dd014521eb50",
-          "size_bytes": 1078
+          "sha256": "8c050953e38437fd1964d22412ad8e60604aa794901f78e0ce586bc54a9019d0",
+          "size_bytes": 1077
         }
       ],
       "name": "ext-stdio",
@@ -10685,6 +10685,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "0d711f12b7a0e71a0c5ed4293376e5365732dcef3edc9970e41c0bbd17bbeba6",
+  "packages_hash": "46a1bb873612a5654000cf27e988070e500ae670c0a541b736b84f62568fbcff",
   "packages_root": "packages/ext"
 }
