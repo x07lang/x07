@@ -86,6 +86,18 @@
     },
     {
       "kind": "contract",
+      "path": "docs/os/rand-v1.md",
+      "spec_id": "x07.spec.contract.os.rand-v1@0.1.0",
+      "title": "Rand v1 (run-os) \u2014 External CSPRNG Package"
+    },
+    {
+      "kind": "contract",
+      "path": "docs/os/stdio-v1.md",
+      "spec_id": "x07.spec.contract.os.stdio-v1@0.1.0",
+      "title": "Stdio v1 (run-os) \u2014 External Stdio Package"
+    },
+    {
+      "kind": "contract",
       "path": "docs/text/regex-v1.md",
       "spec_id": "x07.spec.contract.text.regex-v1@0.1.0",
       "title": "Regex v1 (ext.regex)"
@@ -915,6 +927,13 @@
       "schema_id": "https://x07.io/spec/x07-tool-lint.report.schema.json",
       "schema_version": "x07.tool.lint.report@0.1.0",
       "title": "x07.tool.lint.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-mcp.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-mcp.report.schema.json",
+      "schema_version": "x07.tool.mcp.report@0.1.0",
+      "title": "x07.tool.mcp.report@0.1.0"
     },
     {
       "kind": "schema",

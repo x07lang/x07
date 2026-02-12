@@ -1,6 +1,7 @@
 #![recursion_limit = "256"]
 
 use std::collections::BTreeMap;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -22,6 +23,7 @@ mod bench;
 mod bundle;
 mod cli;
 mod contract_repro;
+mod delegate;
 mod diag;
 mod doc;
 mod doctor;
@@ -119,6 +121,18 @@ enum Command {
     Rr(rr::RrArgs),
     /// Verify contracts within bounds (BMC / SMT).
     Verify(verify::VerifyArgs),
+    /// MCP server kit tooling (delegates to `x07-mcp`).
+    Mcp(McpArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+struct McpArgs {
+    #[arg(
+        trailing_var_arg = true,
+        allow_hyphen_values = true,
+        value_name = "ARG"
+    )]
+    args: Vec<OsString>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -368,6 +382,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(rr::RrCommand::Record(_)) => vec!["rr", "record"],
             },
             Some(Command::Verify(_)) => vec!["verify"],
+            Some(Command::Mcp(_)) => vec!["mcp"],
         };
 
         let node = x07c::cli_specrows::find_command(&root, &path).unwrap_or(&root);
@@ -406,6 +421,18 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Sm(args) => sm::cmd_sm(&cli.machine, args),
         Command::Rr(args) => rr::cmd_rr(&cli.machine, args),
         Command::Verify(args) => verify::cmd_verify(&cli.machine, args),
+        Command::Mcp(args) => cmd_mcp(args),
+    }
+}
+
+fn cmd_mcp(args: McpArgs) -> Result<std::process::ExitCode> {
+    match delegate::run_inherit("x07-mcp", &args.args)? {
+        delegate::DelegateOutput::Exited(status) => Ok(delegate::exit_code_from_status(&status)),
+        delegate::DelegateOutput::NotFound => {
+            eprintln!("x07-mcp not found on PATH");
+            eprintln!("hint: install x07-mcp and ensure it is discoverable on PATH");
+            Ok(std::process::ExitCode::from(2))
+        }
     }
 }
 

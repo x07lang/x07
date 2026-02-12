@@ -33,6 +33,32 @@
       "status": "stable"
     },
     {
+      "id": "stdio.io",
+      "summary": "OS stdio API (run-os*).",
+      "canonical": {
+        "name": "ext-stdio",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental"
+    },
+    {
+      "id": "crypto.rand",
+      "summary": "OS-backed cryptographically secure random bytes (run-os*).",
+      "canonical": {
+        "name": "ext-rand",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental"
+    },
+    {
       "id": "net.http",
       "summary": "HTTP client for OS worlds (GET/POST, headers, body).",
       "canonical": {

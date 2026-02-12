@@ -1091,12 +1091,25 @@ mod tests {
     }
 
     fn compile_external_os_program(world: WorldId, rel_path: &str) -> CompilerResult {
+        compile_external_os_program_with_extra_roots(world, rel_path, &[])
+    }
+
+    fn compile_external_os_program_with_extra_roots(
+        world: WorldId,
+        rel_path: &str,
+        extra_roots: &[PathBuf],
+    ) -> CompilerResult {
         let root = workspace_root();
         let program_path = root.join(rel_path);
         let program = std::fs::read(&program_path)
             .unwrap_or_else(|e| panic!("read {}: {e}", program_path.display()));
 
-        let module_roots = os_paths::default_os_module_roots().expect("stdlib/os module roots");
+        let mut module_roots = os_paths::default_os_module_roots().expect("stdlib/os module roots");
+        for r in extra_roots {
+            if !module_roots.contains(r) {
+                module_roots.push(r.clone());
+            }
+        }
         let compile_options = compile::CompileOptions {
             world,
             enable_fs: false,

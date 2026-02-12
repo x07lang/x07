@@ -7383,6 +7383,28 @@
       "version": "0.1.5"
     },
     {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.os.rand.spec",
+          "path": "packages/ext/x07-ext-rand/0.1.0/modules/std/os/rand/spec.x07.json",
+          "sha256": "c15a7c664309bfe23a6483bd2a8514343f358befda57716d5fa2e3712195ef41",
+          "size_bytes": 1977
+        },
+        {
+          "module_id": "std.os.rand",
+          "path": "packages/ext/x07-ext-rand/0.1.0/modules/std/os/rand.x07.json",
+          "sha256": "535cdbe55361d27b118dd24aba0bdff34d1593b76deb26dcb803714b2967b821",
+          "size_bytes": 490
+        }
+      ],
+      "name": "ext-rand",
+      "package_manifest_sha256": "5653a7aab132b08369c6f5c073549df75d223cfe25ac4ea0166e251c3774979c",
+      "path": "packages/ext/x07-ext-rand/0.1.0",
+      "version": "0.1.0"
+    },
+    {
       "determinism_tier": "pure",
       "import_mode": "handwritten",
       "modules": [
@@ -8018,6 +8040,28 @@
       "package_manifest_sha256": "53e9c4ceb4c798a0dd013ac7e2d51b33f92652a7a43b63dbd31687520226dd6a",
       "path": "packages/ext/x07-ext-sockets-c/0.1.6",
       "version": "0.1.6"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.os.stdio.spec",
+          "path": "packages/ext/x07-ext-stdio/0.1.0/modules/std/os/stdio/spec.x07.json",
+          "sha256": "38048c23d5c48b20738db39ef32e1d66d62b6ab4400f5502caae200413f984d4",
+          "size_bytes": 2436
+        },
+        {
+          "module_id": "std.os.stdio",
+          "path": "packages/ext/x07-ext-stdio/0.1.0/modules/std/os/stdio.x07.json",
+          "sha256": "c2a76f9052043bdb6538f4b826631b31415f5e1c923e3b772c66dd014521eb50",
+          "size_bytes": 1078
+        }
+      ],
+      "name": "ext-stdio",
+      "package_manifest_sha256": "f62d48be6adc0bc9de1a31c2911e5477cb8ed046ab2a37a8226eaedfd73b7c4e",
+      "path": "packages/ext/x07-ext-stdio/0.1.0",
+      "version": "0.1.0"
     },
     {
       "determinism_tier": "pure",
@@ -10641,6 +10685,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "954d3ae1c965d3f756987d834282bcabc81b09a764fdbda53f39ec498649e234",
+  "packages_hash": "0d711f12b7a0e71a0c5ed4293376e5365732dcef3edc9970e41c0bbd17bbeba6",
   "packages_root": "packages/ext"
 }

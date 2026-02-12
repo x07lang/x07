@@ -6869,6 +6869,209 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
+                    "os.stdio.read_line_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_STDIO,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.stdio.read_line_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 || dest.ty != Ty::ResultBytes || args[0].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.stdio.read_line_v1 expects (bytes caps)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_stdio_read_line_v1({});",
+                                dest.c_name, args[0].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.stdio.write_stdout_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_STDIO,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.stdio.write_stdout_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 2
+                            || dest.ty != Ty::ResultI32
+                            || args[0].ty != Ty::Bytes
+                            || args[1].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.stdio.write_stdout_v1 expects (bytes data, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_stdio_write_stdout_v1({}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.stdio.write_stderr_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_STDIO,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.stdio.write_stderr_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 2
+                            || dest.ty != Ty::ResultI32
+                            || args[0].ty != Ty::Bytes
+                            || args[1].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.stdio.write_stderr_v1 expects (bytes data, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_stdio_write_stderr_v1({}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.stdio.flush_stdout_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_STDIO,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.stdio.flush_stdout_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if !args.is_empty() || dest.ty != Ty::ResultI32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.stdio.flush_stdout_v1 expects 0 args".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("{} = x07_ext_stdio_flush_stdout_v1();", dest.c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.stdio.flush_stderr_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_STDIO,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.stdio.flush_stderr_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if !args.is_empty() || dest.ty != Ty::ResultI32 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.stdio.flush_stderr_v1 expects 0 args".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("{} = x07_ext_stdio_flush_stderr_v1();", dest.c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.rand.bytes_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_RAND,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.rand.bytes_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 2
+                            || dest.ty != Ty::ResultBytes
+                            || args[0].ty != Ty::I32
+                            || args[1].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.rand.bytes_v1 expects (i32 n, bytes caps)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_ext_rand_bytes_v1({}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
+                    "os.rand.u64_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_RAND,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.rand.u64_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 1 || dest.ty != Ty::ResultBytes || args[0].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.rand.u64_v1 expects (bytes caps)".to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!("{} = x07_ext_rand_u64_v1({});", dest.c_name, args[0].c_name),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
                     "os.db.sqlite.open_v1" => {
                         self.require_native_backend(
                             native::BACKEND_ID_EXT_DB_SQLITE,
@@ -13569,6 +13772,24 @@ impl<'a> Emitter<'a> {
                 self.emit_os_fs_walk_glob_sorted_text_v1_to(args, dest_ty, dest)
             }
             "os.fs.stat_v1" => self.emit_os_fs_stat_v1_to(args, dest_ty, dest),
+
+            "os.stdio.read_line_v1" => self.emit_os_stdio_read_line_v1_to(args, dest_ty, dest),
+            "os.stdio.write_stdout_v1" => {
+                self.emit_os_stdio_write_stdout_v1_to(args, dest_ty, dest)
+            }
+            "os.stdio.write_stderr_v1" => {
+                self.emit_os_stdio_write_stderr_v1_to(args, dest_ty, dest)
+            }
+            "os.stdio.flush_stdout_v1" => {
+                self.emit_os_stdio_flush_stdout_v1_to(args, dest_ty, dest)
+            }
+            "os.stdio.flush_stderr_v1" => {
+                self.emit_os_stdio_flush_stderr_v1_to(args, dest_ty, dest)
+            }
+
+            "os.rand.bytes_v1" => self.emit_os_rand_bytes_v1_to(args, dest_ty, dest),
+            "os.rand.u64_v1" => self.emit_os_rand_u64_v1_to(args, dest_ty, dest),
+
             "os.db.sqlite.open_v1" => self.emit_os_db_sqlite_open_v1_to(args, dest_ty, dest),
             "os.db.sqlite.query_v1" => self.emit_os_db_sqlite_query_v1_to(args, dest_ty, dest),
             "os.db.sqlite.exec_v1" => self.emit_os_db_sqlite_exec_v1_to(args, dest_ty, dest),
@@ -19650,6 +19871,252 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             "{dest} = x07_ext_fs_stat_v1({}, {});",
             path.c_name, caps.c_name
         ));
+        Ok(())
+    }
+
+    fn emit_os_stdio_read_line_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.stdio.read_line_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_STDIO,
+            native::ABI_MAJOR_V1,
+            "os.stdio.read_line_v1",
+        )?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.stdio.read_line_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.stdio.read_line_v1 returns result_bytes".to_string(),
+            ));
+        }
+        let caps = self.emit_expr(&args[0])?;
+        if caps.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.stdio.read_line_v1 expects (bytes caps)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_stdio_read_line_v1({});",
+            caps.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_os_stdio_write_stdout_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.stdio.write_stdout_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_STDIO,
+            native::ABI_MAJOR_V1,
+            "os.stdio.write_stdout_v1",
+        )?;
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.stdio.write_stdout_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.stdio.write_stdout_v1 returns result_i32".to_string(),
+            ));
+        }
+        let data = self.emit_expr(&args[0])?;
+        let caps = self.emit_expr(&args[1])?;
+        if data.ty != Ty::Bytes || caps.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.stdio.write_stdout_v1 expects (bytes data, bytes caps)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_stdio_write_stdout_v1({}, {});",
+            data.c_name, caps.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_os_stdio_write_stderr_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.stdio.write_stderr_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_STDIO,
+            native::ABI_MAJOR_V1,
+            "os.stdio.write_stderr_v1",
+        )?;
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.stdio.write_stderr_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.stdio.write_stderr_v1 returns result_i32".to_string(),
+            ));
+        }
+        let data = self.emit_expr(&args[0])?;
+        let caps = self.emit_expr(&args[1])?;
+        if data.ty != Ty::Bytes || caps.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.stdio.write_stderr_v1 expects (bytes data, bytes caps)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_stdio_write_stderr_v1({}, {});",
+            data.c_name, caps.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_os_stdio_flush_stdout_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.stdio.flush_stdout_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_STDIO,
+            native::ABI_MAJOR_V1,
+            "os.stdio.flush_stdout_v1",
+        )?;
+        if !args.is_empty() {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.stdio.flush_stdout_v1 expects 0 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.stdio.flush_stdout_v1 returns result_i32".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = x07_ext_stdio_flush_stdout_v1();"));
+        Ok(())
+    }
+
+    fn emit_os_stdio_flush_stderr_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.stdio.flush_stderr_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_STDIO,
+            native::ABI_MAJOR_V1,
+            "os.stdio.flush_stderr_v1",
+        )?;
+        if !args.is_empty() {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.stdio.flush_stderr_v1 expects 0 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.stdio.flush_stderr_v1 returns result_i32".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = x07_ext_stdio_flush_stderr_v1();"));
+        Ok(())
+    }
+
+    fn emit_os_rand_bytes_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.rand.bytes_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_RAND,
+            native::ABI_MAJOR_V1,
+            "os.rand.bytes_v1",
+        )?;
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.rand.bytes_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.rand.bytes_v1 returns result_bytes".to_string(),
+            ));
+        }
+        let n = self.emit_expr(&args[0])?;
+        let caps = self.emit_expr(&args[1])?;
+        if n.ty != Ty::I32 || caps.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.rand.bytes_v1 expects (i32 n, bytes caps)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_rand_bytes_v1({}, {});",
+            n.c_name, caps.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_os_rand_u64_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.rand.u64_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_RAND,
+            native::ABI_MAJOR_V1,
+            "os.rand.u64_v1",
+        )?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.rand.u64_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultBytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.rand.u64_v1 returns result_bytes".to_string(),
+            ));
+        }
+        let caps = self.emit_expr(&args[0])?;
+        if caps.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.rand.u64_v1 expects (bytes caps)".to_string(),
+            ));
+        }
+        self.line(&format!("{dest} = x07_ext_rand_u64_v1({});", caps.c_name));
         Ok(())
     }
 
@@ -28328,6 +28795,110 @@ impl InferCtx {
                         }
                         Ok(Ty::ResultBytes.into())
                     }
+                    "os.stdio.read_line_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.stdio.read_line_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.stdio.read_line_v1 expects (bytes caps)".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes.into())
+                    }
+                    "os.stdio.write_stdout_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.stdio.write_stdout_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes || self.infer(&args[1])? != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.stdio.write_stdout_v1 expects (bytes data, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32.into())
+                    }
+                    "os.stdio.write_stderr_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.stdio.write_stderr_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes || self.infer(&args[1])? != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.stdio.write_stderr_v1 expects (bytes data, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32.into())
+                    }
+                    "os.stdio.flush_stdout_v1" => {
+                        self.require_standalone_only(head)?;
+                        if !args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.stdio.flush_stdout_v1 expects 0 args".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32.into())
+                    }
+                    "os.stdio.flush_stderr_v1" => {
+                        self.require_standalone_only(head)?;
+                        if !args.is_empty() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.stdio.flush_stderr_v1 expects 0 args".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32.into())
+                    }
+                    "os.rand.bytes_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.rand.bytes_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::I32 || self.infer(&args[1])? != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.rand.bytes_v1 expects (i32 n, bytes caps)".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes.into())
+                    }
+                    "os.rand.u64_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.rand.u64_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.rand.u64_v1 expects (bytes caps)".to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultBytes.into())
+                    }
                     "os.db.sqlite.open_v1" => {
                         self.require_standalone_only(head)?;
                         if args.len() != 2 {
@@ -32853,6 +33424,17 @@ result_i32_t x07_ext_fs_stream_open_write_v1(bytes_t path, bytes_t caps);
 result_i32_t x07_ext_fs_stream_write_all_v1(int32_t writer_handle, bytes_t data);
 result_i32_t x07_ext_fs_stream_close_v1(int32_t writer_handle);
 int32_t x07_ext_fs_stream_drop_v1(int32_t writer_handle);
+
+// Native ext-stdio backend entrypoints (linked from deps/x07/libx07_ext_stdio.*).
+result_bytes_t x07_ext_stdio_read_line_v1(bytes_t caps);
+result_i32_t x07_ext_stdio_write_stdout_v1(bytes_t data, bytes_t caps);
+result_i32_t x07_ext_stdio_write_stderr_v1(bytes_t data, bytes_t caps);
+result_i32_t x07_ext_stdio_flush_stdout_v1(void);
+result_i32_t x07_ext_stdio_flush_stderr_v1(void);
+
+// Native ext-rand backend entrypoints (linked from deps/x07/libx07_ext_rand.*).
+result_bytes_t x07_ext_rand_bytes_v1(int32_t n, bytes_t caps);
+result_bytes_t x07_ext_rand_u64_v1(bytes_t caps);
 
 // Native ext-db-sqlite backend entrypoints (linked from deps/x07/libx07_ext_db_sqlite.*).
 bytes_t x07_ext_db_sqlite_open_v1(bytes_t req, bytes_t caps);

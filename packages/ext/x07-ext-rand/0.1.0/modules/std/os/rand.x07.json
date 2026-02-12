@@ -1,0 +1,2 @@
+{"decls":[{"kind":"export","names":["std.os.rand.bytes_v1","std.os.rand.u64_v1"]},{"body":["os.rand.bytes_v1","n","caps"],"kind":"defn","name":"std.os.rand.bytes_v1","params":[{"name":"n","ty":"i32"},{"name":"caps","ty":"bytes"}],"result":"result_bytes"},{"body":["os.rand.u64_v1","caps"],"kind":"defn","name":"std.os.rand.u64_v1","params":[{"name":"caps","ty":"bytes"}],"result":"result_bytes"}],"imports":[],"kind":"module","module_id":"std.os.rand","schema_version":"x07.x07ast@0.3.0"}
+

@@ -119,6 +119,8 @@
   - [X7SL v1](text/x7sl-v1.md)
 - OS
   - [Process ABI v1](os/process-abi-v1.md)
+  - [Stdio v1](os/stdio-v1.md)
+  - [Rand v1](os/rand-v1.md)
 
 - [FAQ](faq.md)
 - [Versioning policy](versioning-policy.md)

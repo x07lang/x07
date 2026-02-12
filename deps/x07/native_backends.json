@@ -112,6 +112,50 @@
       }
     },
     {
+      "backend_id": "x07.ext.stdio",
+      "abi_major": 1,
+      "link": {
+        "linux": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_ext_stdio.a"],
+          "args": [],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        },
+        "macos": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_ext_stdio.a"],
+          "args": [],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        }
+      }
+    },
+    {
+      "backend_id": "x07.ext.rand",
+      "abi_major": 1,
+      "link": {
+        "linux": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_ext_rand.a"],
+          "args": [],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        },
+        "macos": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_ext_rand.a"],
+          "args": [],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        }
+      }
+    },
+    {
       "backend_id": "x07.ext.regex",
       "abi_major": 1,
       "link": {

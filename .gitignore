@@ -68,6 +68,16 @@ packages/**/dist/
 /deps/x07/x07_ext_fs.lib
 /deps/x07/include/x07_ext_fs_abi_v1.h
 
+# Native ext-stdio backend artifacts (built by scripts/build_ext_stdio.sh)
+/deps/x07/libx07_ext_stdio.a
+/deps/x07/x07_ext_stdio.lib
+/deps/x07/include/x07_ext_stdio_abi_v1.h
+
+# Native ext-rand backend artifacts (built by scripts/build_ext_rand.sh)
+/deps/x07/libx07_ext_rand.a
+/deps/x07/x07_ext_rand.lib
+/deps/x07/include/x07_ext_rand_abi_v1.h
+
 # Native ext-regex backend artifacts (built by scripts/build_ext_regex.sh)
 /deps/x07/libx07_ext_regex.a
 /deps/x07/x07_ext_regex.lib

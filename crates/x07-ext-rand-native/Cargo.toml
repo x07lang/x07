@@ -1,0 +1,15 @@
+[package]
+name = "x07-ext-rand-native"
+version = "0.1.13"
+
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+name = "x07_ext_rand"
+crate-type = ["staticlib", "rlib"]
+doctest = false
+
+[dependencies]
+getrandom = "0.2.17"
+

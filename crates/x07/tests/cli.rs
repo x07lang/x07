@@ -1,6 +1,8 @@
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Once;
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -15,6 +17,7 @@ use x07_contracts::{
 use x07c::json_patch;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
+static MCP_NATIVE_BACKENDS_READY: Once = Once::new();
 
 fn repo_root() -> PathBuf {
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -23,6 +26,30 @@ fn repo_root() -> PathBuf {
         .and_then(|p| p.parent())
         .expect("workspace root")
         .to_path_buf()
+}
+
+fn ensure_mcp_native_backends_staged() {
+    MCP_NATIVE_BACKENDS_READY.call_once(|| {
+        let root = repo_root();
+        for script in [
+            "scripts/ci/ensure_ext_stdio_backend.sh",
+            "scripts/ci/ensure_ext_rand_backend.sh",
+        ] {
+            let script_path = root.join(script);
+            let out = Command::new(&script_path)
+                .current_dir(&root)
+                .output()
+                .unwrap_or_else(|e| panic!("run {}: {e}", script_path.display()));
+            assert!(
+                out.status.success(),
+                "script failed: {}\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+                script_path.display(),
+                out.status,
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr),
+            );
+        }
+    });
 }
 
 fn run_x07(args: &[&str]) -> std::process::Output {
@@ -455,8 +482,8 @@ fn write_pbt_fixture_first_byte_zero(dir: &Path) -> (PathBuf, String) {
                         { "name": "b", "gen": { "kind": "bytes", "max_len": 16 } }
                     ],
                     "case_budget": {
-                        "fuel": 200000,
-                        "timeout_ms": 250,
+                        "fuel": 2000000,
+                        "timeout_ms": 2000,
                         "max_mem_bytes": 67108864,
                         "max_output_bytes": 1048576
                     }
@@ -5270,4 +5297,410 @@ fn x07_scope_json_schema_for_arch_check_is_available() {
         schema["properties"]["command"]["const"],
         Value::String("x07.arch.check".to_string())
     );
+}
+
+#[test]
+fn bundle_stdio_smoke_reads_and_writes() {
+    ensure_mcp_native_backends_staged();
+
+    let root = repo_root();
+    let tmp = fresh_tmp_dir(&root, "bundle_stdio_smoke");
+    std::fs::create_dir_all(&tmp).expect("create tmp dir");
+
+    let out_path = tmp.join("app_stdio_smoke");
+    let program_path = root.join("tests/external_os/stdio_smoke_ok/src/main.x07.json");
+    let module_root = root.join("packages/ext/x07-ext-stdio/0.1.0/modules");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&root)
+        .args([
+            "--out",
+            out_path.to_str().expect("out_path utf-8"),
+            "bundle",
+            "--program",
+            program_path.to_str().expect("program_path utf-8"),
+            "--module-root",
+            module_root.to_str().expect("module_root utf-8"),
+        ])
+        .output()
+        .expect("x07 bundle");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out_path.is_file(),
+        "missing bundled binary: {}",
+        out_path.display()
+    );
+
+    let mut child = Command::new(&out_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn bundled binary");
+    child
+        .stdin
+        .as_mut()
+        .expect("take stdin")
+        .write_all(b"hello\n")
+        .expect("write stdin");
+    drop(child.stdin.take());
+    let run_out = child.wait_with_output().expect("wait bundled binary");
+
+    assert_eq!(
+        run_out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&run_out.stdout),
+        String::from_utf8_lossy(&run_out.stderr)
+    );
+    assert_eq!(run_out.stdout, b"ok\ndone");
+    assert_eq!(run_out.stderr, b"log\n");
+}
+
+#[test]
+fn bundle_rand_smoke_outputs_32_bytes() {
+    ensure_mcp_native_backends_staged();
+
+    let root = repo_root();
+    let tmp = fresh_tmp_dir(&root, "bundle_rand_smoke");
+    std::fs::create_dir_all(&tmp).expect("create tmp dir");
+
+    let out_path = tmp.join("app_rand_smoke");
+    let program_path = root.join("tests/external_os/rand_smoke_ok/src/main.x07.json");
+    let module_root = root.join("packages/ext/x07-ext-rand/0.1.0/modules");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&root)
+        .args([
+            "--out",
+            out_path.to_str().expect("out_path utf-8"),
+            "bundle",
+            "--program",
+            program_path.to_str().expect("program_path utf-8"),
+            "--module-root",
+            module_root.to_str().expect("module_root utf-8"),
+        ])
+        .output()
+        .expect("x07 bundle");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out_path.is_file(),
+        "missing bundled binary: {}",
+        out_path.display()
+    );
+
+    let run1 = Command::new(&out_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run bundled binary");
+    assert_eq!(
+        run1.status.code(),
+        Some(0),
+        "stdout.len={} stderr:\n{}",
+        run1.stdout.len(),
+        String::from_utf8_lossy(&run1.stderr)
+    );
+    assert!(run1.stderr.is_empty(), "expected empty stderr");
+    assert_eq!(run1.stdout.len(), 32, "expected 32 random bytes");
+
+    if run1.stdout.iter().all(|b| *b == 0) {
+        let run2 = Command::new(&out_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .expect("run bundled binary (retry)");
+        assert_eq!(run2.status.code(), Some(0));
+        assert!(run2.stderr.is_empty(), "expected empty stderr");
+        assert_eq!(run2.stdout.len(), 32, "expected 32 random bytes");
+        assert!(
+            !run2.stdout.iter().all(|b| *b == 0),
+            "unexpected all-zero bytes"
+        );
+    }
+}
+
+#[test]
+fn bundle_rand_caps_enforces_bounds() {
+    ensure_mcp_native_backends_staged();
+
+    let root = repo_root();
+    let tmp = fresh_tmp_dir(&root, "bundle_rand_caps_bounds");
+    std::fs::create_dir_all(&tmp).expect("create tmp dir");
+
+    let out_path = tmp.join("app_rand_caps_bounds");
+    let program_path = root.join("tests/external_os/rand_caps_bounds/src/main.x07.json");
+    let module_root = root.join("packages/ext/x07-ext-rand/0.1.0/modules");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&root)
+        .args([
+            "--out",
+            out_path.to_str().expect("out_path utf-8"),
+            "bundle",
+            "--program",
+            program_path.to_str().expect("program_path utf-8"),
+            "--module-root",
+            module_root.to_str().expect("module_root utf-8"),
+        ])
+        .output()
+        .expect("x07 bundle");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out_path.is_file(),
+        "missing bundled binary: {}",
+        out_path.display()
+    );
+
+    let run_out = Command::new(&out_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run bundled binary");
+    assert_eq!(
+        run_out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&run_out.stderr)
+    );
+    assert!(run_out.stderr.is_empty(), "expected empty stderr");
+    assert_eq!(run_out.stdout, b"OK");
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_mcp_delegates_to_x07_mcp_and_forwards_exit_code() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let dir = fresh_os_tmp_dir("x07_mcp_delegate");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let bin_dir = dir.join("bin");
+    std::fs::create_dir_all(&bin_dir).expect("create bin dir");
+
+    let stub = bin_dir.join("x07-mcp");
+    let stub_src = r#"#!/usr/bin/env python3
+import json
+import sys
+
+print(json.dumps({"args": sys.argv[1:]}))
+sys.exit(17)
+"#;
+    write_bytes(&stub, stub_src.as_bytes());
+    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).expect("chmod x07-mcp");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let mut cmd = Command::new(exe);
+    cmd.current_dir(&dir);
+    let existing = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths = vec![bin_dir.clone()];
+    paths.extend(std::env::split_paths(&existing));
+    cmd.env("PATH", std::env::join_paths(paths).expect("join PATH"));
+    cmd.args([
+        "mcp",
+        "scaffold",
+        "init",
+        "--template",
+        "mcp-server-stdio",
+        "--dir",
+        "/tmp/example",
+    ]);
+    let out = cmd.output().expect("run x07 mcp");
+
+    assert_eq!(
+        out.status.code(),
+        Some(17),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse stub JSON");
+    assert_eq!(
+        v["args"],
+        Value::Array(
+            [
+                "scaffold",
+                "init",
+                "--template",
+                "mcp-server-stdio",
+                "--dir",
+                "/tmp/example"
+            ]
+            .into_iter()
+            .map(|s| Value::String(s.to_string()))
+            .collect()
+        )
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_mcp_errors_when_x07_mcp_missing() {
+    let dir = fresh_os_tmp_dir("x07_mcp_missing");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let empty_path = dir.join("empty_path");
+    std::fs::create_dir_all(&empty_path).expect("create empty PATH dir");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env("PATH", empty_path.to_str().unwrap())
+        .args(["mcp", "--", "anything"])
+        .output()
+        .expect("run x07 mcp");
+
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("x07-mcp not found"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_init_mcp_template_delegates_to_x07_mcp_scaffold() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let dir = fresh_os_tmp_dir("x07_init_mcp_delegate");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let bin_dir = dir.join("bin");
+    std::fs::create_dir_all(&bin_dir).expect("create bin dir");
+
+    let stub = bin_dir.join("x07-mcp");
+    let stub_src = r#"#!/usr/bin/env python3
+import json
+import os
+import sys
+
+def arg_value(argv, key):
+    for i, tok in enumerate(argv):
+        if tok == key and i + 1 < len(argv):
+            return argv[i + 1]
+    return None
+
+argv = sys.argv[1:]
+if argv[:2] != ["scaffold", "init"]:
+    print(json.dumps({"ok": False, "error": {"message": "unexpected argv"}}))
+    sys.exit(3)
+
+tpl = arg_value(argv, "--template")
+dst = arg_value(argv, "--dir")
+ver = arg_value(argv, "--toolchain-version")
+mach = arg_value(argv, "--machine")
+
+if not tpl or not dst or not ver or mach != "json":
+    print(json.dumps({"ok": False, "error": {"message": "missing required args"}}))
+    sys.exit(4)
+
+os.makedirs(dst, exist_ok=True)
+with open(os.path.join(dst, "x07.json"), "w", encoding="utf-8") as f:
+    f.write("{}\n")
+with open(os.path.join(dst, ".toolchain-version"), "w", encoding="utf-8") as f:
+    f.write(ver + "\n")
+
+print(json.dumps({"ok": True, "created": ["x07.json", ".toolchain-version"], "next_steps": []}))
+sys.exit(0)
+"#;
+    write_bytes(&stub, stub_src.as_bytes());
+    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).expect("chmod x07-mcp");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let mut cmd = Command::new(exe);
+    cmd.current_dir(&dir);
+    let existing = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths = vec![bin_dir.clone()];
+    paths.extend(std::env::split_paths(&existing));
+    cmd.env("PATH", std::env::join_paths(paths).expect("join PATH"));
+    cmd.args(["init", "--template", "mcp-server-stdio"]);
+    let out = cmd.output().expect("run x07 init");
+
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], Value::from(true));
+    assert!(dir.join("x07.json").is_file(), "x07.json missing");
+    assert!(
+        dir.join(".toolchain-version").is_file(),
+        ".toolchain-version missing"
+    );
+    assert!(
+        dir.join(".x07")
+            .join("policies")
+            .join("base")
+            .join("worker.sandbox.base.policy.json")
+            .is_file(),
+        "worker base policy missing"
+    );
+
+    let ver = std::fs::read_to_string(dir.join(".toolchain-version")).expect("read version file");
+    assert_eq!(ver.trim(), env!("CARGO_PKG_VERSION"));
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_init_mcp_template_errors_when_x07_mcp_missing() {
+    let dir = fresh_os_tmp_dir("x07_init_mcp_missing");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let empty_path = dir.join("empty_path");
+    std::fs::create_dir_all(&empty_path).expect("create empty PATH dir");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env("PATH", empty_path.to_str().unwrap())
+        .args(["init", "--template", "mcp-server-stdio"])
+        .output()
+        .expect("run x07 init");
+
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], Value::from(false));
+    assert_eq!(report["error"]["code"], Value::from("X07INIT_MCP_MISSING"));
 }

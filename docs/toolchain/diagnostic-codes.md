@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 175
-- quickfix support (`sometimes` or `always`): 152
-- quickfix coverage: 86.86%
+- total codes: 178
+- quickfix support (`sometimes` or `always`): 155
+- quickfix coverage: 87.08%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -109,6 +109,9 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07INIT_EXISTS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_EXISTS`. |
 | `X07INIT_GITIGNORE` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_GITIGNORE`. |
 | `X07INIT_IO` | x07 / lint / error | never | Diagnostic code `X07INIT_IO`. |
+| `X07INIT_MCP_FAILED` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MCP_FAILED`. |
+| `X07INIT_MCP_MISSING` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MCP_MISSING`. |
+| `X07INIT_MCP_REPORT` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MCP_REPORT`. |
 | `X07INIT_MODULES` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_MODULES`. |
 | `X07INIT_PKG_LOCK` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_PKG_LOCK`. |
 | `X07INIT_SRC` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_SRC`. |
@@ -2215,6 +2218,63 @@ Agent strategy:
 - Reproduce `X07INIT_IO` and capture structured context.
 - Resolve the external dependency/state.
 - Re-run the command and continue repair loop.
+
+
+## `X07INIT_MCP_FAILED`
+
+Summary: Project/package scaffold diagnostic `X07INIT_MCP_FAILED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+`x07-mcp scaffold init` returned a non-success result or error report.
+
+Agent strategy:
+
+- Run `x07-mcp scaffold init --template mcp-server-stdio --dir <DIR> --machine json` to reproduce.
+- Fix the reported issue and re-run `x07 init`.
+
+
+## `X07INIT_MCP_MISSING`
+
+Summary: Project/package scaffold diagnostic `X07INIT_MCP_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The MCP server templates are provided by `x07-mcp` (an external tool).
+
+Agent strategy:
+
+- Install `x07-mcp` and ensure it is discoverable on PATH.
+- Re-run `x07 init --template mcp-server-stdio` (or another MCP template).
+
+
+## `X07INIT_MCP_REPORT`
+
+Summary: Project/package scaffold diagnostic `X07INIT_MCP_REPORT`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The `x07-mcp scaffold init --machine json` report could not be parsed as JSON.
+
+Agent strategy:
+
+- Ensure `x07-mcp` is up to date and on PATH.
+- Re-run the command and capture stdout/stderr for debugging.
 
 
 ## `X07INIT_MODULES`

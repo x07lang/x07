@@ -1,0 +1,21 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-stdio",
+  "description": "OS stdio API (run-os only).",
+  "docs": "OS stdio API (run-os only).\n\nModules:\n- std.os.stdio\n- std.os.stdio.spec\n\nUsage:\n- Add dependency: x07 pkg add ext-stdio@0.1.0\n- Import the modules listed above.\n",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": [
+    "std.os.stdio",
+    "std.os.stdio.spec"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}
+

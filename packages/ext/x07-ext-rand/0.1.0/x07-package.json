@@ -1,0 +1,21 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-rand",
+  "description": "OS CSPRNG (secure random bytes) for OS worlds (run-os only).",
+  "docs": "OS-backed cryptographically secure random bytes (run-os only).\n\nModules:\n- std.os.rand\n- std.os.rand.spec\n\nUsage:\n- Add dependency: x07 pkg add ext-rand@0.1.0\n- Import the modules listed above.\n",
+  "version": "0.1.0",
+  "module_root": "modules",
+  "modules": [
+    "std.os.rand",
+    "std.os.rand.spec"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}
+

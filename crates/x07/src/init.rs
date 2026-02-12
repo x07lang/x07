@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -40,6 +41,9 @@ pub enum InitTemplate {
     SqliteApp,
     PostgresClient,
     Worker,
+    McpServer,
+    McpServerStdio,
+    McpServerHttp,
 }
 
 #[derive(Debug, Clone)]
@@ -158,6 +162,7 @@ fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str]
         InitTemplate::SqliteApp => &["db.core", "db.sqlite", "data.model", "fs.io"],
         InitTemplate::PostgresClient => &["db.core", "db.postgres", "data.model"],
         InitTemplate::Worker => &["log.basic"],
+        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp => &[],
     }
 }
 
@@ -170,6 +175,9 @@ fn template_default_profile(template: InitTemplate) -> &'static str {
         | InitTemplate::SqliteApp
         | InitTemplate::PostgresClient
         | InitTemplate::Worker => "sandbox",
+        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp => {
+            "os"
+        }
     }
 }
 
@@ -182,6 +190,9 @@ fn init_template_policy_template(template: InitTemplate) -> crate::policy::Polic
         InitTemplate::SqliteApp => crate::policy::PolicyTemplate::SqliteApp,
         InitTemplate::PostgresClient => crate::policy::PolicyTemplate::PostgresClient,
         InitTemplate::Worker => crate::policy::PolicyTemplate::Worker,
+        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp => {
+            crate::policy::PolicyTemplate::Worker
+        }
     }
 }
 
@@ -200,7 +211,232 @@ fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> 
         | InitTemplate::SqliteApp
         | InitTemplate::PostgresClient
         | InitTemplate::Worker => Ok((app_module_bytes()?, main_entry_bytes()?)),
+        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp => {
+            Ok((app_module_bytes()?, main_entry_bytes()?))
+        }
     }
+}
+
+fn is_mcp_template(template: InitTemplate) -> bool {
+    matches!(
+        template,
+        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp
+    )
+}
+
+fn mcp_template_name(template: InitTemplate) -> &'static str {
+    match template {
+        InitTemplate::McpServer => "mcp-server",
+        InitTemplate::McpServerStdio => "mcp-server-stdio",
+        InitTemplate::McpServerHttp => "mcp-server-http",
+        _ => "unknown",
+    }
+}
+
+fn cmd_init_mcp_template(root: &Path, template: InitTemplate) -> Result<std::process::ExitCode> {
+    let mut conflicts = Vec::new();
+    for rel in [
+        ".gitignore",
+        "README.md",
+        "x07.json",
+        "x07.lock.json",
+        "src",
+        "tests",
+        "x07-toolchain.toml",
+        ".agent",
+        ".x07",
+        crate::policy::default_base_policy_rel_path(crate::policy::PolicyTemplate::Worker),
+    ] {
+        let abs = root.join(rel);
+        if abs.exists() {
+            conflicts.push(rel.to_string());
+        }
+    }
+    if !conflicts.is_empty() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_EXISTS".to_string(),
+                message: format!(
+                    "refusing to init into existing paths: {}",
+                    conflicts.join(", ")
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let argv: Vec<OsString> = vec![
+        OsString::from("scaffold"),
+        OsString::from("init"),
+        OsString::from("--template"),
+        OsString::from(mcp_template_name(template)),
+        OsString::from("--dir"),
+        root.as_os_str().to_os_string(),
+        OsString::from("--toolchain-version"),
+        OsString::from(env!("CARGO_PKG_VERSION")),
+        OsString::from("--machine"),
+        OsString::from("json"),
+    ];
+
+    let out = match crate::delegate::run_capture("x07-mcp", &argv, Some(root))? {
+        crate::delegate::DelegateCaptured::NotFound => {
+            let report = InitReport {
+                ok: false,
+                command: "init",
+                root: root.display().to_string(),
+                created: Vec::new(),
+                notes: Vec::new(),
+                next_steps: vec![
+                    "Install x07-mcp and ensure it is discoverable on PATH.".to_string()
+                ],
+                error: Some(InitError {
+                    code: "X07INIT_MCP_MISSING".to_string(),
+                    message: "x07-mcp not found on PATH".to_string(),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+        crate::delegate::DelegateCaptured::Output(out) => out,
+    };
+
+    if !out.status.success() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_MCP_FAILED".to_string(),
+                message: format!(
+                    "x07-mcp scaffold init failed (exit={})\n\nstdout:\n{}\n\nstderr:\n{}",
+                    out.status.code().unwrap_or(1),
+                    String::from_utf8_lossy(&out.stdout),
+                    String::from_utf8_lossy(&out.stderr)
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let v: Value = match serde_json::from_slice(&out.stdout) {
+        Ok(v) => v,
+        Err(err) => {
+            let report = InitReport {
+                ok: false,
+                command: "init",
+                root: root.display().to_string(),
+                created: Vec::new(),
+                notes: Vec::new(),
+                next_steps: Vec::new(),
+                error: Some(InitError {
+                    code: "X07INIT_MCP_REPORT".to_string(),
+                    message: format!("parse x07-mcp report JSON: {err}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    let ok = v.get("ok").and_then(Value::as_bool).unwrap_or(false);
+    let mut created = v
+        .get("created")
+        .and_then(Value::as_array)
+        .map(|xs| {
+            xs.iter()
+                .filter_map(Value::as_str)
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let next_steps = v
+        .get("next_steps")
+        .and_then(Value::as_array)
+        .map(|xs| {
+            xs.iter()
+                .filter_map(Value::as_str)
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    if !ok {
+        let message = v
+            .get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(Value::as_str)
+            .unwrap_or("x07-mcp scaffold init failed")
+            .to_string();
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created,
+            notes: Vec::new(),
+            next_steps,
+            error: Some(InitError {
+                code: "X07INIT_MCP_FAILED".to_string(),
+                message,
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let policy_rel =
+        crate::policy::default_base_policy_rel_path(crate::policy::PolicyTemplate::Worker);
+    let policy_path = root.join(policy_rel);
+    if !policy_path.exists() {
+        let policy_bytes = crate::policy::render_base_policy_template_bytes(
+            crate::policy::PolicyTemplate::Worker,
+            None,
+        )?;
+        if let Err(err) = write_new_file(&policy_path, &policy_bytes) {
+            return print_io_error(root, &created, policy_rel, err);
+        }
+        created.push(rel(root, &policy_path));
+    }
+
+    let agent_paths = AgentKitPaths::new(root);
+    if let Err(err) = init_agent_kit(root, &agent_paths, &mut created) {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created,
+            notes: Vec::new(),
+            next_steps,
+            error: Some(InitError {
+                code: "X07INIT_AGENT".to_string(),
+                message: format!("{err:#}"),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let report = InitReport {
+        ok: true,
+        command: "init",
+        root: root.display().to_string(),
+        created,
+        notes: Vec::new(),
+        next_steps,
+        error: None,
+    };
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(std::process::ExitCode::SUCCESS)
 }
 
 pub fn cmd_init(
@@ -246,6 +482,12 @@ pub fn cmd_init(
         }
 
         return cmd_init_package(&root);
+    }
+
+    if let Some(template) = args.template {
+        if is_mcp_template(template) {
+            return cmd_init_mcp_template(&root, template);
+        }
     }
 
     let paths = InitPaths {

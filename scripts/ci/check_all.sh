@@ -74,6 +74,12 @@ step "stage native math backend"
 step "stage native stream-xf backend"
 ./scripts/ci/ensure_stream_xf_backend.sh
 
+step "stage native ext-stdio backend"
+./scripts/ci/ensure_ext_stdio_backend.sh
+
+step "stage native ext-rand backend"
+./scripts/ci/ensure_ext_rand_backend.sh
+
 step "cargo test"
 cargo test
 
