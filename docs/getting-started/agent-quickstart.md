@@ -232,7 +232,7 @@ See also: [Packages & projects](../packages/index.md).
 ## 7) World selection (OS worlds)
 
 - `run-os`: real OS adapters (disk/network/time/env/process)
-- `run-os-sandboxed`: policy-gated OS adapters (not a hardened sandbox)
+- `run-os-sandboxed`: policy-gated OS adapters (defaults to a VM boundary; still not a hardened sandbox if you mount secrets or enable networking)
 
 For `run-os-sandboxed`, start from a schema-valid policy template instead of hand-writing JSON:
 

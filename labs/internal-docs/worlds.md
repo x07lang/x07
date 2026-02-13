@@ -20,7 +20,7 @@ Compiler/linter world → feature-flag mapping (fs/rr/kv + sandboxed unsafe/ffi 
 | `solve-kv` | eval | yes | seeded deterministic key/value store |
 | `solve-full` | eval | yes | `solve-fs` + `solve-rr` + `solve-kv` |
 | `run-os` | standalone | no | real OS access (fs/env/time/process/net) + `unsafe` + `extern "C"` |
-| `run-os-sandboxed` | standalone | no | same surface as `run-os`, but restricted by a policy file (`schemas/run-os-policy.schema.json`) |
+| `run-os-sandboxed` | standalone | no | same surface as `run-os`, but restricted by a policy file (`schemas/run-os-policy.schema.json`); defaults to `sandbox_backend=vm` (fail closed) |
 
 ## Capability gating rules
 
@@ -44,3 +44,7 @@ Example (deterministic):
 Example (standalone OS):
 
 `cargo run -p x07-os-runner -- --program program.x07.json --world run-os-sandboxed --policy policy.json`
+
+Policy-only mode (weaker isolation; no VM boundary):
+
+`cargo run -p x07-os-runner -- --program program.x07.json --world run-os-sandboxed --policy policy.json --sandbox-backend os --i-accept-weaker-isolation`

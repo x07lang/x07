@@ -2815,6 +2815,7 @@ dependencies = [
  "x07-host-runner",
  "x07-pkg",
  "x07-runner-common",
+ "x07-vm",
  "x07-worlds",
  "x07c",
 ]
@@ -2909,6 +2910,17 @@ name = "x07-ext-stdio-native"
 version = "0.1.13"
 
 [[package]]
+name = "x07-guestd"
+version = "0.1.13"
+dependencies = [
+ "anyhow",
+ "libc",
+ "serde",
+ "serde_json",
+ "x07-contracts",
+]
+
+[[package]]
 name = "x07-host-runner"
 version = "0.1.13"
 dependencies = [
@@ -2946,6 +2958,7 @@ dependencies = [
  "x07-contracts",
  "x07-host-runner",
  "x07-runner-common",
+ "x07-vm",
  "x07-worlds",
  "x07c",
 ]
@@ -2976,9 +2989,11 @@ name = "x07-runner-common"
 version = "0.1.13"
 dependencies = [
  "anyhow",
+ "clap",
  "serde",
  "serde_json",
  "x07-contracts",
+ "x07-worlds",
 ]
 
 [[package]]
@@ -2991,6 +3006,40 @@ version = "0.1.13"
 dependencies = [
  "chrono",
  "chrono-tz",
+]
+
+[[package]]
+name = "x07-vm"
+version = "0.1.13"
+dependencies = [
+ "anyhow",
+ "libc",
+ "serde",
+ "serde_json",
+ "x07-contracts",
+ "x07-host-runner",
+]
+
+[[package]]
+name = "x07-vm-launcher"
+version = "0.1.13"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "x07-runner-common",
+ "x07-vm",
+]
+
+[[package]]
+name = "x07-vm-reaper"
+version = "0.1.13"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde",
+ "serde_json",
+ "x07-vm",
 ]
 
 [[package]]

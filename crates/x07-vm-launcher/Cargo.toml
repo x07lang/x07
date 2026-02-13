@@ -1,0 +1,13 @@
+[package]
+name = "x07-vm-launcher"
+version = "0.1.13"
+
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+x07-runner-common = { path = "../x07-runner-common" }
+x07-vm = { path = "../x07-vm" }

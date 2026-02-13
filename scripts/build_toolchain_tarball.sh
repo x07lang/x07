@@ -13,7 +13,8 @@ Usage:
   scripts/build_toolchain_tarball.sh --tag vX.Y.Z [--platform <macOS|Linux>] [--target-dir <dir>] [--out <path>] [--skip-native-backends]
 
 Builds a toolchain tarball containing:
-  - bin/{x07,x07c,x07-host-runner,x07-os-runner,x07import-cli}
+  - bin/{x07,x07c,x07-host-runner,x07-os-runner,x07-vm-launcher,x07-vm-reaper,x07import-cli}
+  - bin/x07-vz-helper (macOS only; required for `X07_VM_BACKEND=vz`)
   - stdlib.lock + stdlib.os.lock (stdlib package lockfiles used by `x07 test`)
   - deps/x07/native_backends.json + native backend archives (for native backends like ext-regex)
   - stdlib/os/0.2.0/modules (for x07-os-runner)
@@ -24,7 +25,7 @@ Expected inputs:
   - Release binaries already built under <target-dir>/release (default: ./target/release)
 
 Examples:
-  cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli
+  cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07-vm-launcher -p x07-vm-reaper -p x07import-cli
   scripts/build_toolchain_tarball.sh --tag v0.0.5 --platform macOS
 EOF
 }
@@ -122,9 +123,17 @@ install_bin() {
   touch -t 200001010000.00 "$dst" 2>/dev/null || true
 }
 
-for bin in x07 x07c x07-host-runner x07-os-runner x07import-cli; do
+for bin in x07 x07c x07-host-runner x07-os-runner x07-vm-launcher x07-vm-reaper x07import-cli; do
   install_bin "$bin"
 done
+
+if [[ "$platform" == "macOS" ]]; then
+  if [[ -f "$target_dir/release/x07-vz-helper" ]]; then
+    install_bin "x07-vz-helper"
+  else
+    echo "warn: missing x07-vz-helper at $target_dir/release/x07-vz-helper (vz backend will be unavailable)" >&2
+  fi
+fi
 
 stdlib_src="$root/stdlib/os/0.2.0/modules"
 stdlib_dst="$stage_root/stdlib/os/0.2.0/modules"

@@ -43,7 +43,7 @@ This reduces “LLM confusion” and makes programs and patches more uniform.
 
 When you need real OS resources (real network, real disk, real time), use `run-os` or `run-os-sandboxed`.
 
-`run-os-sandboxed` is governed by explicit policy files (it is not a hardened sandbox).
+`run-os-sandboxed` is governed by explicit policy files; X07 defaults to a VM boundary on supported platforms, but it is still not a hardened sandbox if you mount secrets or enable networking.
 
 ### 3) Production worlds are opt-in
 

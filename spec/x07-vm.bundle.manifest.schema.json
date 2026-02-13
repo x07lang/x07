@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-vm.bundle.manifest.schema.json",
+  "title": "X07 VM bundle manifest v0.1.0",
+  "description": "Sidecar manifest for VM-backed bundles produced by `x07 bundle --profile sandbox` when sandbox_backend=vm.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "guest_image", "payload", "workdir", "policy"],
+  "properties": {
+    "schema_version": { "const": "x07.vm.bundle.manifest@0.1.0" },
+
+    "guest_image": {
+      "type": "string",
+      "description": "OCI image reference for the Linux guest runtime."
+    },
+    "payload": {
+      "type": "string",
+      "description": "Relative path (from sidecar root) to the Linux payload executable."
+    },
+    "workdir": {
+      "type": "string",
+      "description": "Absolute working directory inside the guest."
+    },
+    "policy": {
+      "type": "string",
+      "description": "Relative path (from sidecar root) to the effective run-os-sandboxed policy JSON."
+    }
+  }
+}
+

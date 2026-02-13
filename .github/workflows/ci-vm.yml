@@ -1,0 +1,87 @@
+name: CI (VM sandbox)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  macos-vm:
+    name: vm / macos (vz)
+    runs-on: [self-hosted, x07-vm-macos]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 90
+    env:
+      X07_VM_BACKEND: vz
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build guest runner image
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/build_guest_runner_image.sh --image x07-guest-runner --tag vm-ci
+          echo "X07_VM_GUEST_IMAGE=x07-guest-runner:vm-ci" >> "$GITHUB_ENV"
+
+      - name: Build VZ guest bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d 2>/dev/null || mktemp -d -t x07_vz_bundle)"
+          bundle_dir="${tmp}/guest.bundle"
+          ./scripts/build_vz_guest_bundle.sh --image "x07-guest-runner:vm-ci" --out "$bundle_dir"
+          echo "X07_VM_VZ_GUEST_BUNDLE=$bundle_dir" >> "$GITHUB_ENV"
+
+      - name: Build VZ helper
+        shell: bash
+        run: ./scripts/build_vz_helper.sh ./target/debug/x07-vz-helper
+
+      - name: VM sandbox smoke
+        shell: bash
+        run: ./scripts/ci/check_vm_sandbox_smoke.sh
+
+  linux-vm:
+    name: vm / linux (firecracker)
+    runs-on: [self-hosted, x07-vm-linux-firecracker]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 90
+    env:
+      X07_VM_BACKEND: firecracker-ctr
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build and import guest runner image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/build_guest_runner_image.sh --image x07-guest-runner --tag vm-ci
+
+          tmp="$(mktemp -d 2>/dev/null || mktemp -d -t x07_guest_image)"
+          image_tar="${tmp}/guest-runner.tar"
+          docker save "x07-guest-runner:vm-ci" -o "$image_tar"
+
+          sock="${X07_VM_FIRECRACKER_CONTAINERD_SOCK:-/run/firecracker-containerd/containerd.sock}"
+          ns="${X07_VM_CONTAINERD_NAMESPACE:-x07}"
+          firecracker-ctr --address "$sock" --namespace "$ns" images import "$image_tar"
+
+          echo "X07_VM_GUEST_IMAGE=x07-guest-runner:vm-ci" >> "$GITHUB_ENV"
+
+      - name: VM sandbox smoke
+        shell: bash
+        run: ./scripts/ci/check_vm_sandbox_smoke.sh

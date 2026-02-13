@@ -245,9 +245,10 @@ See: [Embedding in C](embedding-in-c.md).
   - Produces a native CLI executable (standard `argc/argv`, raw stdout).
   - Runs without the X07 toolchain installed at runtime.
 - `x07 bundle --project x07.json --profile sandbox --out dist/mytool`
-  - Bundles a policy-enforced OS-world executable (requires a base policy via profile or `--policy`).
+  - Bundles a VM-backed sandbox bundle by default (requires a base policy via profile or `--policy`).
+  - To emit a legacy policy-only bundle (weaker isolation), add: `--sandbox-backend os --i-accept-weaker-isolation`.
 
-Bundle report schema: `spec/x07-bundle.report.schema.json` (`schema_version: "x07.bundle.report@0.1.0"`).
+Bundle report schema: `spec/x07-bundle.report.schema.json` (`schema_version: "x07.bundle.report@0.2.0"`).
 
 ### Running programs (canonical)
 

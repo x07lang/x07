@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-guest.request.schema.json",
+  "title": "x07 guest request v1 (VM backends)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "exec"],
+  "properties": {
+    "schema_version": {
+      "const": "x07.guest.request@1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "mounts": {
+      "type": "array",
+      "maxItems": 64,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tag", "guest_path", "readonly"],
+        "properties": {
+          "tag": {
+            "type": "string",
+            "pattern": "^x07m([0-9]|[1-5][0-9]|6[0-3])$"
+          },
+          "guest_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^/[^\\u0000]*$"
+          },
+          "readonly": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "exec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "argv"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^/[^\\u0000]*$"
+        },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "items": {
+            "type": "string",
+            "maxLength": 16384,
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "env": {
+          "type": "object",
+          "default": {},
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 65536,
+            "pattern": "^[^\\u0000]*$"
+          }
+        }
+      }
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {
+        "stdout_schema_version": "x07-os-runner.report@0.3.0",
+        "stdout_is_single_json_object": true
+      },
+      "properties": {
+        "stdout_schema_version": {
+          "const": "x07-os-runner.report@0.3.0"
+        },
+        "stdout_is_single_json_object": {
+          "const": true
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "wall_ms": { "type": "integer", "minimum": 1 },
+        "stdout_max_bytes": { "type": "integer", "minimum": 0 },
+        "stderr_max_bytes": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
+

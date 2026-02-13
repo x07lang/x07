@@ -9,7 +9,7 @@ Exactly one target mode is used:
 - `x07 run` (no flags): auto-discovers a project manifest (`x07.json` or a single `*.x07project.json`) by walking up from the current directory.
 - `x07 run --project path/to/x07.json`: run a specific project manifest (+ lockfile).
 - `x07 run --program path/to/main.x07.json`: compile+run a single file (module roots are inferred unless `--module-root` is provided).
-- `x07 run --artifact path/to/exe`: run a precompiled executable (runner output only; no project metadata).
+- `x07 run --artifact path/to/exe`: run a precompiled executable (run-os only; runner output only; no project metadata).
 
 ## Auto-repair (default)
 
@@ -91,6 +91,16 @@ Convenience overrides for net/filesystem allowlists are available only in `run-o
 
 Note: `--allow-host` requires explicit ports; `*` is accepted only by `--deny-host`.
 
+### Sandbox backend (run-os-sandboxed)
+
+`run-os-sandboxed` defaults to `sandbox_backend=vm` and **fails closed** if a VM boundary can’t be provided.
+
+Control it with:
+
+- CLI: `--sandbox-backend auto|vm|os|none`
+- CLI: `--i-accept-weaker-isolation` (required when the effective backend is `os`/`none`)
+- Env: `X07_SANDBOX_BACKEND` / `X07_I_ACCEPT_WEAKER_ISOLATION`
+
 ## Compilation and resource knobs
 
 Common flags:
@@ -103,7 +113,7 @@ Common flags:
 
 ## Distribute a native executable (canonical): `x07 bundle`
 
-`x07 bundle` produces a native CLI executable that can be run directly (no framed I/O) and does not require the X07 toolchain at runtime.
+`x07 bundle` produces a native CLI executable that can be run directly (no framed I/O).
 
 Examples:
 
@@ -112,9 +122,14 @@ Examples:
 x07 bundle --profile os --out dist/mytool
 ./dist/mytool --help
 
-# Bundle a policy-enforced OS-world binary (requires a base policy via profile or --policy):
+# Bundle a VM-backed sandbox bundle (run-os-sandboxed):
 x07 bundle --profile sandbox --out dist/mytool
+
+# Bundle a legacy policy-only sandbox bundle (weaker isolation; no VM boundary):
+x07 bundle --profile sandbox --sandbox-backend os --i-accept-weaker-isolation --out dist/mytool
 ```
+
+For `--profile sandbox` with `sandbox_backend=vm`, the output is a host-native launcher plus a sidecar directory `dist/mytool.vm/`.
 
 The bundled binary encodes `argc/argv` to `argv_v1` input bytes and writes the program output bytes directly to stdout.
 

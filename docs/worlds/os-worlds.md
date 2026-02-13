@@ -24,6 +24,34 @@ Same as `run-os`, but enforced by policy:
 - max live processes / connections
 - byte caps / timeouts
 
+### Sandbox backend (VM boundary)
+
+By default, `run-os-sandboxed` runs behind a **guest kernel boundary** (`sandbox_backend=vm`) and fails closed if a VM runtime isn’t available.
+
+Controls:
+
+- CLI: `--sandbox-backend auto|vm|os|none`
+- CLI: `--i-accept-weaker-isolation` (required when the effective backend is `os`/`none`)
+- Env: `X07_SANDBOX_BACKEND` / `X07_I_ACCEPT_WEAKER_ISOLATION`
+
+VM runtime configuration:
+
+- VM backend selection: `X07_VM_BACKEND`
+  - macOS:
+    - `apple-container` (macOS 26+; requires Apple `container`)
+    - `vz` (macOS 12+; requires `x07-vz-helper` + `X07_VM_VZ_GUEST_BUNDLE`)
+    - `podman` / `docker` (weaker isolation; requires `X07_I_ACCEPT_WEAKER_ISOLATION=1`)
+  - Linux: `firecracker-ctr` (requires `/dev/kvm` + firecracker-containerd)
+- Guest image (OCI backends): `X07_VM_GUEST_IMAGE` (default: `ghcr.io/x07lang/x07-guest-runner:<x07-version>`)
+- VZ guest bundle (macOS): `X07_VM_VZ_GUEST_BUNDLE`
+- VZ helper binary (macOS): `X07_VM_VZ_HELPER_BIN`
+- Firecracker config (Linux): `X07_VM_FIRECRACKER_CTR_BIN`, `X07_VM_FIRECRACKER_CONTAINERD_SOCK`, `X07_VM_FIRECRACKER_SNAPSHOTTER`, `X07_VM_CONTAINERD_NAMESPACE`
+
+VM hardening notes:
+
+- Build/run split: VM execution compiles in a build phase and executes in a separate run phase, so the run phase does not automatically include the project tree unless it’s mounted via policy filesystem roots.
+- Networking: VM networking stays disabled unless `policy.net.enabled=true` and `policy.net.allow_hosts` is non-empty. Allowlist enforcement at the VM boundary is currently implemented for the `vz` backend; other VM backends require `X07_I_ACCEPT_WEAKER_ISOLATION=1` to enable networking.
+
 ### Create a base policy (recommended)
 
 Use `x07 policy init` to generate a schema-valid starting point (then extend it for your app):
@@ -57,10 +85,11 @@ See also: [Sandbox policy walkthrough](sandbox-policy-walkthrough.md).
 
 ## Distribution (`x07 bundle`)
 
-To ship an OS-world program as a normal executable (no framed I/O, no toolchain required at runtime), use `x07 bundle`:
+To ship an OS-world program as a normal executable (no framed I/O), use `x07 bundle`:
 
 - `x07 bundle --profile os --out dist/app`
-- `x07 bundle --profile sandbox --out dist/app` (policy enforced)
+- `x07 bundle --profile sandbox --out dist/app` (VM-backed bundle by default; produces `dist/app` + `dist/app.vm/`)
+- `x07 bundle --profile sandbox --sandbox-backend os --i-accept-weaker-isolation --out dist/app` (legacy policy-only bundle; weaker isolation)
 
 ## Platform support
 
@@ -84,4 +113,4 @@ And Tier-2:
 `run-os-sandboxed` is “policy gating + resource limits”.
 It is not a hardened sandbox against hostile code.
 
-For untrusted code, use additional OS-level sandboxing (containers, VMs, seccomp, etc.) around X07.
+Even with a VM boundary, treat any mounted host roots as sensitive: hostile code can read/write whatever you mount and can exfiltrate if networking is enabled.

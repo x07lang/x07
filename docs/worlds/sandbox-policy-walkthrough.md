@@ -23,6 +23,13 @@ You will start from `x07 init` and evolve the program through stages:
 - Toolchain installed: `x07 --help`
 - OS runner installed: `x07-os-runner --help`
 
+By default, `run-os-sandboxed` uses `sandbox_backend=vm`. If you don’t have a VM runtime configured yet, you can run this walkthrough in the legacy policy-only mode (weaker isolation):
+
+```bash
+export X07_SANDBOX_BACKEND=os
+export X07_I_ACCEPT_WEAKER_ISOLATION=1
+```
+
 For the HTTP stage:
 
 - Run `x07 doctor` and install the suggested native prerequisites (libcurl/OpenSSL, C compiler, etc).

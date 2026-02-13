@@ -1,4 +1,7 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use base64::Engine;
@@ -10,7 +13,15 @@ use x07_contracts::{
     X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
 };
 use x07_host_runner::{apply_cc_profile, CcProfile, NativeCliWrapperOpts, NativeToolchainConfig};
+use x07_runner_common::sandbox_backend::{
+    resolve_sandbox_backend, EffectiveSandboxBackend, SandboxBackend,
+};
 use x07_runner_common::{auto_ffi, os_env, os_paths, os_policy};
+use x07_vm::{
+    default_cleanup_ms, default_grace_ms, firecracker_ctr_config_from_env,
+    resolve_sibling_or_path as resolve_sibling_or_path_vm, resolve_vm_backend, LimitsSpec,
+    MountSpec, NetworkMode, RunSpec, VmBackend,
+};
 use x07_worlds::WorldId;
 use x07c::project;
 
@@ -19,6 +30,8 @@ use crate::repair::RepairArgs;
 
 const DEFAULT_SOLVE_FUEL: u64 = 50_000_000;
 const DEFAULT_MAX_MEMORY_BYTES: usize = 64 * 1024 * 1024;
+
+static VM_RUN_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Args)]
 pub struct BundleArgs {
@@ -41,6 +54,14 @@ pub struct BundleArgs {
     /// Policy JSON (required for `run-os-sandboxed`; not a hardened sandbox).
     #[arg(long, value_name = "PATH")]
     pub policy: Option<PathBuf>,
+
+    /// Sandbox backend selection (run-os-sandboxed defaults to "vm").
+    #[arg(long, value_enum)]
+    pub sandbox_backend: Option<SandboxBackend>,
+
+    /// Required to bundle run-os-sandboxed without a VM boundary.
+    #[arg(long)]
+    pub i_accept_weaker_isolation: bool,
 
     /// Append network destinations to the sandbox policy allowlist (repeatable).
     #[arg(long, value_name = "HOST:PORT[,PORT...]")]
@@ -149,6 +170,40 @@ struct BundleSection {
     abi: BundleAbi,
     policy: Option<BundlePolicy>,
     emit_dir: Option<String>,
+    kind: &'static str,
+    guest: Option<BundleGuest>,
+}
+
+#[derive(Debug, Serialize)]
+struct BundleGuestPlatform {
+    os: &'static str,
+    arch: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct BundleGuestImage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    digest: Option<String>,
+    #[serde(rename = "ref", skip_serializing_if = "Option::is_none")]
+    ref_: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    layout: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct BundleGuestMounts {
+    job_in: String,
+    job_out: String,
+}
+
+#[derive(Debug, Serialize)]
+struct BundleGuest {
+    contract: &'static str,
+    platform: BundleGuestPlatform,
+    image: BundleGuestImage,
+    entrypoint: Vec<String>,
+    workdir: String,
+    mounts: BundleGuestMounts,
 }
 
 #[derive(Debug, Serialize)]
@@ -221,6 +276,24 @@ pub fn cmd_bundle(
         project_manifest.as_deref(),
         selected_profile.as_ref(),
     )?;
+
+    if world != WorldId::RunOsSandboxed
+        && (args.sandbox_backend.is_some() || args.i_accept_weaker_isolation)
+    {
+        anyhow::bail!(
+            "--sandbox-backend/--i-accept-weaker-isolation are only supported for --world run-os-sandboxed"
+        );
+    }
+
+    let sandbox_backend = if world == WorldId::RunOsSandboxed {
+        Some(resolve_sandbox_backend(
+            world,
+            args.sandbox_backend,
+            args.i_accept_weaker_isolation,
+        )?)
+    } else {
+        None
+    };
 
     let cc_profile = args
         .cc_profile
@@ -322,6 +395,34 @@ pub fn cmd_bundle(
         .as_ref()
         .and_then(|p| p.cpu_time_limit_seconds));
 
+    if sandbox_backend == Some(EffectiveSandboxBackend::Vm) {
+        let base_policy = base_policy
+            .as_deref()
+            .context("internal error: base_policy missing")?;
+        let effective_policy = effective_policy
+            .as_deref()
+            .context("internal error: effective_policy missing")?;
+
+        return cmd_bundle_vm(CmdBundleVmParams {
+            args: &args,
+            cwd: &cwd,
+            world,
+            target_kind,
+            target_path: &target_path,
+            project_root: project_root.as_deref(),
+            out_path: &out_path,
+            bundle_name: &bundle_name,
+            base_policy,
+            effective_policy,
+            embedded_env_keys: &policy_embedded_keys,
+            resolved_module_roots: &resolved_module_roots,
+            lockfile: lockfile.as_deref(),
+            max_memory_bytes,
+            max_output_bytes,
+            cpu_time_limit_seconds,
+        });
+    }
+
     let mut compile_options = x07c::world_config::compile_options_for_world(world, module_roots);
     compile_options.arch_root = project_root.clone();
     if world == WorldId::RunOsSandboxed {
@@ -385,6 +486,8 @@ pub fn cmd_bundle(
                 embedded_env_keys: policy_embedded_keys,
             }),
             emit_dir: args.emit_dir.as_ref().map(|p| p.display().to_string()),
+            kind: "native",
+            guest: None,
         },
         report: host_report,
     };
@@ -426,6 +529,568 @@ pub fn cmd_bundle(
 
     let exit_code: u8 = if compile_out.compile.ok { 0 } else { 1 };
     Ok(std::process::ExitCode::from(exit_code))
+}
+
+#[derive(Debug, Serialize)]
+struct VmBundleManifest {
+    schema_version: &'static str,
+    guest_image: String,
+    payload: &'static str,
+    workdir: &'static str,
+    policy: &'static str,
+}
+
+struct CmdBundleVmParams<'a> {
+    args: &'a BundleArgs,
+    cwd: &'a Path,
+    world: WorldId,
+    target_kind: TargetKind,
+    target_path: &'a Path,
+    project_root: Option<&'a Path>,
+    out_path: &'a Path,
+    bundle_name: &'a str,
+    base_policy: &'a Path,
+    effective_policy: &'a Path,
+    embedded_env_keys: &'a [String],
+    resolved_module_roots: &'a [String],
+    lockfile: Option<&'a Path>,
+    max_memory_bytes: usize,
+    max_output_bytes: Option<usize>,
+    cpu_time_limit_seconds: Option<u64>,
+}
+
+fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode> {
+    let CmdBundleVmParams {
+        args,
+        cwd,
+        world,
+        target_kind,
+        target_path,
+        project_root,
+        out_path,
+        bundle_name,
+        base_policy,
+        effective_policy,
+        embedded_env_keys,
+        resolved_module_roots,
+        lockfile,
+        max_memory_bytes,
+        max_output_bytes,
+        cpu_time_limit_seconds,
+    } = params;
+    if world != WorldId::RunOsSandboxed {
+        anyhow::bail!("VM bundles are only supported for run-os-sandboxed");
+    }
+
+    if !cfg!(any(target_os = "macos", target_os = "linux")) {
+        anyhow::bail!("VM bundles are not supported on this platform");
+    }
+
+    let sidecar = vm_sidecar_dir_for_out(out_path);
+    if sidecar.exists() && !sidecar.is_dir() {
+        anyhow::bail!(
+            "vm sidecar exists but is not a directory: {}",
+            sidecar.display()
+        );
+    }
+    if sidecar.is_dir() {
+        std::fs::remove_dir_all(&sidecar)
+            .with_context(|| format!("remove vm sidecar dir: {}", sidecar.display()))?;
+    }
+    std::fs::create_dir_all(sidecar.join("deps"))
+        .with_context(|| format!("create vm sidecar deps dir: {}", sidecar.display()))?;
+
+    let policy_bytes = std::fs::read(effective_policy)
+        .with_context(|| format!("read effective policy: {}", effective_policy.display()))?;
+    let policy: os_policy::Policy = serde_json::from_slice(&policy_bytes)
+        .with_context(|| format!("parse effective policy: {}", effective_policy.display()))?;
+    policy
+        .validate_basic()
+        .map_err(|e| anyhow::anyhow!("policy invalid: {e}"))?;
+
+    let guest_image =
+        std::env::var("X07_VM_GUEST_IMAGE").unwrap_or_else(|_| default_vm_guest_image());
+
+    let payload_dst = sidecar.join("payload");
+    let policy_dst = sidecar.join("policy.json");
+    crate::util::write_atomic(&policy_dst, &policy_bytes)
+        .with_context(|| format!("write vm bundle policy: {}", policy_dst.display()))?;
+
+    let manifest = VmBundleManifest {
+        schema_version: "x07.vm.bundle.manifest@0.1.0",
+        guest_image: guest_image.clone(),
+        payload: "payload",
+        workdir: "/x07/work",
+        policy: "policy.json",
+    };
+    let mut manifest_bytes = serde_json::to_vec_pretty(&manifest)?;
+    manifest_bytes.push(b'\n');
+    crate::util::write_atomic(&sidecar.join("manifest.json"), &manifest_bytes)
+        .with_context(|| format!("write vm bundle manifest under {}", sidecar.display()))?;
+
+    let launcher_src = resolve_sibling_or_path_vm("x07-vm-launcher");
+    if !launcher_src.is_file() {
+        anyhow::bail!(
+            "missing x07-vm-launcher binary (expected next to x07 binary or in PATH): {}",
+            launcher_src.display()
+        );
+    }
+    copy_executable_atomic(&launcher_src, out_path)?;
+
+    let reaper_src = resolve_sibling_or_path_vm("x07-vm-reaper");
+    if !reaper_src.is_file() {
+        anyhow::bail!(
+            "missing x07-vm-reaper binary (expected next to x07 binary or in PATH): {}",
+            reaper_src.display()
+        );
+    }
+    copy_executable_atomic(&reaper_src, &sidecar.join("deps").join("x07-vm-reaper"))?;
+
+    let guest_payload = build_vm_payload_bundle(VmPayloadBundleParams {
+        args,
+        cwd,
+        target_kind,
+        target_path,
+        policy_bytes: &policy_bytes,
+        guest_image: &guest_image,
+        policy: &policy,
+        max_memory_bytes,
+        max_output_bytes,
+        cpu_time_limit_seconds,
+        emit_dir: args.emit_dir.as_deref(),
+    })?;
+
+    copy_executable_atomic(&guest_payload.payload_path, &payload_dst)?;
+
+    let guest_report = guest_payload.report;
+
+    let guest_arch = guest_platform_arch()?;
+    let report = BundleReport {
+        schema_version: X07_BUNDLE_REPORT_SCHEMA_VERSION,
+        runner: "host",
+        world: world.as_str(),
+        target: BundleTarget {
+            kind: target_kind.as_str(),
+            path: target_path.display().to_string(),
+            project_root: project_root.map(|p| p.display().to_string()),
+            lockfile: lockfile.map(|p| p.display().to_string()),
+            resolved_module_roots: resolved_module_roots.to_vec(),
+        },
+        bundle: BundleSection {
+            out: out_path.display().to_string(),
+            name: bundle_name.to_string(),
+            abi: BundleAbi { kind: "argv_v1" },
+            policy: Some(BundlePolicy {
+                base_policy: base_policy.display().to_string(),
+                effective_policy: effective_policy.display().to_string(),
+                embedded_env_keys: embedded_env_keys.to_vec(),
+            }),
+            emit_dir: args.emit_dir.as_ref().map(|p| p.display().to_string()),
+            kind: "vm",
+            guest: Some(BundleGuest {
+                contract: "x07.vm.exec@0.1.0",
+                platform: BundleGuestPlatform {
+                    os: "linux",
+                    arch: guest_arch,
+                },
+                image: BundleGuestImage {
+                    digest: None,
+                    ref_: Some(guest_image.clone()),
+                    layout: None,
+                },
+                entrypoint: vec!["/x07/bundle/payload".to_string()],
+                workdir: "/x07/work".to_string(),
+                mounts: BundleGuestMounts {
+                    job_in: "/x07/in".to_string(),
+                    job_out: "/x07/out".to_string(),
+                },
+            }),
+        },
+        report: guest_report,
+    };
+
+    let mut bytes = serde_json::to_vec_pretty(&report)?;
+    bytes.push(b'\n');
+
+    if let Some(dir) = &args.emit_dir {
+        std::fs::create_dir_all(dir)
+            .with_context(|| format!("create emit dir: {}", dir.display()))?;
+        std::fs::write(dir.join("report.json"), &bytes)
+            .with_context(|| format!("write emit report.json under {}", dir.display()))?;
+        std::fs::write(dir.join("policy.used.json"), &policy_bytes)
+            .with_context(|| format!("write emit policy.used.json under {}", dir.display()))?;
+    }
+
+    std::io::Write::write_all(&mut std::io::stdout(), &bytes).context("write stdout")?;
+
+    let ok = report
+        .report
+        .get("compile")
+        .and_then(|v| v.get("ok"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let exit_code: u8 = if ok { 0 } else { 1 };
+    Ok(std::process::ExitCode::from(exit_code))
+}
+
+struct VmPayloadBundleOut {
+    report: Value,
+    payload_path: PathBuf,
+}
+
+struct VmPayloadBundleParams<'a> {
+    args: &'a BundleArgs,
+    cwd: &'a Path,
+    target_kind: TargetKind,
+    target_path: &'a Path,
+    policy_bytes: &'a [u8],
+    guest_image: &'a str,
+    policy: &'a os_policy::Policy,
+    max_memory_bytes: usize,
+    max_output_bytes: Option<usize>,
+    cpu_time_limit_seconds: Option<u64>,
+    emit_dir: Option<&'a Path>,
+}
+
+fn build_vm_payload_bundle(params: VmPayloadBundleParams<'_>) -> Result<VmPayloadBundleOut> {
+    let VmPayloadBundleParams {
+        args,
+        cwd,
+        target_kind,
+        target_path,
+        policy_bytes,
+        guest_image,
+        policy,
+        max_memory_bytes,
+        max_output_bytes,
+        cpu_time_limit_seconds,
+        emit_dir,
+    } = params;
+    if args.i_accept_weaker_isolation {
+        std::env::set_var(x07_vm::ENV_ACCEPT_WEAKER_ISOLATION, "1");
+    }
+
+    let backend = resolve_vm_backend()?;
+
+    let created_unix_ms = now_unix_ms()?;
+    let run_id = {
+        let pid = std::process::id();
+        let n = VM_RUN_COUNTER.fetch_add(1, Ordering::Relaxed);
+        format!("{created_unix_ms}-{pid}-{n}")
+    };
+
+    let wall_ms = policy.limits.wall_ms.max(1);
+    let deadline_unix_ms = created_unix_ms.saturating_add(wall_ms);
+    let grace_ms = default_grace_ms(wall_ms);
+    let cleanup_ms = default_cleanup_ms();
+
+    let state_root = x07_vm::default_vm_state_root()?;
+    let state_dir = state_root.join(&run_id);
+
+    let job_in = state_dir.join("in");
+    let job_out = state_dir.join("out");
+    std::fs::create_dir_all(&job_in)
+        .with_context(|| format!("create job input dir: {}", job_in.display()))?;
+    std::fs::create_dir_all(&job_out)
+        .with_context(|| format!("create job output dir: {}", job_out.display()))?;
+
+    std::fs::write(job_in.join("policy.json"), policy_bytes).context("write policy.json")?;
+
+    let guest_target_args: Vec<String> = match target_kind {
+        TargetKind::Program => {
+            let bytes = std::fs::read(target_path)
+                .with_context(|| format!("read program: {}", target_path.display()))?;
+            let program_dir = job_in.join("program");
+            std::fs::create_dir_all(&program_dir)
+                .with_context(|| format!("create program dir: {}", program_dir.display()))?;
+            std::fs::write(program_dir.join("main.x07.json"), bytes)
+                .with_context(|| format!("write program to {}", program_dir.display()))?;
+
+            let mut guest_target_args = vec![
+                "--program".to_string(),
+                "/x07/in/program/main.x07.json".to_string(),
+            ];
+
+            let module_roots_dir = job_in.join("module_roots");
+            std::fs::create_dir_all(&module_roots_dir).with_context(|| {
+                format!("create module_roots dir: {}", module_roots_dir.display())
+            })?;
+
+            for (idx, root) in args.module_root.iter().enumerate() {
+                let root_abs = if root.is_absolute() {
+                    root.to_path_buf()
+                } else {
+                    cwd.join(root)
+                };
+                let dst = module_roots_dir.join(idx.to_string());
+                x07_vm::copy_dir_recursive(&root_abs, &dst).with_context(|| {
+                    format!(
+                        "copy module root {} -> {}",
+                        root_abs.display(),
+                        dst.display()
+                    )
+                })?;
+
+                guest_target_args.push("--module-root".to_string());
+                guest_target_args.push(format!("/x07/in/module_roots/{idx}"));
+            }
+
+            guest_target_args
+        }
+
+        TargetKind::Project => {
+            let manifest_abs = if target_path.is_absolute() {
+                target_path.to_path_buf()
+            } else {
+                cwd.join(target_path)
+            };
+            let base = manifest_abs
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .context("project manifest has no parent dir")?
+                .to_path_buf();
+
+            let project_dst = job_in.join("project");
+            x07_vm::copy_dir_recursive(&base, &project_dst).with_context(|| {
+                format!(
+                    "copy project dir {} -> {}",
+                    base.display(),
+                    project_dst.display()
+                )
+            })?;
+
+            let file_name = manifest_abs
+                .file_name()
+                .unwrap_or_else(|| std::ffi::OsStr::new("x07.json"));
+            let guest_project_path = PathBuf::from("/x07/in/project").join(file_name);
+
+            vec![
+                "--project".to_string(),
+                guest_project_path.display().to_string(),
+            ]
+        }
+    };
+
+    let mut guest_argv: Vec<String> = vec!["x07".to_string(), "bundle".to_string()];
+
+    guest_argv.extend(guest_target_args);
+
+    if let Some(profile) = args.profile.as_ref() {
+        guest_argv.push("--profile".to_string());
+        guest_argv.push(profile.clone());
+    }
+
+    guest_argv.push("--world".to_string());
+    guest_argv.push(WorldId::RunOsSandboxed.as_str().to_string());
+
+    guest_argv.push("--sandbox-backend".to_string());
+    guest_argv.push("os".to_string());
+    guest_argv.push("--i-accept-weaker-isolation".to_string());
+
+    guest_argv.push("--policy".to_string());
+    guest_argv.push("/x07/in/policy.json".to_string());
+
+    guest_argv.push("--out".to_string());
+    guest_argv.push("/x07/out/payload".to_string());
+
+    guest_argv.push("--max-memory-bytes".to_string());
+    guest_argv.push(max_memory_bytes.to_string());
+
+    if let Some(v) = max_output_bytes {
+        guest_argv.push("--max-output-bytes".to_string());
+        guest_argv.push(v.to_string());
+    }
+    if let Some(v) = cpu_time_limit_seconds {
+        guest_argv.push("--cpu-time-limit-seconds".to_string());
+        guest_argv.push(v.to_string());
+    }
+    if args.debug_borrow_checks {
+        guest_argv.push("--debug-borrow-checks".to_string());
+    }
+    if let Some(v) = args.max_c_bytes {
+        guest_argv.push("--max-c-bytes".to_string());
+        guest_argv.push(v.to_string());
+    }
+    if let Some(cc_profile) = args.cc_profile {
+        guest_argv.push("--cc-profile".to_string());
+        guest_argv.push(
+            match cc_profile {
+                CcProfile::Default => "default",
+                CcProfile::Size => "size",
+            }
+            .to_string(),
+        );
+    }
+    if args.auto_ffi {
+        guest_argv.push("--auto-ffi".to_string());
+    }
+    if args.no_auto_ffi {
+        guest_argv.push("--no-auto-ffi".to_string());
+    }
+
+    if emit_dir.is_some() {
+        guest_argv.push("--emit-dir".to_string());
+        guest_argv.push("/x07/out/emit".to_string());
+    }
+
+    let mounts: Vec<MountSpec> = vec![
+        MountSpec {
+            host_path: job_in.clone(),
+            guest_path: PathBuf::from("/x07/in"),
+            readonly: true,
+        },
+        MountSpec {
+            host_path: job_out.clone(),
+            guest_path: PathBuf::from("/x07/out"),
+            readonly: false,
+        },
+    ];
+
+    let limits = LimitsSpec {
+        wall_ms,
+        grace_ms,
+        cleanup_ms,
+        mem_bytes: Some(policy.limits.mem_bytes),
+        vcpus: None,
+        max_stdout_bytes: 16 * 1024 * 1024,
+        max_stderr_bytes: 16 * 1024 * 1024,
+        network: NetworkMode::None,
+    };
+
+    let spec = RunSpec {
+        run_id: run_id.clone(),
+        backend,
+        image: if backend == VmBackend::Vz {
+            std::env::var(x07_vm::ENV_VZ_GUEST_BUNDLE).unwrap_or_default()
+        } else {
+            guest_image.to_string()
+        },
+        argv: guest_argv,
+        env: BTreeMap::new(),
+        mounts,
+        workdir: Some(PathBuf::from("/opt/x07")),
+        limits,
+    };
+
+    let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
+        Some(firecracker_ctr_config_from_env())
+    } else {
+        None
+    };
+
+    let reaper_bin = resolve_sibling_or_path_vm("x07-vm-reaper");
+    let out = x07_vm::run_vm_job(
+        &spec,
+        x07_vm::VmJobRunParams {
+            state_root: &state_root,
+            state_dir: &state_dir,
+            reaper_bin: &reaper_bin,
+            created_unix_ms,
+            deadline_unix_ms,
+            firecracker_cfg: firecracker_cfg.as_ref(),
+        },
+    )?;
+
+    if !out.stderr.is_empty() {
+        let _ = std::io::Write::write_all(&mut std::io::stderr(), &out.stderr);
+    }
+
+    let report_json: serde_json::Value = serde_json::from_slice(&out.stdout)
+        .with_context(|| "guest x07 bundle did not emit valid JSON")?;
+
+    let payload_path = job_out.join("payload");
+    if !payload_path.is_file() {
+        anyhow::bail!(
+            "guest x07 bundle did not produce expected payload at {}",
+            payload_path.display()
+        );
+    }
+
+    if let Some(dir) = emit_dir {
+        std::fs::create_dir_all(dir)
+            .with_context(|| format!("create emit dir: {}", dir.display()))?;
+        let guest_emit = job_out.join("emit");
+        if guest_emit.is_dir() {
+            let _ = std::fs::remove_dir_all(dir.join("guest"));
+            x07_vm::copy_dir_recursive(&guest_emit, &dir.join("guest")).with_context(|| {
+                format!(
+                    "copy guest emit dir {} -> {}",
+                    guest_emit.display(),
+                    dir.display()
+                )
+            })?;
+        }
+    }
+
+    let runner_report = report_json
+        .get("report")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+
+    Ok(VmPayloadBundleOut {
+        report: runner_report,
+        payload_path,
+    })
+}
+
+fn default_vm_guest_image() -> String {
+    format!(
+        "ghcr.io/x07lang/x07-guest-runner:{}",
+        env!("CARGO_PKG_VERSION")
+    )
+}
+
+fn vm_sidecar_dir_for_out(out_path: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.vm", out_path.display()))
+}
+
+fn guest_platform_arch() -> Result<&'static str> {
+    match std::env::consts::ARCH {
+        "x86_64" => Ok("amd64"),
+        "aarch64" => Ok("arm64"),
+        other => anyhow::bail!("unsupported guest arch: {other}"),
+    }
+}
+
+fn copy_executable_atomic(src: &Path, dst: &Path) -> Result<()> {
+    if let Some(parent) = dst.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create dir: {}", parent.display()))?;
+    }
+
+    let file_name = dst
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let pid = std::process::id();
+    let n = VM_RUN_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let tmp = dst.with_file_name(format!(".{file_name}.{pid}.{n}.tmp"));
+
+    std::fs::copy(src, &tmp)
+        .with_context(|| format!("copy file {} -> {}", src.display(), tmp.display()))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755));
+    }
+
+    match std::fs::rename(&tmp, dst) {
+        Ok(()) => Ok(()),
+        Err(_) => {
+            let _ = std::fs::remove_file(dst);
+            std::fs::rename(&tmp, dst)?;
+            Ok(())
+        }
+    }
+}
+
+fn now_unix_ms() -> Result<u64> {
+    let d = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system time before unix epoch")?;
+    Ok(d.as_millis().try_into().unwrap_or(u64::MAX))
 }
 
 fn resolve_target(cwd: &Path, args: &BundleArgs) -> Result<(TargetKind, PathBuf, Option<PathBuf>)> {

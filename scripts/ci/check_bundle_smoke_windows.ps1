@@ -147,7 +147,7 @@ try {
       $report = Join-Path $outdir "bundle.report.json"
 
       Step "bundle: fixture=$fixtureName profile=$profile"
-      # `x07 bundle` must print x07.bundle.report@0.1.0 JSON to stdout (machine-clean).
+      # `x07 bundle` must print x07.bundle.report@0.2.0 JSON to stdout (machine-clean).
       $json = & $x07 bundle --project x07.json --profile $profile --out $outbin --emit-dir $emitdir
       $json | Out-File -Encoding utf8 $report
 

@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use base64::Engine;
@@ -12,7 +14,15 @@ use x07_host_runner::{
     apply_cc_profile, compile_program_with_options, CcProfile, CompilerResult, RunnerConfig,
     RunnerResult,
 };
+use x07_runner_common::sandbox_backend::{
+    resolve_sandbox_backend, EffectiveSandboxBackend, SandboxBackend,
+};
 use x07_runner_common::{auto_ffi, os_env, os_paths};
+use x07_vm::{
+    copy_dir_recursive, default_cleanup_ms, default_grace_ms, firecracker_ctr_config_from_env,
+    resolve_sibling_or_path as resolve_sibling_or_path_vm, resolve_vm_backend, LimitsSpec,
+    MountSpec, NetworkMode, RunSpec, VmBackend,
+};
 use x07_worlds::WorldId;
 
 #[cfg(test)]
@@ -21,6 +31,8 @@ use x07c::project;
 
 mod policy;
 mod sandbox;
+
+static VM_RUN_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Parser)]
 #[command(name = "x07-os-runner")]
@@ -43,6 +55,14 @@ struct Cli {
 
     #[arg(long, value_enum, default_value_t = WorldId::RunOs)]
     world: WorldId,
+
+    /// Sandbox backend selection (run-os-sandboxed defaults to "vm").
+    #[arg(long, value_enum)]
+    sandbox_backend: Option<SandboxBackend>,
+
+    /// Required to run run-os-sandboxed without a VM boundary.
+    #[arg(long)]
+    i_accept_weaker_isolation: bool,
 
     #[arg(long, value_name = "BYTES")]
     max_c_bytes: Option<usize>,
@@ -70,6 +90,14 @@ struct Cli {
 
     #[arg(long)]
     compiled_out: Option<PathBuf>,
+
+    /// Compile but do not run (internal; used for VM build/run separation).
+    #[arg(long, hide = true)]
+    compile_only: bool,
+
+    /// Allow `--artifact` for run-os-sandboxed (internal; build/run separation only).
+    #[arg(long, hide = true)]
+    i_accept_precompiled_artifact: bool,
 
     #[arg(long)]
     module_root: Vec<PathBuf>,
@@ -121,6 +149,14 @@ fn run() -> std::process::ExitCode {
 fn try_main() -> Result<std::process::ExitCode> {
     let cli = Cli::parse();
 
+    if cli.compile_only && cli.artifact.is_some() {
+        anyhow::bail!("--compile-only is not supported with --artifact");
+    }
+
+    if cli.i_accept_weaker_isolation {
+        std::env::set_var(x07_vm::ENV_ACCEPT_WEAKER_ISOLATION, "1");
+    }
+
     if cli.cli_specrows {
         use clap::CommandFactory as _;
         let cmd = Cli::command();
@@ -143,9 +179,14 @@ fn try_main() -> Result<std::process::ExitCode> {
         );
     }
 
+    let sandbox_backend =
+        resolve_sandbox_backend(world, cli.sandbox_backend, cli.i_accept_weaker_isolation)?;
+
     let policy = load_policy(world, cli.policy.as_ref())?;
     if let Some(ref pol) = policy {
-        sandbox::apply_sandbox(pol).map_err(|e| anyhow::anyhow!("{e}"))?;
+        if sandbox_backend == EffectiveSandboxBackend::Os {
+            sandbox::apply_sandbox(pol).map_err(|e| anyhow::anyhow!("{e}"))?;
+        }
     }
     let (allow_unsafe, allow_ffi) = match (world, policy.as_ref()) {
         (WorldId::RunOsSandboxed, Some(pol)) => (
@@ -167,6 +208,35 @@ fn try_main() -> Result<std::process::ExitCode> {
     let run_limits = run_limits_for_cli(&cli, world, policy.as_ref());
     let wall_ms = wall_timeout_ms_for_cli(world, policy.as_ref(), &cli);
 
+    if sandbox_backend == EffectiveSandboxBackend::Vm {
+        match run_vm(
+            &cli,
+            world,
+            policy.as_ref(),
+            &input,
+            wall_ms,
+            max_output_bytes,
+        ) {
+            Ok(code) => return Ok(code),
+            Err(err) => {
+                let _ = std::io::Write::write_all(
+                    &mut std::io::stderr(),
+                    format!("{err:#}\n").as_bytes(),
+                );
+
+                let mode = if cli.project.is_some() {
+                    "project-compile-run"
+                } else {
+                    "compile-run"
+                };
+                let json =
+                    synthesize_vm_backend_failure_report(mode, world, "vm backend failure", &err)?;
+                println!("{}", serde_json::to_string_pretty(&json)?);
+                return Ok(std::process::ExitCode::from(1));
+            }
+        }
+    }
+
     match (&cli.artifact, &cli.program, &cli.project) {
         (Some(_), Some(_), _)
         | (Some(_), _, Some(_))
@@ -176,7 +246,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         }
 
         (Some(artifact), None, None) => {
-            if world == WorldId::RunOsSandboxed {
+            if world == WorldId::RunOsSandboxed && !cli.i_accept_precompiled_artifact {
                 anyhow::bail!("run-os-sandboxed does not support --artifact; use --program or --project so x07-os-runner can enforce policy.language.allow_unsafe/allow_ffi at compile time");
             }
             let inv = RunInvocation {
@@ -273,6 +343,36 @@ fn try_main() -> Result<std::process::ExitCode> {
                 let json = serde_json::json!({
                     "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
                     "mode": "compile-run",
+                    "world": world.as_str(),
+                    "exit_code": exit_code,
+                    "compile": compiler_json(&compile, &b64),
+                    "solve": serde_json::Value::Null,
+                });
+                println!("{}", serde_json::to_string_pretty(&json)?);
+                return Ok(std::process::ExitCode::from(exit_code));
+            }
+
+            if cli.compile_only {
+                let b64 = base64::engine::general_purpose::STANDARD;
+                let exit_code: u8 = 0;
+                let json = serde_json::json!({
+                    "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
+                    "mode": "compile-run",
+                    "world": world.as_str(),
+                    "exit_code": exit_code,
+                    "compile": compiler_json(&compile, &b64),
+                    "solve": serde_json::Value::Null,
+                });
+                println!("{}", serde_json::to_string_pretty(&json)?);
+                return Ok(std::process::ExitCode::from(exit_code));
+            }
+
+            if cli.compile_only {
+                let b64 = base64::engine::general_purpose::STANDARD;
+                let exit_code: u8 = 0;
+                let json = serde_json::json!({
+                    "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
+                    "mode": "project-compile-run",
                     "world": world.as_str(),
                     "exit_code": exit_code,
                     "compile": compiler_json(&compile, &b64),
@@ -429,6 +529,746 @@ fn try_main() -> Result<std::process::ExitCode> {
             Ok(std::process::ExitCode::from(exit_code))
         }
     }
+}
+
+fn synthesize_vm_backend_failure_report(
+    mode: &str,
+    world: WorldId,
+    context: &str,
+    err: &anyhow::Error,
+) -> Result<serde_json::Value> {
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let err_msg = err.to_string();
+    let compile = serde_json::json!({
+        "ok": false,
+        "exit_status": 1,
+        "lang_id": "",
+        "native_requires": {
+            "schema_version": "x07.native-requires@0.1.0",
+            "world": world.as_str(),
+            "requires": [],
+        },
+        "c_source_size": 0,
+        "compiled_exe": serde_json::Value::Null,
+        "compiled_exe_size": serde_json::Value::Null,
+        "compile_error": serde_json::Value::Null,
+        "stdout_b64": b64.encode(b""),
+        "stderr_b64": b64.encode(err_msg.as_bytes()),
+        "fuel_used": serde_json::Value::Null,
+        "trap": format!("{context}: {err_msg}"),
+    });
+
+    Ok(serde_json::json!({
+        "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
+        "mode": mode,
+        "world": world.as_str(),
+        "exit_code": 1,
+        "compile": compile,
+        "solve": serde_json::Value::Null,
+    }))
+}
+
+fn now_unix_ms() -> Result<u64> {
+    let d = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system time before unix epoch")?;
+    Ok(d.as_millis().try_into().unwrap_or(u64::MAX))
+}
+
+fn default_vm_guest_image() -> String {
+    format!(
+        "ghcr.io/x07lang/x07-guest-runner:{}",
+        env!("CARGO_PKG_VERSION")
+    )
+}
+
+fn policy_bytes_with_wall_override(policy_bytes: &[u8], wall_ms: u64) -> Result<Vec<u8>> {
+    let mut v: serde_json::Value =
+        serde_json::from_slice(policy_bytes).context("parse policy JSON")?;
+    let limits = v
+        .get_mut("limits")
+        .and_then(|v| v.as_object_mut())
+        .context("policy JSON missing limits object")?;
+    limits.insert(
+        "wall_ms".to_string(),
+        serde_json::Value::from(wall_ms.max(1)),
+    );
+    let mut out = serde_json::to_vec_pretty(&v)?;
+    out.push(b'\n');
+    Ok(out)
+}
+
+fn extract_runner_result_from_run_os_report_json(
+    run_os_report: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let run_os_report = run_os_report
+        .as_object()
+        .context("run-os report JSON must be an object")?;
+
+    let mut out = serde_json::Map::new();
+    for key in [
+        "ok",
+        "exit_status",
+        "solve_output_b64",
+        "stdout_b64",
+        "stderr_b64",
+        "fuel_used",
+        "heap_used",
+        "fs_read_file_calls",
+        "fs_list_dir_calls",
+        "rr_open_calls",
+        "rr_close_calls",
+        "rr_stats_calls",
+        "rr_next_calls",
+        "rr_next_miss_calls",
+        "rr_append_calls",
+        "kv_get_calls",
+        "kv_set_calls",
+        "sched_stats",
+        "mem_stats",
+        "debug_stats",
+        "trap",
+    ] {
+        let v = run_os_report
+            .get(key)
+            .with_context(|| format!("missing required key in run-os report: {key:?}"))?;
+        out.insert(key.to_string(), v.clone());
+    }
+
+    Ok(serde_json::Value::Object(out))
+}
+
+fn synthesize_vm_solve_failure_runner_result(
+    exit_status: i32,
+    stdout: &[u8],
+    stderr: &[u8],
+    trap: String,
+) -> serde_json::Value {
+    let b64 = base64::engine::general_purpose::STANDARD;
+    serde_json::json!({
+        "ok": false,
+        "exit_status": exit_status,
+        "solve_output_b64": b64.encode(b""),
+        "stdout_b64": b64.encode(stdout),
+        "stderr_b64": b64.encode(stderr),
+        "fuel_used": serde_json::Value::Null,
+        "heap_used": serde_json::Value::Null,
+        "fs_read_file_calls": serde_json::Value::Null,
+        "fs_list_dir_calls": serde_json::Value::Null,
+        "rr_open_calls": serde_json::Value::Null,
+        "rr_close_calls": serde_json::Value::Null,
+        "rr_stats_calls": serde_json::Value::Null,
+        "rr_next_calls": serde_json::Value::Null,
+        "rr_next_miss_calls": serde_json::Value::Null,
+        "rr_append_calls": serde_json::Value::Null,
+        "kv_get_calls": serde_json::Value::Null,
+        "kv_set_calls": serde_json::Value::Null,
+        "sched_stats": serde_json::Value::Null,
+        "mem_stats": serde_json::Value::Null,
+        "debug_stats": serde_json::Value::Null,
+        "trap": trap,
+    })
+}
+
+fn run_vm(
+    cli: &Cli,
+    world: WorldId,
+    policy: Option<&policy::Policy>,
+    input: &[u8],
+    wall_ms: u64,
+    max_output_bytes: usize,
+) -> Result<std::process::ExitCode> {
+    if world != WorldId::RunOsSandboxed {
+        anyhow::bail!("sandbox_backend=vm is only supported for --world run-os-sandboxed");
+    }
+    let policy = policy.context("internal error: run-os-sandboxed policy missing")?;
+
+    let backend = resolve_vm_backend()?;
+
+    let guest_image = if backend == VmBackend::Vz {
+        std::env::var(x07_vm::ENV_VZ_GUEST_BUNDLE).unwrap_or_default()
+    } else {
+        std::env::var("X07_VM_GUEST_IMAGE").unwrap_or_else(|_| default_vm_guest_image())
+    };
+
+    let overall_created_unix_ms = now_unix_ms()?;
+    let run_id_base = {
+        let pid = std::process::id();
+        let n = VM_RUN_COUNTER.fetch_add(1, Ordering::Relaxed);
+        format!("{overall_created_unix_ms}-{pid}-{n}")
+    };
+
+    let overall_deadline_unix_ms = overall_created_unix_ms.saturating_add(wall_ms.max(1));
+
+    let state_root = x07_vm::default_vm_state_root()?;
+
+    let build_run_id = format!("{run_id_base}-build");
+    let run_run_id = format!("{run_id_base}-run");
+
+    let policy_path = cli
+        .policy
+        .as_ref()
+        .context("run-os-sandboxed requires --policy")?;
+    let policy_bytes = std::fs::read(policy_path)
+        .with_context(|| format!("read policy: {}", policy_path.display()))?;
+
+    let build_state_dir = state_root.join(&build_run_id);
+    let build_job_in = build_state_dir.join("in");
+    let build_job_out = build_state_dir.join("out");
+    std::fs::create_dir_all(&build_job_in)
+        .with_context(|| format!("create build job input dir: {}", build_job_in.display()))?;
+    std::fs::create_dir_all(&build_job_out)
+        .with_context(|| format!("create build job output dir: {}", build_job_out.display()))?;
+
+    std::fs::write(build_job_in.join("policy.json"), &policy_bytes)
+        .context("write build policy.json")?;
+    std::fs::write(build_job_in.join("input.bin"), input).context("write build input.bin")?;
+
+    let (mode, guest_target_args, base_host, base_guest) = match (&cli.program, &cli.project) {
+        (Some(program_path), None) => {
+            if !program_path
+                .as_os_str()
+                .to_string_lossy()
+                .ends_with(".x07.json")
+            {
+                anyhow::bail!(
+                    "--program must be an x07AST JSON file (*.x07.json), got {}",
+                    program_path.display()
+                );
+            }
+
+            let bytes = std::fs::read(program_path)
+                .with_context(|| format!("read program: {}", program_path.display()))?;
+            let program_dir = build_job_in.join("program");
+            std::fs::create_dir_all(&program_dir)
+                .with_context(|| format!("create program dir: {}", program_dir.display()))?;
+            let guest_program_path = PathBuf::from("/x07/in/program/main.x07.json");
+            std::fs::write(program_dir.join("main.x07.json"), bytes)
+                .with_context(|| format!("write program to {}", program_dir.display()))?;
+
+            let module_roots_dir = build_job_in.join("module_roots");
+            std::fs::create_dir_all(&module_roots_dir).with_context(|| {
+                format!("create module_roots dir: {}", module_roots_dir.display())
+            })?;
+
+            let mut guest_target_args: Vec<String> = vec![
+                "--program".to_string(),
+                guest_program_path.display().to_string(),
+            ];
+
+            for (idx, root) in cli.module_root.iter().enumerate() {
+                let root_abs = if root.is_absolute() {
+                    root.to_path_buf()
+                } else {
+                    std::env::current_dir()
+                        .unwrap_or_else(|_| PathBuf::from("."))
+                        .join(root)
+                };
+                let dst = module_roots_dir.join(idx.to_string());
+                copy_dir_recursive(&root_abs, &dst).with_context(|| {
+                    format!(
+                        "copy module root {} -> {}",
+                        root_abs.display(),
+                        dst.display()
+                    )
+                })?;
+
+                guest_target_args.push("--module-root".to_string());
+                guest_target_args.push(format!("/x07/in/module_roots/{idx}"));
+            }
+
+            (
+                "compile-run",
+                guest_target_args,
+                std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+                PathBuf::from("/opt/x07"),
+            )
+        }
+
+        (None, Some(project_path)) => {
+            let base = project_path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."))
+                .to_path_buf();
+
+            let project_dst = build_job_in.join("project");
+            copy_dir_recursive(&base, &project_dst).with_context(|| {
+                format!(
+                    "copy project dir {} -> {}",
+                    base.display(),
+                    project_dst.display()
+                )
+            })?;
+
+            let file_name = project_path
+                .file_name()
+                .unwrap_or_else(|| std::ffi::OsStr::new("x07.json"));
+            let guest_project_path = PathBuf::from("/x07/in/project").join(file_name);
+
+            let guest_target_args: Vec<String> = vec![
+                "--project".to_string(),
+                guest_project_path.display().to_string(),
+            ];
+
+            (
+                "project-compile-run",
+                guest_target_args,
+                base,
+                PathBuf::from("/x07/in/project"),
+            )
+        }
+
+        (Some(_), Some(_)) => {
+            anyhow::bail!("set exactly one of --program or --project");
+        }
+        (None, None) => {
+            anyhow::bail!("set --program or --project for sandbox_backend=vm");
+        }
+    };
+
+    let build_mounts: Vec<MountSpec> = vec![
+        MountSpec {
+            host_path: build_job_in.clone(),
+            guest_path: PathBuf::from("/x07/in"),
+            readonly: true,
+        },
+        MountSpec {
+            host_path: build_job_out.clone(),
+            guest_path: PathBuf::from("/x07/out"),
+            readonly: false,
+        },
+    ];
+
+    let compiled_out_guest_path = "/x07/out/compiled-out";
+    let mut build_guest_argv: Vec<String> = vec![
+        "x07-os-runner".to_string(),
+        "--cc-profile".to_string(),
+        match cli.cc_profile {
+            CcProfile::Default => "default",
+            CcProfile::Size => "size",
+        }
+        .to_string(),
+        "--world".to_string(),
+        world.as_str().to_string(),
+        "--sandbox-backend".to_string(),
+        "os".to_string(),
+        "--i-accept-weaker-isolation".to_string(),
+    ];
+
+    if let Some(max_c_bytes) = cli.max_c_bytes {
+        build_guest_argv.push("--max-c-bytes".to_string());
+        build_guest_argv.push(max_c_bytes.to_string());
+    }
+
+    build_guest_argv.push("--policy".to_string());
+    build_guest_argv.push("/x07/in/policy.json".to_string());
+
+    build_guest_argv.push("--input".to_string());
+    build_guest_argv.push("/x07/in/input.bin".to_string());
+
+    build_guest_argv.push("--solve-fuel".to_string());
+    build_guest_argv.push(cli.solve_fuel.to_string());
+
+    build_guest_argv.push("--max-memory-bytes".to_string());
+    build_guest_argv.push(cli.max_memory_bytes.to_string());
+
+    if cli.max_output_bytes.is_some() {
+        build_guest_argv.push("--max-output-bytes".to_string());
+        build_guest_argv.push(max_output_bytes.to_string());
+    }
+
+    build_guest_argv.push("--cpu-time-limit-seconds".to_string());
+    build_guest_argv.push(cli.cpu_time_limit_seconds.to_string());
+
+    if cli.debug_borrow_checks {
+        build_guest_argv.push("--debug-borrow-checks".to_string());
+    }
+
+    build_guest_argv.push("--compiled-out".to_string());
+    build_guest_argv.push(compiled_out_guest_path.to_string());
+    build_guest_argv.push("--compile-only".to_string());
+
+    if cli.auto_ffi {
+        build_guest_argv.push("--auto-ffi".to_string());
+    }
+
+    build_guest_argv.extend(guest_target_args.clone());
+
+    let build_created_unix_ms = now_unix_ms()?;
+    let build_wall_ms = overall_deadline_unix_ms
+        .saturating_sub(build_created_unix_ms)
+        .max(1);
+    let build_limits = LimitsSpec {
+        wall_ms: build_wall_ms,
+        grace_ms: default_grace_ms(build_wall_ms),
+        cleanup_ms: default_cleanup_ms(),
+        mem_bytes: Some(policy.limits.mem_bytes),
+        vcpus: None,
+        max_stdout_bytes: 32 * 1024 * 1024,
+        max_stderr_bytes: 32 * 1024 * 1024,
+        network: NetworkMode::None,
+    };
+
+    let build_spec = RunSpec {
+        run_id: build_run_id.clone(),
+        backend,
+        image: guest_image.clone(),
+        argv: build_guest_argv,
+        env: BTreeMap::new(),
+        mounts: build_mounts,
+        workdir: Some(PathBuf::from("/opt/x07")),
+        limits: build_limits,
+    };
+
+    let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
+        Some(firecracker_ctr_config_from_env())
+    } else {
+        None
+    };
+
+    let reaper_bin = resolve_sibling_or_path_vm("x07-vm-reaper");
+    let build_out = x07_vm::run_vm_job(
+        &build_spec,
+        x07_vm::VmJobRunParams {
+            state_root: &state_root,
+            state_dir: &build_state_dir,
+            reaper_bin: &reaper_bin,
+            created_unix_ms: build_created_unix_ms,
+            deadline_unix_ms: overall_deadline_unix_ms,
+            firecracker_cfg: firecracker_cfg.as_ref(),
+        },
+    )?;
+
+    if !build_out.stderr.is_empty() {
+        let _ = std::io::Write::write_all(&mut std::io::stderr(), &build_out.stderr);
+    }
+
+    let mut build_report_bytes = build_out.stdout;
+    if !build_report_bytes.ends_with(b"\n") {
+        build_report_bytes.push(b'\n');
+    }
+
+    let mut build_exit_code: u8 = 1;
+    let build_report_json: serde_json::Value = match serde_json::from_slice(&build_report_bytes) {
+        Ok(v) => v,
+        Err(err) => {
+            let json = synthesize_vm_runner_output_failure_report(
+                mode,
+                world,
+                build_out.exit_status,
+                &build_report_bytes,
+                &build_out.stderr,
+                format!("invalid runner report JSON: {err}"),
+            )?;
+            println!("{}", serde_json::to_string_pretty(&json)?);
+            return Ok(std::process::ExitCode::from(1));
+        }
+    };
+
+    if build_report_json
+        .get("schema_version")
+        .and_then(|v| v.as_str())
+        != Some(X07_OS_RUNNER_REPORT_SCHEMA_VERSION)
+    {
+        let json = synthesize_vm_runner_output_failure_report(
+            mode,
+            world,
+            build_out.exit_status,
+            &build_report_bytes,
+            &build_out.stderr,
+            "runner report schema_version mismatch".to_string(),
+        )?;
+        println!("{}", serde_json::to_string_pretty(&json)?);
+        return Ok(std::process::ExitCode::from(1));
+    }
+
+    if let Some(v) = build_report_json.get("exit_code").and_then(|v| v.as_u64()) {
+        build_exit_code = v.min(255) as u8;
+    } else if build_out.exit_status == 0 && !build_out.timed_out {
+        build_exit_code = 0;
+    }
+
+    if build_report_json.get("mode").and_then(|v| v.as_str()) != Some(mode) {
+        let json = synthesize_vm_runner_output_failure_report(
+            mode,
+            world,
+            build_out.exit_status,
+            &build_report_bytes,
+            &build_out.stderr,
+            "runner report mode mismatch".to_string(),
+        )?;
+        println!("{}", serde_json::to_string_pretty(&json)?);
+        return Ok(std::process::ExitCode::from(1));
+    }
+
+    let compile_ok = build_report_json
+        .get("compile")
+        .and_then(|v| v.get("ok"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !compile_ok {
+        std::io::Write::write_all(&mut std::io::stdout(), &build_report_bytes)
+            .context("write report")?;
+        return Ok(std::process::ExitCode::from(build_exit_code));
+    }
+
+    let compiled_artifact = build_job_out.join("compiled-out");
+    if !compiled_artifact.is_file() {
+        anyhow::bail!(
+            "vm build phase did not produce expected compiled artifact at {}",
+            compiled_artifact.display()
+        );
+    }
+
+    if let Some(host_compiled_out) = cli.compiled_out.as_ref() {
+        if let Some(parent) = host_compiled_out.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("create compiled_out parent dir: {}", parent.display()))?;
+        }
+        std::fs::copy(&compiled_artifact, host_compiled_out).with_context(|| {
+            format!(
+                "copy compiled_out {} -> {}",
+                compiled_artifact.display(),
+                host_compiled_out.display()
+            )
+        })?;
+    }
+
+    let run_state_dir = state_root.join(&run_run_id);
+    let run_job_in = run_state_dir.join("in");
+    let run_job_out = run_state_dir.join("out");
+    std::fs::create_dir_all(&run_job_in)
+        .with_context(|| format!("create run job input dir: {}", run_job_in.display()))?;
+    std::fs::create_dir_all(&run_job_out)
+        .with_context(|| format!("create run job output dir: {}", run_job_out.display()))?;
+
+    let run_created_unix_ms = now_unix_ms()?;
+    let run_wall_ms = overall_deadline_unix_ms
+        .saturating_sub(run_created_unix_ms)
+        .max(1);
+    let run_policy_bytes = policy_bytes_with_wall_override(&policy_bytes, run_wall_ms)?;
+    std::fs::write(run_job_in.join("policy.json"), &run_policy_bytes)
+        .context("write run policy.json")?;
+    std::fs::write(run_job_in.join("input.bin"), input).context("write run input.bin")?;
+
+    if mode == "project-compile-run" {
+        std::fs::create_dir_all(run_job_in.join("project"))
+            .context("create run project mountpoint dir")?;
+    }
+
+    let artifact_path = run_job_in.join("artifact");
+    std::fs::copy(&compiled_artifact, &artifact_path).with_context(|| {
+        format!(
+            "copy compiled artifact {} -> {}",
+            compiled_artifact.display(),
+            artifact_path.display()
+        )
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let _ = std::fs::set_permissions(&artifact_path, std::fs::Permissions::from_mode(0o755));
+    }
+
+    let mut run_mounts: Vec<MountSpec> = vec![
+        MountSpec {
+            host_path: run_job_in.clone(),
+            guest_path: PathBuf::from("/x07/in"),
+            readonly: true,
+        },
+        MountSpec {
+            host_path: run_job_out.clone(),
+            guest_path: PathBuf::from("/x07/out"),
+            readonly: false,
+        },
+    ];
+    x07_vm::append_root_mounts(
+        &mut run_mounts,
+        &policy.fs.read_roots,
+        &policy.fs.write_roots,
+        &base_host,
+        &base_guest,
+    )?;
+
+    let mut run_guest_argv: Vec<String> = vec![
+        "x07-os-runner".to_string(),
+        "--world".to_string(),
+        world.as_str().to_string(),
+        "--sandbox-backend".to_string(),
+        "os".to_string(),
+        "--i-accept-weaker-isolation".to_string(),
+        "--i-accept-precompiled-artifact".to_string(),
+        "--policy".to_string(),
+        "/x07/in/policy.json".to_string(),
+        "--input".to_string(),
+        "/x07/in/input.bin".to_string(),
+        "--artifact".to_string(),
+        "/x07/in/artifact".to_string(),
+        "--cpu-time-limit-seconds".to_string(),
+        cli.cpu_time_limit_seconds.to_string(),
+    ];
+    if cli.max_output_bytes.is_some() {
+        run_guest_argv.push("--max-output-bytes".to_string());
+        run_guest_argv.push(max_output_bytes.to_string());
+    }
+
+    let accept_weaker_isolation = cli.i_accept_weaker_isolation
+        || x07_vm::read_accept_weaker_isolation_env().unwrap_or(false);
+    let allowlist_requested = policy.net.enabled && !policy.net.allow_hosts.is_empty();
+    let run_network_mode = if allowlist_requested {
+        if backend == VmBackend::Vz || accept_weaker_isolation {
+            NetworkMode::Default
+        } else {
+            anyhow::bail!(
+                "VM backend {backend} does not yet enforce policy.net.allow_hosts at the VM boundary.\n\nfix:\n  - use the VZ backend (macOS): X07_VM_BACKEND=vz, or\n  - set X07_I_ACCEPT_WEAKER_ISOLATION=1 to allow networking without VM-boundary allowlist enforcement"
+            );
+        }
+    } else {
+        NetworkMode::None
+    };
+
+    let run_limits = LimitsSpec {
+        wall_ms: run_wall_ms,
+        grace_ms: default_grace_ms(run_wall_ms),
+        cleanup_ms: default_cleanup_ms(),
+        mem_bytes: Some(policy.limits.mem_bytes),
+        vcpus: None,
+        max_stdout_bytes: 32 * 1024 * 1024,
+        max_stderr_bytes: 32 * 1024 * 1024,
+        network: run_network_mode,
+    };
+
+    let run_spec = RunSpec {
+        run_id: run_run_id.clone(),
+        backend,
+        image: guest_image,
+        argv: run_guest_argv,
+        env: BTreeMap::new(),
+        mounts: run_mounts,
+        workdir: Some(PathBuf::from("/opt/x07")),
+        limits: run_limits,
+    };
+
+    let run_out = x07_vm::run_vm_job(
+        &run_spec,
+        x07_vm::VmJobRunParams {
+            state_root: &state_root,
+            state_dir: &run_state_dir,
+            reaper_bin: &reaper_bin,
+            created_unix_ms: run_created_unix_ms,
+            deadline_unix_ms: overall_deadline_unix_ms,
+            firecracker_cfg: firecracker_cfg.as_ref(),
+        },
+    )?;
+
+    if !run_out.stderr.is_empty() {
+        let _ = std::io::Write::write_all(&mut std::io::stderr(), &run_out.stderr);
+    }
+
+    let mut run_report_bytes = run_out.stdout;
+    if !run_report_bytes.ends_with(b"\n") {
+        run_report_bytes.push(b'\n');
+    }
+
+    let solve = match serde_json::from_slice::<serde_json::Value>(&run_report_bytes) {
+        Ok(run_report_json) => {
+            if run_report_json
+                .get("schema_version")
+                .and_then(|v| v.as_str())
+                != Some(X07_OS_RUNNER_REPORT_SCHEMA_VERSION)
+            {
+                synthesize_vm_solve_failure_runner_result(
+                    run_out.exit_status,
+                    &run_report_bytes,
+                    &run_out.stderr,
+                    "runner report schema_version mismatch".to_string(),
+                )
+            } else {
+                extract_runner_result_from_run_os_report_json(&run_report_json).unwrap_or_else(
+                    |err| {
+                        synthesize_vm_solve_failure_runner_result(
+                            run_out.exit_status,
+                            &run_report_bytes,
+                            &run_out.stderr,
+                            format!("invalid run-os runner report: {err}"),
+                        )
+                    },
+                )
+            }
+        }
+        Err(err) => synthesize_vm_solve_failure_runner_result(
+            run_out.exit_status,
+            &run_report_bytes,
+            &run_out.stderr,
+            format!("invalid run-os runner report JSON: {err}"),
+        ),
+    };
+
+    let compile = build_report_json
+        .get("compile")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let solve_ok = solve.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+    let solve_exit_status = solve
+        .get("exit_status")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(1);
+
+    let exit_code: u8 = if compile_ok && solve_ok && solve_exit_status == 0 {
+        0
+    } else {
+        1
+    };
+
+    let combined = serde_json::json!({
+        "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
+        "mode": mode,
+        "world": world.as_str(),
+        "exit_code": exit_code,
+        "compile": compile,
+        "solve": solve,
+    });
+    println!("{}", serde_json::to_string_pretty(&combined)?);
+    Ok(std::process::ExitCode::from(exit_code))
+}
+
+fn synthesize_vm_runner_output_failure_report(
+    mode: &str,
+    world: WorldId,
+    exit_status: i32,
+    stdout: &[u8],
+    stderr: &[u8],
+    trap: String,
+) -> Result<serde_json::Value> {
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let compile = serde_json::json!({
+        "ok": false,
+        "exit_status": exit_status,
+        "lang_id": "",
+        "native_requires": {
+            "schema_version": "x07.native-requires@0.1.0",
+            "world": world.as_str(),
+            "requires": [],
+        },
+        "c_source_size": 0,
+        "compiled_exe": serde_json::Value::Null,
+        "compiled_exe_size": serde_json::Value::Null,
+        "compile_error": serde_json::Value::Null,
+        "stdout_b64": b64.encode(stdout),
+        "stderr_b64": b64.encode(stderr),
+        "fuel_used": serde_json::Value::Null,
+        "trap": trap,
+    });
+
+    Ok(serde_json::json!({
+        "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
+        "mode": mode,
+        "world": world.as_str(),
+        "exit_code": 1,
+        "compile": compile,
+        "solve": serde_json::Value::Null,
+    }))
 }
 
 fn compiler_json(

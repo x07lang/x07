@@ -83,9 +83,14 @@ version = "0.1.13"
 
 edition = "2021"
 
+[features]
+clap = ["dep:clap"]
+
 [dependencies]
 anyhow = "1"
+clap = { version = "4", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 x07-contracts = { path = "../x07-contracts" }
+x07-worlds = { path = "../x07-worlds" }

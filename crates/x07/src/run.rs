@@ -11,6 +11,7 @@ use serde_json::value::RawValue;
 use serde_json::Value;
 use x07_contracts::{PROJECT_LOCKFILE_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION};
 use x07_host_runner::{CcProfile, RunnerConfig};
+use x07_runner_common::sandbox_backend::SandboxBackend;
 use x07_worlds::WorldId;
 use x07c::project;
 
@@ -124,6 +125,14 @@ pub struct RunArgs {
     /// Policy JSON (required for `run-os-sandboxed`; not a hardened sandbox).
     #[arg(long, value_name = "PATH")]
     pub policy: Option<PathBuf>,
+
+    /// Sandbox backend selection (run-os-sandboxed defaults to "vm").
+    #[arg(long, value_enum)]
+    pub sandbox_backend: Option<SandboxBackend>,
+
+    /// Required to run run-os-sandboxed without a VM boundary.
+    #[arg(long)]
+    pub i_accept_weaker_isolation: bool,
 
     /// Append network destinations to the sandbox policy allowlist (repeatable).
     #[arg(long, value_name = "HOST:PORT[,PORT...]")]
@@ -287,6 +296,14 @@ pub fn cmd_run(
         RunnerKind::Host => crate::util::resolve_sibling_or_path("x07-host-runner"),
         RunnerKind::Os => crate::util::resolve_sibling_or_path("x07-os-runner"),
     };
+
+    if runner != RunnerKind::Os
+        && (args.sandbox_backend.is_some() || args.i_accept_weaker_isolation)
+    {
+        anyhow::bail!(
+            "--sandbox-backend/--i-accept-weaker-isolation are only supported for OS worlds"
+        );
+    }
 
     let cc_profile = resolve_cc_profile(&args, selected_profile.as_ref());
     let solve_fuel = args
@@ -523,6 +540,14 @@ pub fn cmd_run(
             if let Some(path) = policy.as_ref() {
                 argv.push("--policy".to_string());
                 argv.push(path.display().to_string());
+            }
+
+            if let Some(backend) = args.sandbox_backend {
+                argv.push("--sandbox-backend".to_string());
+                argv.push(backend.as_str().to_string());
+            }
+            if args.i_accept_weaker_isolation {
+                argv.push("--i-accept-weaker-isolation".to_string());
             }
 
             if resolve_auto_ffi(&args, selected_profile.as_ref()) {

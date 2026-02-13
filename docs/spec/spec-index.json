@@ -554,8 +554,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-bundle.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-bundle.report.schema.json",
-      "schema_version": "x07.bundle.report@0.1.0",
-      "title": "X07 x07 bundle report v0.1.0"
+      "schema_version": "x07.bundle.report@0.2.0",
+      "title": "X07 x07 bundle report v0.2.0"
     },
     {
       "kind": "schema",
@@ -591,6 +591,20 @@
       "schema_id": "https://x07.io/spec/x07-doc.report.schema.json",
       "schema_version": "x07.doc.report@0.1.0",
       "title": "X07 x07 doc report v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-guest.failure.schema.json",
+      "schema_id": "https://x07.io/spec/x07-guest.failure.schema.json",
+      "schema_version": "x07.guest.failure@0.1.0",
+      "title": "x07 guest failure artifact (v0.1.0)"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-guest.request.schema.json",
+      "schema_id": "https://x07.io/spec/x07-guest.request.schema.json",
+      "schema_version": "x07.guest.request@1",
+      "title": "x07 guest request v1 (VM backends)"
     },
     {
       "kind": "schema",
@@ -1165,6 +1179,13 @@
       "schema_id": "https://x07.io/spec/x07-verify.report.schema.json",
       "schema_version": "x07.verify.report@0.1.0",
       "title": "X07 x07 verify report v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-vm.bundle.manifest.schema.json",
+      "schema_id": "https://x07.io/spec/x07-vm.bundle.manifest.schema.json",
+      "schema_version": "x07.vm.bundle.manifest@0.1.0",
+      "title": "X07 VM bundle manifest v0.1.0"
     },
     {
       "kind": "schema",

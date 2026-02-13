@@ -107,6 +107,7 @@ walkdir = "2.5.0"
 x07-contracts = { path = "../x07-contracts" }
 x07-host-runner = { path = "../x07-host-runner" }
 x07-pkg = { path = "../x07-pkg" }
-x07-runner-common = { path = "../x07-runner-common" }
+x07-runner-common = { path = "../x07-runner-common", features = ["clap"] }
+x07-vm = { path = "../x07-vm" }
 x07c = { path = "../x07c" }
 x07-worlds = { path = "../x07-worlds", features = ["clap"] }

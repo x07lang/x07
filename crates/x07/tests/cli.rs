@@ -14,6 +14,7 @@ use x07_contracts::{
     X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
     X07_VERIFY_REPORT_SCHEMA_VERSION,
 };
+use x07_runner_common::sandbox_backend::{ENV_ACCEPT_WEAKER_ISOLATION, ENV_SANDBOX_BACKEND};
 use x07c::json_patch;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -54,13 +55,20 @@ fn ensure_mcp_native_backends_staged() {
 
 fn run_x07(args: &[&str]) -> std::process::Output {
     let exe = env!("CARGO_BIN_EXE_x07");
-    Command::new(exe).args(args).output().expect("run x07")
+    Command::new(exe)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .args(args)
+        .output()
+        .expect("run x07")
 }
 
 fn run_x07_in_dir(dir: &Path, args: &[&str]) -> std::process::Output {
     let exe = env!("CARGO_BIN_EXE_x07");
     Command::new(exe)
         .current_dir(dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
         .args(args)
         .output()
         .expect("run x07")
