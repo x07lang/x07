@@ -113,6 +113,8 @@ jobs:
           set -euo pipefail
           ./scripts/build_ext_regex.sh
           ./scripts/build_ext_fs.sh
+          ./scripts/build_ext_stdio.sh
+          ./scripts/build_ext_rand.sh
           ./scripts/build_ext_math.sh
           ./scripts/build_ext_stream_xf.sh
           ./scripts/build_ext_time.sh
