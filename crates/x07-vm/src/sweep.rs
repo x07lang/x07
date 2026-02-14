@@ -238,8 +238,12 @@ fn parse_deadline_label(labels: &crate::Labels) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::ErrorKind;
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     struct TempDir {
         path: PathBuf,
@@ -247,14 +251,27 @@ mod tests {
 
     impl TempDir {
         fn new(prefix: &str) -> Self {
-            let mut path = std::env::temp_dir();
-            let nanos = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("time since epoch")
-                .as_nanos();
-            path.push(format!("{prefix}_{}_{}", std::process::id(), nanos));
-            std::fs::create_dir_all(&path).expect("create temp dir");
-            Self { path }
+            let base = std::env::temp_dir();
+            let pid = std::process::id();
+
+            for _ in 0..256 {
+                let attempt_id = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+                let nanos = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("time since epoch")
+                    .as_nanos();
+
+                let mut path = base.clone();
+                path.push(format!("{prefix}_{pid}_{nanos}_{attempt_id}"));
+
+                match std::fs::create_dir(&path) {
+                    Ok(()) => return Self { path },
+                    Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
+                    Err(e) => panic!("create temp dir {path:?}: {e}"),
+                }
+            }
+
+            panic!("failed to create unique temp dir");
         }
     }
 
