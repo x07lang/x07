@@ -3,6 +3,25 @@ set -euo pipefail
 
 python="${X07_PYTHON:-python3}"
 
-"$python" -m pip install --upgrade pip
-"$python" -m pip install 'jsonschema==4.25.1'
+pip_install() {
+  local tmp
+  tmp="$(mktemp)"
+  if "$python" -m pip "$@" 2>"$tmp"; then
+    rm -f "$tmp"
+    return 0
+  fi
 
+  if grep -q "externally-managed-environment" "$tmp" 2>/dev/null; then
+    if "$python" -m pip "$@" --break-system-packages; then
+      rm -f "$tmp"
+      return 0
+    fi
+  fi
+
+  cat "$tmp" >&2 || true
+  rm -f "$tmp"
+  return 1
+}
+
+pip_install install --upgrade pip
+pip_install install 'jsonschema==4.25.1'
