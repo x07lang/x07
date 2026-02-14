@@ -12,7 +12,7 @@ pip_install() {
   fi
 
   if grep -q "externally-managed-environment" "$tmp" 2>/dev/null; then
-    if "$python" -m pip "$@" --break-system-packages; then
+    if "$python" -m pip "$@" --break-system-packages --ignore-installed; then
       rm -f "$tmp"
       return 0
     fi
