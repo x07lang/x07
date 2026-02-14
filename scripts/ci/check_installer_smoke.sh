@@ -97,7 +97,7 @@ installer_path=""
 
 if [[ "$mode" == "local" ]]; then
   step "build release binaries (including x07up)"
-  cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07import-cli -p x07up
+  cargo build --release -p x07 -p x07c -p x07-host-runner -p x07-os-runner -p x07-vm-launcher -p x07-vm-reaper -p x07import-cli -p x07up
 
   tag="v0.0.0-ci"
   artifacts="$tmp/artifacts"
