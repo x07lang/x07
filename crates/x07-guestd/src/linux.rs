@@ -162,16 +162,16 @@ fn try_main() -> Result<i32> {
 
     ensure_dir(Path::new("/x07/in")).context("create /x07/in mountpoint")?;
     if let Err(err) = mount_virtiofs("x07in", Path::new("/x07/in"), true) {
-        let written = write_guest_failure(
-            &cmdline_run_id,
-            "mount_x07in",
-            "x07in",
-            Some("/x07/in"),
-            None,
-            Some(true),
-            &err,
+        let written = write_guest_failure(GuestFailureWriteSpec {
+            run_id: &cmdline_run_id,
+            stage: "mount_x07in",
+            tag: Some("x07in"),
+            mountpoint: Some("/x07/in"),
+            guest_path: None,
+            readonly: Some(true),
+            err: &err,
             out_mounted,
-        )
+        })
         .unwrap_or(false);
         let mut flags = FLAG_CONTRACT_ERROR | FLAG_METRICS_PRESENT;
         if written {
@@ -245,16 +245,17 @@ fn try_main() -> Result<i32> {
             .with_context(|| format!("create mountpoint {}", stage_mountpoint.display()))?;
 
         if let Err(err) = mount_virtiofs(tag, &stage_mountpoint, m.readonly) {
-            let written = write_guest_failure(
-                &req.run_id,
-                "mount_tag",
-                tag,
-                Some(stage_mountpoint.to_string_lossy().as_ref()),
-                Some(&m.guest_path),
-                Some(m.readonly),
-                &err,
+            let stage_mountpoint_str = stage_mountpoint.to_string_lossy();
+            let written = write_guest_failure(GuestFailureWriteSpec {
+                run_id: &req.run_id,
+                stage: "mount_tag",
+                tag: Some(tag),
+                mountpoint: Some(stage_mountpoint_str.as_ref()),
+                guest_path: Some(&m.guest_path),
+                readonly: Some(m.readonly),
+                err: &err,
                 out_mounted,
-            )
+            })
             .unwrap_or(false);
             let mut flags = FLAG_CONTRACT_ERROR | FLAG_METRICS_PRESENT;
             if written {
@@ -269,16 +270,17 @@ fn try_main() -> Result<i32> {
             .with_context(|| format!("ensure guest_path {}", guest_path.display()))?;
 
         if let Err(err) = bind_mount(&stage_mountpoint, guest_path) {
-            let written = write_guest_failure(
-                &req.run_id,
-                "bind_mount",
-                tag,
-                Some(stage_mountpoint.to_string_lossy().as_ref()),
-                Some(&m.guest_path),
-                Some(m.readonly),
-                &err,
+            let stage_mountpoint_str = stage_mountpoint.to_string_lossy();
+            let written = write_guest_failure(GuestFailureWriteSpec {
+                run_id: &req.run_id,
+                stage: "bind_mount",
+                tag: Some(tag),
+                mountpoint: Some(stage_mountpoint_str.as_ref()),
+                guest_path: Some(&m.guest_path),
+                readonly: Some(m.readonly),
+                err: &err,
                 out_mounted,
-            )
+            })
             .unwrap_or(false);
             let mut flags = FLAG_CONTRACT_ERROR | FLAG_METRICS_PRESENT;
             if written {
@@ -290,16 +292,17 @@ fn try_main() -> Result<i32> {
 
         if m.readonly {
             if let Err(err) = remount_bind_readonly(guest_path) {
-                let written = write_guest_failure(
-                    &req.run_id,
-                    "remount_ro",
-                    tag,
-                    Some(stage_mountpoint.to_string_lossy().as_ref()),
-                    Some(&m.guest_path),
-                    Some(true),
-                    &err,
+                let stage_mountpoint_str = stage_mountpoint.to_string_lossy();
+                let written = write_guest_failure(GuestFailureWriteSpec {
+                    run_id: &req.run_id,
+                    stage: "remount_ro",
+                    tag: Some(tag),
+                    mountpoint: Some(stage_mountpoint_str.as_ref()),
+                    guest_path: Some(&m.guest_path),
+                    readonly: Some(true),
+                    err: &err,
                     out_mounted,
-                )
+                })
                 .unwrap_or(false);
                 let mut flags = FLAG_CONTRACT_ERROR | FLAG_METRICS_PRESENT;
                 if written {
@@ -507,12 +510,9 @@ fn enforce_network_policy(policy_path: &str) -> Result<()> {
 }
 
 fn resolve_nft_bin() -> Option<&'static str> {
-    for cand in ["/usr/sbin/nft", "/usr/bin/nft"] {
-        if Path::new(cand).is_file() {
-            return Some(cand);
-        }
-    }
-    None
+    ["/usr/sbin/nft", "/usr/bin/nft"]
+        .into_iter()
+        .find(|&cand| Path::new(cand).is_file())
 }
 
 #[derive(Debug, Clone)]
@@ -541,11 +541,12 @@ fn build_nft_script(net: &PolicyNet) -> Result<String> {
         }
     }
 
-    let mut rules: Vec<String> = Vec::new();
-    rules.push("  chain output {".to_string());
-    rules.push("    type filter hook output priority 0; policy drop;".to_string());
-    rules.push("    oifname \"lo\" accept".to_string());
-    rules.push("    ct state established,related accept".to_string());
+    let mut rules: Vec<String> = vec![
+        "  chain output {".to_string(),
+        "    type filter hook output priority 0; policy drop;".to_string(),
+        "    oifname \"lo\" accept".to_string(),
+        "    ct state established,related accept".to_string(),
+    ];
 
     if net.enabled && net.allow_dns {
         for ns in &nameservers {
@@ -973,41 +974,44 @@ fn write_ctrl_record(
     Ok(())
 }
 
-fn write_guest_failure_generic(
-    run_id: &str,
+#[derive(Clone, Copy)]
+struct GuestFailureWriteSpec<'a> {
+    run_id: &'a str,
     stage: &'static str,
-    tag: Option<&str>,
-    mountpoint: Option<&str>,
-    guest_path: Option<&str>,
+    tag: Option<&'a str>,
+    mountpoint: Option<&'a str>,
+    guest_path: Option<&'a str>,
     readonly: Option<bool>,
-    err: &anyhow::Error,
+    err: &'a anyhow::Error,
     out_mounted: bool,
-) -> Result<bool> {
-    if !out_mounted {
+}
+
+fn write_guest_failure(spec: GuestFailureWriteSpec<'_>) -> Result<bool> {
+    if !spec.out_mounted {
         return Ok(false);
     }
 
     let when_unix_ms = now_unix_ms().unwrap_or(0);
     let failure = GuestFailure {
         schema_version: "x07.guest.failure@0.1.0",
-        run_id: if run_id.trim().is_empty() {
+        run_id: if spec.run_id.trim().is_empty() {
             "unknown".to_string()
         } else {
-            run_id.to_string()
+            spec.run_id.to_string()
         },
         failure_kind: "mount_failed",
-        stage,
+        stage: spec.stage,
         when_unix_ms,
-        tag: tag.map(|s| s.to_string()),
-        mountpoint: mountpoint.map(|s| s.to_string()),
-        guest_path: guest_path.map(|s| s.to_string()),
-        readonly,
-        errno: err
+        tag: spec.tag.map(|s| s.to_string()),
+        mountpoint: spec.mountpoint.map(|s| s.to_string()),
+        guest_path: spec.guest_path.map(|s| s.to_string()),
+        readonly: spec.readonly,
+        errno: spec
+            .err
             .root_cause()
             .downcast_ref::<std::io::Error>()
-            .map(|e| e.raw_os_error())
-            .flatten(),
-        message: format!("{err:#}"),
+            .and_then(|e| e.raw_os_error()),
+        message: format!("{:#}", spec.err),
         detail: None,
     };
 
@@ -1022,28 +1026,6 @@ fn write_guest_failure_generic(
     std::fs::rename(tmp_path, out_path).context("rename guest_failure.json")?;
     let _ = fsync_path(out_path);
     Ok(true)
-}
-
-fn write_guest_failure(
-    run_id: &str,
-    stage: &'static str,
-    tag: &str,
-    mountpoint: Option<&str>,
-    guest_path: Option<&str>,
-    readonly: Option<bool>,
-    err: &anyhow::Error,
-    out_mounted: bool,
-) -> Result<bool> {
-    write_guest_failure_generic(
-        run_id,
-        stage,
-        Some(tag),
-        mountpoint,
-        guest_path,
-        readonly,
-        err,
-        out_mounted,
-    )
 }
 
 fn fsync_path(path: &Path) -> Result<()> {
@@ -1078,9 +1060,7 @@ fn try_send_ctrl_only(
 fn read_run_id_from_cmdline() -> Option<String> {
     let cmdline = std::fs::read_to_string("/proc/cmdline").ok()?;
     for tok in cmdline.split_whitespace() {
-        let mut it = tok.splitn(2, '=');
-        let k = it.next()?;
-        let v = it.next()?;
+        let (k, v) = tok.split_once('=')?;
         if k == CMDLINE_RUN_ID_KEY && !v.trim().is_empty() {
             let v = v.trim().to_string();
             if v.len() <= 128 {
