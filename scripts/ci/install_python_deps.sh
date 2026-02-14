@@ -23,5 +23,4 @@ pip_install() {
   return 1
 }
 
-pip_install install --upgrade pip
 pip_install install 'jsonschema==4.25.1'
