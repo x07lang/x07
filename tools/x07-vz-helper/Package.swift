@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "x07_tools",
+    name: "x07_vz_helper",
     platforms: [
         .macOS(.v12)
     ],
@@ -13,8 +13,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "x07_vz_helper",
-            path: "tools/x07-vz-helper",
-            exclude: ["entitlements.plist"],
+            path: ".",
+            exclude: ["entitlements.plist", "Package.swift"],
             sources: ["main.swift"],
             linkerSettings: [
                 .linkedFramework("Virtualization")
