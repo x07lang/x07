@@ -691,6 +691,23 @@ fn run_vm(
         std::env::var("X07_VM_GUEST_IMAGE").unwrap_or_else(|_| default_vm_guest_image())
     };
 
+    if let Ok(expected_digest) = std::env::var(x07_vm::ENV_VM_GUEST_IMAGE_DIGEST) {
+        let accept_weaker_isolation = x07_vm::read_accept_weaker_isolation_env().unwrap_or(false);
+        if !accept_weaker_isolation {
+            let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
+                Some(firecracker_ctr_config_from_env())
+            } else {
+                None
+            };
+            x07_vm::verify_vm_guest_digest(
+                backend,
+                &guest_image,
+                &expected_digest,
+                firecracker_cfg.as_ref(),
+            )?;
+        }
+    }
+
     let overall_created_unix_ms = now_unix_ms()?;
     let run_id_base = {
         let pid = std::process::id();

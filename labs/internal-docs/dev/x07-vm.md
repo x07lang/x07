@@ -68,6 +68,9 @@ OCI-based VM backends run a Linux guest runner image that contains Linux builds 
 
 - Default: `ghcr.io/x07lang/x07-guest-runner:<x07-version>`
 - Override: `X07_VM_GUEST_IMAGE=<ref>`
+- Optional (direct VM runs): `X07_VM_GUEST_IMAGE_DIGEST=sha256:<64-hex>` enforces that the resolved guest image digest matches the expected value (fails closed unless `X07_I_ACCEPT_WEAKER_ISOLATION=1`).
+
+VM bundles produced by `x07 bundle --profile sandbox` pin the guest digest in the sidecar manifest (`x07.vm.bundle.manifest@0.2.0`) and verify it at runtime by default.
 
 Build a local image (Docker backend):
 

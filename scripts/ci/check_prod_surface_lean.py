@@ -62,6 +62,7 @@ ALLOWED_TRACKED_ROOT_ENTRIES = {
     "spec",
     "stdlib",
     "tests",
+    "tools",
     "worlds",
 
     # optional labs (may be absent in trimmed checkouts)

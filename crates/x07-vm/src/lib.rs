@@ -9,16 +9,25 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use x07_contracts::X07_OS_RUNNER_REPORT_SCHEMA_VERSION;
 
+mod caps;
+mod digest;
 mod inspect_parsers;
 mod job_runner;
+mod kill_plan;
 mod labels;
 mod sweep;
 
+pub use caps::VmCaps;
+pub use digest::{resolve_vm_guest_digest, verify_vm_guest_digest};
 pub use inspect_parsers::{
     is_owned_by_x07, parse_apple_container_json_owned, parse_ctr_container_info_json_owned, Labels,
     OwnedContainer, ParseError,
 };
 pub use job_runner::{run_vm_job, DefaultVmDriver, VmDriver, VmJobRunParams};
+pub use kill_plan::{
+    enforce_kill_plan, enforce_kill_plan_for_job, CommandSpec, ExecResult, KillBackend, KillPlan,
+    KillResult, RetryPolicy, Signal, TargetRef,
+};
 pub use labels::{
     read_or_create_runner_instance_id, LabelError, X07LabelSet, X07_LABEL_BACKEND_KEY,
     X07_LABEL_CREATED_UNIX_MS_KEY, X07_LABEL_DEADLINE_UNIX_MS_KEY, X07_LABEL_IMAGE_DIGEST_KEY,
@@ -35,6 +44,7 @@ pub const ENV_ACCEPT_WEAKER_ISOLATION: &str = "X07_I_ACCEPT_WEAKER_ISOLATION";
 
 pub const ENV_VZ_HELPER_BIN: &str = "X07_VM_VZ_HELPER_BIN";
 pub const ENV_VZ_GUEST_BUNDLE: &str = "X07_VM_VZ_GUEST_BUNDLE";
+pub const ENV_VM_GUEST_IMAGE_DIGEST: &str = "X07_VM_GUEST_IMAGE_DIGEST";
 
 pub const DEFAULT_VZ_HELPER_BIN: &str = "x07-vz-helper";
 

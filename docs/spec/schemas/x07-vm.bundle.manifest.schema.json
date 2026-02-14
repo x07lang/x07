@@ -1,17 +1,27 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-vm.bundle.manifest.schema.json",
-  "title": "X07 VM bundle manifest v0.1.0",
+  "title": "X07 VM bundle manifest v0.2.0",
   "description": "Sidecar manifest for VM-backed bundles produced by `x07 bundle --profile sandbox` when sandbox_backend=vm.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "guest_image", "payload", "workdir", "policy"],
+  "required": ["schema_version", "backend", "guest_image", "guest_digest", "payload", "workdir", "policy"],
   "properties": {
-    "schema_version": { "const": "x07.vm.bundle.manifest@0.1.0" },
+    "schema_version": { "const": "x07.vm.bundle.manifest@0.2.0" },
 
+    "backend": {
+      "type": "string",
+      "enum": ["vz", "apple-container", "docker", "podman", "firecracker-ctr"],
+      "description": "VM backend required by this bundle."
+    },
     "guest_image": {
       "type": "string",
-      "description": "OCI image reference for the Linux guest runtime."
+      "description": "OCI image reference for the Linux guest runtime (used by non-vz backends)."
+    },
+    "guest_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Expected digest of the guest runtime image/bundle used by this bundle."
     },
     "payload": {
       "type": "string",
@@ -27,4 +37,3 @@
     }
   }
 }
-

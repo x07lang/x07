@@ -56,6 +56,20 @@ echo "==> policy init (sandbox base policy)"
 echo "==> run (run-os-sandboxed; sandbox_backend=vm)"
 "$x07_bin" run --project x07.json --profile sandbox --input /dev/null >/dev/null
 
+echo "==> security smoke (fs policy deny)"
+os_runner_bin="$root/target/debug/x07-os-runner"
+if [[ ! -x "$os_runner_bin" ]]; then
+  echo "ERROR: missing x07-os-runner binary at $os_runner_bin" >&2
+  exit 2
+fi
+
+"$os_runner_bin" \
+  --program "$root/tests/external_os/fs_policy_deny_smoke/src/main.x07.json" \
+  --world run-os-sandboxed \
+  --policy "$root/tests/external_os/fs_policy_deny_smoke/run-os-policy.fs_policy_deny_smoke.json" \
+  --module-root "$root/tests/external_os/modules" \
+  | python3 "$root/scripts/ci/assert_run_os_ok.py" "vm.fs_policy_deny_smoke" --expect "OK" >/dev/null
+
 echo "==> bundle (run-os-sandboxed; sandbox_backend=vm)"
 outdir="$tmp_dir/out"
 mkdir -p "$outdir"

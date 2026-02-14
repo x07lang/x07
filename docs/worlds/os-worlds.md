@@ -43,6 +43,7 @@ VM runtime configuration:
     - `podman` / `docker` (weaker isolation; requires `X07_I_ACCEPT_WEAKER_ISOLATION=1`)
   - Linux: `firecracker-ctr` (requires `/dev/kvm` + firecracker-containerd)
 - Guest image (OCI backends): `X07_VM_GUEST_IMAGE` (default: `ghcr.io/x07lang/x07-guest-runner:<x07-version>`)
+- Guest image digest (optional): `X07_VM_GUEST_IMAGE_DIGEST=sha256:<64-hex>` (enforce a pinned digest for direct VM runs; VM bundles pin/verify their guest digest by default)
 - VZ guest bundle (macOS): `X07_VM_VZ_GUEST_BUNDLE`
 - VZ helper binary (macOS): `X07_VM_VZ_HELPER_BIN`
 - Firecracker config (Linux): `X07_VM_FIRECRACKER_CTR_BIN`, `X07_VM_FIRECRACKER_CONTAINERD_SOCK`, `X07_VM_FIRECRACKER_SNAPSHOTTER`, `X07_VM_CONTAINERD_NAMESPACE`

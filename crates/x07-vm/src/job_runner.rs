@@ -8,7 +8,7 @@ use crate::{
     firecracker_ctr_hard_kill, podman_cleanup, podman_hard_kill, run_apple_container, run_docker,
     run_firecracker_ctr, run_podman, spawn_reaper, spawn_vz_helper, sweep_orphans_best_effort,
     touch_done_marker, vz_cleanup_scratch, wait_child_output_capped, write_job_file, x07_label_set,
-    CtrJob, FirecrackerCtrConfig, RunOutput, RunSpec, VmBackend, VmJob,
+    CtrJob, FirecrackerCtrConfig, RunOutput, RunSpec, VmBackend, VmCaps, VmJob,
 };
 
 pub struct VmJobRunParams<'a> {
@@ -22,14 +22,52 @@ pub struct VmJobRunParams<'a> {
 
 pub trait VmDriver {
     fn run_job(&self, spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutput>;
+
+    fn capabilities(&self) -> VmCaps;
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct DefaultVmDriver;
+#[derive(Debug, Clone, Copy)]
+pub struct DefaultVmDriver {
+    backend: VmBackend,
+}
+
+impl DefaultVmDriver {
+    pub fn new(backend: VmBackend) -> Self {
+        Self { backend }
+    }
+
+    pub fn backend(&self) -> VmBackend {
+        self.backend
+    }
+}
+
+impl Default for DefaultVmDriver {
+    fn default() -> Self {
+        let backend = if cfg!(target_os = "macos") {
+            VmBackend::Vz
+        } else if cfg!(target_os = "linux") {
+            VmBackend::FirecrackerCtr
+        } else {
+            VmBackend::Vz
+        };
+        Self { backend }
+    }
+}
 
 impl VmDriver for DefaultVmDriver {
     fn run_job(&self, spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutput> {
+        if spec.backend != self.backend {
+            anyhow::bail!(
+                "DefaultVmDriver backend mismatch: driver={} spec={}",
+                self.backend,
+                spec.backend
+            );
+        }
         run_vm_job(spec, params)
+    }
+
+    fn capabilities(&self) -> VmCaps {
+        VmCaps::for_backend(self.backend)
     }
 }
 

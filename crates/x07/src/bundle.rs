@@ -534,7 +534,9 @@ pub fn cmd_bundle(
 #[derive(Debug, Serialize)]
 struct VmBundleManifest {
     schema_version: &'static str,
+    backend: String,
     guest_image: String,
+    guest_digest: String,
     payload: &'static str,
     workdir: &'static str,
     policy: &'static str,
@@ -608,6 +610,8 @@ fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode
         .validate_basic()
         .map_err(|e| anyhow::anyhow!("policy invalid: {e}"))?;
 
+    let backend = resolve_vm_backend()?;
+
     let guest_image =
         std::env::var("X07_VM_GUEST_IMAGE").unwrap_or_else(|_| default_vm_guest_image());
 
@@ -615,18 +619,6 @@ fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode
     let policy_dst = sidecar.join("policy.json");
     crate::util::write_atomic(&policy_dst, &policy_bytes)
         .with_context(|| format!("write vm bundle policy: {}", policy_dst.display()))?;
-
-    let manifest = VmBundleManifest {
-        schema_version: "x07.vm.bundle.manifest@0.1.0",
-        guest_image: guest_image.clone(),
-        payload: "payload",
-        workdir: "/x07/work",
-        policy: "policy.json",
-    };
-    let mut manifest_bytes = serde_json::to_vec_pretty(&manifest)?;
-    manifest_bytes.push(b'\n');
-    crate::util::write_atomic(&sidecar.join("manifest.json"), &manifest_bytes)
-        .with_context(|| format!("write vm bundle manifest under {}", sidecar.display()))?;
 
     let launcher_src = resolve_sibling_or_path_vm("x07-vm-launcher");
     if !launcher_src.is_file() {
@@ -664,6 +656,39 @@ fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode
 
     let guest_report = guest_payload.report;
 
+    let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
+        Some(firecracker_ctr_config_from_env())
+    } else {
+        None
+    };
+
+    let guest_digest = if backend == VmBackend::Vz {
+        let bundle_dir = std::env::var(x07_vm::ENV_VZ_GUEST_BUNDLE).unwrap_or_default();
+        if bundle_dir.trim().is_empty() {
+            anyhow::bail!(
+                "missing VZ guest bundle directory (set {}=/path/to/guest.bundle)",
+                x07_vm::ENV_VZ_GUEST_BUNDLE
+            );
+        }
+        x07_vm::resolve_vm_guest_digest(backend, &bundle_dir, None)?
+    } else {
+        x07_vm::resolve_vm_guest_digest(backend, &guest_image, firecracker_cfg.as_ref())?
+    };
+
+    let manifest = VmBundleManifest {
+        schema_version: "x07.vm.bundle.manifest@0.2.0",
+        backend: backend.to_string(),
+        guest_image: guest_image.clone(),
+        guest_digest: guest_digest.clone(),
+        payload: "payload",
+        workdir: "/x07/work",
+        policy: "policy.json",
+    };
+    let mut manifest_bytes = serde_json::to_vec_pretty(&manifest)?;
+    manifest_bytes.push(b'\n');
+    crate::util::write_atomic(&sidecar.join("manifest.json"), &manifest_bytes)
+        .with_context(|| format!("write vm bundle manifest under {}", sidecar.display()))?;
+
     let guest_arch = guest_platform_arch()?;
     let report = BundleReport {
         schema_version: X07_BUNDLE_REPORT_SCHEMA_VERSION,
@@ -694,8 +719,12 @@ fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode
                     arch: guest_arch,
                 },
                 image: BundleGuestImage {
-                    digest: None,
-                    ref_: Some(guest_image.clone()),
+                    digest: Some(guest_digest),
+                    ref_: if backend == VmBackend::Vz {
+                        None
+                    } else {
+                        Some(guest_image.clone())
+                    },
                     layout: None,
                 },
                 entrypoint: vec!["/x07/bundle/payload".to_string()],

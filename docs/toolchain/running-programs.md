@@ -131,6 +131,8 @@ x07 bundle --profile sandbox --sandbox-backend os --i-accept-weaker-isolation --
 
 For `--profile sandbox` with `sandbox_backend=vm`, the output is a host-native launcher plus a sidecar directory `dist/mytool.vm/`.
 
+The sidecar includes a versioned manifest (`x07.vm.bundle.manifest@0.2.0`) that pins the VM backend and the expected guest digest.
+
 The bundled binary encodes `argc/argv` to `argv_v1` input bytes and writes the program output bytes directly to stdout.
 
 ## Reports (stdout + optional file)

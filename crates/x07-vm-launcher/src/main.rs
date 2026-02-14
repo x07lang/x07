@@ -13,7 +13,9 @@ use x07_vm::{
 #[derive(Debug, Clone, Deserialize)]
 struct VmBundleManifest {
     schema_version: String,
+    backend: String,
     guest_image: String,
+    guest_digest: String,
     payload: String,
     workdir: String,
     policy: String,
@@ -39,7 +41,7 @@ fn try_main() -> Result<std::process::ExitCode> {
     )
     .with_context(|| format!("parse vm bundle manifest: {}", manifest_path.display()))?;
 
-    if manifest.schema_version != "x07.vm.bundle.manifest@0.1.0" {
+    if manifest.schema_version != "x07.vm.bundle.manifest@0.2.0" {
         anyhow::bail!(
             "unsupported vm bundle manifest schema_version: {:?}",
             manifest.schema_version
@@ -55,13 +57,45 @@ fn try_main() -> Result<std::process::ExitCode> {
         .validate_basic()
         .map_err(|e| anyhow::anyhow!("policy invalid: {e}"))?;
 
+    let accept_weaker_isolation = x07_vm::read_accept_weaker_isolation_env().unwrap_or(false);
+
+    let manifest_backend: VmBackend = manifest.backend.parse()?;
+    let backend = match std::env::var(x07_vm::ENV_VM_BACKEND).ok() {
+        Some(raw) => {
+            let b: VmBackend = raw.parse()?;
+            if b != manifest_backend && !accept_weaker_isolation {
+                anyhow::bail!(
+                    "VM bundle requires backend {manifest_backend}, but {}={b} is set.\n\nfix:\n  - unset {}, or\n  - set {}=1 to override backend selection",
+                    x07_vm::ENV_VM_BACKEND,
+                    x07_vm::ENV_VM_BACKEND,
+                    x07_vm::ENV_ACCEPT_WEAKER_ISOLATION,
+                );
+            }
+            b
+        }
+        None => manifest_backend,
+    };
+    std::env::set_var(x07_vm::ENV_VM_BACKEND, backend.to_string());
     let backend = resolve_vm_backend()?;
 
+    let guest_image_override = std::env::var("X07_VM_GUEST_IMAGE").ok();
     let guest_image = if backend == VmBackend::Vz {
         std::env::var(ENV_VZ_GUEST_BUNDLE).unwrap_or_default()
+    } else if let Some(override_ref) = guest_image_override {
+        if !accept_weaker_isolation {
+            anyhow::bail!(
+                "VM bundle does not allow overriding X07_VM_GUEST_IMAGE without {}=1",
+                x07_vm::ENV_ACCEPT_WEAKER_ISOLATION
+            );
+        }
+        override_ref
     } else {
-        std::env::var("X07_VM_GUEST_IMAGE").unwrap_or(manifest.guest_image)
+        manifest.guest_image.clone()
     };
+
+    if guest_image.trim().is_empty() {
+        anyhow::bail!("missing guest image (bundle manifest and environment are empty)");
+    }
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
@@ -125,7 +159,6 @@ fn try_main() -> Result<std::process::ExitCode> {
         guest_argv.push(a);
     }
 
-    let accept_weaker_isolation = x07_vm::read_accept_weaker_isolation_env().unwrap_or(false);
     let allowlist_requested = policy.net.enabled && !policy.net.allow_hosts.is_empty();
     let network_mode = if allowlist_requested {
         if backend == VmBackend::Vz || accept_weaker_isolation {
@@ -138,6 +171,20 @@ fn try_main() -> Result<std::process::ExitCode> {
     } else {
         NetworkMode::None
     };
+
+    let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
+        Some(firecracker_ctr_config_from_env())
+    } else {
+        None
+    };
+    if !accept_weaker_isolation {
+        x07_vm::verify_vm_guest_digest(
+            backend,
+            &guest_image,
+            &manifest.guest_digest,
+            firecracker_cfg.as_ref(),
+        )?;
+    }
 
     let limits = LimitsSpec {
         wall_ms,
@@ -159,12 +206,6 @@ fn try_main() -> Result<std::process::ExitCode> {
         mounts,
         workdir: Some(PathBuf::from(&manifest.workdir)),
         limits,
-    };
-
-    let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
-        Some(firecracker_ctr_config_from_env())
-    } else {
-        None
     };
 
     let reaper_bin = resolve_reaper(&exe, &sidecar);
