@@ -1069,10 +1069,19 @@ pub fn emit_native_cli_wrapper_c(opts: &NativeCliWrapperOpts) -> String {
     for (k, v) in &opts.env {
         let k_lit = c_string_literal_concat(k.as_bytes());
         let v_lit = c_string_literal_concat(v.as_bytes());
+        let overwrite = if k == "X07_WORLD" || k == "X07_OS_SANDBOXED" {
+            1
+        } else if k.starts_with("X07_OS_") {
+            0
+        } else {
+            1
+        };
         env_lines.push_str("  x07_setenv(");
         env_lines.push_str(&k_lit);
         env_lines.push_str(", ");
         env_lines.push_str(&v_lit);
+        env_lines.push_str(", ");
+        env_lines.push_str(&overwrite.to_string());
         env_lines.push_str(");\n");
     }
 
@@ -1105,8 +1114,8 @@ pub fn emit_native_cli_wrapper_c(opts: &NativeCliWrapperOpts) -> String {
 #include <string.h>
 #include <sys/resource.h>
 
-static void x07_setenv(const char* k, const char* v) {{
-  setenv(k, v, 1);
+static void x07_setenv(const char* k, const char* v, int overwrite) {{
+  setenv(k, v, overwrite);
 }}
 
 static void x07_u32le_write(uint8_t* dst, uint32_t v) {{

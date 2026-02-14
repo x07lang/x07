@@ -135,6 +135,15 @@ The sidecar includes a versioned manifest (`x07.vm.bundle.manifest@0.2.0`) that 
 
 The bundled binary encodes `argc/argv` to `argv_v1` input bytes and writes the program output bytes directly to stdout.
 
+### Sandbox bundle environment overrides
+
+For sandbox bundles, the generated native wrapper always forces sandboxing on:
+
+- `X07_WORLD=run-os-sandboxed`
+- `X07_OS_SANDBOXED=1`
+
+Other `X07_OS_*` environment variables embedded into the wrapper are treated as defaults and may be overridden by the parent process. This enables per-invocation policy injection (for example, spawning a sandboxed worker with tool-specific filesystem/network allowlists).
+
 ## Reports (stdout + optional file)
 
 `x07 run` always prints a JSON report to stdout. You can also write the same bytes to a file with `--report-out <PATH>`.

@@ -5496,6 +5496,113 @@ fn bundle_rand_caps_enforces_bounds() {
     assert_eq!(run_out.stdout, b"OK");
 }
 
+#[test]
+fn bundle_sandboxed_env_overrides_allow_policy_override_but_cannot_disable_sandbox() {
+    let root = repo_root();
+    let tmp = fresh_tmp_dir(&root, "bundle_sandboxed_env_override");
+    std::fs::create_dir_all(&tmp).expect("create tmp dir");
+
+    let out_path = tmp.join("app_sandboxed_env_override");
+    let program_path = root.join("tests/external_os/bundle_sandbox_env_override/src/main.x07.json");
+    let policy_path =
+        root.join("tests/external_os/bundle_sandbox_env_override/run-os-policy.base.json");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&root)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .args([
+            "--out",
+            out_path.to_str().expect("out_path utf-8"),
+            "bundle",
+            "--program",
+            program_path.to_str().expect("program_path utf-8"),
+            "--module-root",
+            root.join("stdlib/std/0.1.2/modules")
+                .to_str()
+                .expect("module_root utf-8"),
+            "--world",
+            "run-os-sandboxed",
+            "--policy",
+            policy_path.to_str().expect("policy_path utf-8"),
+            "--sandbox-backend",
+            "os",
+            "--i-accept-weaker-isolation",
+        ])
+        .output()
+        .expect("x07 bundle");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out_path.is_file(),
+        "missing bundled binary: {}",
+        out_path.display()
+    );
+
+    write_bytes(&tmp.join("ok.txt"), b"hello\n");
+
+    let run0 = Command::new(&out_path)
+        .current_dir(&tmp)
+        .env_remove("X07_WORLD")
+        .env_remove("X07_OS_SANDBOXED")
+        .env_remove("X07_OS_FS")
+        .env_remove("X07_OS_FS_READ_ROOTS")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run bundled binary (base policy)");
+    assert_ne!(
+        run0.status.code(),
+        Some(0),
+        "expected base policy to deny fs; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&run0.stdout),
+        String::from_utf8_lossy(&run0.stderr)
+    );
+
+    let run1 = Command::new(&out_path)
+        .current_dir(&tmp)
+        .env_remove("X07_OS_FS")
+        .env_remove("X07_OS_FS_READ_ROOTS")
+        .env("X07_WORLD", "run-os")
+        .env("X07_OS_SANDBOXED", "0")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run bundled binary (attempt disable sandbox)");
+    assert_ne!(
+        run1.status.code(),
+        Some(0),
+        "expected wrapper to force sandbox on; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&run1.stdout),
+        String::from_utf8_lossy(&run1.stderr)
+    );
+
+    let run2 = Command::new(&out_path)
+        .current_dir(&tmp)
+        .env_remove("X07_WORLD")
+        .env_remove("X07_OS_SANDBOXED")
+        .env("X07_OS_FS", "1")
+        .env("X07_OS_FS_READ_ROOTS", ".")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run bundled binary (fs override)");
+    assert_eq!(
+        run2.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&run2.stderr)
+    );
+    assert!(run2.stderr.is_empty(), "expected empty stderr");
+    assert_eq!(run2.stdout, b"OK");
+}
+
 #[cfg(unix)]
 #[test]
 fn x07_mcp_delegates_to_x07_mcp_and_forwards_exit_code() {
