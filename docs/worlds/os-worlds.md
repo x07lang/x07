@@ -51,6 +51,7 @@ VM runtime configuration:
 VM hardening notes:
 
 - Build/run split: VM execution compiles in a build phase and executes in a separate run phase, so the run phase does not automatically include the project tree unless it’s mounted via policy filesystem roots.
+- Guest transport (v1): `vz` uses `/x07/in/request.json` + vsock streaming via `x07-guestd`; OCI backends (`firecracker-ctr`, `apple-container`, `docker`, `podman`) run `x07-os-runner` directly and capture stdout/stderr via the container runtime.
 - Networking: VM networking stays disabled unless `policy.net.enabled=true` and `policy.net.allow_hosts` is non-empty. Allowlist enforcement at the VM boundary is currently implemented for the `vz` backend; other VM backends require `X07_I_ACCEPT_WEAKER_ISOLATION=1` to enable networking.
 
 ### Create a base policy (recommended)

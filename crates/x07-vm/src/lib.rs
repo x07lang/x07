@@ -15,6 +15,7 @@ mod inspect_parsers;
 mod job_runner;
 mod kill_plan;
 mod labels;
+mod reaper_joiner;
 mod sweep;
 
 pub use caps::VmCaps;
@@ -89,6 +90,7 @@ pub struct RunSpec {
     pub run_id: String,
     pub backend: VmBackend,
     pub image: String,
+    pub image_digest: Option<String>,
     pub argv: Vec<String>,
     pub env: BTreeMap<String, String>,
     pub mounts: Vec<MountSpec>,
@@ -494,12 +496,18 @@ pub fn x07_label_set(
     backend: VmBackend,
     created_unix_ms: u64,
     deadline_unix_ms: u64,
+    image_digest: Option<&str>,
 ) -> Result<BTreeMap<String, String>> {
     let runner_instance = read_or_create_runner_instance_id(state_root)?;
     let set = X07LabelSet::new(run_id, runner_instance, deadline_unix_ms)
         .with_job_id(run_id)
         .with_backend(format!("vm.{backend}"))
         .with_created_unix_ms(created_unix_ms);
+    let set = if let Some(d) = image_digest {
+        set.with_image_digest(d)
+    } else {
+        set
+    };
     set.to_btreemap().map_err(anyhow::Error::new)
 }
 
@@ -558,8 +566,29 @@ pub fn spawn_reaper(reaper_bin: &Path, job_file: &Path) -> Result<()> {
     cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::null());
     cmd.stderr(Stdio::null());
-    cmd.spawn()
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt as _;
+        unsafe {
+            cmd.pre_exec(|| {
+                if libc::setsid() == -1 {
+                    if libc::setpgid(0, 0) == -1 {
+                        return Err(std::io::Error::last_os_error());
+                    }
+                } else {
+                    let _ = libc::setpgid(0, 0);
+                }
+                Ok(())
+            });
+        }
+    }
+
+    let child = cmd
+        .spawn()
         .with_context(|| format!("spawn reaper: {}", reaper_bin.display()))?;
+
+    reaper_joiner::register(child);
     Ok(())
 }
 
@@ -834,6 +863,35 @@ pub fn hard_kill_pid_and_group(pid: u32) {
     }
 }
 
+fn validate_mount_kv_string_safe(path: &Path, label: &str) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt as _;
+        for &bad in [b',', b'\0', b'\n', b'\r'].iter() {
+            if path.as_os_str().as_bytes().contains(&bad) {
+                anyhow::bail!(
+                    "{label} mount path contains disallowed byte {bad:?}: {}",
+                    path.display()
+                );
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let s = path.as_os_str().to_string_lossy();
+        for bad in [",", "\0", "\n", "\r"] {
+            if s.contains(bad) {
+                anyhow::bail!(
+                    "{label} mount path contains disallowed sequence {bad:?}: {}",
+                    path.display()
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn run_docker_like(
     bin: &str,
     spec: &RunSpec,
@@ -878,6 +936,9 @@ fn run_docker_like(
     }
 
     for m in &spec.mounts {
+        validate_mount_kv_string_safe(&m.host_path, "host")?;
+        validate_mount_kv_string_safe(&m.guest_path, "guest")?;
+
         let mut mount = format!(
             "type=bind,source={},target={}",
             m.host_path.display(),
@@ -957,6 +1018,9 @@ pub fn run_apple_container(
     }
 
     for m in &spec.mounts {
+        validate_mount_kv_string_safe(&m.host_path, "host")?;
+        validate_mount_kv_string_safe(&m.guest_path, "guest")?;
+
         let mut mount = format!(
             "type=bind,source={},target={}",
             m.host_path.display(),
@@ -1121,6 +1185,9 @@ pub fn run_firecracker_ctr(
     }
 
     for m in &spec.mounts {
+        validate_mount_kv_string_safe(&m.host_path, "host")?;
+        validate_mount_kv_string_safe(&m.guest_path, "guest")?;
+
         let options = if m.readonly { "rbind:ro" } else { "rbind" };
         cmd.arg("--mount").arg(format!(
             "type=bind,src={},dst={},options={options}",
@@ -1476,5 +1543,21 @@ mod tests {
         assert!(validate_container_id("").is_err());
         assert!(validate_container_id("x07-!").is_err());
         assert!(validate_container_id(&"a".repeat(129)).is_err());
+    }
+
+    #[test]
+    fn mount_kv_string_validation_rejects_comma() {
+        assert!(validate_mount_kv_string_safe(Path::new("/tmp/has,comma"), "host").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mount_kv_string_validation_rejects_nul() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt as _;
+
+        let os = OsString::from_vec(vec![b'a', 0, b'b']);
+        let p = PathBuf::from(os);
+        assert!(validate_mount_kv_string_safe(&p, "host").is_err());
     }
 }

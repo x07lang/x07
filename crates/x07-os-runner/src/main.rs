@@ -691,8 +691,11 @@ fn run_vm(
         std::env::var("X07_VM_GUEST_IMAGE").unwrap_or_else(|_| default_vm_guest_image())
     };
 
-    if let Ok(expected_digest) = std::env::var(x07_vm::ENV_VM_GUEST_IMAGE_DIGEST) {
-        let accept_weaker_isolation = x07_vm::read_accept_weaker_isolation_env().unwrap_or(false);
+    let accept_weaker_isolation = cli.i_accept_weaker_isolation
+        || x07_vm::read_accept_weaker_isolation_env().unwrap_or(false);
+
+    let guest_image_digest = std::env::var(x07_vm::ENV_VM_GUEST_IMAGE_DIGEST).ok();
+    if let Some(expected_digest) = guest_image_digest.as_deref() {
         if !accept_weaker_isolation {
             let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
                 Some(firecracker_ctr_config_from_env())
@@ -702,7 +705,7 @@ fn run_vm(
             x07_vm::verify_vm_guest_digest(
                 backend,
                 &guest_image,
-                &expected_digest,
+                expected_digest,
                 firecracker_cfg.as_ref(),
             )?;
         }
@@ -931,6 +934,7 @@ fn run_vm(
         run_id: build_run_id.clone(),
         backend,
         image: guest_image.clone(),
+        image_digest: guest_image_digest.clone(),
         argv: build_guest_argv,
         env: BTreeMap::new(),
         mounts: build_mounts,
@@ -1130,8 +1134,6 @@ fn run_vm(
         run_guest_argv.push(max_output_bytes.to_string());
     }
 
-    let accept_weaker_isolation = cli.i_accept_weaker_isolation
-        || x07_vm::read_accept_weaker_isolation_env().unwrap_or(false);
     let allowlist_requested = policy.net.enabled && !policy.net.allow_hosts.is_empty();
     let run_network_mode = if allowlist_requested {
         if backend == VmBackend::Vz || accept_weaker_isolation {
@@ -1160,6 +1162,7 @@ fn run_vm(
         run_id: run_run_id.clone(),
         backend,
         image: guest_image,
+        image_digest: guest_image_digest,
         argv: run_guest_argv,
         env: BTreeMap::new(),
         mounts: run_mounts,

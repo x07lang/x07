@@ -994,6 +994,7 @@ fn build_vm_payload_bundle(params: VmPayloadBundleParams<'_>) -> Result<VmPayloa
         } else {
             guest_image.to_string()
         },
+        image_digest: None,
         argv: guest_argv,
         env: BTreeMap::new(),
         mounts,

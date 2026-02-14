@@ -40,7 +40,7 @@ Minimum label set (keys under `io.x07.*`):
 - `io.x07.run_id=<run_id>`
 - `io.x07.runner_instance=<stable runner id>`
 - `io.x07.deadline_unix_ms=<ms>` (absolute wall deadline used by reaper/sweeper)
-- Optional: `io.x07.backend`, `io.x07.created_unix_ms`, `io.x07.image_digest`
+- Optional: `io.x07.backend`, `io.x07.created_unix_ms`, `io.x07.image_digest` (set for VM bundles; also set when `X07_VM_GUEST_IMAGE_DIGEST` is provided)
 
 Sweeping behavior:
 
@@ -71,6 +71,18 @@ OCI-based VM backends run a Linux guest runner image that contains Linux builds 
 - Optional (direct VM runs): `X07_VM_GUEST_IMAGE_DIGEST=sha256:<64-hex>` enforces that the resolved guest image digest matches the expected value (fails closed unless `X07_I_ACCEPT_WEAKER_ISOLATION=1`).
 
 VM bundles produced by `x07 bundle --profile sandbox` pin the guest digest in the sidecar manifest (`x07.vm.bundle.manifest@0.2.0`) and verify it at runtime by default.
+
+## Guest transport contract (v1)
+
+- `vz`: uses the guest contract transport (`/x07/in/request.json` + vsock streaming via `x07-guestd`).
+- OCI backends (`firecracker-ctr`, `apple-container`, `docker`, `podman`): do not use the guest contract transport in v1; they run `x07-os-runner` directly and rely on container stdout/stderr capture.
+
+This split is a v1 contract: don’t assume the guest contract transport exists on OCI backends.
+
+## Operational notes
+
+- `firecracker-ctr` is a `ctr`-compatible CLI surface; its output format is not guaranteed stable across releases. Pin the runtime tooling in production and keep parsers conservative.
+- OCI/ctr backends encode mounts as comma-separated `key=value` strings; mount paths must not contain `,`, `\\0`, `\\n`, or `\\r`.
 
 Build a local image (Docker backend):
 

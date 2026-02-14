@@ -215,26 +215,71 @@ fn resolve_apple_container_image_digest(image: &str) -> Result<String> {
         anyhow::bail!("apple-container digest resolution is only supported on macOS");
     }
 
-    let mut cmd = std::process::Command::new("container");
-    cmd.args(["images", "inspect", image]);
-    let out = crate::run_command_capped(cmd, 2_000, 256 * 1024, 256 * 1024)
-        .with_context(|| format!("container images inspect {image}"))?;
-    if out.timed_out {
-        anyhow::bail!("container images inspect timed out");
-    }
-    if out.exit_status != 0 {
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        anyhow::bail!("container images inspect failed: {stderr}");
+    let mut last_missing_subcommand_err: Option<String> = None;
+
+    for subcmd in ["image", "images"] {
+        let mut cmd = std::process::Command::new("container");
+        cmd.args([subcmd, "inspect", image]);
+
+        let out = crate::run_command_capped(cmd, 2_000, 256 * 1024, 256 * 1024)
+            .with_context(|| format!("container {subcmd} inspect {image}"))?;
+
+        if out.timed_out {
+            anyhow::bail!("container {subcmd} inspect timed out");
+        }
+        if out.exit_status != 0 {
+            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+
+            if is_container_subcommand_missing(&stderr, subcmd) {
+                last_missing_subcommand_err =
+                    Some(format!("container {subcmd} inspect failed: {stderr}"));
+                continue;
+            }
+
+            anyhow::bail!("container {subcmd} inspect failed: {stderr}");
+        }
+
+        let v: serde_json::Value = serde_json::from_slice(&out.stdout)
+            .with_context(|| format!("parse container {subcmd} inspect JSON"))?;
+
+        let v = v.as_array().and_then(|a| a.first()).unwrap_or(&v);
+        if let Some(d) = extract_preferred_digest(v) {
+            return normalize_sha256_digest(&d);
+        }
+
+        anyhow::bail!("could not extract digest from container {subcmd} inspect output");
     }
 
-    let v: serde_json::Value =
-        serde_json::from_slice(&out.stdout).context("parse container images inspect JSON")?;
-
-    let v = v.as_array().and_then(|a| a.first()).unwrap_or(&v);
-    if let Some(d) = extract_preferred_digest(v) {
-        return normalize_sha256_digest(&d);
+    if let Some(err) = last_missing_subcommand_err {
+        anyhow::bail!(
+            "{err}\n(note: tried both `container image inspect` and `container images inspect`)"
+        );
     }
-    anyhow::bail!("could not extract digest from container images inspect output");
+    anyhow::bail!("apple-container digest resolution failed (tried both `container image inspect` and `container images inspect`)");
+}
+
+fn is_container_subcommand_missing(stderr: &str, subcmd: &str) -> bool {
+    let s = stderr.to_ascii_lowercase();
+
+    if s.contains("failed to find plugin named") && s.contains(&format!("container-{subcmd}")) {
+        return true;
+    }
+
+    if s.contains("unknown subcommand") && s.contains(subcmd) {
+        return true;
+    }
+    if s.contains("unknown command") && s.contains(subcmd) {
+        return true;
+    }
+
+    if s.contains("unexpected argument")
+        && s.contains(subcmd)
+        && (s.contains("usage: container") || s.contains("see 'container"))
+    {
+        return true;
+    }
+
+    false
 }
 
 fn extract_preferred_digest(v: &serde_json::Value) -> Option<String> {
@@ -328,5 +373,33 @@ mod tests {
     fn normalize_sha256_digest_accepts_64_hex() {
         let d = format!("sha256:{}", "a".repeat(64));
         assert_eq!(normalize_sha256_digest(&d).unwrap(), d);
+    }
+
+    #[test]
+    fn apple_container_subcommand_missing_detection() {
+        assert!(is_container_subcommand_missing(
+            "Error: unknown command \"images\" for \"container\"",
+            "images"
+        ));
+
+        assert!(is_container_subcommand_missing(
+            "Error: unknown subcommand: image",
+            "image"
+        ));
+
+        assert!(is_container_subcommand_missing(
+            "Error: failed to find plugin named container-images",
+            "images"
+        ));
+
+        assert!(is_container_subcommand_missing(
+            "Error: Unexpected argument \"images\".\nUsage: container ...",
+            "images"
+        ));
+
+        assert!(!is_container_subcommand_missing(
+            "Error: image not found: ghcr.io/x07lang/x07-guest-runner:missing",
+            "image"
+        ));
     }
 }

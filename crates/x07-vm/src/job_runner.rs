@@ -83,6 +83,7 @@ pub fn run_vm_job(spec: &RunSpec, params: VmJobRunParams<'_>) -> Result<RunOutpu
         spec.backend,
         params.created_unix_ms,
         params.deadline_unix_ms,
+        spec.image_digest.as_deref(),
     )?;
 
     let firecracker_cfg = if spec.backend == VmBackend::FirecrackerCtr {

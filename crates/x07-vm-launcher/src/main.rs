@@ -201,6 +201,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         run_id: run_id.clone(),
         backend,
         image: guest_image,
+        image_digest: Some(manifest.guest_digest.clone()),
         argv: guest_argv,
         env: BTreeMap::new(),
         mounts,
