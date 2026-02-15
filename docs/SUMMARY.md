@@ -38,6 +38,7 @@
 
 ## Toolchain
 - [CLI](toolchain/cli.md)
+- [MCP kit](toolchain/mcp-kit.md)
 - [Benchmarks](toolchain/benchmarks.md)
 - [Compiler limits](toolchain/compiler-limits.md)
 - [Architecture check](toolchain/arch-check.md)
