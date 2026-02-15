@@ -720,6 +720,20 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-assets-embed-dir.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-assets-embed-dir.report.schema.json",
+      "schema_version": "x07.tool.assets.embed-dir.report@0.1.0",
+      "title": "x07.tool.assets.embed-dir.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-assets.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-assets.report.schema.json",
+      "schema_version": "x07.tool.assets.report@0.1.0",
+      "title": "x07.tool.assets.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-ast-apply-patch.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-ast-apply-patch.report.schema.json",
       "schema_version": "x07.tool.ast.apply-patch.report@0.1.0",

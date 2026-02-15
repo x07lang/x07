@@ -3,16 +3,16 @@
   "dependencies": [
     {
       "name": "ext-cli",
-      "version": "0.1.11",
-      "path": ".x07/deps/ext-cli/0.1.11",
-      "package_manifest_sha256": "24d14dafc36cf04e7a5afc1bc4833b8ce21a81ec274aec89318591696ee67ae1",
+      "version": "0.1.12",
+      "path": ".x07/deps/ext-cli/0.1.12",
+      "package_manifest_sha256": "a72d7b6d076d8a42d86b5a766075b73099309d5e97ea8b8ac9077c70888a95aa",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.cli": "ca7de75fda065788b5314b8266e94e46b1ef4db7c63d4b64aac15d46e4f10fc0",
-        "ext.cli.complete": "e2019240ef981c4ec0653ba231e004b025f745b978a6f37d6c3aad7111716ec0",
+        "ext.cli": "acfd46f859a0c17d4232c9faecf22a981d12182a65bd190c259efc8a34572cc5",
+        "ext.cli.complete": "10b0df962057c9d4b554334e02282c02e6ab3e324d469ca0e820a6ae44f12419",
         "ext.cli.help": "b9f65f30258d54335bad42bfbd4f6a55c80056780d236f5889f6e762efe6c360",
         "ext.cli.specrows": "5786b16971fef9d07065bcedea641c7015e49e3b10e9cb9382a649c739750f66",
-        "ext.cli.tests": "c73c49e9fd349715ab7aa16c3e9fe977f77c1258e9499ebef3944a9c00d63b00"
+        "ext.cli.tests": "6e9da0448d85512ffc0d0c8de160e129d099841acd5bd879ff87369cf325e0a6"
       }
     },
     {

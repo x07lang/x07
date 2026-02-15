@@ -35,6 +35,7 @@ fn ensure_mcp_native_backends_staged() {
         for script in [
             "scripts/ci/ensure_ext_stdio_backend.sh",
             "scripts/ci/ensure_ext_rand_backend.sh",
+            "scripts/ci/ensure_ext_jsonschema_backend.sh",
         ] {
             let script_path = root.join(script);
             let out = Command::new(&script_path)
@@ -5308,6 +5309,96 @@ fn x07_scope_json_schema_for_arch_check_is_available() {
 }
 
 #[test]
+fn x07_scope_json_schema_for_assets_embed_dir_is_available() {
+    let out = run_x07(&["assets", "embed-dir", "--json-schema"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let schema: Value = serde_json::from_slice(&out.stdout).expect("parse schema");
+    assert_eq!(
+        schema["properties"]["schema_version"]["const"],
+        Value::String("x07.tool.assets.embed-dir.report@0.1.0".to_string())
+    );
+    assert_eq!(
+        schema["properties"]["command"]["const"],
+        Value::String("x07.assets.embed-dir".to_string())
+    );
+}
+
+#[test]
+fn assets_embed_dir_emits_stable_paths_and_base64_literals() {
+    use base64::Engine as _;
+
+    let root = repo_root();
+    let tmp = fresh_tmp_dir(&root, "assets_embed_dir");
+    let in_dir = tmp.join("in");
+    let out_path = tmp.join("out.x07.json");
+    std::fs::create_dir_all(in_dir.join("sub")).expect("mkdir in/sub");
+
+    let a_path = in_dir.join("a.txt");
+    let b_path = in_dir.join("sub").join("b.bin");
+    let a_bytes = b"hello\n".to_vec();
+    let b_bytes = vec![0u8, 1u8, 2u8, 3u8, 254u8, 255u8];
+    std::fs::write(&a_path, &a_bytes).expect("write a.txt");
+    std::fs::write(&b_path, &b_bytes).expect("write b.bin");
+
+    let out = run_x07(&[
+        "assets",
+        "embed-dir",
+        "--in",
+        in_dir.to_str().expect("utf-8"),
+        "--module-id",
+        "my.assets",
+        "--out",
+        out_path.to_str().expect("utf-8"),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(out.stderr.is_empty(), "expected empty stderr");
+    assert!(out_path.is_file(), "expected out module");
+
+    let report: Value = serde_json::from_slice(&out.stdout).expect("parse report JSON");
+    assert_eq!(report["ok"], Value::Bool(true));
+    assert_eq!(
+        report["command"],
+        Value::String("assets.embed-dir".to_string())
+    );
+    assert_eq!(report["module_id"], Value::String("my.assets".to_string()));
+    assert_eq!(report["file_count"], Value::from(2));
+    assert_eq!(
+        report["files"],
+        Value::Array(vec![
+            Value::String("a.txt".to_string()),
+            Value::String("sub/b.bin".to_string()),
+        ])
+    );
+
+    let module_text = std::fs::read_to_string(&out_path).expect("read out module");
+    assert!(
+        module_text.contains("\"module_id\": \"my.assets\"")
+            || module_text.contains("\"module_id\":\"my.assets\""),
+        "module_id not present in output"
+    );
+
+    let a_b64 = base64::engine::general_purpose::STANDARD.encode(&a_bytes);
+    let b_b64 = base64::engine::general_purpose::STANDARD.encode(&b_bytes);
+    for needle in ["a.txt", "sub/b.bin", &a_b64, &b_b64] {
+        assert!(
+            module_text.contains(needle),
+            "expected output module to contain {needle:?}"
+        );
+    }
+}
+
+#[test]
 fn bundle_stdio_smoke_reads_and_writes() {
     ensure_mcp_native_backends_staged();
 
@@ -5370,6 +5461,61 @@ fn bundle_stdio_smoke_reads_and_writes() {
     );
     assert_eq!(run_out.stdout, b"ok\ndone");
     assert_eq!(run_out.stderr, b"log\n");
+}
+
+#[test]
+fn bundle_jsonschema_smoke_validates_ok_and_err() {
+    ensure_mcp_native_backends_staged();
+
+    let root = repo_root();
+    let tmp = fresh_tmp_dir(&root, "bundle_jsonschema_smoke");
+    std::fs::create_dir_all(&tmp).expect("create tmp dir");
+
+    let out_path = tmp.join("app_jsonschema_smoke");
+    let program_path = root.join("tests/external_os/jsonschema_smoke_ok/src/main.x07.json");
+    let module_root = root.join("packages/ext/x07-ext-jsonschema-rs/0.1.0/modules");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&root)
+        .args([
+            "--out",
+            out_path.to_str().expect("out_path utf-8"),
+            "bundle",
+            "--program",
+            program_path.to_str().expect("program_path utf-8"),
+            "--module-root",
+            module_root.to_str().expect("module_root utf-8"),
+        ])
+        .output()
+        .expect("x07 bundle");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out_path.is_file(),
+        "missing bundled binary: {}",
+        out_path.display()
+    );
+
+    let run_out = Command::new(&out_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run bundled binary");
+    assert_eq!(
+        run_out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&run_out.stdout),
+        String::from_utf8_lossy(&run_out.stderr)
+    );
+    assert!(run_out.stderr.is_empty(), "expected empty stderr");
+    assert_eq!(run_out.stdout, b"OK");
 }
 
 #[test]

@@ -1,0 +1,153 @@
+{
+  "schema_version": "x07.x07ast@0.5.0",
+  "kind": "module",
+  "module_id": "ext.jsonschema.tests",
+  "imports": ["ext.jsonschema", "std.bytes", "std.test"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.jsonschema.tests.test_default_dialect_2020_12",
+        "ext.jsonschema.tests.test_schema_override_draft07",
+        "ext.jsonschema.tests.test_unsupported_dialect_is_error",
+        "ext.jsonschema.tests.test_error_ordering_by_pointer"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.tests._find_subslice_v1",
+      "params": [
+        { "name": "hay", "ty": "bytes_view" },
+        { "name": "needle", "ty": "bytes_view" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "hn", ["view.len", "hay"]],
+        ["let", "nn", ["view.len", "needle"]],
+        ["if", ["=", "nn", 0], ["return", 0], 0],
+        ["if", [">u", "nn", "hn"], ["return", -1], 0],
+        ["let", "limit", ["+", ["-", "hn", "nn"], 1]],
+        [
+          "for",
+          "i",
+          0,
+          "limit",
+          [
+            "begin",
+            ["let", "cmp", ["bytes.cmp_range", "needle", 0, "nn", "hay", "i", "nn"]],
+            ["if", ["=", "cmp", 0], ["return", "i"], 0],
+            0
+          ]
+        ],
+        -1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.tests.test_default_dialect_2020_12",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "schema_b",
+          [
+            "bytes.lit",
+            "{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"string\"}},\"unevaluatedProperties\":false}"
+          ]
+        ],
+        ["let", "compiled_b", ["ext.jsonschema.compile_v1", ["bytes.view", "schema_b"]]],
+        ["let", "compiled", ["bytes.view", "compiled_b"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.jsonschema.is_err_v1", "compiled"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "instance_b", ["bytes.lit", "{\"a\":\"x\",\"b\":1}"]],
+        ["let", "val_b", ["ext.jsonschema.validate_v1", "compiled", ["bytes.view", "instance_b"]]],
+        ["let", "val", ["bytes.view", "val_b"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.jsonschema.is_err_v1", "val"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["let", "errors_b", ["ext.jsonschema.errors_json_v1", "val"]],
+        ["let", "errors", ["bytes.view", "errors_b"]],
+        ["let", "needle_b", ["bytes.lit", "\"keyword\":\"unevaluatedProperties\""]],
+        ["try", ["std.test.assert_i32_eq", [">=", ["ext.jsonschema.tests._find_subslice_v1", "errors", ["bytes.view", "needle_b"]], 0], 1, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.tests.test_schema_override_draft07",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "schema_b",
+          [
+            "bytes.lit",
+            "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"string\"}},\"unevaluatedProperties\":false}"
+          ]
+        ],
+        ["let", "compiled_b", ["ext.jsonschema.compile_v1", ["bytes.view", "schema_b"]]],
+        ["let", "compiled", ["bytes.view", "compiled_b"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.jsonschema.is_err_v1", "compiled"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "instance_b", ["bytes.lit", "{\"a\":\"x\",\"b\":1}"]],
+        ["let", "val_b", ["ext.jsonschema.validate_v1", "compiled", ["bytes.view", "instance_b"]]],
+        ["let", "val", ["bytes.view", "val_b"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.jsonschema.is_err_v1", "val"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.tests.test_unsupported_dialect_is_error",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        ["let", "schema_b", ["bytes.lit", "{\"$schema\":\"http://example.invalid/unsupported\",\"type\":\"object\"}"]],
+        ["let", "compiled_b", ["ext.jsonschema.compile_v1", ["bytes.view", "schema_b"]]],
+        ["let", "compiled", ["bytes.view", "compiled_b"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.jsonschema.is_err_v1", "compiled"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["let", "msg_b", ["ext.jsonschema.err_msg_v1", "compiled"]],
+        ["let", "msg", ["bytes.view", "msg_b"]],
+        ["let", "needle_b", ["bytes.lit", "unsupported $schema dialect"]],
+        ["try", ["std.test.assert_i32_eq", [">=", ["ext.jsonschema.tests._find_subslice_v1", "msg", ["bytes.view", "needle_b"]], 0], 1, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.tests.test_error_ordering_by_pointer",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "schema_b",
+          [
+            "bytes.lit",
+            "{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"string\"},\"b\":{\"type\":\"number\"}},\"required\":[\"a\",\"b\"],\"additionalProperties\":false}"
+          ]
+        ],
+        ["let", "compiled_b", ["ext.jsonschema.compile_v1", ["bytes.view", "schema_b"]]],
+        ["let", "compiled", ["bytes.view", "compiled_b"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.jsonschema.is_err_v1", "compiled"], 0, ["std.test.code_assert_i32_eq"]]],
+        ["let", "instance_b", ["bytes.lit", "{\"a\":1,\"b\":\"x\"}"]],
+        ["let", "val_b", ["ext.jsonschema.validate_v1", "compiled", ["bytes.view", "instance_b"]]],
+        ["let", "val", ["bytes.view", "val_b"]],
+        ["try", ["std.test.assert_i32_eq", ["ext.jsonschema.is_err_v1", "val"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["let", "errors_b", ["ext.jsonschema.errors_json_v1", "val"]],
+        ["let", "errors", ["bytes.view", "errors_b"]],
+        ["let", "needle_a_b", ["bytes.lit", "\"jsonPointer\":\"/a\""]],
+        ["let", "needle_b_b", ["bytes.lit", "\"jsonPointer\":\"/b\""]],
+        ["let", "ia", ["ext.jsonschema.tests._find_subslice_v1", "errors", ["bytes.view", "needle_a_b"]]],
+        ["let", "ib", ["ext.jsonschema.tests._find_subslice_v1", "errors", ["bytes.view", "needle_b_b"]]],
+        ["try", ["std.test.assert_i32_eq", [">=", "ia", 0], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", [">=", "ib", 0], 1, ["std.test.code_assert_i32_eq"]]],
+        ["try", ["std.test.assert_i32_eq", ["<", "ia", "ib"], 1, ["std.test.code_assert_i32_eq"]]],
+        ["std.test.pass"]
+      ]
+    }
+  ]
+}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -28,6 +29,9 @@ def stable_canon(obj: Any) -> str:
 
 
 def repo_root() -> Path:
+    override = os.environ.get("X07_LOCKGEN_REPO_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
     return Path(__file__).resolve().parent.parent
 
 

@@ -178,6 +178,28 @@
       }
     },
     {
+      "backend_id": "x07.ext.jsonschema",
+      "abi_major": 1,
+      "link": {
+        "linux": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_ext_jsonschema.a"],
+          "args": [],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        },
+        "macos": {
+          "kind": "static",
+          "files": ["deps/x07/libx07_ext_jsonschema.a"],
+          "args": [],
+          "search_paths": [],
+          "force_load": false,
+          "whole_archive": false
+        }
+      }
+    },
+    {
       "backend_id": "x07.math",
       "abi_major": 1,
       "link": {

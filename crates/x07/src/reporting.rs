@@ -348,6 +348,7 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "test"
             | "bench"
             | "arch"
+            | "assets"
             | "run"
             | "bundle"
             | "guide"
@@ -376,6 +377,7 @@ fn is_top_level_command(cmd: &str) -> bool {
 fn nested_commands(scope: &str) -> &'static [&'static str] {
     match scope {
         "arch" => &["check"],
+        "assets" => &["embed-dir"],
         "ast" => &[
             "init",
             "get",

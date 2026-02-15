@@ -1,0 +1,90 @@
+{
+  "schema_version": "x07.x07ast@0.5.0",
+  "kind": "module",
+  "module_id": "ext.jsonschema",
+  "imports": ["std.bytes"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.jsonschema.compile_v1",
+        "ext.jsonschema.validate_v1",
+        "ext.jsonschema.is_err_v1",
+        "ext.jsonschema.err_code_v1",
+        "ext.jsonschema.err_msg_v1",
+        "ext.jsonschema.errors_json_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.compile_v1",
+      "params": [{ "name": "schema_json", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["jsonschema.compile_v1", "schema_json"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.validate_v1",
+      "params": [
+        { "name": "compiled", "ty": "bytes_view" },
+        { "name": "instance_json", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": ["jsonschema.validate_v1", "compiled", "instance_json"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.is_err_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "if",
+        ["<u", ["view.len", "doc"], 1],
+        1,
+        ["=", ["view.get_u8", "doc", 0], 0]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.err_code_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["=", ["ext.jsonschema.is_err_v1", "doc"], 0], ["return", 0], 0],
+        ["if", ["<u", ["view.len", "doc"], 10], ["return", 0], 0],
+        ["codec.read_u32_le", "doc", 6]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema._err_payload_bytes_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["=", ["ext.jsonschema.is_err_v1", "doc"], 0], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["<u", "n", 14], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "len", ["codec.read_u32_le", "doc", 10]],
+        ["let", "start", 14],
+        ["if", ["<u", "n", ["+", "start", "len"]], ["return", ["bytes.alloc", 0]], 0],
+        ["view.to_bytes", ["view.slice", "doc", "start", "len"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.err_msg_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["ext.jsonschema._err_payload_bytes_v1", "doc"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.jsonschema.errors_json_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": ["ext.jsonschema._err_payload_bytes_v1", "doc"]
+    }
+  ]
+}

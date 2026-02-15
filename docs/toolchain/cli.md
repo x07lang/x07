@@ -39,6 +39,12 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 `--input` may be repeated. Each `<path>` may be a file or a directory; directory inputs are scanned recursively for `*.x07.json`.
 
+### Assets (embed files)
+
+- `x07 assets embed-dir --in <dir> --module-id <module_id> --out <path>`
+  - Generates an `.x07.json` module that embeds all matching files under `<dir>` as base64 payloads.
+  - Useful for shipping templates or other static assets inside bundled OS-world CLIs (similar to Rust `include_bytes!`).
+
 ### Linting + diagnostics (`x07diag` JSON)
 
 - `x07 lint --input <path>`

@@ -11,6 +11,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("arch.check") => Some(include_bytes!(
             "../../../spec/x07-tool-arch-check.report.schema.json"
         )),
+        Some("assets") => Some(include_bytes!(
+            "../../../spec/x07-tool-assets.report.schema.json"
+        )),
+        Some("assets.embed-dir") => Some(include_bytes!(
+            "../../../spec/x07-tool-assets-embed-dir.report.schema.json"
+        )),
         Some("ast") => Some(include_bytes!(
             "../../../spec/x07-tool-ast.report.schema.json"
         )),

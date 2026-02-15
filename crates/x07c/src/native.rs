@@ -7,6 +7,7 @@ pub const BACKEND_ID_TIME: &str = "x07.time";
 pub const BACKEND_ID_EXT_FS: &str = "x07.ext.fs";
 pub const BACKEND_ID_EXT_RAND: &str = "x07.ext.rand";
 pub const BACKEND_ID_EXT_STDIO: &str = "x07.ext.stdio";
+pub const BACKEND_ID_EXT_JSONSCHEMA: &str = "x07.ext.jsonschema";
 pub const BACKEND_ID_EXT_DB_SQLITE: &str = "x07.ext.db.sqlite";
 pub const BACKEND_ID_EXT_DB_PG: &str = "x07.ext.db.pg";
 pub const BACKEND_ID_EXT_DB_MYSQL: &str = "x07.ext.db.mysql";

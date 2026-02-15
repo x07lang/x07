@@ -1067,6 +1067,46 @@
       "modules": [
         {
           "module_id": "ext.cli.complete",
+          "path": "packages/ext/x07-ext-cli/0.1.12/modules/ext/cli/complete.x07.json",
+          "sha256": "10b0df962057c9d4b554334e02282c02e6ab3e324d469ca0e820a6ae44f12419",
+          "size_bytes": 559
+        },
+        {
+          "module_id": "ext.cli.help",
+          "path": "packages/ext/x07-ext-cli/0.1.12/modules/ext/cli/help.x07.json",
+          "sha256": "b9f65f30258d54335bad42bfbd4f6a55c80056780d236f5889f6e762efe6c360",
+          "size_bytes": 3394
+        },
+        {
+          "module_id": "ext.cli.specrows",
+          "path": "packages/ext/x07-ext-cli/0.1.12/modules/ext/cli/specrows.x07.json",
+          "sha256": "5786b16971fef9d07065bcedea641c7015e49e3b10e9cb9382a649c739750f66",
+          "size_bytes": 11107
+        },
+        {
+          "module_id": "ext.cli.tests",
+          "path": "packages/ext/x07-ext-cli/0.1.12/modules/ext/cli/tests.x07.json",
+          "sha256": "6e9da0448d85512ffc0d0c8de160e129d099841acd5bd879ff87369cf325e0a6",
+          "size_bytes": 13991
+        },
+        {
+          "module_id": "ext.cli",
+          "path": "packages/ext/x07-ext-cli/0.1.12/modules/ext/cli.x07.json",
+          "sha256": "acfd46f859a0c17d4232c9faecf22a981d12182a65bd190c259efc8a34572cc5",
+          "size_bytes": 42312
+        }
+      ],
+      "name": "ext-cli",
+      "package_manifest_sha256": "a72d7b6d076d8a42d86b5a766075b73099309d5e97ea8b8ac9077c70888a95aa",
+      "path": "packages/ext/x07-ext-cli/0.1.12",
+      "version": "0.1.12"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.cli.complete",
           "path": "packages/ext/x07-ext-cli/0.1.2/modules/ext/cli/complete.x07.json",
           "sha256": "e2019240ef981c4ec0653ba231e004b025f745b978a6f37d6c3aad7111716ec0",
           "size_bytes": 558
@@ -5138,6 +5178,28 @@
       "package_manifest_sha256": "7801ecd8a774f290c864a42e5bc3280e6ed7268bc2e79d8d66c5e1472eebe208",
       "path": "packages/ext/x07-ext-json-rs/0.1.4",
       "version": "0.1.4"
+    },
+    {
+      "determinism_tier": "pure",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.jsonschema.tests",
+          "path": "packages/ext/x07-ext-jsonschema-rs/0.1.0/modules/ext/jsonschema/tests.x07.json",
+          "sha256": "e85b2571087fa42e206a387fbaef66c910ec544d373738984de58c6e8f431c1d",
+          "size_bytes": 6726
+        },
+        {
+          "module_id": "ext.jsonschema",
+          "path": "packages/ext/x07-ext-jsonschema-rs/0.1.0/modules/ext/jsonschema.x07.json",
+          "sha256": "e21611444b8ea6bd6659a4d01a78dbb39f4043d2f66ac3fd10457a0333ab1da3",
+          "size_bytes": 2748
+        }
+      ],
+      "name": "ext-jsonschema-rs",
+      "package_manifest_sha256": "5964a1f60b89cdea77d6989601fd45f0a9102e60e7cee8b1b5a26a42b74634d3",
+      "path": "packages/ext/x07-ext-jsonschema-rs/0.1.0",
+      "version": "0.1.0"
     },
     {
       "determinism_tier": "pure",
@@ -10685,6 +10747,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "46a1bb873612a5654000cf27e988070e500ae670c0a541b736b84f62568fbcff",
+  "packages_hash": "bdddfdaf31fc3ee3f0bd453304a4d6a0d776ba0ba72022b97ea37146b6e8af6d",
   "packages_root": "packages/ext"
 }

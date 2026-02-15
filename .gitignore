@@ -83,6 +83,11 @@ packages/**/dist/
 /deps/x07/x07_ext_regex.lib
 /deps/x07/include/x07_ext_regex_abi_v1.h
 
+# Native ext-jsonschema backend artifacts (built by scripts/build_ext_jsonschema.sh)
+/deps/x07/libx07_ext_jsonschema.a
+/deps/x07/x07_ext_jsonschema.lib
+/deps/x07/include/x07_ext_jsonschema_abi_v1.h
+
 # Native ext-db-sqlite backend artifacts (built by scripts/build_ext_db_sqlite.sh)
 /deps/x07/libx07_ext_db_sqlite.a
 /deps/x07/x07_ext_db_sqlite.lib

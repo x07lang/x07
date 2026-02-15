@@ -13611,6 +13611,9 @@ impl<'a> Emitter<'a> {
             "regex.split_v1" => self.emit_regex_split_v1_to(args, dest_ty, dest),
             "regex.replace_all_v1" => self.emit_regex_replace_all_v1_to(args, dest_ty, dest),
 
+            "jsonschema.compile_v1" => self.emit_jsonschema_compile_v1_to(args, dest_ty, dest),
+            "jsonschema.validate_v1" => self.emit_jsonschema_validate_v1_to(args, dest_ty, dest),
+
             "bytes.view" => self.emit_bytes_view_to(args, dest_ty, dest),
             "bytes.subview" => self.emit_bytes_subview_to(args, dest_ty, dest),
             "view.len" => self.emit_view_len_to(args, dest_ty, dest),
@@ -20801,6 +20804,85 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         self.line(&format!(
             "{dest} = x07_ext_regex_replace_all_v1((bytes_t){{ .ptr = {}.ptr, .len = {}.len }}, (bytes_t){{ .ptr = {}.ptr, .len = {}.len }}, (bytes_t){{ .ptr = {}.ptr, .len = {}.len }}, (int32_t){});",
             compiled.c_name, compiled.c_name, text.c_name, text.c_name, repl.c_name, repl.c_name, cap_limit.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_jsonschema_compile_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_JSONSCHEMA,
+            native::ABI_MAJOR_V1,
+            "jsonschema.compile_v1",
+        )?;
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "jsonschema.compile_v1 expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "jsonschema.compile_v1 returns bytes".to_string(),
+            ));
+        }
+        let schema_json = self.emit_expr(&args[0])?;
+        if schema_json.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "jsonschema.compile_v1 expects bytes_view schema_json".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_jsonschema_compile_v1((bytes_t){{ .ptr = {}.ptr, .len = {}.len }});",
+            schema_json.c_name, schema_json.c_name
+        ));
+        Ok(())
+    }
+
+    fn emit_jsonschema_validate_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_JSONSCHEMA,
+            native::ABI_MAJOR_V1,
+            "jsonschema.validate_v1",
+        )?;
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "jsonschema.validate_v1 expects 2 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "jsonschema.validate_v1 returns bytes".to_string(),
+            ));
+        }
+        let compiled = self.emit_expr(&args[0])?;
+        let instance_json = self.emit_expr(&args[1])?;
+        if compiled.ty != Ty::BytesView || instance_json.ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "jsonschema.validate_v1 expects (bytes_view compiled, bytes_view instance_json)"
+                    .to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_jsonschema_validate_v1((bytes_t){{ .ptr = {}.ptr, .len = {}.len }}, (bytes_t){{ .ptr = {}.ptr, .len = {}.len }});",
+            compiled.c_name,
+            compiled.c_name,
+            instance_json.c_name,
+            instance_json.c_name
         ));
         Ok(())
     }
@@ -31056,6 +31138,38 @@ impl InferCtx {
                         }
                         Ok(Ty::Bytes.into())
                     }
+                    "jsonschema.compile_v1" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "jsonschema.compile_v1 expects 1 arg".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::BytesView {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "jsonschema.compile_v1 expects bytes_view".to_string(),
+                            ));
+                        }
+                        Ok(Ty::Bytes.into())
+                    }
+                    "jsonschema.validate_v1" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "jsonschema.validate_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::BytesView
+                            || self.infer(&args[1])? != Ty::BytesView
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "jsonschema.validate_v1 expects (bytes_view, bytes_view)".to_string(),
+                            ));
+                        }
+                        Ok(Ty::Bytes.into())
+                    }
                     "vec_u8.with_capacity" => {
                         if args.len() != 1 {
                             return Err(CompilerError::new(
@@ -33466,6 +33580,10 @@ bytes_t x07_ext_regex_exec_caps_from_v1(bytes_t compiled, bytes_t text, int32_t 
 bytes_t x07_ext_regex_find_all_x7sl_v1(bytes_t compiled, bytes_t text, int32_t max_matches_i32);
 bytes_t x07_ext_regex_split_v1(bytes_t compiled, bytes_t text, int32_t max_parts_i32);
 bytes_t x07_ext_regex_replace_all_v1(bytes_t compiled, bytes_t text, bytes_t repl, int32_t cap_limit_i32);
+
+// Native ext-jsonschema backend entrypoints (linked from deps/x07/libx07_ext_jsonschema.*).
+bytes_t x07_ext_jsonschema_compile_v1(bytes_t schema_json);
+bytes_t x07_ext_jsonschema_validate_v1(bytes_t compiled, bytes_t instance_json);
 
 #ifdef X07_STANDALONE
 static uint32_t rt_os_process_poll_all(ctx_t* ctx, int poll_timeout_ms);

@@ -278,7 +278,7 @@ fn cmd_init_mcp_template(root: &Path, template: InitTemplate) -> Result<std::pro
         OsString::from("--template"),
         OsString::from(mcp_template_name(template)),
         OsString::from("--dir"),
-        root.as_os_str().to_os_string(),
+        OsString::from("."),
         OsString::from("--toolchain-version"),
         OsString::from(env!("CARGO_PKG_VERSION")),
         OsString::from("--machine"),

@@ -18,6 +18,7 @@ use x07_worlds::WorldId;
 use x07c::project;
 
 mod arch;
+mod assets_cmd;
 mod ast;
 mod bench;
 mod bundle;
@@ -78,6 +79,8 @@ enum Command {
     Bench(bench::BenchArgs),
     /// Check architecture manifests (architecture as data).
     Arch(arch::ArchArgs),
+    /// Embed and manage asset bundles (codegen helpers).
+    Assets(assets_cmd::AssetsArgs),
     /// Run X07 programs via the appropriate runner.
     Run(Box<run::RunArgs>),
     /// Produce a distributable native executable (no toolchain required at runtime).
@@ -304,6 +307,10 @@ fn try_main() -> Result<std::process::ExitCode> {
                 None => vec!["arch"],
                 Some(arch::ArchCommand::Check(_)) => vec!["arch", "check"],
             },
+            Some(Command::Assets(args)) => match &args.cmd {
+                None => vec!["assets"],
+                Some(assets_cmd::AssetsCommand::EmbedDir(_)) => vec!["assets", "embed-dir"],
+            },
             Some(Command::Run(_)) => vec!["run"],
             Some(Command::Bundle(_)) => vec!["bundle"],
             Some(Command::Guide(_)) => vec!["guide"],
@@ -400,6 +407,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Test(args) => cmd_test(&cli.machine, args),
         Command::Bench(args) => bench::cmd_bench(&cli.machine, args),
         Command::Arch(args) => arch::cmd_arch(&cli.machine, args),
+        Command::Assets(args) => assets_cmd::cmd_assets(&cli.machine, args),
         Command::Run(args) => run::cmd_run(&cli.machine, *args),
         Command::Bundle(args) => bundle::cmd_bundle(&cli.machine, *args),
         Command::Guide(args) => guide::cmd_guide(&cli.machine, args),

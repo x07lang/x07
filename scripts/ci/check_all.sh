@@ -83,6 +83,9 @@ step "stage native ext-stdio backend"
 step "stage native ext-rand backend"
 ./scripts/ci/ensure_ext_rand_backend.sh
 
+step "stage native ext-jsonschema backend"
+./scripts/ci/ensure_ext_jsonschema_backend.sh
+
 step "cargo test"
 cargo test
 
