@@ -184,7 +184,7 @@
         "linux": {
           "kind": "static",
           "files": ["deps/x07/libx07_ext_jsonschema.a"],
-          "args": [],
+          "args": ["-lm"],
           "search_paths": [],
           "force_load": false,
           "whole_archive": false

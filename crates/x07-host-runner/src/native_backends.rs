@@ -81,6 +81,33 @@ fn push_link_args(
     Ok(())
 }
 
+fn split_linux_link_args(args: &[String], backend_id: &str) -> Result<(Vec<String>, Vec<String>)> {
+    let mut head: Vec<String> = Vec::new();
+    let mut tail: Vec<String> = Vec::new();
+    let mut i: usize = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "-framework" || arg == "-weak_framework" {
+            let Some(name) = args.get(i + 1) else {
+                anyhow::bail!(
+                    "native backend {backend_id} has dangling {arg} in args (expected framework name)"
+                );
+            };
+            head.push(arg.clone());
+            head.push(name.clone());
+            i = i.saturating_add(2);
+            continue;
+        }
+        if arg.starts_with("-l") {
+            tail.push(arg.clone());
+        } else {
+            head.push(arg.clone());
+        }
+        i = i.saturating_add(1);
+    }
+    Ok((head, tail))
+}
+
 pub fn plan_native_link_argv(
     toolchain_root: &Path,
     requires: &NativeRequires,
@@ -122,6 +149,7 @@ pub fn plan_native_link_argv(
     let mut seen_args: BTreeSet<String> = BTreeSet::new();
     let mut libs: Vec<String> = Vec::new();
     let mut seen_libs: BTreeSet<String> = BTreeSet::new();
+    let mut tail_args_linux: Vec<String> = Vec::new();
 
     for req in &reqs {
         let backend = backends
@@ -167,7 +195,16 @@ pub fn plan_native_link_argv(
             }
         }
 
-        push_link_args(&mut out, &mut seen_args, &spec.args, &backend.backend_id)?;
+        match platform {
+            HostPlatform::Linux => {
+                let (head, tail) = split_linux_link_args(&spec.args, &backend.backend_id)?;
+                push_link_args(&mut out, &mut seen_args, &head, &backend.backend_id)?;
+                tail_args_linux.extend(tail);
+            }
+            HostPlatform::MacOS => {
+                push_link_args(&mut out, &mut seen_args, &spec.args, &backend.backend_id)?;
+            }
+        }
 
         if spec.force_load {
             anyhow::bail!(
@@ -205,6 +242,7 @@ pub fn plan_native_link_argv(
                 out.extend(libs);
                 out.push("-Wl,--end-group".to_string());
             }
+            push_link_args(&mut out, &mut seen_args, &tail_args_linux, "linux-tail")?;
         }
         HostPlatform::MacOS => {
             out.extend(libs);
@@ -250,7 +288,7 @@ fn join_rel(root: &Path, rel: &str) -> Result<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::push_link_args;
+    use super::{push_link_args, split_linux_link_args};
     use std::collections::BTreeSet;
 
     #[test]
@@ -296,5 +334,30 @@ mod tests {
         let mut seen = BTreeSet::new();
         push_link_args(&mut out, &mut seen, &args, "x07.test").expect("push args");
         assert_eq!(out, args);
+    }
+
+    #[test]
+    fn split_linux_link_args_moves_library_flags_to_tail() {
+        let args = vec![
+            "-pthread".to_string(),
+            "-lm".to_string(),
+            "-lssl".to_string(),
+            "-Wl,-rpath,/tmp/x07".to_string(),
+        ];
+        let (head, tail) = split_linux_link_args(&args, "x07.test").expect("split args");
+        assert_eq!(head, vec!["-pthread", "-Wl,-rpath,/tmp/x07"]);
+        assert_eq!(tail, vec!["-lm", "-lssl"]);
+    }
+
+    #[test]
+    fn split_linux_link_args_preserves_framework_pairs() {
+        let args = vec![
+            "-framework".to_string(),
+            "CoreFoundation".to_string(),
+            "-lm".to_string(),
+        ];
+        let (head, tail) = split_linux_link_args(&args, "x07.test").expect("split args");
+        assert_eq!(head, vec!["-framework", "CoreFoundation"]);
+        assert_eq!(tail, vec!["-lm"]);
     }
 }
