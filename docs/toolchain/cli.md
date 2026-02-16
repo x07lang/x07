@@ -12,11 +12,16 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Creates a publishable package repo: `x07-package.json`, a minimal `x07.json` + `x07.lock.json`, publishable `modules/` layout, and a CI-friendly `tests/tests.json`.
   - Not compatible with `--template` (templates are for app scaffolds).
 
-### MCP kit tooling (delegated)
+### MCP kit tooling
 
 - `x07 mcp [ARGS...]`
   - Delegates to `x07-mcp` on PATH.
-  - Exit code `2` if `x07-mcp` is not installed/discoverable.
+  - Delegated commands exit with code `2` if `x07-mcp` is not installed/discoverable.
+- Common subcommands (provided by `x07-mcp`):
+  - `x07 mcp registry gen --in <x07.mcp.json> --out <server.json> [--mcpb <file>] [--schema <schema.json>]`
+  - `x07 mcp publish --dry-run --server-json <server.json> --mcpb <file>`
+  - `x07 mcp conformance --url <url> [--baseline <path>] [--spawn <server-id> --mode <noauth|oauth>]`
+  - `x07 mcp bundle --mcpb --server-dir <servers/<id>> [--out <dist/...mcpb>]`
 - `x07 init --template mcp-server|mcp-server-stdio|mcp-server-http`
   - Delegates template generation to `x07-mcp scaffold init ... --machine json`.
   - Creates the agent kit and a worker base policy at `.x07/policies/base/worker.sandbox.base.policy.json`.

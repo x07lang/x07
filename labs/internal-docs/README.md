@@ -17,6 +17,7 @@ Quick entry points:
 - Release and cross-repo propagation: `change-propagation.md`
 - Rename note: `rename.md`
 - Stream pipe internals: `spec/stream-pipe.md`
+- MCP kit release policy: `mcp/ecosystem-release.md`
 
 End-user package contracts live under:
 
