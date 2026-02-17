@@ -2,6 +2,14 @@
 
 `x07-mcp` is the MCP server kit for X07. It ships templates, package modules, and a dedicated CLI for scaffold/check/bundle/conformance workflows.
 
+Phase 4 adds:
+
+- Streamable HTTP SSE (`POST /mcp` streaming and `GET /mcp` listen streams)
+- progress tokens (`_meta.progressToken`) + `notifications/progress`
+- explicit cancellation (`notifications/cancelled`)
+- `resources/subscribe` / `resources/unsubscribe` + `notifications/resources/updated`
+- deterministic HTTP+SSE RR fixtures (`*.http_sse.session.jsonl`)
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:
@@ -39,11 +47,27 @@ Or spawn a reference server in the same command:
 
 ```sh
 x07 mcp conformance \
-  --url http://127.0.0.1:8080/mcp \
   --baseline conformance/conformance-baseline.yml \
   --spawn postgres-mcp \
-  --mode oauth
+  --mode noauth
 ```
+
+When `--url` is omitted with `--spawn`, the harness derives host/port/path from the selected server config.
+
+Default run mode executes the Phase-4 regression scenarios:
+
+- `server-initialize`
+- `ping`
+- `tools-list`
+- `tools-call-with-progress`
+- `resources-subscribe`
+- `resources-unsubscribe`
+- `server-sse-multiple-streams`
+- `dns-rebinding-protection`
+
+Use `--full-suite` to run the full active conformance suite.
+
+Current policy: keep `conformance/conformance-baseline.yml` empty and fail CI on regressions.
 
 ## Registry and publish workflow
 
@@ -88,4 +112,4 @@ The kit includes these reference servers:
 ## OAuth and replay in template tests
 
 - OAuth fixture tokens (`TOKEN_OK`, `TOKEN_NO_SCOPE`) are defined in `config/mcp.oauth.json` for deterministic local tests.
-- `tests/mcp_http_replay.x07.json` replays HTTP cassettes to verify protocol/auth guardrails without live network dependencies.
+- `tests/mcp_http_replay.x07.json` replays HTTP and HTTP+SSE cassettes to verify protocol/auth/streaming guardrails without live network dependencies.

@@ -12,10 +12,26 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
 ## Conformance baseline policy
 
 - Keep expected-failure baseline minimal.
-- Current baseline keys:
-  - `tools-call-with-progress`
-  - `resources-subscribe`
+- Current baseline keys: _none_ (`server: []`, `client: []`).
 - CI fails on regressions and also fails when baseline entries become stale.
+
+## Phase 4 verification checks
+
+- `POST /mcp` SSE flow:
+  - prime event emitted first
+  - progress notification emitted when `_meta.progressToken` is requested
+  - final JSON-RPC response event emitted unless cancelled
+- `GET /mcp` listen SSE flow:
+  - subscription updates routed to listen stream only
+  - no-broadcast routing between request/listen streams
+- Resumption:
+  - `Last-Event-ID` resumes from bounded stream buffer
+  - replay does not cross stream keys
+- Cancellation:
+  - `notifications/cancelled` stops in-flight request
+  - cancelled request produces no final response
+- Origin enforcement:
+  - invalid Origin on POST or GET returns `403`
 
 ## Release checklist
 
