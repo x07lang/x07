@@ -879,7 +879,7 @@ fn x07_test_contract_violation_emits_repro_and_report_fields() {
         repro["source"]["test_entry"],
         "contracts_fixture.contract_fail"
     );
-    assert_eq!(repro["runner"]["solve_fuel"], 50_000_000);
+    assert_eq!(repro["runner"]["solve_fuel"], 200_000_000);
     assert_eq!(repro["runner"]["max_memory_bytes"], 64 * 1024 * 1024);
     assert_eq!(repro["runner"]["max_output_bytes"], 1024 * 1024);
     assert_eq!(repro["runner"]["cpu_time_limit_seconds"], 5);

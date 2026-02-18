@@ -1315,6 +1315,7 @@ struct OsRunnerSolveRaw {
 }
 
 static X07TEST_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+const X07TEST_SOLVE_FUEL: u64 = 200_000_000;
 
 fn create_temp_test_dir(base: &Path) -> Result<PathBuf> {
     std::fs::create_dir_all(base)
@@ -1470,6 +1471,7 @@ fn run_one_test_os(
     };
     cmd.arg("--cpu-time-limit-seconds")
         .arg(cpu_time_limit_seconds.to_string());
+    cmd.arg("--solve-fuel").arg(X07TEST_SOLVE_FUEL.to_string());
 
     let output = cmd.output().with_context(|| {
         format!(
@@ -1581,7 +1583,7 @@ fn run_one_test_os(
                         fixture_rr_dir: None,
                         fixture_kv_dir: None,
                         fixture_kv_seed: None,
-                        solve_fuel: 50_000_000,
+                        solve_fuel: X07TEST_SOLVE_FUEL,
                         max_memory_bytes: 64 * 1024 * 1024,
                         max_output_bytes: 1024 * 1024,
                         cpu_time_limit_seconds,
@@ -1705,7 +1707,7 @@ fn runner_config_for_test(test: &TestDecl) -> Result<RunnerConfig> {
         fixture_rr_dir: None,
         fixture_kv_dir: None,
         fixture_kv_seed: None,
-        solve_fuel: 50_000_000,
+        solve_fuel: X07TEST_SOLVE_FUEL,
         max_memory_bytes: 64 * 1024 * 1024,
         max_output_bytes: 1024 * 1024,
         cpu_time_limit_seconds,
