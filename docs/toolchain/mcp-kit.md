@@ -10,12 +10,20 @@ Phase 4 adds:
 - `resources/subscribe` / `resources/unsubscribe` + `notifications/resources/updated`
 - deterministic HTTP+SSE RR fixtures (`*.http_sse.session.jsonl`)
 
+Phase 5 adds:
+
+- Tasks API (`tools/call` task mode + `tasks/get|list|result|cancel`)
+- task-aware negotiation (`tools/list.execution.taskSupport`)
+- task stores: in-memory + durable sqlite (restart marks `working → failed`)
+- deterministic RR transcript fixtures (JSONL)
+- a new template: `mcp-server-http-tasks`
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:
 
 - `x07 mcp ...` delegates to `x07-mcp ...` on PATH.
-- `x07 init --template mcp-server|mcp-server-stdio|mcp-server-http` delegates scaffold generation to `x07-mcp scaffold init`.
+- `x07 init --template mcp-server|mcp-server-stdio|mcp-server-http|mcp-server-http-tasks` delegates scaffold generation to `x07-mcp scaffold init`.
 
 If `x07-mcp` is not installed on PATH, delegated commands exit with code `2`.
 
@@ -34,6 +42,22 @@ The HTTP template includes:
 - `config/mcp.tools.json` (`x07.mcp.tools_manifest@0.2.0`)
 - `config/mcp.oauth.json` (`x07.mcp.oauth@0.1.0`, with deterministic `test_static` dev tokens)
 - deterministic HTTP replay fixtures under `tests/.x07_rr/sessions/`
+
+## HTTP Tasks template quickstart
+
+```sh
+x07 init --template mcp-server-http-tasks --dir ./my-mcp-http-tasks
+cd ./my-mcp-http-tasks
+x07 pkg lock
+x07 test --manifest tests/tests.json
+```
+
+The HTTP Tasks template includes:
+
+- `mcp.server.json` (`x07.mcp.server_config@0.3.0`)
+- `mcp.server.sqlite.json` (sqlite store example + restart behavior smoke test)
+- `mcp.tools.json` (`x07.mcp.tools_manifest@0.2.0`, including `execution.taskSupport`)
+- RR transcript fixtures under `tests/fixtures/rr/`
 
 ## Conformance workflow
 

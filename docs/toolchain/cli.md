@@ -22,7 +22,7 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - `x07 mcp publish --dry-run --server-json <server.json> --mcpb <file>`
   - `x07 mcp conformance --url <url> [--baseline <path>] [--spawn <server-id> --mode <noauth|oauth>]`
   - `x07 mcp bundle --mcpb --server-dir <servers/<id>> [--out <dist/...mcpb>]`
-- `x07 init --template mcp-server|mcp-server-stdio|mcp-server-http`
+- `x07 init --template mcp-server|mcp-server-stdio|mcp-server-http|mcp-server-http-tasks`
   - Delegates template generation to `x07-mcp scaffold init ... --machine json`.
   - Creates the agent kit and a worker base policy at `.x07/policies/base/worker.sandbox.base.policy.json`.
 

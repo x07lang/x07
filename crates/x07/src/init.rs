@@ -44,6 +44,7 @@ pub enum InitTemplate {
     McpServer,
     McpServerStdio,
     McpServerHttp,
+    McpServerHttpTasks,
 }
 
 #[derive(Debug, Clone)]
@@ -162,7 +163,10 @@ fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str]
         InitTemplate::SqliteApp => &["db.core", "db.sqlite", "data.model", "fs.io"],
         InitTemplate::PostgresClient => &["db.core", "db.postgres", "data.model"],
         InitTemplate::Worker => &["log.basic"],
-        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp => &[],
+        InitTemplate::McpServer
+        | InitTemplate::McpServerStdio
+        | InitTemplate::McpServerHttp
+        | InitTemplate::McpServerHttpTasks => &[],
     }
 }
 
@@ -175,9 +179,10 @@ fn template_default_profile(template: InitTemplate) -> &'static str {
         | InitTemplate::SqliteApp
         | InitTemplate::PostgresClient
         | InitTemplate::Worker => "sandbox",
-        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp => {
-            "os"
-        }
+        InitTemplate::McpServer
+        | InitTemplate::McpServerStdio
+        | InitTemplate::McpServerHttp
+        | InitTemplate::McpServerHttpTasks => "os",
     }
 }
 
@@ -190,9 +195,10 @@ fn init_template_policy_template(template: InitTemplate) -> crate::policy::Polic
         InitTemplate::SqliteApp => crate::policy::PolicyTemplate::SqliteApp,
         InitTemplate::PostgresClient => crate::policy::PolicyTemplate::PostgresClient,
         InitTemplate::Worker => crate::policy::PolicyTemplate::Worker,
-        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp => {
-            crate::policy::PolicyTemplate::Worker
-        }
+        InitTemplate::McpServer
+        | InitTemplate::McpServerStdio
+        | InitTemplate::McpServerHttp
+        | InitTemplate::McpServerHttpTasks => crate::policy::PolicyTemplate::Worker,
     }
 }
 
@@ -211,16 +217,20 @@ fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> 
         | InitTemplate::SqliteApp
         | InitTemplate::PostgresClient
         | InitTemplate::Worker => Ok((app_module_bytes()?, main_entry_bytes()?)),
-        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp => {
-            Ok((app_module_bytes()?, main_entry_bytes()?))
-        }
+        InitTemplate::McpServer
+        | InitTemplate::McpServerStdio
+        | InitTemplate::McpServerHttp
+        | InitTemplate::McpServerHttpTasks => Ok((app_module_bytes()?, main_entry_bytes()?)),
     }
 }
 
 fn is_mcp_template(template: InitTemplate) -> bool {
     matches!(
         template,
-        InitTemplate::McpServer | InitTemplate::McpServerStdio | InitTemplate::McpServerHttp
+        InitTemplate::McpServer
+            | InitTemplate::McpServerStdio
+            | InitTemplate::McpServerHttp
+            | InitTemplate::McpServerHttpTasks
     )
 }
 
@@ -229,6 +239,7 @@ fn mcp_template_name(template: InitTemplate) -> &'static str {
         InitTemplate::McpServer => "mcp-server",
         InitTemplate::McpServerStdio => "mcp-server-stdio",
         InitTemplate::McpServerHttp => "mcp-server-http",
+        InitTemplate::McpServerHttpTasks => "mcp-server-http-tasks",
         _ => "unknown",
     }
 }
