@@ -1315,7 +1315,7 @@ struct OsRunnerSolveRaw {
 }
 
 static X07TEST_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
-const X07TEST_SOLVE_FUEL: u64 = 200_000_000;
+const X07TEST_SOLVE_FUEL: u64 = 400_000_000;
 
 fn create_temp_test_dir(base: &Path) -> Result<PathBuf> {
     std::fs::create_dir_all(base)

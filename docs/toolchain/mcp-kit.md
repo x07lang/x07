@@ -18,6 +18,13 @@ Phase 5 adds:
 - deterministic RR transcript fixtures (JSONL)
 - a new template: `mcp-server-http-tasks`
 
+Phase 6 adds:
+
+- progress token lifecycle enforcement for tasks
+- `notifications/progress` tied to task lifetime (stops after terminal)
+- resumable SSE outbox behavior (bounded buffering + `Last-Event-ID`)
+- golden RR transcript fixture for tasks progress (`hello_tasks_progress`)
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:

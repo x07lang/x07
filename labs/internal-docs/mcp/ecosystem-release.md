@@ -33,6 +33,16 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
 - Origin enforcement:
   - invalid Origin on POST or GET returns `403`
 
+## Phase 6 verification checks
+
+- Task progress invariants:
+  - task-augmented `tools/call` progress token remains valid for task lifetime
+  - progress notifications stop after the task reaches a terminal state
+  - progress notifications include related-task metadata
+- Deterministic RR guardrails:
+  - `hello_tasks_progress` replay fixture is enforced in CI
+  - replay fails if progress continues after terminal
+
 ## Release checklist
 
 1. Run `x07-mcp` checks (`./scripts/ci/check_all.sh` and reference server suites).
