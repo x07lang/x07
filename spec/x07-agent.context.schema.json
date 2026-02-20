@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-agent.context.schema.json",
+  "title": "x07.agent.context@0.1.0",
+  "description": "Deterministic, portable context pack artifact produced by `x07 agent context`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "toolchain",
+    "project",
+    "focus",
+    "diagnostics",
+    "ast",
+    "env",
+    "digests"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "x07.agent.context@0.1.0"
+    },
+    "toolchain": {
+      "$ref": "#/$defs/toolchain"
+    },
+    "project": {
+      "$ref": "#/$defs/project"
+    },
+    "focus": {
+      "$ref": "#/$defs/focus"
+    },
+    "diagnostics": {
+      "$ref": "https://x07.io/spec/x07diag.schema.json"
+    },
+    "ast": {
+      "$ref": "#/$defs/ast"
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "digests": {
+      "$ref": "#/$defs/digests"
+    }
+  },
+  "$defs": {
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "const": "x07"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "world", "entry"],
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "world": {
+          "enum": [
+            "solve-pure",
+            "solve-fs",
+            "solve-rr",
+            "solve-kv",
+            "solve-full",
+            "run-os",
+            "run-os-sandboxed"
+          ]
+        },
+        "entry": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["diag_code", "loc_ptr"],
+      "properties": {
+        "diag_code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loc_ptr": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2048,
+          "description": "JSON Pointer (RFC 6901) into the source x07AST."
+        }
+      }
+    },
+    "ast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_path",
+        "source_schema_version",
+        "slice_ast",
+        "slice_meta"
+      ],
+      "properties": {
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_schema_version": {
+          "enum": [
+            "x07.x07ast@0.3.0",
+            "x07.x07ast@0.4.0",
+            "x07.x07ast@0.5.0"
+          ]
+        },
+        "slice_ast": {
+          "oneOf": [
+            {
+              "$ref": "https://x07.io/spec/x07ast.v0.3.0.schema.json"
+            },
+            {
+              "$ref": "https://x07.io/spec/x07ast.v0.4.0.schema.json"
+            },
+            {
+              "$ref": "https://x07.io/spec/x07ast.v0.5.0.schema.json"
+            }
+          ]
+        },
+        "slice_meta": {
+          "$ref": "#/$defs/slice_meta"
+        }
+      }
+    },
+    "ptr_remap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" }
+      }
+    },
+    "slice_meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ptr",
+        "enclosure",
+        "closure",
+        "ptr_remap",
+        "omitted",
+        "missing",
+        "truncated"
+      ],
+      "properties": {
+        "ptr": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2048
+        },
+        "enclosure": {
+          "enum": ["defn", "decl", "module"]
+        },
+        "closure": {
+          "enum": ["locals", "types", "imports", "all"]
+        },
+        "ptr_remap": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ptr_remap" },
+          "default": []
+        },
+        "omitted": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["locals", "types", "imports"],
+          "properties": {
+            "locals": { "type": "boolean" },
+            "types": { "type": "boolean" },
+            "imports": { "type": "boolean" }
+          }
+        },
+        "missing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["locals", "types", "imports"],
+          "properties": {
+            "locals": { "type": "array", "items": { "type": "string" }, "default": [] },
+            "types": { "type": "array", "items": { "type": "string" }, "default": [] },
+            "imports": { "type": "array", "items": { "type": "string" }, "default": [] }
+          }
+        },
+        "truncated": { "type": "boolean" },
+        "truncation": { "$ref": "#/$defs/truncation" }
+      }
+    },
+    "truncation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decls_before", "decls_after", "bytes_before", "bytes_after", "reason"],
+      "properties": {
+        "max_nodes": { "type": "integer", "minimum": 1 },
+        "max_bytes": { "type": "integer", "minimum": 1 },
+        "decls_before": { "type": "integer", "minimum": 0 },
+        "decls_after": { "type": "integer", "minimum": 0 },
+        "bytes_before": { "type": "integer", "minimum": 0 },
+        "bytes_after": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "file_digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes_len"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "bytes_len": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputs", "outputs"],
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file_digest" },
+          "default": []
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file_digest" },
+          "default": []
+        }
+      }
+    }
+  }
+}
+

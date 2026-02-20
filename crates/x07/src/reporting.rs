@@ -356,6 +356,7 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "diag"
             | "policy"
             | "ast"
+            | "agent"
             | "fmt"
             | "lint"
             | "fix"
@@ -381,12 +382,14 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
         "ast" => &[
             "init",
             "get",
+            "slice",
             "apply-patch",
             "validate",
             "canon",
             "schema",
             "grammar",
         ],
+        "agent" => &["context"],
         "bench" => &["list", "validate", "eval"],
         "cli" => &["spec"],
         "cli.spec" => &["fmt", "check", "compile"],

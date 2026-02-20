@@ -31,6 +31,9 @@ For explicit control (or when you want the raw reports), use `x07 fmt` / `x07 li
 - Raw diagnostics output: `x07diag` (schema: `spec/x07diag.schema.json`)
 - Tool reports (`--json`): `spec/x07-tool-<scope>.report.schema.json` (base: `spec/x07-tool.report.schema.json`)
 - Tool streaming events (`--jsonl`): `spec/x07-tool.events.schema.json` (`schema_version: "x07.tool.events@0.1.0"`)
+- Deterministic AST slice wrapper (`x07 --json ast slice ...`): `spec/x07-tool-ast-slice.report.schema.json` (`schema_version: "x07.tool.ast.slice.report@0.1.0"`)
+- Deterministic context pack artifact (`x07 agent context ...`): `spec/x07-agent.context.schema.json` (`schema_version: "x07.agent.context@0.1.0"`)
+- Context pack wrapper (`x07 --json agent context ...`): `spec/x07-tool-agent-context.report.schema.json` (`schema_version: "x07.tool.agent.context.report@0.1.0"`)
 - Diagnostics catalog (source of truth): `catalog/diagnostics.json` (schema: `spec/x07-diag.catalog.schema.json`)
 - Diagnostics coverage report: `x07.diag.coverage@0.1.0` (schema: `spec/x07-diag.coverage.schema.json`)
 

@@ -61,6 +61,28 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 See: [PBT repro → regression test](pbt-fix-from-repro.md).
 
+### AST slicing (deterministic context views)
+
+- `x07 ast slice --in <path> --ptr <json_pointer> [--enclosure decl|defn|module] [--closure locals|types|imports|all] [--max-nodes N] [--max-bytes BYTES]`
+  - Emits a minimal, semantically-closed x07AST slice around `--ptr` (plus `slice_meta` describing omissions, remaps, and truncation).
+  - Pointers refer to the canonical x07AST view (run `x07 fmt` or use pointers produced by toolchain diagnostics).
+  - If the focus decl is re-indexed to `decls[0]`, `slice_meta.ptr_remap[]` records the pointer rewrite.
+  - If bounds force truncation, `slice_meta.truncated=true` and diagnostic `X07-AST-SLICE-0001` is emitted.
+  - With global `--out <path>`, writes the canonical `slice_ast` to `<path>` and omits it from the stdout report to avoid duplication.
+  - Tool wrapper schema (`--json`): `spec/x07-tool-ast-slice.report.schema.json` (`schema_version: "x07.tool.ast.slice.report@0.1.0"`).
+
+### Agent context packs
+
+- `x07 agent context --diag <path> --project <path> [--enclosure ...] [--closure ...] [--max-nodes ...] [--max-bytes ...]`
+  - Produces a deterministic, portable context artifact (`schema_version: "x07.agent.context@0.1.0"`) that embeds:
+    - the diagnostics (focus = first `severity=error`, else first),
+    - an AST slice of the project entry module at the focused diagnostic pointer,
+    - input digests for traceability.
+  - `--diag` accepts either raw `x07diag` (`x07.x07diag@0.1.0`) or a tool wrapper report (`x07.tool.*.report@0.1.0`); diagnostics are extracted deterministically.
+  - With global `--out <path>`, writes the canonical context pack JSON to `<path>` and prints nothing to stdout.
+  - Artifact schema: `spec/x07-agent.context.schema.json`.
+  - Tool wrapper schema (`--json`): `spec/x07-tool-agent-context.report.schema.json` (`schema_version: "x07.tool.agent.context.report@0.1.0"`).
+
 ### Architecture check (repo contracts)
 
 - `x07 arch check`

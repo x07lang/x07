@@ -47,6 +47,7 @@
 - [Running programs](toolchain/running-programs.md)
 - [Embedding in C](toolchain/embedding-in-c.md)
 - [Repair loop](toolchain/repair-loop.md)
+- [Agent context packs](toolchain/agent-context.md)
 - [Diagnostics & repair](toolchain/diagnostics-repair.md)
 - [Diagnostic codes](toolchain/diagnostic-codes.md)
 - [Review & trust artifacts](toolchain/review-trust.md)

@@ -17,9 +17,11 @@ use x07_host_runner::{run_artifact_file, RunnerConfig, RunnerResult};
 use x07_worlds::WorldId;
 use x07c::project;
 
+mod agent;
 mod arch;
 mod assets_cmd;
 mod ast;
+mod ast_slice_engine;
 mod bench;
 mod bundle;
 mod cli;
@@ -52,6 +54,7 @@ mod toolchain;
 mod trust;
 mod util;
 mod verify;
+mod x07ast_util;
 
 #[derive(Parser, Debug)]
 #[command(name = "x07")]
@@ -95,6 +98,8 @@ enum Command {
     Policy(policy::PolicyArgs),
     /// Initialize, validate, and patch x07AST JSON files.
     Ast(ast::AstArgs),
+    /// Agent-focused artifacts and utilities.
+    Agent(agent::AgentArgs),
     /// Format x07AST JSON files.
     Fmt(toolchain::FmtArgs),
     /// Lint x07AST JSON files.
@@ -332,11 +337,16 @@ fn try_main() -> Result<std::process::ExitCode> {
                 None => vec!["ast"],
                 Some(ast::AstCommand::Init(_)) => vec!["ast", "init"],
                 Some(ast::AstCommand::Get(_)) => vec!["ast", "get"],
+                Some(ast::AstCommand::Slice(_)) => vec!["ast", "slice"],
                 Some(ast::AstCommand::ApplyPatch(_)) => vec!["ast", "apply-patch"],
                 Some(ast::AstCommand::Validate(_)) => vec!["ast", "validate"],
                 Some(ast::AstCommand::Canon(_)) => vec!["ast", "canon"],
                 Some(ast::AstCommand::Schema(_)) => vec!["ast", "schema"],
                 Some(ast::AstCommand::Grammar(_)) => vec!["ast", "grammar"],
+            },
+            Some(Command::Agent(args)) => match &args.cmd {
+                None => vec!["agent"],
+                Some(agent::AgentCommand::Context(_)) => vec!["agent", "context"],
             },
             Some(Command::Fmt(_)) => vec!["fmt"],
             Some(Command::Lint(_)) => vec!["lint"],
@@ -415,6 +425,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Diag(args) => diag::cmd_diag(&cli.machine, args),
         Command::Policy(args) => policy::cmd_policy(&cli.machine, args),
         Command::Ast(args) => ast::cmd_ast(&cli.machine, args),
+        Command::Agent(args) => agent::cmd_agent(&cli.machine, args),
         Command::Fmt(args) => toolchain::cmd_fmt(&cli.machine, args),
         Command::Lint(args) => toolchain::cmd_lint(&cli.machine, args),
         Command::Fix(args) => toolchain::cmd_fix(&cli.machine, args),

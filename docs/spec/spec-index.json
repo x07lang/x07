@@ -286,6 +286,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-agent.context.schema.json",
+      "schema_id": "https://x07.io/spec/x07-agent.context.schema.json",
+      "schema_version": "x07.agent.context@0.1.0",
+      "title": "x07.agent.context@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-arch.archive.index.schema.json",
       "schema_id": "https://x07.io/spec/x07-arch.archive.index.schema.json",
       "schema_version": "x07.arch.archive.index@0.1.0",
@@ -706,6 +713,20 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-agent-context.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-agent-context.report.schema.json",
+      "schema_version": "x07.tool.agent.context.report@0.1.0",
+      "title": "x07.tool.agent.context.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-agent.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-agent.report.schema.json",
+      "schema_version": "x07.tool.agent.report@0.1.0",
+      "title": "x07.tool.agent.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-arch-check.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-arch-check.report.schema.json",
       "schema_version": "x07.tool.arch.check.report@0.1.0",
@@ -773,6 +794,13 @@
       "schema_id": "https://x07.io/spec/x07-tool-ast-schema.report.schema.json",
       "schema_version": "x07.tool.ast.schema.report@0.1.0",
       "title": "x07.tool.ast.schema.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-ast-slice.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-ast-slice.report.schema.json",
+      "schema_version": "x07.tool.ast.slice.report@0.1.0",
+      "title": "x07.tool.ast.slice.report@0.1.0"
     },
     {
       "kind": "schema",

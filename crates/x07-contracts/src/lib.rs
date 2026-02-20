@@ -20,6 +20,7 @@ pub const X07_MONO_MAP_SCHEMA_VERSION: &str = "x07.mono.map@0.1.0";
 pub const X07_PBT_REPRO_SCHEMA_VERSION: &str = "x07.pbt.repro@0.1.0";
 pub const X07_CONTRACT_REPRO_SCHEMA_VERSION: &str = "x07.contract.repro@0.1.0";
 pub const X07DIAG_SCHEMA_VERSION: &str = "x07.x07diag@0.1.0";
+pub const X07_AGENT_CONTEXT_SCHEMA_VERSION: &str = "x07.agent.context@0.1.0";
 pub const X07TEST_SCHEMA_VERSION: &str = "x07.x07test@0.3.0";
 pub const X07_DIAG_CATALOG_SCHEMA_VERSION: &str = "x07.diag.catalog@0.1.0";
 pub const X07_DIAG_COVERAGE_SCHEMA_VERSION: &str = "x07.diag.coverage@0.1.0";

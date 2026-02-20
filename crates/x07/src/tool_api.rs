@@ -1,6 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::io::Read as _;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::Instant;
@@ -252,13 +253,27 @@ fn wrapped_report(
         stderr_json,
     };
 
-    let mut meta = reporting::MetaDelta::default();
+    let mut input_paths: BTreeSet<PathBuf> = BTreeSet::new();
+    let mut output_paths: BTreeSet<PathBuf> = BTreeSet::new();
+
     if let Some(out) = parsed.out.as_ref() {
-        meta.outputs.push(out.clone());
+        output_paths.insert(out.clone());
     }
     if let Some(path) = parsed.report_out.as_ref() {
-        meta.outputs.push(path.clone());
+        output_paths.insert(path.clone());
     }
+    if let Some(doc) = result.stdout_json.as_ref() {
+        collect_meta_paths_from_child(doc, &mut input_paths, &mut output_paths);
+    }
+    if let Some(doc) = result.stderr_json.as_ref() {
+        collect_meta_paths_from_child(doc, &mut input_paths, &mut output_paths);
+    }
+
+    let meta = reporting::MetaDelta {
+        inputs: input_paths.into_iter().collect(),
+        outputs: output_paths.into_iter().collect(),
+        ..Default::default()
+    };
 
     Ok(reporting::build_report(
         scope,
@@ -270,6 +285,45 @@ fn wrapped_report(
         result,
         meta,
     ))
+}
+
+fn collect_meta_paths_from_child(
+    doc: &Value,
+    inputs: &mut BTreeSet<PathBuf>,
+    outputs: &mut BTreeSet<PathBuf>,
+) {
+    let meta_obj = doc.get("meta").and_then(Value::as_object);
+    let digests_obj = doc.get("digests").and_then(Value::as_object);
+
+    let meta_inputs = meta_obj.and_then(|m| m.get("inputs").and_then(Value::as_array));
+    if let Some(arr) = meta_inputs {
+        for v in arr {
+            if let Some(s) = v.as_str() {
+                inputs.insert(PathBuf::from(s));
+            }
+        }
+    } else if let Some(arr) = digests_obj.and_then(|d| d.get("inputs").and_then(Value::as_array)) {
+        for v in arr {
+            if let Some(p) = v.get("path").and_then(Value::as_str) {
+                inputs.insert(PathBuf::from(p));
+            }
+        }
+    }
+
+    let meta_outputs = meta_obj.and_then(|m| m.get("outputs").and_then(Value::as_array));
+    if let Some(arr) = meta_outputs {
+        for v in arr {
+            if let Some(s) = v.as_str() {
+                outputs.insert(PathBuf::from(s));
+            }
+        }
+    } else if let Some(arr) = digests_obj.and_then(|d| d.get("outputs").and_then(Value::as_array)) {
+        for v in arr {
+            if let Some(p) = v.get("path").and_then(Value::as_str) {
+                outputs.insert(PathBuf::from(p));
+            }
+        }
+    }
 }
 
 fn emit_schema_or_id(
@@ -559,16 +613,54 @@ fn extract_diagnostics(doc: Option<&Value>) -> Option<Vec<diagnostics::Diagnosti
                 Some("hint") => diagnostics::Severity::Hint,
                 _ => diagnostics::Severity::Error,
             };
+
+            let loc = obj
+                .get("loc")
+                .and_then(|v| serde_json::from_value::<diagnostics::Location>(v.clone()).ok());
+
+            let notes: Vec<String> = obj
+                .get("notes")
+                .and_then(Value::as_array)
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_string)
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let related: Vec<diagnostics::Location> = obj
+                .get("related")
+                .and_then(Value::as_array)
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| {
+                            serde_json::from_value::<diagnostics::Location>(v.clone()).ok()
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let data: BTreeMap<String, Value> = obj
+                .get("data")
+                .and_then(Value::as_object)
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                .unwrap_or_default();
+
+            let quickfix = obj
+                .get("quickfix")
+                .and_then(|v| serde_json::from_value::<diagnostics::Quickfix>(v.clone()).ok());
+
             diags.push(diagnostics::Diagnostic {
                 code: code.to_string(),
                 severity,
                 stage,
                 message: message.to_string(),
-                loc: None,
-                notes: Vec::new(),
-                related: Vec::new(),
-                data: BTreeMap::new(),
-                quickfix: None,
+                loc,
+                notes,
+                related,
+                data,
+                quickfix,
             });
         }
         if !diags.is_empty() {

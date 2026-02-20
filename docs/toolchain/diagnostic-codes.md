@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 178
+- total codes: 179
 - quickfix support (`sometimes` or `always`): 155
-- quickfix coverage: 87.08%
+- quickfix coverage: 86.59%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -54,6 +54,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-RETURN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-RETURN-0001`. |
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
+| `X07-AST-SLICE-0001` | x07 / run / info | never | AST slice truncated `X07-AST-SLICE-0001`. |
 | `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
 | `X07-CONTRACT-0001` | x07c / type / error | sometimes | Contract clause must typecheck to i32. |
 | `X07-CONTRACT-0002` | x07c / type / error | sometimes | Contract expression is not contract-pure. |
@@ -1107,6 +1108,26 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07-AST-SLICE-0001`
+
+Summary: AST slice truncated `X07-AST-SLICE-0001`.
+
+Origins:
+- x07 (stage: run, severity: info)
+
+Quickfix support: `never`
+No quickfix reason: Truncation is controlled by slice bounds.
+
+Details:
+
+Emitted when `x07 ast slice` truncates the output due to `--max_nodes` or `--max_bytes`. The slice remains deterministic but may omit context needed for repair.
+
+Agent strategy:
+
+- Re-run with a higher `--max_nodes` / `--max_bytes` bound.
+- Use `--enclosure=module` and/or `--closure=all` if more context is required.
 
 
 ## `X07-BORROW-0001`

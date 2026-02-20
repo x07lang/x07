@@ -5,6 +5,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         None => Some(include_bytes!(
             "../../../spec/x07-tool-root.report.schema.json"
         )),
+        Some("agent") => Some(include_bytes!(
+            "../../../spec/x07-tool-agent.report.schema.json"
+        )),
+        Some("agent.context") => Some(include_bytes!(
+            "../../../spec/x07-tool-agent-context.report.schema.json"
+        )),
         Some("arch") => Some(include_bytes!(
             "../../../spec/x07-tool-arch.report.schema.json"
         )),
@@ -37,6 +43,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         )),
         Some("ast.schema") => Some(include_bytes!(
             "../../../spec/x07-tool-ast-schema.report.schema.json"
+        )),
+        Some("ast.slice") => Some(include_bytes!(
+            "../../../spec/x07-tool-ast-slice.report.schema.json"
         )),
         Some("ast.validate") => Some(include_bytes!(
             "../../../spec/x07-tool-ast-validate.report.schema.json"

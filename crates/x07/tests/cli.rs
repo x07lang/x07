@@ -7,11 +7,11 @@ use std::sync::Once;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use x07_contracts::{
-    X07AST_SCHEMA_VERSION, X07C_REPORT_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
-    X07_ARCH_REPORT_SCHEMA_VERSION, X07_CONTRACT_REPRO_SCHEMA_VERSION,
-    X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_PATCHSET_SCHEMA_VERSION,
-    X07_POLICY_INIT_REPORT_SCHEMA_VERSION, X07_REVIEW_DIFF_SCHEMA_VERSION,
-    X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
+    X07AST_SCHEMA_VERSION, X07C_REPORT_SCHEMA_VERSION, X07DIAG_SCHEMA_VERSION,
+    X07TEST_SCHEMA_VERSION, X07_AGENT_CONTEXT_SCHEMA_VERSION, X07_ARCH_REPORT_SCHEMA_VERSION,
+    X07_CONTRACT_REPRO_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
+    X07_PATCHSET_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
+    X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
     X07_VERIFY_REPORT_SCHEMA_VERSION,
 };
 use x07_runner_common::sandbox_backend::{ENV_ACCEPT_WEAKER_ISOLATION, ENV_SANDBOX_BACKEND};
@@ -1667,6 +1667,25 @@ fn x07_cli_specrows_includes_nested_subcommands() {
     assert!(
         has_ast_grammar,
         "missing ast.grammar in --cli-specrows output"
+    );
+
+    let has_ast_slice = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("ast.slice")
+    });
+    assert!(has_ast_slice, "missing ast.slice in --cli-specrows output");
+
+    let has_agent_context = rows.iter().any(|row| {
+        row.as_array()
+            .and_then(|cols| cols.first())
+            .and_then(|v| v.as_str())
+            == Some("agent.context")
+    });
+    assert!(
+        has_agent_context,
+        "missing agent.context in --cli-specrows output"
     );
 }
 
@@ -4494,6 +4513,538 @@ fn x07_ast_get_extracts_json_pointer() {
     assert_eq!(v["ok"], true);
     assert_eq!(v["ptr"], "/a/2/b");
     assert_eq!(v["value"], "c");
+}
+
+#[test]
+fn x07_ast_slice_pointer_remap_preserves_value() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_ast_slice_ptr_remap");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program_doc = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": ["std.bytes", "std.text"],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.aa_helper",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "body": "x"
+            },
+            {
+                "kind": "defn",
+                "name": "main.zz_focus",
+                "type_params": [{"name":"A"}],
+                "requires": [{"expr": 0}],
+                "params": [{"name":"y","ty":"i32"}],
+                "result": "i32",
+                "body": ["main.aa_helper", "y"]
+            }
+        ]
+    });
+    let program_bytes = serde_json::to_vec(&program_doc).expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program_bytes);
+
+    let ptr = "/decls/1/body/1";
+    let out = run_x07(&[
+        "ast",
+        "slice",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        ptr,
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(out.stderr.is_empty(), "expected empty stderr");
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["slice_meta"]["ptr"], ptr);
+
+    let remaps = report["slice_meta"]["ptr_remap"]
+        .as_array()
+        .expect("slice_meta.ptr_remap[]");
+    assert_eq!(remaps.len(), 1, "expected a single pointer remap");
+    assert_eq!(remaps[0]["from"], ptr);
+    let new_ptr = remaps[0]["to"].as_str().expect("ptr_remap.to");
+
+    let orig_value = program_doc.pointer(ptr).expect("value at original ptr");
+    let slice_ast = report.get("slice_ast").expect("slice_ast");
+    let slice_value = slice_ast.pointer(new_ptr).expect("value at remapped ptr");
+    assert_eq!(
+        slice_value, orig_value,
+        "expected remapped pointer value match"
+    );
+}
+
+#[test]
+fn x07_ast_slice_semantic_closure_all_vs_locals() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_ast_slice_semantic_closure");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program_doc = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": ["std.bytes", "std.text"],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.aa_helper",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "body": "x"
+            },
+            {
+                "kind": "defn",
+                "name": "main.zz_focus",
+                "type_params": [{"name":"A"}],
+                "requires": [{"expr": 0}],
+                "params": [{"name":"y","ty":"i32"}],
+                "result": "i32",
+                "body": ["+", ["main.aa_helper", 1], ["std.bytes.len", ["bytes.lit", "abc"]]]
+            }
+        ]
+    });
+    let program_path = dir.join("main.x07.json");
+    write_bytes(
+        &program_path,
+        &serde_json::to_vec(&program_doc).expect("serialize x07AST"),
+    );
+
+    let ptr = "/decls/1/body/1/0";
+
+    let out_all = run_x07(&[
+        "ast",
+        "slice",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        ptr,
+    ]);
+    assert_eq!(
+        out_all.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out_all.stderr)
+    );
+    let report_all = parse_json_stdout(&out_all);
+    assert_eq!(report_all["ok"], true);
+    let slice_all = report_all.get("slice_ast").expect("slice_ast");
+    assert_eq!(slice_all["imports"], serde_json::json!(["std.bytes"]));
+    let decls_all = slice_all["decls"].as_array().expect("decls[]");
+    assert!(
+        decls_all
+            .iter()
+            .any(|d| d.get("name").and_then(Value::as_str) == Some("main.aa_helper")),
+        "expected helper decl included for closure=all"
+    );
+
+    let out_locals = run_x07(&[
+        "ast",
+        "slice",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        ptr,
+        "--closure",
+        "locals",
+    ]);
+    assert_eq!(
+        out_locals.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out_locals.stderr)
+    );
+    let report_locals = parse_json_stdout(&out_locals);
+    assert_eq!(report_locals["ok"], true);
+
+    let slice_locals = report_locals.get("slice_ast").expect("slice_ast");
+    assert_eq!(slice_locals["imports"], serde_json::json!([]));
+    let decls_locals = slice_locals["decls"].as_array().expect("decls[]");
+    assert_eq!(
+        decls_locals
+            .first()
+            .and_then(|d| d.get("name"))
+            .and_then(Value::as_str),
+        Some("main.zz_focus"),
+        "expected focus decl first"
+    );
+    assert!(
+        decls_locals
+            .iter()
+            .any(|d| d.get("name").and_then(Value::as_str) == Some("main.aa_helper")),
+        "expected helper decl included for closure=locals"
+    );
+    assert!(
+        decls_locals[0].get("type_params").is_none(),
+        "expected types stripped for closure=locals"
+    );
+    assert!(
+        decls_locals[0].get("requires").is_none(),
+        "expected contracts stripped for closure=locals"
+    );
+
+    let meta = &report_locals["slice_meta"];
+    assert_eq!(meta["omitted"]["imports"], true);
+    assert_eq!(meta["omitted"]["types"], true);
+    assert_eq!(meta["missing"]["imports"], serde_json::json!(["std.bytes"]));
+    let missing_types = meta["missing"]["types"]
+        .as_array()
+        .expect("missing.types[]");
+    assert!(
+        missing_types.iter().any(|v| v == "A"),
+        "expected missing types to include type param name"
+    );
+    assert!(
+        missing_types.iter().any(|v| v == "contracts"),
+        "expected missing types to include contracts sentinel"
+    );
+}
+
+#[test]
+fn x07_ast_slice_is_deterministic_and_wrapper_meta_has_input_digest() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_ast_slice_determinism");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program_doc = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.focus",
+                "params": [{"name":"y","ty":"i32"}],
+                "result": "i32",
+                "body": ["+", "y", 1]
+            }
+        ]
+    });
+    let program_bytes = serde_json::to_vec(&program_doc).expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program_bytes);
+
+    let ptr = "/decls/0/body/1";
+
+    let out1 = run_x07(&[
+        "ast",
+        "slice",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        ptr,
+    ]);
+    assert_eq!(out1.status.code(), Some(0));
+
+    let out2 = run_x07(&[
+        "ast",
+        "slice",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        ptr,
+    ]);
+    assert_eq!(out2.status.code(), Some(0));
+    assert_eq!(
+        out1.stdout, out2.stdout,
+        "expected byte-identical ast slice output"
+    );
+
+    let out_wrapped = run_x07(&[
+        "ast",
+        "slice",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        ptr,
+        "--json",
+    ]);
+    assert_eq!(
+        out_wrapped.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out_wrapped.stderr)
+    );
+    let report = parse_json_stdout(&out_wrapped);
+    assert_eq!(report["schema_version"], "x07.tool.ast.slice.report@0.1.0");
+    assert_eq!(report["command"], "x07.ast.slice");
+    assert_eq!(report["ok"], true);
+
+    let expected_sha = sha256_hex(&program_bytes);
+    let inputs = report["meta"]["inputs"].as_array().expect("meta.inputs[]");
+    let program_path_str = program_path.display().to_string();
+    let input = inputs
+        .iter()
+        .find(|d| d.get("path").and_then(Value::as_str) == Some(program_path_str.as_str()))
+        .expect("missing input digest for program");
+    assert_eq!(input["sha256"], expected_sha);
+}
+
+#[test]
+fn x07_ast_slice_bounds_emit_truncation_diagnostic_and_respect_max_bytes() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_ast_slice_bounds");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let big = "x".repeat(4096);
+    let program_doc = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": ["std.bytes"],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.aa_helper",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "body": "x"
+            },
+            {
+                "kind": "defn",
+                "name": "main.zz_focus",
+                "params": [],
+                "result": "i32",
+                "body": ["+", ["main.aa_helper", 1], ["std.bytes.len", ["bytes.lit", big]]]
+            }
+        ]
+    });
+    let program_path = dir.join("main.x07.json");
+    write_bytes(
+        &program_path,
+        &serde_json::to_vec(&program_doc).expect("serialize x07AST"),
+    );
+
+    let ptr = "/decls/1/name";
+
+    let out_nodes = run_x07(&[
+        "ast",
+        "slice",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        ptr,
+        "--max-nodes",
+        "1",
+    ]);
+    assert_eq!(
+        out_nodes.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out_nodes.stderr)
+    );
+    let report_nodes = parse_json_stdout(&out_nodes);
+    assert_eq!(report_nodes["ok"], true);
+    assert_eq!(report_nodes["slice_meta"]["truncated"], true);
+    let diags = report_nodes["diagnostics"]
+        .as_array()
+        .expect("diagnostics[]");
+    assert!(
+        diags.iter().any(|d| {
+            d.get("code")
+                .and_then(Value::as_str)
+                .is_some_and(|c| c == "X07-AST-SLICE-0001")
+        }),
+        "expected truncation diagnostic"
+    );
+    let decls = report_nodes["slice_ast"]["decls"]
+        .as_array()
+        .expect("decls[]");
+    assert_eq!(decls.len(), 1, "expected max_nodes to drop decls");
+
+    let out_path = dir.join("slice.x07.json");
+    let max_bytes = 350usize;
+    let out_bytes = run_x07(&[
+        "--out",
+        out_path.to_str().unwrap(),
+        "ast",
+        "slice",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        ptr,
+        "--max-bytes",
+        &max_bytes.to_string(),
+    ]);
+    assert_eq!(
+        out_bytes.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out_bytes.stderr)
+    );
+    let report_bytes = parse_json_stdout(&out_bytes);
+    assert_eq!(report_bytes["ok"], true);
+    assert_eq!(report_bytes["slice_meta"]["truncated"], true);
+    let diags = report_bytes["diagnostics"]
+        .as_array()
+        .expect("diagnostics[]");
+    assert!(
+        diags.iter().any(|d| {
+            d.get("code")
+                .and_then(Value::as_str)
+                .is_some_and(|c| c == "X07-AST-SLICE-0001")
+        }),
+        "expected truncation diagnostic"
+    );
+
+    let mut written = std::fs::read(&out_path).expect("read slice output");
+    if written.last() == Some(&b'\n') {
+        written.pop();
+    }
+    assert!(
+        written.len() <= max_bytes,
+        "expected canonical slice_ast bytes len <= max_bytes (got {})",
+        written.len()
+    );
+}
+
+#[test]
+fn x07_agent_context_emits_context_pack_with_valid_slice_and_digests() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_agent_context_pack");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let project_doc = serde_json::json!({
+        "schema_version": "x07.project@0.2.0",
+        "world": "solve-pure",
+        "entry": "main.x07.json",
+        "module_roots": ["."]
+    });
+    let project_bytes = serde_json::to_vec(&project_doc).expect("serialize project");
+    let project_path = dir.join("x07.json");
+    write_bytes(&project_path, &project_bytes);
+
+    let entry_doc = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.aa_helper",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "body": "x"
+            },
+            {
+                "kind": "defn",
+                "name": "main.zz_focus",
+                "params": [{"name":"y","ty":"i32"}],
+                "result": "i32",
+                "body": ["main.aa_helper", "y"]
+            }
+        ],
+        "solve": ["main.zz_focus", 1]
+    });
+    let entry_bytes = serde_json::to_vec(&entry_doc).expect("serialize entry");
+    let entry_path = dir.join("main.x07.json");
+    write_bytes(&entry_path, &entry_bytes);
+
+    let ptr = "/decls/1/body/1";
+    let diag_doc = serde_json::json!({
+        "schema_version": X07DIAG_SCHEMA_VERSION,
+        "ok": false,
+        "diagnostics": [
+            {
+                "code": "X07-TEST-0001",
+                "severity": "error",
+                "stage": "lint",
+                "message": "boom",
+                "loc": {"kind":"x07ast","ptr": ptr}
+            }
+        ],
+        "meta": {}
+    });
+    let diag_bytes = serde_json::to_vec(&diag_doc).expect("serialize x07diag");
+    let diag_path = dir.join("diag.x07diag.json");
+    write_bytes(&diag_path, &diag_bytes);
+
+    let out = run_x07(&[
+        "agent",
+        "context",
+        "--diag",
+        diag_path.to_str().unwrap(),
+        "--project",
+        project_path.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(out.stderr.is_empty(), "expected empty stderr");
+
+    let pack = parse_json_stdout(&out);
+    assert_eq!(pack["schema_version"], X07_AGENT_CONTEXT_SCHEMA_VERSION);
+    assert_eq!(pack["toolchain"]["name"], "x07");
+    assert_eq!(pack["toolchain"]["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(pack["project"]["root"], dir.display().to_string());
+    assert_eq!(pack["project"]["world"], "solve-pure");
+    assert_eq!(pack["project"]["entry"], "main.x07.json");
+    assert_eq!(pack["focus"]["diag_code"], "X07-TEST-0001");
+    assert_eq!(pack["focus"]["loc_ptr"], ptr);
+
+    assert_eq!(
+        pack["diagnostics"]["schema_version"],
+        X07DIAG_SCHEMA_VERSION
+    );
+
+    let slice_ast = pack["ast"]["slice_ast"].clone();
+    let slice_bytes = serde_json::to_vec(&slice_ast).expect("encode slice_ast");
+    x07c::x07ast::parse_x07ast_json(&slice_bytes).expect("parse slice_ast x07AST");
+
+    let inputs = pack["digests"]["inputs"]
+        .as_array()
+        .expect("digests.inputs[]");
+    assert_eq!(inputs.len(), 3, "expected diag+project+entry digests");
+    let get_input = |p: &Path| {
+        let path_str = p.display().to_string();
+        inputs
+            .iter()
+            .find(|d| d.get("path").and_then(Value::as_str) == Some(path_str.as_str()))
+            .expect("missing input digest")
+    };
+    assert_eq!(get_input(&diag_path)["sha256"], sha256_hex(&diag_bytes));
+    assert_eq!(
+        get_input(&project_path)["sha256"],
+        sha256_hex(&project_bytes)
+    );
+    assert_eq!(get_input(&entry_path)["sha256"], sha256_hex(&entry_bytes));
+    assert_eq!(
+        pack["digests"]["outputs"],
+        serde_json::json!([]),
+        "expected empty outputs digests"
+    );
 }
 
 #[test]

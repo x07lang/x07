@@ -15,7 +15,10 @@ use x07_worlds::WorldId;
 use x07c::diagnostics;
 use x07c::json_patch;
 
+use crate::ast_slice_engine;
+use crate::reporting;
 use crate::util;
+use crate::x07ast_util::canonicalize_x07ast_bytes_to_value;
 
 const X07AST_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.schema.json");
 const X07AST_SCHEMA_V0_3_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.v0.3.0.schema.json");
@@ -46,6 +49,8 @@ pub enum AstCommand {
     Init(AstInitArgs),
     /// Extract a subvalue by JSON Pointer (RFC 6901).
     Get(AstGetArgs),
+    /// Emit a deterministic, semantically-closed x07AST slice focused around a JSON Pointer.
+    Slice(AstSliceArgs),
     /// Apply a JSON patch file to an x07AST JSON input.
     ApplyPatch(AstApplyPatchArgs),
     /// Validate an x07AST file (schema + optional diagnostics catalog).
@@ -145,6 +150,7 @@ pub fn cmd_ast(
     match cmd {
         AstCommand::Init(args) => cmd_init(machine, args),
         AstCommand::Get(args) => cmd_get(machine, args),
+        AstCommand::Slice(args) => cmd_slice(machine, args),
         AstCommand::ApplyPatch(args) => cmd_apply_patch(machine, args),
         AstCommand::Validate(args) => cmd_validate(args),
         AstCommand::Canon(args) => cmd_canon(machine, args),
@@ -169,6 +175,29 @@ pub struct AstGetArgs {
 
     #[arg(long, value_name = "JSON_POINTER")]
     pub ptr: String,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AstSliceArgs {
+    #[arg(long, value_name = "PATH")]
+    pub r#in: PathBuf,
+
+    #[arg(long, value_name = "JSON_POINTER")]
+    pub ptr: String,
+
+    #[arg(long, value_enum, default_value = "decl")]
+    pub enclosure: ast_slice_engine::SliceEnclosure,
+
+    #[arg(long, value_enum, default_value = "all")]
+    pub closure: ast_slice_engine::SliceClosure,
+
+    /// Max number of decls in `slice_ast.decls` (hard bound; deterministic truncation).
+    #[arg(long, value_name = "N")]
+    pub max_nodes: Option<usize>,
+
+    /// Max canonical JSON byte length of `slice_ast` (hard bound; deterministic truncation).
+    #[arg(long, value_name = "BYTES")]
+    pub max_bytes: Option<usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -347,6 +376,186 @@ fn cmd_get(
         value: Some(value),
     };
     print_json(&report)?;
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+#[derive(Debug, Serialize)]
+struct AstSliceDigests {
+    inputs: Vec<reporting::FileDigest>,
+    outputs: Vec<reporting::FileDigest>,
+}
+
+#[derive(Debug, Serialize)]
+struct AstSliceReport {
+    ok: bool,
+    r#in: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    out: Option<String>,
+    slice_ast: Value,
+    slice_meta: ast_slice_engine::SliceMeta,
+    diagnostics: Vec<diagnostics::Diagnostic>,
+    digests: AstSliceDigests,
+}
+
+fn slice_meta_stub(
+    ptr: &str,
+    enclosure: ast_slice_engine::SliceEnclosure,
+    closure: ast_slice_engine::SliceClosure,
+) -> ast_slice_engine::SliceMeta {
+    ast_slice_engine::SliceMeta {
+        ptr: ptr.trim().to_string(),
+        enclosure: enclosure.as_str().to_string(),
+        closure: closure.as_str().to_string(),
+        ptr_remap: Vec::new(),
+        omitted: ast_slice_engine::SliceOmitted {
+            locals: !closure.include_locals(),
+            types: !closure.include_types(),
+            imports: !closure.include_imports(),
+        },
+        missing: ast_slice_engine::SliceMissing::default(),
+        truncated: false,
+        truncation: None,
+    }
+}
+
+fn cmd_slice(
+    machine: &crate::reporting::MachineArgs,
+    args: AstSliceArgs,
+) -> Result<std::process::ExitCode> {
+    let out_path = machine.out.as_ref();
+    if let Some(out_path) = out_path {
+        if out_path.as_os_str() == "-" {
+            let report = AstSliceReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: Some(out_path.display().to_string()),
+                slice_ast: Value::Null,
+                slice_meta: slice_meta_stub(&args.ptr, args.enclosure, args.closure),
+                diagnostics: vec![reporting::diag_error(
+                    "X07-TOOL-EXEC-0001",
+                    diagnostics::Stage::Run,
+                    "--out '-' is not supported (stdout is reserved for the report)",
+                )],
+                digests: AstSliceDigests {
+                    inputs: Vec::new(),
+                    outputs: Vec::new(),
+                },
+            };
+            let bytes = reporting::canonical_json_bytes(&serde_json::to_value(&report)?)?;
+            write_stdout_bytes(&bytes)?;
+            return Ok(std::process::ExitCode::from(20));
+        }
+    }
+
+    let input_bytes = match std::fs::read(&args.r#in) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            let report = AstSliceReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: out_path.map(|p| p.display().to_string()),
+                slice_ast: Value::Null,
+                slice_meta: slice_meta_stub(&args.ptr, args.enclosure, args.closure),
+                diagnostics: vec![reporting::diag_error(
+                    "X07-TOOL-EXEC-0001",
+                    diagnostics::Stage::Run,
+                    &err.to_string(),
+                )],
+                digests: AstSliceDigests {
+                    inputs: Vec::new(),
+                    outputs: Vec::new(),
+                },
+            };
+            let bytes = reporting::canonical_json_bytes(&serde_json::to_value(&report)?)?;
+            write_stdout_bytes(&bytes)?;
+            return Ok(exit_with_error(err));
+        }
+    };
+
+    let doc = match canonicalize_x07ast_bytes_to_value(&input_bytes) {
+        Ok(doc) => doc,
+        Err(err) => {
+            let report = AstSliceReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: out_path.map(|p| p.display().to_string()),
+                slice_ast: Value::Null,
+                slice_meta: slice_meta_stub(&args.ptr, args.enclosure, args.closure),
+                diagnostics: vec![reporting::diag_error(
+                    "X07-TOOL-EXEC-0001",
+                    diagnostics::Stage::Run,
+                    &format!("{err:#}"),
+                )],
+                digests: AstSliceDigests {
+                    inputs: vec![reporting::file_digest(&args.r#in)?],
+                    outputs: Vec::new(),
+                },
+            };
+            let bytes = reporting::canonical_json_bytes(&serde_json::to_value(&report)?)?;
+            write_stdout_bytes(&bytes)?;
+            return Ok(std::process::ExitCode::from(2));
+        }
+    };
+
+    let req = ast_slice_engine::SliceRequest {
+        ptr: args.ptr.clone(),
+        enclosure: args.enclosure,
+        closure: args.closure,
+        max_nodes: args.max_nodes,
+        max_bytes: args.max_bytes,
+    };
+
+    let outcome = match ast_slice_engine::slice_x07ast(&doc, &req) {
+        Ok(v) => v,
+        Err(err) => {
+            let report = AstSliceReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: out_path.map(|p| p.display().to_string()),
+                slice_ast: Value::Null,
+                slice_meta: slice_meta_stub(&req.ptr, req.enclosure, req.closure),
+                diagnostics: vec![reporting::diag_error(
+                    "X07-TOOL-EXEC-0001",
+                    diagnostics::Stage::Run,
+                    &format!("{err:#}"),
+                )],
+                digests: AstSliceDigests {
+                    inputs: vec![reporting::file_digest(&args.r#in)?],
+                    outputs: Vec::new(),
+                },
+            };
+            let bytes = reporting::canonical_json_bytes(&serde_json::to_value(&report)?)?;
+            write_stdout_bytes(&bytes)?;
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    let mut outputs = Vec::new();
+    let slice_ast_value = if let Some(out_path) = out_path {
+        let out_bytes = reporting::canonical_json_bytes(&outcome.slice_ast)?;
+        util::write_atomic(out_path, &out_bytes)
+            .with_context(|| format!("write: {}", out_path.display()))?;
+        outputs.push(reporting::file_digest(out_path)?);
+        Value::Null
+    } else {
+        outcome.slice_ast.clone()
+    };
+
+    let report = AstSliceReport {
+        ok: true,
+        r#in: args.r#in.display().to_string(),
+        out: out_path.map(|p| p.display().to_string()),
+        slice_ast: slice_ast_value,
+        slice_meta: outcome.slice_meta,
+        diagnostics: outcome.diagnostics,
+        digests: AstSliceDigests {
+            inputs: vec![reporting::file_digest(&args.r#in)?],
+            outputs,
+        },
+    };
+
+    let bytes = reporting::canonical_json_bytes(&serde_json::to_value(&report)?)?;
+    write_stdout_bytes(&bytes)?;
     Ok(std::process::ExitCode::SUCCESS)
 }
 
@@ -962,12 +1171,6 @@ fn validate_semantic_supplement_doc(doc: &Value) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn canonicalize_x07ast_bytes_to_value(bytes: &[u8]) -> Result<Value> {
-    let mut file = x07c::x07ast::parse_x07ast_json(bytes).map_err(|e| anyhow::anyhow!("{e}"))?;
-    x07c::x07ast::canonicalize_x07ast_file(&mut file);
-    Ok(x07c::x07ast::x07ast_file_to_value(&file))
 }
 
 fn exit_with_error(err: impl std::fmt::Display) -> std::process::ExitCode {

@@ -74,6 +74,20 @@ If you changed dependencies, refresh the lockfile:
 x07 pkg lock --project x07.json
 ```
 
+## Context pack (portable agent input)
+
+To hand a failing state to an agent (or to reduce token usage), capture a tool report and produce a single context artifact:
+
+```bash
+x07 lint --input src/main.x07.json --json --report-out .x07/artifacts/reports/lint.json --quiet-json
+x07 agent context --diag .x07/artifacts/reports/lint.json --project x07.json --out .x07/artifacts/context/context.json
+```
+
+Notes:
+
+- `x07 agent context` accepts `--diag` as either raw `x07diag` (`x07.x07diag@0.1.0`) or a tool wrapper report (`x07.tool.*.report@0.1.0`).
+- The focused diagnostic must have `loc.kind="x07ast"` pointers (otherwise re-run producing x07AST pointers).
+
 ## Output contracts (for agents)
 
 - Diagnostics schema: `spec/x07diag.schema.json`
