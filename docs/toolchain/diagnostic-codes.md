@@ -1146,7 +1146,9 @@ Quickfix is context-dependent: when a safe insertion point exists, linter emits 
 
 Agent strategy:
 
+- Read `diagnostics[].data.mem_provenance` to identify the temporary owner and the borrow call.
 - Prefer binding owner expressions to locals before `bytes.view`/`bytes.subview`/`vec_u8.as_view`.
+- If `mem_provenance.hints[]` contains `bind_owner_to_local`, introduce `let tmp = <owner>` and borrow from `tmp`.
 - Apply quickfix when present.
 - If quickfix is absent, perform equivalent manual rewrite and re-run lint.
 
@@ -1329,6 +1331,8 @@ Linter emits a JSON Patch quickfix that copies one side using `view.to_bytes(byt
 
 Agent strategy:
 
+- Read `diagnostics[].data.mem_provenance` to confirm the use-after-move chain.
+- If `mem_provenance.hints[]` contains `clone_before_use`, copy one side (for example via `view.to_bytes(bytes.view(name))`) before reuse.
 - Apply quickfix.
 - Confirm resulting expression keeps ownership semantics.
 - Re-run lint/build.
@@ -1350,6 +1354,8 @@ Linter emits a JSON Patch quickfix that copies bytes for condition use (`_x07_tm
 
 Agent strategy:
 
+- Read `diagnostics[].data.mem_provenance` to see the conflicting `bytes.view` borrows across condition/branch.
+- If `mem_provenance.hints[]` contains `introduce_tmp_copy`, copy bytes for the `if` condition and use the copy in the condition.
 - Apply quickfix.
 - Validate condition logic still matches intent.
 - Re-run lint/build.

@@ -16,9 +16,16 @@ Diagnostics include:
 - `severity`
 - `message` (human)
 - `loc` (where in x07AST or text)
+- `data` (optional structured payload; machine-first)
 - optional `quickfix` (JSON Patch)
 
 Agents should never scrape text; they should parse the structured payload.
+
+## Ownership provenance (`mem_provenance`)
+
+Some ownership/move/borrow diagnostics include `diagnostics[].data.mem_provenance`, a small structured graph that traces the owned value through moves/borrows and highlights the violating use.
+
+- Schema: `spec/x07-mem.provenance-graph.schema.json` (`schema_version: "x07.mem.provenance_graph@0.1.0"`)
 
 ## Repair loop
 

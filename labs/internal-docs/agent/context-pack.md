@@ -68,7 +68,7 @@ The focused diagnostic must have `loc.kind="x07ast"` so `focus.loc_ptr` is a JSO
 
 The context pack embeds:
 
-- the diagnostics payload (`x07.x07diag@0.1.0`)
+- the diagnostics payload (`x07.x07diag@0.1.0`), including structured `diagnostics[].data` payloads (for example `mem_provenance`)
 - an AST slice (`ast.slice_ast` + `ast.slice_meta`)
 - stable input digests for traceability:
   - diag file

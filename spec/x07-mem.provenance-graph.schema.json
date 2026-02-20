@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-mem.provenance-graph.schema.json",
+  "title": "X07 Memory Provenance Graph v0.1.0",
+  "description": "Structured ownership/move/borrow provenance graph for x07diag diagnostics.data.mem_provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "focus", "nodes", "edges", "violation"],
+  "properties": {
+    "schema_version": { "const": "x07.mem.provenance_graph@0.1.0" },
+    "focus": { "$ref": "#/$defs/focus" },
+    "truncated": { "type": "boolean", "default": false },
+    "truncation": { "$ref": "#/$defs/truncation" },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" }, "default": [] },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" }, "default": [] },
+    "violation": { "$ref": "#/$defs/violation" },
+    "hints": { "type": "array", "items": { "$ref": "#/$defs/hint" }, "default": [] }
+  },
+  "$defs": {
+    "json_pointer": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 2048,
+      "description": "JSON Pointer (RFC 6901) into the input x07AST document."
+    },
+    "focus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ptr"],
+      "properties": { "ptr": { "$ref": "#/$defs/json_pointer" } }
+    },
+    "node_role": { "type": "string", "enum": ["owner", "temporary", "borrow", "move", "use"] },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role", "ptr", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 32, "pattern": "^n[0-9]+$" },
+        "role": { "$ref": "#/$defs/node_role" },
+        "ptr": { "$ref": "#/$defs/json_pointer" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "edge_kind": {
+      "type": "string",
+      "enum": ["borrowed_from", "moved_to", "used_after_move", "borrow_conflict"]
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "from", "to"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/edge_kind" },
+        "from": { "type": "string", "pattern": "^n[0-9]+$" },
+        "to": { "type": "string", "pattern": "^n[0-9]+$" }
+      }
+    },
+    "violation_kind": {
+      "type": "string",
+      "enum": ["borrow_from_temporary", "use_after_move", "borrow_conflict"]
+    },
+    "violation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "node"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/violation_kind" },
+        "node": { "type": "string", "pattern": "^n[0-9]+$" }
+      }
+    },
+    "hint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "repair_pattern" },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      }
+    },
+    "truncation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_nodes", "max_edges", "dropped_nodes", "dropped_edges"],
+      "properties": {
+        "max_nodes": { "type": "integer", "minimum": 1 },
+        "max_edges": { "type": "integer", "minimum": 1 },
+        "dropped_nodes": { "type": "integer", "minimum": 0 },
+        "dropped_edges": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

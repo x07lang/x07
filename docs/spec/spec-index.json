@@ -636,6 +636,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-mem.provenance-graph.schema.json",
+      "schema_id": "https://x07.io/spec/x07-mem.provenance-graph.schema.json",
+      "schema_version": "x07.mem.provenance_graph@0.1.0",
+      "title": "X07 Memory Provenance Graph v0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-mono.map.schema.json",
       "schema_id": "https://x07.io/spec/x07-mono.map.schema.json",
       "schema_version": "x07.mono.map@0.1.0",

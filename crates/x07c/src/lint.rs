@@ -4,6 +4,10 @@ use crate::ast::Expr;
 use crate::diagnostics::{
     Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Report, Severity, Stage,
 };
+use crate::mem_provenance::{
+    attach_mem_provenance, Edge, EdgeKind, Hint, HintKind, MemProvenanceGraph, Node, NodeRole,
+    Violation, ViolationKind,
+};
 use crate::x07ast::{self, X07AstFile, X07AstKind};
 use x07_contracts::{X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0};
 
@@ -1091,7 +1095,46 @@ fn lint_core_borrow_rules(
         None
     };
 
-    diagnostics.push(Diagnostic {
+    let owner_label = match owner {
+        Expr::List { items, .. } => items
+            .first()
+            .and_then(Expr::as_ident)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "expr".to_string()),
+        Expr::Int { .. } => "int".to_string(),
+        _ => "expr".to_string(),
+    };
+
+    let mut graph = MemProvenanceGraph::new(
+        owner_ptr.clone(),
+        Violation {
+            kind: ViolationKind::BorrowFromTemporary,
+            node: "n1".to_string(),
+        },
+    );
+    graph.nodes.push(Node {
+        id: "n0".to_string(),
+        role: NodeRole::Temporary,
+        ptr: owner_ptr.clone(),
+        label: owner_label,
+    });
+    graph.nodes.push(Node {
+        id: "n1".to_string(),
+        role: NodeRole::Borrow,
+        ptr: ptr.to_string(),
+        label: head.to_string(),
+    });
+    graph.edges.push(Edge {
+        kind: EdgeKind::BorrowedFrom,
+        from: "n0".to_string(),
+        to: "n1".to_string(),
+    });
+    graph.hints.push(Hint {
+        kind: HintKind::RepairPattern,
+        id: "bind_owner_to_local".to_string(),
+    });
+
+    let mut diag = Diagnostic {
         code: "X07-BORROW-0001".to_string(),
         severity: Severity::Error,
         stage: Stage::Lint,
@@ -1103,7 +1146,9 @@ fn lint_core_borrow_rules(
         related: Vec::new(),
         data: Default::default(),
         quickfix,
-    });
+    };
+    attach_mem_provenance(&mut diag, graph);
+    diagnostics.push(diag);
 }
 
 fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<Diagnostic>) {
@@ -1111,6 +1156,37 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
         let cond = &items[1];
         let then_branch = &items[2];
         let else_branch = &items[3];
+
+        #[derive(Clone)]
+        struct BytesViewOcc {
+            owner: String,
+            borrow_call_ptr: String,
+            owner_ident_ptr: String,
+        }
+
+        fn collect_bytes_view_occurrences(
+            expr: &Expr,
+            expr_ptr: &str,
+            out: &mut Vec<BytesViewOcc>,
+        ) {
+            match expr {
+                Expr::Int { .. } | Expr::Ident { .. } => {}
+                Expr::List { items, .. } => {
+                    if items.len() == 2 && items[0].as_ident() == Some("bytes.view") {
+                        if let Some(name) = items[1].as_ident() {
+                            out.push(BytesViewOcc {
+                                owner: name.to_string(),
+                                borrow_call_ptr: expr_ptr.to_string(),
+                                owner_ident_ptr: format!("{expr_ptr}/1"),
+                            });
+                        }
+                    }
+                    for (idx, item) in items.iter().enumerate() {
+                        collect_bytes_view_occurrences(item, &format!("{expr_ptr}/{idx}"), out);
+                    }
+                }
+            }
+        }
 
         fn collect_bytes_view_idents(expr: &Expr, out: &mut std::collections::BTreeSet<String>) {
             match expr {
@@ -1162,6 +1238,28 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
         duplicates.sort();
 
         if let Some(name) = duplicates.first() {
+            let mut cond_occs: Vec<BytesViewOcc> = Vec::new();
+            collect_bytes_view_occurrences(cond, &format!("{ptr}/1"), &mut cond_occs);
+            let mut branch_occs: Vec<BytesViewOcc> = Vec::new();
+            collect_bytes_view_occurrences(then_branch, &format!("{ptr}/2"), &mut branch_occs);
+            collect_bytes_view_occurrences(else_branch, &format!("{ptr}/3"), &mut branch_occs);
+
+            let cond_hit = cond_occs.iter().find(|o| o.owner == *name).cloned();
+            let branch_hit = branch_occs.iter().find(|o| o.owner == *name).cloned();
+
+            let owner_ident_ptr = cond_hit
+                .as_ref()
+                .map(|o| o.owner_ident_ptr.clone())
+                .unwrap_or_else(|| ptr.to_string());
+            let cond_borrow_call_ptr = cond_hit
+                .as_ref()
+                .map(|o| o.borrow_call_ptr.clone())
+                .unwrap_or_else(|| ptr.to_string());
+            let branch_borrow_call_ptr = branch_hit
+                .as_ref()
+                .map(|o| o.borrow_call_ptr.clone())
+                .unwrap_or_else(|| ptr.to_string());
+
             let tmp = "_x07_tmp_copy";
             let cond_fixed = rewrite_bytes_view_owner(cond, name, tmp);
 
@@ -1183,7 +1281,52 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
                 ]),
             ]);
 
-            diagnostics.push(Diagnostic {
+            let mut graph = MemProvenanceGraph::new(
+                ptr.to_string(),
+                Violation {
+                    kind: ViolationKind::BorrowConflict,
+                    node: "n2".to_string(),
+                },
+            );
+            graph.nodes.push(Node {
+                id: "n0".to_string(),
+                role: NodeRole::Owner,
+                ptr: owner_ident_ptr,
+                label: name.to_string(),
+            });
+            graph.nodes.push(Node {
+                id: "n1".to_string(),
+                role: NodeRole::Borrow,
+                ptr: cond_borrow_call_ptr,
+                label: "bytes.view (cond)".to_string(),
+            });
+            graph.nodes.push(Node {
+                id: "n2".to_string(),
+                role: NodeRole::Borrow,
+                ptr: branch_borrow_call_ptr,
+                label: "bytes.view (branch)".to_string(),
+            });
+            graph.edges.push(Edge {
+                kind: EdgeKind::BorrowedFrom,
+                from: "n0".to_string(),
+                to: "n1".to_string(),
+            });
+            graph.edges.push(Edge {
+                kind: EdgeKind::BorrowedFrom,
+                from: "n0".to_string(),
+                to: "n2".to_string(),
+            });
+            graph.edges.push(Edge {
+                kind: EdgeKind::BorrowConflict,
+                from: "n1".to_string(),
+                to: "n2".to_string(),
+            });
+            graph.hints.push(Hint {
+                kind: HintKind::RepairPattern,
+                id: "introduce_tmp_copy".to_string(),
+            });
+
+            let mut diag = Diagnostic {
                 code: "X07-MOVE-0002".to_string(),
                 severity: Severity::Error,
                 stage: Stage::Lint,
@@ -1209,7 +1352,9 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
                     }],
                     note: Some("Copy bytes for if condition".to_string()),
                 }),
-            });
+            };
+            attach_mem_provenance(&mut diag, graph);
+            diagnostics.push(diag);
             return;
         }
     }
@@ -1245,13 +1390,54 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
         expr_ident(a.to_string()),
     ]);
 
-    diagnostics.push(Diagnostic {
+    let focus_ptr = format!("{ptr}/2");
+    let mut graph = MemProvenanceGraph::new(
+        focus_ptr.clone(),
+        Violation {
+            kind: ViolationKind::UseAfterMove,
+            node: "n2".to_string(),
+        },
+    );
+    graph.nodes.push(Node {
+        id: "n0".to_string(),
+        role: NodeRole::Owner,
+        ptr: format!("{ptr}/1"),
+        label: a.to_string(),
+    });
+    graph.nodes.push(Node {
+        id: "n1".to_string(),
+        role: NodeRole::Move,
+        ptr: format!("{ptr}/1"),
+        label: "bytes.concat arg1".to_string(),
+    });
+    graph.nodes.push(Node {
+        id: "n2".to_string(),
+        role: NodeRole::Use,
+        ptr: focus_ptr.clone(),
+        label: "bytes.concat arg2".to_string(),
+    });
+    graph.edges.push(Edge {
+        kind: EdgeKind::MovedTo,
+        from: "n0".to_string(),
+        to: "n1".to_string(),
+    });
+    graph.edges.push(Edge {
+        kind: EdgeKind::UsedAfterMove,
+        from: "n1".to_string(),
+        to: "n2".to_string(),
+    });
+    graph.hints.push(Hint {
+        kind: HintKind::RepairPattern,
+        id: "clone_before_use".to_string(),
+    });
+
+    let mut diag = Diagnostic {
         code: "X07-MOVE-0001".to_string(),
         severity: Severity::Error,
         stage: Stage::Lint,
         message: "bytes.concat uses the same identifier twice".to_string(),
         loc: Some(Location::X07Ast {
-            ptr: format!("{ptr}/2"),
+            ptr: focus_ptr.clone(),
         }),
         notes: {
             // Keep a stable note set for repair-corpus goldens.
@@ -1268,7 +1454,9 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
             }],
             note: Some("Copy one side to avoid use-after-move".to_string()),
         }),
-    });
+    };
+    attach_mem_provenance(&mut diag, graph);
+    diagnostics.push(diag);
 }
 
 fn lint_world_heads(
