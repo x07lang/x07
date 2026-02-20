@@ -14,6 +14,7 @@ X07 builds and runs native solver artifacts from generated C, so the only extern
 - Full repo gate: `./scripts/ci/check_all.sh`
 - Machine-readable gate (JSON report): `./scripts/ci/run.sh pr --strict`
 - Tool presence check: `./scripts/ci/check_tools.sh`
+- Fuzz smoke (nondeterministic; CI required job): `./scripts/ci/check_fuzz_smoke.sh`
 - LLM-first contract smoke: `./scripts/ci/check_llm_contracts.sh`
 - Tool JSON contract gate: `./scripts/ci/check_tool_json_contracts.py`
 - Skills pack check: `./scripts/ci/check_skills.sh`

@@ -35,3 +35,18 @@ Agents need:
 - stable failure semantics
 
 If every project reinvents testing, agents become unreliable.
+
+## Compiler fuzzing (CI smoke gate)
+
+The toolchain repo includes `cargo-fuzz` targets under `labs/fuzz/`. CI runs a short fuzz smoke gate (30 seconds per target) and uploads `labs/fuzz/artifacts/` on failure to enable local reproduction.
+
+To run locally:
+
+- `cargo install cargo-fuzz`
+- `cargo +nightly fuzz run --fuzz-dir labs/fuzz parse_x07ast_json -- -max_total_time=30`
+- `cargo +nightly fuzz run --fuzz-dir labs/fuzz parse_sexpr -- -max_total_time=30`
+- `cargo +nightly fuzz run --fuzz-dir labs/fuzz compile_program_to_c -- -max_total_time=30`
+
+To reproduce a CI crash input:
+
+- `cargo +nightly fuzz run --fuzz-dir labs/fuzz <target> labs/fuzz/artifacts/<target>/crash-*`
