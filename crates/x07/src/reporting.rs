@@ -361,6 +361,7 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "lint"
             | "fix"
             | "build"
+            | "check"
             | "cli"
             | "pkg"
             | "review"

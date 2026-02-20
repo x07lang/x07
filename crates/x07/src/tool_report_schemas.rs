@@ -68,6 +68,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("bundle") => Some(include_bytes!(
             "../../../spec/x07-tool-bundle.report.schema.json"
         )),
+        Some("check") => Some(include_bytes!(
+            "../../../spec/x07-tool-check.report.schema.json"
+        )),
         Some("cli") => Some(include_bytes!(
             "../../../spec/x07-tool-cli.report.schema.json"
         )),

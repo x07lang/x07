@@ -26,6 +26,32 @@ pub struct TypecheckReport {
     pub tapp_rewrites: Vec<TappRewrite>,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct TypecheckSigs {
+    sigs: BTreeMap<String, FnSigAst>,
+}
+
+impl TypecheckSigs {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_file(&mut self, file: &X07AstFile) {
+        add_file_sigs(file, &mut self.sigs);
+    }
+
+    pub fn add_builtins(&mut self) {
+        add_builtin_sigs(&mut self.sigs);
+    }
+
+    pub fn for_file_with_builtins(file: &X07AstFile) -> Self {
+        let mut sigs = Self::new();
+        sigs.add_file(file);
+        sigs.add_builtins();
+        sigs
+    }
+}
+
 #[derive(Debug, Clone)]
 struct FnSigAst {
     name: String,
@@ -1333,9 +1359,7 @@ fn term_to_type_ref(tt: &TyTerm) -> Option<TypeRef> {
     }
 }
 
-fn collect_sigs(file: &X07AstFile) -> BTreeMap<String, FnSigAst> {
-    let mut sigs: BTreeMap<String, FnSigAst> = BTreeMap::new();
-
+fn add_file_sigs(file: &X07AstFile, sigs: &mut BTreeMap<String, FnSigAst>) {
     let export_slots = if file.kind == crate::x07ast::X07AstKind::Module && !file.exports.is_empty()
     {
         1usize
@@ -1406,10 +1430,6 @@ fn collect_sigs(file: &X07AstFile) -> BTreeMap<String, FnSigAst> {
             },
         );
     }
-
-    add_builtin_sigs(&mut sigs);
-
-    sigs
 }
 
 fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
@@ -1716,8 +1736,20 @@ fn contract_ty_brief(tt: &TyTerm) -> String {
     }
 }
 
+pub fn typecheck_file_with_sigs(
+    file: &X07AstFile,
+    sigs: &TypecheckSigs,
+    _opts: &TypecheckOptions,
+) -> TypecheckReport {
+    typecheck_file_impl(file, &sigs.sigs)
+}
+
 pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> TypecheckReport {
-    let sigs = collect_sigs(file);
+    let sigs = TypecheckSigs::for_file_with_builtins(file);
+    typecheck_file_impl(file, &sigs.sigs)
+}
+
+fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> TypecheckReport {
     let expr_values = file_expr_values(file);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
     let mut tapp_rewrites: BTreeMap<String, TappRewrite> = BTreeMap::new();
@@ -1730,7 +1762,7 @@ pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> Type
     let defn_base = export_slots + file.extern_functions.len();
 
     if let Some(solve) = &file.solve {
-        let mut infer = InferState::new(&sigs, &file.module_id, TyTerm::Named("bytes".to_string()));
+        let mut infer = InferState::new(sigs, &file.module_id, TyTerm::Named("bytes".to_string()));
         let _ = infer.infer_expr(solve, Some(&TyTerm::Named("bytes".to_string())));
         infer.solve_constraints();
         drain_pending_tapp(
@@ -1745,7 +1777,7 @@ pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> Type
 
     for (idx, f) in file.functions.iter().enumerate() {
         let decl_idx = defn_base + idx;
-        let mut infer = InferState::new(&sigs, &file.module_id, type_ref_to_term(&f.result));
+        let mut infer = InferState::new(sigs, &file.module_id, type_ref_to_term(&f.result));
         for p in &f.params {
             infer.bind(
                 p.name.clone(),
@@ -1919,7 +1951,7 @@ pub fn typecheck_file_local(file: &X07AstFile, _opts: &TypecheckOptions) -> Type
 
     for (idx, f) in file.async_functions.iter().enumerate() {
         let decl_idx = defn_base + file.functions.len() + idx;
-        let mut infer = InferState::new(&sigs, &file.module_id, type_ref_to_term(&f.result));
+        let mut infer = InferState::new(sigs, &file.module_id, type_ref_to_term(&f.result));
         for p in &f.params {
             infer.bind(
                 p.name.clone(),

@@ -1,13 +1,16 @@
-use std::collections::HashSet;
-use std::path::PathBuf;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Args;
 use walkdir::WalkDir;
 use x07_worlds::WorldId;
+use x07c::compile;
 use x07c::diagnostics;
 use x07c::lint;
+use x07c::module_source;
 use x07c::project;
+use x07c::typecheck;
 use x07c::x07ast;
 
 use crate::repair::{RepairArgs, RepairMode};
@@ -146,6 +149,57 @@ pub struct BuildArgs {
 
     #[command(flatten)]
     pub repair: RepairArgs,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CheckArgs {
+    /// Project manifest path (`x07.json`).
+    #[arg(long, value_name = "PATH")]
+    pub project: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+struct ProjectCtx {
+    base: PathBuf,
+    manifest: project::ProjectManifest,
+    lock: project::Lockfile,
+    lock_path: PathBuf,
+    program_path: PathBuf,
+    module_roots: Vec<PathBuf>,
+    world: WorldId,
+}
+
+fn load_project_ctx(project_path: &Path) -> Result<ProjectCtx> {
+    let manifest = project::load_project_manifest(project_path).context("load project manifest")?;
+    let lock_path = project::default_lockfile_path(project_path, &manifest);
+    let lock_bytes = std::fs::read(&lock_path)
+        .with_context(|| format!("read lockfile: {}", lock_path.display()))?;
+    let lock: project::Lockfile = serde_json::from_slice(&lock_bytes)
+        .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?;
+
+    project::verify_lockfile(project_path, &manifest, &lock).context("verify lockfile")?;
+
+    let base = project_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+    let program_path = base.join(&manifest.entry);
+
+    let module_roots =
+        project::collect_module_roots(project_path, &manifest, &lock).context("module roots")?;
+    let world = x07c::world_config::parse_world_id(&manifest.world)
+        .with_context(|| format!("invalid project world {:?}", manifest.world))?;
+
+    Ok(ProjectCtx {
+        base,
+        manifest,
+        lock,
+        lock_path,
+        program_path,
+        module_roots,
+        world,
+    })
 }
 
 pub fn cmd_fmt(
@@ -437,24 +491,15 @@ pub fn cmd_build(
         std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
     }
 
-    let manifest = project::load_project_manifest(&args.project)?;
-    let lock_path = project::default_lockfile_path(&args.project, &manifest);
-    let lock_bytes = std::fs::read(&lock_path)
-        .with_context(|| format!("read lockfile: {}", lock_path.display()))?;
-    let lock: project::Lockfile = serde_json::from_slice(&lock_bytes)
-        .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?;
-
-    project::verify_lockfile(&args.project, &manifest, &lock)?;
-
-    let base = args
-        .project
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."));
-    let program_path = base.join(&manifest.entry);
-
-    let module_roots = project::collect_module_roots(&args.project, &manifest, &lock)?;
-    let world = x07c::world_config::parse_world_id(&manifest.world)
-        .with_context(|| format!("invalid project world {:?}", manifest.world))?;
+    let ctx = load_project_ctx(&args.project).context("load project")?;
+    let ProjectCtx {
+        base,
+        manifest: _manifest,
+        program_path,
+        module_roots,
+        world,
+        ..
+    } = ctx;
 
     let repair_result = crate::repair::maybe_repair_x07ast_file(&program_path, world, &args.repair)
         .with_context(|| format!("repair entry: {}", program_path.display()))?;
@@ -466,7 +511,7 @@ pub fn cmd_build(
     };
 
     let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
-    options.arch_root = Some(base.to_path_buf());
+    options.arch_root = Some(base);
     if args.freestanding {
         options.emit_main = false;
         options.freestanding = true;
@@ -502,6 +547,415 @@ pub fn cmd_build(
     }
 
     Ok(std::process::ExitCode::SUCCESS)
+}
+
+#[derive(Debug, Clone)]
+struct LoadedModuleFile {
+    file: x07ast::X07AstFile,
+    path: Option<PathBuf>,
+    is_builtin: bool,
+}
+
+fn load_module_recursive(
+    module_id: &str,
+    world: WorldId,
+    module_roots: &[PathBuf],
+    out: &mut BTreeMap<String, LoadedModuleFile>,
+    visiting: &mut BTreeSet<String>,
+) -> Result<(), compile::CompilerError> {
+    if out.contains_key(module_id) {
+        return Ok(());
+    }
+    if !visiting.insert(module_id.to_string()) {
+        return Err(compile::CompilerError::new(
+            compile::CompileErrorKind::Parse,
+            format!("cyclic import detected at module {module_id:?}"),
+        ));
+    }
+
+    let source = module_source::load_module_source(module_id, world, module_roots)?;
+    if !source.src.trim_start().starts_with('{') {
+        return Err(compile::CompilerError::new(
+            compile::CompileErrorKind::Parse,
+            format!(
+                "{module_id:?}: module source must be x07AST JSON (*.x07.json); legacy S-expr is not supported"
+            ),
+        ));
+    }
+
+    let mut file = x07ast::parse_x07ast_json(source.src.as_bytes()).map_err(|e| {
+        compile::CompilerError::new(
+            compile::CompileErrorKind::Parse,
+            format!("{module_id:?}: {e}"),
+        )
+    })?;
+    x07ast::canonicalize_x07ast_file(&mut file);
+
+    for dep in file.imports.clone() {
+        load_module_recursive(&dep, world, module_roots, out, visiting)?;
+    }
+
+    out.insert(
+        module_id.to_string(),
+        LoadedModuleFile {
+            file,
+            path: source.path,
+            is_builtin: source.is_builtin,
+        },
+    );
+    let _ = visiting.remove(module_id);
+    Ok(())
+}
+
+fn parse_fn_and_ptr_suffix(message: &str) -> (Option<String>, Option<String>) {
+    let Some(start) = message.rfind("(fn=") else {
+        return (None, None);
+    };
+    let suffix = &message[start + 1..];
+    let Some(end) = suffix.find(')') else {
+        return (None, None);
+    };
+    let inner = &suffix[..end];
+    let mut fn_name = None;
+    let mut ptr = None;
+    for part in inner.split_whitespace() {
+        if let Some(v) = part.strip_prefix("fn=") {
+            fn_name = Some(v.to_string());
+        } else if let Some(v) = part.strip_prefix("ptr=") {
+            ptr = Some(v.to_string());
+        }
+    }
+    (fn_name, ptr)
+}
+
+pub fn cmd_check(
+    machine: &crate::reporting::MachineArgs,
+    args: CheckArgs,
+) -> Result<std::process::ExitCode> {
+    let mut diags: Vec<diagnostics::Diagnostic> = Vec::new();
+
+    let ctx = match load_project_ctx(&args.project) {
+        Ok(ctx) => ctx,
+        Err(err) => {
+            diags.push(crate::reporting::diag_error(
+                "X07-IO-READ-0001",
+                diagnostics::Stage::Parse,
+                &format!("{err:#}"),
+            ));
+            let mut report = diagnostics::Report::ok();
+            report.ok = false;
+            report.diagnostics = diags;
+            let out = serde_json::to_string(&report)? + "\n";
+            if let Some(path) = machine.out.as_deref() {
+                crate::reporting::write_bytes(path, out.as_bytes())?;
+            } else {
+                print!("{out}");
+            }
+            return Ok(std::process::ExitCode::from(1));
+        }
+    };
+
+    let ProjectCtx {
+        base,
+        manifest: _manifest,
+        lock: _lock,
+        lock_path,
+        program_path,
+        module_roots,
+        world,
+    } = ctx;
+
+    let program_bytes = match std::fs::read(&program_path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            diags.push(crate::reporting::diag_error(
+                "X07-IO-READ-0001",
+                diagnostics::Stage::Parse,
+                &format!("read entry {}: {err}", program_path.display()),
+            ));
+            let mut report = diagnostics::Report::ok();
+            report.ok = false;
+            report.diagnostics = diags;
+            report.meta.insert(
+                "inputs".to_string(),
+                serde_json::Value::Array(vec![
+                    serde_json::Value::String(args.project.display().to_string()),
+                    serde_json::Value::String(lock_path.display().to_string()),
+                    serde_json::Value::String(program_path.display().to_string()),
+                ]),
+            );
+            let out = serde_json::to_string(&report)? + "\n";
+            if let Some(path) = machine.out.as_deref() {
+                crate::reporting::write_bytes(path, out.as_bytes())?;
+            } else {
+                print!("{out}");
+            }
+            return Ok(std::process::ExitCode::from(1));
+        }
+    };
+
+    let mut entry_file = match x07ast::parse_x07ast_json(&program_bytes) {
+        Ok(file) => file,
+        Err(err) => {
+            let mut d = diagnostics::Diagnostic {
+                code: "X07-X07AST-PARSE-0001".to_string(),
+                severity: diagnostics::Severity::Error,
+                stage: diagnostics::Stage::Parse,
+                message: err.message,
+                loc: Some(diagnostics::Location::X07Ast { ptr: err.ptr }),
+                notes: Vec::new(),
+                related: Vec::new(),
+                data: Default::default(),
+                quickfix: None,
+            };
+            d.data.insert(
+                "file".to_string(),
+                serde_json::Value::String(program_path.display().to_string()),
+            );
+            diags.push(d);
+            let mut report = diagnostics::Report::ok();
+            report.ok = false;
+            report.diagnostics = diags;
+            report.meta.insert(
+                "inputs".to_string(),
+                serde_json::Value::Array(vec![
+                    serde_json::Value::String(args.project.display().to_string()),
+                    serde_json::Value::String(lock_path.display().to_string()),
+                    serde_json::Value::String(program_path.display().to_string()),
+                ]),
+            );
+            let out = serde_json::to_string(&report)? + "\n";
+            if let Some(path) = machine.out.as_deref() {
+                crate::reporting::write_bytes(path, out.as_bytes())?;
+            } else {
+                print!("{out}");
+            }
+            return Ok(std::process::ExitCode::from(1));
+        }
+    };
+    x07ast::canonicalize_x07ast_file(&mut entry_file);
+
+    let mut modules: BTreeMap<String, LoadedModuleFile> = BTreeMap::new();
+    let mut visiting: BTreeSet<String> = BTreeSet::new();
+    for module_id in entry_file.imports.clone() {
+        if let Err(err) = load_module_recursive(
+            &module_id,
+            world,
+            &module_roots,
+            &mut modules,
+            &mut visiting,
+        ) {
+            diags.push(crate::reporting::diag_error(
+                "X07-X07AST-PARSE-0001",
+                diagnostics::Stage::Parse,
+                &format!("{:?}: {}", err.kind, err.message),
+            ));
+            let mut inputs: BTreeSet<String> = BTreeSet::new();
+            inputs.insert(args.project.display().to_string());
+            inputs.insert(lock_path.display().to_string());
+            inputs.insert(program_path.display().to_string());
+            for m in modules.values() {
+                if m.is_builtin {
+                    continue;
+                }
+                if let Some(p) = m.path.as_ref() {
+                    inputs.insert(p.display().to_string());
+                }
+            }
+
+            let mut report = diagnostics::Report::ok();
+            report.ok = false;
+            report.diagnostics = diags;
+            report.meta.insert(
+                "inputs".to_string(),
+                serde_json::Value::Array(
+                    inputs.into_iter().map(serde_json::Value::String).collect(),
+                ),
+            );
+
+            let out = serde_json::to_string(&report)? + "\n";
+            if let Some(path) = machine.out.as_deref() {
+                crate::reporting::write_bytes(path, out.as_bytes())?;
+            } else {
+                print!("{out}");
+            }
+
+            return Ok(std::process::ExitCode::from(1));
+        }
+    }
+
+    let lint_opts = x07c::world_config::lint_options_for_world(world);
+
+    let mut all_diags: Vec<diagnostics::Diagnostic> = Vec::new();
+    let mut has_error = false;
+
+    let mut file_set: Vec<(PathBuf, x07ast::X07AstFile)> = Vec::new();
+    file_set.push((program_path.clone(), entry_file.clone()));
+    for m in modules.values() {
+        if m.is_builtin {
+            continue;
+        }
+        if let Some(path) = m.path.clone() {
+            file_set.push((path, m.file.clone()));
+        }
+    }
+    file_set.sort_by(|(ap, _), (bp, _)| ap.cmp(bp));
+
+    for (path, file) in &file_set {
+        let report = lint::lint_file_no_typecheck(file, lint_opts);
+        if !report.ok {
+            has_error = true;
+        }
+        for mut d in report.diagnostics {
+            d.data.insert(
+                "file".to_string(),
+                serde_json::Value::String(path.display().to_string()),
+            );
+            all_diags.push(d);
+        }
+    }
+
+    let mut sigs = typecheck::TypecheckSigs::new();
+    for (_path, file) in &file_set {
+        sigs.add_file(file);
+    }
+    sigs.add_builtins();
+
+    for (path, file) in &file_set {
+        let report = typecheck::typecheck_file_with_sigs(file, &sigs, &Default::default());
+        for mut d in report.diagnostics {
+            if d.severity == diagnostics::Severity::Error {
+                has_error = true;
+            }
+            d.data.insert(
+                "file".to_string(),
+                serde_json::Value::String(path.display().to_string()),
+            );
+            all_diags.push(d);
+        }
+    }
+
+    if !has_error {
+        let mut options = x07c::world_config::compile_options_for_world(world, module_roots);
+        options.arch_root = Some(base);
+        if let Err(err) = compile::check_program(&program_bytes, &options) {
+            let (fn_name, ptr) = parse_fn_and_ptr_suffix(&err.message);
+            let mut code = "X07-INTERNAL-0001";
+            if err.message.contains("use after move") {
+                code = "X07-MOVE-0001";
+            } else if err.message.contains("borrow") {
+                code = "X07-MOVE-0002";
+            }
+            let mut d = diagnostics::Diagnostic {
+                code: code.to_string(),
+                severity: diagnostics::Severity::Error,
+                stage: diagnostics::Stage::Codegen,
+                message: err.message.clone(),
+                loc: ptr
+                    .as_ref()
+                    .map(|p| diagnostics::Location::X07Ast { ptr: p.clone() }),
+                notes: Vec::new(),
+                related: Vec::new(),
+                data: Default::default(),
+                quickfix: None,
+            };
+            d.data.insert(
+                "compiler_error_kind".to_string(),
+                serde_json::Value::String(format!("{:?}", err.kind)),
+            );
+            if let Some(fn_name) = fn_name.as_deref() {
+                d.data.insert(
+                    "fn".to_string(),
+                    serde_json::Value::String(fn_name.to_string()),
+                );
+                if fn_name == "solve" || fn_name.starts_with("main.") {
+                    d.data.insert(
+                        "file".to_string(),
+                        serde_json::Value::String(program_path.display().to_string()),
+                    );
+                } else if let Some((mod_id, _)) = fn_name.rsplit_once('.') {
+                    if let Some(m) = modules.get(mod_id) {
+                        if let Some(p) = m.path.as_ref() {
+                            d.data.insert(
+                                "file".to_string(),
+                                serde_json::Value::String(p.display().to_string()),
+                            );
+                        }
+                    }
+                }
+            }
+            if !d.data.contains_key("file") {
+                d.data.insert(
+                    "file".to_string(),
+                    serde_json::Value::String(program_path.display().to_string()),
+                );
+            }
+            all_diags.push(d);
+        }
+    }
+
+    all_diags.sort_by(|a, b| {
+        let ap = a.data.get("file").and_then(|v| v.as_str()).unwrap_or("");
+        let bp = b.data.get("file").and_then(|v| v.as_str()).unwrap_or("");
+        let a_ptr = a
+            .loc
+            .as_ref()
+            .and_then(|l| match l {
+                diagnostics::Location::X07Ast { ptr } => Some(ptr.as_str()),
+                diagnostics::Location::Text { .. } => None,
+            })
+            .unwrap_or("");
+        let b_ptr = b
+            .loc
+            .as_ref()
+            .and_then(|l| match l {
+                diagnostics::Location::X07Ast { ptr } => Some(ptr.as_str()),
+                diagnostics::Location::Text { .. } => None,
+            })
+            .unwrap_or("");
+        ap.cmp(bp)
+            .then_with(|| a_ptr.cmp(b_ptr))
+            .then_with(|| a.code.cmp(&b.code))
+            .then_with(|| a.message.cmp(&b.message))
+    });
+
+    let ok = all_diags
+        .iter()
+        .all(|d| d.severity != diagnostics::Severity::Error);
+
+    let mut inputs: BTreeSet<String> = BTreeSet::new();
+    inputs.insert(args.project.display().to_string());
+    inputs.insert(lock_path.display().to_string());
+    inputs.insert(program_path.display().to_string());
+    for m in modules.values() {
+        if m.is_builtin {
+            continue;
+        }
+        if let Some(p) = m.path.as_ref() {
+            inputs.insert(p.display().to_string());
+        }
+    }
+
+    let mut report = diagnostics::Report::ok();
+    report.ok = ok;
+    report.diagnostics = all_diags;
+    report.meta.insert(
+        "inputs".to_string(),
+        serde_json::Value::Array(inputs.into_iter().map(serde_json::Value::String).collect()),
+    );
+
+    let out = serde_json::to_string(&report)? + "\n";
+    if let Some(path) = machine.out.as_deref() {
+        crate::reporting::write_bytes(path, out.as_bytes())?;
+    } else {
+        print!("{out}");
+    }
+
+    Ok(if report.ok {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::from(1)
+    })
 }
 
 #[cfg(test)]

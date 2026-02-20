@@ -2,18 +2,17 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
-use crate::builtin_modules;
 use crate::c_emit;
 use crate::diagnostics::{Location, Severity};
 use crate::generics;
 use crate::guide;
 use crate::language;
+use crate::module_source;
 use crate::native::NativeRequires;
 use crate::optimize;
 use crate::program::Program;
 use crate::stream_pipe;
 use crate::types::Ty;
-use crate::validate;
 use crate::x07ast;
 use x07_contracts::{NATIVE_REQUIRES_SCHEMA_VERSION, X07AST_SCHEMA_VERSION_V0_5_0};
 
@@ -144,6 +143,115 @@ pub fn compile_program_to_c_with_meta(
     program: &[u8],
     options: &CompileOptions,
 ) -> Result<CompileToCOutput, CompilerError> {
+    let FrontendOutput {
+        mut parsed_program,
+        mono_map,
+        module_infos,
+        mut fuel_used,
+    } = compile_frontend(program, options)?;
+
+    // Optimize solve expression.
+    parsed_program.solve = optimize::optimize_expr(parsed_program.solve);
+    fuel_used = fuel_used.saturating_add(parsed_program.solve.node_count() as u64);
+
+    // Optimize function bodies.
+    for f in &mut parsed_program.functions {
+        f.body = optimize::optimize_expr(f.body.clone());
+        fuel_used = fuel_used.saturating_add(f.body.node_count() as u64);
+    }
+
+    // Optimize async function bodies.
+    for f in &mut parsed_program.async_functions {
+        f.body = optimize::optimize_expr(f.body.clone());
+        fuel_used = fuel_used.saturating_add(f.body.node_count() as u64);
+    }
+
+    validate_program_visibility(&parsed_program, &module_infos)?;
+    forbid_internal_only_heads_in_non_builtin_code(&parsed_program, &module_infos)?;
+
+    let contract_nodes = |clauses: &[crate::x07ast::ContractClauseAst]| -> usize {
+        clauses
+            .iter()
+            .map(|c| c.expr.node_count() + c.witness.iter().map(|w| w.node_count()).sum::<usize>())
+            .sum()
+    };
+
+    let total_nodes: usize = parsed_program.solve.node_count()
+        + parsed_program
+            .functions
+            .iter()
+            .map(|f| {
+                f.body.node_count()
+                    + contract_nodes(&f.requires)
+                    + contract_nodes(&f.ensures)
+                    + contract_nodes(&f.invariant)
+            })
+            .sum::<usize>()
+        + parsed_program
+            .async_functions
+            .iter()
+            .map(|f| {
+                f.body.node_count()
+                    + contract_nodes(&f.requires)
+                    + contract_nodes(&f.ensures)
+                    + contract_nodes(&f.invariant)
+            })
+            .sum::<usize>();
+    let max_ast_nodes = language::limits::max_ast_nodes();
+    if total_nodes > max_ast_nodes {
+        return Err(CompilerError::new(
+            CompileErrorKind::Budget,
+            format!(
+                "AST too large: max_ast_nodes={} got {} (set X07_MAX_AST_NODES=<n>)",
+                max_ast_nodes, total_nodes
+            ),
+        ));
+    }
+
+    let (c_src, native_requires) =
+        c_emit::emit_c_program_with_native_requires(&parsed_program, options)?;
+
+    let max_c_bytes = language::limits::max_c_bytes();
+    if c_src.len() > max_c_bytes {
+        return Err(CompilerError::new(
+            CompileErrorKind::Budget,
+            format!(
+                "C source too large: max_c_bytes={} got {} (set X07_MAX_C_BYTES=<bytes> or pass --max-c-bytes <bytes>)",
+                max_c_bytes,
+                c_src.len()
+            ),
+        ));
+    }
+
+    Ok(CompileToCOutput {
+        c_src,
+        stats: CompileStats { fuel_used },
+        native_requires: NativeRequires {
+            schema_version: NATIVE_REQUIRES_SCHEMA_VERSION.to_string(),
+            world: Some(options.world.as_str().to_string()),
+            requires: native_requires,
+        },
+        mono_map: Some(mono_map),
+    })
+}
+
+pub fn check_program(program: &[u8], options: &CompileOptions) -> Result<(), CompilerError> {
+    let _ = compile_frontend(program, options)?;
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct FrontendOutput {
+    parsed_program: Program,
+    mono_map: crate::generics::MonoMapV1,
+    module_infos: BTreeMap<String, ModuleInfo>,
+    fuel_used: u64,
+}
+
+fn compile_frontend(
+    program: &[u8],
+    options: &CompileOptions,
+) -> Result<FrontendOutput, CompilerError> {
     if options.freestanding {
         if options.emit_main {
             return Err(CompilerError::new(
@@ -293,88 +401,11 @@ pub fn compile_program_to_c_with_meta(
     validate_program_world_caps(&parsed_program, options)?;
     c_emit::check_c_program(&parsed_program, options)?;
 
-    // Optimize solve expression.
-    parsed_program.solve = optimize::optimize_expr(parsed_program.solve);
-    fuel_used = fuel_used.saturating_add(parsed_program.solve.node_count() as u64);
-
-    // Optimize function bodies.
-    for f in &mut parsed_program.functions {
-        f.body = optimize::optimize_expr(f.body.clone());
-        fuel_used = fuel_used.saturating_add(f.body.node_count() as u64);
-    }
-
-    // Optimize async function bodies.
-    for f in &mut parsed_program.async_functions {
-        f.body = optimize::optimize_expr(f.body.clone());
-        fuel_used = fuel_used.saturating_add(f.body.node_count() as u64);
-    }
-
-    validate_program_visibility(&parsed_program, &module_infos)?;
-    forbid_internal_only_heads_in_non_builtin_code(&parsed_program, &module_infos)?;
-
-    let contract_nodes = |clauses: &[crate::x07ast::ContractClauseAst]| -> usize {
-        clauses
-            .iter()
-            .map(|c| c.expr.node_count() + c.witness.iter().map(|w| w.node_count()).sum::<usize>())
-            .sum()
-    };
-
-    let total_nodes: usize = parsed_program.solve.node_count()
-        + parsed_program
-            .functions
-            .iter()
-            .map(|f| {
-                f.body.node_count()
-                    + contract_nodes(&f.requires)
-                    + contract_nodes(&f.ensures)
-                    + contract_nodes(&f.invariant)
-            })
-            .sum::<usize>()
-        + parsed_program
-            .async_functions
-            .iter()
-            .map(|f| {
-                f.body.node_count()
-                    + contract_nodes(&f.requires)
-                    + contract_nodes(&f.ensures)
-                    + contract_nodes(&f.invariant)
-            })
-            .sum::<usize>();
-    let max_ast_nodes = language::limits::max_ast_nodes();
-    if total_nodes > max_ast_nodes {
-        return Err(CompilerError::new(
-            CompileErrorKind::Budget,
-            format!(
-                "AST too large: max_ast_nodes={} got {} (set X07_MAX_AST_NODES=<n>)",
-                max_ast_nodes, total_nodes
-            ),
-        ));
-    }
-
-    let (c_src, native_requires) =
-        c_emit::emit_c_program_with_native_requires(&parsed_program, options)?;
-
-    let max_c_bytes = language::limits::max_c_bytes();
-    if c_src.len() > max_c_bytes {
-        return Err(CompilerError::new(
-            CompileErrorKind::Budget,
-            format!(
-                "C source too large: max_c_bytes={} got {} (set X07_MAX_C_BYTES=<bytes> or pass --max-c-bytes <bytes>)",
-                max_c_bytes,
-                c_src.len()
-            ),
-        ));
-    }
-
-    Ok(CompileToCOutput {
-        c_src,
-        stats: CompileStats { fuel_used },
-        native_requires: NativeRequires {
-            schema_version: NATIVE_REQUIRES_SCHEMA_VERSION.to_string(),
-            world: Some(options.world.as_str().to_string()),
-            requires: native_requires,
-        },
-        mono_map: Some(mono_map),
+    Ok(FrontendOutput {
+        parsed_program,
+        mono_map,
+        module_infos,
+        fuel_used,
     })
 }
 
@@ -986,20 +1017,10 @@ fn load_module_recursive(
         ));
     }
 
-    let (src, is_builtin) =
-        if options.world.is_standalone_only() && module_id.starts_with("std.world.") {
-            (
-                read_module_from_roots(module_id, &options.module_roots)?,
-                false,
-            )
-        } else if let Some(src) = builtin_modules::builtin_module_source(module_id) {
-            (src.to_string(), true)
-        } else {
-            (
-                read_module_from_roots(module_id, &options.module_roots)?,
-                false,
-            )
-        };
+    let source =
+        module_source::load_module_source(module_id, options.world, &options.module_roots)?;
+    let src = source.src;
+    let is_builtin = source.is_builtin;
 
     if !src.trim_start().starts_with('{') {
         return Err(CompilerError::new(
@@ -1029,59 +1050,6 @@ fn load_module_recursive(
     module_infos.insert(module_id.to_string(), info);
     let _ = visiting.remove(module_id);
     Ok(())
-}
-
-fn read_module_from_roots(
-    module_id: &str,
-    module_roots: &[std::path::PathBuf],
-) -> Result<String, CompilerError> {
-    if module_roots.is_empty() {
-        return Err(CompilerError::new(
-            CompileErrorKind::Parse,
-            format!("unknown module: {module_id:?}"),
-        ));
-    }
-
-    validate::validate_module_id(module_id)
-        .map_err(|message| CompilerError::new(CompileErrorKind::Parse, message))?;
-
-    let mut rel_path_base = std::path::PathBuf::new();
-    for seg in module_id.split('.') {
-        rel_path_base.push(seg);
-    }
-
-    let mut json_rel = rel_path_base.clone();
-    json_rel.set_extension("x07.json");
-    let json_rel_display = json_rel.display().to_string();
-
-    let mut json_hits: Vec<std::path::PathBuf> = Vec::new();
-    for root in module_roots {
-        let path = root.join(&json_rel);
-        if path.exists() {
-            json_hits.push(path);
-        }
-    }
-    if !json_hits.is_empty() {
-        return match json_hits.len() {
-            1 => {
-                let path = &json_hits[0];
-                std::fs::read_to_string(path).map_err(|e| {
-                    CompilerError::new(
-                        CompileErrorKind::Parse,
-                        format!("read module {module_id:?} at {}: {e}", path.display()),
-                    )
-                })
-            }
-            _ => Err(CompilerError::new(
-                CompileErrorKind::Parse,
-                format!("module {module_id:?} is ambiguous across roots: {json_hits:?}"),
-            )),
-        };
-    }
-    Err(CompilerError::new(
-        CompileErrorKind::Parse,
-        format!("unknown module: {module_id:?} (searched: {json_rel_display})"),
-    ))
 }
 
 fn x07ast_node_count(file: &x07ast::X07AstFile) -> u64 {

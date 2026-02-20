@@ -264,6 +264,17 @@ Notes:
 - Use `x07 pkg lock --check` in CI to fail if `x07.lock.json` is out of date.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
 
+### Project check (no emit)
+
+- `x07 check --project x07.json`
+  - Reads `x07.json` + `x07.lock.json` and resolves the full module import graph (including locked dependencies).
+  - Runs schema validation + lint + project-wide typecheck + backend-check.
+  - Non-mutating: does not run the repair loop and does not write source files.
+  - Does not emit C and does not invoke any native compiler.
+  - Emits an `x07diag` JSON report to stdout (or writes it with global `--out`).
+
+Tool wrapper schema (`--json`): `spec/x07-tool-check.report.schema.json` (`schema_version: "x07.tool.check.report@0.1.0"`).
+
 ### Build to C (project)
 
 - `x07 build --project x07.json --out build/program.c`

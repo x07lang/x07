@@ -110,6 +110,14 @@ impl LintOptions {
 }
 
 pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
+    lint_file_impl(file, options, true)
+}
+
+pub fn lint_file_no_typecheck(file: &X07AstFile, options: LintOptions) -> Report {
+    lint_file_impl(file, options, false)
+}
+
+fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) -> Report {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     match file.kind {
@@ -212,8 +220,9 @@ pub fn lint_file(file: &X07AstFile, options: LintOptions) -> Report {
         lint_expr(&f.body, &ptr, options, &ctx, &mut diagnostics);
     }
 
-    if file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0
-        || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0
+    if run_typecheck
+        && (file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0)
     {
         let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
         diagnostics.extend(tc.diagnostics);

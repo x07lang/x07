@@ -11,6 +11,7 @@ pub mod json_patch;
 pub mod language;
 pub mod lint;
 pub(crate) mod mem_provenance;
+pub mod module_source;
 pub mod native;
 pub mod optimize;
 pub mod program;

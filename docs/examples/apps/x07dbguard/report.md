@@ -95,7 +95,7 @@ The error "unsupported head: std.u32.read_le_at" after monomorphization doesn't 
 
 ### 3.4 No incremental compilation for debugging
 
-Every change requires a full recompile. For a project with many modules and dependencies, this creates a slow feedback loop. There's no `x07 check` (type-check only) to quickly validate module interfaces without full compilation.
+Every change requires a full compile and (for `x07 build` / `x07 run`) C emission + native compilation. For a project with many modules and dependencies, this creates a slow feedback loop. `x07 check --project x07.json` helps by running schema validation + lint + project-wide typecheck + backend-check without emitting C or invoking a native compiler, but it is still not incremental compilation.
 
 ---
 
@@ -117,7 +117,7 @@ Every change requires a full recompile. For a project with many modules and depe
 
 6. **Project-level lint**: `x07 lint --project x07.json` that resolves cross-module references during lint, not just at compile time.
 
-7. **Type-check-only mode**: `x07 check` that validates types and module interfaces without generating C code or compiling, for faster iteration.
+7. **Project check (no emit)**: `x07 check --project x07.json` runs schema validation + lint + project-wide typecheck + backend-check without emitting C or invoking a native compiler.
 
 8. **Diagnostic quickfixes for cross-module issues**: When lint reports "unknown callee", provide a quickfix that adds the missing import.
 

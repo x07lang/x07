@@ -115,7 +115,7 @@ When a function name or schema version is close but wrong, the toolchain doesn't
 
 ### Priority 4: Project-level tools
 1. Add `x07 lint --project x07.json` for project-level type checking
-2. Add `x07 check` as a unified pre-commit gate (fmt + lint + arch + test)
+2. Use `x07 check --project x07.json` as a fast project-wide gate (lint + typecheck + backend-check). For a full pre-commit gate, compose `x07 fmt`, `x07 arch check`, and `x07 test`.
 
 ## 6. Project Structure
 

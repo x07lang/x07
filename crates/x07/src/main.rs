@@ -108,6 +108,8 @@ enum Command {
     Fix(toolchain::FixArgs),
     /// Build a project to C.
     Build(toolchain::BuildArgs),
+    /// Check a project (lint + typecheck + backend-check; no emit).
+    Check(toolchain::CheckArgs),
     /// Work with CLI specrows schemas and tooling.
     Cli(cli::CliArgs),
     /// Manage packages and lockfiles.
@@ -352,6 +354,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Lint(_)) => vec!["lint"],
             Some(Command::Fix(_)) => vec!["fix"],
             Some(Command::Build(_)) => vec!["build"],
+            Some(Command::Check(_)) => vec!["check"],
             Some(Command::Cli(args)) => match &args.cmd {
                 None => vec!["cli"],
                 Some(cli::CliCommand::Spec(args)) => match &args.cmd {
@@ -430,6 +433,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Lint(args) => toolchain::cmd_lint(&cli.machine, args),
         Command::Fix(args) => toolchain::cmd_fix(&cli.machine, args),
         Command::Build(args) => toolchain::cmd_build(&cli.machine, args),
+        Command::Check(args) => toolchain::cmd_check(&cli.machine, args),
         Command::Cli(args) => cli::cmd_cli(&cli.machine, args),
         Command::Pkg(args) => pkg::cmd_pkg(&cli.machine, args),
         Command::Review(args) => review::cmd_review(&cli.machine, args),

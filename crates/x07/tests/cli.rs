@@ -7,8 +7,9 @@ use std::sync::Once;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use x07_contracts::{
-    X07AST_SCHEMA_VERSION, X07C_REPORT_SCHEMA_VERSION, X07DIAG_SCHEMA_VERSION,
-    X07TEST_SCHEMA_VERSION, X07_AGENT_CONTEXT_SCHEMA_VERSION, X07_ARCH_REPORT_SCHEMA_VERSION,
+    PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_MANIFEST_SCHEMA_VERSION, X07AST_SCHEMA_VERSION,
+    X07C_REPORT_SCHEMA_VERSION, X07DIAG_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
+    X07_AGENT_CONTEXT_SCHEMA_VERSION, X07_ARCH_REPORT_SCHEMA_VERSION,
     X07_CONTRACT_REPRO_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
     X07_PATCHSET_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
     X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
@@ -167,6 +168,224 @@ fn copy_dir_recursive(src: &Path, dst: &Path) {
             std::fs::copy(path, &out).expect("copy fixture file");
         }
     }
+}
+
+#[test]
+fn x07_check_schema_discovery() {
+    let out = run_x07(&["check", "--json-schema-id"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "x07.tool.check.report@0.1.0\n"
+    );
+
+    let out = run_x07(&["check", "--json-schema"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let schema: Value = serde_json::from_slice(&out.stdout).expect("parse schema JSON");
+    assert_eq!(
+        schema["properties"]["schema_version"]["const"],
+        "x07.tool.check.report@0.1.0"
+    );
+    assert_eq!(schema["properties"]["command"]["const"], "x07.check");
+}
+
+#[test]
+fn x07_check_valid_project_no_emit() {
+    let root = fresh_tmp_dir(&repo_root(), "x07_check_valid");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let project = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    }))
+    .expect("serialize x07.json");
+    write_bytes(&root.join("x07.json"), &project);
+
+    let lock = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
+        "dependencies": []
+    }))
+    .expect("serialize x07.lock.json");
+    write_bytes(&root.join("x07.lock.json"), &lock);
+
+    let entry = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": ["bytes.alloc", 0]
+    }))
+    .expect("serialize entry x07AST");
+    write_bytes(&root.join("src/main.x07.json"), &entry);
+
+    let out = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(out.stderr.is_empty(), "expected empty stderr");
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(v["ok"], true);
+
+    let mut saw_c = false;
+    for entry in walkdir::WalkDir::new(&root).into_iter().flatten() {
+        if entry.file_type().is_file()
+            && entry.path().extension().and_then(|e| e.to_str()) == Some("c")
+        {
+            saw_c = true;
+            break;
+        }
+    }
+    assert!(!saw_c, "expected no *.c outputs under {}", root.display());
+
+    std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_check_project_wide_typecheck_across_modules() {
+    let root = fresh_tmp_dir(&repo_root(), "x07_check_type");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let project = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    }))
+    .expect("serialize x07.json");
+    write_bytes(&root.join("x07.json"), &project);
+
+    let lock = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
+        "dependencies": []
+    }))
+    .expect("serialize x07.lock.json");
+    write_bytes(&root.join("x07.lock.json"), &lock);
+
+    let foo = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "foo",
+        "imports": [],
+        "decls": [
+            { "kind": "export", "names": ["foo.ret_i32"] },
+            { "kind": "defn", "name": "foo.ret_i32", "params": [], "result": "i32", "body": 0 }
+        ]
+    }))
+    .expect("serialize foo module");
+    write_bytes(&root.join("src/foo.x07.json"), &foo);
+
+    let entry = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": ["foo"],
+        "decls": [],
+        "solve": ["foo.ret_i32"]
+    }))
+    .expect("serialize entry x07AST");
+    write_bytes(&root.join("src/main.x07.json"), &entry);
+
+    let out = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "expected failure; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(out.stderr.is_empty(), "expected empty stderr");
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(v["ok"], false);
+
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(
+        diags.iter().any(|d| {
+            d["severity"] == "error"
+                && d["stage"] == "type"
+                && d["loc"]["kind"] == "x07ast"
+                && d["loc"]["ptr"] == "/solve"
+        }),
+        "expected type error at /solve; diagnostics:\n{}",
+        serde_json::to_string_pretty(&v["diagnostics"]).unwrap()
+    );
+
+    std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_check_surfaces_move_errors() {
+    let root = fresh_tmp_dir(&repo_root(), "x07_check_move");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let project = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    }))
+    .expect("serialize x07.json");
+    write_bytes(&root.join("x07.json"), &project);
+
+    let lock = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
+        "dependencies": []
+    }))
+    .expect("serialize x07.lock.json");
+    write_bytes(&root.join("x07.lock.json"), &lock);
+
+    let entry = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": ["begin", ["let", "x", ["bytes.lit", "a"]], ["bytes.concat", "x", "x"]]
+    }))
+    .expect("serialize entry x07AST");
+    write_bytes(&root.join("src/main.x07.json"), &entry);
+
+    let out = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "expected failure; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(out.stderr.is_empty(), "expected empty stderr");
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(v["ok"], false);
+
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(
+        diags.iter().any(|d| d["code"]
+            .as_str()
+            .is_some_and(|c| c.starts_with("X07-MOVE-"))),
+        "expected X07-MOVE-* diagnostic; diagnostics:\n{}",
+        serde_json::to_string_pretty(&v["diagnostics"]).unwrap()
+    );
+
+    std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
 }
 
 #[test]

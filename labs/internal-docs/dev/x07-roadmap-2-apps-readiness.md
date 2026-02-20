@@ -13,6 +13,7 @@ Inputs:
 ### Tooling + workflows
 
 - `x07 fmt` / `x07 lint` / `x07 fix` accept directory inputs and repeated `--input`, enabling simple CI gates over `src/` + `tests/`.
+- `x07 check --project x07.json` resolves the full module graph and runs lint + project-wide typecheck + backend-check without emitting C or invoking a native compiler.
 
 ### `x07 arch check` recovery loop
 
@@ -45,7 +46,6 @@ These are real friction points seen repeatedly across the reports and reference 
 
 ### Agent workflow gaps
 
-- Project-level lint/check entry point (`x07 check` and/or `x07 lint --project x07.json`) to support a fast “lint → fix → lint” loop across multi-module projects without running full compilation.
 - Structured JSON parse errors with x07AST context (ptr / decl path) for single-line minified files.
 
 ### Package manager resilience
@@ -71,10 +71,7 @@ These are real friction points seen repeatedly across the reports and reference 
    - Extend `x07 fix` to safely rewrite nested temporary borrow patterns (`bytes.view(bytes.lit(..))`) into let-bound owners in more cases.
    - Add regression tests with minimal failing x07AST inputs.
 
-4. **Project-level lint/check (medium/large)**
-   - Design and implement a `--project x07.json` mode for `x07 lint` (or a new `x07 check`) that:
-     - loads module roots + lockfile and resolves imports,
-     - reports diagnostics across the full project.
+4. **Project-level check (done)**
+   - `x07 check --project x07.json` loads module roots + lockfile, resolves imports, and reports diagnostics across the full project without emitting C or invoking a native compiler.
 
 Acceptance criteria for each item should be driven by the reference apps under `docs/examples/apps/` (add failing cases first, then fix).
-

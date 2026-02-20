@@ -33,6 +33,13 @@ Some ownership/move/borrow diagnostics include `diagnostics[].data.mem_provenanc
 
 For explicit control (or when you want the raw reports), use `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch` and see [Repair loop](repair-loop.md).
 
+## Whole-project check
+
+- `x07 check --project x07.json`
+  - Resolves the full import graph (including locked dependencies).
+  - Runs schema validation + lint + project-wide typecheck + backend-check.
+  - Non-mutating: does not run the repair loop and does not emit C or invoke any native compiler.
+
 ## Output contracts (agent-friendly)
 
 - Raw diagnostics output: `x07diag` (schema: `spec/x07diag.schema.json`)
