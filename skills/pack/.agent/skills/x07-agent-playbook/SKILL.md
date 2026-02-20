@@ -78,6 +78,8 @@ module files under `modules/` and run tests via `x07 test --manifest tests/tests
 - Semantic diff + trust report (for human review / CI artifacts):
   - `x07 review diff --from . --to . --html-out target/review/diff.html --json-out target/review/diff.json`
   - `x07 trust report --project x07.json --out target/trust/trust.json --html-out target/trust/trust.html`
+  - SBOM artifact (default CycloneDX): `target/trust/trust.sbom.cdx.json`
+  - Dependency capability gate: add `--fail-on deps-capability` and provide `x07.deps.capability-policy.json`
 
 - Function contracts + bounded verification artifacts:
   - add `requires` / `ensures` / `invariant` clauses on a `defn`

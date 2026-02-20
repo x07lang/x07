@@ -114,7 +114,7 @@ enum Command {
     Pkg(pkg::PkgArgs),
     /// Produce human review artifacts (semantic diffs).
     Review(review::ReviewArgs),
-    /// Emit CI trust artifacts (budgets/caps, capabilities, nondeterminism, SBOM placeholders).
+    /// Emit CI trust artifacts (budgets/caps, capabilities, nondeterminism, SBOM artifacts).
     Trust(trust::TrustArgs),
     /// Apply deterministic multi-file JSON patchsets.
     Patch(patch::PatchArgs),

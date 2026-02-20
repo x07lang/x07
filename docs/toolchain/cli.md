@@ -105,8 +105,10 @@ See: [Review & trust artifacts](review-trust.md).
 
 - `x07 trust report --project x07.json --out <path>`
 - `x07 trust report --project x07.json --profile sandbox --out <path> --html-out <path>`
-  - Emits a machine-readable trust summary (budgets/caps, declared+used capabilities, nondeterminism flags, SBOM placeholders).
+  - Emits a machine-readable trust summary (budgets/caps, declared+used capabilities, nondeterminism flags, deterministic SBOM artifacts).
   - Supports observed merges via `--run-report`, `--bundle-report`, `--x07test`.
+  - SBOM output: `--sbom-format none|cyclonedx|spdx` (default: `cyclonedx`) writes `*.sbom.cdx.json` (or `*.sbom.spdx.json`) next to the trust report output.
+  - Dependency capability policy: `--deps-cap-policy <path>` (safe relative path) + CI gate `--fail-on deps-capability`.
   - Supports CI gates via `--strict` and `--fail-on ...`.
   - JSON schema: `spec/x07-trust.report.schema.json` (`schema_version: "x07.trust.report@0.1.0"`).
 

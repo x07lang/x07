@@ -5725,6 +5725,78 @@ fn x07_trust_report_outputs_expected_schema_and_flags() {
         "expected stdlib sbom components from stdlib.lock"
     );
 
+    assert_eq!(report["sbom"]["format"], "cyclonedx");
+    assert_eq!(report["sbom"]["generated"], true);
+    assert_eq!(report["sbom"]["cyclonedx"]["spec_version"], "1.5");
+    let sbom_path = report["sbom"]["path"].as_str().expect("sbom.path");
+    let expected_sbom_path = trust_json.with_extension("sbom.cdx.json");
+    assert_eq!(PathBuf::from(sbom_path), expected_sbom_path);
+    assert!(
+        expected_sbom_path.is_file(),
+        "missing {}",
+        expected_sbom_path.display()
+    );
+
+    let sbom_bytes_1 = std::fs::read(&expected_sbom_path).expect("read sbom-1");
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "report",
+            "--project",
+            "x07.json",
+            "--profile",
+            "sandbox",
+            "--out",
+            trust_json.to_str().unwrap(),
+            "--html-out",
+            trust_html.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let sbom_bytes_2 = std::fs::read(&expected_sbom_path).expect("read sbom-2");
+    assert_eq!(sbom_bytes_1, sbom_bytes_2, "SBOM must be deterministic");
+
+    let trust_none_json = dir.join("trust_none.json");
+    let trust_none_sbom = trust_none_json.with_extension("sbom.cdx.json");
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "report",
+            "--project",
+            "x07.json",
+            "--profile",
+            "sandbox",
+            "--out",
+            trust_none_json.to_str().unwrap(),
+            "--sbom-format",
+            "none",
+            "--fail-on",
+            "sbom-missing",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        trust_none_json.is_file(),
+        "missing {}",
+        trust_none_json.display()
+    );
+    assert!(
+        !trust_none_sbom.exists(),
+        "expected no SBOM artifact for --sbom-format none"
+    );
+
     let out = run_x07_in_dir(
         &dir,
         &[
@@ -5746,6 +5818,186 @@ fn x07_trust_report_outputs_expected_schema_and_flags() {
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+fn scaffold_deps_capability_fixture(dir: &Path) -> (String, String, String) {
+    std::fs::create_dir_all(dir.join("src")).expect("create src");
+
+    write_json(
+        &dir.join("src/main.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["bytes.lit", "ok"]
+        }),
+    );
+
+    let dep_name = "ext-bad".to_string();
+    let dep_version = "0.1.0".to_string();
+    let dep_path = format!(".x07/deps/{}/{}", dep_name, dep_version);
+
+    let dep_modules_dir = dir.join(&dep_path).join("modules");
+    std::fs::create_dir_all(&dep_modules_dir).expect("create dep modules");
+    write_json(
+        &dep_modules_dir.join("bad.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "bad",
+            "imports": [],
+            "decls": [
+                {
+                    "kind": "defn",
+                    "name": "bad.net",
+                    "params": [],
+                    "result": ["t", "bytes"],
+                    "body": ["std.os.net.fake"]
+                }
+            ]
+        }),
+    );
+
+    write_json(
+        &dir.join("x07.json"),
+        &serde_json::json!({
+            "schema_version": "x07.project@0.2.0",
+            "world": "solve-pure",
+            "entry": "src/main.x07.json",
+            "module_roots": ["src"],
+            "dependencies": [
+                { "name": dep_name, "version": dep_version, "path": dep_path }
+            ]
+        }),
+    );
+
+    write_json(
+        &dir.join("x07.lock.json"),
+        &serde_json::json!({
+            "schema_version": "x07.lock@0.2.0",
+            "dependencies": [
+                {
+                    "name": dep_name,
+                    "version": dep_version,
+                    "path": dep_path,
+                    "package_manifest_sha256": "00",
+                    "module_root": "modules",
+                    "modules_sha256": {}
+                }
+            ]
+        }),
+    );
+
+    (dep_name, dep_version, dep_path)
+}
+
+#[test]
+fn x07_trust_report_fail_on_deps_capability_emits_structured_diagnostics_in_wrapper() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_deps_capability_deny");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let (_dep_name, _dep_version, _dep_path) = scaffold_deps_capability_fixture(&dir);
+
+    write_json(
+        &dir.join("x07.deps.capability-policy.json"),
+        &serde_json::json!({
+            "schema_version": "x07.deps.capability_policy@0.1.0",
+            "policy_id": "deny-net",
+            "default": { "deny_sensitive_namespaces": ["std.os.net"] }
+        }),
+    );
+
+    let trust_json = dir.join("trust.json");
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "report",
+            "--project",
+            "x07.json",
+            "--out",
+            trust_json.to_str().unwrap(),
+            "--fail-on",
+            "deps-capability",
+            "--json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], false);
+    assert_eq!(report["exit_code"], 20);
+
+    let diags = report["diagnostics"].as_array().expect("diagnostics[]");
+    let deny = diags
+        .iter()
+        .find(|d| d["code"] == "E_DEPS_CAP_POLICY_DENY")
+        .expect("missing E_DEPS_CAP_POLICY_DENY");
+    assert_eq!(deny["severity"], "error");
+    assert!(
+        deny["data"]["offending_namespaces"]
+            .as_array()
+            .expect("offending_namespaces[]")
+            .iter()
+            .any(|v| v == "std.os.net."),
+        "expected offending std.os.net."
+    );
+}
+
+#[test]
+fn x07_trust_report_missing_deps_cap_policy_fails_only_under_fail_on() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_deps_capability_missing_policy");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let (_dep_name, _dep_version, _dep_path) = scaffold_deps_capability_fixture(&dir);
+
+    let trust_json = dir.join("trust.json");
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "report",
+            "--project",
+            "x07.json",
+            "--out",
+            trust_json.to_str().unwrap(),
+            "--fail-on",
+            "deps-capability",
+            "--json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], false);
+    assert_eq!(report["exit_code"], 20);
+
+    let diags = report["diagnostics"].as_array().expect("diagnostics[]");
+    let missing = diags
+        .iter()
+        .find(|d| d["code"] == "W_DEPS_CAP_POLICY_MISSING")
+        .expect("missing W_DEPS_CAP_POLICY_MISSING");
+    assert_eq!(missing["severity"], "error");
 }
 
 #[test]

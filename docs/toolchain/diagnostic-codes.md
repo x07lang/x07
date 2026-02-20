@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 179
+- total codes: 182
 - quickfix support (`sometimes` or `always`): 155
-- quickfix coverage: 86.59%
+- quickfix coverage: 85.16%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -44,8 +44,11 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `E_ARCH_LOCK_READ` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_READ`. |
 | `E_ARCH_MODULE_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_MODULE_PARSE`. |
 | `E_ARCH_TOOL_BUDGET_EXCEEDED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_TOOL_BUDGET_EXCEEDED`. |
+| `E_DEPS_CAP_POLICY_DENY` | x07 / lint / error | never | Dependency violates capability policy. |
+| `E_SBOM_GENERATION_FAILED` | x07 / lint / error | never | SBOM generation failed. |
 | `W_ARCH_CONTRACTS_LOCK_MISSING` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`. |
 | `W_ARCH_CONTRACT_OPAQUE_USAGE` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACT_OPAQUE_USAGE`. |
+| `W_DEPS_CAP_POLICY_MISSING` | x07 / lint / warning | never | Dependency capability policy missing. |
 | `X07-ARITY-0000` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-0000`. |
 | `X07-ARITY-BEGIN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-BEGIN-0001`. |
 | `X07-ARITY-FOR-0001` | x07c / lint / error | sometimes | `for` has invalid arity. |
@@ -908,6 +911,53 @@ Agent strategy:
 - Re-run `x07 arch check` until green.
 
 
+## `E_DEPS_CAP_POLICY_DENY`
+
+Summary: Dependency violates capability policy.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a policy decision (allow vs deny) and/or changing the dependency code.
+
+Details:
+
+A locked dependency statically uses one or more sensitive namespaces that are denied by the dependency capability policy.
+
+This gate is based on the same sensitive namespace scan surfaced in `x07 trust report` (for example `std.os.net.` or `std.os.process.`).
+
+Agent strategy:
+
+- Inspect `diagnostics[].data.offending_namespaces` and the `policy` fields (path/rule).
+- If the dependency is expected to use the capability, add an explicit allow entry for that package.
+- Otherwise, replace the dependency or remove the sensitive namespace usage.
+- Re-run `x07 trust report --fail-on deps-capability` to verify the policy is enforced.
+
+
+## `E_SBOM_GENERATION_FAILED`
+
+Summary: SBOM generation failed.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: SBOM output depends on filesystem availability and explicit configuration.
+
+Details:
+
+`x07 trust report` failed to generate or write a deterministic SBOM artifact (CycloneDX/SPDX).
+
+If CI is gating on `--fail-on sbom-missing`, this will cause the trust report command to fail.
+
+Agent strategy:
+
+- Check the `diagnostics[].data.path` and filesystem permissions for the output directory.
+- If SBOM output is intentionally disabled, avoid gating on `sbom-missing` or remove `--sbom-format none`.
+- Re-run `x07 trust report` to confirm the SBOM artifact is generated and stable.
+
+
 ## `W_ARCH_CONTRACTS_LOCK_MISSING`
 
 Summary: Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`.
@@ -946,6 +996,29 @@ Agent strategy:
 - Run `x07 arch check --write-lock`.
 - Apply suggested manifest/contracts updates.
 - Re-run `x07 arch check` until green.
+
+
+## `W_DEPS_CAP_POLICY_MISSING`
+
+Summary: Dependency capability policy missing.
+
+Origins:
+- x07 (stage: lint, severity: warning)
+
+Quickfix support: `never`
+No quickfix reason: Requires author intent (define a deny/allow policy for the project dependencies).
+
+Details:
+
+The project declares dependencies but `x07 trust report` did not find a dependency capability policy file.
+
+By default, the policy is discovered at `x07.deps.capability-policy.json` in the project root (or overridden via `--deps-cap-policy`).
+
+Agent strategy:
+
+- Create `x07.deps.capability-policy.json` in the project root (schema: `x07.deps.capability_policy@0.1.0`).
+- Or pass `--deps-cap-policy <path>` to point at an existing policy file.
+- To enforce in CI, add `--fail-on deps-capability`.
 
 
 ## `X07-ARITY-0000`

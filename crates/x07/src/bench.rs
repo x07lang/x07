@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::io::{BufRead, BufReader, Read};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -1318,7 +1318,7 @@ fn eval_one_instance(
     copy_dir_recursive(&repo_src, &repo_work)
         .with_context(|| format!("copy repo snapshot from {}", repo_src.display()))?;
 
-    let x07test_subdir = if is_safe_rel_path(&instance.eval.artifact_dir) {
+    let x07test_subdir = if util::is_safe_rel_path(&instance.eval.artifact_dir) {
         instance.eval.artifact_dir.clone()
     } else {
         "x07test".to_string()
@@ -1742,7 +1742,7 @@ fn parse_patch_kind(s: &str) -> Option<BenchPatchKind> {
 }
 
 fn resolve_safe_patch_path(base_dir: &Path, rel: &str) -> Result<PathBuf> {
-    if !is_safe_rel_path(rel) {
+    if !util::is_safe_rel_path(rel) {
         bail!("unsafe relative path: {rel}");
     }
     let path = base_dir.join(rel);
@@ -1897,7 +1897,7 @@ fn apply_patchset_allow_create(repo_root: &Path, patchset_path: &Path) -> Result
         if let Some(note) = target.note.as_deref() {
             let _ = note;
         }
-        if !is_safe_rel_path(&target.path) {
+        if !util::is_safe_rel_path(&target.path) {
             bail!("unsafe patch target path: {}", target.path);
         }
 
@@ -1947,7 +1947,7 @@ fn apply_unified_diff(repo_root: &Path, diff_path: &Path) -> Result<Vec<PathBuf>
 
     let touched_rel = parse_unified_diff_touched_paths(&diff_text);
     for rel in &touched_rel {
-        if !is_safe_rel_path(rel) {
+        if !util::is_safe_rel_path(rel) {
             bail!("unsafe path in unified diff: {rel}");
         }
     }
@@ -2277,14 +2277,14 @@ fn check_expectations(
 }
 
 fn resolve_repo_path(repo_root: &Path, rel: &str) -> Result<PathBuf> {
-    if !is_safe_rel_path(rel) {
+    if !util::is_safe_rel_path(rel) {
         bail!("unsafe relative path: {rel}");
     }
     Ok(repo_root.join(rel))
 }
 
 fn resolve_stdlib_lock(repo_root: &Path, rel: &str) -> PathBuf {
-    if is_safe_rel_path(rel) {
+    if util::is_safe_rel_path(rel) {
         let candidate = repo_root.join(rel);
         if candidate.exists() {
             return candidate;
@@ -2569,26 +2569,6 @@ fn safe_artifact_dir_name(id: &str) -> String {
     hasher.update(id.as_bytes());
     let hex = util::hex_lower(&hasher.finalize());
     format!("id_{hex}")
-}
-
-fn is_safe_rel_path(raw: &str) -> bool {
-    if raw.is_empty() || raw.contains('\\') {
-        return false;
-    }
-
-    let p = Path::new(raw);
-    if p.is_absolute() {
-        return false;
-    }
-
-    for c in p.components() {
-        match c {
-            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return false,
-            Component::Normal(_) | Component::CurDir => {}
-        }
-    }
-
-    true
 }
 
 fn read_stderr_snippet(path: &Path, max_bytes: usize) -> String {

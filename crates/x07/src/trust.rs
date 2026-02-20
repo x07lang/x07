@@ -1,22 +1,28 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand, ValueEnum};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use x07_contracts::{PROJECT_LOCKFILE_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION};
+use x07_contracts::{
+    PROJECT_LOCKFILE_SCHEMA_VERSION, X07DIAG_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
+};
 use x07_worlds::WorldId;
 use x07c::diagnostics;
 use x07c::project;
 
 use crate::policy_overrides::{PolicyOverrides, PolicyResolution};
 use crate::report_common;
+use crate::reporting;
 use crate::run;
 use crate::util;
 
 const X07_TRUST_REPORT_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-trust.report.schema.json");
+const X07_DEPS_CAPABILITY_POLICY_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-deps.capability-policy.schema.json");
 
 const DEFAULT_SOLVE_FUEL: u64 = 50_000_000;
 const DEFAULT_MAX_MEMORY_BYTES: u64 = 64 * 1024 * 1024;
@@ -30,7 +36,7 @@ pub struct TrustArgs {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum TrustCommand {
-    /// Emit a CI trust report artifact (budgets/caps, capabilities, nondeterminism, SBOM placeholders).
+    /// Emit a CI trust report artifact (budgets/caps, capabilities, nondeterminism, SBOM).
     Report(TrustReportArgs),
 }
 
@@ -43,6 +49,15 @@ pub enum TrustFailOn {
     ProcessEnabled,
     Nondeterminism,
     SbomMissing,
+    DepsCapability,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+#[clap(rename_all = "kebab_case")]
+pub enum SbomFormat {
+    None,
+    Cyclonedx,
+    Spdx,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -70,6 +85,16 @@ pub struct TrustReportArgs {
     /// Optional x07test reports to merge observed stats (best-effort).
     #[arg(long, value_name = "PATH")]
     pub x07test: Vec<PathBuf>,
+
+    /// SBOM format to generate (deterministic).
+    #[arg(long, value_enum, default_value_t = SbomFormat::Cyclonedx)]
+    pub sbom_format: SbomFormat,
+
+    /// Optional dependency capability policy path (safe relative path).
+    ///
+    /// If omitted: attempts to load `x07.deps.capability-policy.json` from the project root.
+    #[arg(long, value_name = "PATH")]
+    pub deps_cap_policy: Option<String>,
 
     /// If set: missing policy/lock/schema mismatch becomes a hard error.
     #[arg(long)]
@@ -235,6 +260,7 @@ struct ProjectContext {
     runner: String,
     module_roots: Vec<PathBuf>,
     profile: Option<String>,
+    declared_dependencies: Vec<project::DependencySpec>,
     lockfile_path: Option<PathBuf>,
     stdlib_lock_path: Option<PathBuf>,
     arch_root: Option<PathBuf>,
@@ -254,6 +280,28 @@ struct StaticScan {
     op_counts: BTreeMap<String, u64>,
     scopes: Vec<BudgetScope>,
     uses_os_time: bool,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+struct DepsCapabilityPolicyDefault {
+    deny_sensitive_namespaces: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct DepsCapabilityPolicyPackage {
+    name: String,
+    #[serde(default)]
+    allow_sensitive_namespaces: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct DepsCapabilityPolicy {
+    policy_id: String,
+    #[serde(default)]
+    default: DepsCapabilityPolicyDefault,
+    #[serde(default)]
+    packages: Vec<DepsCapabilityPolicyPackage>,
 }
 
 pub fn cmd_trust(
@@ -316,6 +364,129 @@ fn cmd_trust_report(
     }
 
     let static_scan = scan_module_roots(&ctx.module_roots);
+
+    let fail_on_deps_capability = args.fail_on.contains(&TrustFailOn::DepsCapability);
+    let mut deps_cap_diags: Vec<diagnostics::Diagnostic> = Vec::new();
+    let mut deps_cap_policy_schema_invalid = false;
+    let mut deps_cap_policy_missing = false;
+    let mut deps_cap_policy: Option<DepsCapabilityPolicy> = None;
+
+    let deps_declared = !ctx.declared_dependencies.is_empty();
+    if ctx.project_path.is_some() && deps_declared {
+        let default_policy_path = ctx.root.join("x07.deps.capability-policy.json");
+        let policy_path = if let Some(raw) = args.deps_cap_policy.as_deref() {
+            if !util::is_safe_rel_path(raw) {
+                anyhow::bail!(
+                    "--deps-cap-policy must be a safe relative path (no '..', no absolute paths): {:?}",
+                    raw
+                );
+            }
+            ctx.root.join(raw)
+        } else {
+            default_policy_path
+        };
+
+        if policy_path.is_file() {
+            let doc = report_common::read_json_file(&policy_path)?;
+            let schema_diags = report_common::validate_schema(
+                X07_DEPS_CAPABILITY_POLICY_SCHEMA_BYTES,
+                "spec/x07-deps.capability-policy.schema.json",
+                &doc,
+            )?;
+            if !schema_diags.is_empty() {
+                deps_cap_policy_schema_invalid = true;
+                deps_cap_diags.extend(schema_diags);
+            } else {
+                deps_cap_policy = match serde_json::from_value::<DepsCapabilityPolicy>(doc.clone())
+                {
+                    Ok(parsed) => Some(parsed),
+                    Err(err) => {
+                        deps_cap_policy_schema_invalid = true;
+                        deps_cap_diags.push(reporting::diag_error(
+                            "X07-TOOL-EXEC-0001",
+                            diagnostics::Stage::Run,
+                            &format!("parse deps capability policy JSON: {err}"),
+                        ));
+                        None
+                    }
+                };
+            }
+        } else {
+            deps_cap_policy_missing = true;
+            let mut diag = reporting::diag_error(
+                "W_DEPS_CAP_POLICY_MISSING",
+                diagnostics::Stage::Lint,
+                "dependency capability policy missing",
+            );
+            diag.severity = if fail_on_deps_capability {
+                diagnostics::Severity::Error
+            } else {
+                diagnostics::Severity::Warning
+            };
+            diag.data.insert(
+                "expected_path".to_string(),
+                Value::String(policy_path.display().to_string()),
+            );
+            deps_cap_diags.push(diag);
+        }
+
+        if let (Some(lock), Some(policy)) = (ctx.lockfile.as_ref(), deps_cap_policy.as_ref()) {
+            let deny = normalize_sensitive_namespace_set(&policy.default.deny_sensitive_namespaces);
+            for dep in &lock.dependencies {
+                let module_root = ctx.root.join(&dep.path).join(&dep.module_root);
+                let scan = scan_module_roots(&[module_root]);
+                if scan.namespaces.is_empty() {
+                    continue;
+                }
+
+                let allow = deps_cap_allowlist(policy, &dep.name);
+                let denied_effective: BTreeSet<String> = deny.difference(&allow).cloned().collect();
+                let offending: BTreeSet<String> = scan
+                    .namespaces
+                    .intersection(&denied_effective)
+                    .cloned()
+                    .collect();
+                if offending.is_empty() {
+                    continue;
+                }
+
+                let mut diag = reporting::diag_error(
+                    "E_DEPS_CAP_POLICY_DENY",
+                    diagnostics::Stage::Lint,
+                    &format!(
+                        "dependency {:?} uses denied sensitive namespaces",
+                        dep.name.as_str()
+                    ),
+                );
+                diag.data.insert(
+                    "package".to_string(),
+                    json!({
+                        "name": dep.name.as_str(),
+                        "version": dep.version.as_str(),
+                        "path": dep.path.as_str(),
+                    }),
+                );
+                diag.data.insert(
+                    "offending_namespaces".to_string(),
+                    Value::Array(offending.into_iter().map(Value::String).collect()),
+                );
+                diag.data.insert(
+                    "policy".to_string(),
+                    json!({
+                        "path": policy_path.display().to_string(),
+                        "policy_id": policy.policy_id.as_str(),
+                        "rule_ptr": "/default/deny_sensitive_namespaces"
+                    }),
+                );
+                deps_cap_diags.push(diag);
+            }
+        }
+    }
+    if !deps_cap_diags.is_empty() {
+        for diag in &deps_cap_diags {
+            eprintln!("{}: {}", diag.code, diag.message);
+        }
+    }
 
     let mut observed_budget = ObservedBudget::default();
     let mut observed_caps = serde_json::Map::new();
@@ -500,6 +671,14 @@ fn cmd_trust_report(
             ))
     });
 
+    let mut sbom_diags: Vec<diagnostics::Diagnostic> = Vec::new();
+    let sbom = build_sbom(&args, out_path, sbom_components, &mut sbom_diags);
+    if !sbom_diags.is_empty() {
+        for diag in &sbom_diags {
+            eprintln!("{}: {}", diag.code, diag.message);
+        }
+    }
+
     let report = TrustReport {
         schema_version: X07_TRUST_REPORT_SCHEMA_VERSION,
         tool: ToolInfo {
@@ -563,14 +742,7 @@ fn cmd_trust_report(
             observed: caps_observed,
         },
         nondeterminism: Nondeterminism { flags },
-        sbom: Sbom {
-            format: "none".to_string(),
-            generated: false,
-            path: None,
-            cyclonedx: None,
-            spdx: None,
-            components: sbom_components,
-        },
+        sbom,
     };
 
     let report_value = serde_json::to_value(&report)?;
@@ -585,23 +757,63 @@ fn cmd_trust_report(
     }
 
     let fail_on_triggered = trust_fail_on_triggered(&report, &args.fail_on);
+    let deps_cap_violation = deps_cap_diags
+        .iter()
+        .any(|d| d.code == "E_DEPS_CAP_POLICY_DENY");
+    let deps_cap_strict_triggered =
+        args.strict && (deps_cap_policy_schema_invalid || deps_cap_violation);
+    let deps_cap_fail_on_triggered = fail_on_deps_capability
+        && (deps_cap_policy_schema_invalid || deps_cap_violation || deps_cap_policy_missing);
+
+    if args.strict && deps_cap_policy_schema_invalid {
+        strict_issues.push("strict mode: deps capability policy schema invalid".to_string());
+    }
 
     let json_bytes = report_common::canonical_pretty_json_bytes(&report_value)?;
     util::write_atomic(out_path, &json_bytes)
         .with_context(|| format!("write trust report: {}", out_path.display()))?;
 
     if let Some(html_out) = &args.html_out {
-        let html = render_trust_html(&report, &strict_issues, &schema_diags);
+        let html = render_trust_html(&report, &strict_issues, &schema_diags, &deps_cap_diags);
         util::write_atomic(html_out, html.as_bytes())
             .with_context(|| format!("write trust html: {}", html_out.display()))?;
     }
 
-    if !schema_diags.is_empty() || fail_on_triggered || (args.strict && !strict_issues.is_empty()) {
+    if !schema_diags.is_empty()
+        || fail_on_triggered
+        || deps_cap_fail_on_triggered
+        || deps_cap_strict_triggered
+        || (args.strict && !strict_issues.is_empty())
+    {
         for issue in &strict_issues {
             eprintln!("x07 trust: {issue}");
         }
         for diag in &schema_diags {
             eprintln!("{}: {}", diag.code, diag.message);
+        }
+
+        if std::env::var_os("X07_TOOL_API_CHILD").is_some() {
+            let mut diags = Vec::new();
+            for issue in &strict_issues {
+                diags.push(reporting::diag_error(
+                    "X07-TOOL-EXEC-0001",
+                    diagnostics::Stage::Lint,
+                    issue,
+                ));
+            }
+            diags.extend(schema_diags.clone());
+            diags.extend(deps_cap_diags.clone());
+            diags.extend(sbom_diags);
+
+            let report = diagnostics::Report {
+                schema_version: X07DIAG_SCHEMA_VERSION.to_string(),
+                ok: false,
+                diagnostics: diags,
+                meta: BTreeMap::new(),
+            };
+            let doc = serde_json::to_value(&report)?;
+            let bytes = report_common::canonical_pretty_json_bytes(&doc)?;
+            std::io::stdout().write_all(&bytes)?;
         }
         return Ok(std::process::ExitCode::from(20));
     }
@@ -811,6 +1023,7 @@ fn resolve_project_context(
             runner,
             module_roots,
             profile: profile.map(str::to_string),
+            declared_dependencies: manifest.dependencies.clone(),
             lockfile_path: if lockfile_path.is_file() {
                 Some(lockfile_path)
             } else {
@@ -835,6 +1048,7 @@ fn resolve_project_context(
             runner: "host".to_string(),
             module_roots: Vec::new(),
             profile: profile.map(str::to_string),
+            declared_dependencies: Vec::new(),
             lockfile_path: None,
             stdlib_lock_path: None,
             arch_root: None,
@@ -1197,10 +1411,11 @@ fn trust_fail_on_triggered(report: &TrustReport, fail_on: &[TrustFailOn]) -> boo
                 }
             }
             TrustFailOn::SbomMissing => {
-                if report.sbom.format == "none" || report.sbom.components.is_empty() {
+                if !report.sbom.generated || report.sbom.path.is_none() {
                     return true;
                 }
             }
+            TrustFailOn::DepsCapability => {}
         }
     }
     false
@@ -1210,6 +1425,7 @@ fn render_trust_html(
     report: &TrustReport,
     strict_issues: &[String],
     schema_diags: &[diagnostics::Diagnostic],
+    deps_cap_diags: &[diagnostics::Diagnostic],
 ) -> String {
     let mut s = String::new();
     s.push_str("<!doctype html>\n<html><head><meta charset=\"utf-8\">");
@@ -1250,7 +1466,15 @@ fn render_trust_html(
     ));
     s.push_str("</pre>");
 
-    s.push_str("<h2>SBOM Placeholder</h2><pre>");
+    s.push_str("<h2>SBOM</h2>");
+    if report.sbom.generated {
+        if let Some(path) = report.sbom.path.as_deref() {
+            s.push_str("<p><b>generated:</b> <code>");
+            s.push_str(&report_common::html_escape(path));
+            s.push_str("</code></p>");
+        }
+    }
+    s.push_str("<pre>");
     let sbom = serde_json::to_value(&report.sbom).unwrap_or(Value::Null);
     let sbom_bytes =
         report_common::canonical_pretty_json_bytes(&sbom).unwrap_or_else(|_| b"{}\n".to_vec());
@@ -1281,6 +1505,18 @@ fn render_trust_html(
         s.push_str("</ul>");
     }
 
+    if !deps_cap_diags.is_empty() {
+        s.push_str("<h2>Dependency Capability Policy Diagnostics</h2><ul>");
+        for diag in deps_cap_diags {
+            s.push_str("<li><code>");
+            s.push_str(&report_common::html_escape(&diag.code));
+            s.push_str("</code>: ");
+            s.push_str(&report_common::html_escape(&diag.message));
+            s.push_str("</li>");
+        }
+        s.push_str("</ul>");
+    }
+
     s.push_str("<details><summary>Raw JSON</summary><pre>");
     let raw = serde_json::to_value(report).unwrap_or(Value::Null);
     let raw_bytes =
@@ -1292,6 +1528,219 @@ fn render_trust_html(
 
     s.push_str("</body></html>\n");
     s
+}
+
+fn normalize_sensitive_namespace_set(items: &[String]) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    for raw in items {
+        let mut s = raw.trim().to_string();
+        if s.is_empty() {
+            continue;
+        }
+        if !s.ends_with('.') {
+            s.push('.');
+        }
+        out.insert(s);
+    }
+    out
+}
+
+fn deps_cap_allowlist(policy: &DepsCapabilityPolicy, pkg_name: &str) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    for pkg in &policy.packages {
+        if pkg.name == pkg_name {
+            out.extend(normalize_sensitive_namespace_set(
+                &pkg.allow_sensitive_namespaces,
+            ));
+        }
+    }
+    out
+}
+
+fn build_sbom(
+    args: &TrustReportArgs,
+    out_path: &Path,
+    sbom_components: Vec<SbomComponent>,
+    sbom_diags: &mut Vec<diagnostics::Diagnostic>,
+) -> Sbom {
+    let format = match args.sbom_format {
+        SbomFormat::None => "none",
+        SbomFormat::Cyclonedx => "cyclonedx",
+        SbomFormat::Spdx => "spdx",
+    }
+    .to_string();
+
+    let (cyclonedx, spdx) = match args.sbom_format {
+        SbomFormat::Cyclonedx => (Some(json!({ "spec_version": "1.5" })), None),
+        SbomFormat::Spdx => (None, Some(json!({ "spec_version": "2.3" }))),
+        SbomFormat::None => (None, None),
+    };
+
+    let mut generated = false;
+    let mut path = None;
+
+    let sbom_out_path = match args.sbom_format {
+        SbomFormat::Cyclonedx => Some(out_path.with_extension("sbom.cdx.json")),
+        SbomFormat::Spdx => Some(out_path.with_extension("sbom.spdx.json")),
+        SbomFormat::None => None,
+    };
+
+    if let Some(sbom_out_path) = sbom_out_path {
+        let doc = match args.sbom_format {
+            SbomFormat::Cyclonedx => build_cyclonedx_sbom(&sbom_components),
+            SbomFormat::Spdx => build_spdx_sbom(&sbom_components),
+            SbomFormat::None => Value::Null,
+        };
+
+        match report_common::canonical_pretty_json_bytes(&doc) {
+            Ok(bytes) => match util::write_atomic(&sbom_out_path, &bytes) {
+                Ok(()) => {
+                    generated = true;
+                    path = Some(sbom_out_path.display().to_string());
+                }
+                Err(err) => {
+                    let mut diag = reporting::diag_error(
+                        "E_SBOM_GENERATION_FAILED",
+                        diagnostics::Stage::Lint,
+                        "write SBOM artifact failed",
+                    );
+                    diag.data.insert(
+                        "path".to_string(),
+                        Value::String(sbom_out_path.display().to_string()),
+                    );
+                    diag.data
+                        .insert("error".to_string(), Value::String(err.to_string()));
+                    sbom_diags.push(diag);
+                }
+            },
+            Err(err) => {
+                let mut diag = reporting::diag_error(
+                    "E_SBOM_GENERATION_FAILED",
+                    diagnostics::Stage::Lint,
+                    "generate SBOM artifact failed",
+                );
+                diag.data.insert(
+                    "path".to_string(),
+                    Value::String(sbom_out_path.display().to_string()),
+                );
+                diag.data
+                    .insert("error".to_string(), Value::String(err.to_string()));
+                sbom_diags.push(diag);
+            }
+        }
+    } else if args.fail_on.contains(&TrustFailOn::SbomMissing) {
+        sbom_diags.push(reporting::diag_error(
+            "E_SBOM_GENERATION_FAILED",
+            diagnostics::Stage::Lint,
+            "SBOM generation disabled (--sbom-format none)",
+        ));
+    }
+
+    Sbom {
+        format,
+        generated,
+        path,
+        cyclonedx,
+        spdx,
+        components: sbom_components,
+    }
+}
+
+fn build_cyclonedx_sbom(sbom_components: &[SbomComponent]) -> Value {
+    let components: Vec<Value> = sbom_components
+        .iter()
+        .map(|c| {
+            let id = format!(
+                "{}\t{}\t{}",
+                c.kind,
+                c.name,
+                c.version.as_deref().unwrap_or("")
+            );
+            let bom_ref = format!("x07:{}", util::sha256_hex(id.as_bytes()));
+            let component_type = if c.kind == "toolchain" {
+                "application"
+            } else {
+                "library"
+            };
+
+            let mut obj = serde_json::Map::new();
+            obj.insert(
+                "type".to_string(),
+                Value::String(component_type.to_string()),
+            );
+            obj.insert("name".to_string(), Value::String(c.name.clone()));
+            if let Some(version) = c.version.as_deref() {
+                obj.insert("version".to_string(), Value::String(version.to_string()));
+            }
+            obj.insert("bom-ref".to_string(), Value::String(bom_ref));
+            Value::Object(obj)
+        })
+        .collect();
+
+    json!({
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.5",
+        "version": 1,
+        "metadata": {
+            "tools": {
+                "components": [
+                    {
+                        "type": "application",
+                        "name": "x07",
+                        "version": env!("CARGO_PKG_VERSION"),
+                    }
+                ]
+            }
+        },
+        "components": components,
+    })
+}
+
+fn build_spdx_sbom(sbom_components: &[SbomComponent]) -> Value {
+    let mut lines: Vec<String> = Vec::new();
+    for c in sbom_components {
+        lines.push(format!(
+            "{}\t{}\t{}",
+            c.kind,
+            c.name,
+            c.version.as_deref().unwrap_or("")
+        ));
+    }
+    let hash = util::sha256_hex(lines.join("\n").as_bytes());
+
+    let mut packages = Vec::new();
+    for (idx, c) in sbom_components.iter().enumerate() {
+        let spdx_id = format!("SPDXRef-Package-{}", idx + 1);
+        let mut pkg = serde_json::Map::new();
+        pkg.insert("SPDXID".to_string(), Value::String(spdx_id));
+        pkg.insert("name".to_string(), Value::String(c.name.clone()));
+        pkg.insert(
+            "downloadLocation".to_string(),
+            Value::String("NOASSERTION".to_string()),
+        );
+        if let Some(version) = c.version.as_deref() {
+            pkg.insert(
+                "versionInfo".to_string(),
+                Value::String(version.to_string()),
+            );
+        }
+        packages.push(Value::Object(pkg));
+    }
+
+    json!({
+        "spdxVersion": "SPDX-2.3",
+        "dataLicense": "CC0-1.0",
+        "SPDXID": "SPDXRef-DOCUMENT",
+        "name": "x07 trust SBOM",
+        "documentNamespace": format!("https://x07.io/spdx/{}", hash),
+        "creationInfo": {
+            "created": "2000-01-01T00:00:00Z",
+            "creators": [
+                format!("Tool: x07-{}", env!("CARGO_PKG_VERSION"))
+            ]
+        },
+        "packages": packages
+    })
 }
 
 fn now_unix_ms() -> u64 {

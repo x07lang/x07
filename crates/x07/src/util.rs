@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::Result;
@@ -46,6 +46,27 @@ pub fn hex_lower(bytes: &[u8]) -> String {
         out.push(nybble_to_hex(b & 0x0f));
     }
     out
+}
+
+pub(crate) fn is_safe_rel_path(raw: &str) -> bool {
+    let raw = raw.trim();
+    if raw.is_empty() || raw.contains('\\') {
+        return false;
+    }
+
+    let p = Path::new(raw);
+    if p.is_absolute() {
+        return false;
+    }
+
+    for c in p.components() {
+        match c {
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return false,
+            Component::Normal(_) | Component::CurDir => {}
+        }
+    }
+
+    true
 }
 
 pub fn write_atomic(path: &Path, contents: &[u8]) -> std::io::Result<()> {

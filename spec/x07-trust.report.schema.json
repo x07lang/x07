@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-trust.report.schema.json",
   "title": "X07 x07 trust report v0.1.0",
-  "description": "CI-friendly trust artifact summarizing budgets/caps, world capabilities, nondeterminism signals, and SBOM placeholder fields for an X07 project/build.",
+  "description": "CI-friendly trust artifact summarizing budgets/caps, world capabilities, nondeterminism signals, and SBOM artifacts for an X07 project/build.",
   "type": "object",
   "additionalProperties": false,
   "required": [

@@ -38,6 +38,7 @@ pub const X07_BENCH_INSTANCE_SCHEMA_VERSION: &str = "x07.bench.instance@0.1.0";
 pub const X07_BENCH_REPORT_SCHEMA_VERSION: &str = "x07.bench.report@0.1.0";
 pub const X07_REVIEW_DIFF_SCHEMA_VERSION: &str = "x07.review.diff@0.1.0";
 pub const X07_TRUST_REPORT_SCHEMA_VERSION: &str = "x07.trust.report@0.1.0";
+pub const X07_DEPS_CAPABILITY_POLICY_SCHEMA_VERSION: &str = "x07.deps.capability_policy@0.1.0";
 pub const X07_TOOL_REPORT_SCHEMA_VERSION: &str = "x07.tool.report@0.1.0";
 
 pub const RUN_OS_POLICY_SCHEMA_VERSION: &str = "x07.run-os-policy@0.1.0";

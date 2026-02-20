@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-deps.capability-policy.schema.json",
+  "title": "X07 dependency capability policy v0.1.0",
+  "description": "Policy for denying/allowing sensitive namespace usage by locked dependencies.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "policy_id"],
+  "properties": {
+    "schema_version": { "const": "x07.deps.capability_policy@0.1.0" },
+
+    "policy_id": { "type": "string" },
+
+    "default": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "deny_sensitive_namespaces": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
+
+    "packages": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "allow_sensitive_namespaces": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          }
+        }
+      }
+    }
+  }
+}
