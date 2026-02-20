@@ -1279,7 +1279,7 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
                     expr_ident(tmp.to_string()),
                     expr_list(vec![
                         expr_ident("view.to_bytes"),
-                        expr_ident(name.to_string()),
+                        expr_list(vec![expr_ident("bytes.view"), expr_ident(name.to_string())]),
                     ]),
                 ]),
                 expr_list(vec![

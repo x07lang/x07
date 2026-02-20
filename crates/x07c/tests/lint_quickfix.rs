@@ -1,5 +1,6 @@
 use serde_json::json;
 use x07_contracts::X07AST_SCHEMA_VERSION;
+use x07c::compile::{compile_program_to_c, CompileOptions};
 use x07c::diagnostics::QuickfixKind;
 use x07c::{json_patch, lint, x07ast};
 
@@ -199,6 +200,24 @@ fn lint_quickfix_copies_bytes_view_for_if_condition() {
     };
     assert_eq!(let_items[0].as_ident(), Some("let"));
     assert_eq!(let_items[1].as_ident(), Some("_x07_tmp_copy"));
+    assert_eq!(let_items.len(), 3, "let binding must have 3 elements total");
+
+    let x07c::ast::Expr::List {
+        items: init_items, ..
+    } = &let_items[2]
+    else {
+        panic!("expected let init expression to be a list");
+    };
+    assert_eq!(init_items[0].as_ident(), Some("view.to_bytes"));
+    let x07c::ast::Expr::List {
+        items: init_view_items,
+        ..
+    } = &init_items[1]
+    else {
+        panic!("expected view.to_bytes arg to be a list");
+    };
+    assert_eq!(init_view_items[0].as_ident(), Some("bytes.view"));
+    assert_eq!(init_view_items[1].as_ident(), Some("resp"));
 
     let x07c::ast::Expr::List {
         items: if_items, ..
@@ -227,4 +246,50 @@ fn lint_quickfix_copies_bytes_view_for_if_condition() {
 
     let cond_owner = find_bytes_view_owner(&if_items[1]).expect("expected bytes.view in if cond");
     assert_eq!(cond_owner, "_x07_tmp_copy");
+}
+
+#[test]
+fn lint_quickfix_copies_one_side_for_bytes_concat_and_compiles() {
+    let mut doc = parse_doc(
+        r#"
+        {
+          "kind":"entry",
+          "module_id":"main",
+          "imports":[],
+          "decls":[],
+          "solve":["begin",
+            ["let","x",["bytes.lit","a"]],
+            ["bytes.concat","x","x"]
+          ]
+        }
+        "#,
+    );
+
+    let doc_bytes = serde_json::to_vec(&doc).expect("serialize doc");
+    let mut file = x07ast::parse_x07ast_json(&doc_bytes).expect("parse x07ast");
+    x07ast::canonicalize_x07ast_file(&mut file);
+    let report = lint::lint_file(&file, lint::LintOptions::default());
+    assert!(!report.ok, "expected lint errors");
+
+    let d = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "X07-MOVE-0001")
+        .expect("expected move diagnostic");
+    let q = d.quickfix.as_ref().expect("expected quickfix");
+    assert_eq!(q.kind, QuickfixKind::JsonPatch);
+    json_patch::apply_patch(&mut doc, &q.patch).expect("apply quickfix patch");
+
+    let patched_bytes = serde_json::to_vec(&doc).expect("serialize patched");
+    let mut patched_file = x07ast::parse_x07ast_json(&patched_bytes).expect("reparse patched");
+    x07ast::canonicalize_x07ast_file(&mut patched_file);
+    let patched_report = lint::lint_file(&patched_file, lint::LintOptions::default());
+    assert!(
+        patched_report.ok,
+        "expected lint ok after patch: {:?}",
+        patched_report.diagnostics
+    );
+
+    compile_program_to_c(&patched_bytes, &CompileOptions::default())
+        .expect("patched program must compile");
 }

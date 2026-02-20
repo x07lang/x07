@@ -121,10 +121,25 @@ fn contract_clause_expr_must_be_pure() {
     let file = typecheck_testutil::file_from_json(&doc);
     let report = typecheck_file_local(&file, &TypecheckOptions::default());
 
+    let d = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "X07-CONTRACT-0002")
+        .expect("expected X07-CONTRACT-0002");
     assert!(
-        has_code(&report.diagnostics, "X07-CONTRACT-0002"),
-        "expected X07-CONTRACT-0002, got: {:?}",
-        report.diagnostics
+        d.notes.iter().any(|n| n.contains("Allowed contract-pure")),
+        "expected allowlist note, got: {:?}",
+        d.notes
+    );
+    assert!(
+        d.notes.iter().any(|n| n.contains("bytes.lit")),
+        "expected bytes.lit in allowlist note, got: {:?}",
+        d.notes
+    );
+    assert!(
+        d.notes.iter().any(|n| n.contains("view.len")),
+        "expected view.len in allowlist note, got: {:?}",
+        d.notes
     );
 }
 

@@ -1602,54 +1602,64 @@ fn contract_collect_binding_ptrs(expr: &Expr, out: &mut Vec<(String, String)>) {
 }
 
 fn diag_contract_err(code: &str, ptr: String, message: String) -> Diagnostic {
+    let mut notes = Vec::new();
+    if code == "X07-CONTRACT-0002" {
+        notes.push(format!(
+            "Allowed contract-pure heads/operators: {}; plus any `option_*` and `result_*`. Module calls are disallowed (only builtins/operators).",
+            CONTRACT_PURE_CALL_HEAD_ALLOWLIST.join(", ")
+        ));
+    }
     Diagnostic {
         code: code.to_string(),
         severity: Severity::Error,
         stage: Stage::Type,
         message,
         loc: Some(Location::X07Ast { ptr }),
-        notes: Vec::new(),
+        notes,
         related: Vec::new(),
         data: BTreeMap::new(),
         quickfix: None,
     }
 }
 
+const CONTRACT_PURE_CALL_HEAD_ALLOWLIST: &[&str] = &[
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
+    "=",
+    "!=",
+    "<",
+    "<=",
+    ">",
+    ">=",
+    "<u",
+    "<=u",
+    ">u",
+    ">=u",
+    "<<u",
+    ">>u",
+    "&",
+    "|",
+    "^",
+    "bytes.lit",
+    "i32.lit",
+    "bytes.view",
+    "bytes.subview",
+    "bytes.len",
+    "bytes.get_u8",
+    "bytes.eq",
+    "bytes.cmp_range",
+    "view.len",
+    "view.get_u8",
+    "view.slice",
+    "view.to_bytes",
+];
+
 fn contract_pure_call_head(head: &str) -> bool {
-    matches!(
-        head,
-        "+" | "-"
-            | "*"
-            | "/"
-            | "%"
-            | "="
-            | "!="
-            | "<"
-            | "<="
-            | ">"
-            | ">="
-            | "<u"
-            | "<=u"
-            | ">u"
-            | ">=u"
-            | "<<u"
-            | ">>u"
-            | "&"
-            | "|"
-            | "^"
-            | "bytes.lit"
-            | "i32.lit"
-            | "bytes.view"
-            | "bytes.subview"
-            | "bytes.len"
-            | "bytes.get_u8"
-            | "bytes.eq"
-            | "bytes.cmp_range"
-            | "view.len"
-            | "view.get_u8"
-            | "view.slice"
-            | "view.to_bytes"
-    ) || head.starts_with("option_")
+    CONTRACT_PURE_CALL_HEAD_ALLOWLIST.contains(&head)
+        || head.starts_with("option_")
         || head.starts_with("result_")
 }
 

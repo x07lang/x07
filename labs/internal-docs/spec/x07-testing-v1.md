@@ -48,12 +48,33 @@ Alternate entry signature:
 - `(defn <entry> () bytes ...)` returning `X7TEST_STATUS_V1` (see below)
   - select this mode with `returns: "bytes_status_v1"`
 
-### `X7TEST_STATUS_V1` (5 bytes)
+### `X7TEST_STATUS_V1` (5+ bytes)
+
+Base record:
 
 - Byte 0: `tag` (`1` = pass, `0` = fail, `2` = skip)
 - Bytes 1..4: `u32_le(code)` (0 for pass/skip)
 
 The harness uses `std.test.status_from_result_i32` to convert `result_i32` tests into this record.
+
+Optional appended payload (assertion details):
+
+- Only when `tag == 0` and `code == 1003` (`std.test.assert_bytes_eq`).
+- If present, bytes after the first 5 are a binary payload:
+  - magic: 4 bytes `X7T1`
+  - `prefix_max` u8 (currently 64)
+  - `got_len` u32 le
+  - `expected_len` u32 le
+  - `got_prefix` bytes: `min(got_len, prefix_max)`
+  - `expected_prefix` bytes: `min(expected_len, prefix_max)`
+
+`x07 test` surfaces this as an extra per-test diagnostic:
+
+- `tests[].diags[]` includes `{ code: "X07T_ASSERT_BYTES_EQ", message: "assert_bytes_eq failed", details: { ... } }`
+- `details` includes:
+  - `prefix_max_bytes`
+  - `got: { len, prefix_hex, prefix_utf8_lossy }`
+  - `expected: { len, prefix_hex, prefix_utf8_lossy }`
 
 ## CLI
 

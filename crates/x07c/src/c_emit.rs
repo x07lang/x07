@@ -33369,6 +33369,8 @@ typedef struct rt_bufread_s rt_bufread_t;
 typedef struct rt_scratch_u8_fixed_s rt_scratch_u8_fixed_t;
 typedef struct rt_os_proc_s rt_os_proc_t;
 
+#define X07_ASSERT_BYTES_EQ_PREFIX_MAX 64
+
 typedef struct {
   uint64_t fuel_init;
   uint64_t fuel;
@@ -33489,6 +33491,12 @@ typedef struct {
   uint32_t os_procs_cap;
   uint32_t os_procs_live;
   uint32_t os_procs_spawned;
+
+  uint32_t last_bytes_eq_valid;
+  uint32_t last_bytes_eq_a_len;
+  uint32_t last_bytes_eq_b_len;
+  uint8_t last_bytes_eq_a_prefix[X07_ASSERT_BYTES_EQ_PREFIX_MAX];
+  uint8_t last_bytes_eq_b_prefix[X07_ASSERT_BYTES_EQ_PREFIX_MAX];
 } ctx_t;
 
 // Global ctx pointer for native extension backends that need to allocate bytes via the runtime.
@@ -34395,15 +34403,31 @@ static bytes_t rt_bytes_concat(ctx_t* ctx, bytes_t a, bytes_t b) {
 }
 
 static uint32_t rt_bytes_eq(ctx_t* ctx, bytes_t a, bytes_t b) {
-  if (a.len != b.len) return UINT32_C(0);
-  if (a.len == 0) return UINT32_C(1);
+  uint32_t a_prefix_len = 0;
+  uint32_t b_prefix_len = 0;
+  ctx->last_bytes_eq_valid = 0;
 #ifdef X07_DEBUG_BORROW
   if (!rt_dbg_bytes_check(ctx, a)) return UINT32_C(0);
   if (!rt_dbg_bytes_check(ctx, b)) return UINT32_C(0);
-#else
-  (void)ctx;
 #endif
-  return (memcmp(a.ptr, b.ptr, a.len) == 0) ? UINT32_C(1) : UINT32_C(0);
+  if (a.len != b.len) goto mismatch;
+  if (a.len == 0) return UINT32_C(1);
+#ifdef X07_DEBUG_BORROW
+  // rt_dbg_bytes_check already ran above.
+#endif
+  if (memcmp(a.ptr, b.ptr, a.len) == 0) return UINT32_C(1);
+
+mismatch:
+  ctx->last_bytes_eq_valid = 1;
+  ctx->last_bytes_eq_a_len = a.len;
+  ctx->last_bytes_eq_b_len = b.len;
+  a_prefix_len =
+      (a.len < X07_ASSERT_BYTES_EQ_PREFIX_MAX) ? a.len : X07_ASSERT_BYTES_EQ_PREFIX_MAX;
+  b_prefix_len =
+      (b.len < X07_ASSERT_BYTES_EQ_PREFIX_MAX) ? b.len : X07_ASSERT_BYTES_EQ_PREFIX_MAX;
+  if (a_prefix_len) memcpy(ctx->last_bytes_eq_a_prefix, a.ptr, a_prefix_len);
+  if (b_prefix_len) memcpy(ctx->last_bytes_eq_b_prefix, b.ptr, b_prefix_len);
+  return UINT32_C(0);
 }
 
 static uint32_t rt_bytes_cmp_range(
@@ -34502,15 +34526,32 @@ static bytes_view_t rt_view_slice(ctx_t* ctx, bytes_view_t v, uint32_t start, ui
 }
 
 static uint32_t rt_view_eq(ctx_t* ctx, bytes_view_t a, bytes_view_t b) {
-  if (a.len != b.len) return UINT32_C(0);
+  uint32_t a_prefix_len = 0;
+  uint32_t b_prefix_len = 0;
+  ctx->last_bytes_eq_valid = 0;
+  if (a.len != b.len) goto mismatch;
   if (a.len == 0) return UINT32_C(1);
 #ifdef X07_DEBUG_BORROW
   if (!rt_dbg_borrow_check(ctx, a.bid, a.off_bytes, a.len)) return UINT32_C(0);
   if (!rt_dbg_borrow_check(ctx, b.bid, b.off_bytes, b.len)) return UINT32_C(0);
-#else
-  (void)ctx;
 #endif
-  return (memcmp(a.ptr, b.ptr, a.len) == 0) ? UINT32_C(1) : UINT32_C(0);
+  if (memcmp(a.ptr, b.ptr, a.len) == 0) return UINT32_C(1);
+
+mismatch:
+  a_prefix_len =
+      (a.len < X07_ASSERT_BYTES_EQ_PREFIX_MAX) ? a.len : X07_ASSERT_BYTES_EQ_PREFIX_MAX;
+  b_prefix_len =
+      (b.len < X07_ASSERT_BYTES_EQ_PREFIX_MAX) ? b.len : X07_ASSERT_BYTES_EQ_PREFIX_MAX;
+#ifdef X07_DEBUG_BORROW
+  if (a_prefix_len && !rt_dbg_borrow_check(ctx, a.bid, a.off_bytes, a_prefix_len)) return UINT32_C(0);
+  if (b_prefix_len && !rt_dbg_borrow_check(ctx, b.bid, b.off_bytes, b_prefix_len)) return UINT32_C(0);
+#endif
+  ctx->last_bytes_eq_valid = 1;
+  ctx->last_bytes_eq_a_len = a.len;
+  ctx->last_bytes_eq_b_len = b.len;
+  if (a_prefix_len) memcpy(ctx->last_bytes_eq_a_prefix, a.ptr, a_prefix_len);
+  if (b_prefix_len) memcpy(ctx->last_bytes_eq_b_prefix, b.ptr, b_prefix_len);
+  return UINT32_C(0);
 }
 
 static uint32_t rt_view_cmp_range(
@@ -44614,14 +44655,60 @@ int main(void) {
 #endif
 
   uint32_t out_len = out.len;
+  uint8_t bytes_eq_payload[13 + (X07_ASSERT_BYTES_EQ_PREFIX_MAX * 2)];
+  uint32_t bytes_eq_payload_len = 0;
+  if (out_len == 5 && out.ptr && out.ptr[0] == 0 && ctx.last_bytes_eq_valid) {
+    uint32_t code = (uint32_t)out.ptr[1]
+                  | ((uint32_t)out.ptr[2] << 8)
+                  | ((uint32_t)out.ptr[3] << 16)
+                  | ((uint32_t)out.ptr[4] << 24);
+    if (code == 1003) {
+      uint32_t got_len = ctx.last_bytes_eq_a_len;
+      uint32_t expected_len = ctx.last_bytes_eq_b_len;
+      uint32_t got_prefix_len = (got_len < X07_ASSERT_BYTES_EQ_PREFIX_MAX)
+        ? got_len
+        : X07_ASSERT_BYTES_EQ_PREFIX_MAX;
+      uint32_t expected_prefix_len = (expected_len < X07_ASSERT_BYTES_EQ_PREFIX_MAX)
+        ? expected_len
+        : X07_ASSERT_BYTES_EQ_PREFIX_MAX;
+
+      bytes_eq_payload[0] = (uint8_t)'X';
+      bytes_eq_payload[1] = (uint8_t)'7';
+      bytes_eq_payload[2] = (uint8_t)'T';
+      bytes_eq_payload[3] = (uint8_t)'1';
+      bytes_eq_payload[4] = (uint8_t)X07_ASSERT_BYTES_EQ_PREFIX_MAX;
+      bytes_eq_payload[5] = (uint8_t)(got_len & UINT32_C(0xFF));
+      bytes_eq_payload[6] = (uint8_t)((got_len >> 8) & UINT32_C(0xFF));
+      bytes_eq_payload[7] = (uint8_t)((got_len >> 16) & UINT32_C(0xFF));
+      bytes_eq_payload[8] = (uint8_t)((got_len >> 24) & UINT32_C(0xFF));
+      bytes_eq_payload[9] = (uint8_t)(expected_len & UINT32_C(0xFF));
+      bytes_eq_payload[10] = (uint8_t)((expected_len >> 8) & UINT32_C(0xFF));
+      bytes_eq_payload[11] = (uint8_t)((expected_len >> 16) & UINT32_C(0xFF));
+      bytes_eq_payload[12] = (uint8_t)((expected_len >> 24) & UINT32_C(0xFF));
+
+      uint32_t off = 13;
+      if (got_prefix_len) {
+        memcpy(bytes_eq_payload + off, ctx.last_bytes_eq_a_prefix, got_prefix_len);
+        off += got_prefix_len;
+      }
+      if (expected_prefix_len) {
+        memcpy(bytes_eq_payload + off, ctx.last_bytes_eq_b_prefix, expected_prefix_len);
+        off += expected_prefix_len;
+      }
+      bytes_eq_payload_len = off;
+    }
+  }
+
+  uint32_t out_total_len = out_len + bytes_eq_payload_len;
   uint8_t out_len_buf[4] = {
-    (uint8_t)(out_len & UINT32_C(0xFF)),
-    (uint8_t)((out_len >> 8) & UINT32_C(0xFF)),
-    (uint8_t)((out_len >> 16) & UINT32_C(0xFF)),
-    (uint8_t)((out_len >> 24) & UINT32_C(0xFF)),
+    (uint8_t)(out_total_len & UINT32_C(0xFF)),
+    (uint8_t)((out_total_len >> 8) & UINT32_C(0xFF)),
+    (uint8_t)((out_total_len >> 16) & UINT32_C(0xFF)),
+    (uint8_t)((out_total_len >> 24) & UINT32_C(0xFF)),
   };
   if (rt_write_exact(STDOUT_FILENO, out_len_buf, 4) != 0) return 2;
   if (out_len && rt_write_exact(STDOUT_FILENO, out.ptr, out_len) != 0) return 2;
+  if (bytes_eq_payload_len && rt_write_exact(STDOUT_FILENO, bytes_eq_payload, bytes_eq_payload_len) != 0) return 2;
 
   rt_bytes_drop(&ctx, &out);
   rt_bytes_drop(&ctx, &input_bytes);

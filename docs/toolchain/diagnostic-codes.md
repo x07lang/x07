@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 182
-- quickfix support (`sometimes` or `always`): 155
-- quickfix coverage: 85.16%
+- total codes: 185
+- quickfix support (`sometimes` or `always`): 156
+- quickfix coverage: 84.32%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -69,6 +69,8 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-INTERNAL-0001` | x07 / run / error | never | Internal tool failure `X07-INTERNAL-0001`. |
 | `X07-MOVE-0001` | x07c / lint / error | always | `bytes.concat` uses the same identifier on both sides (use-after-move risk). |
 | `X07-MOVE-0002` | x07c / lint / error | always | `if` condition and branch both borrow `bytes.view` from the same owner. |
+| `X07-MOVE-0901` | x07 / codegen / error | sometimes | Use-after-move detected during backend checking. |
+| `X07-MOVE-0902` | x07 / codegen / error | never | Borrow/move rule violation detected during backend checking. |
 | `X07-PBT-FIX-ARGS-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-ARGS-0001`. |
 | `X07-PBT-FIX-CONFLICT-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-CONFLICT-0001`. |
 | `X07-PBT-FIX-INFO-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-INFO-0001`. |
@@ -144,6 +146,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07RR_LATENCY_OUT_OF_RANGE` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_LATENCY_OUT_OF_RANGE`. |
 | `X07RR_OP_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_OP_EMPTY`. |
 | `X07RR_URL_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_URL_EMPTY`. |
+| `X07T_ASSERT_BYTES_EQ` | x07 / run / error | never | `std.test.assert_bytes_eq` failed with expected vs got payload. |
 | `X07T_EPBT_MANIFEST_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_MANIFEST_INVALID`. |
 | `X07T_EPBT_PARAM_EMPTY` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`. |
 | `X07T_EPBT_UNKNOWN_GEN_KIND` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNKNOWN_GEN_KIND`. |
@@ -1257,11 +1260,12 @@ Quickfix support: `sometimes`
 
 Details:
 
-Contract clause expressions (and witness expressions) must be contract-pure so they do not change program semantics. Disallowed operations include `world.*`, `task.*`, mutation forms (for example `set`, `unsafe`), and other impure/nondeterministic constructs.
+Contract clause expressions (and witness expressions) must be contract-pure so they do not change program semantics. Disallowed operations include `world.*`, `task.*`, mutation forms (for example `set`, `unsafe`), module calls, and other impure/nondeterministic constructs. The diagnostic includes a note enumerating the allowed contract-pure builtins/operators.
 
 Agent strategy:
 
-- Replace the impure subexpression with a pure computation (compute in the main body and reference the pure value in the contract).
+- Inspect the main message for the disallowed head/operator and the allowlist note in `notes[]`.
+- Replace the impure subexpression with a contract-pure computation (or compute in the main body and reference the pure value in the contract).
 - If the clause needs external state, move that check into program logic/tests instead of a contract.
 - Re-run `x07 lint` to confirm the impurity is gone.
 
@@ -1423,7 +1427,7 @@ Quickfix kinds: `json_patch`
 
 Details:
 
-Linter emits a JSON Patch quickfix that copies bytes for condition use (`_x07_tmp_copy`) and rewrites the condition to avoid move conflicts.
+Linter emits a JSON Patch quickfix that copies bytes for condition use (`_x07_tmp_copy`) and rewrites the condition to use the copy (via `view.to_bytes(bytes.view(name))`) to avoid move conflicts.
 
 Agent strategy:
 
@@ -1432,6 +1436,46 @@ Agent strategy:
 - Apply quickfix.
 - Validate condition logic still matches intent.
 - Re-run lint/build.
+
+
+## `X07-MOVE-0901`
+
+Summary: Use-after-move detected during backend checking.
+
+Origins:
+- x07 (stage: codegen, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+`x07 check` runs a backend-check pass that can detect ownership errors that are not caught by front-end lint patterns. The compiler error message typically includes `moved_ptr=/...` pointing at the moved identifier.
+
+Agent strategy:
+
+- If a `quickfix` is present, apply it (it replaces the moved identifier at `moved_ptr` with `view.to_bytes(bytes.view(name))`).
+- Otherwise, insert a copy before the move site and re-run `x07 check`.
+
+
+## `X07-MOVE-0902`
+
+Summary: Borrow/move rule violation detected during backend checking.
+
+Origins:
+- x07 (stage: codegen, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Backend-check borrow diagnostics are not safely auto-fixable in general.
+
+Details:
+
+`x07 check` runs a backend-check pass that can detect borrow-rule violations during lowering/codegen. See the compiler message for pointer fields like `ptr=/...` and `borrowed_ptr=/...` when present.
+
+Agent strategy:
+
+- Inspect the reported pointers and rewrite the expression to avoid conflicting borrows/moves.
+- Re-run `x07 check` to verify.
 
 
 ## `X07-PBT-FIX-ARGS-0001`
@@ -2940,6 +2984,26 @@ Agent strategy:
 - Validate RR entry fields (key/url/kind/op/latency).
 - Regenerate or edit fixtures deterministically.
 - Re-run `x07 rr` operation.
+
+
+## `X07T_ASSERT_BYTES_EQ`
+
+Summary: `std.test.assert_bytes_eq` failed with expected vs got payload.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Test assertion failures require intent; no safe automatic source-level patch exists.
+
+Details:
+
+When a test fails with code `1003`, the runtime may append an assertion payload to the `X7TEST_STATUS_V1` bytes. `x07 test` decodes it and emits this diagnostic with bounded prefixes of `got` and `expected`.
+
+Agent strategy:
+
+- Use `details.got` and `details.expected` to update expected bytes or fix serialization/encoding logic.
+- Keep fixes deterministic and re-run `x07 test`.
 
 
 ## `X07T_EPBT_MANIFEST_INVALID`

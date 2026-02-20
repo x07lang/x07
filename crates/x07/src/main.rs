@@ -1000,7 +1000,7 @@ fn run_one_test(
     }
 
     let status_bytes = run_res.solve_output.clone();
-    let (tag, code_u32) = match parse_evtest_status_v1(&status_bytes) {
+    let status_v1 = match parse_evtest_status_v1(&status_bytes) {
         Ok(x) => x,
         Err(msg) => {
             result.diags.push(Diag::new("EBAD_STATUS", msg.to_string()));
@@ -1010,6 +1010,13 @@ fn run_one_test(
             return Ok(result);
         }
     };
+    let tag = status_v1.tag;
+    let code_u32 = status_v1.code_u32;
+    if let Some(details) = status_v1.assert_bytes_eq_details {
+        result.diags.push(
+            Diag::new("X07T_ASSERT_BYTES_EQ", "assert_bytes_eq failed").with_details(details),
+        );
+    }
 
     result.run = Some(RunSection {
         failure_code_u32: Some(code_u32 as u64),
@@ -1207,12 +1214,20 @@ fn run_one_pbt_test(
             return Ok(result);
         }
 
-        let (tag, code_u32) = parse_evtest_status_v1(&run_res.solve_output)?;
+        let status_v1 = parse_evtest_status_v1(&run_res.solve_output)?;
+        let tag = status_v1.tag;
+        let code_u32 = status_v1.code_u32;
         if let Some(run) = result.run.as_mut() {
             run.failure_code_u32 = Some(code_u32 as u64);
         }
         result.status = compute_status(test.expect, tag);
         result.duration_ms = start.elapsed().as_millis() as u64;
+
+        if let Some(details) = status_v1.assert_bytes_eq_details {
+            result.diags.push(
+                Diag::new("X07T_ASSERT_BYTES_EQ", "assert_bytes_eq failed").with_details(details),
+            );
+        }
 
         if tag == 1 {
             result.diags.push(Diag::new(
@@ -1677,7 +1692,7 @@ fn run_one_test_os(
         }
     };
 
-    let (tag, code_u32) = match parse_evtest_status_v1(&status_bytes) {
+    let status_v1 = match parse_evtest_status_v1(&status_bytes) {
         Ok(x) => x,
         Err(msg) => {
             result.diags.push(Diag::new("EBAD_STATUS", msg.to_string()));
@@ -1688,6 +1703,8 @@ fn run_one_test_os(
             return Ok(result);
         }
     };
+    let tag = status_v1.tag;
+    let code_u32 = status_v1.code_u32;
 
     if let Some(run) = result.run.as_mut() {
         run.failure_code_u32 = Some(code_u32 as u64);
@@ -1695,6 +1712,12 @@ fn run_one_test_os(
 
     result.status = compute_status(test.expect, tag);
     result.duration_ms = start.elapsed().as_millis() as u64;
+
+    if let Some(details) = status_v1.assert_bytes_eq_details {
+        result.diags.push(
+            Diag::new("X07T_ASSERT_BYTES_EQ", "assert_bytes_eq failed").with_details(details),
+        );
+    }
 
     if args.verbose && args.keep_artifacts {
         eprintln!("artifacts: {}", out_dir.display());
@@ -1814,16 +1837,85 @@ fn compute_status(expect: Expect, tag: u8) -> String {
     .to_string()
 }
 
-fn parse_evtest_status_v1(status: &[u8]) -> Result<(u8, u32)> {
-    if status.len() != 5 {
-        anyhow::bail!("X7TEST_STATUS_V1 must be 5 bytes, got {}", status.len());
+#[derive(Debug, Clone)]
+struct EvtestStatusV1 {
+    tag: u8,
+    code_u32: u32,
+    assert_bytes_eq_details: Option<serde_json::Value>,
+}
+
+fn parse_assert_bytes_eq_payload_v1(payload: &[u8]) -> Result<serde_json::Value> {
+    if payload.len() < 13 {
+        anyhow::bail!(
+            "X7TEST_ASSERT_BYTES_EQ payload too short: got {}",
+            payload.len()
+        );
+    }
+    if &payload[..4] != b"X7T1" {
+        anyhow::bail!("X7TEST_ASSERT_BYTES_EQ payload magic mismatch");
+    }
+    let prefix_max_bytes = payload[4] as usize;
+    if prefix_max_bytes > 64 {
+        anyhow::bail!(
+            "X7TEST_ASSERT_BYTES_EQ prefix_max_bytes must be <= 64, got {}",
+            prefix_max_bytes
+        );
+    }
+    let got_len = u32::from_le_bytes([payload[5], payload[6], payload[7], payload[8]]);
+    let expected_len = u32::from_le_bytes([payload[9], payload[10], payload[11], payload[12]]);
+    let got_prefix_len = std::cmp::min(got_len as usize, prefix_max_bytes);
+    let expected_prefix_len = std::cmp::min(expected_len as usize, prefix_max_bytes);
+    let total = 13 + got_prefix_len + expected_prefix_len;
+    if payload.len() != total {
+        anyhow::bail!(
+            "X7TEST_ASSERT_BYTES_EQ payload length mismatch: expected {} got {}",
+            total,
+            payload.len()
+        );
+    }
+    let got_prefix = &payload[13..13 + got_prefix_len];
+    let expected_prefix = &payload[13 + got_prefix_len..];
+    Ok(serde_json::json!({
+        "prefix_max_bytes": prefix_max_bytes,
+        "got": {
+            "len": got_len,
+            "prefix_hex": crate::util::hex_lower(got_prefix),
+            "prefix_utf8_lossy": String::from_utf8_lossy(got_prefix),
+        },
+        "expected": {
+            "len": expected_len,
+            "prefix_hex": crate::util::hex_lower(expected_prefix),
+            "prefix_utf8_lossy": String::from_utf8_lossy(expected_prefix),
+        }
+    }))
+}
+
+fn parse_evtest_status_v1(status: &[u8]) -> Result<EvtestStatusV1> {
+    if status.len() < 5 {
+        anyhow::bail!("X7TEST_STATUS_V1 must be >= 5 bytes, got {}", status.len());
     }
     let tag = status[0];
     if !matches!(tag, 0..=2) {
         anyhow::bail!("X7TEST_STATUS_V1 tag must be 0, 1, or 2, got {}", tag);
     }
-    let code = u32::from_le_bytes([status[1], status[2], status[3], status[4]]);
-    Ok((tag, code))
+    let code_u32 = u32::from_le_bytes([status[1], status[2], status[3], status[4]]);
+    let trailing = &status[5..];
+    if !trailing.is_empty() {
+        if tag != 0 || code_u32 != 1003 {
+            anyhow::bail!("X7TEST_STATUS_V1 must be 5 bytes, got {}", status.len());
+        }
+        let details = parse_assert_bytes_eq_payload_v1(trailing)?;
+        return Ok(EvtestStatusV1 {
+            tag,
+            code_u32,
+            assert_bytes_eq_details: Some(details),
+        });
+    }
+    Ok(EvtestStatusV1 {
+        tag,
+        code_u32,
+        assert_bytes_eq_details: None,
+    })
 }
 
 fn build_test_driver_x07ast_json(test: &TestDecl) -> Result<Vec<u8>> {

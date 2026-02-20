@@ -1611,6 +1611,12 @@ fn pointers_from_compile_error(message: &str) -> Vec<String> {
     out
 }
 
+pub(crate) fn first_pointer_for_compile_error(message: &str, key: &str) -> Option<String> {
+    let mut raw: Vec<&str> = Vec::new();
+    collect_pointers(message, key, &mut raw);
+    raw.first().map(|p| (*p).to_string())
+}
+
 fn collect_pointers<'a>(message: &'a str, key: &str, out: &mut Vec<&'a str>) {
     let mut rest = message;
     while let Some(idx) = rest.find(key) {

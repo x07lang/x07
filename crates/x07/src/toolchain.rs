@@ -842,9 +842,9 @@ pub fn cmd_check(
             let (fn_name, ptr) = parse_fn_and_ptr_suffix(&err.message);
             let mut code = "X07-INTERNAL-0001";
             if err.message.contains("use after move") {
-                code = "X07-MOVE-0001";
+                code = "X07-MOVE-0901";
             } else if err.message.contains("borrow") {
-                code = "X07-MOVE-0002";
+                code = "X07-MOVE-0902";
             }
             let mut d = diagnostics::Diagnostic {
                 code: code.to_string(),
@@ -863,6 +863,7 @@ pub fn cmd_check(
                 "compiler_error_kind".to_string(),
                 serde_json::Value::String(format!("{:?}", err.kind)),
             );
+            let mut diag_path: Option<PathBuf> = None;
             if let Some(fn_name) = fn_name.as_deref() {
                 d.data.insert(
                     "fn".to_string(),
@@ -873,6 +874,7 @@ pub fn cmd_check(
                         "file".to_string(),
                         serde_json::Value::String(program_path.display().to_string()),
                     );
+                    diag_path = Some(program_path.clone());
                 } else if let Some((mod_id, _)) = fn_name.rsplit_once('.') {
                     if let Some(m) = modules.get(mod_id) {
                         if let Some(p) = m.path.as_ref() {
@@ -880,6 +882,7 @@ pub fn cmd_check(
                                 "file".to_string(),
                                 serde_json::Value::String(p.display().to_string()),
                             );
+                            diag_path = Some(p.clone());
                         }
                     }
                 }
@@ -889,6 +892,32 @@ pub fn cmd_check(
                     "file".to_string(),
                     serde_json::Value::String(program_path.display().to_string()),
                 );
+                diag_path = Some(program_path.clone());
+            }
+
+            if d.code == "X07-MOVE-0901" {
+                if let (Some(path), Some(moved_ptr)) = (
+                    diag_path.as_ref(),
+                    crate::run::first_pointer_for_compile_error(&d.message, "moved_ptr="),
+                ) {
+                    if let Ok(bytes) = std::fs::read(path) {
+                        if let Ok(doc) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                            if let Some(serde_json::Value::String(name)) = doc.pointer(&moved_ptr) {
+                                d.quickfix = Some(diagnostics::Quickfix {
+                                    kind: diagnostics::QuickfixKind::JsonPatch,
+                                    patch: vec![diagnostics::PatchOp::Replace {
+                                        path: moved_ptr,
+                                        value: serde_json::json!([
+                                            "view.to_bytes",
+                                            ["bytes.view", name]
+                                        ]),
+                                    }],
+                                    note: Some("Copy before move".to_string()),
+                                });
+                            }
+                        }
+                    }
+                }
             }
             all_diags.push(d);
         }

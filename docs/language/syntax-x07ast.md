@@ -75,6 +75,16 @@ Notes:
 - Contract expressions and witnesses must be contract-pure (no `world.*`, `task.*`, mutation forms, etc.).
 - `__result` is reserved and is only available inside `ensures` expressions.
 
+### Contract-pure allowlist
+
+Contract expressions and witnesses may only call contract-pure builtins/operators:
+
+- Operators: `+`, `-`, `*`, `/`, `%`, `=`, `!=`, `<`, `<=`, `>`, `>=`, `<u`, `<=u`, `>u`, `>=u`, `<<u`, `>>u`, `&`, `|`, `^`.
+- Builtins: `bytes.lit`, `i32.lit`, `bytes.view`, `bytes.subview`, `bytes.len`, `bytes.get_u8`, `bytes.eq`, `bytes.cmp_range`, `view.len`, `view.get_u8`, `view.slice`, `view.to_bytes`.
+- Also allowed: any builtin head with prefix `option_*` or `result_*`.
+
+Module calls (like `foo.bar`) are not allowed in contracts.
+
 ## Branded bytes annotations
 
 X07 can attach a nominal **brand** to bytes-like parameters and results to model “validated bytes of encoding X” (compile-time only).

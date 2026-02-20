@@ -100,6 +100,14 @@ Contract failures:
 - If a test fails due to a runtime contract violation, the report includes `failure_kind: "contract_violation"` and `contract_repro_path`.
 - The repro JSON is written under `.x07/artifacts/contract/<clause_id>/repro.json` (default artifact dir).
 
+Assertion payloads (`std.test.assert_bytes_eq`):
+
+- When `std.test.assert_bytes_eq` fails (failure code `1003`), `x07 test` adds a diagnostic with code `X07T_ASSERT_BYTES_EQ`.
+- The diagnostic `details` includes:
+  - `prefix_max_bytes` (currently 64),
+  - `got` and `expected` lengths,
+  - bounded prefixes in both hex (`prefix_hex`) and UTF-8 lossy (`prefix_utf8_lossy`).
+
 List failing test IDs:
 
 ```bash

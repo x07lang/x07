@@ -389,6 +389,121 @@ fn x07_check_surfaces_move_errors() {
 }
 
 #[test]
+fn x07_check_backend_use_after_move_has_quickfix_and_can_apply_it() {
+    let root = fresh_tmp_dir(&repo_root(), "x07_check_backend_move_qf");
+    std::fs::create_dir_all(&root).expect("create root");
+
+    let project = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": "solve-pure",
+        "entry": "src/main.x07.json",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    }))
+    .expect("serialize x07.json");
+    write_bytes(&root.join("x07.json"), &project);
+
+    let lock = serde_json::to_vec(&serde_json::json!({
+        "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
+        "dependencies": []
+    }))
+    .expect("serialize x07.lock.json");
+    write_bytes(&root.join("x07.lock.json"), &lock);
+
+    let entry = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            { "kind": "export", "names": ["main.id_bytes"] },
+            {
+                "kind": "defn",
+                "name": "main.id_bytes",
+                "params": [{ "name": "b", "ty": "bytes" }],
+                "result": "bytes",
+                "body": "b"
+            }
+        ],
+        "solve": [
+            "begin",
+            ["let", "x", ["bytes.lit", "a"]],
+            ["let", "y", ["main.id_bytes", "x"]],
+            ["bytes.concat", "y", "x"]
+        ]
+    }))
+    .expect("serialize entry x07AST");
+    let program_path = root.join("src/main.x07.json");
+    write_bytes(&program_path, &entry);
+
+    let out = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "expected failure; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(out.stderr.is_empty(), "expected empty stderr");
+
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(v["ok"], false);
+
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    let diag = diags
+        .iter()
+        .find(|d| d["code"] == "X07-MOVE-0901")
+        .expect("expected X07-MOVE-0901 diagnostic");
+    let q = diag["quickfix"]
+        .as_object()
+        .expect("expected quickfix object");
+    assert_eq!(q["kind"], "json_patch");
+    assert_eq!(q["note"], "Copy before move");
+
+    let patch_ops: Vec<x07c::diagnostics::PatchOp> =
+        serde_json::from_value(q["patch"].clone()).expect("parse patch ops");
+    assert_eq!(patch_ops.len(), 1, "expected a single patch op");
+    match &patch_ops[0] {
+        x07c::diagnostics::PatchOp::Replace { path, value: _ } => {
+            assert_eq!(path, "/solve/2/2/1");
+        }
+        other => panic!("expected replace op, got: {other:?}"),
+    }
+
+    let mut doc: Value =
+        serde_json::from_slice(&std::fs::read(&program_path).expect("read program"))
+            .expect("parse program");
+    json_patch::apply_patch(&mut doc, &patch_ops).expect("apply patch");
+    write_bytes(
+        &program_path,
+        serde_json::to_string_pretty(&doc)
+            .expect("encode patched program")
+            .as_bytes(),
+    );
+
+    let out2 = run_x07_in_dir(&root, &["check", "--project", "x07.json"]);
+    assert_eq!(
+        out2.status.code(),
+        Some(0),
+        "expected ok after patch; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out2.stdout),
+        String::from_utf8_lossy(&out2.stderr)
+    );
+    assert!(
+        out2.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out2.stderr)
+    );
+    let v2 = parse_json_stdout(&out2);
+    assert_eq!(v2["schema_version"], X07DIAG_SCHEMA_VERSION);
+    assert_eq!(v2["ok"], true);
+
+    std::fs::remove_dir_all(&root).expect("cleanup tmp dir");
+}
+
+#[test]
 fn arch_check_suggests_and_applies_patches_for_rr_sorting_and_sanitizer_defaults() {
     let root = fresh_tmp_dir(&repo_root(), "arch_check_suggest");
     std::fs::create_dir_all(&root).expect("create root");
@@ -913,6 +1028,112 @@ fn x07_test_smoke_suite() {
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+#[test]
+fn x07_test_assert_bytes_eq_emits_details() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "test_assert_bytes_eq_details");
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let module = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "app",
+        "imports": ["std.test"],
+        "decls": [
+            { "kind": "export", "names": ["app.fail_bytes_eq"] },
+            {
+                "kind": "defn",
+                "name": "app.fail_bytes_eq",
+                "params": [],
+                "result": "result_i32",
+                "body": [
+                    "begin",
+                    ["let", "got_v", ["vec_u8.with_capacity", 2]],
+                    ["set", "got_v", ["vec_u8.push", "got_v", 255]],
+                    ["set", "got_v", ["vec_u8.push", "got_v", 97]],
+                    ["let", "got", ["vec_u8.into_bytes", "got_v"]],
+                    ["let", "exp_v", ["vec_u8.with_capacity", 2]],
+                    ["set", "exp_v", ["vec_u8.push", "exp_v", 255]],
+                    ["set", "exp_v", ["vec_u8.push", "exp_v", 98]],
+                    ["let", "expected", ["vec_u8.into_bytes", "exp_v"]],
+                    [
+                        "try",
+                        [
+                            "std.test.assert_bytes_eq",
+                            "got",
+                            "expected",
+                            ["std.test.code_assert_bytes_eq"]
+                        ]
+                    ],
+                    ["std.test.pass"]
+                ]
+            }
+        ]
+    });
+    write_bytes(
+        &dir.join("app.x07.json"),
+        serde_json::to_string_pretty(&module)
+            .expect("encode module")
+            .as_bytes(),
+    );
+
+    let manifest_path = dir.join("tests.json");
+    let manifest = serde_json::json!({
+        "schema_version": "x07.tests_manifest@0.2.0",
+        "tests": [
+            {
+                "id": "smoke/assert_bytes_eq_details",
+                "world": "solve-pure",
+                "entry": "app.fail_bytes_eq",
+                "expect": "pass"
+            }
+        ]
+    });
+    write_bytes(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest)
+            .expect("encode manifest")
+            .as_bytes(),
+    );
+
+    let out = run_x07_in_dir(&dir, &["test", "--manifest", "tests.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(10),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
+    assert_eq!(v["summary"]["failed"], 1);
+
+    let tests = v["tests"].as_array().expect("tests[]");
+    assert_eq!(tests.len(), 1);
+    assert_eq!(tests[0]["id"], "smoke/assert_bytes_eq_details");
+    assert_eq!(tests[0]["status"], "fail");
+    let diags = tests[0]["diags"].as_array().expect("diags[]");
+    let d = diags
+        .iter()
+        .find(|d| d["code"] == "X07T_ASSERT_BYTES_EQ")
+        .expect("expected X07T_ASSERT_BYTES_EQ diag");
+    let details = d["details"].as_object().expect("expected details object");
+    assert_eq!(details["prefix_max_bytes"], 64);
+    assert_eq!(details["got"]["len"], 2);
+    assert_eq!(details["expected"]["len"], 2);
+    assert_eq!(details["got"]["prefix_hex"], "ff61");
+    assert_eq!(details["expected"]["prefix_hex"], "ff62");
+    assert!(
+        details["got"]["prefix_utf8_lossy"]
+            .as_str()
+            .expect("got.prefix_utf8_lossy")
+            .contains('\u{FFFD}'),
+        "expected got.prefix_utf8_lossy to contain U+FFFD: {:?}",
+        details["got"]["prefix_utf8_lossy"]
+    );
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
 }
 
 #[test]

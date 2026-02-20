@@ -772,8 +772,10 @@ pub(crate) fn run_pbt_suite(args: RunPbtSuiteArgs<'_>) -> Result<(PbtSuiteRun, P
             break;
         }
 
-        let (tag, code_u32) = crate::parse_evtest_status_v1(&run.solve_output)
+        let status_v1 = crate::parse_evtest_status_v1(&run.solve_output)
             .context("parse std.test.status_v1 output")?;
+        let tag = status_v1.tag;
+        let code_u32 = status_v1.code_u32;
 
         match tag {
             1 => {}
@@ -794,8 +796,10 @@ pub(crate) fn run_pbt_suite(args: RunPbtSuiteArgs<'_>) -> Result<(PbtSuiteRun, P
 
     let Some(failure_values) = failure_values else {
         let run = last_run.context("internal error: missing last run")?;
-        let (tag, code_u32) = crate::parse_evtest_status_v1(&run.solve_output)
+        let status_v1 = crate::parse_evtest_status_v1(&run.solve_output)
             .context("parse std.test.status_v1 output")?;
+        let tag = status_v1.tag;
+        let code_u32 = status_v1.code_u32;
         let suite = PbtSuiteRun {
             final_run: run,
             status_tag: Some(tag),
@@ -834,7 +838,9 @@ pub(crate) fn run_pbt_suite(args: RunPbtSuiteArgs<'_>) -> Result<(PbtSuiteRun, P
                 trap_id,
             });
         }
-        let (tag, code_u32) = crate::parse_evtest_status_v1(&run.solve_output)?;
+        let status_v1 = crate::parse_evtest_status_v1(&run.solve_output)?;
+        let tag = status_v1.tag;
+        let code_u32 = status_v1.code_u32;
         match tag {
             1 => Ok(CaseEvalOutcome {
                 fails: false,
