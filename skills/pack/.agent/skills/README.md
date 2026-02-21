@@ -23,7 +23,7 @@ Available skills:
 - `x07-bundle`: bundle a native executable for distribution (`x07 bundle`)
 - `x07-lint-repair`: lint/fix/patch x07AST JSON (`x07 lint` / `x07 fix` / `x07 ast`)
 - `x07-format`: canonical x07AST JSON formatting (`x07 fmt`)
-- `x07-package`: dependency + lockfile workflows (`x07 pkg ...`)
+- `x07-package`: dependency + lockfile workflows (`x07 pkg ...`, including `project.patch` + lock safety checks)
 - `x07-test`: project test harness workflow (`x07 test ...`)
 - `x07-os-run`: run OS-world programs (`x07-os-runner`)
 - `x07-ffi-c`: emit C + a C header for embedding (`x07 build --emit-c-header`)

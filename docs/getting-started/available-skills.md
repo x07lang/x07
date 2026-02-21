@@ -27,7 +27,7 @@ All skills live under `.agent/skills/<skill-name>/SKILL.md`.
 | `x07-bundle` | Build distributable native executables (`x07 bundle`) |
 | `x07-lint-repair` | Diagnostics + quickfix + patch workflows (`x07 lint`, `x07 fix`, `x07 ast apply-patch`) |
 | `x07-format` | Formatting workflows (`x07 fmt`) |
-| `x07-package` | Dependency + lockfile workflows (`x07 pkg ...`) |
+| `x07-package` | Dependency + lockfile workflows (`x07 pkg ...`, `project.patch`, lock safety checks) |
 | `x07-test` | Test harness workflows (`x07 test ...`) |
 | `x07-os-run` | OS runner workflows (`x07-os-runner`) (advanced) |
 | `x07-ffi-c` | OS-world embedding via C (`x07 build --emit-c-header`) (advanced) |

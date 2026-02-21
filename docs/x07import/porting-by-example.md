@@ -239,7 +239,7 @@ Create `x07.json` for local tests:
 
 ```json
 {
-  "schema_version": "x07.project@0.2.0",
+  "schema_version": "x07.project@0.3.0",
   "world": "run-os",
   "entry": "modules/ext/hex/tests.x07.json",
   "module_roots": ["modules"],

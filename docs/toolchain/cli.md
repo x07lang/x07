@@ -261,8 +261,10 @@ Notes:
 - `x07 pkg add <name>@<version>` edits `x07.json` only (no network) unless you pass `--sync`.
 - `x07 pkg add <name>` consults the index to resolve a version (network unless you use a file-based index).
 - `x07 pkg lock` uses the official registry index by default when fetching is required; override with `--index` or use `--offline`.
-- Use `x07 pkg lock --check` in CI to fail if `x07.lock.json` is out of date.
-- Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
+- Use `x07 pkg lock --project x07.json --check` in CI to fail if `x07.lock.json` is out of date.
+- When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
+- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.3.0`; `x07.project@0.2.0` is accepted for legacy manifests but does not support `project.patch`).
+- Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
 
 ### Project check (no emit)
 
@@ -393,7 +395,8 @@ Canonical minimal sequence (keep the loop simple; prefer `x07 run`):
 
 1. Discover CLIs: `x07 --cli-specrows`
 2. Iterate: `x07 run` (auto-repair by default; use `--repair=off` when debugging)
-3. Validate: `x07 test`
-4. Debug/repair explicitly (when needed): `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch`
+3. Validate whole project (non-mutating): `x07 check --project x07.json`
+4. Validate behavior: `x07 test`
+5. Debug/repair explicitly (when needed): `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch`
 
 See: [Agent quickstart](../getting-started/agent-quickstart.md).

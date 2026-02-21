@@ -53,14 +53,20 @@ Canonical docs:
    - `x07 run -- tool --help`
 3. If the project uses dependencies, update the lockfile:
    - `x07 pkg lock --project x07.json`
+   - `x07 pkg lock --project x07.json --check` (CI gate)
 
+   If the index can be consulted, `--check` also fails on yanked dependencies and active advisories unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
    If any dependency declares required helper packages via `meta.requires_packages`, `x07 pkg lock` may also update `x07.json` to add those transitive deps.
+   If a transitive dependency must be forced to a safe version, use `project.patch` in `x07.json` (requires `x07.project@0.3.0`).
 
-4. If you need a distributable native executable (end-user CLI binary, no toolchain required at runtime), bundle it:
+4. Run non-mutating whole-project validation before packaging:
+   - `x07 check --project x07.json`
+
+5. If you need a distributable native executable (end-user CLI binary, no toolchain required at runtime), bundle it:
    - `x07 bundle --profile os --out dist/app`
    - `x07 bundle --profile sandbox --out dist/app` (policy enforced)
 
-5. If you need explicit diagnostics or tighter control than the default auto-repair loop:
+6. If you need explicit diagnostics or tighter control than the default auto-repair loop:
    - `x07 fmt` / `x07 lint` / `x07 fix` / `x07 ast apply-patch`
 
 Keep each iteration small and checkable; if a repair loop does not converge quickly, stop and re-evaluate the approach.
@@ -89,7 +95,7 @@ module files under `modules/` and run tests via `x07 test --manifest tests/tests
 
 For app projects (`x07 init`):
 
-- `x07.json`: project manifest (`x07.project@0.2.0`)
+- `x07.json`: project manifest (`x07.project@0.3.0`; `x07.project@0.2.0` is legacy compatibility)
 - `x07.lock.json`: project lockfile (or `lockfile` configured in `x07.json`)
 - `src/main.x07.json`: entry
 - `src/`: module roots

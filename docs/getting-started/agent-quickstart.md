@@ -133,6 +133,12 @@ Run the deterministic harness (repo-defined suites):
 x07 test --manifest tests/tests.json
 ```
 
+For non-mutating, whole-project validation (full import graph + typecheck + backend-check, no emit), run:
+
+```bash
+x07 check --project x07.json
+```
+
 If the suite includes property-based tests, run:
 
 ```bash
@@ -207,6 +213,7 @@ x07 pkg remove NAME --sync
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
+- Canonical project manifests use `x07.project@0.3.0`. `x07.project@0.2.0` is accepted for legacy manifests, but `project.patch` requires `@0.3.0`.
 - `x07 pkg add NAME@VERSION` is safe to re-run: if the same dep+version already exists, it succeeds as a no-op. If the dep exists at a different version, pick a version explicitly and update the project deps.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
@@ -216,6 +223,9 @@ Notes:
 - For structured encodings, prefer branded bytes + validators over ad-hoc parsing (see `std.brand.cast_view_v1` / `std.brand.cast_view_copy_v1` in `x07 guide` and `meta.brands_v1` in schema-derived modules).
 - For streaming transforms, prefer `std.stream.pipe_v1` and `std.io.bufread` over manual loops (more predictable allocations; fewer borrow/ownership hazards).
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
+- In CI, run `x07 pkg lock --project x07.json --check`.
+- When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
+- If you must force a transitive dependency version, use `project.patch` in `x07.json` (requires `x07.project@0.3.0`).
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 - Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).
 

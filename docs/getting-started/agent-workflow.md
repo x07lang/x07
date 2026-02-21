@@ -34,6 +34,7 @@ An autonomous agent should follow a loop like:
 2. Modify code **only through structured patches** (JSON Patch)
 3. Iterate in deterministic worlds:
    - `x07 run` (auto-repair by default via `--repair=...`)
+   - `x07 check --project x07.json` (non-mutating whole-project validation)
    - `x07 test`
    - optional: `x07 lint` for raw diagnostics (`x07diag`)
 4. If it fails:
@@ -42,6 +43,13 @@ An autonomous agent should follow a loop like:
 5. Repeat until green
 
 See also: [Repair loop](../toolchain/repair-loop.md) and [Running programs](../toolchain/running-programs.md).
+
+When dependencies change, update and verify the lockfile in the same loop:
+
+- `x07 pkg lock --project x07.json`
+- `x07 pkg lock --project x07.json --check` (CI gate)
+- When the index can be consulted, `--check` also fails on yanked/advised deps unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
+- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical schema: `x07.project@0.3.0`; `x07.project@0.2.0` is legacy compatibility only).
 
 If you want a good mental model for “AI-native engineering”, see OpenAI’s Codex guide on building AI-native engineering teams.
 

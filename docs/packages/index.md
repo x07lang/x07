@@ -8,6 +8,12 @@ X07 packages are source-only (x07AST JSON), and projects pin dependencies with a
 - `x07-package.json` — package definition (required only for publishable packages)
 - `x07.lock.json` — pinned dependency graph + hashes
 
+## Manifest schema (canonical)
+
+- New and actively maintained projects should use `x07.project@0.3.0`.
+- The toolchain still accepts `x07.project@0.2.0` for legacy manifests.
+- `project.patch` (transitive dependency overrides) requires `x07.project@0.3.0`.
+
 ## Module roots (important)
 
 `x07.json` contains a `module_roots` list. This should list **your source directories** (usually `src` for projects, and `modules` for publishable package repos).
@@ -47,6 +53,26 @@ for the canonical pack/login/publish workflow.
 
 `x07 pkg lock` downloads dependencies into `.x07/deps/…` and writes `x07.lock.json`.
 Commit `x07.lock.json` to make builds reproducible.
+
+In CI, use:
+
+- `x07 pkg lock --project x07.json --check`
+
+When the index can be consulted, `--check` also fails on:
+
+- yanked dependencies (allow only with `--allow-yanked`)
+- active advisories (allow only with `--allow-advisories`)
+
+If you need to override a transitive dependency (for example to move off a yanked/advised version), use `project.patch` in `x07.json`:
+
+```jsonc
+{
+  "schema_version": "x07.project@0.3.0",
+  "patch": {
+    "some-dep": { "version": "1.2.3" }
+  }
+}
+```
 
 Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add those transitive deps to `x07.json` before locking. Treat this as a convenience, not a contract; prefer the capability map and `x07 init --template ...` so the dependency set is explicit.
 

@@ -40,8 +40,11 @@ Workflow (follow exactly, keep it simple):
 
 3) Implement the minimal end-to-end loop first
    - Add/adjust `src/main.x07.json` so `x07 run` works.
+   - Run non-mutating whole-project validation with `x07 check --project x07.json`.
    - Ensure a deterministic test suite exists at `tests/tests.json` and that `x07 test --manifest tests/tests.json` reflects the intended behavior.
    - Iterate until green using the canonical repair loop (prefer `x07 run` / `x07 test`; use `x07 fix` when diagnostics provide quickfixes).
+   - If dependencies change, run `x07 pkg lock --project x07.json`; in CI, enforce `x07 pkg lock --project x07.json --check`.
+   - If `--check` reports yanked/advised transitive deps, prefer `project.patch` overrides in `x07.json` (`x07.project@0.3.0`).
 
 4) Apply higher-level X07 concepts to match the goal
    - If the project is streaming-heavy, model the flow as a `std.stream.pipe_v1` pipeline (sources → transforms → sinks) with bounded buffering and explicit encodings.
