@@ -7,11 +7,12 @@ use std::sync::Once;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use x07_contracts::{
-    PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_MANIFEST_SCHEMA_VERSION, X07AST_SCHEMA_VERSION,
-    X07C_REPORT_SCHEMA_VERSION, X07DIAG_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
-    X07_AGENT_CONTEXT_SCHEMA_VERSION, X07_ARCH_REPORT_SCHEMA_VERSION,
-    X07_CONTRACT_REPRO_SCHEMA_VERSION, X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
-    X07_PATCHSET_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
+    PACKAGE_MANIFEST_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSION,
+    PROJECT_MANIFEST_SCHEMA_VERSION, X07AST_SCHEMA_VERSION, X07C_REPORT_SCHEMA_VERSION,
+    X07DIAG_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION, X07_AGENT_CONTEXT_SCHEMA_VERSION,
+    X07_ARCH_REPORT_SCHEMA_VERSION, X07_CONTRACT_REPRO_SCHEMA_VERSION,
+    X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_PATCHSET_SCHEMA_VERSION,
+    X07_PKG_ADVISORY_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
     X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
     X07_VERIFY_REPORT_SCHEMA_VERSION,
 };
@@ -111,6 +112,55 @@ fn write_bytes(path: &Path, bytes: &[u8]) {
 fn file_url_for_dir(dir: &std::path::Path) -> String {
     let abs = dir.canonicalize().expect("canonicalize");
     format!("file://{}/", abs.display())
+}
+
+fn write_fake_file_index_config(index_dir: &Path) -> String {
+    std::fs::create_dir_all(index_dir.join("dl")).expect("create dl dir");
+    std::fs::create_dir_all(index_dir.join("api")).expect("create api dir");
+    let index_url = file_url_for_dir(index_dir);
+
+    let cfg = serde_json::json!({
+        "dl": format!("{index_url}dl/"),
+        "api": format!("{index_url}api/"),
+        "auth-required": false,
+    });
+    write_bytes(
+        &index_dir.join("config.json"),
+        serde_json::to_vec_pretty(&cfg).unwrap().as_slice(),
+    );
+
+    index_url
+}
+
+fn write_index_entries_ndjson(index_dir: &Path, package_name: &str, entries: &[Value]) {
+    let rel = sparse_index_rel_path(package_name);
+    let index_file = index_dir.join(rel);
+    let mut ndjson = String::new();
+    for e in entries {
+        ndjson.push_str(&serde_json::to_string(e).unwrap());
+        ndjson.push('\n');
+    }
+    write_bytes(&index_file, ndjson.as_bytes());
+}
+
+fn write_minimal_pkg_manifest(dir: &Path, name: &str, version: &str, requires_packages: &[&str]) {
+    std::fs::create_dir_all(dir).expect("create package dir");
+    let mut doc = serde_json::json!({
+        "schema_version": PACKAGE_MANIFEST_SCHEMA_VERSION,
+        "name": name,
+        "version": version,
+        "module_root": "modules",
+        "modules": [],
+    });
+    if !requires_packages.is_empty() {
+        doc["meta"] = serde_json::json!({
+            "requires_packages": requires_packages,
+        });
+    }
+    write_bytes(
+        &dir.join("x07-package.json"),
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
 }
 
 fn sparse_index_rel_path(package_name: &str) -> String {
@@ -4311,6 +4361,367 @@ fn x07_pkg_lock_transitive_conflict_includes_required_by_context() {
         "stderr missing required-by context:\n{}",
         stderr
     );
+}
+
+#[test]
+fn x07_pkg_lock_patch_overrides_transitive_requires_packages() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_patch_override_transitive");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("a/1.0.0"), "a", "1.0.0", &["b@1.0.0"]);
+    write_minimal_pkg_manifest(&deps_root.join("b/1.0.0"), "b", "1.0.0", &["c@1.0.0"]);
+    write_minimal_pkg_manifest(&deps_root.join("c/1.0.0"), "c", "1.0.0", &[]);
+    write_minimal_pkg_manifest(&deps_root.join("c/1.0.1"), "c", "1.0.1", &[]);
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json"))
+        .expect("parse x07.json");
+    let obj = doc.as_object_mut().expect("x07.json must be object");
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![
+            serde_json::json!({"name":"a","version":"1.0.0","path":".x07/deps/a/1.0.0"}),
+        ]),
+    );
+    obj.insert(
+        "patch".to_string(),
+        serde_json::json!({
+            "c": { "version": "1.0.1" }
+        }),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let index_dir = dir.join("fake_index");
+    std::fs::create_dir_all(&index_dir).expect("create fake index dir");
+    let index_url = write_fake_file_index_config(&index_dir);
+
+    write_index_entries_ndjson(
+        &index_dir,
+        "a",
+        &[
+            serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":"a","version":"1.0.0","cksum":"aa","yanked":false}),
+        ],
+    );
+    write_index_entries_ndjson(
+        &index_dir,
+        "b",
+        &[
+            serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":"b","version":"1.0.0","cksum":"bb","yanked":false}),
+        ],
+    );
+    write_index_entries_ndjson(
+        &index_dir,
+        "c",
+        &[
+            serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":"c","version":"1.0.0","cksum":"c0","yanked":true}),
+            serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":"c","version":"1.0.1","cksum":"c1","yanked":false}),
+        ],
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--index", index_url.as_str()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "pkg.lock");
+
+    let updated: Value =
+        serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json after lock"))
+            .expect("parse x07.json after lock");
+    let deps = updated["dependencies"].as_array().expect("dependencies[]");
+    assert!(
+        deps.iter()
+            .any(|d| d["name"] == "c" && d["version"] == "1.0.1"),
+        "expected patched c@1.0.1 in dependencies[]; got:\n{}",
+        serde_json::to_string_pretty(&updated).unwrap()
+    );
+    assert!(
+        !deps
+            .iter()
+            .any(|d| d["name"] == "c" && d["version"] == "1.0.0"),
+        "expected c@1.0.0 to be replaced by patch"
+    );
+
+    let lock: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.lock.json")).unwrap())
+        .expect("parse x07.lock.json");
+    let lock_deps = lock["dependencies"]
+        .as_array()
+        .expect("lock.dependencies[]");
+    let c_dep = lock_deps
+        .iter()
+        .find(|d| d["name"] == "c")
+        .expect("c dep in lockfile");
+    assert_eq!(c_dep["version"], "1.0.1");
+    assert_eq!(c_dep["overridden_by"], "c");
+    assert_eq!(c_dep["yanked"], false);
+}
+
+#[test]
+fn x07_pkg_lock_check_fails_on_yanked_dep() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_check_yanked");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("yankme/1.0.0"), "yankme", "1.0.0", &[]);
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json"))
+        .expect("parse x07.json");
+    let obj = doc.as_object_mut().expect("x07.json must be object");
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![
+            serde_json::json!({"name":"yankme","version":"1.0.0","path":".x07/deps/yankme/1.0.0"}),
+        ]),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let index_dir = dir.join("fake_index");
+    std::fs::create_dir_all(&index_dir).expect("create fake index dir");
+    let index_url = write_fake_file_index_config(&index_dir);
+    write_index_entries_ndjson(
+        &index_dir,
+        "yankme",
+        &[
+            serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":"yankme","version":"1.0.0","cksum":"00","yanked":true}),
+        ],
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--index", index_url.as_str()]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(
+        &dir,
+        &["pkg", "lock", "--check", "--index", index_url.as_str()],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["error"]["code"], "X07PKG_YANKED_DEP");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "pkg",
+            "lock",
+            "--check",
+            "--allow-yanked",
+            "--index",
+            index_url.as_str(),
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+}
+
+#[test]
+fn x07_pkg_lock_check_fails_on_advisories() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_check_advisories");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("advised/1.0.0"), "advised", "1.0.0", &[]);
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json"))
+        .expect("parse x07.json");
+    let obj = doc.as_object_mut().expect("x07.json must be object");
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![serde_json::json!({"name":"advised","version":"1.0.0","path":".x07/deps/advised/1.0.0"})]),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let index_dir = dir.join("fake_index");
+    std::fs::create_dir_all(&index_dir).expect("create fake index dir");
+    let index_url = write_fake_file_index_config(&index_dir);
+    let advisory = serde_json::json!({
+        "schema_version": X07_PKG_ADVISORY_SCHEMA_VERSION,
+        "id": "00000000-0000-0000-0000-000000000001",
+        "package": "advised",
+        "version": "1.0.0",
+        "kind": "broken",
+        "severity": "high",
+        "summary": "bad release",
+        "created_at_utc": "2026-01-01T00:00:00Z",
+    });
+    write_index_entries_ndjson(
+        &index_dir,
+        "advised",
+        &[serde_json::json!({
+            "schema_version":"x07.index-entry@0.1.0",
+            "name":"advised",
+            "version":"1.0.0",
+            "cksum":"00",
+            "yanked":false,
+            "advisories":[advisory]
+        })],
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--index", index_url.as_str()]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07_in_dir(
+        &dir,
+        &["pkg", "lock", "--check", "--index", index_url.as_str()],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["error"]["code"], "X07PKG_ADVISED_DEP");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "pkg",
+            "lock",
+            "--check",
+            "--allow-advisories",
+            "--index",
+            index_url.as_str(),
+        ],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+}
+
+#[test]
+fn x07_pkg_lock_offline_patch_requires_dep_present() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_offline_patch_present");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("a/1.0.0"), "a", "1.0.0", &["b@1.0.0"]);
+    write_minimal_pkg_manifest(&deps_root.join("b/1.0.0"), "b", "1.0.0", &["c@1.0.0"]);
+    write_minimal_pkg_manifest(&deps_root.join("c/1.0.0"), "c", "1.0.0", &[]);
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json"))
+        .expect("parse x07.json");
+    let obj = doc.as_object_mut().expect("x07.json must be object");
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![
+            serde_json::json!({"name":"a","version":"1.0.0","path":".x07/deps/a/1.0.0"}),
+        ]),
+    );
+    obj.insert(
+        "patch".to_string(),
+        serde_json::json!({
+            "c": { "version": "1.0.1" }
+        }),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let before = std::fs::read(&proj_path).expect("read x07.json before lock");
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["error"]["code"], "X07PKG_OFFLINE_MISSING_DEP");
+
+    let after = std::fs::read(&proj_path).expect("read x07.json after failed lock");
+    assert_eq!(
+        after, before,
+        "x07.json changed despite offline missing dep"
+    );
+
+    write_minimal_pkg_manifest(&deps_root.join("c/1.0.1"), "c", "1.0.1", &[]);
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+
+    let lock: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.lock.json")).unwrap())
+        .expect("parse x07.lock.json");
+    let lock_deps = lock["dependencies"]
+        .as_array()
+        .expect("lock.dependencies[]");
+    let c_dep = lock_deps
+        .iter()
+        .find(|d| d["name"] == "c")
+        .expect("c dep in lockfile");
+    assert_eq!(c_dep["version"], "1.0.1");
+    assert_eq!(c_dep["overridden_by"], "c");
 }
 
 #[test]

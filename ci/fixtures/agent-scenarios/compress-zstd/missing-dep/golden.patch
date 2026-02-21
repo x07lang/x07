@@ -44,7 +44,7 @@ index d7f8feb..ef2c4f9 100644
 +++ b/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/expected/x07.lock.json
 @@ -1,4 +1,33 @@
  {
-   "schema_version": "x07.lock@0.2.0",
+   "schema_version": "x07.lock@0.3.0",
 -  "dependencies": []
 +  "dependencies": [
 +    {

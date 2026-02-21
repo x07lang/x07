@@ -7,7 +7,8 @@ use clap::{Args, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use x07_contracts::{
-    PROJECT_LOCKFILE_SCHEMA_VERSION, X07DIAG_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
+    PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
+    X07DIAG_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
 };
 use x07_worlds::WorldId;
 use x07c::diagnostics;
@@ -871,10 +872,13 @@ fn resolve_project_context(
                 .with_context(|| format!("read lockfile: {}", lockfile_path.display()))?;
             let lock: project::Lockfile = serde_json::from_slice(&bytes)
                 .with_context(|| format!("parse lockfile JSON: {}", lockfile_path.display()))?;
-            if lock.schema_version != PROJECT_LOCKFILE_SCHEMA_VERSION {
+            if !PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED
+                .iter()
+                .any(|v| *v == lock.schema_version.trim())
+            {
                 anyhow::bail!(
-                    "lockfile schema_version mismatch: expected {} got {:?}",
-                    PROJECT_LOCKFILE_SCHEMA_VERSION,
+                    "lockfile schema_version mismatch: expected one of {:?} got {:?}",
+                    PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
                     lock.schema_version
                 );
             }

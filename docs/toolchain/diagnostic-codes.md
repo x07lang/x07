@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 185
-- quickfix support (`sometimes` or `always`): 156
-- quickfix coverage: 84.32%
+- total codes: 188
+- quickfix support (`sometimes` or `always`): 159
+- quickfix coverage: 84.57%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -122,6 +122,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07INIT_PKG_LOCK` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_PKG_LOCK`. |
 | `X07INIT_SRC` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_SRC`. |
 | `X07INIT_TESTS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_TESTS`. |
+| `X07PKG_ADVISED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_ADVISED_DEP`. |
 | `X07PKG_API_URL` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_API_URL`. |
 | `X07PKG_DEP_EXISTS` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_DEP_EXISTS`. |
 | `X07PKG_DEP_NOT_FOUND` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_DEP_NOT_FOUND`. |
@@ -134,11 +135,13 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_LOGIN_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_LOGIN_FAILED`. |
 | `X07PKG_LOGIN_TOKEN` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOGIN_TOKEN`. |
 | `X07PKG_OFFLINE_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_OFFLINE_MISSING_DEP`. |
+| `X07PKG_PATCH_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PATCH_MISSING_DEP`. |
 | `X07PKG_PUBLISH_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_PUBLISH_FAILED`. |
 | `X07PKG_PUBLISH_RESPONSE` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE`. |
 | `X07PKG_PUBLISH_RESPONSE_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_PUBLISH_RESPONSE_MISMATCH`. |
 | `X07PKG_SPEC_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_SPEC_INVALID`. |
 | `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
+| `X07PKG_YANKED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_YANKED_DEP`. |
 | `X07RR_ENTRY_EXISTS` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_ENTRY_EXISTS`. |
 | `X07RR_HTTP` | x07 / run / error | never | Diagnostic code `X07RR_HTTP`. |
 | `X07RR_KEY_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_KEY_EMPTY`. |
@@ -2501,6 +2504,27 @@ Agent strategy:
 - Re-run `x07 init` command variant.
 
 
+## `X07PKG_ADVISED_DEP`
+
+Summary: Package workflow diagnostic `X07PKG_ADVISED_DEP`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A resolved dependency has active advisories in the package index. Use an updated version or an explicit override (`project.patch`) to move to a safe version, or explicitly allow advisories if you have audited and accept the risk.
+
+Agent strategy:
+
+- Inspect the advisory IDs/summaries in the error output.
+- Run `x07 pkg versions <name>` and pick an unaffected version.
+- Update `x07.json` or `project.patch` to use the chosen version.
+- Re-run `x07 pkg lock` (or `x07 pkg lock --check --allow-advisories` if you intentionally accept the advisories).
+
+
 ## `X07PKG_API_URL`
 
 Summary: Package workflow diagnostic `X07PKG_API_URL`.
@@ -2744,6 +2768,26 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07PKG_PATCH_MISSING_DEP`
+
+Summary: Package workflow diagnostic `X07PKG_PATCH_MISSING_DEP`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A `project.patch` entry uses a local `path` override, but the dependency is missing on disk or does not contain `x07-package.json`. Local overrides are not downloaded automatically.
+
+Agent strategy:
+
+- Ensure the patched dependency exists at the configured `path` and contains `x07-package.json`.
+- If you intended a registry dependency, remove `project.patch[<name>].path` so `x07 pkg lock` can fetch it.
+- Re-run `x07 pkg lock`.
+
+
 ## `X07PKG_PUBLISH_FAILED`
 
 Summary: Diagnostic code `X07PKG_PUBLISH_FAILED`.
@@ -2843,6 +2887,26 @@ Agent strategy:
 - Normalize dependency specs and run `x07 pkg lock`.
 - Use `x07 pkg add/remove/versions/login/publish` as needed.
 - Re-run the original package command.
+
+
+## `X07PKG_YANKED_DEP`
+
+Summary: Package workflow diagnostic `X07PKG_YANKED_DEP`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A resolved dependency is currently yanked in the package index. Use an updated version or an explicit override (`project.patch`) to move off the yanked version, or explicitly allow yanked deps if you have a reason to keep it.
+
+Agent strategy:
+
+- Run `x07 pkg versions <name>` and choose a non-yanked version.
+- Update `x07.json` (direct dep) or `project.patch` (transitive) to use the chosen version.
+- Re-run `x07 pkg lock` (or `x07 pkg lock --check --allow-yanked` if you intentionally accept the yank).
 
 
 ## `X07RR_ENTRY_EXISTS`

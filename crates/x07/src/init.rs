@@ -781,6 +781,8 @@ pub fn cmd_init(
             index: None,
             check: false,
             offline: false,
+            allow_yanked: false,
+            allow_advisories: false,
         };
         let (code, err_msg) = crate::pkg::pkg_lock_for_init(&lock_args)?;
         if let Some(msg) = err_msg {

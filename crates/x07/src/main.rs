@@ -11,7 +11,8 @@ use anyhow::{Context, Result};
 use base64::Engine;
 use clap::{Args, Parser};
 use x07_contracts::{
-    PROJECT_LOCKFILE_SCHEMA_VERSION, X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
+    PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
+    X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
 };
 use x07_host_runner::{run_artifact_file, RunnerConfig, RunnerResult};
 use x07_worlds::WorldId;
@@ -611,10 +612,13 @@ fn compute_test_module_roots(
         );
     };
 
-    if lock.schema_version.trim() != PROJECT_LOCKFILE_SCHEMA_VERSION {
+    if !PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED
+        .iter()
+        .any(|v| *v == lock.schema_version.trim())
+    {
         anyhow::bail!(
-            "lockfile schema_version mismatch: expected {} got {:?}",
-            PROJECT_LOCKFILE_SCHEMA_VERSION,
+            "lockfile schema_version mismatch: expected one of {:?} got {:?}",
+            PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
             lock.schema_version
         );
     }

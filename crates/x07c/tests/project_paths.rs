@@ -2,7 +2,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde_json::json;
-use x07_contracts::{PACKAGE_MANIFEST_SCHEMA_VERSION, PROJECT_MANIFEST_SCHEMA_VERSION};
+use x07_contracts::{
+    PACKAGE_MANIFEST_SCHEMA_VERSION, PROJECT_MANIFEST_SCHEMA_VERSION,
+    PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0,
+};
 use x07_worlds::WorldId;
 use x07c::project;
 use x07c::{compile, world_config};
@@ -256,7 +259,10 @@ fn project_manifest_accepts_link_config_and_trims_fields() {
     .expect("write project manifest");
 
     let manifest = project::load_project_manifest(&path).expect("load project manifest");
-    assert_eq!(manifest.schema_version, PROJECT_MANIFEST_SCHEMA_VERSION);
+    assert_eq!(
+        manifest.schema_version,
+        PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0
+    );
     assert_eq!(manifest.world, "solve-pure");
     assert_eq!(manifest.entry, "main.x07.json");
     assert_eq!(manifest.module_roots, vec!["src".to_string()]);
@@ -394,6 +400,7 @@ fn project_module_roots_dedup_prevents_duplicate_module_hits() {
         ],
         link: project::LinkConfig::default(),
         dependencies: Vec::new(),
+        patch: std::collections::BTreeMap::new(),
         lockfile: Some("x07.lock.json".to_string()),
     };
 
@@ -406,6 +413,9 @@ fn project_module_roots_dedup_prevents_duplicate_module_hits() {
             package_manifest_sha256: "0".repeat(64),
             module_root: "modules".to_string(),
             modules_sha256: std::collections::BTreeMap::new(),
+            overridden_by: None,
+            yanked: None,
+            advisories: Vec::new(),
         }],
     };
 

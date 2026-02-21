@@ -39,7 +39,7 @@ index d7f8feb..b3dd79c 100644
 +++ b/ci/fixtures/agent-scenarios/text-core/missing-dep/expected/x07.lock.json
 @@ -1,4 +1,21 @@
  {
-   "schema_version": "x07.lock@0.2.0",
+   "schema_version": "x07.lock@0.3.0",
 -  "dependencies": []
 +  "dependencies": [
 +    {

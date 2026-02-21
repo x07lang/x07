@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-pkg.advisory.schema.json",
+  "title": "x07.pkg.advisory@0.1.0",
+  "description": "Machine-readable advisory for a specific registry package version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "package",
+    "version",
+    "kind",
+    "severity",
+    "summary",
+    "created_at_utc"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.pkg.advisory@0.1.0" },
+    "id": { "$ref": "#/$defs/uuid" },
+    "package": { "$ref": "#/$defs/pkg_name" },
+    "version": { "$ref": "#/$defs/semver" },
+    "kind": { "type": "string", "enum": ["broken", "security", "deprecated"] },
+    "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "url": { "type": "string", "format": "uri" },
+    "details": { "type": "string", "maxLength": 65536 },
+    "created_at_utc": { "type": "string", "format": "date-time" },
+    "withdrawn_at_utc": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "pkg_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_-]{0,127}$",
+      "description": "Registry package name."
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

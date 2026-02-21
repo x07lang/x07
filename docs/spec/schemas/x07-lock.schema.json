@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-lock.schema.json",
-  "title": "x07.lock@0.2.0",
+  "title": "x07.lock@0.3.0",
   "description": "Project lockfile (x07.lock.json). Written by `x07 pkg lock`; consumed by x07c and x07 run when resolving dependency module roots.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "dependencies"],
   "properties": {
-    "schema_version": { "const": "x07.lock@0.2.0" },
+    "schema_version": { "const": "x07.lock@0.3.0" },
     "dependencies": {
       "type": "array",
       "items": { "$ref": "#/$defs/locked_dependency" },
@@ -70,7 +70,20 @@
         "path": { "$ref": "#/$defs/rel_path" },
         "package_manifest_sha256": { "$ref": "#/$defs/sha256_hex" },
         "module_root": { "$ref": "#/$defs/rel_path" },
-        "modules_sha256": { "$ref": "#/$defs/modules_sha256" }
+        "modules_sha256": { "$ref": "#/$defs/modules_sha256" },
+        "overridden_by": {
+          "anyOf": [{ "$ref": "#/$defs/pkg_name" }, { "type": "null" }],
+          "default": null
+        },
+        "yanked": {
+          "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+          "default": null
+        },
+        "advisories": {
+          "type": "array",
+          "items": { "$ref": "x07-pkg.advisory.schema.json" },
+          "default": []
+        }
       }
     }
   }

@@ -145,6 +145,14 @@ pub struct LockArgs {
     /// Disallow network access and reuse existing `.x07/deps` contents.
     #[arg(long)]
     pub offline: bool,
+
+    /// When using `--check`, allow yanked dependencies.
+    #[arg(long)]
+    pub allow_yanked: bool,
+
+    /// When using `--check`, allow dependencies with active advisories.
+    #[arg(long)]
+    pub allow_advisories: bool,
 }
 
 #[derive(Debug, Args)]
@@ -506,6 +514,8 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
                             index: args.index.clone(),
                             check: false,
                             offline: false,
+                            allow_yanked: false,
+                            allow_advisories: false,
                         };
                         let (lock_code, lock_report) = pkg_lock_report(&lock_args)?;
                         add_result.lock = lock_report.result;
@@ -591,6 +601,8 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
                         index: args.index.clone(),
                         check: false,
                         offline: false,
+                        allow_yanked: false,
+                        allow_advisories: false,
                     };
                     let (lock_code, lock_report) = pkg_lock_report(&lock_args)?;
                     add_result.lock = lock_report.result;
@@ -708,18 +720,41 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
             index: args.index.clone(),
             check: false,
             offline: false,
+            allow_yanked: false,
+            allow_advisories: false,
+        };
+        let index = match lock_args.index.as_deref() {
+            Some(index) => index.to_string(),
+            None => default_index_url(),
         };
         let mut fetched: Vec<FetchedDep> = Vec::new();
         let mut index_used: Option<String> = None;
-        let closure_outcome = match resolve_transitive_deps(
-            &mut doc,
-            &project_path,
-            &manifest,
+        let mut client: Option<SparseIndexClient> = None;
+        let patch_updates =
+            match apply_patch_overrides_to_project_doc_deps(&mut doc, &manifest.patch) {
+                Ok(v) => v,
+                Err(err) => {
+                    if let Err(rollback_err) =
+                        std::fs::write(&project_path, &original_project_bytes)
+                    {
+                        return Err(anyhow::anyhow!(
+                            "{err}\nrollback failed ({}): {rollback_err}",
+                            project_path.display()
+                        ));
+                    }
+                    return Err(err);
+                }
+            };
+        let mut ctx = TransitiveResolveCtx {
             base,
-            &lock_args,
-            &mut fetched,
-            &mut index_used,
-        ) {
+            args: &lock_args,
+            index: index.as_str(),
+            patch: &manifest.patch,
+            client: &mut client,
+            fetched: &mut fetched,
+            index_used: &mut index_used,
+        };
+        let closure_outcome = match resolve_transitive_deps(&mut doc, &project_path, &mut ctx) {
             Ok(outcome) => outcome,
             Err(err) => {
                 if let Err(rollback_err) = std::fs::write(&project_path, &original_project_bytes) {
@@ -733,7 +768,7 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
         };
         match closure_outcome {
             TransitiveResolutionOutcome::Ok(resolution) => {
-                if resolution.changed {
+                if resolution.changed || !patch_updates.is_empty() {
                     sort_project_deps(
                         doc.as_object_mut()
                             .and_then(|o| o.get_mut("dependencies"))
@@ -765,6 +800,8 @@ fn pkg_add_report(args: &AddArgs) -> Result<(std::process::ExitCode, PkgReport<A
             index: args.index.clone(),
             check: false,
             offline: false,
+            allow_yanked: false,
+            allow_advisories: false,
         };
         let (lock_code, lock_report) = match pkg_lock_report(&lock_args) {
             Ok(out) => out,
@@ -902,6 +939,8 @@ fn pkg_remove_report(
             index: args.index.clone(),
             check: false,
             offline: false,
+            allow_yanked: false,
+            allow_advisories: false,
         };
         let (lock_code, lock_report) = match pkg_lock_report(&lock_args) {
             Ok(out) => out,
@@ -939,9 +978,23 @@ fn pkg_remove_report(
 }
 
 #[derive(Debug, Serialize)]
+struct VersionsAdvisory {
+    id: String,
+    kind: String,
+    severity: String,
+    summary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
 struct VersionsRow {
     version: String,
     yanked: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    advisories_count: Option<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    advisories: Vec<VersionsAdvisory>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1021,11 +1074,27 @@ fn pkg_versions_report(
         let Some(semver) = parse_semver_version(&entry.version) else {
             continue;
         };
+        let mut advisories: Vec<VersionsAdvisory> = entry
+            .advisories
+            .into_iter()
+            .map(|a| VersionsAdvisory {
+                id: a.id,
+                kind: a.kind,
+                severity: a.severity,
+                summary: a.summary,
+                url: a.url,
+            })
+            .collect();
+        advisories.sort_by(|a, b| a.id.cmp(&b.id));
+        let advisories_count = (!advisories.is_empty()).then_some(advisories.len() as u64);
+
         versions.push((
             semver,
             VersionsRow {
                 version: entry.version,
                 yanked: entry.yanked,
+                advisories_count,
+                advisories,
             },
         ));
     }
@@ -1424,27 +1493,94 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         )
     })?;
 
-    // Validate using the canonical parser for better error messages and stricter checks.
-    let mut manifest =
-        project::load_project_manifest(&project_path).context("load project manifest")?;
-
     let base = project_path
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
 
+    let index = match args.index.as_deref() {
+        Some(index) => index.to_string(),
+        None => default_index_url(),
+    };
+
+    let patch_non_empty = doc
+        .get("patch")
+        .and_then(Value::as_object)
+        .is_some_and(|p| !p.is_empty());
+    let schema_version_raw = doc
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    let mut schema_bumped = false;
+    if patch_non_empty
+        && schema_version_raw == x07_contracts::PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0
+    {
+        if args.check {
+            let report = PkgReport {
+                ok: false,
+                command: "pkg.lock",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_TRANSITIVE_MISSING".to_string(),
+                    message: format!(
+                        "project.patch requires schema_version {} (run `x07 pkg lock` to update x07.json)",
+                        x07_contracts::PROJECT_MANIFEST_SCHEMA_VERSION
+                    ),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+
+        let obj = doc
+            .as_object_mut()
+            .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+        obj.insert(
+            "schema_version".to_string(),
+            Value::String(x07_contracts::PROJECT_MANIFEST_SCHEMA_VERSION.to_string()),
+        );
+        schema_bumped = true;
+    }
+
+    let manifest = {
+        let bytes = serde_json::to_vec(&doc)?;
+        project::parse_project_manifest_bytes(&bytes, &project_path)
+            .context("load project manifest")?
+    };
+    for (name, spec) in &manifest.patch {
+        if !is_valid_semver_version(&spec.version) {
+            let report = PkgReport {
+                ok: false,
+                command: "pkg.lock",
+                result: None,
+                error: Some(PkgError {
+                    code: "X07PKG_SPEC_INVALID".to_string(),
+                    message: format!(
+                        "project.patch[{name:?}].version must be semver (MAJOR.MINOR.PATCH), got {:?}",
+                        spec.version
+                    ),
+                }),
+            };
+            return Ok((std::process::ExitCode::from(20), report));
+        }
+    }
+
+    let mut updated_specs = apply_patch_overrides_to_project_doc_deps(&mut doc, &manifest.patch)?;
+
     let mut fetched = Vec::new();
     let mut index_used: Option<String> = None;
+    let mut client: Option<SparseIndexClient> = None;
 
-    let transitive = match resolve_transitive_deps(
-        &mut doc,
-        &project_path,
-        &manifest,
+    let mut ctx = TransitiveResolveCtx {
         base,
         args,
-        &mut fetched,
-        &mut index_used,
-    )? {
+        index: index.as_str(),
+        patch: &manifest.patch,
+        client: &mut client,
+        fetched: &mut fetched,
+        index_used: &mut index_used,
+    };
+    let transitive = match resolve_transitive_deps(&mut doc, &project_path, &mut ctx)? {
         TransitiveResolutionOutcome::Ok(res) => res,
         TransitiveResolutionOutcome::Error(err) => {
             let report = PkgReport {
@@ -1456,8 +1592,34 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
             return Ok((std::process::ExitCode::from(20), report));
         }
     };
-    if transitive.changed {
+    updated_specs.extend(transitive.updated_specs);
+    updated_specs.sort();
+    updated_specs.dedup();
+    let mut added_specs = transitive.added_specs;
+    added_specs.sort();
+    added_specs.dedup();
+
+    let project_changed = schema_bumped || transitive.changed || !updated_specs.is_empty();
+    if project_changed {
         if args.check {
+            let mut parts: Vec<String> = Vec::new();
+            if schema_bumped {
+                parts.push(format!(
+                    "schema_version -> {}",
+                    x07_contracts::PROJECT_MANIFEST_SCHEMA_VERSION
+                ));
+            }
+            if !updated_specs.is_empty() {
+                parts.push(format!("patched: {}", updated_specs.join(", ")));
+            }
+            if !added_specs.is_empty() {
+                parts.push(format!("missing: {}", added_specs.join(", ")));
+            }
+            let extra = if parts.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", parts.join("; "))
+            };
             let report = PkgReport {
                 ok: false,
                 command: "pkg.lock",
@@ -1465,26 +1627,76 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
                 error: Some(PkgError {
                     code: "X07PKG_TRANSITIVE_MISSING".to_string(),
                     message: format!(
-                        "project is missing transitive dependencies (run `x07 pkg lock` to update x07.json): {}",
-                        transitive.added_specs.join(", ")
+                        "project dependencies are out of date (run `x07 pkg lock` to update x07.json){}",
+                        extra
                     ),
                 }),
             };
             return Ok((std::process::ExitCode::from(20), report));
         }
+
+        // Validate the updated project document before writing it.
+        let _ = {
+            let bytes = serde_json::to_vec(&doc)?;
+            project::parse_project_manifest_bytes(&bytes, &project_path)
+                .context("validate updated project manifest")?
+        };
         write_canonical_json_file(&project_path, &doc)
             .with_context(|| format!("write: {}", project_path.display()))?;
-        manifest = project::load_project_manifest(&project_path).context("reload project")?;
     }
+
+    let manifest = {
+        let bytes = serde_json::to_vec(&doc)?;
+        project::parse_project_manifest_bytes(&bytes, &project_path)
+            .context("load project manifest")?
+    };
 
     let lock_path = project::default_lockfile_path(&project_path, &manifest);
 
-    let lock = project::compute_lockfile(&project_path, &manifest)?;
+    let mut lock = project::compute_lockfile(&project_path, &manifest)?;
+
+    let existing_lock_bytes = match std::fs::read(&lock_path) {
+        Ok(bytes) => Some(bytes),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+        Err(err) => {
+            return Err(err).with_context(|| format!("read lockfile: {}", lock_path.display()))
+        }
+    };
+    let existing_lock: Option<project::Lockfile> = match existing_lock_bytes.as_deref() {
+        Some(bytes) => Some(
+            serde_json::from_slice(bytes)
+                .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?,
+        ),
+        None => None,
+    };
+
+    if let Some(err) = apply_lock_overrides_and_metadata(
+        &manifest,
+        &index,
+        args,
+        &mut client,
+        &mut index_used,
+        existing_lock.as_ref(),
+        &mut lock,
+    )? {
+        let report = PkgReport {
+            ok: false,
+            command: "pkg.lock",
+            result: Some(LockResult {
+                project: project_path.display().to_string(),
+                index: index_used.clone().or(args.index.clone()),
+                lockfile: lock_path.display().to_string(),
+                fetched,
+            }),
+            error: Some(err),
+        };
+        return Ok((std::process::ExitCode::from(20), report));
+    }
 
     if args.check {
-        let existing_bytes = match std::fs::read(&lock_path) {
-            Ok(bytes) => bytes,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+        let existing = match existing_lock {
+            Some(lock) => lock,
+            None => {
                 let report = PkgReport {
                     ok: false,
                     command: "pkg.lock",
@@ -1496,13 +1708,83 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
                 };
                 return Ok((std::process::ExitCode::from(20), report));
             }
-            Err(err) => {
-                return Err(err).with_context(|| format!("read lockfile: {}", lock_path.display()))
-            }
         };
-        let existing: project::Lockfile = serde_json::from_slice(&existing_bytes)
-            .with_context(|| format!("parse lockfile JSON: {}", lock_path.display()))?;
-        if existing != lock {
+
+        let metadata_online = !args.offline && (args.index.is_some() || index_used.is_some());
+
+        if metadata_online {
+            if !args.allow_yanked {
+                let yanked: Vec<String> = lock
+                    .dependencies
+                    .iter()
+                    .filter(|d| d.yanked == Some(true))
+                    .map(|d| format!("{}@{}", d.name, d.version))
+                    .collect();
+                if !yanked.is_empty() {
+                    let report = PkgReport {
+                        ok: false,
+                        command: "pkg.lock",
+                        result: Some(LockResult {
+                            project: project_path.display().to_string(),
+                            index: index_used.clone().or(args.index.clone()),
+                            lockfile: lock_path.display().to_string(),
+                            fetched,
+                        }),
+                        error: Some(PkgError {
+                            code: "X07PKG_YANKED_DEP".to_string(),
+                            message: format!(
+                                "lockfile contains yanked dependencies: {} (hint: use project.patch or bump; allow with --allow-yanked)",
+                                yanked.join(", ")
+                            ),
+                        }),
+                    };
+                    return Ok((std::process::ExitCode::from(20), report));
+                }
+            }
+
+            if !args.allow_advisories {
+                let mut advised: Vec<String> = Vec::new();
+                for dep in &lock.dependencies {
+                    if dep.advisories.is_empty() {
+                        continue;
+                    }
+                    let mut ids: Vec<String> = dep
+                        .advisories
+                        .iter()
+                        .map(|a| format!("{} ({})", a.id, a.summary))
+                        .collect();
+                    ids.sort();
+                    advised.push(format!("{}@{}: {}", dep.name, dep.version, ids.join(", ")));
+                }
+                if !advised.is_empty() {
+                    let report = PkgReport {
+                        ok: false,
+                        command: "pkg.lock",
+                        result: Some(LockResult {
+                            project: project_path.display().to_string(),
+                            index: index_used.clone().or(args.index.clone()),
+                            lockfile: lock_path.display().to_string(),
+                            fetched,
+                        }),
+                        error: Some(PkgError {
+                            code: "X07PKG_ADVISED_DEP".to_string(),
+                            message: format!(
+                                "lockfile contains dependencies with active advisories: {} (hint: use project.patch or bump; allow with --allow-advisories)",
+                                advised.join("; ")
+                            ),
+                        }),
+                    };
+                    return Ok((std::process::ExitCode::from(20), report));
+                }
+            }
+        }
+
+        let mismatch = if metadata_online {
+            existing != lock
+        } else {
+            !lockfiles_equal_core(&existing, &lock)
+        };
+        if mismatch {
             let report = PkgReport {
                 ok: false,
                 command: "pkg.lock",
@@ -1578,6 +1860,7 @@ pub(crate) fn pkg_lock_for_init(
 struct TransitiveResolution {
     changed: bool,
     added_specs: Vec<String>,
+    updated_specs: Vec<String>,
 }
 
 enum TransitiveResolutionOutcome {
@@ -1585,31 +1868,29 @@ enum TransitiveResolutionOutcome {
     Error(PkgError),
 }
 
+struct TransitiveResolveCtx<'a> {
+    base: &'a Path,
+    args: &'a LockArgs,
+    index: &'a str,
+    patch: &'a std::collections::BTreeMap<String, project::PatchSpec>,
+    client: &'a mut Option<SparseIndexClient>,
+    fetched: &'a mut Vec<FetchedDep>,
+    index_used: &'a mut Option<String>,
+}
+
 fn resolve_transitive_deps(
     doc: &mut Value,
     project_path: &Path,
-    _manifest: &project::ProjectManifest,
-    base: &Path,
-    args: &LockArgs,
-    fetched: &mut Vec<FetchedDep>,
-    index_used: &mut Option<String>,
+    ctx: &mut TransitiveResolveCtx<'_>,
 ) -> Result<TransitiveResolutionOutcome> {
     let mut scanned: HashSet<(String, String)> = HashSet::new();
     let mut added: BTreeSet<String> = BTreeSet::new();
+    let mut updated: BTreeSet<String> = BTreeSet::new();
     let mut changed = false;
-
-    let index = match args.index.as_deref() {
-        Some(index) => index.to_string(),
-        None => default_index_url(),
-    };
-
-    let mut client: Option<SparseIndexClient> = None;
 
     loop {
         let deps = deps_from_project_doc(doc, project_path)?;
-        if let Some(err) =
-            ensure_deps_present(&deps, base, args, &index, &mut client, fetched, index_used)?
-        {
+        if let Some(err) = ensure_deps_present(deps.as_slice(), ctx)? {
             return Ok(TransitiveResolutionOutcome::Error(err));
         }
 
@@ -1619,21 +1900,30 @@ fn resolve_transitive_deps(
             if !scanned.insert(key) {
                 continue;
             }
-            let dep_dir = base.join(&dep.path);
+            let dep_dir = ctx.base.join(&dep.path);
             let reqs = requires_packages_from_manifest(&dep_dir)?;
             for spec in reqs {
                 let (name, version) = parse_pkg_spec(&spec)?;
-                let path = format!(".x07/deps/{name}/{version}");
-                match ensure_dep_entry(doc, &name, &version, &path)? {
+                let (version, path) = apply_patch_override(&name, &version, ctx.patch);
+                let allow_update = ctx.patch.contains_key(&name);
+                match ensure_dep_entry(doc, &name, &version, &path, allow_update)? {
                     EnsureDepOutcome::Added => {
                         changed = true;
                         round_added = true;
                         added.insert(format!("{name}@{version}"));
                     }
                     EnsureDepOutcome::AlreadyPresentSameVersion => {}
+                    EnsureDepOutcome::UpdatedExisting { existing_version } => {
+                        changed = true;
+                        round_added = true;
+                        updated.insert(format!("{name}@{version}"));
+                        if existing_version != version {
+                            scanned.remove(&(name.clone(), existing_version));
+                        }
+                    }
                     EnsureDepOutcome::AlreadyPresentDifferentVersion { existing_version } => {
                         anyhow::bail!(
-                            "dependency version conflict: project has {name}@{existing_version}, but {spec:?} is required by {}@{}",
+                            "dependency version conflict: project has {name}@{existing_version}, but {spec:?} is required by {}@{} (hint: use project.patch to override {name})",
                             dep.name,
                             dep.version
                         );
@@ -1650,6 +1940,7 @@ fn resolve_transitive_deps(
     Ok(TransitiveResolutionOutcome::Ok(TransitiveResolution {
         changed,
         added_specs: added.into_iter().collect(),
+        updated_specs: updated.into_iter().collect(),
     }))
 }
 
@@ -1657,6 +1948,7 @@ fn resolve_transitive_deps(
 enum EnsureDepOutcome {
     Added,
     AlreadyPresentSameVersion,
+    UpdatedExisting { existing_version: String },
     AlreadyPresentDifferentVersion { existing_version: String },
 }
 
@@ -1665,6 +1957,7 @@ fn ensure_dep_entry(
     name: &str,
     version: &str,
     path: &str,
+    allow_update: bool,
 ) -> Result<EnsureDepOutcome> {
     let obj = doc
         .as_object_mut()
@@ -1676,14 +1969,34 @@ fn ensure_dep_entry(
         .as_array_mut()
         .ok_or_else(|| anyhow::anyhow!("project.dependencies must be an array"))?;
 
-    for dep in deps.iter() {
+    let mut found_idx: Option<usize> = None;
+    for (idx, dep) in deps.iter().enumerate() {
         let dep_name = dep.get("name").and_then(Value::as_str).unwrap_or("");
-        if dep_name != name {
-            continue;
+        if dep_name == name {
+            found_idx = Some(idx);
+            break;
         }
-        let dep_ver = dep.get("version").and_then(Value::as_str).unwrap_or("");
-        if dep_ver == version {
+    }
+    if let Some(idx) = found_idx {
+        let dep_ver = deps[idx]
+            .get("version")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let dep_path = deps[idx].get("path").and_then(Value::as_str).unwrap_or("");
+        if dep_ver == version && (!allow_update || dep_path == path) {
             return Ok(EnsureDepOutcome::AlreadyPresentSameVersion);
+        }
+        if allow_update {
+            let existing_version = dep_ver.to_string();
+            {
+                let dep = &mut deps[idx];
+                if let Some(obj) = dep.as_object_mut() {
+                    obj.insert("version".to_string(), Value::String(version.to_string()));
+                    obj.insert("path".to_string(), Value::String(path.to_string()));
+                }
+            }
+            sort_project_deps(deps);
+            return Ok(EnsureDepOutcome::UpdatedExisting { existing_version });
         }
         return Ok(EnsureDepOutcome::AlreadyPresentDifferentVersion {
             existing_version: dep_ver.to_string(),
@@ -1715,6 +2028,279 @@ fn sort_project_deps(deps: &mut [Value]) {
         let bv = b.get("version").and_then(Value::as_str).unwrap_or("");
         av.cmp(bv)
     });
+}
+
+fn ensure_index_client(
+    index: &str,
+    client: &mut Option<SparseIndexClient>,
+    index_used: &mut Option<String>,
+) -> Result<Option<PkgError>> {
+    if client.is_none() {
+        let token = x07_pkg::load_token(index).unwrap_or(None);
+        *client = match SparseIndexClient::from_index_url(index, token) {
+            Ok(c) => Some(c),
+            Err(err) => {
+                return Ok(Some(PkgError {
+                    code: "X07PKG_INDEX_CONFIG".to_string(),
+                    message: format!("{err:#}"),
+                }))
+            }
+        };
+    }
+    if index_used.is_none() {
+        *index_used = Some(index.to_string());
+    }
+    Ok(None)
+}
+
+fn apply_patch_override(
+    name: &str,
+    version: &str,
+    patch: &std::collections::BTreeMap<String, project::PatchSpec>,
+) -> (String, String) {
+    match patch.get(name) {
+        Some(spec) => {
+            let version = spec.version.clone();
+            let path = spec
+                .path
+                .clone()
+                .unwrap_or_else(|| format!(".x07/deps/{name}/{version}"));
+            (version, path)
+        }
+        None => (version.to_string(), format!(".x07/deps/{name}/{version}")),
+    }
+}
+
+fn apply_patch_overrides_to_project_doc_deps(
+    doc: &mut Value,
+    patch: &std::collections::BTreeMap<String, project::PatchSpec>,
+) -> Result<Vec<String>> {
+    if patch.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let obj = doc
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+    let Some(deps_val) = obj.get_mut("dependencies") else {
+        return Ok(Vec::new());
+    };
+    let Some(deps) = deps_val.as_array_mut() else {
+        anyhow::bail!("project.dependencies must be an array");
+    };
+
+    let mut updated: Vec<String> = Vec::new();
+    for dep in deps.iter_mut() {
+        let Some(dep_obj) = dep.as_object_mut() else {
+            continue;
+        };
+        let name = dep_obj
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if name.is_empty() {
+            continue;
+        }
+        if !patch.contains_key(&name) {
+            continue;
+        }
+        let current_version = dep_obj
+            .get("version")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let current_path = dep_obj
+            .get("path")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+
+        let (desired_version, desired_path) = apply_patch_override(&name, current_version, patch);
+        if current_version != desired_version || current_path != desired_path {
+            dep_obj.insert("name".to_string(), Value::String(name.clone()));
+            dep_obj.insert(
+                "version".to_string(),
+                Value::String(desired_version.clone()),
+            );
+            dep_obj.insert("path".to_string(), Value::String(desired_path));
+            updated.push(format!("{name}@{desired_version}"));
+        }
+    }
+
+    if !updated.is_empty() {
+        sort_project_deps(deps);
+    }
+
+    Ok(updated)
+}
+
+fn lockfiles_equal_core(a: &project::Lockfile, b: &project::Lockfile) -> bool {
+    if a.schema_version.trim() != b.schema_version.trim() {
+        return false;
+    }
+    if a.dependencies.len() != b.dependencies.len() {
+        return false;
+    }
+    for (da, db) in a.dependencies.iter().zip(b.dependencies.iter()) {
+        if da.name != db.name || da.version != db.version || da.path != db.path {
+            return false;
+        }
+        if da.package_manifest_sha256 != db.package_manifest_sha256 {
+            return false;
+        }
+        if da.module_root != db.module_root {
+            return false;
+        }
+        if da.modules_sha256 != db.modules_sha256 {
+            return false;
+        }
+    }
+    true
+}
+
+type LockMetadataKey = (String, String, String, String);
+type LockMetadataValue = (Option<bool>, Vec<project::LockAdvisory>);
+type LockMetadataMap = std::collections::HashMap<LockMetadataKey, LockMetadataValue>;
+
+fn preserve_lock_metadata(existing: &project::Lockfile, lock: &mut project::Lockfile) {
+    let mut map: LockMetadataMap = LockMetadataMap::new();
+    for dep in &existing.dependencies {
+        map.insert(
+            (
+                dep.name.clone(),
+                dep.version.clone(),
+                dep.path.clone(),
+                dep.package_manifest_sha256.clone(),
+            ),
+            (dep.yanked, dep.advisories.clone()),
+        );
+    }
+    for dep in &mut lock.dependencies {
+        if let Some((yanked, advisories)) = map.get(&(
+            dep.name.clone(),
+            dep.version.clone(),
+            dep.path.clone(),
+            dep.package_manifest_sha256.clone(),
+        )) {
+            dep.yanked = *yanked;
+            dep.advisories = advisories.clone();
+        }
+    }
+}
+
+fn apply_lock_overrides_and_metadata(
+    manifest: &project::ProjectManifest,
+    index: &str,
+    args: &LockArgs,
+    client: &mut Option<SparseIndexClient>,
+    index_used: &mut Option<String>,
+    existing_lock: Option<&project::Lockfile>,
+    lock: &mut project::Lockfile,
+) -> Result<Option<PkgError>> {
+    for dep in &mut lock.dependencies {
+        if manifest.patch.contains_key(&dep.name) {
+            dep.overridden_by = Some(dep.name.clone());
+        } else {
+            dep.overridden_by = None;
+        }
+    }
+
+    if args.offline {
+        if let Some(existing) = existing_lock {
+            preserve_lock_metadata(existing, lock);
+        }
+        return Ok(None);
+    }
+
+    let metadata_online = args.index.is_some()
+        || std::env::var("X07_PKG_INDEX_URL")
+            .ok()
+            .is_some_and(|v| !v.trim().is_empty())
+        || index_used.is_some();
+    if !metadata_online {
+        if let Some(existing) = existing_lock {
+            preserve_lock_metadata(existing, lock);
+        }
+        return Ok(None);
+    }
+
+    let needs_index = lock
+        .dependencies
+        .iter()
+        .any(|d| d.path.starts_with(".x07/deps/"));
+    if !needs_index {
+        return Ok(None);
+    }
+    if let Some(err) = ensure_index_client(index, client, index_used)? {
+        return Ok(Some(err));
+    }
+    let client = client.as_ref().expect("client initialized");
+
+    let mut cache: std::collections::HashMap<String, Vec<x07_pkg::IndexEntry>> =
+        std::collections::HashMap::new();
+
+    for dep in &mut lock.dependencies {
+        if !dep.path.starts_with(".x07/deps/") {
+            continue;
+        }
+
+        let entries = match cache.get(&dep.name) {
+            Some(entries) => entries,
+            None => {
+                let entries = match client.fetch_entries(&dep.name) {
+                    Ok(entries) => entries,
+                    Err(err) => {
+                        return Ok(Some(PkgError {
+                            code: "X07PKG_INDEX_FETCH".to_string(),
+                            message: format!(
+                                "fetch index entries for {:?}: {err:#} (hint: check the package name and index URL)",
+                                dep.name
+                            ),
+                        }))
+                    }
+                };
+                cache.insert(dep.name.clone(), entries);
+                cache.get(&dep.name).expect("cache insert")
+            }
+        };
+
+        let Some(entry) = entries
+            .iter()
+            .find(|e| e.name == dep.name && e.version == dep.version)
+        else {
+            return Ok(Some(PkgError {
+                code: "X07PKG_INDEX_NO_MATCH".to_string(),
+                message: format!(
+                    "no index entry for {:?}@{:?} (hint: run `x07 pkg versions {}`)",
+                    dep.name, dep.version, dep.name
+                ),
+            }));
+        };
+
+        dep.yanked = Some(entry.yanked);
+        dep.advisories = entry
+            .advisories
+            .iter()
+            .map(|a| project::LockAdvisory {
+                schema_version: a.schema_version.clone(),
+                id: a.id.clone(),
+                package: a.package.clone(),
+                version: a.version.clone(),
+                kind: a.kind.clone(),
+                severity: a.severity.clone(),
+                summary: a.summary.clone(),
+                url: a.url.clone(),
+                details: a.details.clone(),
+                created_at_utc: a.created_at_utc.clone(),
+                withdrawn_at_utc: a.withdrawn_at_utc.clone(),
+            })
+            .collect();
+        dep.advisories.sort_by(|a, b| a.id.cmp(&b.id));
+    }
+
+    Ok(None)
 }
 
 fn write_canonical_json_file(path: &Path, doc: &Value) -> Result<()> {
@@ -1913,19 +2499,36 @@ fn try_copy_official_dep(
 
 fn ensure_deps_present(
     deps: &[project::DependencySpec],
-    base: &Path,
-    args: &LockArgs,
-    index: &str,
-    client: &mut Option<SparseIndexClient>,
-    fetched: &mut Vec<FetchedDep>,
-    index_used: &mut Option<String>,
+    ctx: &mut TransitiveResolveCtx<'_>,
 ) -> Result<Option<PkgError>> {
+    let mut missing_local_override: Vec<String> = Vec::new();
     let mut missing: Vec<&project::DependencySpec> = Vec::new();
     for dep in deps {
-        let dep_dir = base.join(&dep.path);
+        let dep_dir = ctx.base.join(&dep.path);
         if !dep_dir.join("x07-package.json").is_file() {
-            missing.push(dep);
+            if ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some()) {
+                missing_local_override.push(format!(
+                    "{}@{} ({})",
+                    dep.name,
+                    dep.version,
+                    dep_dir.display()
+                ));
+            } else {
+                missing.push(dep);
+            }
         }
+    }
+
+    if !missing_local_override.is_empty() {
+        missing_local_override.sort();
+        missing_local_override.dedup();
+        return Ok(Some(PkgError {
+            code: "X07PKG_PATCH_MISSING_DEP".to_string(),
+            message: format!(
+                "patched dependencies are missing on disk: {}",
+                missing_local_override.join(", ")
+            ),
+        }));
     }
 
     if missing.is_empty() {
@@ -1935,7 +2538,7 @@ fn ensure_deps_present(
     if let Some(official_ext) = official_ext_packages_dir() {
         let mut still_missing: Vec<&project::DependencySpec> = Vec::new();
         for dep in missing {
-            if try_copy_official_dep(&official_ext, dep, base)? {
+            if try_copy_official_dep(&official_ext, dep, ctx.base)? {
                 continue;
             }
             still_missing.push(dep);
@@ -1947,32 +2550,20 @@ fn ensure_deps_present(
         missing = still_missing;
     }
 
-    if args.offline {
+    if ctx.args.offline {
         return Ok(Some(PkgError {
             code: "X07PKG_OFFLINE_MISSING_DEP".to_string(),
             message: format!("{} missing dependencies (offline mode)", missing.len()),
         }));
     }
 
-    if client.is_none() {
-        let token = x07_pkg::load_token(index).unwrap_or(None);
-        *client = match SparseIndexClient::from_index_url(index, token) {
-            Ok(c) => Some(c),
-            Err(err) => {
-                return Ok(Some(PkgError {
-                    code: "X07PKG_INDEX_CONFIG".to_string(),
-                    message: format!("{err:#}"),
-                }))
-            }
-        };
+    if let Some(err) = ensure_index_client(ctx.index, ctx.client, ctx.index_used)? {
+        return Ok(Some(err));
     }
-    let client = client.as_ref().expect("client initialized");
-    if index_used.is_none() {
-        *index_used = Some(index.to_string());
-    }
+    let client = ctx.client.as_ref().expect("client initialized");
 
     for dep in missing {
-        let dep_dir = base.join(&dep.path);
+        let dep_dir = ctx.base.join(&dep.path);
         let entries = match client.fetch_entries(&dep.name) {
             Ok(entries) => entries,
             Err(err) => {
@@ -1987,18 +2578,18 @@ fn ensure_deps_present(
         };
         let Some(entry) = entries
             .into_iter()
-            .find(|e| e.name == dep.name && e.version == dep.version && !e.yanked)
+            .find(|e| e.name == dep.name && e.version == dep.version)
         else {
             return Ok(Some(PkgError {
                 code: "X07PKG_INDEX_NO_MATCH".to_string(),
                 message: format!(
-                    "no non-yanked index entry for {:?}@{:?}",
-                    dep.name, dep.version
+                    "no index entry for {:?}@{:?} (hint: run `x07 pkg versions {}`)",
+                    dep.name, dep.version, dep.name
                 ),
             }));
         };
 
-        let cache_dir = base.join(".x07").join("cache").join("sha256");
+        let cache_dir = ctx.base.join(".x07").join("cache").join("sha256");
         let archive_path = cache_dir.join(format!("{}.x07pkg", entry.cksum));
         if archive_path.is_file() {
             let bytes = std::fs::read(&archive_path)
@@ -2026,7 +2617,7 @@ fn ensure_deps_present(
 
         let archive_bytes = std::fs::read(&archive_path)
             .with_context(|| format!("read archive for {:?}@{:?}", dep.name, dep.version))?;
-        let tmp_dir = temp_unpack_dir(base)?;
+        let tmp_dir = temp_unpack_dir(ctx.base)?;
         x07_pkg::unpack_tar_bytes(&archive_bytes, &tmp_dir)?;
 
         let (pkg, _pkg_manifest_path, _pkg_manifest_bytes) =
@@ -2058,7 +2649,7 @@ fn ensure_deps_present(
             )
         })?;
 
-        fetched.push(FetchedDep {
+        ctx.fetched.push(FetchedDep {
             name: dep.name.clone(),
             version: dep.version.clone(),
             path: dep.path.clone(),

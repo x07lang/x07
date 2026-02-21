@@ -44,7 +44,7 @@ index d7f8feb..21e4439 100644
 +++ b/ci/fixtures/agent-scenarios/checksum-fast/missing-dep/expected/x07.lock.json
 @@ -1,4 +1,28 @@
  {
-   "schema_version": "x07.lock@0.2.0",
+   "schema_version": "x07.lock@0.3.0",
 -  "dependencies": []
 +  "dependencies": [
 +    {

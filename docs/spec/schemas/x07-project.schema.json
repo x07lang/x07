@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-project.schema.json",
-  "title": "x07.project@0.2.0",
+  "title": "x07.project@0.3.0",
   "description": "Project manifest (x07.json). Core fields are consumed by the compiler (x07c). Run profiles are consumed by x07 run.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "world", "entry", "module_roots"],
   "properties": {
     "schema_version": {
-      "const": "x07.project@0.2.0",
+      "const": "x07.project@0.3.0",
       "description": "Pinned schema identifier."
     },
     "world": {
@@ -36,6 +36,15 @@
       "items": { "$ref": "#/$defs/dependency_spec" },
       "default": [],
       "description": "Resolved dependency list (typically managed by x07 pkg)."
+    },
+    "patch": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_-]{0,127}$": { "$ref": "#/$defs/patch_spec" }
+      },
+      "additionalProperties": false,
+      "default": {},
+      "description": "Dependency overrides: map of package name -> pinned override."
     },
     "lockfile": {
       "anyOf": [{ "$ref": "#/$defs/rel_path" }, { "type": "null" }],
@@ -104,6 +113,21 @@
       "maxLength": 128,
       "pattern": "^[a-z][a-z0-9_-]{0,127}$",
       "description": "Registry package name."
+    },
+    "patch_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/semver",
+          "description": "Pinned override version."
+        },
+        "path": {
+          "$ref": "#/$defs/rel_path",
+          "description": "Optional local override path (project-relative)."
+        }
+      }
     },
     "link_name": {
       "type": "string",

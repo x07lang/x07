@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-project.v0.2.0.schema.json",
+  "title": "x07.project@0.2.0",
+  "description": "Project manifest (x07.json). Core fields are consumed by the compiler (x07c). Run profiles are consumed by x07 run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "world", "entry", "module_roots"],
+  "properties": {
+    "schema_version": {
+      "const": "x07.project@0.2.0",
+      "description": "Pinned schema identifier."
+    },
+    "world": {
+      "$ref": "#/$defs/solve_world_id",
+      "description": "Deterministic compile/lint/test world for the project (must be a solve-* world)."
+    },
+    "entry": {
+      "$ref": "#/$defs/entry_path",
+      "description": "Entry module file (x07AST JSON)."
+    },
+    "module_roots": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/rel_path" },
+      "description": "Module root directories (relative to project)."
+    },
+    "link": {
+      "$ref": "#/$defs/link_config",
+      "default": {},
+      "description": "Optional native link config (used by C/native build backends)."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dependency_spec" },
+      "default": [],
+      "description": "Resolved dependency list (typically managed by x07 pkg)."
+    },
+    "lockfile": {
+      "anyOf": [{ "$ref": "#/$defs/rel_path" }, { "type": "null" }],
+      "default": "x07.lock.json",
+      "description": "Optional lockfile path; null disables lockfile usage."
+    },
+    "default_profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "description": "Default run profile name for x07 run (must exist in profiles to be usable)."
+    },
+    "profiles": {
+      "$ref": "#/$defs/profiles_map",
+      "default": {},
+      "description": "Named run profiles consumed by x07 run."
+    }
+  },
+  "$defs": {
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "description": "Known world IDs."
+    },
+    "solve_world_id": {
+      "type": "string",
+      "enum": ["solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full"],
+      "description": "World IDs permitted for deterministic compilation/testing."
+    },
+    "semver": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+      "description": "Semantic version string (MAJOR.MINOR.PATCH with optional prerelease/build)."
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+",
+      "description": "Relative path: must not be absolute, must not contain '..' segments, must not contain Windows drive prefixes."
+    },
+    "entry_path": {
+      "allOf": [
+        { "$ref": "#/$defs/rel_path" },
+        {
+          "type": "string",
+          "pattern": "\\.x07\\.json$",
+          "description": "Must end in .x07.json."
+        }
+      ]
+    },
+    "pkg_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_-]{0,127}$",
+      "description": "Registry package name."
+    },
+    "link_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!-)[^\\s/\\\\]+$",
+      "description": "Link token: must not start with '-' and must not contain whitespace or path separators."
+    },
+    "link_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "libs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/link_name" },
+          "default": []
+        },
+        "search_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rel_path" },
+          "default": []
+        },
+        "frameworks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/link_name" },
+          "default": []
+        },
+        "static": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, pass -static to the native linker (where supported)."
+        }
+      },
+      "default": {}
+    },
+    "dependency_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "path"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/pkg_name"
+        },
+        "version": {
+          "$ref": "#/$defs/semver",
+          "description": "Pinned package version."
+        },
+        "path": {
+          "$ref": "#/$defs/rel_path",
+          "description": "Resolved local filesystem path to the package directory."
+        }
+      }
+    },
+    "runner_mode": {
+      "type": "string",
+      "enum": ["auto", "host", "os"],
+      "description": "Runner selection hint for x07 run."
+    },
+    "cc_profile": {
+      "type": "string",
+      "enum": ["default", "size"],
+      "description": "Native/C backend compile profile."
+    },
+    "run_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world"],
+      "properties": {
+        "world": {
+          "$ref": "#/$defs/world_id",
+          "description": "Execution world for x07 run."
+        },
+        "policy": {
+          "$ref": "#/$defs/rel_path",
+          "description": "Path to run-os-sandboxed policy JSON. Required iff world == run-os-sandboxed."
+        },
+        "runner": {
+          "$ref": "#/$defs/runner_mode"
+        },
+        "input": {
+          "$ref": "#/$defs/rel_path",
+          "description": "Path to input bytes file. Optional; x07 run may derive input from CLI args."
+        },
+        "auto_ffi": {
+          "type": "boolean",
+          "description": "If true, x07 run auto-wires native backends when allowed by the world."
+        },
+        "solve_fuel": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Fuel budget (solve-* worlds)."
+        },
+        "cpu_time_limit_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "CPU time limit in seconds (runner-enforced)."
+        },
+        "max_memory_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Max memory limit in bytes (runner-enforced)."
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Max captured output bytes (runner-enforced)."
+        },
+        "cc_profile": {
+          "$ref": "#/$defs/cc_profile"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "world": { "const": "run-os-sandboxed" } },
+            "required": ["world"]
+          },
+          "then": { "required": ["policy"] },
+          "else": { "not": { "required": ["policy"] } }
+        }
+      ]
+    },
+    "profiles_map": {
+      "type": "object",
+      "patternProperties": {
+        "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$": { "$ref": "#/$defs/run_profile" }
+      },
+      "additionalProperties": false,
+      "default": {},
+      "description": "Map of profile name -> profile config."
+    }
+  }
+}

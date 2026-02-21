@@ -22,6 +22,26 @@ pub struct IndexEntry {
     pub version: String,
     pub cksum: String,
     pub yanked: bool,
+    #[serde(default)]
+    pub advisories: Vec<PkgAdvisory>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PkgAdvisory {
+    pub schema_version: String,
+    pub id: String,
+    pub package: String,
+    pub version: String,
+    pub kind: String,
+    pub severity: String,
+    pub summary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
+    pub created_at_utc: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withdrawn_at_utc: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -402,6 +422,23 @@ fn parse_ndjson(bytes: &[u8]) -> Result<Vec<IndexEntry>> {
                 "index entry schema_version mismatch: expected x07.index-entry@0.1.0 got {:?}",
                 entry.schema_version
             );
+        }
+        for adv in &entry.advisories {
+            if adv.schema_version.trim() != "x07.pkg.advisory@0.1.0" {
+                anyhow::bail!(
+                    "advisory schema_version mismatch: expected x07.pkg.advisory@0.1.0 got {:?}",
+                    adv.schema_version
+                );
+            }
+            if adv.package.trim() != entry.name || adv.version.trim() != entry.version {
+                anyhow::bail!(
+                    "advisory identity mismatch: expected {:?}@{:?} got {:?}@{:?}",
+                    entry.name,
+                    entry.version,
+                    adv.package,
+                    adv.version
+                );
+            }
         }
         out.push(entry);
     }

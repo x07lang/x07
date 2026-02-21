@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use x07_contracts::{
     PACKAGE_MANIFEST_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSION,
-    PROJECT_MANIFEST_SCHEMA_VERSION,
+    PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED, PROJECT_LOCKFILE_SCHEMA_VERSION_V0_2_0,
+    PROJECT_MANIFEST_SCHEMA_VERSION, PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED,
+    PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0,
 };
 
 fn validate_rel_path(field: &str, raw: &str) -> Result<()> {
@@ -70,6 +72,25 @@ fn validate_link_name(field: &str, raw: &str) -> Result<()> {
     Ok(())
 }
 
+fn validate_pkg_name(field: &str, raw: &str) -> Result<()> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        anyhow::bail!("{field} must be non-empty");
+    }
+    if !raw
+        .as_bytes()
+        .first()
+        .is_some_and(|b| b.is_ascii_lowercase())
+        || raw
+            .as_bytes()
+            .iter()
+            .any(|b| !b.is_ascii_lowercase() && !b.is_ascii_digit() && !matches!(b, b'_' | b'-'))
+    {
+        anyhow::bail!("{field} must match ^[a-z][a-z0-9_-]*$, got {:?}", raw);
+    }
+    Ok(())
+}
+
 fn normalize_string_in_place(s: &mut String) {
     if s.trim() != s {
         *s = s.trim().to_string();
@@ -93,7 +114,16 @@ pub struct ProjectManifest {
     #[serde(default)]
     pub dependencies: Vec<DependencySpec>,
     #[serde(default)]
+    pub patch: BTreeMap<String, PatchSpec>,
+    #[serde(default)]
     pub lockfile: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PatchSpec {
+    pub version: String,
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -170,6 +200,24 @@ pub struct Lockfile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LockAdvisory {
+    pub schema_version: String,
+    pub id: String,
+    pub package: String,
+    pub version: String,
+    pub kind: String,
+    pub severity: String,
+    pub summary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
+    pub created_at_utc: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withdrawn_at_utc: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LockedDependency {
     pub name: String,
     pub version: String,
@@ -177,12 +225,22 @@ pub struct LockedDependency {
     pub package_manifest_sha256: String,
     pub module_root: String,
     pub modules_sha256: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overridden_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub yanked: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub advisories: Vec<LockAdvisory>,
 }
 
 pub fn load_project_manifest(path: &Path) -> Result<ProjectManifest> {
     let bytes = std::fs::read(path)
         .with_context(|| format!("[X07PROJECT_READ] read project: {}", path.display()))?;
-    let mut m: ProjectManifest = serde_json::from_slice(&bytes)
+    parse_project_manifest_bytes(&bytes, path)
+}
+
+pub fn parse_project_manifest_bytes(bytes: &[u8], path: &Path) -> Result<ProjectManifest> {
+    let mut m: ProjectManifest = serde_json::from_slice(bytes)
         .with_context(|| format!("[X07PROJECT_PARSE] parse project JSON: {}", path.display()))?;
 
     normalize_string_in_place(&mut m.schema_version);
@@ -195,6 +253,28 @@ pub fn load_project_manifest(path: &Path) -> Result<ProjectManifest> {
         normalize_string_in_place(&mut dep.version);
         normalize_string_in_place(&mut dep.path);
     }
+    let normalized_patch = {
+        let mut out: BTreeMap<String, PatchSpec> = BTreeMap::new();
+        for (raw_key, mut spec) in std::mem::take(&mut m.patch) {
+            let key = raw_key.trim().to_string();
+            if key.is_empty() {
+                anyhow::bail!("project.patch key must be non-empty");
+            }
+            if out.contains_key(&key) {
+                anyhow::bail!("project.patch has duplicate key {:?}", key);
+            }
+            normalize_string_in_place(&mut spec.version);
+            if let Some(path) = spec.path.as_mut() {
+                normalize_string_in_place(path);
+                if path.is_empty() {
+                    spec.path = None;
+                }
+            }
+            out.insert(key, spec);
+        }
+        out
+    };
+    m.patch = normalized_patch;
     if let Some(lockfile) = m.lockfile.as_mut() {
         normalize_string_in_place(lockfile);
     }
@@ -202,11 +282,21 @@ pub fn load_project_manifest(path: &Path) -> Result<ProjectManifest> {
         m.lockfile = None;
     }
 
-    if m.schema_version != PROJECT_MANIFEST_SCHEMA_VERSION {
+    if !PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED
+        .iter()
+        .any(|v| *v == m.schema_version)
+    {
         anyhow::bail!(
-            "project schema_version mismatch: expected {} got {:?}",
-            PROJECT_MANIFEST_SCHEMA_VERSION,
+            "project schema_version mismatch: expected one of {:?} got {:?}",
+            PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED,
             m.schema_version
+        );
+    }
+    if m.schema_version == PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0 && !m.patch.is_empty() {
+        anyhow::bail!(
+            "project.patch requires project schema_version {} (got {})",
+            PROJECT_MANIFEST_SCHEMA_VERSION,
+            PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0
         );
     }
     crate::world_config::parse_world_id(&m.world)
@@ -227,6 +317,15 @@ pub fn load_project_manifest(path: &Path) -> Result<ProjectManifest> {
     m.link.validate()?;
     for (idx, dep) in m.dependencies.iter().enumerate() {
         validate_rel_path(&format!("project.dependencies[{idx}].path"), &dep.path)?;
+    }
+    for (name, spec) in &m.patch {
+        validate_pkg_name("project.patch key", name)?;
+        if spec.version.trim().is_empty() {
+            anyhow::bail!("project.patch[{name:?}].version must be non-empty");
+        }
+        if let Some(path) = &spec.path {
+            validate_rel_path(&format!("project.patch[{name:?}].path"), path)?;
+        }
     }
     if let Some(lockfile) = &m.lockfile {
         validate_rel_path("project.lockfile", lockfile)?;
@@ -318,6 +417,9 @@ pub fn compute_lockfile(project_path: &Path, manifest: &ProjectManifest) -> Resu
             package_manifest_sha256: manifest_sha,
             module_root: pkg.module_root.clone(),
             modules_sha256,
+            overridden_by: None,
+            yanked: None,
+            advisories: Vec::new(),
         });
     }
 
@@ -332,11 +434,23 @@ pub fn verify_lockfile(
     manifest: &ProjectManifest,
     lock: &Lockfile,
 ) -> Result<()> {
-    if lock.schema_version.trim() != PROJECT_LOCKFILE_SCHEMA_VERSION {
+    if !PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED
+        .iter()
+        .any(|v| *v == lock.schema_version.trim())
+    {
+        let hint = if lock.schema_version.trim() == PROJECT_LOCKFILE_SCHEMA_VERSION_V0_2_0 {
+            format!(
+                " (hint: run `x07 pkg lock` to update to {})",
+                PROJECT_LOCKFILE_SCHEMA_VERSION
+            )
+        } else {
+            " (hint: run `x07 pkg lock`)".to_string()
+        };
         anyhow::bail!(
-            "[X07LOCK_SCHEMA] lockfile schema_version mismatch: expected {} got {:?} (hint: run `x07 pkg lock`)",
-            PROJECT_LOCKFILE_SCHEMA_VERSION,
-            lock.schema_version
+            "[X07LOCK_SCHEMA] lockfile schema_version mismatch: expected one of {:?} got {:?}{}",
+            PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
+            lock.schema_version,
+            hint
         );
     }
 

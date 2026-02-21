@@ -167,7 +167,7 @@ It also generates a minimal `x07.json` so `x07 test` can automatically discover 
 
 ```json
 {
-  "schema_version": "x07.project@0.2.0",
+  "schema_version": "x07.project@0.3.0",
   "world": "run-os",
   "entry": "modules/ext/acme_hello_demo/tests.x07.json",
   "module_roots": ["modules"],
@@ -175,6 +175,20 @@ It also generates a minimal `x07.json` so `x07 test` can automatically discover 
   "dependencies": []
 }
 ```
+
+### Overrides & advisories (optional)
+
+If a transitive dependency is yanked or has an advisory, you can force a different version via `patch`:
+
+```jsonc
+{
+  "patch": {
+    "some-dep": { "version": "1.2.3" }
+  }
+}
+```
+
+When `x07 pkg lock` consults an index, it records `yanked` and `advisories` metadata into `x07.lock.json`. In CI, `x07 pkg lock --check` fails on yanked/advised deps unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
 
 Run tests:
 

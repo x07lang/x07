@@ -43,7 +43,7 @@ CLI example (standalone, without a project manifest):
 
 ## Project workflow (manifest + lockfile)
 
-Project manifest (`x07.project@0.2.0`) is JSON:
+Project manifest (`x07.project@0.3.0`) is JSON (tooling also accepts `x07.project@0.2.0`, but `patch` requires `@0.3.0`):
 
 - `world`: one of `solve-pure`, `solve-fs`, `solve-rr`, `solve-kv`, `solve-full`
 - `entry`: entry program file (compiled as module `main`)
@@ -54,11 +54,30 @@ Project manifest (`x07.project@0.2.0`) is JSON:
   - `link.frameworks`: list of macOS frameworks
   - `link.static`: boolean for `-static`
 - `dependencies`: path dependencies that contain `x07-package.json`
+- `patch`: optional dependency override map (Cargo-like familiarity):
+  - `patch.<name>.version`: semver version to force (required)
+  - `patch.<name>.path`: project-relative local/vendored override (optional)
 - `lockfile`: optional output path (default `x07.lock.json`)
+
+`patch` semantics:
+
+- When resolving the dependency closure, any request for `patch.<name>` is rewritten to the patched version/path.
+- The effective override is recorded in the lockfile via `dependencies[].overridden_by`.
+
+Example:
+
+```jsonc
+{
+  "schema_version": "x07.project@0.3.0",
+  "patch": {
+    "c": { "version": "1.0.1" }
+  }
+}
+```
 
 Commands:
 
-- Generate/update lockfile: `cargo run -p x07c -- lock --project <path/to/x07.json>`
+- Generate/update lockfile: `x07 pkg lock --project <path/to/x07.json>`
 - Build deterministic C output: `cargo run -p x07c -- build --project <path/to/x07.json> --out target/out.c`
 - Compile+run native: `cargo run -p x07-host-runner -- --project <path/to/x07.json> --world solve-pure --input <case.bin>`
 
@@ -84,6 +103,21 @@ Lockfiles pin:
 
 - Each dependency package manifest SHA-256
 - Each dependency module file SHA-256
+
+Lockfile metadata (schema `x07.lock@0.3.0`):
+
+- `dependencies[].overridden_by`: set when the dependency was forced by `project.patch`
+- `dependencies[].yanked`: snapshot from the index when `x07 pkg lock` consults an index
+- `dependencies[].advisories`: snapshot from the index when `x07 pkg lock` consults an index
+
+`x07 pkg lock --check`:
+
+- Fails if `x07.json` dependency closure is out of date.
+- Fails if `x07.lock.json` is out of date.
+- When it can consult the index, it also fails on yanked dependencies and active advisories unless explicitly allowed:
+  - `--allow-yanked`
+  - `--allow-advisories`
+- With `--offline`, it compares only the deterministic core of the lockfile and does not enforce yanks/advisories.
 
 ## Built-in stdlib
 

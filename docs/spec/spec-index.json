@@ -638,8 +638,22 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-lock.schema.json",
       "schema_id": "https://x07.io/spec/x07-lock.schema.json",
+      "schema_version": "x07.lock@0.3.0",
+      "title": "x07.lock@0.3.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-lock.v0.2.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07-lock.v0.2.0.schema.json",
       "schema_version": "x07.lock@0.2.0",
       "title": "x07.lock@0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-lock.v0.3.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07-lock.v0.3.0.schema.json",
+      "schema_version": "x07.lock@0.3.0",
+      "title": "x07.lock@0.3.0"
     },
     {
       "kind": "schema",
@@ -685,6 +699,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-pkg.advisory.schema.json",
+      "schema_id": "https://x07.io/spec/x07-pkg.advisory.schema.json",
+      "schema_version": "x07.pkg.advisory@0.1.0",
+      "title": "x07.pkg.advisory@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-policy-init.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-policy-init.report.schema.json",
       "schema_version": "x07.policy.init.report@0.1.0",
@@ -694,8 +715,22 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-project.schema.json",
       "schema_id": "https://x07.io/spec/x07-project.schema.json",
+      "schema_version": "x07.project@0.3.0",
+      "title": "x07.project@0.3.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-project.v0.2.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07-project.v0.2.0.schema.json",
       "schema_version": "x07.project@0.2.0",
       "title": "x07.project@0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-project.v0.3.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07-project.v0.3.0.schema.json",
+      "schema_version": "x07.project@0.3.0",
+      "title": "x07.project@0.3.0"
     },
     {
       "kind": "schema",
