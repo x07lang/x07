@@ -431,3 +431,159 @@ fn fresh_name(used: &mut BTreeSet<String>, prefix: &str) -> String {
         i += 1;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::ast::Expr;
+
+    use super::{const_fold, cse_pure_subexpressions, expr_ident, expr_list, licm_bytes_len};
+
+    fn expr_int(value: i32) -> Expr {
+        Expr::Int {
+            value,
+            ptr: String::new(),
+        }
+    }
+
+    fn contains_call_head(expr: &Expr, head: &str) -> bool {
+        match expr {
+            Expr::Int { .. } | Expr::Ident { .. } => false,
+            Expr::List { items, .. } => {
+                if items.first().and_then(Expr::as_ident) == Some(head) {
+                    return true;
+                }
+                items.iter().any(|it| contains_call_head(it, head))
+            }
+        }
+    }
+
+    #[test]
+    fn const_fold_positive_folds_constants() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let expr = expr_list(vec![expr_ident("+"), expr_int(1), expr_int(2)]);
+        let out = const_fold(expr);
+        assert_eq!(out, expr_int(3));
+    }
+
+    #[test]
+    fn const_fold_regression_keeps_nonconst() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let expr = expr_list(vec![expr_ident("+"), expr_ident("x"), expr_int(1)]);
+        let out = const_fold(expr.clone());
+        assert_eq!(out, expr);
+    }
+
+    #[test]
+    fn cse_positive_introduces_let_for_repeated_pure_subexpr() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let mul = expr_list(vec![expr_ident("*"), expr_ident("x"), expr_ident("x")]);
+        let expr = expr_list(vec![expr_ident("+"), mul.clone(), mul]);
+
+        let out = cse_pure_subexpressions(expr);
+
+        let Expr::List { items, .. } = out else {
+            panic!("expected list");
+        };
+        assert_eq!(items.len(), 3, "expected begin + 1 let + expr");
+        assert_eq!(items[0].as_ident(), Some("begin"));
+
+        let Expr::List {
+            items: let_items, ..
+        } = &items[1]
+        else {
+            panic!("expected let binding");
+        };
+        assert_eq!(let_items[0].as_ident(), Some("let"));
+        assert_eq!(let_items[1].as_ident(), Some("__x07_cse0"));
+        assert_eq!(
+            let_items[2],
+            expr_list(vec![expr_ident("*"), expr_ident("x"), expr_ident("x")])
+        );
+
+        let Expr::List {
+            items: sum_items, ..
+        } = &items[2]
+        else {
+            panic!("expected rewritten expression");
+        };
+        assert_eq!(sum_items[0].as_ident(), Some("+"));
+        assert_eq!(sum_items[1].as_ident(), Some("__x07_cse0"));
+        assert_eq!(sum_items[2].as_ident(), Some("__x07_cse0"));
+    }
+
+    #[test]
+    fn cse_regression_does_not_hoist_impure_calls() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let call = expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]);
+        let expr = expr_list(vec![expr_ident("begin"), call.clone(), call]);
+        let out = cse_pure_subexpressions(expr.clone());
+        assert_eq!(out, expr);
+    }
+
+    #[test]
+    fn licm_positive_hoists_repeated_bytes_len() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let len_bs = expr_list(vec![expr_ident("bytes.len"), expr_ident("bs")]);
+        let body = expr_list(vec![expr_ident("begin"), len_bs.clone(), len_bs]);
+        let expr = expr_list(vec![
+            expr_ident("for"),
+            expr_ident("i"),
+            expr_int(0),
+            expr_int(10),
+            body,
+        ]);
+
+        let out = licm_bytes_len(expr);
+
+        let Expr::List { items, .. } = &out else {
+            panic!("expected list");
+        };
+        assert_eq!(items.len(), 3, "expected begin + let + for");
+        assert_eq!(items[0].as_ident(), Some("begin"));
+
+        let Expr::List {
+            items: let_items, ..
+        } = &items[1]
+        else {
+            panic!("expected let binding");
+        };
+        assert_eq!(let_items[0].as_ident(), Some("let"));
+        assert_eq!(let_items[1].as_ident(), Some("__x07_len0"));
+        assert_eq!(
+            let_items[2],
+            expr_list(vec![expr_ident("bytes.len"), expr_ident("bs")])
+        );
+
+        let Expr::List {
+            items: for_items, ..
+        } = &items[2]
+        else {
+            panic!("expected for");
+        };
+        assert_eq!(for_items[0].as_ident(), Some("for"));
+        assert_eq!(for_items[1].as_ident(), Some("i"));
+        assert_eq!(for_items[2], expr_int(0));
+        assert_eq!(for_items[3], expr_int(10));
+        assert!(
+            !contains_call_head(&for_items[4], "bytes.len"),
+            "expected bytes.len hoisted from loop body"
+        );
+    }
+
+    #[test]
+    fn licm_regression_does_not_hoist_bound_or_loop_var() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let len_bs = expr_list(vec![expr_ident("bytes.len"), expr_ident("bs")]);
+        let body = expr_list(vec![expr_ident("begin"), len_bs.clone(), len_bs]);
+        let expr = expr_list(vec![
+            expr_ident("for"),
+            expr_ident("bs"),
+            expr_int(0),
+            expr_int(10),
+            body,
+        ]);
+
+        let out = licm_bytes_len(expr.clone());
+        assert_eq!(out, expr);
+    }
+}

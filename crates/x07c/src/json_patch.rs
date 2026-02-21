@@ -232,3 +232,143 @@ fn remove(doc: &mut Value, ptr: &str) -> Result<(), PatchError> {
         }),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{json, Value};
+    use x07_contracts::X07AST_SCHEMA_VERSION;
+
+    use super::{apply_patch, PatchOp};
+
+    #[test]
+    fn applies_add_replace_remove_object_and_array() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let mut doc = json!({"a": {"b": [1, 2]}});
+        let ops = vec![
+            PatchOp::Add {
+                path: "/a/c".to_string(),
+                value: json!(3),
+            },
+            PatchOp::Replace {
+                path: "/a/b/0".to_string(),
+                value: json!(9),
+            },
+            PatchOp::Remove {
+                path: "/a/b/1".to_string(),
+            },
+        ];
+
+        apply_patch(&mut doc, &ops).expect("apply patch");
+        assert_eq!(doc, json!({"a": {"b": [9], "c": 3}}));
+    }
+
+    #[test]
+    fn pointer_unescaping_and_dash_append() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let mut doc = json!({"a/b": {"~": 1}, "arr": [1]});
+        let ops = vec![
+            PatchOp::Replace {
+                path: "/a~1b/~0".to_string(),
+                value: json!(7),
+            },
+            PatchOp::Add {
+                path: "/arr/-".to_string(),
+                value: json!(2),
+            },
+        ];
+
+        apply_patch(&mut doc, &ops).expect("apply patch");
+        assert_eq!(doc, json!({"a/b": {"~": 7}, "arr": [1, 2]}));
+    }
+
+    #[test]
+    fn move_and_copy_semantics_on_arrays() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let mut doc = json!({"a": ["A", "B"]});
+        apply_patch(
+            &mut doc,
+            &[PatchOp::Move {
+                path: "/a/1".to_string(),
+                from: "/a/0".to_string(),
+            }],
+        )
+        .expect("apply move patch");
+        assert_eq!(doc, json!({"a": ["B", "A"]}));
+
+        let mut doc = json!({"a": [1]});
+        apply_patch(
+            &mut doc,
+            &[PatchOp::Copy {
+                path: "/a/1".to_string(),
+                from: "/a/0".to_string(),
+            }],
+        )
+        .expect("apply copy patch");
+        assert_eq!(doc, json!({"a": [1, 1]}));
+    }
+
+    #[test]
+    fn test_op_and_invalid_pointer_errors() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let mut doc = json!({"a": 1});
+        let err = apply_patch(
+            &mut doc,
+            &[PatchOp::Test {
+                path: "/a".to_string(),
+                value: json!(2),
+            }],
+        )
+        .expect_err("test op must fail");
+        assert!(
+            err.message.contains("test failed"),
+            "unexpected error: {err}"
+        );
+
+        let mut doc = json!({"a": 1});
+        let err = apply_patch(
+            &mut doc,
+            &[PatchOp::Remove {
+                path: "a".to_string(),
+            }],
+        )
+        .expect_err("invalid JSON Pointer must fail");
+        assert!(
+            err.message.contains("invalid JSON Pointer"),
+            "unexpected error: {err}"
+        );
+
+        let mut doc = Value::Null;
+        let err = apply_patch(
+            &mut doc,
+            &[PatchOp::Remove {
+                path: "".to_string(),
+            }],
+        )
+        .expect_err("removing root must fail");
+        assert_eq!(err.message, "cannot remove the document root");
+    }
+
+    #[test]
+    fn x07ast_roundtrip_after_patch() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let mut doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["bytes.alloc", 0],
+        });
+        apply_patch(
+            &mut doc,
+            &[PatchOp::Replace {
+                path: "/solve".to_string(),
+                value: json!(["bytes.alloc", 1]),
+            }],
+        )
+        .expect("apply patch");
+
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let _ = crate::x07ast::parse_x07ast_json(&bytes).expect("parse x07AST after patch");
+    }
+}

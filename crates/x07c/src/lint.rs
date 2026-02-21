@@ -1571,3 +1571,76 @@ fn lint_world_heads(
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::ast::Expr;
+
+    use super::{
+        expr_ident, expr_list, lint_core_borrow_rules, lint_core_move_rules, LintCtx, QuickfixKind,
+    };
+
+    fn expr_int(value: i32) -> Expr {
+        Expr::Int {
+            value,
+            ptr: String::new(),
+        }
+    }
+
+    #[test]
+    fn lint_core_borrow_rules_reports_bytes_view_on_temporary() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let ctx = LintCtx::default();
+        let mut diagnostics = Vec::new();
+        let items = vec![
+            expr_ident("bytes.view"),
+            expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
+        ];
+
+        lint_core_borrow_rules(
+            "bytes.view",
+            items.as_slice(),
+            "/solve",
+            &ctx,
+            &mut diagnostics,
+        );
+
+        assert_eq!(diagnostics.len(), 1, "unexpected diags: {diagnostics:?}");
+        let diag = diagnostics.first().expect("len == 1");
+        assert_eq!(diag.code, "X07-BORROW-0001");
+        let q = diag.quickfix.as_ref().expect("expected quickfix");
+        assert_eq!(q.kind, QuickfixKind::JsonPatch);
+    }
+
+    #[test]
+    fn lint_core_move_rules_reports_bytes_concat_same_ident() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let mut diagnostics = Vec::new();
+        let items = vec![expr_ident("bytes.concat"), expr_ident("x"), expr_ident("x")];
+
+        lint_core_move_rules("bytes.concat", items.as_slice(), "/solve", &mut diagnostics);
+
+        assert_eq!(diagnostics.len(), 1, "unexpected diags: {diagnostics:?}");
+        let diag = diagnostics.first().expect("len == 1");
+        assert_eq!(diag.code, "X07-MOVE-0001");
+        assert!(
+            diag.data.contains_key("mem_provenance"),
+            "expected mem provenance graph"
+        );
+    }
+
+    #[test]
+    fn lint_core_move_rules_reports_if_bytes_view_conflict() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let mut diagnostics = Vec::new();
+        let cond = expr_list(vec![expr_ident("bytes.view"), expr_ident("x")]);
+        let then_branch = expr_list(vec![expr_ident("bytes.view"), expr_ident("x")]);
+        let items = vec![expr_ident("if"), cond, then_branch, expr_int(0)];
+
+        lint_core_move_rules("if", items.as_slice(), "/solve", &mut diagnostics);
+
+        assert_eq!(diagnostics.len(), 1, "unexpected diags: {diagnostics:?}");
+        let diag = diagnostics.first().expect("len == 1");
+        assert_eq!(diag.code, "X07-MOVE-0002");
+    }
+}

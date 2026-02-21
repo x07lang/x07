@@ -2690,3 +2690,151 @@ fn lower_ty_intrinsic(
         )),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use crate::ast::Expr;
+    use crate::x07ast::{AstFunctionDef, AstFunctionParam, TypeParam, TypeRef};
+
+    use super::{
+        assert_no_generic_syntax, ensure_instance, mangle_specialized_name, monomorphize, FnKind,
+        GenericProgram, RewriteCtx,
+    };
+
+    fn ident(name: &str) -> Expr {
+        Expr::Ident {
+            name: name.to_string(),
+            ptr: String::new(),
+        }
+    }
+
+    fn int(value: i32) -> Expr {
+        Expr::Int {
+            value,
+            ptr: String::new(),
+        }
+    }
+
+    fn list(items: Vec<Expr>) -> Expr {
+        Expr::List {
+            items,
+            ptr: String::new(),
+        }
+    }
+
+    #[test]
+    fn ensure_instance_enforces_max_specializations() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let ctx = RewriteCtx {
+            caller: "main".to_string(),
+            caller_module: "main".to_string(),
+        };
+        let mut instances = BTreeMap::new();
+        let mut pending = BTreeSet::new();
+
+        let _ = ensure_instance(
+            "main.id",
+            FnKind::Defn,
+            "main",
+            &[TypeRef::Named("i32".to_string())],
+            &ctx,
+            "/solve",
+            &mut instances,
+            &mut pending,
+            1,
+        )
+        .expect("first instance ok");
+
+        let err = ensure_instance(
+            "main.id",
+            FnKind::Defn,
+            "main",
+            &[TypeRef::Named("bytes".to_string())],
+            &ctx,
+            "/solve",
+            &mut instances,
+            &mut pending,
+            1,
+        )
+        .expect_err("must enforce specialization cap");
+        assert_eq!(err.kind, crate::compile::CompileErrorKind::Budget);
+        assert!(
+            err.message.contains("X07-TY-0106"),
+            "unexpected error: {err:?}"
+        );
+    }
+
+    #[test]
+    fn monomorphize_deduplicates_recursive_generic_instance() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let loop_fn = AstFunctionDef {
+            name: "main.loop".to_string(),
+            type_params: vec![TypeParam {
+                name: "A".to_string(),
+                bound: None,
+            }],
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
+            params: vec![AstFunctionParam {
+                name: "x".to_string(),
+                ty: TypeRef::Var("A".to_string()),
+                brand: None,
+            }],
+            result: TypeRef::Var("A".to_string()),
+            result_brand: None,
+            body: list(vec![
+                ident("tapp"),
+                ident("main.loop"),
+                list(vec![ident("t"), ident("A")]),
+                ident("x"),
+            ]),
+        };
+
+        let program = GenericProgram {
+            functions: vec![loop_fn],
+            async_functions: Vec::new(),
+            extern_functions: Vec::new(),
+            solve: list(vec![
+                ident("tapp"),
+                ident("main.loop"),
+                ident("i32"),
+                int(0),
+            ]),
+        };
+
+        let module_exports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let (mono, mono_map) =
+            monomorphize(program, &module_exports, "x07.x07ast@0.5.0").expect("monomorphize");
+
+        let type_args = vec![TypeRef::Named("i32".to_string())];
+        let expected = mangle_specialized_name("main.loop", type_args.as_slice());
+
+        assert_eq!(
+            mono_map.items.len(),
+            1,
+            "expected exactly one specialization, got: {:?}",
+            mono_map.items
+        );
+        let item = mono_map.items.first().expect("len == 1");
+        assert_eq!(item.generic, "main.loop");
+        assert_eq!(item.specialized, expected);
+
+        let f = mono
+            .functions
+            .iter()
+            .find(|f| f.name == expected)
+            .expect("specialized function emitted");
+        assert_no_generic_syntax(&f.body).expect("generic syntax must be eliminated");
+
+        let Expr::List { items, .. } = &f.body else {
+            panic!("expected recursive call list in body");
+        };
+        assert_eq!(
+            items.first().and_then(Expr::as_ident),
+            Some(expected.as_str())
+        );
+    }
+}

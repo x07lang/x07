@@ -372,20 +372,7 @@ fn compile_frontend(
 
     let (mut parsed_program, mono_map) =
         generics::monomorphize(generic_program, &module_exports, &main_schema_version)?;
-    for item in &mono_map.items {
-        let Some(info) = module_infos.get_mut(&item.def_module) else {
-            return Err(CompilerError::new(
-                CompileErrorKind::Internal,
-                format!(
-                    "internal error: mono map item references unknown module: {:?}",
-                    item.def_module
-                ),
-            ));
-        };
-        if info.exports.contains(&item.generic) {
-            info.exports.insert(item.specialized.clone());
-        }
-    }
+    propagate_mono_exports(&mut module_infos, &mono_map)?;
 
     forbid_reserved_helper_function_names(&parsed_program)?;
     stream_pipe::elaborate_stream_pipes(&mut parsed_program, options, &module_metas)?;
@@ -407,6 +394,27 @@ fn compile_frontend(
         module_infos,
         fuel_used,
     })
+}
+
+fn propagate_mono_exports(
+    module_infos: &mut BTreeMap<String, ModuleInfo>,
+    mono_map: &generics::MonoMapV1,
+) -> Result<(), CompilerError> {
+    for item in &mono_map.items {
+        let Some(info) = module_infos.get_mut(&item.def_module) else {
+            return Err(CompilerError::new(
+                CompileErrorKind::Internal,
+                format!(
+                    "internal error: mono map item references unknown module: {:?}",
+                    item.def_module
+                ),
+            ));
+        };
+        if info.exports.contains(&item.generic) {
+            info.exports.insert(item.specialized.clone());
+        }
+    }
+    Ok(())
 }
 
 fn forbid_reserved_helper_function_names(program: &Program) -> Result<(), CompilerError> {
@@ -1549,5 +1557,67 @@ fn validate_expr_visibility(
             }
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use serde_json::json;
+    use x07_contracts::{X07AST_SCHEMA_VERSION, X07_MONO_MAP_SCHEMA_VERSION};
+
+    use crate::generics::{MonoItemV1, MonoLimitsV1, MonoMapV1, MonoStatsV1};
+
+    use super::{propagate_mono_exports, ModuleInfo};
+
+    #[test]
+    fn propagate_mono_exports_adds_specialized_symbol_when_generic_exported() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let mut exports = BTreeSet::new();
+        exports.insert("main.g".to_string());
+        let mut module_infos = BTreeMap::new();
+        module_infos.insert(
+            "main".to_string(),
+            ModuleInfo {
+                imports: BTreeSet::new(),
+                exports,
+                is_builtin: false,
+            },
+        );
+
+        let specialized = "main.g__x07_mono_v1__i32__hdeadbeef".to_string();
+        let mono_map = MonoMapV1 {
+            schema_version: X07_MONO_MAP_SCHEMA_VERSION.to_string(),
+            tool: "x07c".to_string(),
+            tool_version: "test".to_string(),
+            input_schema_version: X07AST_SCHEMA_VERSION.to_string(),
+            entry_module: "main".to_string(),
+            limits: MonoLimitsV1 {
+                max_specializations: 1,
+                max_depth: 1,
+            },
+            stats: MonoStatsV1 {
+                generic_functions_defined: 0,
+                specializations_emitted: 1,
+                tapp_sites_total: 0,
+            },
+            items: vec![MonoItemV1 {
+                generic: "main.g".to_string(),
+                type_args: vec![json!("i32")],
+                specialized: specialized.clone(),
+                def_module: "main".to_string(),
+                sites: Vec::new(),
+            }],
+            meta: BTreeMap::new(),
+        };
+
+        propagate_mono_exports(&mut module_infos, &mono_map).expect("propagate");
+        let out = module_infos.get("main").expect("main module");
+        assert!(
+            out.exports.contains(&specialized),
+            "expected specialized symbol exported; exports={:?}",
+            out.exports
+        );
     }
 }

@@ -2152,3 +2152,159 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
         tapp_rewrites: tapp_rewrites.into_values().collect(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use serde_json::{json, Value};
+    use x07_contracts::X07AST_SCHEMA_VERSION;
+
+    use crate::unify::{Subst, TyTerm};
+    use crate::x07ast::{canonicalize_x07ast_file, parse_x07ast_json, TypeRef};
+
+    use super::{drain_pending_tapp, typecheck_file_local, PendingImplicitTapp, TypecheckOptions};
+
+    #[test]
+    fn pending_tapp_unresolved_emits_explicit_tapp_required_diag() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let pending = PendingImplicitTapp {
+            call_ptr: "/solve/0".to_string(),
+            callee: "main.id".to_string(),
+            type_params: vec!["A".to_string()],
+            meta_ids: vec![0],
+        };
+        let subst = Subst::default();
+        let mut diagnostics = Vec::new();
+        let mut tapp_rewrites = BTreeMap::new();
+
+        drain_pending_tapp(vec![pending], &subst, &mut diagnostics, &mut tapp_rewrites);
+
+        assert!(
+            tapp_rewrites.is_empty(),
+            "unexpected rewrites: {tapp_rewrites:?}"
+        );
+        assert_eq!(diagnostics.len(), 1, "unexpected diags: {diagnostics:?}");
+        let diag = diagnostics.first().expect("len == 1");
+        assert_eq!(diag.code, "X07-TAPP-INFER-0001");
+
+        let unresolved = diag
+            .data
+            .get("unresolved_type_params")
+            .and_then(|v| v.as_array())
+            .expect("unresolved_type_params must be an array");
+        assert_eq!(unresolved, &vec![Value::String("A".to_string())]);
+    }
+
+    #[test]
+    fn pending_tapp_resolved_records_rewrite() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let pending = PendingImplicitTapp {
+            call_ptr: "/solve/0".to_string(),
+            callee: "main.id".to_string(),
+            type_params: vec!["A".to_string()],
+            meta_ids: vec![0],
+        };
+        let mut subst = Subst::default();
+        subst.bind(0, TyTerm::Named("i32".to_string()));
+        let mut diagnostics = Vec::new();
+        let mut tapp_rewrites = BTreeMap::new();
+
+        drain_pending_tapp(vec![pending], &subst, &mut diagnostics, &mut tapp_rewrites);
+
+        assert!(diagnostics.is_empty(), "unexpected diags: {diagnostics:?}");
+        assert_eq!(
+            tapp_rewrites.len(),
+            1,
+            "unexpected rewrites: {tapp_rewrites:?}"
+        );
+        let r = tapp_rewrites.get("/solve/0").expect("rewrite present");
+        assert_eq!(
+            r.inferred_type_args,
+            vec![TypeRef::Named("i32".to_string())]
+        );
+    }
+
+    #[test]
+    fn typecheck_contract_clause_must_be_i32() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [
+                {
+                    "kind": "defn",
+                    "name": "main.f",
+                    "params": [{"name": "x", "ty": "bytes"}],
+                    "result": "bytes",
+                    "requires": [{"expr": ["bytes.view", "x"]}],
+                    "body": ["bytes.alloc", 0],
+                }
+            ],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let report = typecheck_file_local(&file, &TypecheckOptions::default());
+        let diag = report
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "X07-CONTRACT-0001")
+            .expect("expected X07-CONTRACT-0001");
+        assert_eq!(
+            diag.data.get("expected"),
+            Some(&Value::String("i32".to_string()))
+        );
+        assert_eq!(
+            diag.data.get("got"),
+            Some(&Value::String("bytes_view".to_string()))
+        );
+    }
+
+    #[test]
+    fn typecheck_call_arg_mismatch_includes_callee_and_arg_index() {
+        // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [
+                {
+                    "kind": "defn",
+                    "name": "main.id",
+                    "params": [{"name": "x", "ty": "i32"}],
+                    "result": "i32",
+                    "body": "x",
+                }
+            ],
+            "solve": ["begin", ["let", "b", ["bytes.alloc", 0]], ["main.id", "b"], ["bytes.alloc", 0]],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let report = typecheck_file_local(&file, &TypecheckOptions::default());
+        let diag = report
+            .diagnostics
+            .iter()
+            .find(|d| d.code == "X07-TYPE-CALL-0002")
+            .expect("expected X07-TYPE-CALL-0002");
+        assert_eq!(
+            diag.data.get("callee"),
+            Some(&Value::String("main.id".to_string()))
+        );
+        assert_eq!(diag.data.get("arg_index").and_then(|v| v.as_u64()), Some(0));
+        assert_eq!(
+            diag.data.get("expected"),
+            Some(&Value::String("i32".to_string()))
+        );
+        assert_eq!(
+            diag.data.get("got"),
+            Some(&Value::String("bytes".to_string()))
+        );
+    }
+}
