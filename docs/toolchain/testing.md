@@ -36,6 +36,20 @@ Agents need:
 
 If every project reinvents testing, agents become unreliable.
 
+## Toolchain unit tests (Rust)
+
+When changing compiler/toolchain internals, run:
+
+- `cargo test -p x07c`
+
+For minimal repro tests, add a grep-friendly tag:
+
+- `REGRESSION: <id>` (for example `REGRESSION: x07.rfc.backlog.unit-tests@0.1.0`)
+
+To find regression tests:
+
+- `rg "REGRESSION:" crates/x07c`
+
 ## Compiler fuzzing (CI smoke gate)
 
 The toolchain repo includes `cargo-fuzz` targets under `labs/fuzz/`. CI runs a short fuzz smoke gate (30 seconds per target) and uploads `labs/fuzz/artifacts/` on failure to enable local reproduction.

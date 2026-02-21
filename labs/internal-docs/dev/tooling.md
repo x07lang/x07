@@ -12,6 +12,8 @@ X07 builds and runs native solver artifacts from generated C, so the only extern
 ## Verify
 
 - Full repo gate: `./scripts/ci/check_all.sh`
+- Fast compiler-only gate: `cargo test -p x07c`
+- Regression test tag convention: `REGRESSION: <id>` (find with `rg "REGRESSION:" crates/x07c`)
 - Machine-readable gate (JSON report): `./scripts/ci/run.sh pr --strict`
 - Tool presence check: `./scripts/ci/check_tools.sh`
 - Fuzz smoke (nondeterministic; CI required job): `./scripts/ci/check_fuzz_smoke.sh`
