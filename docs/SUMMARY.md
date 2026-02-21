@@ -41,6 +41,7 @@
 - [MCP kit](toolchain/mcp-kit.md)
 - [Benchmarks](toolchain/benchmarks.md)
 - [Compiler limits](toolchain/compiler-limits.md)
+- [Optimizer](toolchain/optimizer.md)
 - [Architecture check](toolchain/arch-check.md)
 - [Schema derive](toolchain/schema-derive.md)
 - [State machines](toolchain/state-machines.md)

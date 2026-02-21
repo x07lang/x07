@@ -18,6 +18,14 @@ Key behaviors:
 - No inherited environment variables or CLI args.
 - Filesystem access is deny-by-default; `solve-fs` provides a read-only fixture directory as `.` and exposes file reads via `["fs.read", ...]`.
 
+## Optimizer determinism
+
+The `x07c` optimizer is deterministic by construction:
+
+- Pass order is fixed (no heuristics or fixed-point iteration).
+- Thresholds are constants (`INLINE_MAX_NODES=12`, `UNROLL_MAX_ITERS=8`).
+- Dead-code elimination removes only unused i32 `let` bindings whose RHS is an effect-free i32 operator tree, avoiding rewrites that could change allocation/borrow/move behavior.
+
 ## Phase G2 scheduler determinism
 
 Phase G2 adds a deterministic, single-thread, cooperative scheduler:

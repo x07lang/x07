@@ -47,6 +47,7 @@ fuzz_target!(|data: &[u8]| {
         arch_root: None,
         emit_main: false,
         freestanding: false,
+        optimize: true,
         contract_mode: compile::ContractMode::RuntimeTrap,
         allow_unsafe: None,
         allow_ffi: None,

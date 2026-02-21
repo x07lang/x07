@@ -52,6 +52,7 @@ fn compile_exe(program: &[u8], module_roots: Vec<PathBuf>) -> PathBuf {
         arch_root: None,
         emit_main: true,
         freestanding: false,
+        optimize: true,
         contract_mode: compile::ContractMode::RuntimeTrap,
         allow_unsafe: None,
         allow_ffi: None,

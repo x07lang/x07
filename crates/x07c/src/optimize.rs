@@ -1,11 +1,30 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::ast::Expr;
 use crate::fingerprint::stable_fingerprint;
+use crate::program::FunctionParam;
+use crate::program::Program;
+use crate::types::Ty;
+use crate::x07ast::ContractClauseAst;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SimpleTy {
+    I32,
+    NonI32,
+}
+
+type LocalTyEnv = BTreeMap<String, SimpleTy>;
 
 fn expr_ident(name: impl Into<String>) -> Expr {
     Expr::Ident {
         name: name.into(),
+        ptr: String::new(),
+    }
+}
+
+fn expr_int(value: i32) -> Expr {
+    Expr::Int {
+        value,
         ptr: String::new(),
     }
 }
@@ -18,9 +37,34 @@ fn expr_list(items: Vec<Expr>) -> Expr {
 }
 
 pub fn optimize_expr(expr: Expr) -> Expr {
+    optimize_expr_with_seed(expr, &LocalTyEnv::new())
+}
+
+pub(crate) fn optimize_expr_with_params(expr: Expr, params: &[FunctionParam]) -> Expr {
+    let seed = seed_env_from_params(params);
+    optimize_expr_with_seed(expr, &seed)
+}
+
+fn seed_env_from_params(params: &[FunctionParam]) -> LocalTyEnv {
+    let mut out: LocalTyEnv = LocalTyEnv::new();
+    for p in params {
+        let ty = match p.ty {
+            Ty::I32 => SimpleTy::I32,
+            _ => SimpleTy::NonI32,
+        };
+        out.insert(p.name.clone(), ty);
+    }
+    out
+}
+
+fn optimize_expr_with_seed(expr: Expr, seed: &LocalTyEnv) -> Expr {
     let expr = const_fold(expr);
+    let expr = strength_reduce(expr);
+    let expr = dce_unused_lets(expr, seed);
+    let expr = unroll_small_fors(expr, seed);
     let expr = cse_pure_subexpressions(expr);
-    licm_bytes_len(expr)
+    let expr = licm_bytes_len(expr);
+    dce_unused_lets(expr, seed)
 }
 
 fn const_fold(expr: Expr) -> Expr {
@@ -60,7 +104,10 @@ fn const_fold(expr: Expr) -> Expr {
                         }
                     }
                 }
-                "+" | "-" | "*" | "/" | "%" | "=" | "<u" | ">=u" if items.len() == 3 => {
+                "+" | "-" | "*" | "/" | "%" | "&" | "|" | "^" | "<<u" | ">>u" | "=" | "!="
+                | "<" | "<=" | ">" | ">=" | "<u" | "<=u" | ">u" | ">=u"
+                    if items.len() == 3 =>
+                {
                     let a = items[1].clone();
                     let b = items[2].clone();
                     match (a, b) {
@@ -83,8 +130,26 @@ fn const_fold(expr: Expr) -> Expr {
                                         ((x as u32) % (y as u32)) as i32
                                     }
                                 }
+                                "&" => ((x as u32) & (y as u32)) as i32,
+                                "|" => ((x as u32) | (y as u32)) as i32,
+                                "^" => ((x as u32) ^ (y as u32)) as i32,
+                                "<<u" => {
+                                    let sh = (y as u32) & 31;
+                                    ((x as u32).wrapping_shl(sh)) as i32
+                                }
+                                ">>u" => {
+                                    let sh = (y as u32) & 31;
+                                    ((x as u32).wrapping_shr(sh)) as i32
+                                }
                                 "=" => (x == y) as i32,
+                                "!=" => (x != y) as i32,
+                                "<" => (x < y) as i32,
+                                "<=" => (x <= y) as i32,
+                                ">" => (x > y) as i32,
+                                ">=" => (x >= y) as i32,
                                 "<u" => ((x as u32) < (y as u32)) as i32,
+                                "<=u" => ((x as u32) <= (y as u32)) as i32,
+                                ">u" => ((x as u32) > (y as u32)) as i32,
                                 ">=u" => ((x as u32) >= (y as u32)) as i32,
                                 _ => unreachable!(),
                             };
@@ -97,6 +162,507 @@ fn const_fold(expr: Expr) -> Expr {
             }
         }
     }
+}
+
+fn strength_reduce(expr: Expr) -> Expr {
+    fn is_u32_power_of_two(v: i32) -> Option<u32> {
+        let u = v as u32;
+        if u == 0 {
+            return None;
+        }
+        if (u & (u - 1)) != 0 {
+            return None;
+        }
+        Some(u.trailing_zeros())
+    }
+
+    fn with_root_ptr(expr: Expr, ptr: &str) -> Expr {
+        match expr {
+            Expr::Int { value, .. } => Expr::Int {
+                value,
+                ptr: ptr.to_string(),
+            },
+            Expr::Ident { name, .. } => Expr::Ident {
+                name,
+                ptr: ptr.to_string(),
+            },
+            Expr::List { items, .. } => Expr::List {
+                items,
+                ptr: ptr.to_string(),
+            },
+        }
+    }
+
+    match expr {
+        Expr::Int { .. } | Expr::Ident { .. } => expr,
+        Expr::List { items, ptr } => {
+            let Some(head) = items.first().and_then(Expr::as_ident) else {
+                return Expr::List {
+                    items: items.into_iter().map(strength_reduce).collect(),
+                    ptr,
+                };
+            };
+
+            if items.len() == 3 && matches!(head, "*" | "/" | "%") {
+                let a = strength_reduce(items[1].clone());
+                let b = strength_reduce(items[2].clone());
+
+                match head {
+                    "*" => {
+                        if let Expr::Int { value: x, .. } = a {
+                            if x == 0 && is_pure(&b) {
+                                return Expr::Int { value: 0, ptr };
+                            } else if x == 1 {
+                                return with_root_ptr(b, &ptr);
+                            } else if let Some(k) = is_u32_power_of_two(x) {
+                                return Expr::List {
+                                    items: vec![expr_ident("<<u"), b, expr_int(k as i32)],
+                                    ptr,
+                                };
+                            }
+                        }
+                        if let Expr::Int { value: y, .. } = b {
+                            if y == 0 && is_pure(&a) {
+                                return Expr::Int { value: 0, ptr };
+                            } else if y == 1 {
+                                return with_root_ptr(a, &ptr);
+                            } else if let Some(k) = is_u32_power_of_two(y) {
+                                return Expr::List {
+                                    items: vec![expr_ident("<<u"), a, expr_int(k as i32)],
+                                    ptr,
+                                };
+                            }
+                        }
+                    }
+                    "/" => {
+                        if let Expr::Int { value: y, .. } = b {
+                            if y == 0 && is_pure(&a) {
+                                return Expr::Int { value: 0, ptr };
+                            } else if y == 1 {
+                                return with_root_ptr(a, &ptr);
+                            } else if let Some(k) = is_u32_power_of_two(y) {
+                                return Expr::List {
+                                    items: vec![expr_ident(">>u"), a, expr_int(k as i32)],
+                                    ptr,
+                                };
+                            }
+                        }
+                        if let Expr::Int { value: x, .. } = a {
+                            if x == 0 && is_pure(&b) {
+                                return Expr::Int { value: 0, ptr };
+                            }
+                        }
+                    }
+                    "%" => {
+                        if let Expr::Int { value: y, .. } = b {
+                            if y == 0 {
+                                return with_root_ptr(a, &ptr);
+                            } else if y == 1 && is_pure(&a) {
+                                return Expr::Int { value: 0, ptr };
+                            } else if y == 1 {
+                                // Do not reduce if it would drop evaluation of `a`.
+                            } else if is_u32_power_of_two(y).is_some() {
+                                let mask = ((y as u32) - 1) as i32;
+                                return Expr::List {
+                                    items: vec![expr_ident("&"), a, expr_int(mask)],
+                                    ptr,
+                                };
+                            }
+                        }
+                        if let Expr::Int { value: x, .. } = a {
+                            if x == 0 && is_pure(&b) {
+                                return Expr::Int { value: 0, ptr };
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                return Expr::List {
+                    items: vec![expr_ident(head), a, b],
+                    ptr,
+                };
+            }
+
+            Expr::List {
+                items: items.into_iter().map(strength_reduce).collect(),
+                ptr,
+            }
+        }
+    }
+}
+
+fn dce_unused_lets(expr: Expr, seed: &LocalTyEnv) -> Expr {
+    fn infer_simple_ty(expr: &Expr, env: &LocalTyEnv) -> Option<SimpleTy> {
+        match expr {
+            Expr::Int { .. } => Some(SimpleTy::I32),
+            Expr::Ident { name, .. } => match env.get(name) {
+                Some(SimpleTy::I32) => Some(SimpleTy::I32),
+                _ => None,
+            },
+            Expr::List { items, .. } => {
+                let head = items.first().and_then(Expr::as_ident)?;
+                if items.len() != 3 {
+                    return None;
+                }
+                if !is_pure_i32_head(head) {
+                    return None;
+                }
+                let a = infer_simple_ty(&items[1], env)?;
+                let b = infer_simple_ty(&items[2], env)?;
+                (a == SimpleTy::I32 && b == SimpleTy::I32).then_some(SimpleTy::I32)
+            }
+        }
+    }
+
+    fn free_vars(expr: &Expr, bound: &mut Vec<BTreeSet<String>>, out: &mut BTreeSet<String>) {
+        match expr {
+            Expr::Int { .. } => {}
+            Expr::Ident { name, .. } => {
+                if bound.iter().rev().any(|s| s.contains(name)) {
+                    return;
+                }
+                out.insert(name.clone());
+            }
+            Expr::List { items, .. } => {
+                let Some(head) = items.first().and_then(Expr::as_ident) else {
+                    for item in items {
+                        free_vars(item, bound, out);
+                    }
+                    return;
+                };
+                let args = &items[1..];
+
+                match head {
+                    "begin" | "unsafe" => {
+                        bound.push(BTreeSet::new());
+                        for a in args {
+                            if let Expr::List {
+                                items: let_items, ..
+                            } = a
+                            {
+                                if let_items.first().and_then(Expr::as_ident) == Some("let")
+                                    && let_items.len() == 3
+                                {
+                                    if let Some(name) = let_items[1].as_ident() {
+                                        free_vars(&let_items[2], bound, out);
+                                        bound.last_mut().expect("scope").insert(name.to_string());
+                                        continue;
+                                    }
+                                }
+                            }
+                            free_vars(a, bound, out);
+                        }
+                        bound.pop();
+                    }
+                    "if" if args.len() == 3 => {
+                        free_vars(&args[0], bound, out);
+                        for branch in [&args[1], &args[2]] {
+                            bound.push(BTreeSet::new());
+                            free_vars(branch, bound, out);
+                            bound.pop();
+                        }
+                    }
+                    "for" if args.len() == 4 => {
+                        free_vars(&args[1], bound, out);
+                        free_vars(&args[2], bound, out);
+                        bound.push(BTreeSet::new());
+                        if let Some(var) = args[0].as_ident() {
+                            bound.last_mut().expect("scope").insert(var.to_string());
+                        }
+                        free_vars(&args[3], bound, out);
+                        bound.pop();
+                    }
+                    "set" if args.len() == 2 => {
+                        if let Some(name) = args[0].as_ident() {
+                            if !bound.iter().rev().any(|s| s.contains(name)) {
+                                out.insert(name.to_string());
+                            }
+                        } else {
+                            free_vars(&args[0], bound, out);
+                        }
+                        free_vars(&args[1], bound, out);
+                    }
+                    "bytes.lit" | "i32.lit" => {
+                        for (idx, a) in args.iter().enumerate() {
+                            if idx == 0 {
+                                continue;
+                            }
+                            free_vars(a, bound, out);
+                        }
+                    }
+                    _ => {
+                        for a in args {
+                            free_vars(a, bound, out);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn go(expr: Expr, env: &LocalTyEnv) -> Expr {
+        match expr {
+            Expr::Int { .. } | Expr::Ident { .. } => expr,
+            Expr::List { items, ptr } => {
+                let Some(head) = items.first().and_then(Expr::as_ident) else {
+                    return Expr::List {
+                        items: items.into_iter().map(|e| go(e, env)).collect(),
+                        ptr,
+                    };
+                };
+                let head = head.to_string();
+                let is_unsafe = head == "unsafe";
+                if matches!(head.as_str(), "begin" | "unsafe") {
+                    let mut env_here: LocalTyEnv = env.clone();
+
+                    let mut exprs: Vec<Expr> = Vec::with_capacity(items.len().saturating_sub(1));
+                    let mut is_safe_let_rhs: Vec<bool> = Vec::with_capacity(exprs.len());
+
+                    for raw in items.into_iter().skip(1) {
+                        let e = go(raw, &env_here);
+                        let mut safe_rhs = false;
+
+                        if let Expr::List {
+                            items: let_items, ..
+                        } = &e
+                        {
+                            if let_items.first().and_then(Expr::as_ident) == Some("let")
+                                && let_items.len() == 3
+                            {
+                                if let Some(name) = let_items[1].as_ident() {
+                                    safe_rhs = infer_simple_ty(&let_items[2], &env_here)
+                                        == Some(SimpleTy::I32);
+                                    let ty = infer_simple_ty(&let_items[2], &env_here)
+                                        .unwrap_or(SimpleTy::NonI32);
+                                    env_here.insert(name.to_string(), ty);
+                                }
+                            }
+                        }
+
+                        exprs.push(e);
+                        is_safe_let_rhs.push(safe_rhs);
+                    }
+
+                    if exprs.is_empty() {
+                        return Expr::List {
+                            items: vec![expr_ident(head.as_str())],
+                            ptr,
+                        };
+                    }
+
+                    let mut live: BTreeSet<String> = BTreeSet::new();
+                    {
+                        let mut bound: Vec<BTreeSet<String>> = Vec::new();
+                        free_vars(exprs.last().expect("non-empty"), &mut bound, &mut live);
+                    }
+
+                    let mut kept: Vec<Expr> = Vec::with_capacity(exprs.len());
+                    for (idx, e) in exprs.into_iter().enumerate().rev() {
+                        let is_tail = idx == is_safe_let_rhs.len() - 1;
+                        if is_tail {
+                            kept.push(e);
+                            continue;
+                        }
+
+                        if let Expr::List {
+                            items: let_items, ..
+                        } = &e
+                        {
+                            if let_items.first().and_then(Expr::as_ident) == Some("let")
+                                && let_items.len() == 3
+                            {
+                                if let Some(name) = let_items[1].as_ident() {
+                                    if !live.contains(name) && is_safe_let_rhs[idx] {
+                                        continue;
+                                    }
+
+                                    live.remove(name);
+                                    let mut bound: Vec<BTreeSet<String>> = Vec::new();
+                                    free_vars(&let_items[2], &mut bound, &mut live);
+                                    kept.push(e);
+                                    continue;
+                                }
+                            }
+                        }
+
+                        let mut bound: Vec<BTreeSet<String>> = Vec::new();
+                        free_vars(&e, &mut bound, &mut live);
+                        kept.push(e);
+                    }
+
+                    kept.reverse();
+
+                    if kept.len() == 1 && !is_unsafe {
+                        return kept.remove(0);
+                    }
+
+                    let mut out = Vec::with_capacity(1 + kept.len());
+                    out.push(expr_ident(head.as_str()));
+                    out.extend(kept);
+                    return Expr::List { items: out, ptr };
+                }
+
+                Expr::List {
+                    items: items.into_iter().map(|e| go(e, env)).collect(),
+                    ptr,
+                }
+            }
+        }
+    }
+
+    go(expr, seed)
+}
+
+fn unroll_small_fors(expr: Expr, seed: &LocalTyEnv) -> Expr {
+    const UNROLL_MAX_ITERS: u32 = 8;
+
+    fn contains_set_to_var(expr: &Expr, var: &str) -> bool {
+        match expr {
+            Expr::Int { .. } | Expr::Ident { .. } => false,
+            Expr::List { items, .. } => {
+                if items.first().and_then(Expr::as_ident) == Some("set")
+                    && items.len() >= 2
+                    && items[1].as_ident() == Some(var)
+                {
+                    return true;
+                }
+                items.iter().any(|e| contains_set_to_var(e, var))
+            }
+        }
+    }
+
+    fn contains_nested_for_var(expr: &Expr, var: &str) -> bool {
+        match expr {
+            Expr::Int { .. } | Expr::Ident { .. } => false,
+            Expr::List { items, .. } => {
+                if items.first().and_then(Expr::as_ident) == Some("for")
+                    && items.len() >= 2
+                    && items[1].as_ident() == Some(var)
+                {
+                    return true;
+                }
+                items.iter().any(|e| contains_nested_for_var(e, var))
+            }
+        }
+    }
+
+    fn go(expr: Expr, env: &LocalTyEnv) -> Expr {
+        match expr {
+            Expr::Int { .. } | Expr::Ident { .. } => expr,
+            Expr::List { items, ptr } => {
+                let Some(head) = items.first().and_then(Expr::as_ident) else {
+                    return Expr::List {
+                        items: items.into_iter().map(|e| go(e, env)).collect(),
+                        ptr,
+                    };
+                };
+
+                if matches!(head, "begin" | "unsafe") {
+                    let mut env_here = env.clone();
+                    let items_len = items.len();
+                    let mut it = items.into_iter();
+                    let mut out: Vec<Expr> = Vec::with_capacity(items_len);
+                    out.push(it.next().expect("non-empty"));
+                    for raw in it {
+                        let e = go(raw, &env_here);
+                        if let Expr::List {
+                            items: let_items, ..
+                        } = &e
+                        {
+                            if let_items.first().and_then(Expr::as_ident) == Some("let")
+                                && let_items.len() == 3
+                            {
+                                if let Some(name) = let_items[1].as_ident() {
+                                    env_here.insert(name.to_string(), SimpleTy::NonI32);
+                                }
+                            }
+                        }
+                        out.push(e);
+                    }
+                    return Expr::List { items: out, ptr };
+                }
+
+                if head == "for" && items.len() == 5 {
+                    let Some(var) = items[1].as_ident() else {
+                        return Expr::List {
+                            items: items.into_iter().map(|e| go(e, env)).collect(),
+                            ptr,
+                        };
+                    };
+
+                    let start = go(items[2].clone(), env);
+                    let end = go(items[3].clone(), env);
+
+                    let mut body_env = env.clone();
+                    body_env.insert(var.to_string(), SimpleTy::I32);
+                    let body = go(items[4].clone(), &body_env);
+
+                    let (Expr::Int { value: s_i32, .. }, Expr::Int { value: e_i32, .. }) =
+                        (&start, &end)
+                    else {
+                        return Expr::List {
+                            items: vec![expr_ident("for"), expr_ident(var), start, end, body],
+                            ptr,
+                        };
+                    };
+
+                    if contains_set_to_var(&body, var) || contains_nested_for_var(&body, var) {
+                        return Expr::List {
+                            items: vec![expr_ident("for"), expr_ident(var), start, end, body],
+                            ptr,
+                        };
+                    }
+
+                    let s = *s_i32 as u32;
+                    let e = *e_i32 as u32;
+                    let iters = e.saturating_sub(s);
+                    if iters > UNROLL_MAX_ITERS {
+                        return Expr::List {
+                            items: vec![expr_ident("for"), expr_ident(var), start, end, body],
+                            ptr,
+                        };
+                    }
+
+                    let init_head = if env.contains_key(var) { "set" } else { "let" };
+
+                    let mut out: Vec<Expr> = Vec::new();
+                    out.push(expr_ident("begin"));
+                    out.push(expr_list(vec![
+                        expr_ident(init_head),
+                        expr_ident(var),
+                        start,
+                    ]));
+
+                    for idx in 0..iters {
+                        out.push(expr_list(vec![
+                            expr_ident("begin"),
+                            body.clone(),
+                            expr_int(0),
+                        ]));
+                        if idx + 1 < iters {
+                            out.push(expr_list(vec![
+                                expr_ident("set"),
+                                expr_ident(var),
+                                expr_list(vec![expr_ident("+"), expr_ident(var), expr_int(1)]),
+                            ]));
+                        }
+                    }
+
+                    out.push(expr_int(0));
+
+                    return Expr::List { items: out, ptr };
+                }
+
+                Expr::List {
+                    items: items.into_iter().map(|e| go(e, env)).collect(),
+                    ptr,
+                }
+            }
+        }
+    }
+
+    go(expr, seed)
 }
 
 fn licm_bytes_len(expr: Expr) -> Expr {
@@ -397,14 +963,34 @@ fn is_pure(expr: &Expr) -> bool {
             let Some(head) = items.first().and_then(Expr::as_ident) else {
                 return false;
             };
-            match head {
-                "+" | "-" | "*" | "=" | "<u" | ">=u" => {
-                    items.len() == 3 && items[1..].iter().all(is_pure)
-                }
-                _ => false,
-            }
+            is_pure_i32_head(head) && items.len() == 3 && items[1..].iter().all(is_pure)
         }
     }
+}
+
+fn is_pure_i32_head(head: &str) -> bool {
+    matches!(
+        head,
+        "+" | "-"
+            | "*"
+            | "/"
+            | "%"
+            | "&"
+            | "|"
+            | "^"
+            | "<<u"
+            | ">>u"
+            | "="
+            | "!="
+            | "<"
+            | "<="
+            | ">"
+            | ">="
+            | "<u"
+            | "<=u"
+            | ">u"
+            | ">=u"
+    )
 }
 
 fn collect_idents(expr: &Expr, out: &mut BTreeSet<String>) {
@@ -432,18 +1018,281 @@ fn fresh_name(used: &mut BTreeSet<String>, prefix: &str) -> String {
     }
 }
 
+pub(crate) fn inline_called_once_i32_pure(program: &mut Program) {
+    const INLINE_MAX_NODES: usize = 12;
+
+    fn module_id_of_fn(name: &str) -> &str {
+        name.rsplit_once('.').map(|(m, _)| m).unwrap_or("")
+    }
+
+    fn is_inline_body_expr(expr: &Expr, params: &BTreeSet<String>) -> bool {
+        match expr {
+            Expr::Int { .. } => true,
+            Expr::Ident { name, .. } => params.contains(name),
+            Expr::List { items, .. } => {
+                let Some(head) = items.first().and_then(Expr::as_ident) else {
+                    return false;
+                };
+                is_pure_i32_head(head)
+                    && items.len() == 3
+                    && is_inline_body_expr(&items[1], params)
+                    && is_inline_body_expr(&items[2], params)
+            }
+        }
+    }
+
+    fn collect_call_heads(expr: &Expr, out: &mut BTreeMap<String, usize>) {
+        match expr {
+            Expr::Int { .. } | Expr::Ident { .. } => {}
+            Expr::List { items, .. } => {
+                if let Some(head) = items.first().and_then(Expr::as_ident) {
+                    *out.entry(head.to_string()).or_insert(0) += 1;
+                }
+                for it in items {
+                    collect_call_heads(it, out);
+                }
+            }
+        }
+    }
+
+    fn collect_call_heads_in_contracts(
+        clauses: &[ContractClauseAst],
+        out: &mut BTreeMap<String, usize>,
+    ) {
+        for clause in clauses {
+            collect_call_heads(&clause.expr, out);
+            for w in &clause.witness {
+                collect_call_heads(w, out);
+            }
+        }
+    }
+
+    fn substitute_idents(expr: Expr, mapping: &HashMap<String, String>) -> Expr {
+        match expr {
+            Expr::Int { .. } => expr,
+            Expr::Ident { name, ptr } => {
+                if let Some(dst) = mapping.get(&name) {
+                    Expr::Ident {
+                        name: dst.clone(),
+                        ptr,
+                    }
+                } else {
+                    Expr::Ident { name, ptr }
+                }
+            }
+            Expr::List { items, ptr } => Expr::List {
+                items: items
+                    .into_iter()
+                    .map(|e| substitute_idents(e, mapping))
+                    .collect(),
+                ptr,
+            },
+        }
+    }
+
+    struct InlineCand {
+        module_id: String,
+        param_names: Vec<String>,
+        body: Expr,
+    }
+
+    let mut candidates: BTreeMap<String, InlineCand> = BTreeMap::new();
+    for f in &program.functions {
+        if !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty() {
+            continue;
+        }
+        if f.ret_ty != Ty::I32 {
+            continue;
+        }
+        if f.params.iter().any(|p| p.ty != Ty::I32) {
+            continue;
+        }
+        if f.body.node_count() > INLINE_MAX_NODES {
+            continue;
+        }
+        let params: BTreeSet<String> = f.params.iter().map(|p| p.name.clone()).collect();
+        if !is_inline_body_expr(&f.body, &params) {
+            continue;
+        }
+        candidates.insert(
+            f.name.clone(),
+            InlineCand {
+                module_id: module_id_of_fn(&f.name).to_string(),
+                param_names: f.params.iter().map(|p| p.name.clone()).collect(),
+                body: f.body.clone(),
+            },
+        );
+    }
+    if candidates.is_empty() {
+        return;
+    }
+
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    collect_call_heads(&program.solve, &mut counts);
+    for f in &program.functions {
+        collect_call_heads(&f.body, &mut counts);
+        collect_call_heads_in_contracts(&f.requires, &mut counts);
+        collect_call_heads_in_contracts(&f.ensures, &mut counts);
+        collect_call_heads_in_contracts(&f.invariant, &mut counts);
+    }
+    for f in &program.async_functions {
+        collect_call_heads(&f.body, &mut counts);
+        collect_call_heads_in_contracts(&f.requires, &mut counts);
+        collect_call_heads_in_contracts(&f.ensures, &mut counts);
+        collect_call_heads_in_contracts(&f.invariant, &mut counts);
+    }
+
+    let mut to_inline: BTreeSet<String> = BTreeSet::new();
+    for name in candidates.keys() {
+        if counts.get(name).copied().unwrap_or(0) == 1 {
+            to_inline.insert(name.clone());
+        }
+    }
+    if to_inline.is_empty() {
+        return;
+    }
+
+    fn rewrite_expr(
+        expr: Expr,
+        caller_module: &str,
+        cands: &BTreeMap<String, InlineCand>,
+        remaining: &mut BTreeSet<String>,
+    ) -> Expr {
+        match expr {
+            Expr::Int { .. } | Expr::Ident { .. } => expr,
+            Expr::List { items, ptr } => {
+                let Some(head) = items.first().and_then(Expr::as_ident) else {
+                    return Expr::List {
+                        items: items
+                            .into_iter()
+                            .map(|e| rewrite_expr(e, caller_module, cands, remaining))
+                            .collect(),
+                        ptr,
+                    };
+                };
+
+                if remaining.contains(head) {
+                    let Some(cand) = cands.get(head) else {
+                        return Expr::List { items, ptr };
+                    };
+                    if cand.module_id != caller_module {
+                        // Same-module only.
+                    } else if items.len() == 1 + cand.param_names.len() {
+                        let mut used: BTreeSet<String> = BTreeSet::new();
+                        collect_idents(
+                            &Expr::List {
+                                items: items.clone(),
+                                ptr: String::new(),
+                            },
+                            &mut used,
+                        );
+
+                        let mut mapping: HashMap<String, String> =
+                            HashMap::with_capacity(cand.param_names.len());
+                        let mut lets: Vec<Expr> = Vec::with_capacity(cand.param_names.len());
+
+                        for (idx, param) in cand.param_names.iter().enumerate() {
+                            let tmp = fresh_name(&mut used, "__x07_inl");
+                            mapping.insert(param.clone(), tmp.clone());
+                            lets.push(expr_list(vec![
+                                expr_ident("let"),
+                                expr_ident(tmp),
+                                rewrite_expr(
+                                    items[1 + idx].clone(),
+                                    caller_module,
+                                    cands,
+                                    remaining,
+                                ),
+                            ]));
+                        }
+
+                        let body = substitute_idents(cand.body.clone(), &mapping);
+
+                        let mut out = Vec::with_capacity(2 + lets.len());
+                        out.push(expr_ident("begin"));
+                        out.extend(lets);
+                        out.push(body);
+
+                        remaining.remove(head);
+                        return Expr::List { items: out, ptr };
+                    }
+                }
+
+                Expr::List {
+                    items: items
+                        .into_iter()
+                        .map(|e| rewrite_expr(e, caller_module, cands, remaining))
+                        .collect(),
+                    ptr,
+                }
+            }
+        }
+    }
+
+    fn rewrite_contracts(
+        clauses: &mut [ContractClauseAst],
+        caller_module: &str,
+        cands: &BTreeMap<String, InlineCand>,
+        remaining: &mut BTreeSet<String>,
+    ) {
+        for clause in clauses {
+            clause.expr = rewrite_expr(clause.expr.clone(), caller_module, cands, remaining);
+            let witness = std::mem::take(&mut clause.witness);
+            clause.witness = witness
+                .into_iter()
+                .map(|e| rewrite_expr(e, caller_module, cands, remaining))
+                .collect();
+        }
+    }
+
+    let mut remaining = to_inline.clone();
+    program.solve = rewrite_expr(program.solve.clone(), "main", &candidates, &mut remaining);
+    for f in &mut program.functions {
+        let caller_module = module_id_of_fn(&f.name).to_string();
+        f.body = rewrite_expr(f.body.clone(), &caller_module, &candidates, &mut remaining);
+        rewrite_contracts(&mut f.requires, &caller_module, &candidates, &mut remaining);
+        rewrite_contracts(&mut f.ensures, &caller_module, &candidates, &mut remaining);
+        rewrite_contracts(
+            &mut f.invariant,
+            &caller_module,
+            &candidates,
+            &mut remaining,
+        );
+    }
+    for f in &mut program.async_functions {
+        let caller_module = module_id_of_fn(&f.name).to_string();
+        f.body = rewrite_expr(f.body.clone(), &caller_module, &candidates, &mut remaining);
+        rewrite_contracts(&mut f.requires, &caller_module, &candidates, &mut remaining);
+        rewrite_contracts(&mut f.ensures, &caller_module, &candidates, &mut remaining);
+        rewrite_contracts(
+            &mut f.invariant,
+            &caller_module,
+            &candidates,
+            &mut remaining,
+        );
+    }
+
+    let inlined: BTreeSet<String> = to_inline.difference(&remaining).cloned().collect();
+
+    if inlined.is_empty() {
+        return;
+    }
+
+    program.functions.retain(|f| !inlined.contains(&f.name));
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ast::Expr;
+    use crate::program::{FunctionDef, FunctionParam, Program};
+    use crate::types::Ty;
+    use crate::x07ast::ContractClauseAst;
 
-    use super::{const_fold, cse_pure_subexpressions, expr_ident, expr_list, licm_bytes_len};
-
-    fn expr_int(value: i32) -> Expr {
-        Expr::Int {
-            value,
-            ptr: String::new(),
-        }
-    }
+    use super::{
+        const_fold, cse_pure_subexpressions, dce_unused_lets, expr_ident, expr_int, expr_list,
+        inline_called_once_i32_pure, licm_bytes_len, strength_reduce, unroll_small_fors,
+        LocalTyEnv, SimpleTy,
+    };
 
     fn contains_call_head(expr: &Expr, head: &str) -> bool {
         match expr {
@@ -470,6 +1319,40 @@ mod tests {
         // REGRESSION: x07.rfc.backlog.unit-tests@0.1.0
         let expr = expr_list(vec![expr_ident("+"), expr_ident("x"), expr_int(1)]);
         let out = const_fold(expr.clone());
+        assert_eq!(out, expr);
+    }
+
+    #[test]
+    fn dce_positive_removes_unused_let_i32() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let expr = expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident("t"),
+                expr_list(vec![expr_ident("+"), expr_ident("x"), expr_int(1)]),
+            ]),
+            expr_int(0),
+        ]);
+        let mut seed = LocalTyEnv::new();
+        seed.insert("x".to_string(), SimpleTy::I32);
+        let out = dce_unused_lets(expr, &seed);
+        assert_eq!(out, expr_int(0));
+    }
+
+    #[test]
+    fn dce_regression_does_not_remove_non_i32_let() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let expr = expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![
+                expr_ident("let"),
+                expr_ident("t"),
+                expr_list(vec![expr_ident("bytes.alloc"), expr_int(1)]),
+            ]),
+            expr_int(0),
+        ]);
+        let out = dce_unused_lets(expr.clone(), &LocalTyEnv::new());
         assert_eq!(out, expr);
     }
 
@@ -518,6 +1401,151 @@ mod tests {
         let expr = expr_list(vec![expr_ident("begin"), call.clone(), call]);
         let out = cse_pure_subexpressions(expr.clone());
         assert_eq!(out, expr);
+    }
+
+    #[test]
+    fn strength_reduce_positive_pow2_ops() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let mul = expr_list(vec![expr_ident("*"), expr_ident("x"), expr_int(8)]);
+        assert_eq!(
+            strength_reduce(mul),
+            expr_list(vec![expr_ident("<<u"), expr_ident("x"), expr_int(3)])
+        );
+
+        let div = expr_list(vec![expr_ident("/"), expr_ident("x"), expr_int(8)]);
+        assert_eq!(
+            strength_reduce(div),
+            expr_list(vec![expr_ident(">>u"), expr_ident("x"), expr_int(3)])
+        );
+
+        let rem = expr_list(vec![expr_ident("%"), expr_ident("x"), expr_int(8)]);
+        assert_eq!(
+            strength_reduce(rem),
+            expr_list(vec![expr_ident("&"), expr_ident("x"), expr_int(7)])
+        );
+    }
+
+    #[test]
+    fn strength_reduce_regression_does_not_touch_non_pow2() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let mul = expr_list(vec![expr_ident("*"), expr_ident("x"), expr_int(7)]);
+        assert_eq!(strength_reduce(mul.clone()), mul);
+
+        let div = expr_list(vec![expr_ident("/"), expr_ident("x"), expr_int(3)]);
+        assert_eq!(strength_reduce(div.clone()), div);
+
+        let rem = expr_list(vec![expr_ident("%"), expr_ident("x"), expr_int(3)]);
+        assert_eq!(strength_reduce(rem.clone()), rem);
+    }
+
+    #[test]
+    fn inline_positive_called_once_pure_i32_is_inlined_and_removed() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let mut program = Program {
+            functions: vec![FunctionDef {
+                name: "main.inc".to_string(),
+                requires: Vec::new(),
+                ensures: Vec::new(),
+                invariant: Vec::new(),
+                params: vec![FunctionParam {
+                    name: "x".to_string(),
+                    ty: Ty::I32,
+                    brand: None,
+                }],
+                ret_ty: Ty::I32,
+                ret_brand: None,
+                body: expr_list(vec![expr_ident("+"), expr_ident("x"), expr_int(1)]),
+            }],
+            async_functions: Vec::new(),
+            extern_functions: Vec::new(),
+            solve: expr_list(vec![expr_ident("main.inc"), expr_int(7)]),
+        };
+
+        inline_called_once_i32_pure(&mut program);
+
+        assert!(program.functions.is_empty(), "expected helper removed");
+        assert_eq!(
+            program.solve,
+            expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![
+                    expr_ident("let"),
+                    expr_ident("__x07_inl0"),
+                    expr_int(7),
+                ]),
+                expr_list(vec![expr_ident("+"), expr_ident("__x07_inl0"), expr_int(1),]),
+            ])
+        );
+    }
+
+    #[test]
+    fn inline_regression_called_twice_is_not_inlined() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let inc = FunctionDef {
+            name: "main.inc".to_string(),
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            invariant: Vec::new(),
+            params: vec![FunctionParam {
+                name: "x".to_string(),
+                ty: Ty::I32,
+                brand: None,
+            }],
+            ret_ty: Ty::I32,
+            ret_brand: None,
+            body: expr_list(vec![expr_ident("+"), expr_ident("x"), expr_int(1)]),
+        };
+        let solve = expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![expr_ident("main.inc"), expr_int(1)]),
+            expr_list(vec![expr_ident("main.inc"), expr_int(2)]),
+        ]);
+        let mut program = Program {
+            functions: vec![inc],
+            async_functions: Vec::new(),
+            extern_functions: Vec::new(),
+            solve: solve.clone(),
+        };
+
+        inline_called_once_i32_pure(&mut program);
+
+        assert_eq!(program.functions.len(), 1);
+        assert_eq!(program.solve, solve);
+    }
+
+    #[test]
+    fn inline_regression_contracts_prevent_inlining() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let inc = FunctionDef {
+            name: "main.inc".to_string(),
+            requires: vec![ContractClauseAst {
+                id: Some("r0".to_string()),
+                expr: expr_int(1),
+                witness: Vec::new(),
+            }],
+            ensures: Vec::new(),
+            invariant: Vec::new(),
+            params: vec![FunctionParam {
+                name: "x".to_string(),
+                ty: Ty::I32,
+                brand: None,
+            }],
+            ret_ty: Ty::I32,
+            ret_brand: None,
+            body: expr_list(vec![expr_ident("+"), expr_ident("x"), expr_int(1)]),
+        };
+        let solve = expr_list(vec![expr_ident("main.inc"), expr_int(7)]);
+        let mut program = Program {
+            functions: vec![inc],
+            async_functions: Vec::new(),
+            extern_functions: Vec::new(),
+            solve: solve.clone(),
+        };
+
+        inline_called_once_i32_pure(&mut program);
+
+        assert_eq!(program.functions.len(), 1);
+        assert_eq!(program.solve, solve);
     }
 
     #[test]
@@ -585,5 +1613,105 @@ mod tests {
 
         let out = licm_bytes_len(expr.clone());
         assert_eq!(out, expr);
+    }
+
+    #[test]
+    fn unroll_positive_small_const_range_unrolls() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let body = expr_list(vec![
+            expr_ident("set"),
+            expr_ident("sum"),
+            expr_list(vec![expr_ident("+"), expr_ident("sum"), expr_ident("i")]),
+        ]);
+        let expr = expr_list(vec![
+            expr_ident("for"),
+            expr_ident("i"),
+            expr_int(0),
+            expr_int(4),
+            body.clone(),
+        ]);
+
+        let out = unroll_small_fors(expr, &LocalTyEnv::new());
+
+        let inc = expr_list(vec![
+            expr_ident("set"),
+            expr_ident("i"),
+            expr_list(vec![expr_ident("+"), expr_ident("i"), expr_int(1)]),
+        ]);
+        assert_eq!(
+            out,
+            expr_list(vec![
+                expr_ident("begin"),
+                expr_list(vec![expr_ident("let"), expr_ident("i"), expr_int(0)]),
+                expr_list(vec![expr_ident("begin"), body.clone(), expr_int(0)]),
+                inc.clone(),
+                expr_list(vec![expr_ident("begin"), body.clone(), expr_int(0)]),
+                inc.clone(),
+                expr_list(vec![expr_ident("begin"), body.clone(), expr_int(0)]),
+                inc,
+                expr_list(vec![expr_ident("begin"), body, expr_int(0)]),
+                expr_int(0),
+            ])
+        );
+    }
+
+    #[test]
+    fn unroll_regression_large_range_is_not_unrolled() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let expr = expr_list(vec![
+            expr_ident("for"),
+            expr_ident("i"),
+            expr_int(0),
+            expr_int(9),
+            expr_int(0),
+        ]);
+        let out = unroll_small_fors(expr.clone(), &LocalTyEnv::new());
+        assert_eq!(out, expr);
+    }
+
+    #[test]
+    fn unroll_regression_body_assigns_loop_var_is_not_unrolled() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let expr = expr_list(vec![
+            expr_ident("for"),
+            expr_ident("i"),
+            expr_int(0),
+            expr_int(4),
+            expr_list(vec![expr_ident("set"), expr_ident("i"), expr_int(0)]),
+        ]);
+        let out = unroll_small_fors(expr.clone(), &LocalTyEnv::new());
+        assert_eq!(out, expr);
+    }
+
+    #[test]
+    fn unroll_regression_uses_set_when_loop_var_already_bound() {
+        // REGRESSION: x07.rfc.backlog.optimizer@0.1.0
+        let expr = expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![expr_ident("let"), expr_ident("i"), expr_int(99)]),
+            expr_list(vec![
+                expr_ident("for"),
+                expr_ident("i"),
+                expr_int(0),
+                expr_int(2),
+                expr_int(0),
+            ]),
+            expr_ident("i"),
+        ]);
+        let out = unroll_small_fors(expr, &LocalTyEnv::new());
+
+        let Expr::List { items, .. } = out else {
+            panic!("expected outer begin");
+        };
+        let Expr::List {
+            items: unrolled, ..
+        } = &items[2]
+        else {
+            panic!("expected unrolled loop");
+        };
+        let Expr::List { items: init, .. } = &unrolled[1] else {
+            panic!("expected init");
+        };
+        assert_eq!(init[0].as_ident(), Some("set"));
     }
 }

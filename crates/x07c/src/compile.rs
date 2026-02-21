@@ -35,6 +35,7 @@ pub struct CompileOptions {
     pub arch_root: Option<std::path::PathBuf>,
     pub emit_main: bool,
     pub freestanding: bool,
+    pub optimize: bool,
     pub contract_mode: ContractMode,
     pub allow_unsafe: Option<bool>,
     pub allow_ffi: Option<bool>,
@@ -51,6 +52,7 @@ impl Default for CompileOptions {
             arch_root: None,
             emit_main: true,
             freestanding: false,
+            optimize: true,
             contract_mode: ContractMode::default(),
             allow_unsafe: None,
             allow_ffi: None,
@@ -150,19 +152,28 @@ pub fn compile_program_to_c_with_meta(
         mut fuel_used,
     } = compile_frontend(program, options)?;
 
-    // Optimize solve expression.
-    parsed_program.solve = optimize::optimize_expr(parsed_program.solve);
-    fuel_used = fuel_used.saturating_add(parsed_program.solve.node_count() as u64);
+    if options.optimize {
+        optimize::inline_called_once_i32_pure(&mut parsed_program);
 
-    // Optimize function bodies.
-    for f in &mut parsed_program.functions {
-        f.body = optimize::optimize_expr(f.body.clone());
-        fuel_used = fuel_used.saturating_add(f.body.node_count() as u64);
+        // Optimize solve expression.
+        parsed_program.solve = optimize::optimize_expr(parsed_program.solve);
+
+        // Optimize function bodies.
+        for f in &mut parsed_program.functions {
+            f.body = optimize::optimize_expr_with_params(f.body.clone(), &f.params);
+        }
+
+        // Optimize async function bodies.
+        for f in &mut parsed_program.async_functions {
+            f.body = optimize::optimize_expr_with_params(f.body.clone(), &f.params);
+        }
     }
 
-    // Optimize async function bodies.
-    for f in &mut parsed_program.async_functions {
-        f.body = optimize::optimize_expr(f.body.clone());
+    fuel_used = fuel_used.saturating_add(parsed_program.solve.node_count() as u64);
+    for f in &parsed_program.functions {
+        fuel_used = fuel_used.saturating_add(f.body.node_count() as u64);
+    }
+    for f in &parsed_program.async_functions {
         fuel_used = fuel_used.saturating_add(f.body.node_count() as u64);
     }
 
