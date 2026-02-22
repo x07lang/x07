@@ -25,6 +25,19 @@ Phase 6 adds:
 - resumable SSE outbox behavior (bounded buffering + `Last-Event-ID`)
 - golden RR transcript fixture for tasks progress (`hello_tasks_progress`)
 
+Phase 7 adds:
+
+- `notifications/message` logging + `logging/setLevel`
+- audit sink wiring (JSONL) and metrics export plumbing
+- RR fixtures that capture and replay router/worker OOB signals deterministically
+
+Phase 8 adds:
+
+- OAuth2 Resource Server enforcement on HTTP `POST /mcp` (401/403 + correct `WWW-Authenticate`)
+- RFC9728 Protected Resource Metadata (PRM) at the insertion URL (and optional root alias)
+- strict Streamable HTTP headers (Origin / Accept / MCP-Protocol-Version) with empty-body HTTP failures
+- HTTP record/replay sanitization hardened at the cassette boundary (auth/cookie redaction + fail-closed)
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:
@@ -46,8 +59,9 @@ x07 test --manifest tests/tests.json
 The HTTP template includes:
 
 - `config/mcp.server.json` (`x07.mcp.server_config@0.2.0`)
+- `config/mcp.server.dev.json` (no-auth dev config)
 - `config/mcp.tools.json` (`x07.mcp.tools_manifest@0.2.0`)
-- `config/mcp.oauth.json` (`x07.mcp.oauth@0.1.0`, with deterministic `test_static` dev tokens)
+- `config/mcp.oauth.json` (`x07.mcp.oauth@0.2.0`, with deterministic `test_static` dev tokens)
 - deterministic HTTP replay fixtures under `tests/.x07_rr/sessions/`
 
 ## HTTP Tasks template quickstart
@@ -62,7 +76,9 @@ x07 test --manifest tests/tests.json
 The HTTP Tasks template includes:
 
 - `mcp.server.json` (`x07.mcp.server_config@0.3.0`)
+- `mcp.server.dev.json` (no-auth dev config)
 - `mcp.server.sqlite.json` (sqlite store example + restart behavior smoke test)
+- `mcp.oauth.json` (`x07.mcp.oauth@0.2.0`, with deterministic `test_static` dev tokens)
 - `mcp.tools.json` (`x07.mcp.tools_manifest@0.2.0`, including `execution.taskSupport`)
 - RR transcript fixtures under `tests/fixtures/rr/`
 

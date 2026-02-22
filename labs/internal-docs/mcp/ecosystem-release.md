@@ -43,6 +43,34 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
   - `hello_tasks_progress` replay fixture is enforced in CI
   - replay fails if progress continues after terminal
 
+## Phase 7 verification checks
+
+- Logging semantics:
+  - `logging/setLevel` clamps + rejects invalid params deterministically
+  - `notifications/message` emission is redacted, rate-limited, and replay-stable
+- Observability outputs:
+  - audit sink emits deterministic JSONL sidecars when enabled
+  - metrics snapshot/export wiring is exercised in kit tests (when enabled)
+
+## Phase 8 verification checks
+
+- PRM (RFC9728):
+  - insertion URL is served (derived from configured `oauth.resource`)
+  - root alias is served only when `serve_root_alias=true`
+  - response is `200` with `Content-Type: application/json` and `resource` matches config
+- OAuth RS enforcement on `POST /mcp`:
+  - `?access_token=...` is rejected with `400` (empty body)
+  - missing Authorization returns `401` + `WWW-Authenticate` (resource metadata URL + scope)
+  - insufficient scope returns `403` + `WWW-Authenticate ... error=\"insufficient_scope\"`
+- Strict Streamable HTTP headers:
+  - invalid Origin returns `403`
+  - invalid/missing Accept returns `400`
+  - invalid protocol version returns `400`
+  - HTTP-level failures have empty bodies (status + headers only)
+- RR sanitizer boundary:
+  - redacts Authorization / Proxy-Authorization / Cookie / Set-Cookie
+  - fails closed if token-like patterns survive sanitization
+
 ## Release checklist
 
 1. Run `x07-mcp` checks (`./scripts/ci/check_all.sh` and reference server suites).
