@@ -2831,6 +2831,58 @@ fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::from(20));
     }
 
+    // Best-effort publish verification: check the registry API for the just-published version.
+    //
+    // This is intentionally non-fatal because the sparse index (and sometimes API frontends)
+    // may take a short time to reflect the latest publish.
+    if matches!(client.api_root().scheme(), "http" | "https") {
+        if let Ok(detail_url) = client.api_root().join(&format!("packages/{name}")) {
+            match x07_pkg::http_get_bytes(&detail_url, token.as_deref()) {
+                Ok(bytes) => match serde_json::from_slice::<serde_json::Value>(&bytes) {
+                    Ok(v) => {
+                        let has_version = v
+                            .get("versions")
+                            .and_then(|vv| vv.as_array())
+                            .is_some_and(|vs| {
+                                vs.iter().any(|row| {
+                                    row.get("version")
+                                        .and_then(|s| s.as_str())
+                                        .is_some_and(|s| s == version)
+                                })
+                            });
+                        if !has_version {
+                            eprintln!(
+                                "warning: publish verified upload ok, but registry API did not yet list {name}@{version} at {}",
+                                detail_url.as_str()
+                            );
+                            eprintln!(
+                                "warning: sparse index reads (x07 pkg versions) may be cached; retry API verification via GET /v1/packages/<name>."
+                            );
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "warning: publish verified upload ok, but failed to parse registry API response at {}: {err}",
+                            detail_url.as_str()
+                        );
+                        eprintln!(
+                            "warning: sparse index reads (x07 pkg versions) may be cached; retry API verification via GET /v1/packages/<name>."
+                        );
+                    }
+                },
+                Err(err) => {
+                    eprintln!(
+                        "warning: publish verified upload ok, but failed to fetch registry API {}: {err:#}",
+                        detail_url.as_str()
+                    );
+                    eprintln!(
+                        "warning: sparse index reads (x07 pkg versions) may be cached; retry API verification via GET /v1/packages/<name>."
+                    );
+                }
+            }
+        }
+    }
+
     let report = PkgReport {
         ok: true,
         command: "pkg.publish",

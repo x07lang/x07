@@ -250,6 +250,7 @@ impl<'a> InferState<'a> {
                     "begin" | "unsafe" => self.infer_begin(list_ptr, items, want),
                     "let" => self.infer_let(list_ptr, items),
                     "set" => self.infer_set(list_ptr, items),
+                    "set0" => self.infer_set0(list_ptr, items),
                     "if" => self.infer_if(list_ptr, items, want),
                     "for" => self.infer_for(list_ptr, items),
                     "return" => self.infer_return(list_ptr, items),
@@ -336,6 +337,40 @@ impl<'a> InferState<'a> {
             brand: var.brand,
             view_full: var.view_full,
         }
+    }
+
+    fn infer_set0(&mut self, list_ptr: &str, items: &[Expr]) -> TyInfoTerm {
+        if items.len() != 3 {
+            return TyInfoTerm::unbranded(self.fresh_meta());
+        }
+        let Some(name) = items.get(1).and_then(Expr::as_ident) else {
+            return TyInfoTerm::unbranded(self.fresh_meta());
+        };
+        let Some(var) = self.lookup(name) else {
+            self.diagnostics.push(Diagnostic {
+                code: "X07-TYPE-SET-0001".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Type,
+                message: format!("set0 of unknown local: {name:?}"),
+                loc: Some(Location::X07Ast {
+                    ptr: list_ptr.to_string(),
+                }),
+                notes: Vec::new(),
+                related: Vec::new(),
+                data: BTreeMap::from([("local".to_string(), Value::String(name.to_string()))]),
+                quickfix: None,
+            });
+            let _ = self.infer_expr(&items[2], None);
+            return TyInfoTerm::unbranded(self.fresh_meta());
+        };
+        self.check_expr(
+            &items[2],
+            &var.ty,
+            ConstraintOrigin::SetAssign {
+                name: name.to_string(),
+            },
+        );
+        TyInfoTerm::unbranded(TyTerm::Named("i32".to_string()))
     }
 
     fn infer_if(&mut self, list_ptr: &str, items: &[Expr], want: Option<&TyTerm>) -> TyInfoTerm {
@@ -1588,7 +1623,7 @@ fn contract_collect_binding_ptrs(expr: &Expr, out: &mut Vec<(String, String)>) {
                 contract_collect_binding_ptrs(item, out);
             }
         }
-        "begin" | "if" | "unsafe" | "return" | "try" | "tapp" | "set" => {
+        "begin" | "if" | "unsafe" | "return" | "try" | "tapp" | "set" | "set0" => {
             for item in items.iter().skip(1) {
                 contract_collect_binding_ptrs(item, out);
             }
@@ -1707,7 +1742,7 @@ fn contract_collect_impurity(expr: &Expr, out: &mut Vec<(String, String)>) {
                 contract_collect_impurity(item, out);
             }
         }
-        "unsafe" | "set" | "for" | "return" | "try" => {
+        "unsafe" | "set" | "set0" | "for" | "return" | "try" => {
             out.push((
                 list_ptr.clone(),
                 format!("contract expression is not pure: disallowed form {head:?}"),
@@ -2305,6 +2340,32 @@ mod tests {
         assert_eq!(
             diag.data.get("got"),
             Some(&Value::String("bytes".to_string()))
+        );
+    }
+
+    #[test]
+    fn typecheck_set0_unifies_if_branches_as_i32() {
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["begin",
+                ["let", "b", ["bytes.alloc", 0]],
+                ["if", 1, ["set0", "b", ["bytes.alloc", 1]], 0],
+                "b"
+            ],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let mut file = parse_x07ast_json(&bytes).expect("parse x07AST");
+        canonicalize_x07ast_file(&mut file);
+
+        let report = typecheck_file_local(&file, &TypecheckOptions::default());
+        assert!(
+            report.diagnostics.is_empty(),
+            "unexpected diags: {:?}",
+            report.diagnostics
         );
     }
 }

@@ -280,6 +280,7 @@ impl<'a> Emitter<'a> {
                     }
                     "let" => self.emit_let_stmt(args),
                     "set" => self.emit_set_stmt(args),
+                    "set0" => self.emit_set_stmt(args),
                     "for" => {
                         let tmp = self.alloc_local("t_i32_")?;
                         self.decl_local(Ty::I32, &tmp);
@@ -578,6 +579,7 @@ impl<'a> Emitter<'a> {
             "begin" => self.emit_begin_to(args, dest_ty, dest),
             "let" => self.emit_let_to(args, dest_ty, dest),
             "set" => self.emit_set_to(args, dest_ty, dest),
+            "set0" => self.emit_set0_to(args, dest_ty, dest),
             "if" => self.emit_if_to(args, dest_ty, dest),
             "for" => self.emit_for_to(args, dest_ty, dest),
             "budget.scope_v1" => self.emit_budget_scope_v1_to(args, dest_ty, dest),
@@ -1274,6 +1276,29 @@ impl<'a> Emitter<'a> {
 
         self.emit_set_stmt(args)?;
         self.line(&format!("{dest} = {};", var.c_name));
+        Ok(())
+    }
+
+    pub(super) fn emit_set0_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "set0 form: (set0 <name> <expr>)".to_string(),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("set0 expression must match context type {dest_ty:?}"),
+            ));
+        }
+        self.emit_set_stmt(args)?;
+        self.line(&format!("{dest} = UINT32_C(0);"));
         Ok(())
     }
 

@@ -81,8 +81,10 @@ fn collect_x07ast_inputs(inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
 
 #[derive(Debug, Clone, Args)]
 pub struct FmtArgs {
-    #[arg(long, value_name = "PATH", required = true)]
+    #[arg(long, value_name = "PATH")]
     pub input: Vec<PathBuf>,
+    #[arg(value_name = "PATH")]
+    pub paths: Vec<PathBuf>,
     #[arg(long)]
     pub check: bool,
     #[arg(long)]
@@ -210,7 +212,13 @@ pub fn cmd_fmt(
         anyhow::bail!("set exactly one of --check or --write");
     }
 
-    let inputs = collect_x07ast_inputs(&args.input).context("collect inputs")?;
+    let mut raw_inputs = args.input;
+    raw_inputs.extend(args.paths);
+    if raw_inputs.is_empty() {
+        anyhow::bail!("missing input (use --input <PATH> or pass PATH... as positional args)");
+    }
+
+    let inputs = collect_x07ast_inputs(&raw_inputs).context("collect inputs")?;
     let mut not_formatted: Vec<PathBuf> = Vec::new();
 
     for input in &inputs {

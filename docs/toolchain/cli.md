@@ -39,10 +39,12 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 
 ### Formatting (x07AST JSON)
 
+- `x07 fmt --check <path>...`
+- `x07 fmt --write <path>...`
 - `x07 fmt --input <path> --check`
 - `x07 fmt --input <path> --write`
 
-`--input` may be repeated. Each `<path>` may be a file or a directory; directory inputs are scanned recursively for `*.x07.json`.
+`--input` may be repeated. Positional `<path>` inputs may also be repeated. Each `<path>` may be a file or a directory; directory inputs are scanned recursively for `*.x07.json`.
 
 ### Assets (embed files)
 
@@ -70,6 +72,19 @@ See: [PBT repro → regression test](pbt-fix-from-repro.md).
   - If bounds force truncation, `slice_meta.truncated=true` and diagnostic `X07-AST-SLICE-0001` is emitted.
   - With global `--out <path>`, writes the canonical `slice_ast` to `<path>` and omits it from the stdout report to avoid duplication.
   - Tool wrapper schema (`--json`): `spec/x07-tool-ast-slice.report.schema.json` (`schema_version: "x07.tool.ast.slice.report@0.1.0"`).
+
+### AST editing (targeted structural edits)
+
+- `x07 ast edit insert-stmts --in <path> --defn <name> --stmt-file <path> [--stmt-file <path>...] [--validate]`
+  - Inserts statement expression(s) into a single function body by name (decl `kind=defn|defasync`).
+- `x07 ast edit insert-stmts --in <path> --ptr <json_pointer> --stmt-file <path> [--stmt-file <path>...] [--validate]`
+  - Uses a JSON Pointer target directly.
+  - If the target is a `["begin", ...]` body, inserts statements before the tail expression.
+  - Otherwise rewrites the body to `["begin", <stmts...>, <original_expr>]`.
+- `x07 ast edit apply-quickfix --in <path> --ptr <json_pointer> [--code <diag_code>] [--validate]`
+  - Applies exactly one lint quickfix (JSON Patch) selected by pointer (and optional diagnostic code).
+
+All edit commands write canonical one-line JSON. With global `--out <path>`, they write to that path; otherwise they edit in place.
 
 ### Agent context packs
 

@@ -49,3 +49,4 @@
   - Check: `python3 scripts/publish_ext_packages.py --check`
   - Publish: `python3 scripts/publish_ext_packages.py`
 - Sparse index reads are cached (~5 minutes); prefer verifying publishes via the registry API (`GET /v1/packages/<name>`).
+  - `x07 pkg publish` performs a best-effort post-publish API check and prints a warning if the new version is not visible yet.

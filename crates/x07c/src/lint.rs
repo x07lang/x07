@@ -939,7 +939,7 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
                 });
             }
         }
-        "let" | "set" => {
+        "let" | "set" | "set0" => {
             if items.len() != 3 {
                 let mut diag = Diagnostic {
                     code: "X07-ARITY-LET-0001".to_string(),

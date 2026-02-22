@@ -154,10 +154,18 @@ def main() -> int:
         action="store_true",
         help="Check that existing lock matches; do not rewrite.",
     )
+    ap.add_argument(
+        "--write",
+        action="store_true",
+        help="Write the lockfile (default when not --check).",
+    )
     args = ap.parse_args()
 
     ext_root = Path(args.packages_root)
     out_path = Path(args.out)
+
+    if args.check and args.write:
+        _die("ERROR: --check and --write are mutually exclusive")
 
     lock = _compute_lock(ext_root)
     out_text = json.dumps(lock, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
@@ -169,7 +177,7 @@ def main() -> int:
         if cur != out_text:
             _die(
                 "ERROR: external-packages.lock is out of date.\n"
-                f"  Run: python scripts/generate_external_packages_lock.py --packages-root {ext_root} --out {out_path}\n"
+                f"  Run: python scripts/generate_external_packages_lock.py --packages-root {ext_root} --out {out_path} --write\n"
             )
         print(f"OK: {out_path} up to date ({len(lock['packages'])} packages)")
         return 0

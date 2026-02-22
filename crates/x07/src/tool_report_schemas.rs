@@ -32,6 +32,15 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("ast.canon") => Some(include_bytes!(
             "../../../spec/x07-tool-ast-canon.report.schema.json"
         )),
+        Some("ast.edit") => Some(include_bytes!(
+            "../../../spec/x07-tool-ast-edit.report.schema.json"
+        )),
+        Some("ast.edit.apply-quickfix") => Some(include_bytes!(
+            "../../../spec/x07-tool-ast-edit-apply-quickfix.report.schema.json"
+        )),
+        Some("ast.edit.insert-stmts") => Some(include_bytes!(
+            "../../../spec/x07-tool-ast-edit-insert-stmts.report.schema.json"
+        )),
         Some("ast.get") => Some(include_bytes!(
             "../../../spec/x07-tool-ast-get.report.schema.json"
         )),

@@ -373,7 +373,7 @@ fn dce_unused_lets(expr: Expr, seed: &LocalTyEnv) -> Expr {
                         free_vars(&args[3], bound, out);
                         bound.pop();
                     }
-                    "set" if args.len() == 2 => {
+                    "set" | "set0" if args.len() == 2 => {
                         if let Some(name) = args[0].as_ident() {
                             if !bound.iter().rev().any(|s| s.contains(name)) {
                                 out.insert(name.to_string());
@@ -521,7 +521,7 @@ fn unroll_small_fors(expr: Expr, seed: &LocalTyEnv) -> Expr {
         match expr {
             Expr::Int { .. } | Expr::Ident { .. } => false,
             Expr::List { items, .. } => {
-                if items.first().and_then(Expr::as_ident) == Some("set")
+                if matches!(items.first().and_then(Expr::as_ident), Some("set" | "set0"))
                     && items.len() >= 2
                     && items[1].as_ident() == Some(var)
                 {
@@ -760,7 +760,9 @@ fn collect_assigned_vars(expr: &Expr, out: &mut BTreeSet<String>) {
     match expr {
         Expr::Int { .. } | Expr::Ident { .. } => {}
         Expr::List { items, .. } => {
-            if items.first().and_then(Expr::as_ident) == Some("set") && items.len() >= 2 {
+            if matches!(items.first().and_then(Expr::as_ident), Some("set" | "set0"))
+                && items.len() >= 2
+            {
                 if let Some(name) = items[1].as_ident() {
                     out.insert(name.to_string());
                 }

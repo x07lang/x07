@@ -1580,7 +1580,7 @@ mod tests {
 
     use crate::generics::{MonoItemV1, MonoLimitsV1, MonoMapV1, MonoStatsV1};
 
-    use super::{propagate_mono_exports, ModuleInfo};
+    use super::{compile_program_to_c, propagate_mono_exports, CompileOptions, ModuleInfo};
 
     #[test]
     fn propagate_mono_exports_adds_specialized_symbol_when_generic_exported() {
@@ -1630,5 +1630,24 @@ mod tests {
             "expected specialized symbol exported; exports={:?}",
             out.exports
         );
+    }
+
+    #[test]
+    fn compile_program_set0_smoke() {
+        let doc = json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["begin",
+                ["let", "b", ["bytes.alloc", 0]],
+                ["if", 1, ["set0", "b", ["bytes.alloc", 1]], 0],
+                "b"
+            ],
+        });
+        let bytes = serde_json::to_vec(&doc).expect("encode x07AST json");
+        let options = CompileOptions::default();
+        let _c_src = compile_program_to_c(&bytes, &options).expect("compile to C");
     }
 }

@@ -59,6 +59,8 @@ Move rules (critical):
 - `unsafe`: `["unsafe", e1, e2, ...]` evaluates sequentially and returns the last expression; inside it, unsafe-only operations are allowed (standalone-only)
 - `let`: `["let", name, expr]` binds `name` in the current scope
 - `set`: `["set", name, expr]` assigns an existing binding
+- `set0`: `["set0", name, expr]` assigns an existing binding and returns `0` (i32)
+  - Example: `["if", cond, ["set0","buf",["vec_u8.extend_bytes","buf",v]], 0]` unifies as `i32`.
 - `if`: `["if", cond, then, else]` branches on non-zero `cond`
 - `for`: `["for", i, start, end, body]` declares `i` (i32) and runs it from `start` to `end-1`
   - `body` is a single expression; use `begin` for multiple steps.

@@ -284,6 +284,34 @@ impl InferCtx {
                         }
                         Ok(prev)
                     }
+                    "set0" => {
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "set0 form: (set0 <name> <expr>)".to_string(),
+                            ));
+                        }
+                        let name = args[0].as_ident().ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "set0 name must be an identifier".to_string(),
+                            )
+                        })?;
+                        let prev = self.lookup(name).ok_or_else(|| {
+                            CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("set0 of unknown variable: {name:?}"),
+                            )
+                        })?;
+                        let ty = self.infer(&args[1])?;
+                        if !tyinfo_compat_assign(&ty, &prev) {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                format!("type mismatch in set0 for variable {name:?}"),
+                            ));
+                        }
+                        Ok(TyInfo::unbranded(Ty::I32))
+                    }
                     "if" => {
                         if args.len() != 3 {
                             return Err(CompilerError::new(
@@ -5784,7 +5812,7 @@ impl<'a> Emitter<'a> {
                             (None, None) => Ok(None),
                         }
                     }
-                    "let" | "set" => {
+                    "let" | "set" | "set0" => {
                         if args.len() != 2 {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Parse,
@@ -5951,7 +5979,7 @@ impl<'a> Emitter<'a> {
                             (None, None) => Ok(None),
                         }
                     }
-                    "let" | "set" => {
+                    "let" | "set" | "set0" => {
                         if args.len() != 2 {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Parse,
@@ -6140,7 +6168,7 @@ impl<'a> Emitter<'a> {
                             (None, None) => Ok(None),
                         }
                     }
-                    "let" | "set" => {
+                    "let" | "set" | "set0" => {
                         if args.len() != 2 {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Parse,

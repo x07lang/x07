@@ -342,6 +342,10 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(ast::AstCommand::Get(_)) => vec!["ast", "get"],
                 Some(ast::AstCommand::Slice(_)) => vec!["ast", "slice"],
                 Some(ast::AstCommand::ApplyPatch(_)) => vec!["ast", "apply-patch"],
+                Some(ast::AstCommand::Edit(args)) => match &args.cmd {
+                    ast::AstEditCommand::InsertStmts(_) => vec!["ast", "edit", "insert-stmts"],
+                    ast::AstEditCommand::ApplyQuickfix(_) => vec!["ast", "edit", "apply-quickfix"],
+                },
                 Some(ast::AstCommand::Validate(_)) => vec!["ast", "validate"],
                 Some(ast::AstCommand::Canon(_)) => vec!["ast", "canon"],
                 Some(ast::AstCommand::Schema(_)) => vec!["ast", "schema"],

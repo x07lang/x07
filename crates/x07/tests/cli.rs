@@ -3076,6 +3076,56 @@ fn x07_fix_applies_multiple_borrow_quickfixes() {
 }
 
 #[test]
+fn x07_fmt_accepts_positional_paths() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_fmt_positional");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program_doc = serde_json::json!({
+        "kind": "entry",
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": ["bytes.alloc", 0],
+    });
+    let program_path = dir.join("main.x07.json");
+    write_bytes(
+        &program_path,
+        serde_json::to_vec_pretty(&program_doc)
+            .expect("encode pretty x07AST json")
+            .as_slice(),
+    );
+
+    let out = run_x07(&["fmt", "--check", program_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("file is not formatted:"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07(&["fmt", "--write", program_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07(&["fmt", "--check", program_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
 fn x07_fix_suggest_generics_emits_patchset_and_applies() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_fix_suggest_generics");
@@ -5364,6 +5414,308 @@ fn x07_ast_get_extracts_json_pointer() {
     assert_eq!(v["ok"], true);
     assert_eq!(v["ptr"], "/a/2/b");
     assert_eq!(v["value"], "c");
+}
+
+#[test]
+fn x07_ast_edit_insert_stmts_wraps_non_begin_body() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_ast_edit_insert_wrap");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program_doc = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.f",
+                "params": [],
+                "result": "i32",
+                "body": 0
+            }
+        ]
+    });
+    let program_path = dir.join("main.x07.json");
+    write_bytes(
+        &program_path,
+        serde_json::to_vec(&program_doc)
+            .expect("serialize x07AST")
+            .as_slice(),
+    );
+
+    let stmt_path = dir.join("stmt1.json");
+    write_bytes(
+        &stmt_path,
+        serde_json::to_vec(&serde_json::json!(["let", "x", 1]))
+            .expect("serialize stmt")
+            .as_slice(),
+    );
+
+    let out = run_x07(&[
+        "ast",
+        "edit",
+        "insert-stmts",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--defn",
+        "main.f",
+        "--stmt-file",
+        stmt_path.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["inserted"], 1);
+
+    let edited_bytes = std::fs::read(&program_path).expect("read edited program");
+    let edited_doc: Value = serde_json::from_slice(&edited_bytes).expect("parse edited x07AST");
+    assert_eq!(
+        edited_doc.pointer("/decls/0/body").expect("body"),
+        &serde_json::json!(["begin", ["let", "x", 1], 0])
+    );
+}
+
+#[test]
+fn x07_ast_edit_insert_stmts_inserts_before_begin_tail() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_ast_edit_insert_before_tail");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program_doc = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.f",
+                "params": [],
+                "result": "i32",
+                "body": ["begin", ["let", "y", 2], 0]
+            }
+        ]
+    });
+    let program_path = dir.join("main.x07.json");
+    write_bytes(
+        &program_path,
+        serde_json::to_vec(&program_doc)
+            .expect("serialize x07AST")
+            .as_slice(),
+    );
+
+    let stmt_path = dir.join("stmt1.json");
+    write_bytes(
+        &stmt_path,
+        serde_json::to_vec(&serde_json::json!(["let", "x", 1]))
+            .expect("serialize stmt")
+            .as_slice(),
+    );
+
+    let out = run_x07(&[
+        "ast",
+        "edit",
+        "insert-stmts",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--defn",
+        "main.f",
+        "--stmt-file",
+        stmt_path.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let edited_bytes = std::fs::read(&program_path).expect("read edited program");
+    let edited_doc: Value = serde_json::from_slice(&edited_bytes).expect("parse edited x07AST");
+    assert_eq!(
+        edited_doc.pointer("/decls/0/body").expect("body"),
+        &serde_json::json!(["begin", ["let", "y", 2], ["let", "x", 1], 0])
+    );
+}
+
+#[test]
+fn x07_ast_edit_apply_quickfix_applies_single_borrow_fix() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_ast_edit_apply_quickfix_borrow");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.f",
+                "params": [],
+                "result": "bytes_view",
+                "body": ["bytes.view", ["bytes.lit", "a"]]
+            }
+        ]
+    }))
+    .expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program);
+
+    let out = run_x07(&[
+        "ast",
+        "edit",
+        "apply-quickfix",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        "/decls/0/body/1",
+        "--code",
+        "X07-BORROW-0001",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+
+    let out = run_x07(&["lint", "--input", program_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let lint_report = parse_json_stdout(&out);
+    assert_eq!(lint_report["ok"], true);
+}
+
+#[test]
+fn x07_ast_edit_insert_stmts_errors_on_unknown_defn() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_ast_edit_insert_unknown_defn");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program_doc = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.f",
+                "params": [],
+                "result": "i32",
+                "body": 0
+            }
+        ]
+    });
+    let program_path = dir.join("main.x07.json");
+    write_bytes(
+        &program_path,
+        serde_json::to_vec(&program_doc)
+            .expect("serialize x07AST")
+            .as_slice(),
+    );
+
+    let stmt_path = dir.join("stmt1.json");
+    write_bytes(
+        &stmt_path,
+        serde_json::to_vec(&serde_json::json!(["let", "x", 1]))
+            .expect("serialize stmt")
+            .as_slice(),
+    );
+
+    let out = run_x07(&[
+        "ast",
+        "edit",
+        "insert-stmts",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--defn",
+        "main.nope",
+        "--stmt-file",
+        stmt_path.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(20));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("no matching defn/defasync"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], false);
+}
+
+#[test]
+fn x07_ast_edit_apply_quickfix_errors_on_ambiguous_match() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_ast_edit_apply_quickfix_ambiguous");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program = serde_json::to_vec(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": ["begin",
+            ["let", "x", ["view.len", ["bytes.view", ["bytes.lit", "a"]]]],
+            ["let", "y", ["view.len", ["bytes.view", ["bytes.lit", "b"]]]],
+            0
+        ]
+    }))
+    .expect("serialize x07AST");
+    let program_path = dir.join("main.x07.json");
+    write_bytes(&program_path, &program);
+
+    let out = run_x07(&[
+        "ast",
+        "edit",
+        "apply-quickfix",
+        "--in",
+        program_path.to_str().unwrap(),
+        "--ptr",
+        "/solve",
+        "--code",
+        "X07-BORROW-0001",
+    ]);
+    assert_eq!(out.status.code(), Some(20));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("ambiguous quickfix selection"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], false);
 }
 
 #[test]

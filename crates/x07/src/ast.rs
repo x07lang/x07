@@ -14,6 +14,7 @@ use x07_contracts::{
 use x07_worlds::WorldId;
 use x07c::diagnostics;
 use x07c::json_patch;
+use x07c::lint;
 
 use crate::ast_slice_engine;
 use crate::reporting;
@@ -53,6 +54,8 @@ pub enum AstCommand {
     Slice(AstSliceArgs),
     /// Apply a JSON patch file to an x07AST JSON input.
     ApplyPatch(AstApplyPatchArgs),
+    /// Apply targeted structural edits to an x07AST JSON file.
+    Edit(AstEditArgs),
     /// Validate an x07AST file (schema + optional diagnostics catalog).
     Validate(AstValidateArgs),
     /// Canonicalize an x07AST JSON file (JCS ordering).
@@ -152,11 +155,69 @@ pub fn cmd_ast(
         AstCommand::Get(args) => cmd_get(machine, args),
         AstCommand::Slice(args) => cmd_slice(machine, args),
         AstCommand::ApplyPatch(args) => cmd_apply_patch(machine, args),
+        AstCommand::Edit(args) => cmd_edit(machine, args),
         AstCommand::Validate(args) => cmd_validate(args),
         AstCommand::Canon(args) => cmd_canon(machine, args),
         AstCommand::Schema(args) => cmd_schema(machine, args),
         AstCommand::Grammar(args) => cmd_grammar(args),
     }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AstEditArgs {
+    #[command(subcommand)]
+    pub cmd: AstEditCommand,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum AstEditCommand {
+    /// Insert statement expression(s) into a function body (by defn/defasync name or JSON Pointer).
+    InsertStmts(AstEditInsertStmtsArgs),
+    /// Apply a single lint quickfix (JSON Patch) selected by pointer/code.
+    ApplyQuickfix(AstEditApplyQuickfixArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AstEditInsertStmtsArgs {
+    #[arg(long, value_name = "PATH")]
+    pub r#in: PathBuf,
+
+    #[arg(
+        long,
+        value_name = "NAME",
+        conflicts_with = "ptr",
+        required_unless_present = "ptr"
+    )]
+    pub defn: Option<String>,
+
+    #[arg(
+        long,
+        value_name = "JSON_POINTER",
+        conflicts_with = "defn",
+        required_unless_present = "defn"
+    )]
+    pub ptr: Option<String>,
+
+    #[arg(long, value_name = "PATH", required = true)]
+    pub stmt_file: Vec<PathBuf>,
+
+    #[arg(long)]
+    pub validate: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AstEditApplyQuickfixArgs {
+    #[arg(long, value_name = "PATH")]
+    pub r#in: PathBuf,
+
+    #[arg(long, value_name = "JSON_POINTER")]
+    pub ptr: String,
+
+    #[arg(long, value_name = "DIAG_CODE")]
+    pub code: Option<String>,
+
+    #[arg(long)]
+    pub validate: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -567,6 +628,27 @@ struct AstApplyPatchReport {
     sha256: String,
 }
 
+#[derive(Debug, Serialize)]
+struct AstEditInsertStmtsReport {
+    ok: bool,
+    r#in: String,
+    out: String,
+    target: String,
+    inserted: usize,
+    sha256: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AstEditApplyQuickfixReport {
+    ok: bool,
+    r#in: String,
+    out: String,
+    ptr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
+    sha256: String,
+}
+
 fn cmd_apply_patch(
     machine: &crate::reporting::MachineArgs,
     args: AstApplyPatchArgs,
@@ -667,6 +749,419 @@ fn cmd_apply_patch(
         ok: true,
         r#in: args.r#in.display().to_string(),
         out: out_path.display().to_string(),
+        sha256: sha256_hex(&out_bytes),
+    };
+    print_json(&report)?;
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn cmd_edit(
+    machine: &crate::reporting::MachineArgs,
+    args: AstEditArgs,
+) -> Result<std::process::ExitCode> {
+    match args.cmd {
+        AstEditCommand::InsertStmts(args) => cmd_edit_insert_stmts(machine, args),
+        AstEditCommand::ApplyQuickfix(args) => cmd_edit_apply_quickfix(machine, args),
+    }
+}
+
+fn cmd_edit_insert_stmts(
+    machine: &crate::reporting::MachineArgs,
+    args: AstEditInsertStmtsArgs,
+) -> Result<std::process::ExitCode> {
+    let out_path = machine.out.clone().unwrap_or_else(|| args.r#in.clone());
+    let report_out = out_path.display().to_string();
+
+    let input_bytes = match std::fs::read(&args.r#in) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            let report = AstEditInsertStmtsReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: report_out,
+                target: String::new(),
+                inserted: 0,
+                sha256: String::new(),
+            };
+            print_json(&report)?;
+            return Ok(exit_with_error(err));
+        }
+    };
+
+    let mut doc = match canonicalize_x07ast_bytes_to_value(&input_bytes) {
+        Ok(doc) => doc,
+        Err(err) => {
+            let report = AstEditInsertStmtsReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: report_out,
+                target: String::new(),
+                inserted: 0,
+                sha256: String::new(),
+            };
+            print_json(&report)?;
+            eprintln!("{err:#}");
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    let target_ptr =
+        match resolve_insert_target_ptr(&doc, args.defn.as_deref(), args.ptr.as_deref()) {
+            Ok(ptr) => ptr,
+            Err(err) => {
+                let report = AstEditInsertStmtsReport {
+                    ok: false,
+                    r#in: args.r#in.display().to_string(),
+                    out: report_out,
+                    target: String::new(),
+                    inserted: 0,
+                    sha256: String::new(),
+                };
+                print_json(&report)?;
+                eprintln!("{err}");
+                return Ok(std::process::ExitCode::from(20));
+            }
+        };
+
+    let stmts = match load_stmt_exprs(&args.stmt_file) {
+        Ok(stmts) => stmts,
+        Err(err) => {
+            let report = AstEditInsertStmtsReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: report_out,
+                target: target_ptr.clone(),
+                inserted: 0,
+                sha256: String::new(),
+            };
+            print_json(&report)?;
+            eprintln!("{err}");
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+
+    let target_expr = match json_pointer_get_mut(&mut doc, &target_ptr) {
+        Ok(v) => v,
+        Err(err) => {
+            let report = AstEditInsertStmtsReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: report_out,
+                target: target_ptr.clone(),
+                inserted: 0,
+                sha256: String::new(),
+            };
+            print_json(&report)?;
+            eprintln!("{err}");
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+    if x07c::ast::expr_from_json(target_expr).is_err() {
+        let report = AstEditInsertStmtsReport {
+            ok: false,
+            r#in: args.r#in.display().to_string(),
+            out: report_out,
+            target: target_ptr.clone(),
+            inserted: 0,
+            sha256: String::new(),
+        };
+        print_json(&report)?;
+        eprintln!("target JSON Pointer does not point to an expression: {target_ptr:?}");
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    if let Err(err) = insert_stmts_into_body_expr(target_expr, &stmts) {
+        let report = AstEditInsertStmtsReport {
+            ok: false,
+            r#in: args.r#in.display().to_string(),
+            out: report_out,
+            target: target_ptr.clone(),
+            inserted: 0,
+            sha256: String::new(),
+        };
+        print_json(&report)?;
+        eprintln!("{err}");
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    if args.validate {
+        let diags = validate_x07ast_doc(&doc)?;
+        if !diags.is_empty() {
+            let report = diagnostics::Report::ok().with_diagnostics(diags);
+            print_json(&report)?;
+            return Ok(std::process::ExitCode::from(20));
+        }
+    }
+
+    let mut out_doc = match canonicalize_x07ast_bytes_to_value(&serde_json::to_vec(&doc)?) {
+        Ok(out_doc) => out_doc,
+        Err(err) => {
+            let report = AstEditInsertStmtsReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: report_out,
+                target: target_ptr.clone(),
+                inserted: 0,
+                sha256: String::new(),
+            };
+            print_json(&report)?;
+            eprintln!("edited doc is not valid x07AST: {err:#}");
+            return Ok(std::process::ExitCode::from(21));
+        }
+    };
+
+    x07c::x07ast::canon_value_jcs(&mut out_doc);
+    let out_bytes = with_trailing_newline(serde_json::to_string(&out_doc)?.into_bytes());
+
+    util::write_atomic(&out_path, &out_bytes)
+        .with_context(|| format!("write: {}", out_path.display()))?;
+
+    let report = AstEditInsertStmtsReport {
+        ok: true,
+        r#in: args.r#in.display().to_string(),
+        out: out_path.display().to_string(),
+        target: target_ptr,
+        inserted: stmts.len(),
+        sha256: sha256_hex(&out_bytes),
+    };
+    print_json(&report)?;
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn cmd_edit_apply_quickfix(
+    machine: &crate::reporting::MachineArgs,
+    args: AstEditApplyQuickfixArgs,
+) -> Result<std::process::ExitCode> {
+    let out_path = machine.out.clone().unwrap_or_else(|| args.r#in.clone());
+    let report_out = out_path.display().to_string();
+    let report_in = args.r#in.display().to_string();
+
+    let input_bytes = match std::fs::read(&args.r#in) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            let report = AstEditApplyQuickfixReport {
+                ok: false,
+                r#in: report_in,
+                out: report_out,
+                ptr: args.ptr.clone(),
+                code: args.code.clone(),
+                sha256: String::new(),
+            };
+            print_json(&report)?;
+            return Ok(exit_with_error(err));
+        }
+    };
+
+    let mut file = match x07c::x07ast::parse_x07ast_json(&input_bytes) {
+        Ok(file) => file,
+        Err(err) => {
+            let report = AstEditApplyQuickfixReport {
+                ok: false,
+                r#in: report_in,
+                out: report_out,
+                ptr: args.ptr.clone(),
+                code: args.code.clone(),
+                sha256: String::new(),
+            };
+            print_json(&report)?;
+            eprintln!("parse x07AST failed: {err}");
+            return Ok(std::process::ExitCode::from(20));
+        }
+    };
+    x07c::x07ast::canonicalize_x07ast_file(&mut file);
+
+    let options = lint::LintOptions {
+        world: WorldId::RunOs,
+        ..Default::default()
+    };
+    let lint_report = lint::lint_file(&file, options);
+
+    let want_ptr = args.ptr.trim().to_string();
+    if want_ptr.is_empty() {
+        let report = AstEditApplyQuickfixReport {
+            ok: false,
+            r#in: report_in,
+            out: report_out,
+            ptr: args.ptr.clone(),
+            code: args.code.clone(),
+            sha256: String::new(),
+        };
+        print_json(&report)?;
+        eprintln!("--ptr must not be empty");
+        return Ok(std::process::ExitCode::from(20));
+    }
+    if !want_ptr.starts_with('/') {
+        let report = AstEditApplyQuickfixReport {
+            ok: false,
+            r#in: report_in,
+            out: report_out,
+            ptr: args.ptr.clone(),
+            code: args.code.clone(),
+            sha256: String::new(),
+        };
+        print_json(&report)?;
+        eprintln!("invalid JSON Pointer (expected leading '/'): {want_ptr:?}");
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let mut matches: Vec<&diagnostics::Diagnostic> = Vec::new();
+    for diag in &lint_report.diagnostics {
+        let Some(q) = &diag.quickfix else {
+            continue;
+        };
+        if q.kind != diagnostics::QuickfixKind::JsonPatch {
+            continue;
+        }
+        if let Some(code) = &args.code {
+            if diag.code != *code {
+                continue;
+            }
+        }
+        let diag_ptr = match &diag.loc {
+            Some(diagnostics::Location::X07Ast { ptr }) => ptr.as_str(),
+            _ => continue,
+        };
+        let match_by_loc = diag_ptr == want_ptr;
+        let match_by_patch = q.patch.iter().any(|op| patch_op_touches_ptr(op, &want_ptr));
+        if match_by_loc || match_by_patch {
+            matches.push(diag);
+        }
+    }
+
+    let Some(selected) = matches.first() else {
+        let report = AstEditApplyQuickfixReport {
+            ok: false,
+            r#in: report_in,
+            out: report_out,
+            ptr: want_ptr.clone(),
+            code: args.code.clone(),
+            sha256: String::new(),
+        };
+        print_json(&report)?;
+        eprintln!(
+            "no matching quickfix found for ptr={want_ptr:?} code={:?}",
+            args.code
+        );
+        let mut candidates: Vec<&diagnostics::Diagnostic> = Vec::new();
+        for diag in &lint_report.diagnostics {
+            let Some(q) = &diag.quickfix else { continue };
+            if q.kind != diagnostics::QuickfixKind::JsonPatch {
+                continue;
+            }
+            if let Some(code) = &args.code {
+                if diag.code != *code {
+                    continue;
+                }
+            }
+            candidates.push(diag);
+        }
+        if !candidates.is_empty() {
+            eprintln!("candidates:");
+            for diag in candidates.iter().take(20) {
+                let ptr = match &diag.loc {
+                    Some(diagnostics::Location::X07Ast { ptr }) => ptr.as_str(),
+                    _ => "<no-ptr>",
+                };
+                eprintln!("- {} @ {}: {}", diag.code, ptr, diag.message);
+            }
+            if candidates.len() > 20 {
+                eprintln!("- ... ({} total)", candidates.len());
+            }
+        }
+        return Ok(std::process::ExitCode::from(20));
+    };
+    if matches.len() != 1 {
+        let report = AstEditApplyQuickfixReport {
+            ok: false,
+            r#in: report_in,
+            out: report_out,
+            ptr: want_ptr.clone(),
+            code: args.code.clone(),
+            sha256: String::new(),
+        };
+        print_json(&report)?;
+        eprintln!(
+            "ambiguous quickfix selection for ptr={want_ptr:?} code={:?} (matches={})",
+            args.code,
+            matches.len()
+        );
+        for diag in &matches {
+            let ptr = match &diag.loc {
+                Some(diagnostics::Location::X07Ast { ptr }) => ptr.as_str(),
+                _ => "<no-ptr>",
+            };
+            eprintln!("- {} @ {}: {}", diag.code, ptr, diag.message);
+        }
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let Some(q) = &selected.quickfix else {
+        let report = AstEditApplyQuickfixReport {
+            ok: false,
+            r#in: report_in,
+            out: report_out,
+            ptr: want_ptr.clone(),
+            code: args.code.clone(),
+            sha256: String::new(),
+        };
+        print_json(&report)?;
+        eprintln!("internal error: selected diagnostic has no quickfix");
+        return Ok(std::process::ExitCode::from(20));
+    };
+
+    let mut doc = x07c::x07ast::x07ast_file_to_value(&file);
+    if let Err(err) = json_patch::apply_patch(&mut doc, &q.patch) {
+        let report = AstEditApplyQuickfixReport {
+            ok: false,
+            r#in: report_in,
+            out: report_out,
+            ptr: want_ptr.clone(),
+            code: args.code.clone(),
+            sha256: String::new(),
+        };
+        print_json(&report)?;
+        eprintln!("apply quickfix patch failed: {err}");
+        return Ok(std::process::ExitCode::from(21));
+    }
+
+    if args.validate {
+        let diags = validate_x07ast_doc(&doc)?;
+        if !diags.is_empty() {
+            let report = diagnostics::Report::ok().with_diagnostics(diags);
+            print_json(&report)?;
+            return Ok(std::process::ExitCode::from(20));
+        }
+    }
+
+    let mut out_doc = match canonicalize_x07ast_bytes_to_value(&serde_json::to_vec(&doc)?) {
+        Ok(out_doc) => out_doc,
+        Err(err) => {
+            let report = AstEditApplyQuickfixReport {
+                ok: false,
+                r#in: args.r#in.display().to_string(),
+                out: report_out,
+                ptr: want_ptr.clone(),
+                code: args.code.clone(),
+                sha256: String::new(),
+            };
+            print_json(&report)?;
+            eprintln!("edited doc is not valid x07AST: {err:#}");
+            return Ok(std::process::ExitCode::from(21));
+        }
+    };
+
+    x07c::x07ast::canon_value_jcs(&mut out_doc);
+    let out_bytes = with_trailing_newline(serde_json::to_string(&out_doc)?.into_bytes());
+
+    util::write_atomic(&out_path, &out_bytes)
+        .with_context(|| format!("write: {}", out_path.display()))?;
+
+    let report = AstEditApplyQuickfixReport {
+        ok: true,
+        r#in: args.r#in.display().to_string(),
+        out: out_path.display().to_string(),
+        ptr: want_ptr,
+        code: args.code,
         sha256: sha256_hex(&out_bytes),
     };
     print_json(&report)?;
@@ -975,6 +1470,146 @@ fn sha256_hex(bytes: &[u8]) -> String {
     util::sha256_hex(bytes)
 }
 
+fn resolve_insert_target_ptr(
+    doc: &Value,
+    defn: Option<&str>,
+    ptr: Option<&str>,
+) -> Result<String, String> {
+    match (defn, ptr) {
+        (Some(name), None) => find_defn_body_ptr(doc, name),
+        (None, Some(ptr)) => {
+            let ptr = ptr.trim();
+            if ptr.is_empty() {
+                return Err("--ptr must not be empty".to_string());
+            }
+            if !ptr.starts_with('/') {
+                return Err(format!(
+                    "invalid JSON Pointer (expected leading '/'): {ptr:?}"
+                ));
+            }
+            Ok(ptr.to_string())
+        }
+        (Some(_), Some(_)) => {
+            Err("expected exactly one target selector (use --defn or --ptr)".to_string())
+        }
+        (None, None) => Err("missing target selector (use --defn or --ptr)".to_string()),
+    }
+}
+
+fn find_defn_body_ptr(doc: &Value, name: &str) -> Result<String, String> {
+    let Some(decls) = doc.get("decls").and_then(Value::as_array) else {
+        return Err("x07AST doc missing /decls array".to_string());
+    };
+
+    let mut hits: Vec<usize> = Vec::new();
+    let mut available: Vec<String> = Vec::new();
+    for (idx, decl) in decls.iter().enumerate() {
+        let Some(obj) = decl.as_object() else {
+            continue;
+        };
+        let kind = obj.get("kind").and_then(Value::as_str).unwrap_or_default();
+        if kind != "defn" && kind != "defasync" {
+            continue;
+        }
+        let Some(n) = obj.get("name").and_then(Value::as_str) else {
+            continue;
+        };
+        available.push(n.to_string());
+        if n == name {
+            hits.push(idx);
+        }
+    }
+
+    match hits.as_slice() {
+        [idx] => Ok(format!("/decls/{idx}/body")),
+        [] => {
+            available.sort();
+            let mut msg = format!("no matching defn/defasync: {name:?}");
+            if !available.is_empty() {
+                msg.push_str("\navailable:");
+                for n in available.iter().take(200) {
+                    msg.push_str(&format!("\n- {n}"));
+                }
+                if available.len() > 200 {
+                    msg.push_str(&format!("\n- ... ({} total)", available.len()));
+                }
+            }
+            Err(msg)
+        }
+        other => Err(format!(
+            "multiple matching defn/defasync decls found for {name:?}: {other:?}"
+        )),
+    }
+}
+
+fn load_stmt_exprs(paths: &[PathBuf]) -> Result<Vec<Value>, String> {
+    let mut out: Vec<Value> = Vec::with_capacity(paths.len());
+    for path in paths {
+        let bytes = std::fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+        let v: Value = serde_json::from_slice(&bytes)
+            .map_err(|e| format!("parse JSON {}: {e}", path.display()))?;
+        x07c::ast::expr_from_json(&v)
+            .map_err(|e| format!("statement is not an expression {}: {e}", path.display()))?;
+        out.push(v);
+    }
+    Ok(out)
+}
+
+fn insert_stmts_into_body_expr(target_expr: &mut Value, stmts: &[Value]) -> Result<(), String> {
+    if stmts.is_empty() {
+        return Ok(());
+    }
+
+    match target_expr {
+        Value::Array(items) if items.first().and_then(Value::as_str) == Some("begin") => {
+            if items.len() < 2 {
+                return Err("malformed begin: missing tail expression".to_string());
+            }
+            let insert_at = items.len() - 1;
+            for (i, stmt) in stmts.iter().cloned().enumerate() {
+                items.insert(insert_at + i, stmt);
+            }
+            Ok(())
+        }
+        other => {
+            let orig = std::mem::replace(other, Value::Null);
+            let mut items: Vec<Value> = Vec::with_capacity(2 + stmts.len());
+            items.push(Value::String("begin".to_string()));
+            items.extend(stmts.iter().cloned());
+            items.push(orig);
+            *other = Value::Array(items);
+            Ok(())
+        }
+    }
+}
+
+fn patch_op_touches_ptr(op: &diagnostics::PatchOp, ptr: &str) -> bool {
+    let path = match op {
+        diagnostics::PatchOp::Add { path, .. }
+        | diagnostics::PatchOp::Remove { path }
+        | diagnostics::PatchOp::Replace { path, .. }
+        | diagnostics::PatchOp::Move { path, .. }
+        | diagnostics::PatchOp::Copy { path, .. }
+        | diagnostics::PatchOp::Test { path, .. } => path.as_str(),
+    };
+
+    json_ptr_is_at_or_under(path, ptr)
+}
+
+fn json_ptr_is_at_or_under(path: &str, ptr: &str) -> bool {
+    if path == ptr {
+        return true;
+    }
+    if ptr == "/" {
+        return path.starts_with('/');
+    }
+    if !path.starts_with(ptr) {
+        return false;
+    }
+    let rest = &path[ptr.len()..];
+    rest.starts_with('/')
+}
+
 fn json_pointer_get<'a>(doc: &'a Value, ptr: &str) -> Result<&'a Value, String> {
     let ptr = ptr.trim();
     if ptr.is_empty() {
@@ -1001,6 +1636,44 @@ fn json_pointer_get<'a>(doc: &'a Value, ptr: &str) -> Result<&'a Value, String> 
                 })?;
                 cur = arr
                     .get(idx)
+                    .ok_or_else(|| format!("JSON Pointer array index out of bounds: {idx}"))?;
+            }
+            _ => {
+                return Err(format!(
+                    "JSON Pointer traversal hit non-container value at token: {token:?}"
+                ));
+            }
+        }
+    }
+    Ok(cur)
+}
+
+fn json_pointer_get_mut<'a>(doc: &'a mut Value, ptr: &str) -> Result<&'a mut Value, String> {
+    let ptr = ptr.trim();
+    if ptr.is_empty() {
+        return Ok(doc);
+    }
+    if !ptr.starts_with('/') {
+        return Err(format!(
+            "invalid JSON Pointer (expected leading '/'): {ptr:?}"
+        ));
+    }
+
+    let mut cur = doc;
+    for raw in ptr.split('/').skip(1) {
+        let token = unescape_json_pointer_token(raw)?;
+        match cur {
+            Value::Object(map) => {
+                cur = map
+                    .get_mut(&token)
+                    .ok_or_else(|| format!("JSON Pointer not found at object key: {token:?}"))?;
+            }
+            Value::Array(arr) => {
+                let idx: usize = token.parse().map_err(|_| {
+                    format!("JSON Pointer array index is not an integer: {token:?}")
+                })?;
+                cur = arr
+                    .get_mut(idx)
                     .ok_or_else(|| format!("JSON Pointer array index out of bounds: {idx}"))?;
             }
             _ => {

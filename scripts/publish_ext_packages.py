@@ -487,7 +487,7 @@ def _sync_ext_package_versions(
             _clean_project_state(project_dir)
 
     # Keep the external packages lock consistent with the packages tree.
-    _run([python_bin, "scripts/generate_external_packages_lock.py"], cwd=root)
+    _run([python_bin, "scripts/generate_external_packages_lock.py", "--write"], cwd=root)
 
     return all_changes, changed_projects
 

@@ -251,6 +251,25 @@ pub fn http_post_bytes(url: &Url, token: Option<&str>, body: &[u8]) -> Result<Ve
     }
 }
 
+pub fn http_get_bytes(url: &Url, token: Option<&str>) -> Result<Vec<u8>> {
+    match url.scheme() {
+        "http" | "https" => {
+            let mut req = ureq::get(url.as_str());
+            if let Some(token) = token {
+                req = req.header("Authorization", &format!("Bearer {token}"));
+            }
+            let resp = req
+                .call()
+                .map_err(|e| anyhow::anyhow!("http GET {}: {e}", url))?;
+            let mut reader = resp.into_body().into_reader();
+            let mut buf = Vec::new();
+            reader.read_to_end(&mut buf).context("read http response")?;
+            Ok(buf)
+        }
+        other => anyhow::bail!("unsupported url scheme {other:?} for {}", url.as_str()),
+    }
+}
+
 pub fn sha256_hex(bytes: &[u8]) -> String {
     let mut h = Sha256::new();
     h.update(bytes);
@@ -390,19 +409,7 @@ fn fetch_bytes(url: &Url, token: Option<&str>) -> Result<Vec<u8>> {
             })?;
             std::fs::read(&path).with_context(|| format!("read {}", path.display()))
         }
-        "http" | "https" => {
-            let mut req = ureq::get(url.as_str());
-            if let Some(token) = token {
-                req = req.header("Authorization", &format!("Bearer {token}"));
-            }
-            let resp = req
-                .call()
-                .map_err(|e| anyhow::anyhow!("http GET {}: {e}", url))?;
-            let mut reader = resp.into_body().into_reader();
-            let mut buf = Vec::new();
-            reader.read_to_end(&mut buf).context("read http response")?;
-            Ok(buf)
-        }
+        "http" | "https" => http_get_bytes(url, token),
         other => anyhow::bail!("unsupported url scheme {other:?} for {}", url.as_str()),
     }
 }

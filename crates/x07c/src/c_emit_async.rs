@@ -839,6 +839,7 @@ impl<'a> Emitter<'a> {
                     "begin" => return self.emit_begin(state, args, dest, cont),
                     "let" => return self.emit_let(state, args, dest, cont),
                     "set" => return self.emit_set(state, args, dest, cont),
+                    "set0" => return self.emit_set0(state, args, dest, cont),
                     "if" => return self.emit_if(state, args, dest, cont),
                     "for" => return self.emit_for(state, args, dest, cont),
                     "budget.scope_v1" => return self.emit_budget_scope_v1(state, args, dest, cont),
@@ -7683,6 +7684,99 @@ impl<'a> Emitter<'a> {
                         self.line(after, format!("{} = {};", dest.c_name, var.c_name));
                     }
                 }
+                self.line(after, format!("goto st_{cont};"));
+                Ok(())
+            }
+
+            fn emit_set0(
+                &mut self,
+                state: usize,
+                args: &[Expr],
+                dest: AsyncVarRef,
+                cont: usize,
+            ) -> Result<(), CompilerError> {
+                if args.len() != 2 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "set0 form: (set0 <name> <expr>)".to_string(),
+                    ));
+                }
+                if dest.ty != Ty::I32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("set0 expression must match context type {:?}", dest.ty),
+                    ));
+                }
+                let name = args[0].as_ident().ok_or_else(|| {
+                    CompilerError::new(
+                        CompileErrorKind::Parse,
+                        "set0 name must be an identifier".to_string(),
+                    )
+                })?;
+                let Some(var) = self.lookup(name) else {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("set0 of unknown variable: {name:?}"),
+                    ));
+                };
+                let expr_ty = self.infer_expr(&args[1])?;
+                let want = TyInfo {
+                    ty: var.ty,
+                    brand: var.brand.clone(),
+                    view_full: false,
+                };
+                if expr_ty != Ty::Never && !tyinfo_compat_assign(&expr_ty, &want) {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("type mismatch in set0 for variable {name:?}"),
+                    ));
+                }
+
+                self.line(state, "rt_fuel(ctx, 1);");
+                let tmp = self.alloc_local("t_set0_", var.ty)?;
+                let expr_state = self.new_state();
+                let after = self.new_state();
+                self.line(state, format!("goto st_{expr_state};"));
+                self.emit_expr_entry(expr_state, &args[1], tmp.clone(), after)?;
+                if is_owned_ty(var.ty) {
+                    match var.ty {
+                        Ty::Bytes => {
+                            self.line(after, format!("rt_bytes_drop(ctx, &{});", var.c_name))
+                        }
+                        Ty::VecU8 => {
+                            self.line(after, format!("rt_vec_u8_drop(ctx, &{});", var.c_name))
+                        }
+                        Ty::OptionBytes => {
+                            self.line(after, format!("if ({}.tag) {{", var.c_name));
+                            self.line(
+                                after,
+                                format!("  rt_bytes_drop(ctx, &{}.payload);", var.c_name),
+                            );
+                            self.line(after, "}");
+                            self.line(after, format!("{}.tag = UINT32_C(0);", var.c_name));
+                        }
+                        Ty::ResultBytes => {
+                            self.line(after, format!("if ({}.tag) {{", var.c_name));
+                            self.line(
+                                after,
+                                format!("  rt_bytes_drop(ctx, &{}.payload.ok);", var.c_name),
+                            );
+                            self.line(after, "}");
+                            self.line(after, format!("{}.tag = UINT32_C(0);", var.c_name));
+                            self.line(after, format!("{}.payload.err = UINT32_C(0);", var.c_name));
+                        }
+                        _ => {}
+                    }
+                }
+                self.line(after, format!("{} = {};", var.c_name, tmp.c_name));
+                if is_owned_ty(var.ty) {
+                    self.line(after, format!("{} = {};", tmp.c_name, c_empty(var.ty)));
+                }
+                if let Some(v) = self.lookup_mut(name) {
+                    v.moved = false;
+                    v.moved_ptr = None;
+                }
+                self.line(after, format!("{} = UINT32_C(0);", dest.c_name));
                 self.line(after, format!("goto st_{cont};"));
                 Ok(())
             }
