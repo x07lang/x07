@@ -1,0 +1,93 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.openssl.hash",
+  "imports": ["ext.openssl._ffi"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.openssl.hash.sha256",
+        "ext.openssl.hash.sha512",
+        "ext.openssl.hash.hmac_sha256",
+        "ext.openssl.hash.hmac_sha512"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.openssl.hash.sha256",
+      "params": [{"name": "data", "ty": "bytes_view"}],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "digest_ptr", ["unsafe", ["ext.openssl._ffi.SHA256", ["view.as_ptr", "data"], ["view.len", "data"], ["ptr.cast", "ptr_mut_u8", ["ptr.null"]]]]],
+        ["let", "digest", ["unsafe", ["ptr.as_const", "digest_ptr"]]],
+        ["let", "out", ["vec_u8.with_capacity", 32]],
+        ["for", "i", 0, 32, ["set", "out", ["vec_u8.push", "out", ["unsafe", ["ptr.read_u8", ["ptr.add", "digest", "i"]]]]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.openssl.hash.sha512",
+      "params": [{"name": "data", "ty": "bytes_view"}],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "digest_ptr", ["unsafe", ["ext.openssl._ffi.SHA512", ["view.as_ptr", "data"], ["view.len", "data"], ["ptr.cast", "ptr_mut_u8", ["ptr.null"]]]]],
+        ["let", "digest", ["unsafe", ["ptr.as_const", "digest_ptr"]]],
+        ["let", "out", ["vec_u8.with_capacity", 64]],
+        ["for", "i", 0, 64, ["set", "out", ["vec_u8.push", "out", ["unsafe", ["ptr.read_u8", ["ptr.add", "digest", "i"]]]]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.openssl.hash.hmac_sha256",
+      "params": [
+        {"name": "key", "ty": "bytes_view"},
+        {"name": "data", "ty": "bytes_view"}
+      ],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "out_len", 0],
+        ["let", "out_len_ptr", ["unsafe", ["ptr.cast", "ptr_mut_i32", ["addr_of_mut", "out_len"]]]],
+        ["let", "evp", ["unsafe", ["ext.openssl._ffi.EVP_sha256"]]],
+        ["let", "digest_ptr", ["unsafe", ["ext.openssl._ffi.HMAC", "evp", ["unsafe", ["ptr.cast", "ptr_const_void", ["view.as_ptr", "key"]]], ["view.len", "key"], ["view.as_ptr", "data"], ["view.len", "data"], ["ptr.cast", "ptr_mut_u8", ["ptr.null"]], "out_len_ptr"]]],
+        ["let", "len", ["unsafe", ["ptr.read_i32", "out_len_ptr"]]],
+        ["if", ["<", "len", 1],
+          ["bytes.alloc", 0],
+          ["begin",
+            ["let", "digest", ["unsafe", ["ptr.as_const", "digest_ptr"]]],
+            ["let", "out", ["vec_u8.with_capacity", "len"]],
+            ["for", "i", 0, "len", ["set", "out", ["vec_u8.push", "out", ["unsafe", ["ptr.read_u8", ["ptr.add", "digest", "i"]]]]]],
+            ["vec_u8.into_bytes", "out"]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.openssl.hash.hmac_sha512",
+      "params": [
+        {"name": "key", "ty": "bytes_view"},
+        {"name": "data", "ty": "bytes_view"}
+      ],
+      "result": "bytes",
+      "body": ["begin",
+        ["let", "out_len", 0],
+        ["let", "out_len_ptr", ["unsafe", ["ptr.cast", "ptr_mut_i32", ["addr_of_mut", "out_len"]]]],
+        ["let", "evp", ["unsafe", ["ext.openssl._ffi.EVP_sha512"]]],
+        ["let", "digest_ptr", ["unsafe", ["ext.openssl._ffi.HMAC", "evp", ["unsafe", ["ptr.cast", "ptr_const_void", ["view.as_ptr", "key"]]], ["view.len", "key"], ["view.as_ptr", "data"], ["view.len", "data"], ["ptr.cast", "ptr_mut_u8", ["ptr.null"]], "out_len_ptr"]]],
+        ["let", "len", ["unsafe", ["ptr.read_i32", "out_len_ptr"]]],
+        ["if", ["<", "len", 1],
+          ["bytes.alloc", 0],
+          ["begin",
+            ["let", "digest", ["unsafe", ["ptr.as_const", "digest_ptr"]]],
+            ["let", "out", ["vec_u8.with_capacity", "len"]],
+            ["for", "i", 0, "len", ["set", "out", ["vec_u8.push", "out", ["unsafe", ["ptr.read_u8", ["ptr.add", "digest", "i"]]]]]],
+            ["vec_u8.into_bytes", "out"]
+          ]
+        ]
+      ]
+    }
+  ]
+}

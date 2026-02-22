@@ -19,7 +19,6 @@
       "ext-json-rs@0.1.4",
       "ext-openssl-c@0.1.6"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }
