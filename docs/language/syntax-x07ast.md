@@ -31,6 +31,13 @@ x07AST is an expression tree:
 
 The entrypoint expression returns **bytes**.
 
+## Boolean operators (i32)
+
+X07 represents booleans as `i32` (0 = false, nonzero = true).
+
+- `&` / `|`: eager bitwise ops (both sides are evaluated).
+- `&&` / `||`: short-circuit logical ops (RHS is evaluated only when needed; result is `0` or `1`).
+
 ## Schema version
 
 The root JSON object must include `schema_version`.
@@ -79,8 +86,8 @@ Notes:
 
 Contract expressions and witnesses may only call contract-pure builtins/operators:
 
-- Operators: `+`, `-`, `*`, `/`, `%`, `=`, `!=`, `<`, `<=`, `>`, `>=`, `<u`, `<=u`, `>u`, `>=u`, `<<u`, `>>u`, `&`, `|`, `^`.
-- Builtins: `bytes.lit`, `i32.lit`, `bytes.view`, `bytes.subview`, `bytes.len`, `bytes.get_u8`, `bytes.eq`, `bytes.cmp_range`, `view.len`, `view.get_u8`, `view.slice`, `view.to_bytes`.
+- Operators: `+`, `-`, `*`, `/`, `%`, `=`, `!=`, `<`, `<=`, `>`, `>=`, `<u`, `<=u`, `>u`, `>=u`, `<<u`, `>>u`, `&`, `|`, `^`, `&&`, `||`.
+- Builtins: `bytes.lit`, `bytes.view_lit`, `i32.lit`, `bytes.view`, `bytes.subview`, `bytes.len`, `bytes.get_u8`, `bytes.eq`, `bytes.cmp_range`, `view.len`, `view.get_u8`, `view.slice`, `view.to_bytes`.
 - Also allowed: any builtin head with prefix `option_*` or `result_*`.
 
 Module calls (like `foo.bar`) are not allowed in contracts.

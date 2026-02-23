@@ -514,11 +514,13 @@ pub fn guide_md() -> String {
     out.push_str("- `[\"+\",\"a\",\"b\"]` `[\"-\",\"a\",\"b\"]` `[\"*\",\"a\",\"b\"]` `[\"/\",\"a\",\"b\"]` `[\"%\",\"a\",\"b\"]`\n");
     out.push_str("- `[\"=\",\"a\",\"b\"]` `[\"!=\",\"a\",\"b\"]`\n");
     out.push_str("- Signed comparisons (two’s complement): `[\"<\",\"a\",\"b\"]` `[\"<=\",\"a\",\"b\"]` `[\">\",\"a\",\"b\"]` `[\">=\",\"a\",\"b\"]`\n");
-    out.push_str("- Unsigned comparisons: `[\"<u\",\"a\",\"b\"]` `[\">=u\",\"a\",\"b\"]`\n");
+    out.push_str("- Unsigned comparisons: `[\"<u\",\"a\",\"b\"]` `[\"<=u\",\"a\",\"b\"]` `[\">u\",\"a\",\"b\"]` `[\">=u\",\"a\",\"b\"]`\n");
+    out.push_str("- Short-circuit boolean: `[\"&&\",\"a\",\"b\"]` `[\"||\",\"a\",\"b\"]` (treats non-zero as true)\n");
     out.push_str(
         "- Shifts: `[\"<<u\",\"a\",\"b\"]` `[\">>u\",\"a\",\"b\"]` (shift amount masked by 31)\n",
     );
     out.push_str("- Bitwise: `[\"&\",\"a\",\"b\"]` `[\"|\",\"a\",\"b\"]` `[\"^\",\"a\",\"b\"]`\n");
+    out.push_str("  - Note: `&` and `|` are eager. Use `&&`/`||` for guards.\n");
     out.push('\n');
 
     out.push_str("## Integer Semantics\n\n");

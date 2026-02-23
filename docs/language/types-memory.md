@@ -26,6 +26,12 @@ Performance rule:
 ["let","v",["bytes.view","b"]]
 ```
 
+For string literals, you can use `bytes.view_lit` to produce a `bytes_view` directly:
+
+```json
+["let","v",["bytes.view_lit","hello"]]
+```
+
 ## Vectors (capacity-planned builders)
 
 Use `vec_u8` for output building:

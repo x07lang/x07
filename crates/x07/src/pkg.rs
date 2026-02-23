@@ -332,7 +332,7 @@ fn cmd_pkg_provides(args: ProvidesArgs) -> Result<std::process::ExitCode> {
     }
     rel.set_extension("x07.json");
     for root in &manifest.module_roots {
-        let abs_root = project_root.join(root);
+        let abs_root = project::resolve_rel_path_with_workspace(project_root, root)?;
         if abs_root.join(&rel).is_file() {
             providers.push(ProvidesProvider {
                 kind: "local",
@@ -368,7 +368,8 @@ fn cmd_pkg_provides(args: ProvidesArgs) -> Result<std::process::ExitCode> {
 
         for dep in &lock.dependencies {
             if dep.modules_sha256.contains_key(&module_id) {
-                let root = project_root.join(&dep.path).join(&dep.module_root);
+                let dep_dir = project::resolve_rel_path_with_workspace(project_root, &dep.path)?;
+                let root = dep_dir.join(&dep.module_root);
                 providers.push(ProvidesProvider {
                     kind: "dependency",
                     name: dep.name.clone(),
@@ -1900,7 +1901,7 @@ fn resolve_transitive_deps(
             if !scanned.insert(key) {
                 continue;
             }
-            let dep_dir = ctx.base.join(&dep.path);
+            let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
             let reqs = requires_packages_from_manifest(&dep_dir)?;
             for spec in reqs {
                 let (name, version) = parse_pkg_spec(&spec)?;
@@ -2468,7 +2469,7 @@ fn try_copy_official_dep(
         return Ok(false);
     }
 
-    let dst = base.join(&dep.path);
+    let dst = project::resolve_rel_path_with_workspace(base, &dep.path)?;
     if dst.exists() {
         if dst.is_dir() {
             std::fs::remove_dir_all(&dst)
@@ -2502,12 +2503,20 @@ fn ensure_deps_present(
     ctx: &mut TransitiveResolveCtx<'_>,
 ) -> Result<Option<PkgError>> {
     let mut missing_local_override: Vec<String> = Vec::new();
+    let mut missing_local: Vec<String> = Vec::new();
     let mut missing: Vec<&project::DependencySpec> = Vec::new();
     for dep in deps {
-        let dep_dir = ctx.base.join(&dep.path);
+        let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
         if !dep_dir.join("x07-package.json").is_file() {
             if ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some()) {
                 missing_local_override.push(format!(
+                    "{}@{} ({})",
+                    dep.name,
+                    dep.version,
+                    dep_dir.display()
+                ));
+            } else if !dep.path.starts_with(".x07/deps/") {
+                missing_local.push(format!(
                     "{}@{} ({})",
                     dep.name,
                     dep.version,
@@ -2527,6 +2536,18 @@ fn ensure_deps_present(
             message: format!(
                 "patched dependencies are missing on disk: {}",
                 missing_local_override.join(", ")
+            ),
+        }));
+    }
+
+    if !missing_local.is_empty() {
+        missing_local.sort();
+        missing_local.dedup();
+        return Ok(Some(PkgError {
+            code: "X07PKG_LOCAL_MISSING_DEP".to_string(),
+            message: format!(
+                "local dependencies are missing on disk: {}",
+                missing_local.join(", ")
             ),
         }));
     }
@@ -2563,7 +2584,7 @@ fn ensure_deps_present(
     let client = ctx.client.as_ref().expect("client initialized");
 
     for dep in missing {
-        let dep_dir = ctx.base.join(&dep.path);
+        let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
         let entries = match client.fetch_entries(&dep.name) {
             Ok(entries) => entries,
             Err(err) => {

@@ -11,6 +11,55 @@ use x07_contracts::{
     PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0,
 };
 
+fn workspace_path_remainder(raw: &str) -> Option<&str> {
+    if raw == "$workspace" {
+        return Some("");
+    }
+    raw.strip_prefix("$workspace/")
+}
+
+pub fn resolve_rel_path_with_workspace(base: &Path, raw: &str) -> Result<PathBuf> {
+    let raw = raw.trim();
+    let Some(remainder) = workspace_path_remainder(raw) else {
+        return Ok(base.join(raw));
+    };
+
+    let root = std::env::var_os("X07_WORKSPACE_ROOT")
+        .ok_or_else(|| anyhow::anyhow!("X07_WORKSPACE_ROOT must be set when using {raw:?}"))?;
+    let root = PathBuf::from(root);
+    if root.as_os_str().is_empty() {
+        anyhow::bail!("X07_WORKSPACE_ROOT must be non-empty when using {raw:?}");
+    }
+    let root = root
+        .canonicalize()
+        .with_context(|| format!("canonicalize X07_WORKSPACE_ROOT: {}", root.display()))?;
+
+    let resolved = if remainder.is_empty() {
+        root.clone()
+    } else {
+        root.join(remainder)
+    };
+
+    if resolved.exists() {
+        let resolved = resolved.canonicalize().with_context(|| {
+            format!(
+                "canonicalize $workspace path: {raw:?} -> {}",
+                resolved.display()
+            )
+        })?;
+        if !resolved.starts_with(&root) {
+            anyhow::bail!(
+                "$workspace path escapes workspace root: {raw:?} -> {} (root {})",
+                resolved.display(),
+                root.display()
+            );
+        }
+        Ok(resolved)
+    } else {
+        Ok(resolved)
+    }
+}
+
 fn validate_rel_path(field: &str, raw: &str) -> Result<()> {
     let raw = raw.trim();
     if raw.is_empty() {
@@ -381,7 +430,7 @@ pub fn compute_lockfile(project_path: &Path, manifest: &ProjectManifest) -> Resu
 
     let mut locked_deps = Vec::with_capacity(manifest.dependencies.len());
     for dep in &manifest.dependencies {
-        let dep_dir = base.join(&dep.path);
+        let dep_dir = resolve_rel_path_with_workspace(base, &dep.path)?;
         let (pkg, pkg_manifest_path, pkg_manifest_bytes) = load_package_manifest(&dep_dir)?;
         if pkg.name != dep.name {
             anyhow::bail!(
@@ -499,13 +548,14 @@ pub fn collect_module_roots(
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut roots: Vec<PathBuf> = Vec::new();
     for r in &manifest.module_roots {
-        let root = normalize_module_root_path(base.join(r));
+        let root = normalize_module_root_path(resolve_rel_path_with_workspace(base, r)?);
         if seen.insert(root.clone()) {
             roots.push(root);
         }
     }
     for dep in &lock.dependencies {
-        let root = normalize_module_root_path(base.join(&dep.path).join(&dep.module_root));
+        let dep_dir = resolve_rel_path_with_workspace(base, &dep.path)?;
+        let root = normalize_module_root_path(dep_dir.join(&dep.module_root));
         if seen.insert(root.clone()) {
             roots.push(root);
         }

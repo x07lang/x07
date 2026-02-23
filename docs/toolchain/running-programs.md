@@ -153,6 +153,10 @@ Report modes:
 - `--report runner` (default): pass through the runner JSON (`spec/x07-os-runner.report.schema.json`)
 - `--report wrapped`: wrap the runner JSON in `spec/x07-run.report.schema.json` (`schema_version: "x07.run.report@0.1.0"`)
 
+### Runtime traps (AST pointers)
+
+When a program traps at runtime, the trap message may include an x07AST pointer like `ptr=/solve/...` when available. Use that pointer to locate the corresponding node in the `*.x07.json` source.
+
 ### Common failure: unknown module (missing deps)
 
 If compilation fails because a module can’t be resolved, the report will have:

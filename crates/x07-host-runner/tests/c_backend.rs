@@ -77,6 +77,21 @@ fn fmt_and_parse_roundtrip() {
 }
 
 #[test]
+fn bytes_view_lit_roundtrips_to_bytes() {
+    let cfg = config();
+    let program = x07_program::entry(&[], json!(["view.to_bytes", ["bytes.view_lit", "abc"]]));
+    let exe = compile_exe(program.as_slice());
+    let res = run_artifact_file(&cfg, &exe, b"").expect("runner ok");
+    assert!(
+        res.ok,
+        "trap={:?}\nstderr={:?}",
+        res.trap,
+        String::from_utf8_lossy(&res.stderr)
+    );
+    assert_eq!(res.solve_output, b"abc");
+}
+
+#[test]
 fn vec_u8_builds_bytes() {
     let cfg = config();
     let program = x07_program::entry(
@@ -134,7 +149,59 @@ fn bytes_slice_oob_traps() {
     let exe = compile_exe(program.as_slice());
     let res = run_artifact_file(&cfg, &exe, b"x").expect("runner ok");
     assert!(!res.ok);
-    assert!(String::from_utf8_lossy(&res.stderr).contains("view.slice oob"));
+    let stderr = String::from_utf8_lossy(&res.stderr);
+    assert!(stderr.contains("view.slice oob"), "stderr={stderr:?}");
+    assert!(stderr.contains("ptr="), "stderr={stderr:?}");
+}
+
+#[test]
+fn and_short_circuits_rhs_trap() {
+    let cfg = config();
+    let program = x07_program::entry(
+        &[],
+        json!([
+            "if",
+            [
+                "&&",
+                ["=", ["view.len", "input"], 1],
+                ["=", ["view.get_u8", "input", 0], 47]
+            ],
+            ["bytes.lit", "ok"],
+            ["bytes.lit", "no"]
+        ]),
+    );
+    let exe = compile_exe(program.as_slice());
+    let res = run_artifact_file(&cfg, &exe, b"").expect("runner ok");
+    assert!(
+        res.ok,
+        "trap={:?}\nstderr={:?}",
+        res.trap,
+        String::from_utf8_lossy(&res.stderr)
+    );
+    assert_eq!(res.solve_output, b"no");
+}
+
+#[test]
+fn or_short_circuits_rhs_trap() {
+    let cfg = config();
+    let program = x07_program::entry(
+        &[],
+        json!([
+            "if",
+            ["||", ["=", 1, 1], ["=", ["view.get_u8", "input", 0], 47]],
+            ["bytes.lit", "ok"],
+            ["bytes.lit", "no"]
+        ]),
+    );
+    let exe = compile_exe(program.as_slice());
+    let res = run_artifact_file(&cfg, &exe, b"").expect("runner ok");
+    assert!(
+        res.ok,
+        "trap={:?}\nstderr={:?}",
+        res.trap,
+        String::from_utf8_lossy(&res.stderr)
+    );
+    assert_eq!(res.solve_output, b"ok");
 }
 
 #[test]

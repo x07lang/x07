@@ -869,6 +869,7 @@ impl<'a> Emitter<'a> {
                         }
                         self.borrow_of_view_expr(&args[1])
                     }
+                    "bytes.view_lit" => Ok(None),
                     "std.brand.view_v1" => {
                         if args.len() != 1 {
                             return Err(CompilerError::new(
@@ -2342,6 +2343,8 @@ typedef struct {
   uint32_t os_procs_live;
   uint32_t os_procs_spawned;
 
+  const char* trap_ptr;
+
   uint32_t last_bytes_eq_valid;
   uint32_t last_bytes_eq_a_len;
   uint32_t last_bytes_eq_b_len;
@@ -2460,10 +2463,13 @@ static void rt_os_process_cleanup(ctx_t* ctx) {
 static __attribute__((noreturn)) void rt_trap(const char* msg) {
 
 #ifndef X07_FREESTANDING
-  if (msg) {
-    (void)write(STDERR_FILENO, msg, strlen(msg));
-    (void)write(STDERR_FILENO, "\n", 1);
+  if (msg) (void)write(STDERR_FILENO, msg, strlen(msg));
+  if (rt_ext_ctx && rt_ext_ctx->trap_ptr) {
+    const char* p = rt_ext_ctx->trap_ptr;
+    (void)write(STDERR_FILENO, " ptr=", 5);
+    (void)write(STDERR_FILENO, p, strlen(p));
   }
+  if (msg || (rt_ext_ctx && rt_ext_ctx->trap_ptr)) (void)write(STDERR_FILENO, "\n", 1);
 #else
   (void)msg;
 #endif
@@ -2917,6 +2923,33 @@ static uint64_t rt_dbg_alloc_find(
   return 0;
 }
 
+static uint64_t rt_dbg_alloc_try_find(
+    ctx_t* ctx,
+    uint8_t* ptr,
+    uint32_t len_bytes,
+    uint32_t* out_off_bytes
+) {
+  if (out_off_bytes) *out_off_bytes = 0;
+  if (len_bytes == 0) return 0;
+  if (!ctx->dbg_allocs) return 0;
+  uintptr_t p = (uintptr_t)ptr;
+  // Search newest-to-oldest so re-used pointers resolve to the latest allocation record.
+  for (uint32_t i = ctx->dbg_allocs_len; i > 0; i--) {
+    uint32_t idx = i - 1;
+    dbg_alloc_rec_t* rec = &ctx->dbg_allocs[idx];
+    uintptr_t base = (uintptr_t)rec->base_ptr;
+    uintptr_t end = base + (uintptr_t)rec->size_bytes;
+    if (end < base) continue;
+    if (p >= base && p < end) {
+      uint32_t off = (uint32_t)(p - base);
+      if (off > rec->size_bytes || rec->size_bytes - off < len_bytes) return 0;
+      if (out_off_bytes) *out_off_bytes = off;
+      return (uint64_t)idx + 1;
+    }
+  }
+  return 0;
+}
+
 static uint64_t rt_dbg_alloc_borrow_id(ctx_t* ctx, uint64_t alloc_id) {
   if (alloc_id == 0) return 0;
   uint64_t idx = alloc_id - 1;
@@ -3092,6 +3125,25 @@ static bytes_t rt_bytes_from_literal(ctx_t* ctx, const uint8_t* ptr, uint32_t le
     memcpy(out.ptr, ptr, len);
     rt_mem_on_memcpy(ctx, len);
   }
+  return out;
+}
+
+static bytes_view_t rt_view_from_literal(ctx_t* ctx, const uint8_t* ptr, uint32_t len) {
+  if (len == 0) return rt_view_empty(ctx);
+  bytes_view_t out;
+  out.ptr = (uint8_t*)ptr;
+  out.len = len;
+#ifdef X07_DEBUG_BORROW
+  uint32_t off = 0;
+  uint64_t aid = rt_dbg_alloc_try_find(ctx, (uint8_t*)ptr, len, &off);
+  if (aid == 0) {
+    aid = rt_dbg_alloc_register(ctx, (uint8_t*)ptr, len);
+    off = 0;
+  }
+  out.aid = aid;
+  out.off_bytes = off;
+  out.bid = rt_dbg_alloc_borrow_id(ctx, aid);
+#endif
   return out;
 }
 

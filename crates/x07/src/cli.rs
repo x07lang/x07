@@ -697,10 +697,10 @@ fn infer_cli_module_roots_for_spec(spec_path: &Path) -> Result<Vec<PathBuf>> {
 
     let mut roots: Vec<PathBuf> = Vec::new();
     for r in &manifest.module_roots {
-        roots.push(base.join(r));
+        roots.push(project::resolve_rel_path_with_workspace(base, r)?);
     }
     for dep in &manifest.dependencies {
-        let dep_dir = base.join(&dep.path);
+        let dep_dir = project::resolve_rel_path_with_workspace(base, &dep.path)?;
         let (pkg, _, _) = project::load_package_manifest(&dep_dir).with_context(|| {
             format!(
                 "load package manifest for {:?}@{:?} from {}",

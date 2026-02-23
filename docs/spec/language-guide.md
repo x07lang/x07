@@ -500,9 +500,11 @@ Call module functions using fully-qualified names (e.g. `["std.bytes.reverse","b
 - `["+","a","b"]` `["-","a","b"]` `["*","a","b"]` `["/","a","b"]` `["%","a","b"]`
 - `["=","a","b"]` `["!=","a","b"]`
 - Signed comparisons (two’s complement): `["<","a","b"]` `["<=","a","b"]` `[">","a","b"]` `[">=","a","b"]`
-- Unsigned comparisons: `["<u","a","b"]` `[">=u","a","b"]`
+- Unsigned comparisons: `["<u","a","b"]` `["<=u","a","b"]` `[">u","a","b"]` `[">=u","a","b"]`
+- Short-circuit boolean: `["&&","a","b"]` `["||","a","b"]` (treats non-zero as true)
 - Shifts: `["<<u","a","b"]` `[">>u","a","b"]` (shift amount masked by 31)
 - Bitwise: `["&","a","b"]` `["|","a","b"]` `["^","a","b"]`
+  - Note: `&` and `|` are eager. Use `&&`/`||` for guards.
 
 ## Integer Semantics
 

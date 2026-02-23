@@ -409,7 +409,7 @@ impl InferCtx {
                         Ok(Ty::Never.into())
                     }
                     "+" | "-" | "*" | "/" | "%" | "&" | "|" | "^" | "<<u" | ">>u" | "=" | "!="
-                    | "<" | "<=" | ">" | ">=" | "<u" | ">=u" | ">u" | "<=u" => {
+                    | "<" | "<=" | ">" | ">=" | "<u" | ">=u" | ">u" | "<=u" | "&&" | "||" => {
                         if args.len() != 2 {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Parse,
@@ -992,6 +992,25 @@ impl InferCtx {
                             ));
                         }
                         Ok(Ty::Bytes.into())
+                    }
+                    "bytes.view_lit" => {
+                        if args.len() != 1 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "bytes.view_lit expects 1 arg".to_string(),
+                            ));
+                        }
+                        if args[0].as_ident().is_none() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "bytes.view_lit expects a text string".to_string(),
+                            ));
+                        }
+                        Ok(TyInfo {
+                            ty: Ty::BytesView,
+                            brand: TyBrand::None,
+                            view_full: true,
+                        })
                     }
                     "bytes.copy" => {
                         if args.len() != 2 {
@@ -6252,6 +6271,7 @@ impl<'a> Emitter<'a> {
                         Ok(Some(src))
                     }
                     "result_bytes_view.err" => Ok(Some(ViewBorrowFrom::Runtime)),
+                    "bytes.view_lit" => Ok(Some(ViewBorrowFrom::Runtime)),
                     "std.brand.cast_view_v1" => {
                         if args.len() != 3 {
                             return Err(CompilerError::new(

@@ -76,6 +76,7 @@ struct BeginStmtCtx {
 struct LintCtx {
     begin_stmt: Option<BeginStmtCtx>,
     hoist_safe: bool,
+    value_used: bool,
 }
 
 impl Default for LintCtx {
@@ -83,6 +84,7 @@ impl Default for LintCtx {
         Self {
             begin_stmt: None,
             hoist_safe: true,
+            value_used: true,
         }
     }
 }
@@ -793,6 +795,8 @@ fn lint_expr(
             let head = items[0].as_ident().unwrap_or("");
             lint_core_arity(head, items, ptr, diagnostics);
             lint_core_borrow_rules(head, items, ptr, ctx, diagnostics);
+            lint_core_borrow_escape_rules(head, items, ptr, ctx, diagnostics);
+            lint_core_eager_bool_traps(head, items, ptr, diagnostics);
             lint_core_move_rules(head, items, ptr, diagnostics);
             lint_world_heads(head, ptr, options, diagnostics);
 
@@ -800,6 +804,26 @@ fn lint_expr(
                 let child_ptr = format!("{ptr}/{idx}");
 
                 let mut child_ctx = ctx.clone();
+                child_ctx.value_used = match head {
+                    "begin" | "unsafe" => {
+                        if idx == 0 {
+                            true
+                        } else if idx == items.len().saturating_sub(1) {
+                            ctx.value_used
+                        } else {
+                            false
+                        }
+                    }
+                    "if" => {
+                        if idx <= 1 {
+                            true
+                        } else {
+                            ctx.value_used
+                        }
+                    }
+                    "for" => idx != items.len().saturating_sub(1),
+                    _ => true,
+                };
                 match head {
                     "if" => {
                         if idx == 2 || idx == 3 {
@@ -833,6 +857,314 @@ fn lint_expr(
             }
         }
     }
+}
+
+fn lint_core_eager_bool_traps(
+    head: &str,
+    items: &[Expr],
+    ptr: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if head != "if" || items.len() != 4 {
+        return;
+    }
+    let cond = &items[1];
+    let cond_ptr = format!("{ptr}/1");
+
+    #[derive(Default)]
+    struct CondScan {
+        eager_ptr: Option<String>,
+        eager_head: Option<String>,
+        saw_trap_prone: bool,
+    }
+
+    fn scan(expr: &Expr, ptr: &str, out: &mut CondScan) {
+        let Expr::List { items, .. } = expr else {
+            return;
+        };
+        let head = items.first().and_then(Expr::as_ident).unwrap_or("");
+        if (head == "&" || head == "|") && out.eager_ptr.is_none() {
+            out.eager_ptr = Some(ptr.to_string());
+            out.eager_head = Some(head.to_string());
+        }
+        if matches!(
+            head,
+            "view.get_u8" | "view.slice" | "bytes.get_u8" | "bytes.slice"
+        ) {
+            out.saw_trap_prone = true;
+        }
+        for (idx, item) in items.iter().enumerate() {
+            scan(item, &format!("{ptr}/{idx}"), out);
+        }
+    }
+
+    let mut scan_out = CondScan::default();
+    scan(cond, &cond_ptr, &mut scan_out);
+    if scan_out.eager_ptr.is_none() || !scan_out.saw_trap_prone {
+        return;
+    }
+
+    let eager_ptr = scan_out.eager_ptr.unwrap_or(cond_ptr);
+    let quickfix = match scan_out.eager_head.as_deref() {
+        Some("&") => Some(Quickfix {
+            kind: QuickfixKind::JsonPatch,
+            patch: vec![PatchOp::Replace {
+                path: format!("{eager_ptr}/0"),
+                value: x07ast::expr_to_value(&expr_ident("&&")),
+            }],
+            note: Some("Rewrite '&' to '&&' to short-circuit".to_string()),
+        }),
+        Some("|") => Some(Quickfix {
+            kind: QuickfixKind::JsonPatch,
+            patch: vec![PatchOp::Replace {
+                path: format!("{eager_ptr}/0"),
+                value: x07ast::expr_to_value(&expr_ident("||")),
+            }],
+            note: Some("Rewrite '|' to '||' to short-circuit".to_string()),
+        }),
+        _ => None,
+    };
+
+    let mut notes = vec![
+        "`&` and `|` evaluate both sides eagerly (no short-circuit).".to_string(),
+        "Using `&&` / `||` avoids evaluating the RHS when the LHS determines the result."
+            .to_string(),
+    ];
+    if quickfix.is_some() {
+        notes.push("Auto-fix available: run `x07 fix --input <file> --write`.".to_string());
+    }
+
+    diagnostics.push(Diagnostic {
+        code: "X07-BOOL-0001".to_string(),
+        severity: Severity::Warning,
+        stage: Stage::Lint,
+        message: "if condition uses eager '&' / '|' with trap-prone view ops (prefer '&&' / '||')"
+            .to_string(),
+        loc: Some(Location::X07Ast { ptr: eager_ptr }),
+        notes,
+        related: Vec::new(),
+        data: Default::default(),
+        quickfix,
+    });
+}
+
+fn lint_core_borrow_escape_rules(
+    head: &str,
+    items: &[Expr],
+    ptr: &str,
+    ctx: &LintCtx,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if !matches!(head, "begin" | "unsafe") {
+        return;
+    }
+    if !ctx.value_used {
+        return;
+    }
+    if items.len() < 2 {
+        return;
+    }
+
+    let args = &items[1..];
+    let (stmts, tail) = match args.split_last() {
+        Some((tail, stmts)) => (stmts, tail),
+        None => return,
+    };
+
+    fn parse_let_stmt(stmt: &Expr) -> Option<(&str, &Expr)> {
+        let Expr::List { items, .. } = stmt else {
+            return None;
+        };
+        if items.first().and_then(Expr::as_ident) != Some("let") {
+            return None;
+        }
+        if items.len() != 3 {
+            return None;
+        }
+        let name = items[1].as_ident()?;
+        Some((name, &items[2]))
+    }
+
+    fn infer_view_borrow_sources(
+        expr: &Expr,
+        env: &std::collections::BTreeMap<String, BTreeSet<String>>,
+    ) -> Option<BTreeSet<String>> {
+        match expr {
+            Expr::Ident { name, .. } => {
+                if name == "input" {
+                    return Some(BTreeSet::new());
+                }
+                env.get(name).cloned()
+            }
+            Expr::List { items, .. } => {
+                let head = items.first().and_then(Expr::as_ident)?;
+                let args = &items[1..];
+                match head {
+                    "if" => {
+                        if args.len() != 3 {
+                            return None;
+                        }
+                        let t = infer_view_borrow_sources(&args[1], env)?;
+                        let e = infer_view_borrow_sources(&args[2], env)?;
+                        let mut out = t;
+                        out.extend(e);
+                        Some(out)
+                    }
+                    "std.brand.erase_view_v1" => {
+                        if args.len() != 1 {
+                            return None;
+                        }
+                        infer_view_borrow_sources(&args[0], env)
+                    }
+                    "__internal.brand.assume_view_v1" => {
+                        if args.len() != 2 {
+                            return None;
+                        }
+                        infer_view_borrow_sources(&args[1], env)
+                    }
+                    "view.slice" => {
+                        if args.len() != 3 {
+                            return None;
+                        }
+                        infer_view_borrow_sources(&args[0], env)
+                    }
+                    "bytes.view" | "bytes.subview" | "vec_u8.as_view" | "std.brand.view_v1" => {
+                        let owner = args.first().and_then(Expr::as_ident)?;
+                        let mut out = BTreeSet::new();
+                        out.insert(owner.to_string());
+                        Some(out)
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    let mut locals: BTreeSet<String> = BTreeSet::new();
+    let mut env: std::collections::BTreeMap<String, BTreeSet<String>> = Default::default();
+    for stmt in stmts {
+        let Some((name, init)) = parse_let_stmt(stmt) else {
+            continue;
+        };
+        locals.insert(name.to_string());
+        if let Some(borrow_sources) = infer_view_borrow_sources(init, &env) {
+            env.insert(name.to_string(), borrow_sources);
+        }
+    }
+    if locals.is_empty() {
+        return;
+    }
+
+    let Some(borrow_sources) = infer_view_borrow_sources(tail, &env) else {
+        return;
+    };
+    let mut escaping: Vec<String> = borrow_sources
+        .iter()
+        .filter(|s| locals.contains(*s))
+        .cloned()
+        .collect();
+    if escaping.is_empty() {
+        return;
+    }
+    escaping.sort();
+    escaping.dedup();
+
+    let tail_ptr = format!("{}/{}", ptr, items.len().saturating_sub(1));
+    let quickfix = (|| {
+        if stmts.len() != 1 {
+            return None;
+        }
+        let (name, init) = parse_let_stmt(&stmts[0])?;
+        if escaping != vec![name.to_string()] {
+            return None;
+        }
+
+        let Expr::List {
+            items: init_items, ..
+        } = init
+        else {
+            return None;
+        };
+        if init_items.len() != 2 || init_items[0].as_ident() != Some("bytes.lit") {
+            return None;
+        }
+        let text = init_items[1].as_ident()?.to_string();
+
+        let Expr::List {
+            items: tail_items, ..
+        } = tail
+        else {
+            return None;
+        };
+        let tail_head = tail_items.first().and_then(Expr::as_ident)?;
+        let tail_args = &tail_items[1..];
+
+        match tail_head {
+            "bytes.view" => {
+                if tail_args.len() != 1 || tail_args[0].as_ident() != Some(name) {
+                    return None;
+                }
+                let fixed = expr_list(vec![expr_ident("bytes.view_lit"), expr_ident(text)]);
+                Some(Quickfix {
+                    kind: QuickfixKind::JsonPatch,
+                    patch: vec![PatchOp::Replace {
+                        path: ptr.to_string(),
+                        value: x07ast::expr_to_value(&fixed),
+                    }],
+                    note: Some(
+                        "Rewrite begin(let k = bytes.lit ...; bytes.view k) as bytes.view_lit"
+                            .to_string(),
+                    ),
+                })
+            }
+            "bytes.subview" => {
+                if tail_args.len() != 3 || tail_args[0].as_ident() != Some(name) {
+                    return None;
+                }
+                let fixed = expr_list(vec![
+                    expr_ident("view.slice"),
+                    expr_list(vec![expr_ident("bytes.view_lit"), expr_ident(text)]),
+                    tail_args[1].clone(),
+                    tail_args[2].clone(),
+                ]);
+                Some(Quickfix {
+                    kind: QuickfixKind::JsonPatch,
+                    patch: vec![PatchOp::Replace {
+                        path: ptr.to_string(),
+                        value: x07ast::expr_to_value(&fixed),
+                    }],
+                    note: Some(
+                        "Rewrite begin(let k = bytes.lit ...; bytes.subview k ...) using bytes.view_lit"
+                            .to_string(),
+                    ),
+                })
+            }
+            _ => None,
+        }
+    })();
+
+    let mut notes = vec![
+        "This bytes_view escapes a statement block scope.".to_string(),
+        "Suggested fix: hoist the owned value `let` binding outside the statement block so the borrow source outlives the view.".to_string(),
+    ];
+    if quickfix.is_some() {
+        notes.push("Auto-fix available: run `x07 fix --input <file> --write`.".to_string());
+    }
+    diagnostics.push(Diagnostic {
+        code: "X07-BORROW-0002".to_string(),
+        severity: Severity::Error,
+        stage: Stage::Lint,
+        message: format!(
+            "{head} returns a bytes_view that borrows from a local binding: {}",
+            escaping.join(", ")
+        ),
+        loc: Some(Location::X07Ast { ptr: tail_ptr }),
+        notes,
+        related: Vec::new(),
+        data: Default::default(),
+        quickfix,
+    });
 }
 
 fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<Diagnostic>) {
@@ -1042,6 +1374,10 @@ fn lint_core_borrow_rules(
         notes.push(
             "Suggested fix: replace [\"bytes.view\", <expr>] with [\"begin\", [\"let\", \"tmp\", <expr>], [\"bytes.view\", \"tmp\"]].".to_string(),
         );
+        notes.push(
+            "If you want a literal bytes_view, prefer [\"bytes.view_lit\", \"...\"] over [\"bytes.view\", [\"bytes.lit\", \"...\"]]."
+                .to_string(),
+        );
     } else if head == "bytes.subview" {
         notes.push(
             "Suggested fix: replace [\"bytes.subview\", <expr>, <start>, <len>] with [\"begin\", [\"let\", \"tmp\", <expr>], [\"bytes.subview\", \"tmp\", <start>, <len>]].".to_string(),
@@ -1052,7 +1388,19 @@ fn lint_core_borrow_rules(
                 .to_string(),
         );
     }
-    notes.push("Auto-fix available: run `x07 fix --input <file> --write`.".to_string());
+
+    let bytes_view_lit_text = if head == "bytes.view" {
+        match owner {
+            Expr::List { items, .. }
+                if items.len() == 2 && items[0].as_ident() == Some("bytes.lit") =>
+            {
+                items[1].as_ident().map(|s| s.to_string())
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
 
     let tmp = borrow_tmp_name(ptr);
     let mut call_items: Vec<Expr> = Vec::with_capacity(items.len());
@@ -1062,10 +1410,22 @@ fn lint_core_borrow_rules(
 
     let fixed_call = expr_list(call_items);
 
-    let quickfix = if !ctx.hoist_safe {
-        None
-    } else if let Some(b) = ctx.begin_stmt.as_ref() {
+    let quickfix = if let Some(text) = bytes_view_lit_text.clone() {
         Some(Quickfix {
+            kind: QuickfixKind::JsonPatch,
+            patch: vec![PatchOp::Replace {
+                path: ptr.to_string(),
+                value: x07ast::expr_to_value(&expr_list(vec![
+                    expr_ident("bytes.view_lit"),
+                    expr_ident(text),
+                ])),
+            }],
+            note: Some("Rewrite bytes.view(bytes.lit ...) as bytes.view_lit".to_string()),
+        })
+    } else if !ctx.hoist_safe {
+        None
+    } else {
+        ctx.begin_stmt.as_ref().map(|b| Quickfix {
             kind: QuickfixKind::JsonPatch,
             patch: vec![
                 PatchOp::Replace {
@@ -1083,26 +1443,11 @@ fn lint_core_borrow_rules(
             ],
             note: Some(format!("Introduce let binding for {head} owner")),
         })
-    } else if ptr == "/solve" || ptr.ends_with("/body") {
-        Some(Quickfix {
-            kind: QuickfixKind::JsonPatch,
-            patch: vec![PatchOp::Replace {
-                path: ptr.to_string(),
-                value: x07ast::expr_to_value(&expr_list(vec![
-                    expr_ident("begin"),
-                    expr_list(vec![
-                        expr_ident("let"),
-                        expr_ident(tmp.to_string()),
-                        owner.clone(),
-                    ]),
-                    fixed_call,
-                ])),
-            }],
-            note: Some(format!("Introduce let binding for {head} owner")),
-        })
-    } else {
-        None
     };
+
+    if quickfix.is_some() {
+        notes.push("Auto-fix available: run `x07 fix --input <file> --write`.".to_string());
+    }
 
     let owner_label = match owner {
         Expr::List { items, .. } => items
@@ -1594,7 +1939,7 @@ mod tests {
         let mut diagnostics = Vec::new();
         let items = vec![
             expr_ident("bytes.view"),
-            expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
+            expr_list(vec![expr_ident("bytes.lit"), expr_ident("a")]),
         ];
 
         lint_core_borrow_rules(
@@ -1610,6 +1955,29 @@ mod tests {
         assert_eq!(diag.code, "X07-BORROW-0001");
         let q = diag.quickfix.as_ref().expect("expected quickfix");
         assert_eq!(q.kind, QuickfixKind::JsonPatch);
+    }
+
+    #[test]
+    fn lint_core_borrow_rules_bytes_alloc_does_not_offer_unsafe_quickfix() {
+        let ctx = LintCtx::default();
+        let mut diagnostics = Vec::new();
+        let items = vec![
+            expr_ident("bytes.view"),
+            expr_list(vec![expr_ident("bytes.alloc"), expr_int(0)]),
+        ];
+
+        lint_core_borrow_rules(
+            "bytes.view",
+            items.as_slice(),
+            "/solve",
+            &ctx,
+            &mut diagnostics,
+        );
+
+        assert_eq!(diagnostics.len(), 1, "unexpected diags: {diagnostics:?}");
+        let diag = diagnostics.first().expect("len == 1");
+        assert_eq!(diag.code, "X07-BORROW-0001");
+        assert!(diag.quickfix.is_none());
     }
 
     #[test]

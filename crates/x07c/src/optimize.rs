@@ -383,7 +383,7 @@ fn dce_unused_lets(expr: Expr, seed: &LocalTyEnv) -> Expr {
                         }
                         free_vars(&args[1], bound, out);
                     }
-                    "bytes.lit" | "i32.lit" => {
+                    "bytes.lit" | "bytes.view_lit" | "i32.lit" => {
                         for (idx, a) in args.iter().enumerate() {
                             if idx == 0 {
                                 continue;
@@ -992,6 +992,8 @@ fn is_pure_i32_head(head: &str) -> bool {
             | "<=u"
             | ">u"
             | ">=u"
+            | "&&"
+            | "||"
     )
 }
 

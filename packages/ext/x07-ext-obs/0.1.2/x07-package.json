@@ -20,7 +20,7 @@
       "ext-hex-rs@0.1.4",
       "ext-json-rs@0.1.4",
       "ext-math@0.1.4",
-      "ext-net@0.1.8",
+      "ext-net@0.1.9",
       "ext-pb-rs@0.1.5",
       "ext-u64-rs@0.1.0"
     ],

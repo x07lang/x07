@@ -1,6 +1,27 @@
 use super::*;
 
 impl<'a> Emitter<'a> {
+    fn emit_trap_ptr_set(&mut self) {
+        let Some(ptr) = self.current_ptr.as_deref().filter(|p| !p.is_empty()) else {
+            self.line("ctx->trap_ptr = NULL;");
+            return;
+        };
+        let escaped = c_escape_c_string(ptr);
+        self.line(&format!("ctx->trap_ptr = \"{escaped}\";"));
+    }
+
+    fn emit_trap_ptr_clear(&mut self) {
+        self.line("ctx->trap_ptr = NULL;");
+    }
+
+    fn emit_static_text_literal(&mut self, lit_bytes: &[u8]) -> String {
+        self.tmp_counter += 1;
+        let lit_name = format!("lit_{}", self.tmp_counter);
+        let escaped = c_escape_string(lit_bytes);
+        self.line(&format!("static const char {lit_name}[] = \"{escaped}\";"));
+        lit_name
+    }
+
     pub(super) fn emit_expr(&mut self, expr: &Expr) -> Result<VarRef, CompilerError> {
         let prev_ptr = self.current_ptr.replace(expr.ptr().to_string());
         let out = (|| {
@@ -609,6 +630,8 @@ impl<'a> Emitter<'a> {
             "task.select_evt.drop_v1" => self.emit_task_select_evt_drop_v1_to(args, dest_ty, dest),
             "return" => self.emit_return(args),
 
+            "&&" | "||" => self.emit_bool_short_circuit_to(head, args, dest_ty, dest),
+
             "+" | "-" | "*" | "/" | "%" | "&" | "|" | "^" | "<<u" | ">>u" | "=" | "!=" | "<"
             | "<=" | ">" | ">=" | "<u" | ">=u" | ">u" | "<=u" => {
                 self.emit_binop_to(head, args, dest_ty, dest)
@@ -621,6 +644,7 @@ impl<'a> Emitter<'a> {
             "bytes.empty" => self.emit_bytes_empty_to(args, dest_ty, dest),
             "bytes1" => self.emit_bytes1_to(args, dest_ty, dest),
             "bytes.lit" => self.emit_bytes_lit_to(args, dest_ty, dest),
+            "bytes.view_lit" => self.emit_bytes_view_lit_to(args, dest_ty, dest),
             "bytes.slice" => self.emit_bytes_slice_to(args, dest_ty, dest),
             "bytes.copy" => self.emit_bytes_copy_to(args, dest_ty, dest),
             "bytes.concat" => self.emit_bytes_concat_to(args, dest_ty, dest),
@@ -1520,6 +1544,75 @@ impl<'a> Emitter<'a> {
         }
     }
 
+    pub(super) fn emit_bool_short_circuit_to(
+        &mut self,
+        head: &str,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                format!("{head} expects 2 args"),
+            ));
+        }
+        if dest_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} returns i32"),
+            ));
+        }
+        let a = self.emit_expr(&args[0])?;
+        if a.ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                format!("{head} expects i32 args"),
+            ));
+        }
+
+        match head {
+            "&&" => {
+                self.line(&format!("if ({} == UINT32_C(0)) {{", a.c_name));
+                self.indent += 1;
+                self.line(&format!("{dest} = UINT32_C(0);"));
+                self.indent -= 1;
+                self.line("} else {");
+                self.indent += 1;
+                let b = self.emit_expr(&args[1])?;
+                if b.ty != Ty::I32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects i32 args"),
+                    ));
+                }
+                self.line(&format!("{dest} = ({} != UINT32_C(0));", b.c_name));
+                self.indent -= 1;
+                self.line("}");
+            }
+            "||" => {
+                self.line(&format!("if ({} != UINT32_C(0)) {{", a.c_name));
+                self.indent += 1;
+                self.line(&format!("{dest} = UINT32_C(1);"));
+                self.indent -= 1;
+                self.line("} else {");
+                self.indent += 1;
+                let b = self.emit_expr(&args[1])?;
+                if b.ty != Ty::I32 {
+                    return Err(CompilerError::new(
+                        CompileErrorKind::Typing,
+                        format!("{head} expects i32 args"),
+                    ));
+                }
+                self.line(&format!("{dest} = ({} != UINT32_C(0));", b.c_name));
+                self.indent -= 1;
+                self.line("}");
+            }
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+
     pub(super) fn emit_binop_to(
         &mut self,
         head: &str,
@@ -1803,10 +1896,12 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "bytes.get_u8 expects (bytes_view, i32)".to_string(),
             ));
         }
+        self.emit_trap_ptr_set();
         self.line(&format!(
             "{dest} = rt_view_get_u8(ctx, {}, {});",
             v.c_name, i.c_name
         ));
+        self.emit_trap_ptr_clear();
         self.release_temp_view_borrow(&v)?;
         Ok(())
     }
@@ -1868,10 +1963,12 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 ));
             }
             let var_c_name = var.c_name;
+            self.emit_trap_ptr_set();
             self.line(&format!(
                 "{} = rt_bytes_set_u8(ctx, {}, {}, {});",
                 var_c_name, var_c_name, i.c_name, v.c_name
             ));
+            self.emit_trap_ptr_clear();
             if dest != var_c_name.as_str() {
                 self.line(&format!("{dest} = {var_c_name};"));
                 self.line(&format!("{var_c_name} = {};", c_empty(Ty::Bytes)));
@@ -1893,10 +1990,12 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "bytes.set_u8 expects (bytes, i32, i32)".to_string(),
             ));
         }
+        self.emit_trap_ptr_set();
         self.line(&format!(
             "{dest} = rt_bytes_set_u8(ctx, {}, {}, {});",
             b.c_name, i.c_name, v.c_name
         ));
+        self.emit_trap_ptr_clear();
         if dest != b.c_name.as_str() {
             self.line(&format!("{} = {};", b.c_name, c_empty(Ty::Bytes)));
         }
@@ -1980,10 +2079,12 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
             ));
         }
         self.line(&format!("{dest} = rt_bytes_alloc(ctx, UINT32_C(1));"));
+        self.emit_trap_ptr_set();
         self.line(&format!(
             "{dest} = rt_bytes_set_u8(ctx, {dest}, UINT32_C(0), {});",
             x.c_name
         ));
+        self.emit_trap_ptr_clear();
         Ok(())
     }
 
@@ -2013,12 +2114,43 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
         })?;
         let lit_bytes = ident.as_bytes();
 
-        self.tmp_counter += 1;
-        let lit_name = format!("lit_{}", self.tmp_counter);
-        let escaped = c_escape_string(lit_bytes);
-        self.line(&format!("static const char {lit_name}[] = \"{escaped}\";"));
+        let lit_name = self.emit_static_text_literal(lit_bytes);
         self.line(&format!(
             "{dest} = rt_bytes_from_literal(ctx, (const uint8_t*){lit_name}, UINT32_C({}));",
+            lit_bytes.len()
+        ));
+        Ok(())
+    }
+
+    pub(super) fn emit_bytes_view_lit_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "bytes.view_lit expects 1 arg".to_string(),
+            ));
+        }
+        if dest_ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "bytes.view_lit returns bytes_view".to_string(),
+            ));
+        }
+        let ident = args[0].as_ident().ok_or_else(|| {
+            CompilerError::new(
+                CompileErrorKind::Parse,
+                "bytes.view_lit expects a text string".to_string(),
+            )
+        })?;
+        let lit_bytes = ident.as_bytes();
+
+        let lit_name = self.emit_static_text_literal(lit_bytes);
+        self.line(&format!(
+            "{dest} = rt_view_from_literal(ctx, (const uint8_t*){lit_name}, UINT32_C({}));",
             lit_bytes.len()
         ));
         Ok(())
@@ -2051,10 +2183,12 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "bytes.slice expects (bytes_view, i32, i32)".to_string(),
             ));
         }
+        self.emit_trap_ptr_set();
         self.line(&format!(
             "{dest} = rt_view_to_bytes(ctx, rt_view_slice(ctx, {}, {}, {}));",
             v.c_name, start.c_name, len.c_name
         ));
+        self.emit_trap_ptr_clear();
         self.release_temp_view_borrow(&v)?;
         Ok(())
     }
@@ -2563,10 +2697,12 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "bytes.subview expects (bytes, i32, i32)".to_string(),
             ));
         }
+        self.emit_trap_ptr_set();
         self.line(&format!(
             "{dest} = rt_bytes_subview(ctx, {}, {}, {});",
             b.c_name, start.c_name, len.c_name
         ));
+        self.emit_trap_ptr_clear();
         Ok(())
     }
 
@@ -2626,10 +2762,12 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "view.get_u8 expects (bytes_view, i32)".to_string(),
             ));
         }
+        self.emit_trap_ptr_set();
         self.line(&format!(
             "{dest} = rt_view_get_u8(ctx, {}, {});",
             v.c_name, i.c_name
         ));
+        self.emit_trap_ptr_clear();
         self.release_temp_view_borrow(&v)?;
         Ok(())
     }
@@ -2661,10 +2799,12 @@ Use a signed comparison like `(>= x 0)` when checking for negatives, or remove t
                 "view.slice expects (bytes_view, i32, i32)".to_string(),
             ));
         }
+        self.emit_trap_ptr_set();
         self.line(&format!(
             "{dest} = rt_view_slice(ctx, {}, {}, {});",
             v.c_name, start.c_name, len.c_name
         ));
+        self.emit_trap_ptr_clear();
         Ok(())
     }
 

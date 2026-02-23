@@ -190,6 +190,16 @@ fn special_form_doc(name: &str) -> Option<&'static str> {
              Allocate zero-filled bytes of the given length.\n\
              Example: [\"bytes.alloc\", 64]",
         ),
+        "&&" => Some(
+            "&&(i32, i32) -> i32\n\
+             Short-circuit boolean AND (treats non-zero as true).\n\
+             Example: [\"&&\", [\"=\", [\"view.len\", \"input\"], 1], [\"=\", [\"view.get_u8\", \"input\", 0], 47]]",
+        ),
+        "||" => Some(
+            "||(i32, i32) -> i32\n\
+             Short-circuit boolean OR (treats non-zero as true).\n\
+             Example: [\"||\", [\"=\", 1, 1], [\"=\", [\"view.get_u8\", \"input\", 0], 47]]",
+        ),
         "view.to_bytes" => Some(
             "view.to_bytes(bytes_view) -> bytes\n\
              Copy a view into a new owned bytes value.\n\
@@ -780,7 +790,7 @@ fn resolve_project_module_roots_with_sources(project_path: &Path) -> Result<Vec<
 
     let mut roots = Vec::new();
     for r in &manifest.module_roots {
-        let root = base.join(r);
+        let root = x07c::project::resolve_rel_path_with_workspace(base, r)?;
         roots.push(ModuleRootSource {
             root: root.clone(),
             source: DocSource {
@@ -791,7 +801,7 @@ fn resolve_project_module_roots_with_sources(project_path: &Path) -> Result<Vec<
         });
     }
     for dep in &manifest.dependencies {
-        let dep_dir = base.join(&dep.path);
+        let dep_dir = x07c::project::resolve_rel_path_with_workspace(base, &dep.path)?;
         let (pkg, _, _) = x07c::project::load_package_manifest(&dep_dir).with_context(|| {
             format!(
                 "load package manifest for {:?}@{:?} from {}",
@@ -1218,10 +1228,10 @@ fn resolve_project_module_roots(project_path: &Path) -> Result<Vec<PathBuf>> {
 
     let mut roots = Vec::new();
     for r in &manifest.module_roots {
-        roots.push(base.join(r));
+        roots.push(x07c::project::resolve_rel_path_with_workspace(base, r)?);
     }
     for dep in &manifest.dependencies {
-        let dep_dir = base.join(&dep.path);
+        let dep_dir = x07c::project::resolve_rel_path_with_workspace(base, &dep.path)?;
         let (pkg, _, _) = x07c::project::load_package_manifest(&dep_dir).with_context(|| {
             format!(
                 "load package manifest for {:?}@{:?} from {}",
@@ -1303,7 +1313,7 @@ fn resolve_project_package_by_query(
     let Some(dep) = dep else {
         return Ok(None);
     };
-    let dep_dir = base.join(&dep.path);
+    let dep_dir = x07c::project::resolve_rel_path_with_workspace(base, &dep.path)?;
     let pkg_path = dep_dir.join("x07-package.json");
     if !pkg_path.is_file() {
         return Ok(None);

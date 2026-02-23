@@ -26,6 +26,38 @@ If you see an `unknown module` compile error and you don’t know which package 
 
 - `x07 pkg provides <module-id>`
 
+## Local path dependencies
+
+`project.dependencies[*].path` supports two modes:
+
+1) **Registry-vendored**: paths under `.x07/deps/...`
+
+- Canonical for published packages.
+- `x07 pkg lock` fetches missing versions into `.x07/deps/...`.
+- When index metadata is available, `x07 pkg lock --check` also fails on yanks/advisories unless explicitly allowed.
+
+2) **Local-only**: any other relative path
+
+- Intended for in-repo packages or vendored/unpublished deps.
+- The dependency must exist on disk (lock fails with `X07PKG_LOCAL_MISSING_DEP` when missing).
+- `x07 pkg lock` does not download into these paths and does not require the sparse index for them.
+
+### Workspace-root paths (`$workspace/...`)
+
+For nested projects where `..` segments are rejected, you can use `$workspace/...` in any path field in `x07.json`.
+
+`$workspace/...` resolves relative to the environment variable `X07_WORKSPACE_ROOT` and is guarded so it cannot escape that root.
+
+Example dependency entry:
+
+```jsonc
+{
+  "name": "ext-mcp-auth-core",
+  "version": "0.1.0",
+  "path": "$workspace/packages/ext/x07-ext-mcp-auth-core/0.1.0"
+}
+```
+
 ## Quickstart
 
 ```bash
@@ -51,7 +83,7 @@ If you are creating a publishable package repo, start with `x07 init --package` 
 (it creates `x07-package.json`, `modules/`, `tests/`, and the same agent kit). Follow the `next_steps` in the init JSON report
 for the canonical pack/login/publish workflow.
 
-`x07 pkg lock` downloads dependencies into `.x07/deps/…` and writes `x07.lock.json`.
+`x07 pkg lock` downloads registry dependencies into `.x07/deps/…` and writes `x07.lock.json`.
 Commit `x07.lock.json` to make builds reproducible.
 
 In CI, use:

@@ -784,6 +784,18 @@ impl<'a> InferState<'a> {
             }
             return TyInfoTerm::unbranded(TyTerm::Named("bytes".to_string()));
         }
+        if callee == "bytes.view_lit" {
+            if let Some(want) = want {
+                self.add_constraint(
+                    TyTerm::Named("bytes_view".to_string()),
+                    want.clone(),
+                    list_ptr.to_string(),
+                    ConstraintOrigin::ExprCheck,
+                );
+                return TyInfoTerm::unbranded(want.clone());
+            }
+            return TyInfoTerm::unbranded(TyTerm::Named("bytes_view".to_string()));
+        }
 
         let Some(sig) = self.sigs.get(callee) else {
             if self.should_diag_unknown_callee(callee) {
@@ -1485,7 +1497,7 @@ fn add_builtin_sigs(sigs: &mut BTreeMap<String, FnSigAst>) {
 
     let bin_i32_ops = [
         "+", "-", "*", "/", "%", "=", "!=", "<", "<=", ">", ">=", "<u", ">=u", ">u", "<<u", ">>u",
-        "&", "|", "^",
+        "<=u", "&", "|", "^", "&&", "||",
     ];
     for op in bin_i32_ops {
         sigs.insert(
@@ -1678,7 +1690,10 @@ const CONTRACT_PURE_CALL_HEAD_ALLOWLIST: &[&str] = &[
     "&",
     "|",
     "^",
+    "&&",
+    "||",
     "bytes.lit",
+    "bytes.view_lit",
     "i32.lit",
     "bytes.view",
     "bytes.subview",

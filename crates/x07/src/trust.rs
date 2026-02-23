@@ -434,7 +434,8 @@ fn cmd_trust_report(
         if let (Some(lock), Some(policy)) = (ctx.lockfile.as_ref(), deps_cap_policy.as_ref()) {
             let deny = normalize_sensitive_namespace_set(&policy.default.deny_sensitive_namespaces);
             for dep in &lock.dependencies {
-                let module_root = ctx.root.join(&dep.path).join(&dep.module_root);
+                let dep_dir = project::resolve_rel_path_with_workspace(&ctx.root, &dep.path)?;
+                let module_root = dep_dir.join(&dep.module_root);
                 let scan = scan_module_roots(&[module_root]);
                 if scan.namespaces.is_empty() {
                     continue;

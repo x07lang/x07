@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::Args;
 use walkdir::WalkDir;
+use x07_runner_common::os_paths;
 use x07_worlds::WorldId;
 use x07c::compile;
 use x07c::diagnostics;
@@ -192,6 +193,17 @@ fn load_project_ctx(project_path: &Path) -> Result<ProjectCtx> {
         project::collect_module_roots(project_path, &manifest, &lock).context("module roots")?;
     let world = x07c::world_config::parse_world_id(&manifest.world)
         .with_context(|| format!("invalid project world {:?}", manifest.world))?;
+
+    let mut module_roots = module_roots;
+    if matches!(world, WorldId::RunOs | WorldId::RunOsSandboxed) {
+        for root in os_paths::default_os_module_roots_best_effort_from_exe(
+            std::env::current_exe().ok().as_deref(),
+        ) {
+            if !module_roots.contains(&root) {
+                module_roots.push(root);
+            }
+        }
+    }
 
     Ok(ProjectCtx {
         base,

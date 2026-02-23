@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 188
-- quickfix support (`sometimes` or `always`): 159
-- quickfix coverage: 84.57%
+- total codes: 191
+- quickfix support (`sometimes` or `always`): 162
+- quickfix coverage: 84.82%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -58,7 +58,9 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
 | `X07-AST-SLICE-0001` | x07 / run / info | never | AST slice truncated `X07-AST-SLICE-0001`. |
+| `X07-BOOL-0001` | x07c / lint / warning | sometimes | Eager '&' / '\|' in an if condition can trigger traps. |
 | `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
+| `X07-BORROW-0002` | x07c / lint / error | sometimes | Statement block returns a bytes_view borrowing from a local binding. |
 | `X07-CONTRACT-0001` | x07c / type / error | sometimes | Contract clause must typecheck to i32. |
 | `X07-CONTRACT-0002` | x07c / type / error | sometimes | Contract expression is not contract-pure. |
 | `X07-CONTRACT-0003` | x07c / type / error | sometimes | Reserved identifier `__result` is only available in ensures. |
@@ -130,6 +132,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_INDEX_CONFIG` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_CONFIG`. |
 | `X07PKG_INDEX_FETCH` | x07 / lint / error | never | Diagnostic code `X07PKG_INDEX_FETCH`. |
 | `X07PKG_INDEX_NO_MATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_NO_MATCH`. |
+| `X07PKG_LOCAL_MISSING_DEP` | x07 / lint / error | sometimes | Local dependency is missing on disk. |
 | `X07PKG_LOCK_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISMATCH`. |
 | `X07PKG_LOCK_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISSING`. |
 | `X07PKG_LOGIN_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_LOGIN_FAILED`. |
@@ -1209,6 +1212,28 @@ Agent strategy:
 - Use `--enclosure=module` and/or `--closure=all` if more context is required.
 
 
+## `X07-BOOL-0001`
+
+Summary: Eager '&' / '|' in an if condition can trigger traps.
+
+Origins:
+- x07c (stage: lint, severity: warning)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+`&` and `|` evaluate both sides eagerly (no short-circuit). When used in `if` conditions with trap-prone view ops, this can evaluate a failing RHS even when a LHS guard would otherwise reject.
+
+Agent strategy:
+
+- Prefer `&&` / `||` in `if` conditions that guard trap-prone ops.
+- Keep guards ordered so cheap checks run before trap-prone checks.
+- Re-run `x07 lint` to confirm the warning is resolved.
+- Optionally run `x07 fix --input <file> --write` to rewrite the first eager boolean operator to `&&` / `||`.
+
+
 ## `X07-BORROW-0001`
 
 Summary: Borrowing view/subview from a temporary expression is invalid.
@@ -1230,6 +1255,28 @@ Agent strategy:
 - If `mem_provenance.hints[]` contains `bind_owner_to_local`, introduce `let tmp = <owner>` and borrow from `tmp`.
 - Apply quickfix when present.
 - If quickfix is absent, perform equivalent manual rewrite and re-run lint.
+
+
+## `X07-BORROW-0002`
+
+Summary: Statement block returns a bytes_view borrowing from a local binding.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+A `begin`/`unsafe` statement block returned a `bytes_view` that borrows from a value bound inside that block. The local owner does not outlive the block, so the view would escape its borrow source.
+
+Agent strategy:
+
+- Hoist the owned value `let` binding outside the statement block so the borrow source outlives the view.
+- Or return owned `bytes` instead of a `bytes_view`.
+- Re-run `x07 lint` (and `x07 check --project ...` if applicable).
+- If the borrow source is a `bytes.lit`, `x07 fix --input <file> --write` can rewrite it to `bytes.view_lit`.
 
 
 ## `X07-CONTRACT-0001`
@@ -2664,6 +2711,26 @@ Agent strategy:
 
 - Normalize dependency specs and run `x07 pkg lock`.
 - Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
+
+
+## `X07PKG_LOCAL_MISSING_DEP`
+
+Summary: Local dependency is missing on disk.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A dependency whose `path` is not under `.x07/deps/` is treated as local-only. The package directory must exist and contain `x07-package.json`.
+
+Agent strategy:
+
+- Verify the dependency `path` exists and contains `x07-package.json`.
+- If this dep should be fetched from the registry, use a `.x07/deps/...` path and rerun `x07 pkg lock`.
 - Re-run the original package command.
 
 

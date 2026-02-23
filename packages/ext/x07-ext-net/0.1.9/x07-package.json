@@ -1,0 +1,36 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-net",
+  "description": "Networking APIs (DNS, TCP/UDP, TLS, HTTP) (run-os only).",
+  "docs": "Networking APIs (DNS, TCP/UDP, TLS, HTTP) (run-os only).\n\nModules:\n- std.net.err\n- std.net.codec\n- std.net.dns\n- std.net.tcp\n- std.net.tls\n- std.net.udp\n- std.net.io\n- std.net.http\n- std.net.http.spec\n- std.net.http.client\n- std.net.http.server\n- std.net.http.form_urlencoded\n- std.net.http.form_urlencoded.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-net@0.1.9\n- Import the modules listed above.\n",
+  "version": "0.1.9",
+  "module_root": "modules",
+  "modules": [
+    "std.net.err",
+    "std.net.codec",
+    "std.net.dns",
+    "std.net.tcp",
+    "std.net.tls",
+    "std.net.udp",
+    "std.net.io",
+    "std.net.http",
+    "std.net.http.spec",
+    "std.net.http.client",
+    "std.net.http.server",
+    "std.net.http.form_urlencoded",
+    "std.net.http.form_urlencoded.tests"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "requires_packages": [
+      "ext-curl-c@0.1.6",
+      "ext-sockets-c@0.1.6",
+      "ext-url-rs@0.1.4"
+    ],
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten"
+  }
+}

@@ -522,6 +522,20 @@ impl<'a> Emitter<'a> {
                 self.states[state].push(s.into());
             }
 
+            fn trap_ptr_set(&mut self, state: usize, ptr: &str) {
+                let ptr = ptr.trim();
+                if ptr.is_empty() {
+                    self.line(state, "ctx->trap_ptr = NULL;");
+                    return;
+                }
+                let escaped = c_escape_c_string(ptr);
+                self.line(state, format!("ctx->trap_ptr = \"{escaped}\";"));
+            }
+
+            fn trap_ptr_clear(&mut self, state: usize) {
+                self.line(state, "ctx->trap_ptr = NULL;");
+            }
+
             fn push_scope(&mut self) {
                 self.scopes.push(BTreeMap::new());
             }
@@ -815,13 +829,16 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         Ok(())
                     }
-                    Expr::List { items, .. } => self.emit_list_entry(state, items, dest, cont),
+                    Expr::List { items, ptr } => {
+                        self.emit_list_entry(state, ptr, items, dest, cont)
+                    }
                 }
             }
 
             fn emit_list_entry(
                 &mut self,
                 state: usize,
+                expr_ptr: &str,
                 items: &[Expr],
                 dest: AsyncVarRef,
                 cont: usize,
@@ -861,6 +878,67 @@ impl<'a> Emitter<'a> {
                     }
                     "return" => return self.emit_return(state, args),
                     _ => {}
+                }
+
+                if head == "&&" || head == "||" {
+                    if args.len() != 2 || dest.ty != Ty::I32 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} expects (i32,i32) and returns i32"),
+                        ));
+                    }
+                    if self.infer_expr(&args[0])? != Ty::I32
+                        || self.infer_expr(&args[1])? != Ty::I32
+                    {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("{head} expects i32 args"),
+                        ));
+                    }
+
+                    self.line(state, "rt_fuel(ctx, 1);");
+                    let lhs_tmp = self.alloc_local("t_bool_sc_lhs_", Ty::I32)?;
+                    let lhs_state = self.new_state();
+                    let decide_state = self.new_state();
+                    self.line(state, format!("goto st_{lhs_state};"));
+                    self.emit_expr_entry(lhs_state, &args[0], lhs_tmp.clone(), decide_state)?;
+
+                    let rhs_state = self.new_state();
+                    let rhs_done = self.new_state();
+
+                    match head {
+                        "&&" => {
+                            self.line(
+                                decide_state,
+                                format!("if ({} == UINT32_C(0)) {{", lhs_tmp.c_name),
+                            );
+                            self.line(decide_state, format!("  {} = UINT32_C(0);", dest.c_name));
+                            self.line(decide_state, format!("  goto st_{cont};"));
+                            self.line(decide_state, "} else {");
+                            self.line(decide_state, format!("  goto st_{rhs_state};"));
+                            self.line(decide_state, "}");
+                        }
+                        "||" => {
+                            self.line(
+                                decide_state,
+                                format!("if ({} != UINT32_C(0)) {{", lhs_tmp.c_name),
+                            );
+                            self.line(decide_state, format!("  {} = UINT32_C(1);", dest.c_name));
+                            self.line(decide_state, format!("  goto st_{cont};"));
+                            self.line(decide_state, "} else {");
+                            self.line(decide_state, format!("  goto st_{rhs_state};"));
+                            self.line(decide_state, "}");
+                        }
+                        _ => unreachable!(),
+                    }
+
+                    self.emit_expr_entry(rhs_state, &args[1], dest.clone(), rhs_done)?;
+                    self.line(
+                        rhs_done,
+                        format!("{} = ({} != UINT32_C(0));", dest.c_name, dest.c_name),
+                    );
+                    self.line(rhs_done, format!("goto st_{cont};"));
+                    return Ok(());
                 }
 
                 if head == "vec_u8.len" {
@@ -993,6 +1071,7 @@ impl<'a> Emitter<'a> {
                         } else {
                             v.c_name.clone()
                         };
+                        self.trap_ptr_set(apply_state, expr_ptr);
                         self.line(
                             apply_state,
                             format!(
@@ -1000,6 +1079,7 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, view, idx_tmp.c_name
                             ),
                         );
+                        self.trap_ptr_clear(apply_state);
                         self.line(apply_state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -1295,6 +1375,7 @@ impl<'a> Emitter<'a> {
                     self.line(state, format!("goto st_{start_state};"));
                     self.emit_expr_entry(start_state, &args[1], start_tmp.clone(), len_state)?;
                     self.emit_expr_entry(len_state, &args[2], len_tmp.clone(), apply_state)?;
+                    self.trap_ptr_set(apply_state, expr_ptr);
                     self.line(
                         apply_state,
                         format!(
@@ -1302,6 +1383,7 @@ impl<'a> Emitter<'a> {
                             dest.c_name, owner.c_name, start_tmp.c_name, len_tmp.c_name
                         ),
                     );
+                    self.trap_ptr_clear(apply_state);
                     self.line(apply_state, format!("goto st_{cont};"));
                     return Ok(());
                 }
@@ -1384,6 +1466,46 @@ impl<'a> Emitter<'a> {
                         state,
                         format!(
                             "{} = rt_bytes_from_literal(ctx, (const uint8_t*){lit_name}, UINT32_C({}));",
+                            dest.c_name,
+                            lit_bytes.len()
+                        ),
+                    );
+                    self.line(state, format!("goto st_{cont};"));
+                    return Ok(());
+                }
+
+                if head == "bytes.view_lit" {
+                    if args.len() != 1 {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Parse,
+                            "bytes.view_lit expects 1 arg".to_string(),
+                        ));
+                    }
+                    if dest.ty != Ty::BytesView {
+                        return Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            "bytes.view_lit returns bytes_view".to_string(),
+                        ));
+                    }
+                    let ident = args[0].as_ident().ok_or_else(|| {
+                        CompilerError::new(
+                            CompileErrorKind::Parse,
+                            "bytes.view_lit expects a text string".to_string(),
+                        )
+                    })?;
+                    let lit_bytes = ident.as_bytes();
+                    self.line(state, "rt_fuel(ctx, 1);");
+                    self.tmp_counter += 1;
+                    let lit_name = format!("lit_{}", self.tmp_counter);
+                    let escaped = c_escape_string(lit_bytes);
+                    self.line(
+                        state,
+                        format!("static const char {lit_name}[] = \"{escaped}\";"),
+                    );
+                    self.line(
+                        state,
+                        format!(
+                            "{} = rt_view_from_literal(ctx, (const uint8_t*){lit_name}, UINT32_C({}));",
                             dest.c_name,
                             lit_bytes.len()
                         ),
@@ -1912,7 +2034,7 @@ impl<'a> Emitter<'a> {
                     self.emit_expr_entry(eval_state, expr, tmp, next)?;
                 }
 
-                self.emit_apply_call(apply_state, head, &arg_vars, dest, cont)
+                self.emit_apply_call(apply_state, expr_ptr, head, &arg_vars, dest, cont)
             }
 
             fn emit_ptr_cast_form(
@@ -2050,6 +2172,7 @@ impl<'a> Emitter<'a> {
             fn emit_apply_call(
                 &mut self,
                 state: usize,
+                call_ptr: &str,
                 head: &str,
                 args: &[AsyncVarRef],
                 dest: AsyncVarRef,
@@ -2212,6 +2335,7 @@ impl<'a> Emitter<'a> {
                         } else {
                             args[0].c_name.clone()
                         };
+                        self.trap_ptr_set(state, call_ptr);
                         self.line(
                             state,
                             format!(
@@ -2219,6 +2343,7 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, v, args[1].c_name
                             ),
                         );
+                        self.trap_ptr_clear(state);
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -2234,6 +2359,7 @@ impl<'a> Emitter<'a> {
                                 "bytes.set_u8 expects (bytes, i32, i32)".to_string(),
                             ));
                         }
+                        self.trap_ptr_set(state, call_ptr);
                         self.line(
                             state,
                             format!(
@@ -2241,6 +2367,7 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, args[0].c_name, args[1].c_name, args[2].c_name
                             ),
                         );
+                        self.trap_ptr_clear(state);
                         if dest.c_name != args[0].c_name {
                             self.line(
                                 state,
@@ -2523,6 +2650,7 @@ impl<'a> Emitter<'a> {
                             state,
                             format!("{} = rt_bytes_alloc(ctx, UINT32_C(1));", dest.c_name),
                         );
+                        self.trap_ptr_set(state, call_ptr);
                         self.line(
                             state,
                             format!(
@@ -2530,6 +2658,7 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, dest.c_name, args[0].c_name
                             ),
                         );
+                        self.trap_ptr_clear(state);
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -2556,6 +2685,7 @@ impl<'a> Emitter<'a> {
                         } else {
                             args[0].c_name.clone()
                         };
+                        self.trap_ptr_set(state, call_ptr);
                         self.line(
                             state,
                             format!(
@@ -2563,6 +2693,7 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, v, args[1].c_name, args[2].c_name
                             ),
                         );
+                        self.trap_ptr_clear(state);
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -2684,6 +2815,7 @@ impl<'a> Emitter<'a> {
                                 "bytes.subview expects (bytes,i32,i32)".to_string(),
                             ));
                         }
+                        self.trap_ptr_set(state, call_ptr);
                         self.line(
                             state,
                             format!(
@@ -2691,6 +2823,7 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, args[0].c_name, args[1].c_name, args[2].c_name
                             ),
                         );
+                        self.trap_ptr_clear(state);
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -2716,6 +2849,7 @@ impl<'a> Emitter<'a> {
                                 "view.get_u8 expects (bytes_view,i32)".to_string(),
                             ));
                         }
+                        self.trap_ptr_set(state, call_ptr);
                         self.line(
                             state,
                             format!(
@@ -2723,6 +2857,7 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, args[0].c_name, args[1].c_name
                             ),
                         );
+                        self.trap_ptr_clear(state);
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
@@ -2738,6 +2873,7 @@ impl<'a> Emitter<'a> {
                                 "view.slice expects (bytes_view,i32,i32)".to_string(),
                             ));
                         }
+                        self.trap_ptr_set(state, call_ptr);
                         self.line(
                             state,
                             format!(
@@ -2745,6 +2881,7 @@ impl<'a> Emitter<'a> {
                                 dest.c_name, args[0].c_name, args[1].c_name, args[2].c_name
                             ),
                         );
+                        self.trap_ptr_clear(state);
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
