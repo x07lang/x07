@@ -258,32 +258,32 @@
         {
           "module_id": "std.auth.jose_jws_v1.tests",
           "path": "packages/ext/x07-ext-auth-jwt/0.1.2/modules/std/auth/jose_jws_v1/tests.x07.json",
-          "sha256": "852c2509858f06c47d05ed6475c3cfb0cce68913fa692637e15e4d5d6b4fd1d8",
-          "size_bytes": 6739
+          "sha256": "047d24cdde3c60172d05567bba4a0c0e0d0656268f77674c33ccb83c04094ec7",
+          "size_bytes": 5555
         },
         {
           "module_id": "std.auth.jose_jws_v1",
           "path": "packages/ext/x07-ext-auth-jwt/0.1.2/modules/std/auth/jose_jws_v1.x07.json",
-          "sha256": "30f0eaef3a0dc60528bc161ebffd45c961a924cfb4afb1578ec7b0f8d1f6c287",
-          "size_bytes": 24791
+          "sha256": "3b0627724b4364e0e1e54e3ec0aab38f18e5686a8d046443451f46975601847f",
+          "size_bytes": 17163
         },
         {
           "module_id": "std.auth.jwt.tests",
           "path": "packages/ext/x07-ext-auth-jwt/0.1.2/modules/std/auth/jwt/tests.x07.json",
-          "sha256": "9ec5421106c4e8e580a5b2a3763385d0b6cdd9140f8f74b1594d3684bc7b4322",
-          "size_bytes": 6988
+          "sha256": "766a55ab64089038736d9d32800f37c02c1fe969fd828c2739bbdc68e240eb12",
+          "size_bytes": 5354
         },
         {
           "module_id": "std.auth.jwt",
           "path": "packages/ext/x07-ext-auth-jwt/0.1.2/modules/std/auth/jwt.x07.json",
-          "sha256": "b699a3ec2692a5cf29a302fd5c0ea385b370533d4f018a523691552154c58ca2",
-          "size_bytes": 25403
+          "sha256": "6c0a56abcc61e738c14ebadc395a85ecbcd42b5586d7a71a2e2a8968bf573d5a",
+          "size_bytes": 17178
         },
         {
           "module_id": "std.crypto.ed25519",
           "path": "packages/ext/x07-ext-auth-jwt/0.1.2/modules/std/crypto/ed25519.x07.json",
-          "sha256": "3bac42ce3a882e28507c7ea4c7889dc9a03ea77fc323ffd016ef190ecfd6df3c",
-          "size_bytes": 1127
+          "sha256": "ccebffa3b471320683cce81cc2dbf362514f180f47cb77824df16751b9803234",
+          "size_bytes": 833
         }
       ],
       "name": "ext-auth-jwt",
@@ -7207,26 +7207,26 @@
         {
           "module_id": "ext.openssl._ffi",
           "path": "packages/ext/x07-ext-openssl-c/0.1.7/modules/ext/openssl/_ffi.x07.json",
-          "sha256": "60b8fb1f8c08d4f9363f5a1708781fd7d76baf352b537ea842ead551dfc9f369",
-          "size_bytes": 6720
+          "sha256": "d9d64eb27fb64586ebe664fb38193bc64d718d265d1373da91e3c52b94056144",
+          "size_bytes": 4729
         },
         {
           "module_id": "ext.openssl.ecdsa_p256",
           "path": "packages/ext/x07-ext-openssl-c/0.1.7/modules/ext/openssl/ecdsa_p256.x07.json",
-          "sha256": "81a236295c452f7a72ad39cf6706612e54ae6ccf36f9ad123cb11426b5e0cc1d",
-          "size_bytes": 1359
+          "sha256": "8f6ce4eed7854b9874eba2638c781a0f2c49a5dca860383ad09fc58ef655cb4d",
+          "size_bytes": 874
         },
         {
           "module_id": "ext.openssl.ed25519",
           "path": "packages/ext/x07-ext-openssl-c/0.1.7/modules/ext/openssl/ed25519.x07.json",
-          "sha256": "d01bfa8d53a845bfbff504f33dfc678987c55f874d7d1554555855b97a9c68c7",
-          "size_bytes": 3682
+          "sha256": "5883275c708e1c3d32c0a318db766a437bb2d30bfbc27227c4dac913ab5c3baf",
+          "size_bytes": 2247
         },
         {
           "module_id": "ext.openssl.hash",
           "path": "packages/ext/x07-ext-openssl-c/0.1.7/modules/ext/openssl/hash.x07.json",
-          "sha256": "7a9a3920f08b47ae2f0be442b78bc80882466f11bc44ba66caa0a9b4747f12b9",
-          "size_bytes": 4055
+          "sha256": "391d27f5fc7f105e320dcaed6a4858f7a971d73c94fdfa08badde576295f7eff",
+          "size_bytes": 3104
         },
         {
           "module_id": "ext.openssl.rand",
@@ -7237,8 +7237,8 @@
         {
           "module_id": "ext.openssl.rsa",
           "path": "packages/ext/x07-ext-openssl-c/0.1.7/modules/ext/openssl/rsa.x07.json",
-          "sha256": "49a4e8bf67eed4ad937b17dc02b71b77601665c21c85a742b4dcbc26704fe43c",
-          "size_bytes": 1309
+          "sha256": "e231bc893ede8f52c84d0ebc87b9fcc6067d43dab82e0b9671aef5132d24247a",
+          "size_bytes": 824
         }
       ],
       "name": "ext-openssl-c",
@@ -10837,6 +10837,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "d0b1dbfbe46c1f4cd65d0eab4637e436a2a43493b30ab664a0cbd9b012b8a21f",
+  "packages_hash": "c747b7b9ebe4b34efc8a4074f6c60693816a15273c6d187a2efc4337dbf2eeb0",
   "packages_root": "packages/ext"
 }
