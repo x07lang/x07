@@ -52,3 +52,16 @@ cargo run -p x07-wasm -- run --wasm dist/echo.wasm --input examples/solve_pure_e
   --json --report-out build/wasm/run.echo.json --quiet-json \
   --output-out dist/echo.out.bin
 ```
+
+## Incident bundles
+
+On `x07-wasm run` failures, an incident bundle is written under:
+
+- `.x07-wasm/incidents/<YYYY-MM-DD>/<run_id>/`
+
+It always includes:
+
+- `input.bin`
+- `run.report.json`
+- `wasm.manifest.json` (copied from `<wasm>.manifest.json` when present; otherwise a synthesized manifest with `schema_version: x07.wasm.incident.manifest@0.1.0`)
+- `stderr.txt` (when available)
