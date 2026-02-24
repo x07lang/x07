@@ -85,9 +85,9 @@
     },
     {
       "name": "ext-net",
-      "version": "0.1.8",
-      "path": ".x07/deps/ext-net/0.1.8",
-      "package_manifest_sha256": "2c9e3cd98153bc2e879039c9b777b08e10a236c4923f56929f5dd4f6fc435cfc",
+      "version": "0.1.9",
+      "path": ".x07/deps/ext-net/0.1.9",
+      "package_manifest_sha256": "d0714d4a7e548099b0342270243b25ad5c14d697e5ce55e82e649536c9b2ea02",
       "module_root": "modules",
       "modules_sha256": {
         "std.net.codec": "c44592bb0ef0753a74c2a57f7b8e65e8ee9390513ae1852ba26746ad812f61c3",
@@ -95,6 +95,8 @@
         "std.net.err": "662a4b0385dc9730b7ee5791e73ce1b532ea6c0421c1aa2e4030a08c7535356e",
         "std.net.http": "c65425c329faea952a1e2ece6a5d01cbb30e0f5e7c3ed8f996bcb6acc512f1a2",
         "std.net.http.client": "eadb198ac302344827430d35063ed1e7a02d216c6ead3a5097636d2169e3b6fa",
+        "std.net.http.form_urlencoded": "6278983b53d396eef5b8d5043560a2e506310dae0aee24125d95290ccc607807",
+        "std.net.http.form_urlencoded.tests": "0a5796d11f0a80e8602597f0a27c7f121d18248b6b2771ccb4639a9df0fe6cfe",
         "std.net.http.server": "cdee2135124db79035ba1fb2184e98fad8791b9b8260748341ae75cb26496bd1",
         "std.net.http.spec": "675c224d33ab97a25d7cd8f6593f98cae0778f719fdffe83750e8308db4430e3",
         "std.net.io": "4878202d5cdbf19d144d4e5f17155f161ee9ac11be49d96056fc5412d26115ca",
