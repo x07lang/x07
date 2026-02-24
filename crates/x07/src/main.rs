@@ -134,10 +134,22 @@ enum Command {
     Verify(verify::VerifyArgs),
     /// MCP server kit tooling (delegates to `x07-mcp`).
     Mcp(McpArgs),
+    /// WASM tooling (delegates to `x07-wasm`).
+    Wasm(WasmArgs),
 }
 
 #[derive(Debug, Clone, Args)]
 struct McpArgs {
+    #[arg(
+        trailing_var_arg = true,
+        allow_hyphen_values = true,
+        value_name = "ARG"
+    )]
+    args: Vec<OsString>,
+}
+
+#[derive(Debug, Clone, Args)]
+struct WasmArgs {
     #[arg(
         trailing_var_arg = true,
         allow_hyphen_values = true,
@@ -408,6 +420,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             },
             Some(Command::Verify(_)) => vec!["verify"],
             Some(Command::Mcp(_)) => vec!["mcp"],
+            Some(Command::Wasm(_)) => vec!["wasm"],
         };
 
         let node = x07c::cli_specrows::find_command(&root, &path).unwrap_or(&root);
@@ -450,6 +463,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Rr(args) => rr::cmd_rr(&cli.machine, args),
         Command::Verify(args) => verify::cmd_verify(&cli.machine, args),
         Command::Mcp(args) => cmd_mcp(args),
+        Command::Wasm(args) => cmd_wasm(args),
     }
 }
 
@@ -459,6 +473,17 @@ fn cmd_mcp(args: McpArgs) -> Result<std::process::ExitCode> {
         delegate::DelegateOutput::NotFound => {
             eprintln!("x07-mcp not found on PATH");
             eprintln!("hint: install x07-mcp and ensure it is discoverable on PATH");
+            Ok(std::process::ExitCode::from(2))
+        }
+    }
+}
+
+fn cmd_wasm(args: WasmArgs) -> Result<std::process::ExitCode> {
+    match delegate::run_inherit("x07-wasm", &args.args)? {
+        delegate::DelegateOutput::Exited(status) => Ok(delegate::exit_code_from_status(&status)),
+        delegate::DelegateOutput::NotFound => {
+            eprintln!("x07-wasm not found on PATH");
+            eprintln!("hint: install x07-wasm and ensure it is discoverable on PATH");
             Ok(std::process::ExitCode::from(2))
         }
     }
