@@ -339,9 +339,61 @@
         }
       ],
       "name": "ext-auth-jwt",
-      "package_manifest_sha256": "970923d693cd5bdc05cc1474bbc54e8dbf0ce2f30849e4ffea66d9f577749959",
+      "package_manifest_sha256": "6034228e1a2ae324079a92d2be1834cfc7babc4b28650b9e34ae784eafeead2c",
       "path": "packages/ext/x07-ext-auth-jwt/0.1.3",
       "version": "0.1.3"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.auth.jose_jws_v1.tests",
+          "path": "packages/ext/x07-ext-auth-jwt/0.1.4/modules/std/auth/jose_jws_v1/tests.x07.json",
+          "sha256": "87f4bfad7200acf5be64d32e036622d7468a7c8b430ecaea2b1b420c65ed4c4d",
+          "size_bytes": 15115
+        },
+        {
+          "module_id": "std.auth.jose_jws_v1",
+          "path": "packages/ext/x07-ext-auth-jwt/0.1.4/modules/std/auth/jose_jws_v1.x07.json",
+          "sha256": "e18106883e0bcdc113c4a43a1abd69f47d661222c3529045c44791a923204430",
+          "size_bytes": 30993
+        },
+        {
+          "module_id": "std.auth.jwt.tests",
+          "path": "packages/ext/x07-ext-auth-jwt/0.1.4/modules/std/auth/jwt/tests.x07.json",
+          "sha256": "031f1eb200dd5bef4296f5b7a759f5a90a703d0e568fd2fd12fac3042083a8b8",
+          "size_bytes": 5354
+        },
+        {
+          "module_id": "std.auth.jwt",
+          "path": "packages/ext/x07-ext-auth-jwt/0.1.4/modules/std/auth/jwt.x07.json",
+          "sha256": "6c0a56abcc61e738c14ebadc395a85ecbcd42b5586d7a71a2e2a8968bf573d5a",
+          "size_bytes": 17178
+        },
+        {
+          "module_id": "std.auth.pkce.tests",
+          "path": "packages/ext/x07-ext-auth-jwt/0.1.4/modules/std/auth/pkce/tests.x07.json",
+          "sha256": "8ded85c071054801cb04861c5e4048d1e6b47f607b516a4d0d741c7ae3521b50",
+          "size_bytes": 684
+        },
+        {
+          "module_id": "std.auth.pkce",
+          "path": "packages/ext/x07-ext-auth-jwt/0.1.4/modules/std/auth/pkce.x07.json",
+          "sha256": "ae0ac6cc4cf941184974ca6373c1d42664e09a16504d9c7f6c1aef4def9e789d",
+          "size_bytes": 469
+        },
+        {
+          "module_id": "std.crypto.ed25519",
+          "path": "packages/ext/x07-ext-auth-jwt/0.1.4/modules/std/crypto/ed25519.x07.json",
+          "sha256": "ccebffa3b471320683cce81cc2dbf362514f180f47cb77824df16751b9803234",
+          "size_bytes": 833
+        }
+      ],
+      "name": "ext-auth-jwt",
+      "package_manifest_sha256": "828a6d49bbcf58b52c4af04975ac9a423f874989e887d6babf6281e56ff98e6d",
+      "path": "packages/ext/x07-ext-auth-jwt/0.1.4",
+      "version": "0.1.4"
     },
     {
       "determinism_tier": "pure",
@@ -7388,6 +7440,56 @@
     },
     {
       "determinism_tier": "os-world-only",
+      "ffi_libs": [
+        "ssl",
+        "crypto"
+      ],
+      "import_mode": "ffi",
+      "modules": [
+        {
+          "module_id": "ext.openssl._ffi",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.8/modules/ext/openssl/_ffi.x07.json",
+          "sha256": "80ab6765cad8ed94eae9b8d9b9572cefff6888e5ad6fd22c83a0326f57368080",
+          "size_bytes": 5190
+        },
+        {
+          "module_id": "ext.openssl.ecdsa_p256",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.8/modules/ext/openssl/ecdsa_p256.x07.json",
+          "sha256": "8f6ce4eed7854b9874eba2638c781a0f2c49a5dca860383ad09fc58ef655cb4d",
+          "size_bytes": 874
+        },
+        {
+          "module_id": "ext.openssl.ed25519",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.8/modules/ext/openssl/ed25519.x07.json",
+          "sha256": "5883275c708e1c3d32c0a318db766a437bb2d30bfbc27227c4dac913ab5c3baf",
+          "size_bytes": 2247
+        },
+        {
+          "module_id": "ext.openssl.hash",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.8/modules/ext/openssl/hash.x07.json",
+          "sha256": "391d27f5fc7f105e320dcaed6a4858f7a971d73c94fdfa08badde576295f7eff",
+          "size_bytes": 3104
+        },
+        {
+          "module_id": "ext.openssl.rand",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.8/modules/ext/openssl/rand.x07.json",
+          "sha256": "0457cd38cec9b2a3723d7dba672128501db1f6986663e95ed0dd737edb933b36",
+          "size_bytes": 2319
+        },
+        {
+          "module_id": "ext.openssl.rsa",
+          "path": "packages/ext/x07-ext-openssl-c/0.1.8/modules/ext/openssl/rsa.x07.json",
+          "sha256": "8446f688265627af7088576c84b62de7516bc48a600d31d8c566a62962f3cbaf",
+          "size_bytes": 2067
+        }
+      ],
+      "name": "ext-openssl-c",
+      "package_manifest_sha256": "cc0a83263f5c482f6f453502c65de0879ab186cfa4c0a741cb0d38e6f5c03993",
+      "path": "packages/ext/x07-ext-openssl-c/0.1.8",
+      "version": "0.1.8"
+    },
+    {
+      "determinism_tier": "os-world-only",
       "import_mode": "handwritten",
       "modules": [
         {
@@ -10977,6 +11079,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "67102de34bd9897e50dd5880245bbb3b308330558167ec0195f97b658f4cb454",
+  "packages_hash": "af0cbdaadf46075f989ff710d2fbb03d3c1e9b9270f9aafd11c531d10a2118f2",
   "packages_root": "packages/ext"
 }

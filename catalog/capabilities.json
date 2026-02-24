@@ -119,10 +119,10 @@
     },
     {
       "id": "auth.jwt",
-      "summary": "JWT (Ed25519) encode/verify + JOSE JWS verify pinned by arch/crypto profiles (run-os*).",
+      "summary": "JWT (Ed25519) encode/verify + JOSE JWS compact sign/verify + JWK thumbprints pinned by arch/crypto profiles (run-os*).",
       "canonical": {
         "name": "ext-auth-jwt",
-        "version": "0.1.3"
+        "version": "0.1.4"
       },
       "worlds": [
         "run-os",
