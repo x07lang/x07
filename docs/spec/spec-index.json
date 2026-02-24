@@ -1266,6 +1266,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-wasm.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-wasm.report.schema.json",
+      "schema_version": "x07.tool.wasm.report@0.1.0",
+      "title": "x07.tool.wasm.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool.events.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool.events.schema.json",
       "schema_version": "x07.tool.events@0.1.0",

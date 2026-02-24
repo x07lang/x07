@@ -373,6 +373,7 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "patch"
             | "verify"
             | "mcp"
+            | "wasm"
     )
 }
 

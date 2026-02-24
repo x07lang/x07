@@ -218,6 +218,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("verify") => Some(include_bytes!(
             "../../../spec/x07-tool-verify.report.schema.json"
         )),
+        Some("wasm") => Some(include_bytes!(
+            "../../../spec/x07-tool-wasm.report.schema.json"
+        )),
         _ => None,
     }
 }

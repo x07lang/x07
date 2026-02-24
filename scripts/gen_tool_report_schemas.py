@@ -164,21 +164,20 @@ def render_rust_schema_map(scopes: list[str]) -> bytes:
     lines.append("")
     lines.append("pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static [u8]> {")
     lines.append("    match scope.and_then(|s| s.to_str()) {")
-    lines.append(
-        '        None => Some(include_bytes!("../../../spec/x07-tool-root.report.schema.json")),'
-    )
+    lines.append("        None => Some(include_bytes!(")
+    lines.append('            "../../../spec/x07-tool-root.report.schema.json"')
+    lines.append("        )),")
     for scope in scopes:
         if scope in NATIVE_REPORT_SCOPES:
             continue
         filename = tool_schema_filename(scope)
-        lines.append(
-            f'        Some("{scope}") => Some(include_bytes!("../../../spec/{filename}")),'
-        )
+        lines.append(f'        Some("{scope}") => Some(include_bytes!(')
+        lines.append(f'            "../../../spec/{filename}"')
+        lines.append("        )),")
     lines.append("        _ => None,")
     lines.append("    }")
     lines.append("}")
-    lines.append("")
-    return ("\n".join(lines)).encode("utf-8")
+    return ("\n".join(lines) + "\n").encode("utf-8")
 
 
 def remove_stale_tool_schemas(expected: set[Path], check: bool) -> list[Path]:
