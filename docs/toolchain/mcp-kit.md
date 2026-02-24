@@ -38,6 +38,17 @@ Phase 8 adds:
 - strict Streamable HTTP headers (Origin / Accept / MCP-Protocol-Version) with empty-body HTTP failures
 - HTTP record/replay sanitization hardened at the cassette boundary (auth/cookie redaction + fail-closed)
 
+Phase 9 adds:
+
+- JWT/JWKS access token validation (`jwt_jwks_v1`)
+- DPoP validation + replay window enforcement (RFC9449)
+- client-mode conformance harness (auth suite)
+
+Phase 10 adds:
+
+- DPoP nonce hardening (RFC9449 `use_dpop_nonce`)
+- RFC9728 signed PRM metadata (`signed_metadata`)
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:
