@@ -46,7 +46,9 @@ If you see an `unknown module` compile error and you don’t know which package 
 
 For nested projects where `..` segments are rejected, you can use `$workspace/...` in any path field in `x07.json`.
 
-`$workspace/...` resolves relative to the environment variable `X07_WORKSPACE_ROOT` and is guarded so it cannot escape that root.
+`$workspace/...` resolves relative to the environment variable `X07_WORKSPACE_ROOT` (when set). If `X07_WORKSPACE_ROOT` is not set, tooling attempts to infer the workspace root from the nearest git repository root.
+
+The resolved path is guarded so it cannot escape the chosen workspace root.
 
 Example dependency entry:
 

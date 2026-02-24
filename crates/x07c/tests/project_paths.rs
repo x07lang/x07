@@ -134,6 +134,85 @@ fn project_manifest_allows_workspace_dependency_paths() {
 }
 
 #[test]
+fn project_manifest_allows_workspace_dependency_paths_via_git_root() {
+    let _guard = WORKSPACE_ENV_LOCK.lock().expect("lock env");
+    let prev = std::env::var_os("X07_WORKSPACE_ROOT");
+    std::env::remove_var("X07_WORKSPACE_ROOT");
+
+    let root = create_temp_dir("x07_workspace_root_git");
+    std::fs::create_dir_all(root.join(".git")).expect("create git dir marker");
+
+    let pkg_dir = root.join("packages/dep/0.1.0");
+    std::fs::create_dir_all(pkg_dir.join("modules/dep")).expect("create package dirs");
+    std::fs::write(
+        pkg_dir.join("x07-package.json"),
+        format!(
+            r#"
+            {{
+              "schema_version": "{PACKAGE_MANIFEST_SCHEMA_VERSION}",
+              "name": "dep",
+              "version": "0.1.0",
+              "module_root": "modules",
+              "modules": ["dep.main"]
+            }}
+            "#
+        ),
+    )
+    .expect("write x07-package.json");
+    std::fs::write(
+        pkg_dir.join("modules/dep/main.x07.json"),
+        r#"{"schema_version":"x07.x07ast@0.3.0","kind":"module","module_id":"dep.main","imports":[],"decls":[]}"#,
+    )
+    .expect("write module");
+
+    let nested = root.join("nested");
+    std::fs::create_dir_all(&nested).expect("create nested dir");
+    let project_path = nested.join("x07.json");
+    std::fs::write(
+        &project_path,
+        format!(
+            r#"
+            {{
+              "schema_version": "{PROJECT_MANIFEST_SCHEMA_VERSION}",
+              "world": "solve-pure",
+              "entry": "src/main.x07.json",
+              "module_roots": ["src"],
+              "dependencies": [
+                {{
+                  "name": "dep",
+                  "version": "0.1.0",
+                  "path": "$workspace/packages/dep/0.1.0"
+                }}
+              ]
+            }}
+            "#
+        ),
+    )
+    .expect("write project manifest");
+
+    let manifest = project::load_project_manifest(&project_path).expect("load project manifest");
+    let lock = project::compute_lockfile(&project_path, &manifest).expect("compute lockfile");
+    project::verify_lockfile(&project_path, &manifest, &lock).expect("verify lockfile");
+
+    let roots = project::collect_module_roots(&project_path, &manifest, &lock)
+        .expect("collect module roots");
+    assert!(roots.contains(&nested.join("src")));
+    assert!(roots.contains(
+        &pkg_dir
+            .canonicalize()
+            .expect("canonicalize pkg")
+            .join("modules")
+    ));
+
+    if let Some(prev) = prev {
+        std::env::set_var("X07_WORKSPACE_ROOT", prev);
+    } else {
+        std::env::remove_var("X07_WORKSPACE_ROOT");
+    }
+    rm_rf(&root);
+}
+
+#[test]
 fn project_manifest_rejects_parent_dir_entry() {
     let dir = create_temp_dir("x07_project_paths");
     let path = dir.join("x07.json");

@@ -92,6 +92,21 @@ fn bytes_view_lit_roundtrips_to_bytes() {
 }
 
 #[test]
+fn bytes_view_lit_allows_whitespace() {
+    let cfg = config();
+    let program = x07_program::entry(&[], json!(["view.to_bytes", ["bytes.view_lit", "a b"]]));
+    let exe = compile_exe(program.as_slice());
+    let res = run_artifact_file(&cfg, &exe, b"").expect("runner ok");
+    assert!(
+        res.ok,
+        "trap={:?}\nstderr={:?}",
+        res.trap,
+        String::from_utf8_lossy(&res.stderr)
+    );
+    assert_eq!(res.solve_output, b"a b");
+}
+
+#[test]
 fn vec_u8_builds_bytes() {
     let cfg = config();
     let program = x07_program::entry(

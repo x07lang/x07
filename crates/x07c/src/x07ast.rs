@@ -973,7 +973,7 @@ fn expr_from_json_sexpr(v: &Value, ptr: &str) -> Result<Expr, X07AstError> {
             });
             for (idx, item) in items.iter().enumerate().skip(1) {
                 let item_ptr = format!("{ptr}/{idx}");
-                if head == "bytes.lit" && idx == 1 {
+                if (head == "bytes.lit" || head == "bytes.view_lit") && idx == 1 {
                     if let Value::String(s) = item {
                         out.push(Expr::Ident {
                             name: s.to_string(),

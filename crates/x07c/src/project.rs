@@ -18,15 +18,31 @@ fn workspace_path_remainder(raw: &str) -> Option<&str> {
     raw.strip_prefix("$workspace/")
 }
 
+fn discover_workspace_root_from_git(base: &Path) -> Option<PathBuf> {
+    let base = base.canonicalize().ok()?;
+    for anc in base.ancestors() {
+        let git = anc.join(".git");
+        if git.is_dir() || git.is_file() {
+            return Some(anc.to_path_buf());
+        }
+    }
+    None
+}
+
 pub fn resolve_rel_path_with_workspace(base: &Path, raw: &str) -> Result<PathBuf> {
     let raw = raw.trim();
     let Some(remainder) = workspace_path_remainder(raw) else {
         return Ok(base.join(raw));
     };
 
-    let root = std::env::var_os("X07_WORKSPACE_ROOT")
-        .ok_or_else(|| anyhow::anyhow!("X07_WORKSPACE_ROOT must be set when using {raw:?}"))?;
-    let root = PathBuf::from(root);
+    let root = match std::env::var_os("X07_WORKSPACE_ROOT") {
+        Some(root) => PathBuf::from(root),
+        None => discover_workspace_root_from_git(base).ok_or_else(|| {
+            anyhow::anyhow!(
+                "X07_WORKSPACE_ROOT must be set when using {raw:?} (or use $workspace within a git repo)"
+            )
+        })?,
+    };
     if root.as_os_str().is_empty() {
         anyhow::bail!("X07_WORKSPACE_ROOT must be non-empty when using {raw:?}");
     }

@@ -32,6 +32,8 @@ For string literals, you can use `bytes.view_lit` to produce a `bytes_view` dire
 ["let","v",["bytes.view_lit","hello"]]
 ```
 
+The literal argument may include whitespace (same as `bytes.lit`).
+
 ## Vectors (capacity-planned builders)
 
 Use `vec_u8` for output building:

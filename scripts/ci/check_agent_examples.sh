@@ -211,8 +211,37 @@ run_x07_run() {
   local stdout_log="$work/tmp/run.stdout"
   local stderr_log="$work/tmp/run.stderr"
 
+  local needs_sandbox_env="false"
+  local prev=""
+  for arg in "$@"; do
+    if [[ "$prev" == "--profile" && "$arg" == "sandbox" ]]; then
+      needs_sandbox_env="true"
+      break
+    fi
+    prev="$arg"
+  done
+
   set +e
-  (cd "$work" && "$x07_bin" run --report wrapped --report-out "$wrapped" "$@" >"$stdout_log" 2>"$stderr_log")
+  if [[ "$needs_sandbox_env" == "true" && "$(uname -s)" == "Darwin" ]]; then
+    local -a env_prefix=()
+    if [[ -z "${X07_SANDBOX_BACKEND:-}" ]]; then
+      env_prefix+=("X07_SANDBOX_BACKEND=os")
+    fi
+    if [[ -z "${X07_I_ACCEPT_WEAKER_ISOLATION:-}" ]]; then
+      env_prefix+=("X07_I_ACCEPT_WEAKER_ISOLATION=1")
+    fi
+
+    if [[ "${#env_prefix[@]}" -eq 0 ]]; then
+      (cd "$work" && "$x07_bin" run --report wrapped --report-out "$wrapped" "$@" >"$stdout_log" 2>"$stderr_log")
+    else
+      (
+        cd "$work" &&
+          env "${env_prefix[@]}" "$x07_bin" run --report wrapped --report-out "$wrapped" "$@" >"$stdout_log" 2>"$stderr_log"
+      )
+    fi
+  else
+    (cd "$work" && "$x07_bin" run --report wrapped --report-out "$wrapped" "$@" >"$stdout_log" 2>"$stderr_log")
+  fi
   local code="$?"
   set -e
 
