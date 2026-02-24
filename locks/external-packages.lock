@@ -350,8 +350,8 @@
         {
           "module_id": "std.auth.jose_jws_v1.tests",
           "path": "packages/ext/x07-ext-auth-jwt/0.1.4/modules/std/auth/jose_jws_v1/tests.x07.json",
-          "sha256": "87f4bfad7200acf5be64d32e036622d7468a7c8b430ecaea2b1b420c65ed4c4d",
-          "size_bytes": 15115
+          "sha256": "2883b105dabe9a7dadaca8bd51464b62ab82d41f05a6c01d1417176c1f374418",
+          "size_bytes": 15096
         },
         {
           "module_id": "std.auth.jose_jws_v1",
@@ -11079,6 +11079,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "af0cbdaadf46075f989ff710d2fbb03d3c1e9b9270f9aafd11c531d10a2118f2",
+  "packages_hash": "b6e370034de920a0048d7311a2b3bf738bab49a428825b49a0717ae7d6e15a40",
   "packages_root": "packages/ext"
 }
