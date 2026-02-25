@@ -26,7 +26,7 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Delegates template generation to `x07-mcp scaffold init ... --machine json`.
   - Creates the agent kit and a worker base policy at `.x07/policies/base/worker.sandbox.base.policy.json`.
 
-### WASM tooling (Phase 0)
+### WASM tooling (Phases 0–1)
 
 - `x07 wasm [ARGS...]`
   - Delegates to `x07-wasm` on PATH.
@@ -37,8 +37,15 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - `x07 wasm run`
   - `x07 wasm profile validate`
   - `x07 wasm cli specrows check`
+  - `x07 wasm wit validate`
+  - `x07 wasm component profile validate`
+  - `x07 wasm component build`
+  - `x07 wasm component compose`
+  - `x07 wasm component targets`
+  - `x07 wasm serve`
+  - `x07 wasm component run`
 
-See: [WASM (Phase 0)](wasm.md).
+See: [WASM (Phases 0–1)](wasm.md).
 
 ### Doctor (platform prerequisites)
 

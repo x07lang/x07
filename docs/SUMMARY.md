@@ -39,7 +39,7 @@
 ## Toolchain
 - [CLI](toolchain/cli.md)
 - [MCP kit](toolchain/mcp-kit.md)
-- [WASM (Phase 0)](toolchain/wasm.md)
+- [WASM (Phases 0–1)](toolchain/wasm.md)
 - [Benchmarks](toolchain/benchmarks.md)
 - [Compiler limits](toolchain/compiler-limits.md)
 - [Optimizer](toolchain/optimizer.md)
