@@ -14,12 +14,12 @@
     },
     {
       "name": "ext-fs",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-fs/0.1.4",
-      "package_manifest_sha256": "cf139c695712462ad40689e2b4435feb2eb942f2460a6159f140e84771c59fab",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-fs/0.1.5",
+      "package_manifest_sha256": "b40d97a9ab3b09b10b2c18c6527c05342dc0b775a7a713773e8f7d3a6fb31ae2",
       "module_root": "modules",
       "modules_sha256": {
-        "std.os.fs": "c3067e3b7526d5e14a0c70493290f7512b7a6652af62f042e0629d842090ae31",
+        "std.os.fs": "3b97c48b8a8ff15602c15644b1c0fe5c2957202bc7f1ce8243737fb3a6f05a80",
         "std.os.fs.spec": "b2f5276147697446a50e5d73a6037da1ceb8fcde1c9eadbe5aac654ab1091c7f"
       }
     },

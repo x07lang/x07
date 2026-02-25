@@ -7608,9 +7608,43 @@
         }
       ],
       "name": "ext-path-glob-rs",
-      "package_manifest_sha256": "b8e83c25cb17aa53351c17c8f28c3f9aa0f5f23d8c274f740511a15e6f574653",
+      "package_manifest_sha256": "a8e347d471594c65e030721a8e71657e16e27a5e6b782698d7335109f0f4bea4",
       "path": "packages/ext/x07-ext-path-glob-rs/0.1.2",
       "version": "0.1.2"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.os.fs.glob",
+          "path": "packages/ext/x07-ext-path-glob-rs/0.1.3/modules/std/os/fs/glob.x07.json",
+          "sha256": "397164b5dcb5a986f92efd268a993af9cdc053cf3431151b70a0c2141e17fdd5",
+          "size_bytes": 863
+        },
+        {
+          "module_id": "std.os.fs.globwalk.tests",
+          "path": "packages/ext/x07-ext-path-glob-rs/0.1.3/modules/std/os/fs/globwalk/tests.x07.json",
+          "sha256": "3d4f98561cc4b3c2cbeb5c90d1f1dd2a8e951b4c2a9ea47231f41d22b340088e",
+          "size_bytes": 3020
+        },
+        {
+          "module_id": "std.os.fs.ignore",
+          "path": "packages/ext/x07-ext-path-glob-rs/0.1.3/modules/std/os/fs/ignore.x07.json",
+          "sha256": "5207b89d94ce6b654a78af5c6e85abc0486d06d7db59670f7d19022eba978373",
+          "size_bytes": 2685
+        },
+        {
+          "module_id": "std.os.fs.walk",
+          "path": "packages/ext/x07-ext-path-glob-rs/0.1.3/modules/std/os/fs/walk.x07.json",
+          "sha256": "482b3be2dfa2a3b50c81768c44401aff031ad5341e048eee86de84ad910d9514",
+          "size_bytes": 987
+        }
+      ],
+      "name": "ext-path-glob-rs",
+      "package_manifest_sha256": "e9907ae7878352174bbbbf1360063ab20842d946aafd7b13b14b1db90e6d7062",
+      "path": "packages/ext/x07-ext-path-glob-rs/0.1.3",
+      "version": "0.1.3"
     },
     {
       "determinism_tier": "pure",
@@ -10388,9 +10422,25 @@
         }
       ],
       "name": "ext-walkdir-rs",
-      "package_manifest_sha256": "1d76413fa2b5dc845c66e5a3353d3930a3f372bea0ab991f6a200c31689ece42",
+      "package_manifest_sha256": "23bffc8e4b39d4d54c425835d4b9dd0b7021cd5e056ac11bda7f79cba164d254",
       "path": "packages/ext/x07-ext-walkdir-rs/0.1.2",
       "version": "0.1.2"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "ext.walkdir",
+          "path": "packages/ext/x07-ext-walkdir-rs/0.1.3/modules/ext/walkdir.x07.json",
+          "sha256": "03bb56255d35e6825abcd2c275e581a6e3a9fe8e504a81ffd1f295ddb348e668",
+          "size_bytes": 972
+        }
+      ],
+      "name": "ext-walkdir-rs",
+      "package_manifest_sha256": "1773b1222f0a3a93ad4af57ca4dd71ba87a9974366c2f6d17e1ebcf3eb3905c9",
+      "path": "packages/ext/x07-ext-walkdir-rs/0.1.3",
+      "version": "0.1.3"
     },
     {
       "determinism_tier": "mixed",
@@ -11101,6 +11151,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "15281c183d0cb034523e24a16e08c30465069ca87e24323b43811dc4f578eade",
+  "packages_hash": "6239c54d655270454e1284a5b67452697917a36d8bb89cf369139b853032366b",
   "packages_root": "packages/ext"
 }
