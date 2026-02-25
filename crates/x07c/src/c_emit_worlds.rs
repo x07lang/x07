@@ -1123,6 +1123,46 @@ impl<'a> Emitter<'a> {
         Ok(())
     }
 
+    pub(super) fn emit_os_fs_append_all_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.require_standalone_only("os.fs.append_all_v1")?;
+        self.require_native_backend(
+            native::BACKEND_ID_EXT_FS,
+            native::ABI_MAJOR_V1,
+            "os.fs.append_all_v1",
+        )?;
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "os.fs.append_all_v1 expects 3 args".to_string(),
+            ));
+        }
+        if dest_ty != Ty::ResultI32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.append_all_v1 returns result_i32".to_string(),
+            ));
+        }
+        let path = self.emit_expr(&args[0])?;
+        let data = self.emit_expr(&args[1])?;
+        let caps = self.emit_expr(&args[2])?;
+        if path.ty != Ty::Bytes || data.ty != Ty::Bytes || caps.ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "os.fs.append_all_v1 expects (bytes path, bytes data, bytes caps)".to_string(),
+            ));
+        }
+        self.line(&format!(
+            "{dest} = x07_ext_fs_append_all_v1({}, {}, {});",
+            path.c_name, data.c_name, caps.c_name
+        ));
+        Ok(())
+    }
+
     pub(super) fn emit_os_fs_stream_open_write_v1_to(
         &mut self,
         args: &[Expr],

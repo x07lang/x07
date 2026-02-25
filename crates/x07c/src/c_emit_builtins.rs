@@ -875,6 +875,7 @@ impl<'a> Emitter<'a> {
             "os.fs.write_file" => self.emit_os_fs_write_file_to(args, dest_ty, dest),
             "os.fs.read_all_v1" => self.emit_os_fs_read_all_v1_to(args, dest_ty, dest),
             "os.fs.write_all_v1" => self.emit_os_fs_write_all_v1_to(args, dest_ty, dest),
+            "os.fs.append_all_v1" => self.emit_os_fs_append_all_v1_to(args, dest_ty, dest),
             "os.fs.stream_open_write_v1" => {
                 self.emit_os_fs_stream_open_write_v1_to(args, dest_ty, dest)
             }

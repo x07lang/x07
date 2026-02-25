@@ -129,6 +129,9 @@ pub fn guide_md() -> String {
     out.push_str("  - `os.fs.write_file(path: bytes, data: bytes) -> i32`\n");
     out.push_str("  - `os.fs.read_all_v1(path: bytes, caps: bytes) -> result_bytes`\n");
     out.push_str("  - `os.fs.write_all_v1(path: bytes, data: bytes, caps: bytes) -> result_i32`\n");
+    out.push_str(
+        "  - `os.fs.append_all_v1(path: bytes, data: bytes, caps: bytes) -> result_i32`\n",
+    );
     out.push_str("  - `os.fs.mkdirs_v1(path: bytes, caps: bytes) -> result_i32`\n");
     out.push_str("  - `os.fs.remove_file_v1(path: bytes, caps: bytes) -> result_i32`\n");
     out.push_str("  - `os.fs.remove_dir_all_v1(path: bytes, caps: bytes) -> result_i32`\n");

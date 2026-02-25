@@ -1644,6 +1644,26 @@ impl InferCtx {
                         }
                         Ok(Ty::ResultI32.into())
                     }
+                    "os.fs.append_all_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 3 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.fs.append_all_v1 expects 3 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes
+                            || self.infer(&args[1])? != Ty::Bytes
+                            || self.infer(&args[2])? != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.fs.append_all_v1 expects (bytes path, bytes data, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::ResultI32.into())
+                    }
                     "os.fs.stream_open_write_v1" => {
                         self.require_standalone_only(head)?;
                         if args.len() != 2 {

@@ -42,6 +42,7 @@ void ev_trap(int32_t code);
 // v1 entrypoints used by os.fs.* builtins.
 ev_result_bytes x07_ext_fs_read_all_v1(ev_bytes path, ev_bytes caps);
 ev_result_i32 x07_ext_fs_write_all_v1(ev_bytes path, ev_bytes data, ev_bytes caps);
+ev_result_i32 x07_ext_fs_append_all_v1(ev_bytes path, ev_bytes data, ev_bytes caps);
 ev_result_i32 x07_ext_fs_mkdirs_v1(ev_bytes path, ev_bytes caps);
 ev_result_i32 x07_ext_fs_remove_file_v1(ev_bytes path, ev_bytes caps);
 ev_result_i32 x07_ext_fs_remove_dir_all_v1(ev_bytes path, ev_bytes caps);

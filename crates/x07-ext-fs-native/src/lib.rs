@@ -3,6 +3,7 @@
 
 use globset::{Glob, GlobMatcher};
 use once_cell::sync::OnceCell;
+use std::fs::OpenOptions;
 use std::io::{self, Read as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -648,6 +649,73 @@ pub extern "C" fn x07_ext_fs_write_all_v1(
         }
 
         if let Err(e) = std::fs::write(&pb, data_bytes) {
+            return err_i32(map_io_err(&e));
+        }
+        ok_i32(data_bytes.len() as i32)
+    })
+    .unwrap_or_else(|_| err_i32(FS_ERR_IO))
+}
+
+#[no_mangle]
+pub extern "C" fn x07_ext_fs_append_all_v1(
+    path: ev_bytes,
+    data: ev_bytes,
+    caps: ev_bytes,
+) -> ev_result_i32 {
+    std::panic::catch_unwind(|| unsafe {
+        let caps = match parse_caps_v1(bytes_as_slice(caps)) {
+            Ok(caps) => caps,
+            Err(code) => return err_i32(code),
+        };
+
+        let pol = policy();
+        if cap_allow_symlinks(caps) && !pol.allow_symlinks {
+            return err_i32(FS_ERR_SYMLINK_DENIED);
+        }
+
+        if cap_create_parents(caps) && !pol.allow_mkdir {
+            return err_i32(FS_ERR_POLICY_DENY);
+        }
+        if cap_atomic_write(caps) {
+            return err_i32(FS_ERR_UNSUPPORTED);
+        }
+
+        let path_bytes = bytes_as_slice(path);
+        let pb = match enforce_write_path(caps, path_bytes) {
+            Ok(p) => p,
+            Err(code) => return err_i32(code),
+        };
+
+        let data_bytes = bytes_as_slice(data);
+
+        let max = effective_max(pol.max_write_bytes, caps.max_write_bytes);
+        if data_bytes.len() > (max as usize) {
+            return err_i32(FS_ERR_TOO_LARGE);
+        }
+
+        if cap_create_parents(caps) {
+            if let Some(parent) = pb.parent() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    return err_i32(map_io_err(&e));
+                }
+            }
+        }
+
+        match std::fs::metadata(&pb) {
+            Ok(m) => {
+                if m.is_dir() {
+                    return err_i32(FS_ERR_IS_DIR);
+                }
+            }
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return err_i32(map_io_err(&e)),
+        }
+
+        let mut f = match OpenOptions::new().create(true).append(true).open(&pb) {
+            Ok(f) => f,
+            Err(e) => return err_i32(map_io_err(&e)),
+        };
+        if let Err(e) = f.write_all(data_bytes) {
             return err_i32(map_io_err(&e));
         }
         ok_i32(data_bytes.len() as i32)
@@ -1413,6 +1481,76 @@ mod tests {
             FS_ERR_BAD_HANDLE
         );
         assert_eq!(err_i32(x07_ext_fs_stream_close_v1(123)), FS_ERR_BAD_HANDLE);
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fs_append_all_v1_smoke() {
+        std::env::set_var("X07_OS_SANDBOXED", "0");
+        std::env::set_var("X07_OS_FS", "1");
+        std::env::set_var("X07_OS_FS_ALLOW_MKDIR", "1");
+        std::env::set_var("X07_OS_FS_MAX_WRITE_BYTES", "1000000");
+
+        let root = format!("target/x07_ext_fs_append_test_{}", std::process::id());
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("create test dir");
+
+        let out_path = format!("{root}/out.txt");
+        let caps = caps_v1(1024, CAP_CREATE_PARENTS);
+
+        assert_eq!(
+            ok_i32(x07_ext_fs_append_all_v1(
+                to_ev_bytes(out_path.as_bytes()),
+                to_ev_bytes(b"abc"),
+                to_ev_bytes(&caps),
+            )),
+            3
+        );
+        assert_eq!(
+            ok_i32(x07_ext_fs_append_all_v1(
+                to_ev_bytes(out_path.as_bytes()),
+                to_ev_bytes(b"def"),
+                to_ev_bytes(&caps),
+            )),
+            3
+        );
+        let got = std::fs::read(&out_path).expect("read out.txt");
+        assert_eq!(got, b"abcdef");
+
+        // max_write_bytes enforced per call.
+        let caps_small = caps_v1(2, CAP_CREATE_PARENTS);
+        assert_eq!(
+            err_i32(x07_ext_fs_append_all_v1(
+                to_ev_bytes(out_path.as_bytes()),
+                to_ev_bytes(b"xyz"),
+                to_ev_bytes(&caps_small),
+            )),
+            FS_ERR_TOO_LARGE
+        );
+
+        // Atomic write is not supported for append.
+        let caps_atomic = caps_v1(1024, CAP_CREATE_PARENTS | CAP_ATOMIC_WRITE);
+        assert_eq!(
+            err_i32(x07_ext_fs_append_all_v1(
+                to_ev_bytes(out_path.as_bytes()),
+                to_ev_bytes(b"z"),
+                to_ev_bytes(&caps_atomic),
+            )),
+            FS_ERR_UNSUPPORTED
+        );
+
+        // Directory paths are rejected.
+        let dir_path = format!("{root}/dir");
+        std::fs::create_dir_all(&dir_path).expect("create dir");
+        assert_eq!(
+            err_i32(x07_ext_fs_append_all_v1(
+                to_ev_bytes(dir_path.as_bytes()),
+                to_ev_bytes(b"x"),
+                to_ev_bytes(&caps),
+            )),
+            FS_ERR_IS_DIR
+        );
 
         let _ = std::fs::remove_dir_all(&root);
     }

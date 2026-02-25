@@ -2388,6 +2388,7 @@ bytes_t ev_time_tzdb_snapshot_id_v1(void);
 // Native ext-fs backend entrypoints (linked from deps/x07/libx07_ext_fs.*).
 result_bytes_t x07_ext_fs_read_all_v1(bytes_t path, bytes_t caps);
 result_i32_t x07_ext_fs_write_all_v1(bytes_t path, bytes_t data, bytes_t caps);
+result_i32_t x07_ext_fs_append_all_v1(bytes_t path, bytes_t data, bytes_t caps);
 result_i32_t x07_ext_fs_mkdirs_v1(bytes_t path, bytes_t caps);
 result_i32_t x07_ext_fs_remove_file_v1(bytes_t path, bytes_t caps);
 result_i32_t x07_ext_fs_remove_dir_all_v1(bytes_t path, bytes_t caps);

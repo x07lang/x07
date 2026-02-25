@@ -4690,6 +4690,28 @@
       "version": "0.1.4"
     },
     {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.os.fs.spec",
+          "path": "packages/ext/x07-ext-fs/0.1.5/modules/std/os/fs/spec.x07.json",
+          "sha256": "b2f5276147697446a50e5d73a6037da1ceb8fcde1c9eadbe5aac654ab1091c7f",
+          "size_bytes": 5667
+        },
+        {
+          "module_id": "std.os.fs",
+          "path": "packages/ext/x07-ext-fs/0.1.5/modules/std/os/fs.x07.json",
+          "sha256": "3b97c48b8a8ff15602c15644b1c0fe5c2957202bc7f1ce8243737fb3a6f05a80",
+          "size_bytes": 2414
+        }
+      ],
+      "name": "ext-fs",
+      "package_manifest_sha256": "b40d97a9ab3b09b10b2c18c6527c05342dc0b775a7a713773e8f7d3a6fb31ae2",
+      "path": "packages/ext/x07-ext-fs/0.1.5",
+      "version": "0.1.5"
+    },
+    {
       "determinism_tier": "pure",
       "import_mode": "handwritten",
       "modules": [
@@ -11079,6 +11101,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "b6e370034de920a0048d7311a2b3bf738bab49a428825b49a0717ae7d6e15a40",
+  "packages_hash": "15281c183d0cb034523e24a16e08c30465069ca87e24323b43811dc4f578eade",
   "packages_root": "packages/ext"
 }

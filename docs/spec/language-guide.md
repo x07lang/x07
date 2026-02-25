@@ -129,6 +129,7 @@ Standalone OS builtins:
   - `os.fs.write_file(path: bytes, data: bytes) -> i32`
   - `os.fs.read_all_v1(path: bytes, caps: bytes) -> result_bytes`
   - `os.fs.write_all_v1(path: bytes, data: bytes, caps: bytes) -> result_i32`
+  - `os.fs.append_all_v1(path: bytes, data: bytes, caps: bytes) -> result_i32`
   - `os.fs.mkdirs_v1(path: bytes, caps: bytes) -> result_i32`
   - `os.fs.remove_file_v1(path: bytes, caps: bytes) -> result_i32`
   - `os.fs.remove_dir_all_v1(path: bytes, caps: bytes) -> result_i32`
