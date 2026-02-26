@@ -19,7 +19,7 @@
       "package_manifest_sha256": "b40d97a9ab3b09b10b2c18c6527c05342dc0b775a7a713773e8f7d3a6fb31ae2",
       "module_root": "modules",
       "modules_sha256": {
-        "std.os.fs": "3b97c48b8a8ff15602c15644b1c0fe5c2957202bc7f1ce8243737fb3a6f05a80",
+        "std.os.fs": "5dbbfa61f3a455c5ed7575ec8e87d3c20589f29595fa5ec2f6bdf09ae54e14d5",
         "std.os.fs.spec": "b2f5276147697446a50e5d73a6037da1ceb8fcde1c9eadbe5aac654ab1091c7f"
       }
     },

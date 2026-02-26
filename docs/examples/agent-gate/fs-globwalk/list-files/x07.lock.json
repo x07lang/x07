@@ -21,7 +21,7 @@
       "package_manifest_sha256": "b40d97a9ab3b09b10b2c18c6527c05342dc0b775a7a713773e8f7d3a6fb31ae2",
       "module_root": "modules",
       "modules_sha256": {
-        "std.os.fs": "3b97c48b8a8ff15602c15644b1c0fe5c2957202bc7f1ce8243737fb3a6f05a80",
+        "std.os.fs": "5dbbfa61f3a455c5ed7575ec8e87d3c20589f29595fa5ec2f6bdf09ae54e14d5",
         "std.os.fs.spec": "b2f5276147697446a50e5d73a6037da1ceb8fcde1c9eadbe5aac654ab1091c7f"
       }
     },
@@ -43,10 +43,10 @@
       "package_manifest_sha256": "e9907ae7878352174bbbbf1360063ab20842d946aafd7b13b14b1db90e6d7062",
       "module_root": "modules",
       "modules_sha256": {
-        "std.os.fs.glob": "397164b5dcb5a986f92efd268a993af9cdc053cf3431151b70a0c2141e17fdd5",
-        "std.os.fs.globwalk.tests": "3d4f98561cc4b3c2cbeb5c90d1f1dd2a8e951b4c2a9ea47231f41d22b340088e",
-        "std.os.fs.ignore": "5207b89d94ce6b654a78af5c6e85abc0486d06d7db59670f7d19022eba978373",
-        "std.os.fs.walk": "482b3be2dfa2a3b50c81768c44401aff031ad5341e048eee86de84ad910d9514"
+        "std.os.fs.glob": "931dcfb7c57bce9b024e1ab6ef3416055971a83f36cfa98b9d335e8c9aed7d05",
+        "std.os.fs.globwalk.tests": "35629af22bcf0d2fb31bb3ee03ac0469ea50d632048b17de0e50a9b19212e029",
+        "std.os.fs.ignore": "b09870652b1dbb7243b9cd9162149b6617aae85210577dfa05a7890f4491857d",
+        "std.os.fs.walk": "e760dca3c18983791be147bae1ca1045c3a2640c277bc75f4deade281fd72151"
       }
     }
   ]
