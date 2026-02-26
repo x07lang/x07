@@ -50,6 +50,11 @@ is_linux() {
 
 python_bin="$(pick_python)"
 
+# Resolve relative python paths (e.g. .venv/bin/python) to be stable across `cd`.
+if [[ "${python_bin}" == */* && "${python_bin}" != /* ]]; then
+  python_bin="$root/$python_bin"
+fi
+
 docker_image="${X07_BUNDLE_SMOKE_DOCKER_IMAGE:-}"
 if [[ -z "$docker_image" ]] && is_linux && [[ -f "/etc/os-release" ]]; then
   # shellcheck disable=SC1091

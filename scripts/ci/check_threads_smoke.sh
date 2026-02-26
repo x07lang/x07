@@ -27,6 +27,11 @@ if [[ -z "${python_bin}" ]]; then
   fi
 fi
 
+# Resolve relative python paths (e.g. .venv/bin/python) to be stable across `cd`.
+if [[ "${python_bin}" == */* && "${python_bin}" != /* ]]; then
+  python_bin="$root/$python_bin"
+fi
+
 if [[ -n "${X07_BIN:-}" ]]; then
   x07_bin="${X07_BIN}"
   if [[ "$x07_bin" != /* ]]; then

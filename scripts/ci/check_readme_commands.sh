@@ -19,6 +19,11 @@ if [[ -z "${python_bin}" ]]; then
   fi
 fi
 
+# Resolve relative python paths (e.g. .venv/bin/python) to be stable across `cd`.
+if [[ "${python_bin}" == */* && "${python_bin}" != /* ]]; then
+  python_bin="$root/$python_bin"
+fi
+
 cargo build -p x07 -p x07-host-runner -p x07-os-runner >/dev/null
 
 x07_bin="${X07_BIN:-}"
