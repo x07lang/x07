@@ -49,6 +49,14 @@ Phase 10 adds:
 - DPoP nonce hardening (RFC9449 `use_dpop_nonce`)
 - RFC9728 signed PRM metadata (`signed_metadata`)
 
+Phase 12 adds:
+
+- trust framework bundles (`x07.mcp.trust.bundle@0.1.0`) + framework policy (`x07.mcp.trust.framework@0.1.0`)
+- resource policy resolution with precedence: `exact` > `prefix` > `hostSuffix` > defaults
+- publish-time signed-PRM enforcement (`publish.require_signed_prm=true`)
+- publisher `_meta` trust summary injection (`requireSigned`, `signerIss`, `trustFrameworkSha256`)
+- tag-release guardrails rejecting placeholder trust metadata
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:
@@ -73,6 +81,9 @@ The HTTP template includes:
 - `config/mcp.server.dev.json` (no-auth dev config)
 - `config/mcp.tools.json` (`x07.mcp.tools_manifest@0.2.0`)
 - `config/mcp.oauth.json` (`x07.mcp.oauth@0.2.0`, with deterministic `test_static` dev tokens)
+- `trust/bundles/dev_prm_signers.trust_bundle.json`
+- `trust/frameworks/dev.trust_framework.json`
+- `publish/prm.json` + `publish/server.json` trust summary fixtures
 - deterministic HTTP replay fixtures under `tests/.x07_rr/sessions/`
 
 ## HTTP Tasks template quickstart
@@ -151,6 +162,13 @@ x07 mcp publish --dry-run \
   --server-json servers/postgres-mcp/dist/server.json \
   --mcpb servers/postgres-mcp/dist/postgres-mcp.mcpb
 ```
+
+When `publish.require_signed_prm=true`, dry-run also verifies:
+
+- `signed_metadata` is present in PRM
+- signer issuer is allowed by trust framework resource policy
+- signer key is pinned in trust bundles
+- generated trust summary matches publisher `_meta`
 
 ## Reference server set
 

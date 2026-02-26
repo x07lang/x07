@@ -71,10 +71,25 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
   - redacts Authorization / Proxy-Authorization / Cookie / Set-Cookie
   - fails closed if token-like patterns survive sanitization
 
+## Phase 12 verification checks
+
+- Trust framework (`x07.mcp.trust.framework@0.1.0`):
+  - resource matching precedence is deterministic (`exact` > `prefix` > `hostSuffix` > defaults)
+  - issuer allowlist and pinned key lookup resolve across composed bundles
+- Publish dry-run trust gates:
+  - `publish.require_signed_prm=true` rejects missing `signed_metadata`
+  - signer issuer must be allowed for the resolved resource policy
+  - signer key must be present in trust bundle pins
+  - generated `_meta` trust summary matches publish inputs
+- Release metadata guard:
+  - reject placeholder `trustFrameworkSha256` on release tags
+  - require `x07.io/mcp.prm.requireSigned=true` in publisher metadata
+
 ## Release checklist
 
 1. Run `x07-mcp` checks (`./scripts/ci/check_all.sh` and reference server suites).
 2. Build deterministic `.mcpb` artifact(s) and verify stable SHA-256 across repeat builds.
 3. Generate `server.json` from `x07.mcp.json` and validate schema + non-schema constraints.
 4. Run `x07 mcp publish --dry-run` for release artifacts.
-5. Confirm docs and pin tables are synchronized across `x07-mcp` and `x07`.
+5. Run tag-only release metadata guards (`release_metadata_guard.sh`) to enforce non-placeholder trust + hash metadata.
+6. Confirm docs and pin tables are synchronized across `x07-mcp` and `x07`.
