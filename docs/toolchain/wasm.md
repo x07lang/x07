@@ -1,11 +1,12 @@
-# WASM (Phases 0–3)
+# WASM (Phases 0–4)
 
 Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
 Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
 Phase 2 adds a **Web UI** loop (`web-ui build|serve|test`) on top of Phase 0/1.
 Phase 3 adds a **full-stack app bundle** loop (`app build|serve|test`) that combines Phase 2 (frontend) and Phase 1 (backend).
+Phase 4 adds **native backend targets** so `x07 wasm component build --emit http|cli` can produce runnable standard-world components without guest adapters and without a compose step.
 
-Phases 0–3 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
+Phases 0–4 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
 ## Delegation model
 
@@ -100,15 +101,35 @@ x07 wasm wit validate --json
 x07 wasm component profile validate --json
 ```
 
-Build + compose:
+Phase 4 native targets (adapterless, no compose):
 
 ```sh
-x07 wasm component build --project examples/http_echo/x07.json --emit all --json
+x07 wasm component build --project examples/http_echo/x07.json --emit http --json
+x07 wasm component targets --component target/x07-wasm/component/http.component.wasm --wit wit/deps/wasi/http/0.2.8/proxy.wit --world proxy --json
+x07 wasm serve --mode canary --component target/x07-wasm/component/http.component.wasm --request-body @examples/http_echo/tests/fixtures/request_body.bin --json
+```
+
+```sh
+x07 wasm component build --project examples/solve_pure_echo/x07.json --emit cli --json
+x07 wasm component targets --component target/x07-wasm/component/cli.component.wasm --wit wit/deps/wasi/cli/0.2.8/command.wit --world command --json
+x07 wasm component run --component target/x07-wasm/component/cli.component.wasm --stdin examples/solve_pure_echo/tests/fixtures/in_hello.bin --stdout-out dist/stdout.bin --json
+```
+
+Legacy compose path (Phase 1 adapters + `wac plug`):
+
+```sh
+x07 wasm component build --project examples/http_echo/x07.json --emit solve --json
+x07 wasm component build --project examples/solve_pure_echo/x07.json --emit http-adapter --json
 x07 wasm component compose --adapter http --solve target/x07-wasm/component/solve.component.wasm --out dist/app.http.component.wasm --json
 x07 wasm component targets --component dist/app.http.component.wasm --wit wit/deps/wasi/http/0.2.8/proxy.wit --world proxy --json
 ```
 
-Run:
+Notes:
+
+- `component build --emit all` builds `solve + http + cli` (native). Build adapters explicitly via `http-adapter|cli-adapter`.
+- Native HTTP components surface failures via response headers (`x-x07-diag-code`, optional `x-x07-diag-data-b64`). Native CLI components surface failures via stderr sentinel lines (`x07-diag-code: ...`).
+
+Run (legacy composed artifacts):
 
 ```sh
 x07 wasm serve --mode canary --component dist/app.http.component.wasm --request-body @examples/http_echo/tests/fixtures/request_body.bin --json
