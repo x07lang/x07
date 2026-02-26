@@ -6,7 +6,7 @@
 
 Run X07 UI reducers in the browser with deterministic replay and an incident-to-regression flow:
 
-- `std-web-ui@0.1.0`: canonical `std.web_ui.*` packages
+- `std-web-ui@0.1.1`: canonical `std.web_ui.*` packages
 - `x07-wasm web-ui ...`: build/serve/test tooling with machine-readable reports
 - deterministic trace fixtures and replay harness
 
@@ -20,7 +20,7 @@ Run X07 UI reducers in the browser with deterministic replay and an incident-to-
 ## Phase 2 checklist
 
 - [x] Create canonical `x07-web-ui` repo:
-  - [x] `std-web-ui@0.1.0` package exporting `std.web_ui.*` modules
+  - [x] `std-web-ui@0.1.1` package exporting `std.web_ui.*` modules
   - [x] canonical browser host (`host/index.html`, `host/app-host.mjs`)
   - [x] canonical WIT contract (`x07:web-ui@0.2.0`, world `web-ui-app`)
   - [x] examples (`web_ui_counter`, `web_ui_form`) with deterministic trace fixtures
@@ -39,7 +39,7 @@ Run X07 UI reducers in the browser with deterministic replay and an incident-to-
 - [x] Vendor/sync canonical host assets and WIT from `x07-web-ui` into `x07-wasm-backend`
 - [x] Add Phase 2 CI gate (`x07-wasm-backend/scripts/ci/check_phase2.sh`) + workflow job
 - [x] Publish Phase 2 schemas to `x07.io/spec/` (repo: `x07-registry-web`)
-- [x] Publish `std-web-ui@0.1.0` to `x07.io` registry
+- [x] Publish `std-web-ui@0.1.1` to `x07.io` registry
 
 ## Local smoke loop (target)
 
