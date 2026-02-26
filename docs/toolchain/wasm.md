@@ -1,9 +1,10 @@
-# WASM (Phases 0–1)
+# WASM (Phases 0–2)
 
 Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
 Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
+Phase 2 adds a **Web UI** loop (`web-ui build|serve|test`) on top of Phase 0/1.
 
-Phases 0–1 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
+Phases 0–2 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
 ## Delegation model
 
@@ -26,6 +27,11 @@ Phase 1 also requires additional tools on `PATH` (checked by `x07 wasm doctor`):
 - `wit-bindgen`
 - `wac`
 - `wasmtime`
+
+Phase 2 (component+ESM builds) also uses:
+
+- `node`
+- `jco` (component transpile)
 
 ## Profiles (contracts-as-data)
 
@@ -106,4 +112,34 @@ Run:
 ```sh
 x07 wasm serve --mode canary --component dist/app.http.component.wasm --request-body @examples/http_echo/tests/fixtures/request_body.bin --json
 x07 wasm component run --component dist/app.cli.component.wasm --stdin examples/solve_pure_echo/tests/fixtures/in_hello.bin --stdout-out dist/stdout.bin --json
+```
+
+## Phase 2: web-ui (browser host)
+
+Phase 2 adds a browser host loop for X07 reducers that consume `x07.web_ui.dispatch@0.1.0` and emit `x07.web_ui.frame@0.1.0` as UTF-8 JSON bytes.
+
+The canonical `std-web-ui` package, browser host assets, and WIT contracts live in the `x07-web-ui` repo.
+
+Validate contracts + profile registry (offline):
+
+```sh
+x07 wasm web-ui contracts validate --json
+x07 wasm web-ui profile validate --json
+```
+
+Build + serve + test (example from `x07-web-ui`):
+
+```sh
+git clone https://github.com/x07lang/x07-web-ui.git
+cd x07-web-ui
+
+x07 wasm web-ui build --project examples/web_ui_counter/x07.json --profile web_ui_debug --out-dir dist --json
+x07 wasm web-ui serve --dir dist --mode listen --strict-mime --json
+x07 wasm web-ui test --dist-dir dist --case examples/web_ui_counter/tests/counter.trace.json --json
+```
+
+Component build (transpiled for the browser via `jco transpile`):
+
+```sh
+x07 wasm web-ui build --project examples/web_ui_counter/x07.json --profile web_ui_debug --out-dir dist --format component --json
 ```
