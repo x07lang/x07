@@ -1,10 +1,11 @@
-# WASM (Phases 0–2)
+# WASM (Phases 0–3)
 
 Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
 Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
 Phase 2 adds a **Web UI** loop (`web-ui build|serve|test`) on top of Phase 0/1.
+Phase 3 adds a **full-stack app bundle** loop (`app build|serve|test`) that combines Phase 2 (frontend) and Phase 1 (backend).
 
-Phases 0–2 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
+Phases 0–3 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
 ## Delegation model
 
@@ -142,4 +143,28 @@ Component build (transpiled for the browser via `jco transpile`):
 
 ```sh
 x07 wasm web-ui build --project examples/web_ui_counter/x07.json --profile web_ui_debug --out-dir dist --format component --json
+```
+
+## Phase 3: app bundle (full stack)
+
+Phase 3 introduces an app-bundle registry (`arch/app/*`) and a single closed loop:
+
+- app profile → app build → app serve → app test → incident → regression
+
+Validate (offline):
+
+```sh
+x07 wasm app contracts validate --json
+x07 wasm app profile validate --json
+```
+
+Build + serve + test (example from `x07-wasm-backend`):
+
+```sh
+git clone https://github.com/x07lang/x07-wasm-backend.git
+cd x07-wasm-backend
+
+x07 wasm app build --profile app_dev --out-dir dist/app --clean --json
+x07 wasm app serve --dir dist/app --mode smoke --strict-mime --json
+x07 wasm app test --dir dist/app --trace examples/app_fullstack_hello/tests/trace_0001.json --json
 ```

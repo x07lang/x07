@@ -19,6 +19,7 @@
     "std.test",
     "std.regex-lite",
     "std.json",
+    "std.http.envelope",
     "std.csv",
     "std.map",
     "std.set",

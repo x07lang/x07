@@ -303,6 +303,14 @@
       "version": "0.1.2"
     },
     {
+      "name": "std.http.envelope",
+      "path": "stdlib/std/0.1.2/modules/std/http/envelope.x07.json",
+      "relpath": "std/0.1.2/modules/std/http/envelope.x07.json",
+      "sha256": "e59296d4628b292de950553030e3e97f0b2a58a39bc81312f7bba5d3c2d0ee1a",
+      "size_bytes": 5078,
+      "version": "0.1.2"
+    },
+    {
       "name": "std.io",
       "path": "stdlib/std/0.1.1/modules/std/io.x07.json",
       "relpath": "std/0.1.1/modules/std/io.x07.json",
@@ -905,6 +913,6 @@
       "version": "0.1.2"
     }
   ],
-  "stdlib_hash": "f1ff6644adfbd35770cb0eaff90deec606c0aa014700d068e61c8cf922cf9bd2",
+  "stdlib_hash": "67a32b1742675bd16339cdd6203c0fd3f68165dc63d634beb317a48712b0a0b7",
   "stdlib_root": "stdlib/std"
 }

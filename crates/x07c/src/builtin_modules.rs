@@ -54,6 +54,9 @@ pub fn builtin_module_source(module_id: &str) -> Option<&'static str> {
         "std.json" => Some(include_str!(
             "../../../stdlib/std/0.1.2/modules/std/json.x07.json"
         )),
+        "std.http.envelope" => Some(include_str!(
+            "../../../stdlib/std/0.1.2/modules/std/http/envelope.x07.json"
+        )),
         "std.csv" => Some(include_str!(
             "../../../stdlib/std/0.1.2/modules/std/csv.x07.json"
         )),
@@ -165,6 +168,7 @@ pub fn builtin_module_ids() -> &'static [&'static str] {
         "std.test",
         "std.regex-lite",
         "std.json",
+        "std.http.envelope",
         "std.csv",
         "std.map",
         "std.set",
