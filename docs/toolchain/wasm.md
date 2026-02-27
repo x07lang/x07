@@ -1,4 +1,4 @@
-# WASM (Phases 0–5)
+# WASM (Phases 0–6)
 
 Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
 Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
@@ -6,8 +6,9 @@ Phase 2 adds a **Web UI** loop (`web-ui build|serve|test`) on top of Phase 0/1.
 Phase 3 adds a **full-stack app bundle** loop (`app build|serve|test`) that combines Phase 2 (frontend) and Phase 1 (backend).
 Phase 4 adds **native backend targets** so `x07 wasm component build --emit http|cli` can produce runnable standard-world components without guest adapters and without a compose step.
 Phase 5 adds **Track-1 hardening**: toolchain pin validation, host runtime budgets, deployable app packs, and a core-wasm HTTP reducer loop.
+Phase 6 adds **operational contracts** (ops profiles, capabilities, policy), **SLO-as-code**, **deploy plan generation**, and **hash-first provenance**.
 
-Phases 0–4 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
+Phases 0–6 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
 ## Delegation model
 
@@ -219,3 +220,45 @@ Core-wasm HTTP reducer contracts + loop:
 ```sh
 x07 wasm http contracts validate --strict --json
 ```
+
+## Phase 6: ops + capabilities + policy + SLO + deploy plans + provenance
+
+Phase 6 introduces machine-readable operational governance and deployment artifacts:
+
+```sh
+x07 wasm ops validate --profile arch/app/ops/ops_release.json --json
+x07 wasm caps validate --profile arch/app/ops/caps_release.json --json
+```
+
+Policy cards (assertions + optional RFC-6902 JSON Patch):
+
+```sh
+x07 wasm policy validate --card arch/app/ops/policy_deploy_patch_id.json --json
+```
+
+SLO-as-code + offline evaluation:
+
+```sh
+x07 wasm slo validate --profile arch/slo/slo_min.json --json
+x07 wasm slo eval --profile arch/slo/slo_min.json --metrics examples/app_min/tests/metrics_canary_ok.json --json
+```
+
+Deploy plan generation (writes `deploy.plan.json` + Kubernetes YAMLs under `--out-dir`):
+
+```sh
+x07 wasm deploy plan --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --out-dir dist/deploy_plan --json
+```
+
+Hash-first pack provenance:
+
+```sh
+x07 wasm provenance attest --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --out dist/provenance.slsa.json --json
+x07 wasm provenance verify --attestation dist/provenance.slsa.json --pack-dir dist/app.pack --json
+```
+
+Runtime enforcement via ops profiles:
+
+- `x07 wasm serve --ops <ops.json>` applies capability enforcement to WASI 0.2 HTTP components.
+- `x07 wasm http serve --ops <ops.json>` applies capability enforcement to the core-wasm HTTP reducer effects (for example `http.fetch` and `time.now`).
+- `x07 wasm app serve --ops <ops.json>` applies capability enforcement to backend requests served via the in-proc component host.
+- `x07 wasm app serve --mode canary --ops <ops.json>` includes an SLO decision (if the ops profile includes an SLO reference) under `result.stdout_json.canary.slo_decision`.
