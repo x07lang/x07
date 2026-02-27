@@ -90,6 +90,16 @@ Phase 15 adds:
   - `checkpointSha256`
 - template replay fixtures for metadata refresh success + rollback rejection (`trust.tuf_ok`, `trust.tuf_rollback_timestamp`)
 
+Phase 16 adds:
+
+- trust transparency log verification primitives (CT-style Merkle root, inclusion proof, consistency proof)
+- checkpoint JWS verification and trust bundle inclusion verification helpers
+- run-os monitor runner surfaces that verify append-only growth and evaluate newly appended entries against monitor policy
+- deterministic transparency monitor assets:
+  - `templates/trust-registry-tlog/`
+  - `rr/http/trust_tlog_monitor_{ok,unexpected,inconsistent}.http.jsonl`
+  - `conformance/trust-tlog/` scenario baselines
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:

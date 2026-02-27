@@ -129,6 +129,20 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
 - Template replay fixtures:
   - `tests/replay/trust.tuf_ok/http.jsonl` and `trust.tuf_rollback_timestamp/http.jsonl` are present and enforced in template tests
 
+## Phase 16 verification checks
+
+- Transparency tlog primitives:
+  - Merkle root, inclusion proof, and consistency proof checks pass for the deterministic phase-16 dataset
+  - checkpoint payload verification enforces expected `log_id`/`origin` and root/tree-size fields
+- Monitor behavior:
+  - monitor succeeds for expected append-only growth + allowed entries (`publish16/trust_tlog_monitor_ok`)
+  - monitor rejects unexpected entries with policy violation (`publish16/trust_tlog_monitor_unexpected`)
+  - monitor rejects inconsistent append-only proofs (`publish16/trust_tlog_monitor_inconsistent`)
+- Fixture/replay coverage:
+  - template dataset `templates/trust-registry-tlog/` is present and referenced by RR fixtures
+  - `rr/http/trust_tlog_monitor_{ok,unexpected,inconsistent}.http.jsonl` sessions are present
+  - conformance wrapper `conformance/trust-tlog/run.sh` is green in CI local-deps mode
+
 ## Release checklist
 
 1. Run `x07-mcp` checks (`./scripts/ci/check_all.sh` and reference server suites).
