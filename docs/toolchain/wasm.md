@@ -1,10 +1,11 @@
-# WASM (Phases 0–4)
+# WASM (Phases 0–5)
 
 Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
 Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
 Phase 2 adds a **Web UI** loop (`web-ui build|serve|test`) on top of Phase 0/1.
 Phase 3 adds a **full-stack app bundle** loop (`app build|serve|test`) that combines Phase 2 (frontend) and Phase 1 (backend).
 Phase 4 adds **native backend targets** so `x07 wasm component build --emit http|cli` can produce runnable standard-world components without guest adapters and without a compose step.
+Phase 5 adds **Track-1 hardening**: toolchain pin validation, host runtime budgets, deployable app packs, and a core-wasm HTTP reducer loop.
 
 Phases 0–4 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
@@ -138,7 +139,7 @@ x07 wasm component run --component dist/app.cli.component.wasm --stdin examples/
 
 ## Phase 2: web-ui (browser host)
 
-Phase 2 adds a browser host loop for X07 reducers that consume `x07.web_ui.dispatch@0.1.0` and emit `x07.web_ui.frame@0.1.0` as UTF-8 JSON bytes.
+Phase 2 adds a browser host loop for X07 reducers that consume `x07.web_ui.dispatch@0.1.0` and emit `x07.web_ui.frame@0.2.0` as UTF-8 JSON bytes.
 
 The canonical `std-web-ui` package, browser host assets, and WIT contracts live in the `x07-web-ui` repo.
 
@@ -166,6 +167,8 @@ Component build (transpiled for the browser via `jco transpile`):
 x07 wasm web-ui build --project examples/web_ui_counter/x07.json --profile web_ui_debug --out-dir dist --format component --json
 ```
 
+Note: `web-ui build` emits `dist/wasm.profile.json` (the resolved wasm profile used for the build). `web-ui test` and replay tooling use it to apply Phase-5 runtime limits deterministically.
+
 ## Phase 3: app bundle (full stack)
 
 Phase 3 introduces an app-bundle registry (`arch/app/*`) and a single closed loop:
@@ -188,4 +191,31 @@ cd x07-wasm-backend
 x07 wasm app build --profile app_dev --out-dir dist/app --clean --json
 x07 wasm app serve --dir dist/app --mode smoke --strict-mime --json
 x07 wasm app test --dir dist/app --trace examples/app_fullstack_hello/tests/trace_0001.json --json
+```
+
+## Phase 5: hardening
+
+Toolchain pins as data (CI gate):
+
+```sh
+x07 wasm toolchain validate --profile arch/wasm/toolchain/profiles/toolchain_ci.json --json
+```
+
+Runtime limits can be overridden per command (all optional; defaults come from the selected wasm profile):
+
+```sh
+x07 wasm run --max-fuel 10000 --max-memory-bytes 67108864 --max-table-elements 10000 --max-wasm-stack-bytes 1048576 --json
+```
+
+App deploy artifacts:
+
+```sh
+x07 wasm app pack --bundle-manifest dist/app/app.bundle.json --out-dir dist/app.pack --profile-id app_dev --json
+x07 wasm app verify --pack-manifest dist/app.pack/app.pack.json --json
+```
+
+Core-wasm HTTP reducer contracts + loop:
+
+```sh
+x07 wasm http contracts validate --strict --json
 ```
