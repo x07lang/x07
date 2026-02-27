@@ -80,6 +80,16 @@ Phase 14 adds:
   - `packVersion`
   - `lockSha256`
 
+Phase 15 adds:
+
+- TUF-lite trust registry metadata verification (`root.json`, `timestamp.jwt`, `snapshot.jwt`) plus anti-rollback monotonic checks
+- optional witness checkpoint verification (`transparency/checkpoint.jwt`) for transparency-style attestations
+- trust-pack publish summary anti-rollback fields:
+  - `minSnapshotVersion`
+  - `snapshotSha256`
+  - `checkpointSha256`
+- template replay fixtures for metadata refresh success + rollback rejection (`trust.tuf_ok`, `trust.tuf_rollback_timestamp`)
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:

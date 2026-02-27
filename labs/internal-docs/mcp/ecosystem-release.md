@@ -115,6 +115,20 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
   - trust registry/pack install fixtures are present and wired in template tests
   - remote trust replay fixture validates 200/304 fetch path with deterministic cassette input
 
+## Phase 15 verification checks
+
+- TUF-lite registry metadata:
+  - root/timestamp/snapshot metadata fixtures are present and parse/validate in package tests
+  - timestamp/snapshot rollback is rejected when prior trusted versions are higher
+  - expired timestamp/snapshot metadata is rejected
+  - fast-forward jumps beyond policy cap are rejected
+- Trust-pack anti-rollback metadata:
+  - publish summary includes `trustPack.minSnapshotVersion`, `snapshotSha256`, `checkpointSha256`
+  - release guards reject missing/zero/placeholder anti-rollback trust-pack fields
+  - manifests with trust-pack metadata must provide a trust root file (`root_path`) that exists
+- Template replay fixtures:
+  - `tests/replay/trust.tuf_ok/http.jsonl` and `trust.tuf_rollback_timestamp/http.jsonl` are present and enforced in template tests
+
 ## Release checklist
 
 1. Run `x07-mcp` checks (`./scripts/ci/check_all.sh` and reference server suites).
