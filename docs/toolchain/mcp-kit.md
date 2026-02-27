@@ -69,6 +69,17 @@ Phase 13 adds:
   - `requireSignedPrm`
   - `asSelectionStrategy`
 
+Phase 14 adds:
+
+- trust framework v3 (`x07.mcp.trust.framework@0.3.0`) remote bundle sources (`source.kind=url`, `sig_source.kind=url`) with no-TOFU enforcement
+- trust lock v2 (`x07.mcp.trust.lock@0.2.0`) pins for remote URL + digest pairs (`bundle_url`, `sig_url`, `bundle_sha256`, `sig_sha256`)
+- trust pack registry/semver surfaces (`registry index`, `pack index`, `pack manifest`, deterministic highest-version selection)
+- publisher `_meta` trust pack summary fields under `.../publisher-provided.x07.x07.trustPack`:
+  - `registry`
+  - `packId`
+  - `packVersion`
+  - `lockSha256`
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:
@@ -97,6 +108,9 @@ The HTTP template includes:
 - `trust/bundles/dev_trust_bundle_v1.trust_bundle.sig.jwt`
 - `trust/frameworks/dev_local_trust_framework_v1.trust_framework.json`
 - `trust/trust.lock.json`
+- `trust/frameworks/dev_remote_pack.trust_framework.json`
+- `trust/packs/dev_remote_pack/trust.lock.json`
+- `trust/registry/v1/...` trust-pack fixture registry tree
 - `publish/prm.json` + `publish/server.json` trust summary fixtures
 - deterministic HTTP replay fixtures under `tests/.x07_rr/sessions/`
 
@@ -184,6 +198,7 @@ When `publish.require_signed_prm=true`, dry-run also verifies:
 - signer key is pinned in trust bundles
 - trust bundle signatures verify against pinned bundle publisher keys
 - trust lockfile digests match canonical bundle/signature bytes
+- remote trust bundle URLs are rejected unless pinned by trust lock (no TOFU)
 - generated trust summary matches publisher `_meta`
 
 ## Reference server set

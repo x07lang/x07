@@ -102,6 +102,19 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
   - reject placeholder `trustLockSha256` on release tags
   - require trust lock + referenced signature files to exist for published server artifacts
 
+## Phase 14 verification checks
+
+- Trust framework v3 (`x07.mcp.trust.framework@0.3.0`) + lock v2 (`x07.mcp.trust.lock@0.2.0`):
+  - `source.kind=url` / `sig_source.kind=url` is allowed only with matching lock entries
+  - lock entries pin URL + digest pairs (`bundle_url`, `sig_url`, `bundle_sha256`, `sig_sha256`)
+  - no-TOFU is enforced: remote bundle sources fail when lock pins are missing
+- Trust pack metadata:
+  - publish summary includes `x07.trustPack.{registry,packId,packVersion,lockSha256}` when configured
+  - release guards reject missing/placeholder `packVersion` or `lockSha256`
+- Template replay fixtures:
+  - trust registry/pack install fixtures are present and wired in template tests
+  - remote trust replay fixture validates 200/304 fetch path with deterministic cassette input
+
 ## Release checklist
 
 1. Run `x07-mcp` checks (`./scripts/ci/check_all.sh` and reference server suites).
