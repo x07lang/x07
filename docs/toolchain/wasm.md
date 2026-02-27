@@ -262,3 +262,14 @@ Runtime enforcement via ops profiles:
 - `x07 wasm http serve --ops <ops.json>` applies capability enforcement to the core-wasm HTTP reducer effects (for example `http.fetch` and `time.now`).
 - `x07 wasm app serve --ops <ops.json>` applies capability enforcement to backend requests served via the in-proc component host.
 - `x07 wasm app serve --mode canary --ops <ops.json>` includes an SLO decision (if the ops profile includes an SLO reference) under `result.stdout_json.canary.slo_decision`.
+
+Record/replay evidence (clocks/random + secret delivery metadata):
+
+- If caps use `clocks.mode=record` or `random.mode=record`, `x07 wasm serve` requires:
+  - `--evidence-out <path>` (record), or
+  - `--evidence-in <path>` (replay).
+- Secrets are allowlisted via `caps.secrets.allow[]` and sourced from `.x07/secrets/<id>` or env `X07_SECRET_<ID>` (values are not recorded; only metadata is).
+
+Provenance notes:
+
+- Attestations include `predicate.x07.compatibility_hash` (matches `x07 wasm ops validate`).
