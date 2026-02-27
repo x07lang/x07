@@ -57,6 +57,18 @@ Phase 12 adds:
 - publisher `_meta` trust summary injection (`requireSigned`, `signerIss`, `trustFrameworkSha256`)
 - tag-release guardrails rejecting placeholder trust metadata
 
+Phase 13 adds:
+
+- trust framework v2 (`x07.mcp.trust.framework@0.2.0`) with bundle publisher key pins and AS selection policy
+- signed trust bundle statements (`*.trust_bundle.sig.jwt`) validated against pinned publisher keys
+- trust lockfile pins (`x07.mcp.trust.lock@0.1.0`) for deterministic bundle/signature digest validation
+- governed multi-AS PRM issuer selection (`prefer_order_v1`) with fail-closed behavior
+- publisher `_meta` trust summary fields under `.../publisher-provided.x07`:
+  - `trustFrameworkSha256`
+  - `trustLockSha256`
+  - `requireSignedPrm`
+  - `asSelectionStrategy`
+
 ## Delegation model
 
 The core toolchain delegates MCP kit commands to `x07-mcp`:
@@ -81,8 +93,10 @@ The HTTP template includes:
 - `config/mcp.server.dev.json` (no-auth dev config)
 - `config/mcp.tools.json` (`x07.mcp.tools_manifest@0.2.0`)
 - `config/mcp.oauth.json` (`x07.mcp.oauth@0.2.0`, with deterministic `test_static` dev tokens)
-- `trust/bundles/dev_prm_signers.trust_bundle.json`
-- `trust/frameworks/dev.trust_framework.json`
+- `trust/bundles/dev_trust_bundle_v1.trust_bundle.json`
+- `trust/bundles/dev_trust_bundle_v1.trust_bundle.sig.jwt`
+- `trust/frameworks/dev_local_trust_framework_v1.trust_framework.json`
+- `trust/trust.lock.json`
 - `publish/prm.json` + `publish/server.json` trust summary fixtures
 - deterministic HTTP replay fixtures under `tests/.x07_rr/sessions/`
 
@@ -168,6 +182,8 @@ When `publish.require_signed_prm=true`, dry-run also verifies:
 - `signed_metadata` is present in PRM
 - signer issuer is allowed by trust framework resource policy
 - signer key is pinned in trust bundles
+- trust bundle signatures verify against pinned bundle publisher keys
+- trust lockfile digests match canonical bundle/signature bytes
 - generated trust summary matches publisher `_meta`
 
 ## Reference server set

@@ -83,7 +83,24 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
   - generated `_meta` trust summary matches publish inputs
 - Release metadata guard:
   - reject placeholder `trustFrameworkSha256` on release tags
-  - require `x07.io/mcp.prm.requireSigned=true` in publisher metadata
+  - require `publisher-provided.x07.requireSignedPrm=true` in publisher metadata
+
+## Phase 13 verification checks
+
+- Trust framework v2 (`x07.mcp.trust.framework@0.2.0`) + lock (`x07.mcp.trust.lock@0.1.0`):
+  - bundle publisher pins (`bundle_publishers`) are required for signed bundles
+  - trust lock digests match canonical bundle + signature bytes
+- Signed trust bundle statements:
+  - `*.trust_bundle.sig.jwt` verifies for pinned issuer + `kid`
+  - accepted `alg` allowlist and `iat/exp` windows are enforced
+  - `bundle_sha256` claim must match canonical trust bundle SHA-256
+- Governed multi-AS selection:
+  - `authorization_servers` selection follows policy `prefer_order_v1` deterministically
+  - fail-closed mode rejects PRM when no allowed issuer is present
+  - conformance scenario `prm-multi-as-select-prefer-order` is green in CI
+- Release metadata guard:
+  - reject placeholder `trustLockSha256` on release tags
+  - require trust lock + referenced signature files to exist for published server artifacts
 
 ## Release checklist
 
@@ -91,5 +108,5 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
 2. Build deterministic `.mcpb` artifact(s) and verify stable SHA-256 across repeat builds.
 3. Generate `server.json` from `x07.mcp.json` and validate schema + non-schema constraints.
 4. Run `x07 mcp publish --dry-run` for release artifacts.
-5. Run tag-only release metadata guards (`release_metadata_guard.sh`) to enforce non-placeholder trust + hash metadata.
+5. Run tag-only release metadata guards (`release_metadata_guard.sh`, `release_guard_trust_lock_and_sig.sh`) to enforce non-placeholder trust + hash metadata.
 6. Confirm docs and pin tables are synchronized across `x07-mcp` and `x07`.
