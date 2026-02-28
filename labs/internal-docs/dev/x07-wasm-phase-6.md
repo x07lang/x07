@@ -1,6 +1,6 @@
 # X07 WASM — Phase 6 (Ops + Capabilities + Policy + SLO + Deploy Plans + Provenance)
 
-**Last updated:** 2026-02-27
+**Last updated:** 2026-02-28
 
 ## Goal
 
@@ -32,8 +32,8 @@ Make Phase 0–5 WASM artifacts safe to run and deploy autonomously by adding:
 - [x] Provenance schema + `x07-wasm provenance attest|verify` (digest recompute; tamper negative)
 - [x] Phase 6 CI gate scripts: `scripts/ci/check_phase6.sh` + examples + diagnostic allowlists
 - [x] Always-report parse report schema (`x07.wasm.cli.parse.report@0.1.0`)
-- [ ] Publish updated/new Phase 6 schemas to `x07.io/spec/` (repo: `x07-registry-web`)
-- [ ] Update `x07/docs/toolchain/wasm.md` and sync `x07-website` docs bundle
+- [x] Publish updated/new Phase 6 schemas to `x07.io/spec/` (repo: `x07-registry-web`)
+- [x] Update `x07/docs/toolchain/wasm.md` and sync `x07-website` docs bundle
 
 ## Local gate (target)
 
