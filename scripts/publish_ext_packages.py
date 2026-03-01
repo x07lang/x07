@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -716,6 +718,124 @@ def _run_x07_parens_for_dirs(root: Path, python_bin: str, dirs: list[Path]) -> N
         _run([python_bin, "scripts/check_x07_parens.py", *chunk], cwd=root)
 
 
+def _x07ast_schema_version(root: Path, x07_bin: Path) -> str:
+    out_dir = root / "target" / "publish_ext_packages"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stub = out_dir / "x07ast_init_stub.x07.json"
+    proc = _run(
+        [
+            str(x07_bin),
+            "ast",
+            "init",
+            "--world",
+            "solve-pure",
+            "--module",
+            "main",
+            "--out",
+            str(stub),
+        ],
+        cwd=root,
+    )
+    try:
+        report = json.loads(proc.stdout)
+    except Exception as e:
+        _die(
+            f"ERROR: failed to parse `x07 ast init` report JSON: {e}\nstdout:\n{(proc.stdout or '').strip()}"
+        )
+    if not isinstance(report, dict):
+        _die("ERROR: `x07 ast init` report must be a JSON object")
+    ver = report.get("schema_version")
+    if not isinstance(ver, str) or not ver.startswith("x07.x07ast@"):
+        _die(f"ERROR: `x07 ast init` report missing x07ast schema_version, got: {ver!r}")
+    return ver
+
+
+def _write_test_driver_entry(*, schema_version: str, entry: str, out_path: Path) -> None:
+    if "." not in entry:
+        _die(f"ERROR: test entry must be a fully-qualified symbol, got: {entry!r}")
+    mod, _fn = entry.rsplit(".", 1)
+    driver: dict[str, Any] = {
+        "schema_version": schema_version,
+        "module_id": "main",
+        "kind": "entry",
+        "imports": [mod, "std.test"],
+        "decls": [],
+        "solve": ["std.test.status_from_result_i32", [entry]],
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(driver, separators=(",", ":")) + "\n", encoding="utf-8")
+
+
+def _run_os_world_test(
+    *,
+    root: Path,
+    x07_bin: Path,
+    spec: PackageSpec,
+    test_id: str,
+    world: str,
+    entry: str,
+    policy_path: Path | None,
+    module_roots: list[Path],
+    schema_version: str,
+) -> None:
+    digest = hashlib.sha256(f"{spec}:{test_id}:{world}:{entry}".encode("utf-8")).hexdigest()
+    driver_path = (
+        root
+        / "target"
+        / "publish_ext_packages"
+        / "tests"
+        / f"{spec.name}-{spec.version}"
+        / f"id_{digest}"
+        / "driver.x07.json"
+    )
+    _write_test_driver_entry(schema_version=schema_version, entry=entry, out_path=driver_path)
+
+    cmd = [
+        str(x07_bin),
+        "run",
+        "--world",
+        world,
+        "--program",
+        str(driver_path),
+        "--auto-ffi",
+    ]
+    if world == "run-os-sandboxed":
+        if policy_path is None:
+            _die(f"ERROR: {spec}: run-os-sandboxed test {test_id!r} missing policy_json")
+        if not policy_path.is_file():
+            _die(f"ERROR: {spec}: missing policy_json for {test_id!r}: {policy_path}")
+        cmd.extend(
+            [
+                "--policy",
+                str(policy_path),
+                "--sandbox-backend",
+                "none",
+                "--i-accept-weaker-isolation",
+            ]
+        )
+
+    for mr in module_roots:
+        cmd.extend(["--module-root", str(mr)])
+
+    proc = _run(cmd, cwd=root, allow_fail=True)
+    if proc.returncode != 0:
+        stdout = (proc.stdout or "").rstrip()
+        stderr = (proc.stderr or "").rstrip()
+        msg = [
+            f"ERROR: {spec}: test failed: {test_id} (world={world})",
+            f"command: {' '.join(cmd)}",
+        ]
+        if stdout:
+            msg.append("")
+            msg.append("stdout:")
+            msg.append(stdout)
+        if stderr:
+            msg.append("")
+            msg.append("stderr:")
+            msg.append(stderr)
+        _die("\n".join(msg), code=proc.returncode or 1)
+
+
 def _publish_main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Publish missing ext package versions to a registry index.")
     ap.add_argument(
@@ -807,6 +927,7 @@ def _publish_main(argv: list[str]) -> int:
     publish_order = _topo_sort(missing, deps)
 
     x07_bin = _find_x07_bin(root)
+    x07ast_ver: str | None = None
     for spec in publish_order:
         pkg_dir = _local_pkg_dir(root, spec)
 
@@ -820,17 +941,104 @@ def _publish_main(argv: list[str]) -> int:
                     deps=deps,
                 )
                 module_roots = _module_roots_for_closure(root, manifests, closure)
-                cmd = [
-                    str(x07_bin),
-                    "test",
-                    "--manifest",
-                    str(tests_manifest),
-                    "--json",
-                    "false",
-                ]
-                for mr in module_roots:
-                    cmd.extend(["--module-root", str(mr)])
-                _run(cmd, cwd=root)
+                tests_doc = _read_json(tests_manifest)
+                if tests_doc.get("schema_version") != "x07.tests_manifest@0.1.0":
+                    _die(
+                        f"ERROR: {spec}: unexpected tests manifest schema_version: {tests_doc.get('schema_version')!r}"
+                    )
+                tests = tests_doc.get("tests") or []
+                if not isinstance(tests, list):
+                    _die(f"ERROR: {spec}: tests manifest 'tests' must be an array: {tests_manifest}")
+
+                os_tests: list[dict[str, Any]] = []
+                non_os_tests: list[dict[str, Any]] = []
+                for idx, t in enumerate(tests):
+                    if not isinstance(t, dict):
+                        _die(f"ERROR: {spec}: tests[{idx}] must be an object")
+                    world = t.get("world")
+                    if not isinstance(world, str) or not world.strip():
+                        _die(f"ERROR: {spec}: tests[{idx}].world must be a non-empty string")
+                    if world in ("run-os", "run-os-sandboxed"):
+                        os_tests.append(t)
+                    else:
+                        non_os_tests.append(t)
+
+                if non_os_tests:
+                    tmp_path: Path | None = None
+                    try:
+                        manifest_path = tests_manifest
+                        if os_tests:
+                            tmp = tempfile.NamedTemporaryFile(
+                                mode="w",
+                                encoding="utf-8",
+                                delete=False,
+                                dir=str(tests_manifest.parent),
+                                prefix="tests.non_os.",
+                                suffix=".json",
+                            )
+                            tmp_path = Path(tmp.name)
+                            tmp_doc = {
+                                "schema_version": "x07.tests_manifest@0.1.0",
+                                "tests": non_os_tests,
+                            }
+                            tmp.write(json.dumps(tmp_doc, indent=2) + "\n")
+                            tmp.close()
+                            manifest_path = tmp_path
+
+                        cmd = [
+                            str(x07_bin),
+                            "test",
+                            "--manifest",
+                            str(manifest_path),
+                            "--json",
+                            "false",
+                        ]
+                        for mr in module_roots:
+                            cmd.extend(["--module-root", str(mr)])
+                        _run(cmd, cwd=root)
+                    finally:
+                        if tmp_path is not None:
+                            try:
+                                tmp_path.unlink()
+                            except FileNotFoundError:
+                                pass
+
+                if os_tests:
+                    if x07ast_ver is None:
+                        x07ast_ver = _x07ast_schema_version(root, x07_bin)
+                    for idx, t in enumerate(os_tests):
+                        test_id = t.get("id")
+                        if not isinstance(test_id, str) or not test_id.strip():
+                            test_id = f"tests[{idx}]"
+
+                        world = t.get("world")
+                        entry = t.get("entry")
+                        if not isinstance(world, str) or world not in ("run-os", "run-os-sandboxed"):
+                            _die(f"ERROR: {spec}: invalid os test world for {test_id!r}: {world!r}")
+                        if not isinstance(entry, str) or "." not in entry:
+                            _die(f"ERROR: {spec}: invalid os test entry for {test_id!r}: {entry!r}")
+
+                        policy_path: Path | None = None
+                        if world == "run-os-sandboxed":
+                            policy_json = t.get("policy_json")
+                            if not isinstance(policy_json, str) or not policy_json.strip():
+                                _die(
+                                    f"ERROR: {spec}: run-os-sandboxed test {test_id!r} missing policy_json"
+                                )
+                            policy_path = (tests_manifest.parent / policy_json).resolve()
+
+                        print(f"test: {spec} {test_id} ({world})")
+                        _run_os_world_test(
+                            root=root,
+                            x07_bin=x07_bin,
+                            spec=spec,
+                            test_id=test_id,
+                            world=world,
+                            entry=entry,
+                            policy_path=policy_path,
+                            module_roots=module_roots,
+                            schema_version=x07ast_ver,
+                        )
 
         pub = _run(
             [
