@@ -202,26 +202,26 @@
         {
           "module_id": "std.archive.tar",
           "path": "packages/ext/x07-ext-archive-c/0.1.2/modules/std/archive/tar.x07.json",
-          "sha256": "5dabdadd7f90cd512af89ba8f8f18f8db9053ca1116215ba7c544e24692c041d",
-          "size_bytes": 23104
+          "sha256": "01521c7223660caee5a64ed61160a1fea2881a58f8264ff99086975617da37f3",
+          "size_bytes": 15421
         },
         {
           "module_id": "std.archive.tests",
           "path": "packages/ext/x07-ext-archive-c/0.1.2/modules/std/archive/tests.x07.json",
-          "sha256": "33a6331c6f54fef7629897026cb0c8a26808038851690df6d052f72df9093af2",
-          "size_bytes": 5135
+          "sha256": "95802f4ed5049f0e7a15e7db672d98074ac680ea040b03a4af2099c159ea4b20",
+          "size_bytes": 3039
         },
         {
           "module_id": "std.archive.tgz",
           "path": "packages/ext/x07-ext-archive-c/0.1.2/modules/std/archive/tgz.x07.json",
-          "sha256": "eafbaf53ecf9ed90f573cf58b9fa87b37642b0af58f7425ee7e9300dadfd186c",
-          "size_bytes": 5114
+          "sha256": "78d1cb0ec30d5b912501634e018870aeebe88e5c8e3b3d01ef99073e7101b5a2",
+          "size_bytes": 3491
         },
         {
           "module_id": "std.archive",
           "path": "packages/ext/x07-ext-archive-c/0.1.2/modules/std/archive.x07.json",
-          "sha256": "2424be61e0825ab908bdd31b6b6c0aa7c7cc7fc7232d0a822e09c85662a9da57",
-          "size_bytes": 6781
+          "sha256": "d32043e727c4070fbf0915ec9ee96354eadfa54571544d00e7cc1d0e3a5569de",
+          "size_bytes": 2560
         }
       ],
       "name": "ext-archive-c",
@@ -442,7 +442,7 @@
         {
           "module_id": "std.auth.jose_jws_v1",
           "path": "packages/ext/x07-ext-auth-jwt/0.1.5/modules/std/auth/jose_jws_v1.x07.json",
-          "sha256": "e18106883e0bcdc113c4a43a1abd69f47d661222c3529045c44791a923204430",
+          "sha256": "3f419b33b32bde3507ee6e90b568834f1e07720c3bde1878f6ee95923c443697",
           "size_bytes": 30993
         },
         {
@@ -1054,20 +1054,20 @@
         {
           "module_id": "ext.cbor.data_model",
           "path": "packages/ext/x07-ext-cbor-rs/0.1.7/modules/ext/cbor/data_model.x07.json",
-          "sha256": "383637897d41f07610d38430ec2264e0cabfd369eb931e2b6338d32555ada4eb",
-          "size_bytes": 62812
+          "sha256": "184ebf6556cb86de86fe1c44b0c10a197933fd05dfdcd9e8e7b22149caa99233",
+          "size_bytes": 42474
         },
         {
           "module_id": "ext.cbor.tests",
           "path": "packages/ext/x07-ext-cbor-rs/0.1.7/modules/ext/cbor/tests.x07.json",
-          "sha256": "bdfbd9141dafdc3181859a85ae7de930ff4c6b6190175abe9c3ab27c707431f8",
-          "size_bytes": 12262
+          "sha256": "7900ec3e9f8601ec7d0166a5159dd2e7c0ac41909a8b3d40bd4ae0538e85a748",
+          "size_bytes": 8840
         },
         {
           "module_id": "ext.cbor",
           "path": "packages/ext/x07-ext-cbor-rs/0.1.7/modules/ext/cbor.x07.json",
-          "sha256": "5a1c02de55c197cadc96a8eefcfa7a1706ade507c3045de50b5750fe0cd596b7",
-          "size_bytes": 819
+          "sha256": "fff76e377acfaff61e41e8c39c94a02c2355eb094aa7000d46e0ae18a8a505eb",
+          "size_bytes": 605
         }
       ],
       "name": "ext-cbor-rs",
@@ -1806,32 +1806,32 @@
         {
           "module_id": "std.cli.jsonl",
           "path": "packages/ext/x07-ext-cli-ux/0.1.2/modules/std/cli/jsonl.x07.json",
-          "sha256": "7764b267067d66f2bed69535664b58cafafb2f5e58e4cd777b060189ff377cc7",
-          "size_bytes": 1294
+          "sha256": "51f6653a4a523e3e4a2b747caf98f779a892d12fd5205fab91186142d27c30f4",
+          "size_bytes": 966
         },
         {
           "module_id": "std.cli.profile",
           "path": "packages/ext/x07-ext-cli-ux/0.1.2/modules/std/cli/profile.x07.json",
-          "sha256": "ff75e5fab651984a77d3af6e97ea27d3d315b1af2a78ea9f8ff0f4c240214380",
-          "size_bytes": 5563
+          "sha256": "78c421662ab42929eda91843475c3a475ddb3b2c36fe5e89a9bdceaf74b8a87f",
+          "size_bytes": 4100
         },
         {
           "module_id": "std.cli.progress",
           "path": "packages/ext/x07-ext-cli-ux/0.1.2/modules/std/cli/progress.x07.json",
-          "sha256": "463d5ad2987fcaeb48d9d7314b040ca16333a1446b8d2fa4b4fdada0be1d1bea",
-          "size_bytes": 1778
+          "sha256": "1c19a01507c59facd1cf7db73da66ad4e6f0a651b972ce12f1a3503378d3890f",
+          "size_bytes": 1204
         },
         {
           "module_id": "std.cli.table",
           "path": "packages/ext/x07-ext-cli-ux/0.1.2/modules/std/cli/table.x07.json",
-          "sha256": "777e3f6ed53b95bccec9041f9d0616ac1c366d5318be82375572c662316e8732",
-          "size_bytes": 5463
+          "sha256": "9c49241060448a0f83a46b8f1760f7767cf22e6fb7385ee15df8e52acd5af988",
+          "size_bytes": 3934
         },
         {
           "module_id": "std.cli.tests",
           "path": "packages/ext/x07-ext-cli-ux/0.1.2/modules/std/cli/tests.x07.json",
-          "sha256": "cb8b7551d2d068e78a69a7f51b791c561c2d5455763bb51793b864537b2bb9bc",
-          "size_bytes": 3753
+          "sha256": "d879fa6fc69a9541d73ba1e7a074cd1922333435c8af7bd4b9b0f026ff4fa9ba",
+          "size_bytes": 2929
         }
       ],
       "name": "ext-cli-ux",
@@ -3148,26 +3148,26 @@
         {
           "module_id": "ext.data_model.csv.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/csv/tests.x07.json",
-          "sha256": "81d708e2f0df89050c2cbabf1ff739a88c0166b03ce95e2a0158f73d24159511",
-          "size_bytes": 1717
+          "sha256": "5df3b4a86cf222ca8962cb0ceab2c5fc861437713c36f262bca0fb891cc8614c",
+          "size_bytes": 1383
         },
         {
           "module_id": "ext.data_model.csv",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/csv.x07.json",
-          "sha256": "3535863cd84a4dc45d5068347ca7e6005aae64d596a638e8497810f3f9b562ad",
-          "size_bytes": 3874
+          "sha256": "bd6f36f25bc0e01480859c59e2302f2865c960f100a95cadefed7fe59f4e0c99",
+          "size_bytes": 2641
         },
         {
           "module_id": "ext.data_model.ini.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/ini/tests.x07.json",
-          "sha256": "f13271299d4131a702e33b4d058c98fc9d15f886f29ce93c2c64779f81a00a19",
-          "size_bytes": 1731
+          "sha256": "006b64f4404ba4da08eecaf9af201676fc49797a5a253b80d88236f78aa26e94",
+          "size_bytes": 1397
         },
         {
           "module_id": "ext.data_model.ini",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/ini.x07.json",
-          "sha256": "754a6ed3ecda50959762f9629e99537935dd793dc26e2a3394449f653ad3dff3",
-          "size_bytes": 5753
+          "sha256": "e6cc44509901f4b350da17deffcd653b985dc9ec277a72efe523f122bf06a4a4",
+          "size_bytes": 3711
         },
         {
           "module_id": "ext.data_model.json.tests",
@@ -3184,8 +3184,8 @@
         {
           "module_id": "ext.data_model.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/tests.x07.json",
-          "sha256": "620b200c7570a4c6841cba26f5cda5f8451a7996f78bb73aec0ea3f6aafb825a",
-          "size_bytes": 9392
+          "sha256": "4d0d362e69893b6db9af6f5710c24e2868ef47b0fcad9df751a707547aa147e1",
+          "size_bytes": 7598
         },
         {
           "module_id": "ext.data_model.toml.tests",
@@ -3196,32 +3196,32 @@
         {
           "module_id": "ext.data_model.toml",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/toml.x07.json",
-          "sha256": "675037e7d4bee4a8f5ae791eb94e246760296e122977015a010686f6191d2118",
-          "size_bytes": 13596
+          "sha256": "81def2832777ebc48302c42e025cba94186deff64915aa6a0ccaf8aec6a74b32",
+          "size_bytes": 13597
         },
         {
           "module_id": "ext.data_model.xml.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/xml/tests.x07.json",
-          "sha256": "05017353879a1db1c4578cde7ccac8672b1e0c3f022a7471d79ca21e660934e5",
-          "size_bytes": 1848
+          "sha256": "8346ec79e12f8dde83721bab5727da4f1db94d89bed824caea29c8792794eb47",
+          "size_bytes": 1499
         },
         {
           "module_id": "ext.data_model.xml",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/xml.x07.json",
-          "sha256": "a58d1ba50f669ab944dfe2621d26cd6cc85df5086470eb23d3d39b77478de140",
-          "size_bytes": 13346
+          "sha256": "6a93997653ad26b6922fa494a9b2bd15ab104626d0277f2fd267afd540974750",
+          "size_bytes": 9174
         },
         {
           "module_id": "ext.data_model.yaml.tests",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/yaml/tests.x07.json",
-          "sha256": "9fbb2323670b07f81daf0e339d73aff75cf4e340695ec5f1ae7410339f91609c",
-          "size_bytes": 1157
+          "sha256": "03fc345b1dcaf330f813b6d3c2b11f0bb1ea509f3f72c93b6d2e3146a1ed7f50",
+          "size_bytes": 1158
         },
         {
           "module_id": "ext.data_model.yaml",
           "path": "packages/ext/x07-ext-data-model/0.1.9/modules/ext/data_model/yaml.x07.json",
-          "sha256": "b6f260ed1c258711422ec36f0b7721b5b590e6e32472c4b23d837b3155865c7c",
-          "size_bytes": 13889
+          "sha256": "622ecb16fd5b86ba979f3cde95473bda321af74a69bd43a03701407cc3be1abc",
+          "size_bytes": 9327
         },
         {
           "module_id": "ext.data_model",
@@ -3328,8 +3328,8 @@
         {
           "module_id": "std.db.params",
           "path": "packages/ext/x07-ext-db-core/0.1.10/modules/std/db/params.x07.json",
-          "sha256": "ee1379e753b430099a45c7bf43db56d2c0dac31f6f0bf35ec3bda9143e608a28",
-          "size_bytes": 4111
+          "sha256": "7cfd2e5038d23a08a502fd15fb7b5927a1f1499266c17e8f5b7f7fdac3146215",
+          "size_bytes": 1952
         },
         {
           "module_id": "std.db.pool",
@@ -4332,8 +4332,8 @@
         {
           "module_id": "std.db.sqlite.spec",
           "path": "packages/ext/x07-ext-db-sqlite/0.1.10/modules/std/db/sqlite/spec.x07.json",
-          "sha256": "38f33c696a22184ae7f9396be5e7c6ce359855ddb9de8bb881795f7e4db11c66",
-          "size_bytes": 5593
+          "sha256": "3983ebd84894e96297026d1c5af37e48e1864fc07990ea40c0b1d6d2ddaebfa2",
+          "size_bytes": 4257
         },
         {
           "module_id": "std.db.sqlite",
@@ -6394,32 +6394,32 @@
         {
           "module_id": "std.msg.driver",
           "path": "packages/ext/x07-ext-msg-core/0.1.2/modules/std/msg/driver.x07.json",
-          "sha256": "2997f772e281938bb02c043a10c63f657a87e7b701720845ce8d006fb78332cc",
-          "size_bytes": 13317
+          "sha256": "94b9290594f1f26f4ca9518dd2c0adc2234f716e8a58f96e3c98f3f06530979c",
+          "size_bytes": 10022
         },
         {
           "module_id": "std.msg.envelope",
           "path": "packages/ext/x07-ext-msg-core/0.1.2/modules/std/msg/envelope.x07.json",
-          "sha256": "d8b52f3190645348a07eac5bdae92438fddc298a184a1d326387ce94fe5f6211",
-          "size_bytes": 16726
+          "sha256": "18d05d97ae089b42a66332516d5c8fbc439f72ed54ac22be363c0cca168c6c37",
+          "size_bytes": 12354
         },
         {
           "module_id": "std.msg.rr",
           "path": "packages/ext/x07-ext-msg-core/0.1.2/modules/std/msg/rr.x07.json",
-          "sha256": "cc873392af6dccf3e2ff5940cc019a3167d211728f84f1ac2d3552125b46ec09",
-          "size_bytes": 11792
+          "sha256": "e2c160317d0edeb4f739eed6f7da13058804c7e9e1efa5e54bc111dd2e5c320e",
+          "size_bytes": 9249
         },
         {
           "module_id": "std.msg.spec",
           "path": "packages/ext/x07-ext-msg-core/0.1.2/modules/std/msg/spec.x07.json",
-          "sha256": "e0d49228b4c0a6cd45b48f617342b4f818873a275bfa566d13d22a139b3e2d18",
-          "size_bytes": 4751
+          "sha256": "7ef0299bee87fbf82b04c8bfa5c06e2a97d9de43cdd3603b40977183c5551e2f",
+          "size_bytes": 3429
         },
         {
           "module_id": "std.msg.tests",
           "path": "packages/ext/x07-ext-msg-core/0.1.2/modules/std/msg/tests.x07.json",
-          "sha256": "b5541219d381e8e4c582e219752f58a3ded1e734e8a27129973e84ab8af4a41c",
-          "size_bytes": 12813
+          "sha256": "bb8cc836383805278c289460f815597375baaf9d4e56d49a45e7b519c794b24f",
+          "size_bytes": 10215
         }
       ],
       "name": "ext-msg-core",
@@ -6723,20 +6723,20 @@
         {
           "module_id": "ext.msgpack.data_model",
           "path": "packages/ext/x07-ext-msgpack-rs/0.1.7/modules/ext/msgpack/data_model.x07.json",
-          "sha256": "93c73facb0c7414451519be28632d14971cdd7963f3e60cbfd4c075406e05f5d",
-          "size_bytes": 41993
+          "sha256": "24225fcffe3a50ac8352052de8b5545037dbef4afda28652ddef967c01454365",
+          "size_bytes": 29871
         },
         {
           "module_id": "ext.msgpack.tests",
           "path": "packages/ext/x07-ext-msgpack-rs/0.1.7/modules/ext/msgpack/tests.x07.json",
-          "sha256": "6a64ba670e239f27d0f91aa96fe85e055273e1aca0770304e4055552ba739fd8",
-          "size_bytes": 20219
+          "sha256": "8cd71d12a927715f52452240c9f91b3ab3fe15593499af698273bdf4cfa91607",
+          "size_bytes": 14572
         },
         {
           "module_id": "ext.msgpack",
           "path": "packages/ext/x07-ext-msgpack-rs/0.1.7/modules/ext/msgpack.x07.json",
-          "sha256": "5b74a3ae63c07e6c788568ec88a3571ca2384d8a0a333c705c04c0acab07f417",
-          "size_bytes": 852
+          "sha256": "f79abb1c5fcd7180f1be33127ebb64565c361e15335ef313b135f4f370a6e2f6",
+          "size_bytes": 638
         }
       ],
       "name": "ext-msgpack-rs",
@@ -7591,26 +7591,26 @@
         {
           "module_id": "std.net.grpc",
           "path": "packages/ext/x07-ext-net-protos-c/0.1.2/modules/std/net/grpc.x07.json",
-          "sha256": "9e63909590b5e86922d9cb5cbd521c0dadbaed96f68d246e0123b4c6ab9c9293",
-          "size_bytes": 4582
+          "sha256": "5f85cdd5ecbacf46aed01fc60f0062efa5e9b9a1742d2c81e8e1fb631d635082",
+          "size_bytes": 3430
         },
         {
           "module_id": "std.net.http2",
           "path": "packages/ext/x07-ext-net-protos-c/0.1.2/modules/std/net/http2.x07.json",
-          "sha256": "4685cf14e1cf14e9ea568dec91112dfc863ac47b11d5e42ecc44ae1eb5056b20",
-          "size_bytes": 1854
+          "sha256": "8dd03a8b9e4b65edc430f15cb82f94955b110b18ec148cced958e437cc746e2d",
+          "size_bytes": 1415
         },
         {
           "module_id": "std.net.protos.tests",
           "path": "packages/ext/x07-ext-net-protos-c/0.1.2/modules/std/net/protos/tests.x07.json",
-          "sha256": "0076db9c3ac3d85b5df4fce1f879f6b952cc725aae0df02edb1b8abb2f643789",
-          "size_bytes": 2713
+          "sha256": "1f83eb2fc928ccebbb4e6e1484f56ee083a74dbe798c4a907b3c3a5f70b3ac41",
+          "size_bytes": 2200
         },
         {
           "module_id": "std.net.ws",
           "path": "packages/ext/x07-ext-net-protos-c/0.1.2/modules/std/net/ws.x07.json",
-          "sha256": "6896046f7e4d858044877e8917e9306e30aa6554d2f61190a0f813a256246f32",
-          "size_bytes": 5672
+          "sha256": "34c47b2575090e29f7fc924ef9653d9636163e869db53ec388c10b3f57bcf167",
+          "size_bytes": 4223
         }
       ],
       "name": "ext-net-protos-c",
@@ -11439,38 +11439,38 @@
         {
           "module_id": "std.web.core",
           "path": "packages/ext/x07-ext-web-kit/0.1.2/modules/std/web/core.x07.json",
-          "sha256": "4493743d1127b9f23c5058263599b224650f9abd60df5f44577583b04154c69f",
-          "size_bytes": 3571
+          "sha256": "adaeb4aa33b8cdf5b224802a8fe378ac0d8d0dce6d210a291d32b483a57945c8",
+          "size_bytes": 2586
         },
         {
           "module_id": "std.web.errors",
           "path": "packages/ext/x07-ext-web-kit/0.1.2/modules/std/web/errors.x07.json",
-          "sha256": "d09dfa268241a0de7f71f63513895bbcd653e5880466dd64fa2bc3893049b439",
-          "size_bytes": 3964
+          "sha256": "bb8c42d3f27be9bea0b63f300536d112e3d9e709581191edde170536cdf3b944",
+          "size_bytes": 3276
         },
         {
           "module_id": "std.web.middleware",
           "path": "packages/ext/x07-ext-web-kit/0.1.2/modules/std/web/middleware.x07.json",
-          "sha256": "55da3fd5557f72c71cfc04b0fff00d887714b641365f2d37c857bedbd29874e0",
-          "size_bytes": 593
+          "sha256": "c09dfe7971dc441c4f6aa31e29025e7a2c9e9a1908299cb916c90975c5c58451",
+          "size_bytes": 398
         },
         {
           "module_id": "std.web.openapi",
           "path": "packages/ext/x07-ext-web-kit/0.1.2/modules/std/web/openapi.x07.json",
-          "sha256": "b02aed9349434e26e9be874a90e40c681066af65a7cd5af4759c0f2b7a0b8ecc",
-          "size_bytes": 18171
+          "sha256": "a121a821829687364808db812aa47de5a485d076bc877dd48cd2e7899f7b9488",
+          "size_bytes": 14088
         },
         {
           "module_id": "std.web.router",
           "path": "packages/ext/x07-ext-web-kit/0.1.2/modules/std/web/router.x07.json",
-          "sha256": "25190623758d54bcb85363707b101bd3c39d9f547fa0dc419a3415e9d76950a5",
-          "size_bytes": 8662
+          "sha256": "07fd06d0b9bb70c8acec136aa7bcfa9d2ef6b51927d7dedf158de57b7cbfb557",
+          "size_bytes": 5901
         },
         {
           "module_id": "std.web.tests",
           "path": "packages/ext/x07-ext-web-kit/0.1.2/modules/std/web/tests.x07.json",
-          "sha256": "ffe969af9026faf18bf5010b005964cdb82b50202a98fd2048885c1f6afeebec",
-          "size_bytes": 4236
+          "sha256": "e7312d35760d4bcb11f6199ec2e35a4782386db1c29f132b04f8a26ff0484a76",
+          "size_bytes": 3398
         }
       ],
       "name": "ext-web-kit",
@@ -11939,6 +11939,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "eec043186e337239a1a5bf43c60b2e7eeac11efd52a7f0760b43909e02f359ac",
+  "packages_hash": "de72b26086aa63e7558a1eafa689f3c2985b23635ba16a13aca07f019c011ce4",
   "packages_root": "packages/ext"
 }
