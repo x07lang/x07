@@ -6,7 +6,7 @@ Phase 2 adds a **Web UI** loop (`web-ui build|serve|test`) on top of Phase 0/1.
 Phase 3 adds a **full-stack app bundle** loop (`app build|serve|test`) that combines Phase 2 (frontend) and Phase 1 (backend).
 Phase 4 adds **native backend targets** so `x07 wasm component build --emit http|cli` can produce runnable standard-world components without guest adapters and without a compose step.
 Phase 5 adds **Track-1 hardening**: toolchain pin validation, host runtime budgets, deployable app packs, and a core-wasm HTTP reducer loop.
-Phase 6 adds **operational contracts** (ops profiles, capabilities, policy), **SLO-as-code**, **deploy plan generation**, and **hash-first provenance**.
+Phase 6 adds **operational contracts** (ops profiles, capabilities, policy), **SLO-as-code**, **deploy plan generation**, and **signed provenance** (DSSE + Ed25519).
 
 Phases 0–6 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
@@ -249,11 +249,11 @@ Deploy plan generation (writes `deploy.plan.json` + Kubernetes YAMLs under `--ou
 x07 wasm deploy plan --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --out-dir dist/deploy_plan --json
 ```
 
-Hash-first pack provenance:
+Signed pack provenance (DSSE + Ed25519):
 
 ```sh
-x07 wasm provenance attest --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --out dist/provenance.slsa.json --json
-x07 wasm provenance verify --attestation dist/provenance.slsa.json --pack-dir dist/app.pack --json
+x07 wasm provenance attest --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --signing-key <signing_key.b64> --out dist/provenance.dsse.json --json
+x07 wasm provenance verify --attestation dist/provenance.dsse.json --pack-dir dist/app.pack --trusted-public-key <public_key.b64> --json
 ```
 
 Runtime enforcement via ops profiles:
@@ -273,3 +273,4 @@ Record/replay evidence (clocks/random + secret delivery metadata):
 Provenance notes:
 
 - Attestations include `predicate.x07.compatibility_hash` (matches `x07 wasm ops validate`).
+- `x07 wasm provenance verify` verifies the DSSE signature and then recomputes subject digests against `--pack-dir`.
