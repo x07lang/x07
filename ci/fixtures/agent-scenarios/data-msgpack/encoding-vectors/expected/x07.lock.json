@@ -13,7 +13,8 @@
         "std.math.bigint.fmt": "98675052af019d828e6e3cdb6aaab763e89acfb53f40d664feb6c1dbfc53f74d",
         "std.math.bigint.parse": "542ab8498c612f921fb2c98e4bf94d8c22be87f2f255799daa0516079bc30a74",
         "std.math.bigint.tests": "1c6d0ec34c448e7bb64a0e43a1d09dcbb1525c0637090f33d1933a24fbe8d1d7"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-csv-rs",
@@ -25,7 +26,8 @@
         "ext.csv": "09f75965c511bc084e99e7e0b82e9e19bde36e67b92b5e1eec22c77a2717d793",
         "ext.csv.data_model": "a4de66fec599d5ef92ca30c056ef4e235a9aff85b74caec7d027c6f3aca9b911",
         "ext.csv.tests": "2f9a4ea717e4d1eec3ae65c561877a574f0813f5c43badf501c5b4c283475582"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-data-model",
@@ -48,7 +50,8 @@
         "ext.data_model.xml.tests": "8346ec79e12f8dde83721bab5727da4f1db94d89bed824caea29c8792794eb47",
         "ext.data_model.yaml": "622ecb16fd5b86ba979f3cde95473bda321af74a69bd43a03701407cc3be1abc",
         "ext.data_model.yaml.tests": "03fc345b1dcaf330f813b6d3c2b11f0bb1ea509f3f72c93b6d2e3146a1ed7f50"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-decimal-rs",
@@ -62,7 +65,8 @@
         "std.math.decimal.fmt": "6c9542abaef069370cfeed271a001f85f643b777c3b11128a126a9e90c1c3971",
         "std.math.decimal.parse": "5be50da05a7822aa37afbd26c063296a2a5c4f74e72327d442d9b48942d9ea3f",
         "std.math.decimal.tests": "cebadf071098d7725ab2bd2041a868d407b063ec408c916dbbcd12b52b268328"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-error",
@@ -75,7 +79,8 @@
         "ext.error.context": "3eac73db10c689e7a1e2c944301aadead445e164c3b24c381445fbedac9c5400",
         "ext.error.fmt": "ac94ff7ff9e4dae4b2a1739848addbb7e0aa87f25e3e73b80d5c6b822eb48c12",
         "ext.error.tests": "94903cfffa1f37dd22c1e5c2cc063d56ec6030b92a704e3bf247b7e1367cc906"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-ini-rs",
@@ -87,7 +92,8 @@
         "ext.ini": "9fc4d8075b2b23a3479d2e60b6a42142aac2e27013984d2a1e5b83fae2f80820",
         "ext.ini.data_model": "4748bc43a9eb46ed4a053fa4f07bf9ec7f9eb1ed814cf29bdb0d47e3e33edc03",
         "ext.ini.tests": "f311d5006c1db62968f7094a1bdf3dcd1c7ccf0af8aa820e2b67619ba85fd4a1"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-json-rs",
@@ -100,7 +106,8 @@
         "ext.json.data_model": "d4762aee02eadf4b35fc425b496a6829c0c0f3f389eee667cae90023a4a2a7ff",
         "ext.json.pointer": "658decbd56790023d28bd72ef5f6fe810ed69b0d1ab6275b0c6c54b1f414192a",
         "ext.json.tests": "5ad25069a57e40b87d9ace8f4821d3f2e509df3e56348bd5f4ed914a1bfcdfcd"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-msgpack-rs",
@@ -112,7 +119,8 @@
         "ext.msgpack": "f79abb1c5fcd7180f1be33127ebb64565c361e15335ef313b135f4f370a6e2f6",
         "ext.msgpack.data_model": "24225fcffe3a50ac8352052de8b5545037dbef4afda28652ddef967c01454365",
         "ext.msgpack.tests": "8cd71d12a927715f52452240c9f91b3ab3fe15593499af698273bdf4cfa91607"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-toml-rs",
@@ -124,7 +132,8 @@
         "ext.toml": "3bd80fbe0c44b57092432b628d3ce0068abe190d8c27395ebf9bf711bdeeea35",
         "ext.toml.data_model": "a156658af92d9a9e960d86e58de62c957b02440c7dbd6dca6e56fb28c6a1b642",
         "ext.toml.tests": "f3a1e8df9afd6da0927c097080344af08a3cf12ae5769686721bf462e122a046"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-unicode-rs",
@@ -138,7 +147,8 @@
         "ext.unicode.normalize": "4f86ecc58f838788004617c9978476a1821cb780ed8e640f965d1aa44b826fc5",
         "ext.unicode.segment": "341c8ace2b44f8fca0c5339bdbc8d102a6d06d36ef4a6a705601539a9fbf03c4",
         "ext.unicode.tests": "1d5209fc2aab58dca59930459fd054d8065eb7a7dd9e042c179149ba7252064f"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-xml-rs",
@@ -150,7 +160,8 @@
         "ext.xml": "758a99622b077650c9ec0fdc7fe8d60261c27720bf944361f09dc2fd66d91b3d",
         "ext.xml.data_model": "c152bb642453e15060f7e6d602db0b1b65a3aa1ddb793037db2024f3d4cccb61",
         "ext.xml.tests": "3ff5feb0110c2fa362b452b849fbeb6ade61389badb734bff7ba81277adb391c"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-yaml-rs",
@@ -162,7 +173,8 @@
         "ext.yaml": "065c86d25102c285092c7b9402ca773f38929f58c3acdebbfb4c6c567c1bf853",
         "ext.yaml.data_model": "2e1bf8111f4a41a45fd70f142fd17b5637b4a11d067c0ef2d073788b1f492bb3",
         "ext.yaml.tests": "3b25f2eb094d815c0669f35395d5ff9b1af9c6be5a7089cb50f66639784a0d1e"
-      }
+      },
+      "yanked": false
     }
   ]
 }

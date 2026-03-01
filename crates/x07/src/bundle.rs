@@ -103,6 +103,10 @@ pub struct BundleArgs {
     #[arg(long, value_name = "N")]
     pub cpu_time_limit_seconds: Option<u64>,
 
+    /// Override the initial solve fuel cap (default: profile.solve_fuel, then built-in default).
+    #[arg(long, value_name = "FUEL")]
+    pub solve_fuel: Option<u64>,
+
     #[arg(long)]
     pub debug_borrow_checks: bool,
 
@@ -380,9 +384,9 @@ pub fn cmd_bundle(
         .map(|p| p.display().to_string())
         .collect::<Vec<_>>();
 
-    let solve_fuel = selected_profile
-        .as_ref()
-        .and_then(|p| p.solve_fuel)
+    let solve_fuel = args
+        .solve_fuel
+        .or(selected_profile.as_ref().and_then(|p| p.solve_fuel))
         .unwrap_or(DEFAULT_SOLVE_FUEL);
     let max_memory_bytes = args
         .max_memory_bytes
@@ -907,6 +911,11 @@ fn build_vm_payload_bundle(params: VmPayloadBundleParams<'_>) -> Result<VmPayloa
     if let Some(profile) = args.profile.as_ref() {
         guest_argv.push("--profile".to_string());
         guest_argv.push(profile.clone());
+    }
+
+    if let Some(fuel) = args.solve_fuel {
+        guest_argv.push("--solve-fuel".to_string());
+        guest_argv.push(fuel.to_string());
     }
 
     guest_argv.push("--world".to_string());

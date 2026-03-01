@@ -28,6 +28,7 @@ Each entry in `tests[]` is an object with:
 - `expect` (optional): `pass`, `fail`, or `skip` (default: `pass`).
 - `returns` (optional): `result_i32` or `bytes_status_v1` (default: `result_i32`).
 - `timeout_ms` (optional): integer `>= 1` (converted to a per-test CPU time limit, ceiling to seconds).
+- `solve_fuel` (optional): integer `>= 1` (per-test fuel cap; overrides the harness default).
 - `fixture_root` (optional/required depending on world):
   - forbidden for `solve-pure` and OS worlds
   - required for `solve-fs`, `solve-rr`, `solve-kv`

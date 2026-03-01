@@ -3890,11 +3890,11 @@ static bytes_t rt_os_fs_read_file(ctx_t* ctx, bytes_t path) {
       f = fopen(p, "rb");
       if (f) break;
     }
-    if (!f) rt_trap("os.fs.read_file open failed");
+    if (!f) rt_trap_path("os.fs.read_file open failed", p);
   } else {
     p = rt_os_bytes_to_cstr(ctx, path, "os.fs.read_file path contains NUL");
     f = fopen(p, "rb");
-    if (!f) rt_trap("os.fs.read_file open failed");
+    if (!f) rt_trap_path("os.fs.read_file open failed", p);
   }
 
   if (fseek(f, 0, SEEK_END) != 0) rt_trap("os.fs.read_file seek failed");

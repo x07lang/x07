@@ -1081,6 +1081,202 @@ fn x07_test_smoke_suite() {
 }
 
 #[test]
+fn x07_test_filter_exact_zero_tests_errors_unless_allow_empty() {
+    let root = repo_root();
+    let manifest = root.join("tests/tests.json");
+    assert!(manifest.is_file(), "missing {}", manifest.display());
+
+    let out = run_x07(&[
+        "test",
+        "--manifest",
+        manifest.to_str().unwrap(),
+        "--filter",
+        "definitely_not_a_real_test_id",
+        "--exact",
+    ]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("0 tests selected"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("--allow-empty"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_x07(&[
+        "test",
+        "--manifest",
+        manifest.to_str().unwrap(),
+        "--filter",
+        "definitely_not_a_real_test_id",
+        "--exact",
+        "--allow-empty",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["schema_version"], X07TEST_SCHEMA_VERSION);
+    assert_eq!(v["tests"].as_array().unwrap().len(), 0);
+}
+
+#[test]
+fn x07_test_solve_fuel_override_is_applied() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_test_solve_fuel_override");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let module = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "app",
+        "imports": ["std.test"],
+        "decls": [
+            { "kind": "export", "names": ["app.pass"] },
+            {
+                "kind": "defn",
+                "name": "app.pass",
+                "params": [],
+                "result": "result_i32",
+                "body": ["begin", ["std.test.pass"]]
+            }
+        ]
+    });
+    write_bytes(
+        &dir.join("app.x07.json"),
+        serde_json::to_string_pretty(&module).unwrap().as_bytes(),
+    );
+
+    let manifest = serde_json::json!({
+        "schema_version": "x07.tests_manifest@0.2.0",
+        "tests": [
+            {
+                "id": "fuel_low",
+                "world": "solve-pure",
+                "entry": "app.pass",
+                "expect": "pass",
+                "solve_fuel": 1
+            }
+        ]
+    });
+    let manifest_path = dir.join("tests.json");
+    write_bytes(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap().as_bytes(),
+    );
+
+    let out = run_x07(&["test", "--manifest", manifest_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(12),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    let v = parse_json_stdout(&out);
+    let tests = v["tests"].as_array().expect("tests[]");
+    assert_eq!(tests.len(), 1);
+    let diags = tests[0]["diags"].as_array().expect("diags[]");
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.get("code").and_then(Value::as_str) == Some("X07T_RUN_TRAP")),
+        "expected X07T_RUN_TRAP diag, got:\n{}",
+        serde_json::to_string_pretty(diags).unwrap()
+    );
+}
+
+#[test]
+fn x07_test_run_trap_includes_fs_open_path() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_test_trap_fs_path");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    std::fs::create_dir_all(dir.join("fixture")).expect("create fixture dir");
+
+    let module = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "app",
+        "imports": ["std.fs", "std.test"],
+        "decls": [
+            { "kind": "export", "names": ["app.read_missing"] },
+            {
+                "kind": "defn",
+                "name": "app.read_missing",
+                "params": [],
+                "result": "result_i32",
+                "body": [
+                    "begin",
+                    ["let", "_b", ["std.fs.read", ["bytes.lit", "definitely_missing.txt"]]],
+                    ["std.test.pass"]
+                ]
+            }
+        ]
+    });
+    write_bytes(
+        &dir.join("app.x07.json"),
+        serde_json::to_string_pretty(&module).unwrap().as_bytes(),
+    );
+
+    let manifest = serde_json::json!({
+        "schema_version": "x07.tests_manifest@0.2.0",
+        "tests": [
+            {
+                "id": "missing_file_traps",
+                "world": "solve-fs",
+                "entry": "app.read_missing",
+                "fixture_root": "fixture",
+                "expect": "pass"
+            }
+        ]
+    });
+    let manifest_path = dir.join("tests.json");
+    write_bytes(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap().as_bytes(),
+    );
+
+    let out = run_x07(&["test", "--manifest", manifest_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(12),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    let v = parse_json_stdout(&out);
+    let tests = v["tests"].as_array().expect("tests[]");
+    assert_eq!(tests.len(), 1);
+    let diags = tests[0]["diags"].as_array().expect("diags[]");
+    let trap = diags
+        .iter()
+        .find(|d| d.get("code").and_then(Value::as_str) == Some("X07T_RUN_TRAP"))
+        .and_then(|d| d.get("details"))
+        .and_then(|d| d.get("trap"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    assert!(
+        trap.contains("path=definitely_missing.txt"),
+        "expected trap to include attempted path, got:\n{trap}"
+    );
+}
+
+#[test]
 fn x07_test_assert_bytes_eq_emits_details() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "test_assert_bytes_eq_details");
@@ -3126,6 +3322,55 @@ fn x07_fmt_accepts_positional_paths() {
 }
 
 #[test]
+fn x07_fmt_pretty_writes_multiline_output() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_fmt_pretty");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let program_doc = serde_json::json!({
+        "kind": "entry",
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "module_id": "main",
+        "imports": [],
+        "decls": [],
+        "solve": ["bytes.alloc", 0],
+    });
+    let program_path = dir.join("main.x07.json");
+    write_bytes(
+        &program_path,
+        serde_json::to_vec_pretty(&program_doc)
+            .expect("encode pretty x07AST json")
+            .as_slice(),
+    );
+
+    let out = run_x07(&["fmt", "--write", program_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07(&["fmt", "--write", "--pretty", program_path.to_str().unwrap()]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let contents = std::fs::read_to_string(&program_path).expect("read formatted file");
+    assert!(
+        contents.contains("\n  \""),
+        "expected multi-line JSON output, got:\n{contents}"
+    );
+
+    let out = run_x07(&["fmt", "--check", "--pretty", program_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let out = run_x07(&["fmt", "--check", program_path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(1));
+}
+
+#[test]
 fn x07_fix_suggest_generics_emits_patchset_and_applies() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_fix_suggest_generics");
@@ -4525,6 +4770,110 @@ fn x07_pkg_lock_patch_overrides_transitive_requires_packages() {
     assert_eq!(c_dep["version"], "1.0.1");
     assert_eq!(c_dep["overridden_by"], "c");
     assert_eq!(c_dep["yanked"], false);
+}
+
+#[test]
+fn x07_pkg_lock_check_hydrates_patched_vendored_deps() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_check_hydrate_patched_vendored");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("a/1.0.0"), "a", "1.0.0", &["b@1.0.0"]);
+    write_minimal_pkg_manifest(&deps_root.join("b/1.0.1"), "b", "1.0.1", &[]);
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json"))
+        .expect("parse x07.json");
+    let obj = doc.as_object_mut().expect("x07.json must be object");
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![
+            serde_json::json!({"name":"a","version":"1.0.0","path":".x07/deps/a/1.0.0"}),
+            serde_json::json!({"name":"b","version":"1.0.1","path":".x07/deps/b/1.0.1"}),
+        ]),
+    );
+    obj.insert(
+        "patch".to_string(),
+        serde_json::json!({
+            "b": { "version": "1.0.1", "path": ".x07/deps/b/1.0.1" }
+        }),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    std::fs::remove_dir_all(deps_root.join("b")).expect("remove vendored b dep dir");
+    assert!(
+        !deps_root.join("b/1.0.1/x07-package.json").is_file(),
+        "expected b dep to be missing before hydration"
+    );
+
+    let index_dir = dir.join("fake_index");
+    std::fs::create_dir_all(&index_dir).expect("create fake index dir");
+    let index_url = write_fake_file_index_config(&index_dir);
+
+    let b_pkg = serde_json::json!({
+        "schema_version": PACKAGE_MANIFEST_SCHEMA_VERSION,
+        "name": "b",
+        "version": "1.0.1",
+        "module_root": "modules",
+        "modules": [],
+    });
+    let b_pkg_bytes = serde_json::to_vec_pretty(&b_pkg).expect("encode package manifest");
+    let b_archive = x07_pkg::build_tar_bytes(&[(PathBuf::from("x07-package.json"), b_pkg_bytes)])
+        .expect("build tar");
+    let b_cksum = sha256_hex(&b_archive);
+
+    write_bytes(&index_dir.join("dl/b/1.0.1/download"), &b_archive);
+    write_index_entries_ndjson(
+        &index_dir,
+        "a",
+        &[
+            serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":"a","version":"1.0.0","cksum":"aa","yanked":false}),
+        ],
+    );
+    write_index_entries_ndjson(
+        &index_dir,
+        "b",
+        &[
+            serde_json::json!({"schema_version":"x07.index-entry@0.1.0","name":"b","version":"1.0.1","cksum":b_cksum,"yanked":false}),
+        ],
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &["pkg", "lock", "--check", "--index", index_url.as_str()],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert!(
+        deps_root.join("b/1.0.1/x07-package.json").is_file(),
+        "expected b dep to be hydrated under .x07/deps"
+    );
 }
 
 #[test]

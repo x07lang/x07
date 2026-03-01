@@ -77,6 +77,8 @@ See: [WASM (Phases 0–3)](wasm.md).
 - `x07 fmt --input <path> --check`
 - `x07 fmt --input <path> --write`
 
+Add `--pretty` to produce deterministic multi-line formatting intended for human editing/review (default: canonical one-line JSON).
+
 `--input` may be repeated. Positional `<path>` inputs may also be repeated. Each `<path>` may be a file or a directory; directory inputs are scanned recursively for `*.x07.json`.
 
 ### Assets (embed files)
@@ -298,6 +300,7 @@ See: [State machines](state-machines.md).
 - `x07 pkg remove <name>`
 - `x07 pkg remove <name> --sync`
 - `x07 pkg versions <name>`
+- `x07 pkg versions <name> --refresh`
 - `x07 pkg lock --project x07.json`
 - `x07 pkg provides <module-id>`
 - `x07 pkg pack --package <dir> --out <path>`
@@ -311,6 +314,7 @@ Notes:
 - `x07 pkg lock` uses the official registry index by default when fetching is required; override with `--index` or use `--offline`.
 - Use `x07 pkg lock --project x07.json --check` in CI to fail if `x07.lock.json` is out of date.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
+- Sparse index reads (including `x07 pkg versions`) may be cached; use `x07 pkg versions --refresh <name>` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
 - For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.3.0`; `x07.project@0.2.0` is accepted for legacy manifests but does not support `project.patch`).
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
 
@@ -340,6 +344,8 @@ See: [Embedding in C](embedding-in-c.md).
 - `x07 bundle --project x07.json --profile os --out dist/mytool`
   - Produces a native CLI executable (standard `argc/argv`, raw stdout).
   - Runs without the X07 toolchain installed at runtime.
+- `x07 bundle --project x07.json --profile os --solve-fuel <u64> --out dist/mytool`
+  - Overrides the initial solve fuel cap (otherwise `profile.solve_fuel`, then the built-in default).
 - `x07 bundle --project x07.json --profile sandbox --out dist/mytool`
   - Bundles a VM-backed sandbox bundle by default (requires a base policy via profile or `--policy`).
   - To emit a legacy policy-only bundle (weaker isolation), add: `--sandbox-backend os --i-accept-weaker-isolation`.

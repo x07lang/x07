@@ -35,6 +35,10 @@ Use this skill when:
 - Reverse-lookup which package provides a module:
   - `x07 pkg provides <module-id>`
 
+- List available versions of a package:
+  - `x07 pkg versions <name>`
+  - `x07 pkg versions <name> --refresh`
+
 - Verify a lockfile is up to date (CI mode):
   - `x07 pkg lock --project x07.json --check`
   - If you intentionally accept risk in CI: add `--allow-yanked` and/or `--allow-advisories`
@@ -55,9 +59,11 @@ Use this skill when:
 - Publishing to the official registry requires non-empty `description` and `docs` in `x07-package.json`.
 - The lockfile path is controlled by `x07.json` (`lockfile`) and defaults to `x07.lock.json`.
 - When fetching is required, `x07 pkg lock` defaults to the official registry index; override with `--index <url>`.
+- Sparse index reads (including `x07 pkg versions`) may be cached; use `--refresh` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
 - Canonical project manifests use `x07.project@0.3.0`. `x07.project@0.2.0` is accepted for legacy manifests, but `project.patch` requires `@0.3.0`.
 - In `--check` mode, when the index can be consulted, lock validation also fails on yanked dependencies and active advisories unless explicitly allowed.
 - Use `project.patch` in `x07.json` to override transitive dependency versions (for example, moving off yanked/advised versions).
+- Patch paths under `.x07/deps/...` are treated as vendored deps (fetchable) during `x07 pkg lock` hydration; patch paths elsewhere are local-only and must exist on disk.
 - Official packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add and fetch these transitive deps (and update `x07.json`).
 - If dependencies are already present on disk, `x07 pkg lock` can run without `--index` using `--offline`.
 

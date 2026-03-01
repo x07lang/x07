@@ -26,6 +26,23 @@ See also:
 - [Diagnostic codes](diagnostic-codes.md)
 - [Benchmarks](benchmarks.md)
 
+## Selection and debugging
+
+- Filter by test id:
+  - `x07 test --filter golden_prm_signed_200` (substring match)
+  - `x07 test --filter golden_prm_signed_200 --exact` (exact id match)
+  - By default, filters that select 0 tests are an error; pass `--allow-empty` to treat “0 tests selected” as success.
+  - Use `--list` to print selected tests without running them.
+- Per-test fuel:
+  - If a test fails with `fuel exhausted`, set `solve_fuel` on the test entry in the manifest.
+- Runner traps:
+  - When a test runner traps, the report includes diagnostic `X07T_RUN_TRAP` with `details.trap` set to the decoded trap string.
+- Progress output:
+  - `x07 test --verbose` prints `test: <id>` lines to stderr while preserving the machine report on stdout.
+- OS-world working directory:
+  - For OS worlds (`run-os`, `run-os-sandboxed`), the runner process `cwd` is set from the test manifest directory when possible (sandboxed tests may choose a different `cwd` to satisfy policy read roots).
+  - Relative filesystem paths in test programs are resolved from that `cwd` (not from the repo root).
+
 ## Why X07 includes a built-in test harness
 
 Agents need:

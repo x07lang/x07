@@ -32,6 +32,7 @@ Each test entry:
 - `fixture_root` (string, OPTIONAL): required when `world == "solve-fs"`; relative to the manifest directory
 - `returns` (string, OPTIONAL): `result_i32` (default) or `bytes_status_v1`
 - `timeout_ms` (int, OPTIONAL): rounded up to seconds for the runner wall/CPU gate
+- `solve_fuel` (int, OPTIONAL): per-test fuel cap; must be `>= 1`
 - `input_b64` / `input_path` (OPTIONAL, `x07.tests_manifest@0.2.0` only): raw input bytes for deterministic `solve-*` worlds
 - `pbt` (OPTIONAL): property-based testing config (runs only with `x07 test --pbt` / `--all`)
 
@@ -88,6 +89,7 @@ Key flags:
 - `--manifest PATH` (default `tests/tests.json`)
 - `--module-root DIR` (default: manifest directory)
 - `--filter SUBSTR` / `--exact`
+- `--allow-empty` (allow filters that select 0 tests)
 - `--pbt` (run property-based tests only)
 - `--all` (run unit tests + property-based tests)
 - `--pbt-repro PATH` (replay one counterexample; requires `--pbt`)
@@ -97,6 +99,7 @@ Key flags:
 - `--no-run` (compile wrappers only)
 - `--keep-artifacts --artifact-dir DIR` (stores generated drivers and executables)
 - `--report-out PATH` (writes report file; still emits JSON to stdout)
+- `--verbose` (prints per-test progress to stderr)
 
 Exit codes:
 

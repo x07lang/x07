@@ -13,7 +13,8 @@
         "std.math.bigint.fmt": "98675052af019d828e6e3cdb6aaab763e89acfb53f40d664feb6c1dbfc53f74d",
         "std.math.bigint.parse": "542ab8498c612f921fb2c98e4bf94d8c22be87f2f255799daa0516079bc30a74",
         "std.math.bigint.tests": "1c6d0ec34c448e7bb64a0e43a1d09dcbb1525c0637090f33d1933a24fbe8d1d7"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-decimal-rs",
@@ -27,7 +28,8 @@
         "std.math.decimal.fmt": "6c9542abaef069370cfeed271a001f85f643b777c3b11128a126a9e90c1c3971",
         "std.math.decimal.parse": "5be50da05a7822aa37afbd26c063296a2a5c4f74e72327d442d9b48942d9ea3f",
         "std.math.decimal.tests": "cebadf071098d7725ab2bd2041a868d407b063ec408c916dbbcd12b52b268328"
-      }
+      },
+      "yanked": false
     },
     {
       "name": "ext-error",
@@ -40,7 +42,8 @@
         "ext.error.context": "3eac73db10c689e7a1e2c944301aadead445e164c3b24c381445fbedac9c5400",
         "ext.error.fmt": "ac94ff7ff9e4dae4b2a1739848addbb7e0aa87f25e3e73b80d5c6b822eb48c12",
         "ext.error.tests": "94903cfffa1f37dd22c1e5c2cc063d56ec6030b92a704e3bf247b7e1367cc906"
-      }
+      },
+      "yanked": false
     }
   ]
 }

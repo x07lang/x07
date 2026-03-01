@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 191
-- quickfix support (`sometimes` or `always`): 162
-- quickfix coverage: 84.82%
+- total codes: 193
+- quickfix support (`sometimes` or `always`): 163
+- quickfix coverage: 84.46%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -37,6 +37,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `ETEST_POLICY_UNSAFE_PATH` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_POLICY_UNSAFE_PATH`. |
 | `ETEST_RETURNS_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_RETURNS_INVALID`. |
 | `ETEST_SCHEMA_VERSION` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_SCHEMA_VERSION`. |
+| `ETEST_SOLVE_FUEL_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_SOLVE_FUEL_INVALID`. |
 | `ETEST_TESTS_EMPTY` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TESTS_EMPTY`. |
 | `ETEST_TIMEOUT_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TIMEOUT_INVALID`. |
 | `ETEST_WORLD_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_WORLD_INVALID`. |
@@ -157,6 +158,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07T_EPBT_PARAM_EMPTY` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`. |
 | `X07T_EPBT_UNKNOWN_GEN_KIND` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNKNOWN_GEN_KIND`. |
 | `X07T_EPBT_UNSUPPORTED_WORLD` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNSUPPORTED_WORLD`. |
+| `X07T_RUN_TRAP` | x07 / run / error | never | Runner trapped; trap string surfaced in test diagnostics. |
 | `X07V_EARGS` | x07 / run / error | sometimes | Invalid `x07 verify` arguments. |
 | `X07V_ECBMC_ERROR` | x07 / run / error | sometimes | CBMC reported an error. |
 | `X07V_ECBMC_FAILURE` | x07 / run / error | sometimes | CBMC reported a failing property that is not a contract. |
@@ -777,6 +779,25 @@ Agent strategy:
 
 - Validate `tests/tests.json` fields and world requirements.
 - Apply canonical manifest edits (id/world/entry/expect/returns/paths).
+- Re-run `x07 test`.
+
+
+## `ETEST_SOLVE_FUEL_INVALID`
+
+Summary: Test manifest validation diagnostic `ETEST_SOLVE_FUEL_INVALID`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The test entry contains an invalid `solve_fuel` value. `solve_fuel` must be an integer greater than 0.
+
+Agent strategy:
+
+- Edit the test manifest entry to set `solve_fuel` to an integer greater than 0.
 - Re-run `x07 test`.
 
 
@@ -3215,6 +3236,28 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07T_RUN_TRAP`
+
+Summary: Runner trapped; trap string surfaced in test diagnostics.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Runner traps require intent and/or environment changes; no safe automatic patch exists.
+
+Details:
+
+This diagnostic is emitted by `x07 test` when the runner reports a trap (for example `fuel exhausted`, `wall timeout`, or a runtime trap such as a filesystem open failure). The raw trap string is surfaced under `details.trap`.
+
+Agent strategy:
+
+- Inspect `details.trap` to identify the failing subsystem (fuel, timeout, fs, rr, kv, etc.).
+- If the trap is `fuel exhausted`, increase per-test `solve_fuel` in the test manifest or the invocation fuel cap.
+- For filesystem traps, verify the attempted path exists under the test fixture root / sandbox policy roots.
+- Re-run `x07 test` (use `--verbose` to see the currently-running test id).
 
 
 ## `X07V_EARGS`

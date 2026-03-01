@@ -1,5 +1,12 @@
+diff --git a/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/broken/src/main.x07.json b/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/expected/src/main.x07.json
+index 2f1696e..dda909c 100644
+--- a/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/broken/src/main.x07.json
++++ b/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/expected/src/main.x07.json
+@@ -1,2 +1 @@
+ {"decls":[],"imports":["app"],"kind":"entry","module_id":"main","schema_version":"x07.x07ast@0.3.0","solve":["app.solve","input"]}
+-
 diff --git a/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/broken/x07.json b/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/expected/x07.json
-index f4ea51e..b978f93 100644
+index f4ea51e..ef402bb 100644
 --- a/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/broken/x07.json
 +++ b/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/expected/x07.json
 @@ -1,13 +1,27 @@
@@ -10,13 +17,13 @@ index f4ea51e..b978f93 100644
 +  "dependencies": [
 +    {
 +      "name": "ext-compress-rs",
-+      "path": ".x07/deps/ext-compress-rs/0.1.4",
-+      "version": "0.1.4"
++      "path": ".x07/deps/ext-compress-rs/0.1.5",
++      "version": "0.1.5"
 +    },
 +    {
 +      "name": "ext-error",
-+      "path": ".x07/deps/ext-error/0.1.3",
-+      "version": "0.1.3"
++      "path": ".x07/deps/ext-error/0.1.4",
++      "version": "0.1.4"
 +    }
 +  ],
    "entry": "src/main.x07.json",
@@ -39,41 +46,43 @@ index f4ea51e..b978f93 100644
  }
 -
 diff --git a/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/broken/x07.lock.json b/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/expected/x07.lock.json
-index d7f8feb..ef2c4f9 100644
+index 2925fc0..9e25ee1 100644
 --- a/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/broken/x07.lock.json
 +++ b/ci/fixtures/agent-scenarios/compress-zstd/missing-dep/expected/x07.lock.json
-@@ -1,4 +1,33 @@
+@@ -1,4 +1,35 @@
  {
    "schema_version": "x07.lock@0.3.0",
 -  "dependencies": []
 +  "dependencies": [
 +    {
 +      "name": "ext-compress-rs",
-+      "version": "0.1.4",
-+      "path": ".x07/deps/ext-compress-rs/0.1.4",
-+      "package_manifest_sha256": "ee19745c3ec36c173eef6fc7a43c0ab04ff196202c497ac9967851c0c86204ec",
++      "version": "0.1.5",
++      "path": ".x07/deps/ext-compress-rs/0.1.5",
++      "package_manifest_sha256": "a63d87e0d2c6056c0a8f9a60fdafa315d525d412232a6ba26d661edf5e54e265",
 +      "module_root": "modules",
 +      "modules_sha256": {
-+        "ext.compress": "a86c0f111fc452747a41eef3f380391021fde38c15dc66457fa856c11f7b355e",
-+        "ext.compress.tests": "c725f052d5a2d31b10a97c8ffb5ac53920dc00ca08c92737e6c2f6ed69bcd6ef",
-+        "ext.zip": "196947fc69bc581d12d3839d9a9d902664df60e189c5cdec2f841df5f6e2997c",
-+        "ext.zip.tests": "bbb5355f928ea00fd5112a168130b42681ee8aa6676a335bb9bab22fa4faf1a9",
-+        "ext.zstd": "c750c17f1de5be76575008f9471fb99cce03a967f183223976930152ac565faa",
-+        "ext.zstd.tests": "de6eb2735c6ef68cfd5f4c90ae0831e775e2dacf72de7f58aec9b3fc19fa0792"
-+      }
++        "ext.compress": "950cfa2ca211a5070b15b9e65240c5e666a28c1c9efefd17d01ff077d084b88e",
++        "ext.compress.tests": "7398ebc819e8080045f67bd37446d324c4f097ed82e93ec37641a24606c861fc",
++        "ext.zip": "1ecd51bbf80b9e43a4c7fa7d1bdfa6d26397a27a0a6aee2d237a3e0e90f50671",
++        "ext.zip.tests": "bd96f3212022e41840a43dfddbcd3560b76f5a87ec3be6098a69ca5b38952c8b",
++        "ext.zstd": "1e289c31b5a407d6c5fea3c4d5e5cff7d6f59ff185392ba327bc38a08dedb519",
++        "ext.zstd.tests": "160c77242dc967387c3251cb2467df0fa2d876e5c3577c1922805b1d109965c1"
++      },
++      "yanked": false
 +    },
 +    {
 +      "name": "ext-error",
-+      "version": "0.1.3",
-+      "path": ".x07/deps/ext-error/0.1.3",
-+      "package_manifest_sha256": "723a31c95753dd8c096ad51d3a073f14c56d7915884aa4742ca1229f15e77e88",
++      "version": "0.1.4",
++      "path": ".x07/deps/ext-error/0.1.4",
++      "package_manifest_sha256": "2583aae477f906bf67bd815972b333760588c54d7a1776831be85f1956bfc01e",
 +      "module_root": "modules",
 +      "modules_sha256": {
-+        "ext.error.chain": "c030554da4403f7f68612cea7ec235edd076c9570eac0a64e9800c4352f98c7f",
-+        "ext.error.context": "10c3939f6635e851a87db46ad1dcb4cceb205e4a861c4e23c1e17e1af1c7fbf0",
-+        "ext.error.fmt": "48cfcf0b1ee0f977fd30a4c3626e5979633d4d8142ae2a040a01b40f566ba455",
-+        "ext.error.tests": "49fb5e57aab0fda9d7a19cb61f3cf1b0add2e7e451a6f3411d7f28d844d53586"
-+      }
++        "ext.error.chain": "082d051b9eab7ffba7ab42f20ef6afdbe68389b9060d2fe876575d8fb9f1b76a",
++        "ext.error.context": "3eac73db10c689e7a1e2c944301aadead445e164c3b24c381445fbedac9c5400",
++        "ext.error.fmt": "ac94ff7ff9e4dae4b2a1739848addbb7e0aa87f25e3e73b80d5c6b822eb48c12",
++        "ext.error.tests": "94903cfffa1f37dd22c1e5c2cc063d56ec6030b92a704e3bf247b7e1367cc906"
++      },
++      "yanked": false
 +    }
 +  ]
  }

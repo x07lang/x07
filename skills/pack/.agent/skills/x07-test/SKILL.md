@@ -18,6 +18,19 @@ This skill provides the single canonical way to run tests for an X07 project usi
 ## Notes
 
 - By default, `x07 test` prints JSON to stdout; use `--report-out <path>` to write a report file.
+- Filter selection:
+  - `x07 test --manifest tests/tests.json --filter <substr>`
+  - `x07 test --manifest tests/tests.json --filter <id> --exact`
+  - By default, filters that select 0 tests are an error; pass `--allow-empty` to treat this as success.
+  - Use `--list` to print selected tests without running them.
+- Progress output:
+  - `x07 test --verbose` prints `test: <id>` lines to stderr while preserving the machine report on stdout.
+- Fuel overrides:
+  - Set `solve_fuel` on a test entry in `tests/tests.json` to override the per-test fuel cap.
+- Runner traps:
+  - When a runner traps, the report includes diagnostic `X07T_RUN_TRAP` with `details.trap` set to the decoded trap string.
+- OS-world working directory:
+  - For `run-os` / `run-os-sandboxed`, the runner process `cwd` is derived from the manifest directory when possible (sandboxed tests may choose a different `cwd` to satisfy policy read roots), so relative filesystem paths resolve from that `cwd`.
 - Property-based tests (PBT):
   - `x07 test --pbt --manifest tests/tests.json` runs PBT entries only.
   - `x07 test --all --manifest tests/tests.json` runs unit + PBT.

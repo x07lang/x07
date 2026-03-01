@@ -18,6 +18,11 @@ fn workspace_path_remainder(raw: &str) -> Option<&str> {
     raw.strip_prefix("$workspace/")
 }
 
+pub fn is_vendored_dep_path(raw: &str) -> bool {
+    let raw = raw.trim();
+    raw.starts_with(".x07/deps/") || raw.starts_with("$workspace/.x07/deps/")
+}
+
 fn discover_workspace_root_from_git(base: &Path) -> Option<PathBuf> {
     let base = base.canonicalize().ok()?;
     for anc in base.ancestors() {
@@ -483,7 +488,7 @@ pub fn compute_lockfile(project_path: &Path, manifest: &ProjectManifest) -> Resu
             module_root: pkg.module_root.clone(),
             modules_sha256,
             overridden_by: None,
-            yanked: None,
+            yanked: is_vendored_dep_path(&dep.path).then_some(false),
             advisories: Vec::new(),
         });
     }
@@ -520,23 +525,47 @@ pub fn verify_lockfile(
     }
 
     let expected = compute_lockfile(project_path, manifest)?;
+    let hint = {
+        let uses_workspace_paths = manifest
+            .module_roots
+            .iter()
+            .any(|p| workspace_path_remainder(p).is_some())
+            || manifest
+                .dependencies
+                .iter()
+                .any(|d| workspace_path_remainder(&d.path).is_some());
+        if uses_workspace_paths {
+            format!(
+                " (hint: run `X07_WORKSPACE_ROOT=... x07 pkg lock --project {}`)",
+                project_path.display()
+            )
+        } else {
+            format!(
+                " (hint: run `x07 pkg lock --project {}`)",
+                project_path.display()
+            )
+        }
+    };
 
     if lock.dependencies.len() != expected.dependencies.len() {
-        anyhow::bail!("lockfile dependency list does not match project");
+        anyhow::bail!("lockfile dependency list does not match project{hint}");
     }
 
     for (a, b) in lock.dependencies.iter().zip(expected.dependencies.iter()) {
         if a.name != b.name || a.version != b.version || a.path != b.path {
-            anyhow::bail!("lockfile dependencies do not match project manifest");
+            anyhow::bail!("lockfile dependencies do not match project manifest{hint}");
         }
         if a.package_manifest_sha256 != b.package_manifest_sha256 {
-            anyhow::bail!("lockfile package manifest hash mismatch for {:?}", a.name);
+            anyhow::bail!(
+                "lockfile package manifest hash mismatch for {:?}{hint}",
+                a.name
+            );
         }
         if a.module_root != b.module_root {
-            anyhow::bail!("lockfile module_root mismatch for {:?}", a.name);
+            anyhow::bail!("lockfile module_root mismatch for {:?}{hint}", a.name);
         }
         if a.modules_sha256 != b.modules_sha256 {
-            anyhow::bail!("lockfile module hashes mismatch for {:?}", a.name);
+            anyhow::bail!("lockfile module hashes mismatch for {:?}{hint}", a.name);
         }
     }
 

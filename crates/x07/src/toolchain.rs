@@ -90,6 +90,9 @@ pub struct FmtArgs {
     pub check: bool,
     #[arg(long)]
     pub write: bool,
+    /// Deterministic multi-line formatting intended for human editing/review.
+    #[arg(long)]
+    pub pretty: bool,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -248,7 +251,11 @@ pub fn cmd_fmt(
         x07ast::canonicalize_x07ast_file(&mut file);
         let mut v = x07ast::x07ast_file_to_value(&file);
         x07ast::canon_value_jcs(&mut v);
-        let formatted = serde_json::to_string(&v)? + "\n";
+        let formatted = if args.pretty {
+            serde_json::to_string_pretty(&v)? + "\n"
+        } else {
+            serde_json::to_string(&v)? + "\n"
+        };
 
         if args.check && bytes != formatted.as_bytes() {
             not_formatted.push(input.clone());
@@ -478,9 +485,25 @@ pub fn cmd_fix(
             .count();
         if remaining_errors > 0 {
             ok = false;
+            if let Some(next) = final_report
+                .diagnostics
+                .iter()
+                .find(|d| d.severity == diagnostics::Severity::Error)
+            {
+                let loc = match &next.loc {
+                    Some(diagnostics::Location::X07Ast { ptr }) => format!(" ({ptr})"),
+                    Some(diagnostics::Location::Text { span, .. }) => match &span.file {
+                        Some(file) => format!(" ({}:{}:{})", file, span.start.line, span.start.col),
+                        None => format!(" ({}:{})", span.start.line, span.start.col),
+                    },
+                    None => String::new(),
+                };
+                eprintln!("x07 fix: next error: {}: {}{loc}", next.code, next.message);
+            }
             eprintln!(
                 "x07 fix: {remaining_errors} error(s) remain after auto-fix for {}. \
-                 Run `x07 build` to see codegen-stage errors.",
+                 Run `x07 lint --input {}` to see the remaining diagnostics.",
+                input.display(),
                 input.display()
             );
         }

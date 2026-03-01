@@ -193,6 +193,7 @@ struct TestDecl {
     fixture_root: Option<PathBuf>,
     policy_json: Option<PathBuf>,
     timeout_ms: Option<u64>,
+    solve_fuel: Option<u64>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -221,6 +222,10 @@ struct TestArgs {
 
     #[arg(long)]
     exact: bool,
+
+    /// Allow filters that select zero tests (default: treat as an error).
+    #[arg(long)]
+    allow_empty: bool,
 
     /// Run property-based tests only (tests where `pbt` is set in the manifest).
     #[arg(long)]
@@ -523,6 +528,7 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
     let module_roots = compute_test_module_roots(&args, &validated)?;
 
     let mut tests = validated.tests;
+    let total_tests = tests.len();
     if let Some(world) = args.world {
         tests.retain(|t| t.world == world);
     }
@@ -548,6 +554,36 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
     }
     tests.sort_by(|a, b| a.id.cmp(&b.id));
 
+    if args.pbt_repro.is_some() && tests.is_empty() {
+        anyhow::bail!(
+            "--pbt-repro: referenced test id was not found in the manifest (after filters)"
+        );
+    }
+
+    if tests.is_empty() && !args.allow_empty {
+        let mut selectors: Vec<String> = Vec::new();
+        if let Some(world) = args.world {
+            selectors.push(format!("world={}", world.as_str()));
+        }
+        if let Some(filter) = args.filter.as_deref() {
+            let kind = if args.exact { "exact" } else { "substr" };
+            selectors.push(format!("filter({kind})={filter:?}"));
+        }
+        if args.pbt {
+            selectors.push("pbt_only=true".to_string());
+        } else if !args.all {
+            selectors.push("pbt_only=false".to_string());
+        }
+        if selectors.is_empty() {
+            selectors.push("no filters".to_string());
+        }
+        anyhow::bail!(
+            "0 tests selected (manifest had {total_tests}; {})\n\
+             hint: pass --allow-empty to treat this as success",
+            selectors.join(", ")
+        );
+    }
+
     if args.list {
         for t in &tests {
             println!(
@@ -559,12 +595,6 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
             );
         }
         return Ok(std::process::ExitCode::SUCCESS);
-    }
-
-    if args.pbt_repro.is_some() && tests.is_empty() {
-        anyhow::bail!(
-            "--pbt-repro: referenced test id was not found in the manifest (after filters)"
-        );
     }
 
     let stdlib_lock_raw = args.stdlib_lock.clone();
@@ -980,7 +1010,7 @@ fn run_one_test(
 
     let run_res = last_run.context("internal error: missing run result")?;
 
-    if !run_res.ok {
+    if !run_res.ok || run_res.exit_status != 0 {
         if let Some(trap) = run_res.trap.as_deref() {
             match contract_repro::try_parse_contract_trap(trap) {
                 Ok(Some(info)) => {
@@ -1030,6 +1060,29 @@ fn run_one_test(
                 }
             }
         }
+
+        if let Some(trap) = run_res.trap.as_deref() {
+            result
+                .diags
+                .push(Diag::new("X07T_RUN_TRAP", "runner trapped").with_details(
+                    serde_json::json!({
+                        "trap": trap,
+                    }),
+                ));
+        } else {
+            result.diags.push(Diag::new(
+                "ETEST_RUN",
+                format!(
+                    "runner failed: ok={} exit_status={}",
+                    run_res.ok, run_res.exit_status
+                ),
+            ));
+        }
+
+        result.run = Some(RunSection::from_runner_result(&run_res));
+        result.status = "error".to_string();
+        result.duration_ms = start.elapsed().as_millis() as u64;
+        return Ok(result);
     }
 
     let status_bytes = run_res.solve_output.clone();
@@ -1238,6 +1291,15 @@ fn run_one_pbt_test(
         result.run = Some(RunSection::from_runner_result(&run_res));
 
         if !run_res.ok {
+            if let Some(trap) = run_res.trap.as_deref() {
+                result
+                    .diags
+                    .push(Diag::new("X07T_RUN_TRAP", "runner trapped").with_details(
+                        serde_json::json!({
+                            "trap": trap,
+                        }),
+                    ));
+            }
             result.diags.push(
                 Diag::new("X07T_EPBT_FAIL", "repro case failed (runner trap)")
                     .with_details(pbt::repro_to_details_value(&repro)?),
@@ -1534,7 +1596,8 @@ fn run_one_test_os(
     };
     cmd.arg("--cpu-time-limit-seconds")
         .arg(cpu_time_limit_seconds.to_string());
-    cmd.arg("--solve-fuel").arg(X07TEST_SOLVE_FUEL.to_string());
+    cmd.arg("--solve-fuel")
+        .arg(test.solve_fuel.unwrap_or(X07TEST_SOLVE_FUEL).to_string());
 
     let output = cmd.output().with_context(|| {
         format!(
@@ -1646,7 +1709,7 @@ fn run_one_test_os(
                         fixture_rr_dir: None,
                         fixture_kv_dir: None,
                         fixture_kv_seed: None,
-                        solve_fuel: X07TEST_SOLVE_FUEL,
+                        solve_fuel: test.solve_fuel.unwrap_or(X07TEST_SOLVE_FUEL),
                         max_memory_bytes: 64 * 1024 * 1024,
                         max_output_bytes: 1024 * 1024,
                         cpu_time_limit_seconds,
@@ -1695,6 +1758,15 @@ fn run_one_test_os(
             }
         }
 
+        if let Some(trap) = solve.trap.as_deref() {
+            result
+                .diags
+                .push(Diag::new("X07T_RUN_TRAP", "runner trapped").with_details(
+                    serde_json::json!({
+                        "trap": trap,
+                    }),
+                ));
+        }
         result.diags.push(Diag::new(
             "ETEST_RUN",
             format!(
@@ -1778,7 +1850,7 @@ fn runner_config_for_test(test: &TestDecl) -> Result<RunnerConfig> {
         fixture_rr_dir: None,
         fixture_kv_dir: None,
         fixture_kv_seed: None,
-        solve_fuel: X07TEST_SOLVE_FUEL,
+        solve_fuel: test.solve_fuel.unwrap_or(X07TEST_SOLVE_FUEL),
         max_memory_bytes: 64 * 1024 * 1024,
         max_output_bytes: 1024 * 1024,
         cpu_time_limit_seconds,
@@ -1998,6 +2070,8 @@ struct TestRaw {
     id: String,
     world: String,
     entry: String,
+    #[serde(default)]
+    solve_fuel: Option<u64>,
     #[serde(default)]
     input_b64: Option<String>,
     #[serde(default)]
@@ -2695,6 +2769,17 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
             fixture_root,
             policy_json,
             timeout_ms: t.timeout_ms,
+            solve_fuel: match t.solve_fuel {
+                Some(0) => {
+                    diags.push(ManifestDiag {
+                        code: "ETEST_SOLVE_FUEL_INVALID",
+                        message: "solve_fuel must be > 0".to_string(),
+                        path: format!("{base}/solve_fuel"),
+                    });
+                    continue;
+                }
+                other => other,
+            },
         });
     }
 

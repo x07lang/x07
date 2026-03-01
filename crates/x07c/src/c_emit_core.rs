@@ -2000,6 +2000,7 @@ typedef struct {
 } iface_t;
 
 static __attribute__((noreturn)) void rt_trap(const char* msg);
+static __attribute__((noreturn)) void rt_trap_path(const char* msg, const char* path);
 
 #define RT_IFACE_VTABLE_IO_READER UINT32_C(1)
 #define RT_IFACE_VTABLE_EXT_IO_READER_MIN UINT32_C(2)
@@ -2473,6 +2474,27 @@ static __attribute__((noreturn)) void rt_trap(const char* msg) {
   if (msg || (rt_ext_ctx && rt_ext_ctx->trap_ptr)) (void)write(STDERR_FILENO, "\n", 1);
 #else
   (void)msg;
+#endif
+  __builtin_trap();
+}
+
+static __attribute__((noreturn)) void rt_trap_path(const char* msg, const char* path) {
+
+#ifndef X07_FREESTANDING
+  if (msg) (void)write(STDERR_FILENO, msg, strlen(msg));
+  if (path) {
+    (void)write(STDERR_FILENO, " path=", 6);
+    (void)write(STDERR_FILENO, path, strlen(path));
+  }
+  if (rt_ext_ctx && rt_ext_ctx->trap_ptr) {
+    const char* p = rt_ext_ctx->trap_ptr;
+    (void)write(STDERR_FILENO, " ptr=", 5);
+    (void)write(STDERR_FILENO, p, strlen(p));
+  }
+  if (msg || path || (rt_ext_ctx && rt_ext_ctx->trap_ptr)) (void)write(STDERR_FILENO, "\n", 1);
+#else
+  (void)msg;
+  (void)path;
 #endif
   __builtin_trap();
 }
@@ -5752,10 +5774,7 @@ static bytes_t rt_fs_read(ctx_t* ctx, bytes_view_t path) {
   p[path.len] = 0;
 
   FILE* f = fopen(p, "rb");
-  if (!f) {
-    rt_free(ctx, p, path.len + 1, 1);
-    rt_trap("fs.read open failed");
-  }
+  if (!f) rt_trap_path("fs.read open failed", p);
   rt_free(ctx, p, path.len + 1, 1);
 
   if (fseek(f, 0, SEEK_END) != 0) rt_trap("fs.read seek failed");
@@ -5790,10 +5809,7 @@ static bytes_t rt_fs_list_dir(ctx_t* ctx, bytes_view_t path) {
   p[path.len] = 0;
 
   DIR* dir = opendir(p);
-  if (!dir) {
-    rt_free(ctx, p, path.len + 1, 1);
-    rt_trap("fs.list_dir open failed");
-  }
+  if (!dir) rt_trap_path("fs.list_dir open failed", p);
 
   uint32_t count = 0;
   for (;;) {
@@ -5820,11 +5836,7 @@ static bytes_t rt_fs_list_dir(ctx_t* ctx, bytes_view_t path) {
   char** names = (char**)rt_alloc(ctx, count * (uint32_t)sizeof(char*), 8);
 
   dir = opendir(p);
-  if (!dir) {
-    rt_free(ctx, names, names_cap * (uint32_t)sizeof(char*), 8);
-    rt_free(ctx, p, path.len + 1, 1);
-    rt_trap("fs.list_dir open failed");
-  }
+  if (!dir) rt_trap_path("fs.list_dir open failed", p);
 
   uint32_t idx = 0;
   for (;;) {
@@ -5963,10 +5975,7 @@ static uint32_t rt_fs_open_read(ctx_t* ctx, bytes_view_t path) {
   p[path.len] = 0;
 
   FILE* f = fopen(p, "rb");
-  if (!f) {
-    rt_free(ctx, p, path.len + 1, 1);
-    rt_trap("fs.open_read open failed");
-  }
+  if (!f) rt_trap_path("fs.open_read open failed", p);
   rt_free(ctx, p, path.len + 1, 1);
 
   uint32_t ticks = rt_fs_latency_ticks(ctx, path);

@@ -116,6 +116,10 @@ pub struct VersionsArgs {
     #[arg(long, value_name = "URL")]
     pub index: Option<String>,
 
+    /// Force a fresh sparse-index fetch (cache-busting).
+    #[arg(long)]
+    pub refresh: bool,
+
     /// Package name.
     #[arg(value_name = "NAME")]
     pub name: String,
@@ -1048,7 +1052,11 @@ fn pkg_versions_report(
         }
     };
 
-    let entries = match client.fetch_entries(&name) {
+    let entries = match if args.refresh {
+        client.fetch_entries_refresh(&name)
+    } else {
+        client.fetch_entries(&name)
+    } {
         Ok(entries) => entries,
         Err(err) => {
             let report = PkgReport::<VersionsResult> {
@@ -2157,6 +2165,12 @@ fn lockfiles_equal_core(a: &project::Lockfile, b: &project::Lockfile) -> bool {
         if da.modules_sha256 != db.modules_sha256 {
             return false;
         }
+        if da.overridden_by != db.overridden_by {
+            return false;
+        }
+        if da.yanked != db.yanked {
+            return false;
+        }
     }
     true
 }
@@ -2185,7 +2199,9 @@ fn preserve_lock_metadata(existing: &project::Lockfile, lock: &mut project::Lock
             dep.path.clone(),
             dep.package_manifest_sha256.clone(),
         )) {
-            dep.yanked = *yanked;
+            if yanked.is_some() {
+                dep.yanked = *yanked;
+            }
             dep.advisories = advisories.clone();
         }
     }
@@ -2230,7 +2246,7 @@ fn apply_lock_overrides_and_metadata(
     let needs_index = lock
         .dependencies
         .iter()
-        .any(|d| d.path.starts_with(".x07/deps/"));
+        .any(|d| project::is_vendored_dep_path(&d.path));
     if !needs_index {
         return Ok(None);
     }
@@ -2243,7 +2259,7 @@ fn apply_lock_overrides_and_metadata(
         std::collections::HashMap::new();
 
     for dep in &mut lock.dependencies {
-        if !dep.path.starts_with(".x07/deps/") {
+        if !project::is_vendored_dep_path(&dep.path) {
             continue;
         }
 
@@ -2508,14 +2524,15 @@ fn ensure_deps_present(
     for dep in deps {
         let dep_dir = project::resolve_rel_path_with_workspace(ctx.base, &dep.path)?;
         if !dep_dir.join("x07-package.json").is_file() {
-            if ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some()) {
+            let patched_by_path = ctx.patch.get(&dep.name).is_some_and(|s| s.path.is_some());
+            if patched_by_path && !project::is_vendored_dep_path(&dep.path) {
                 missing_local_override.push(format!(
                     "{}@{} ({})",
                     dep.name,
                     dep.version,
                     dep_dir.display()
                 ));
-            } else if !dep.path.starts_with(".x07/deps/") {
+            } else if !project::is_vendored_dep_path(&dep.path) {
                 missing_local.push(format!(
                     "{}@{} ({})",
                     dep.name,
@@ -2877,7 +2894,7 @@ fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
                                 detail_url.as_str()
                             );
                             eprintln!(
-                                "warning: sparse index reads (x07 pkg versions) may be cached; retry API verification via GET /v1/packages/<name>."
+                                "warning: sparse index reads (x07 pkg versions) may be cached; try `x07 pkg versions --refresh {name}` or retry API verification via GET /v1/packages/<name>."
                             );
                         }
                     }
@@ -2887,7 +2904,7 @@ fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
                             detail_url.as_str()
                         );
                         eprintln!(
-                            "warning: sparse index reads (x07 pkg versions) may be cached; retry API verification via GET /v1/packages/<name>."
+                            "warning: sparse index reads (x07 pkg versions) may be cached; try `x07 pkg versions --refresh {name}` or retry API verification via GET /v1/packages/<name>."
                         );
                     }
                 },
@@ -2897,7 +2914,7 @@ fn cmd_pkg_publish(args: PublishArgs) -> Result<std::process::ExitCode> {
                         detail_url.as_str()
                     );
                     eprintln!(
-                        "warning: sparse index reads (x07 pkg versions) may be cached; retry API verification via GET /v1/packages/<name>."
+                        "warning: sparse index reads (x07 pkg versions) may be cached; try `x07 pkg versions --refresh {name}` or retry API verification via GET /v1/packages/<name>."
                     );
                 }
             }
