@@ -196,7 +196,23 @@ pkg_lock_check() {
   local work="$1"
 
   # Keep agent examples deterministic: no network access during pkg lock checks.
-  (cd "$work" && "$x07_bin" pkg lock --check --offline >/dev/null)
+  mkdir -p "$work/tmp"
+  local stdout_log="$work/tmp/pkg.lock.check.stdout"
+  local stderr_log="$work/tmp/pkg.lock.check.stderr"
+  if (cd "$work" && "$x07_bin" pkg lock --check --offline >"$stdout_log" 2>"$stderr_log"); then
+    return 0
+  fi
+
+  echo "ERROR: pkg lock --check failed for $work" >&2
+  if [[ -s "$stderr_log" ]]; then
+    echo "--- stderr ($stderr_log) ---" >&2
+    cat "$stderr_log" >&2 || true
+  fi
+  if [[ -s "$stdout_log" ]]; then
+    echo "--- stdout ($stdout_log) ---" >&2
+    cat "$stdout_log" >&2 || true
+  fi
+  return 1
 }
 
 run_x07_run() {
