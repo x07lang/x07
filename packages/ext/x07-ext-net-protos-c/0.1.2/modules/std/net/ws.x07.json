@@ -1,0 +1,145 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.net.ws",
+  "imports": ["ext.data_model", "ext.json.data_model"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.net.ws.client_from_arch_v1",
+        "std.net.ws.frame_v1",
+        "std.net.ws.frame_fin_v1",
+        "std.net.ws.frame_is_valid_v1",
+        "std.net.ws.frame_opcode_v1",
+        "std.net.ws.frame_payload_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.ws._read_index_doc_v1",
+      "params": [],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "raw", ["os.fs.read_file", ["bytes.lit", "arch/net/index.x07net.json"]]],
+        ["ext.json.data_model.parse", ["bytes.view", "raw"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.ws.client_from_arch_v1",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "budget.scope_from_arch_v1",
+        ["bytes.lit", "net_proto_v1"],
+        [
+          "begin",
+          ["let", "doc", ["std.net.ws._read_index_doc_v1"]],
+          ["let", "dv", ["bytes.view", "doc"]],
+          ["if", ["=", ["ext.data_model.doc_is_err", "dv"], 1], ["return", ["result_i32.err", 8101]], 0],
+          ["if", ["!=", ["ext.data_model.root_kind", "dv"], 5], ["return", ["result_i32.err", 8102]], 0],
+          ["let", "root", ["ext.data_model.root_offset", "dv"]],
+          ["let", "k_ws", ["bytes.lit", "ws"]],
+          ["let", "ws_off", ["ext.data_model.map_find", "dv", "root", ["bytes.view", "k_ws"]]],
+          ["if", ["<", "ws_off", 0], ["return", ["result_i32.err", 8103]], 0],
+          ["let", "k_enabled", ["bytes.lit", "enabled"]],
+          ["let", "en_off", ["ext.data_model.map_find", "dv", "ws_off", ["bytes.view", "k_enabled"]]],
+          ["if", ["<", "en_off", 0], ["return", ["result_i32.err", 8104]], 0],
+          ["if", ["=", ["ext.data_model.bool_get", "dv", "en_off"], 0], ["return", ["result_i32.err", 8105]], 0],
+          ["result_i32.ok", 0]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.ws.frame_v1",
+      "params": [
+        { "name": "opcode", "ty": "i32" },
+        { "name": "fin", "ty": "i32" },
+        { "name": "payload", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "begin",
+        ["if", ["if", ["<", "opcode", 0], 1, [">", "opcode", 15]], ["return", ["result_bytes.err", 8201]], 0],
+        ["if", ["if", ["!=", "fin", 0], ["!=", "fin", 1], 0], ["return", ["result_bytes.err", 8202]], 0],
+        ["let", "payload_len", ["view.len", "payload"]],
+        ["if", ["<", "payload_len", 0], ["return", ["result_bytes.err", 8203]], 0],
+        ["let", "flags", ["&", "fin", 1]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 20, "payload_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.lit", "X7WS"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", 1]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "opcode"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "flags"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "payload_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "payload", 0, "payload_len"]],
+        ["result_bytes.ok", ["vec_u8.into_bytes", "out"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.ws._frame_is_valid_v1",
+      "params": [{ "name": "frame", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "frame"]],
+        ["if", ["<", "n", 20], ["return", 0], 0],
+        ["if", ["!=", ["view.get_u8", "frame", 0], 88], ["return", 0], 0],
+        ["if", ["!=", ["view.get_u8", "frame", 1], 55], ["return", 0], 0],
+        ["if", ["!=", ["view.get_u8", "frame", 2], 87], ["return", 0], 0],
+        ["if", ["!=", ["view.get_u8", "frame", 3], 83], ["return", 0], 0],
+        ["if", ["!=", ["codec.read_u32_le", "frame", 4], 1], ["return", 0], 0],
+        ["let", "payload_len", ["codec.read_u32_le", "frame", 16]],
+        ["if", ["<", "payload_len", 0], ["return", 0], 0],
+        ["if", ["!=", ["+", 20, "payload_len"], "n"], ["return", 0], 0],
+        1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.ws.frame_is_valid_v1",
+      "params": [{ "name": "frame", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["std.net.ws._frame_is_valid_v1", "frame"]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.ws.frame_opcode_v1",
+      "params": [{ "name": "frame", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "if",
+        ["=", ["std.net.ws._frame_is_valid_v1", "frame"], 1],
+        ["codec.read_u32_le", "frame", 8],
+        ["-", 0, 1]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.ws.frame_fin_v1",
+      "params": [{ "name": "frame", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["if", ["!=", ["std.net.ws._frame_is_valid_v1", "frame"], 1], ["return", ["-", 0, 1]], 0],
+        ["let", "flags", ["codec.read_u32_le", "frame", 12]],
+        ["&", "flags", 1]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.net.ws.frame_payload_v1",
+      "params": [{ "name": "frame", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["if", ["!=", ["std.net.ws._frame_is_valid_v1", "frame"], 1], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "payload_len", ["codec.read_u32_le", "frame", 16]],
+        ["view.to_bytes", ["view.slice", "frame", 20, "payload_len"]]
+      ]
+    }
+  ]
+}

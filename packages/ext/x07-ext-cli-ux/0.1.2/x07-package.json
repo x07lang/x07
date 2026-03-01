@@ -1,0 +1,31 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-cli-ux",
+  "version": "0.1.2",
+  "description": "CLI UX primitives: deterministic progress, tables, and JSONL output (pinned via arch/cli).",
+  "docs": "CLI UX primitives: deterministic progress, tables, and JSONL output (pinned via arch/cli).\n\nModules:\n- std.cli.profile\n- std.cli.progress\n- std.cli.table\n- std.cli.jsonl\n- std.cli.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-cli-ux@0.1.2\n- Load profile from arch: std.cli.profile.from_arch_v1\n- Render progress: std.cli.progress.render_v1\n- Render tables: std.cli.table.render_v1\n- Emit JSONL: std.cli.jsonl.encode_v1\n",
+  "module_root": "modules",
+  "modules": [
+    "std.cli.profile",
+    "std.cli.progress",
+    "std.cli.table",
+    "std.cli.jsonl",
+    "std.cli.tests"
+  ],
+  "meta": {
+    "determinism_tier": "mixed",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-data-model@0.1.9",
+      "ext-json-rs@0.1.5"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

@@ -152,6 +152,14 @@ The HTTP Tasks template includes:
 - `mcp.tools.json` (`x07.mcp.tools_manifest@0.2.0`, including `execution.taskSupport`)
 - RR transcript fixtures under `tests/fixtures/rr/`
 
+## Production hardening notes
+
+- Template runtime auth secrets/keys are generated at scaffold time and are ignored by git (do not commit `config/auth/*`).
+- `mcp.server.json` is production-shaped by default (`origin_allow_missing=false`, `strict_protocol_header=true`).
+- Streamable HTTP enforces basic request caps via `transports.http.streamable.{max_header_bytes,max_body_bytes,max_concurrent_requests}`.
+- Per-tool isolation can be bounded via `sandbox.router_exec.{max_concurrent_per_tool,warm_pool_size_per_tool}`.
+- Server config loading is strict (unknown keys and type mismatches fail closed).
+
 ## Conformance workflow
 
 Run MCP conformance against a running server:

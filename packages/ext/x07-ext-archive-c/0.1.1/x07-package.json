@@ -28,7 +28,6 @@
       "ext-data-model@0.1.8",
       "ext-json-rs@0.1.4"
     ],
-    "import_mode": "handwritten",
-    "visibility": "canonical"
+    "import_mode": "handwritten"
   }
 }

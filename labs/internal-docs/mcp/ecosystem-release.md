@@ -143,11 +143,33 @@ This note tracks the MCP kit conformance + registry + packaging release policy.
   - `rr/http/trust_tlog_monitor_{ok,unexpected,inconsistent}.http.jsonl` sessions are present
   - conformance wrapper `conformance/trust-tlog/run.sh` is green in CI local-deps mode
 
+## Gaps-2 verification checks
+
+- Templates/scaffold:
+  - no runtime secrets/private JWKs are committed under `templates/**/config/auth/`
+  - scaffold generates unique runtime secrets/keys and `.gitignore` ignores them
+- Auth SSRF:
+  - `.test` is not treated as a safe allowlist
+  - DNS failures fail-closed for SSRF checks
+- Auth cache bounds:
+  - OAuth decision cache is bounded by `auth.oauth_cache.*` and cannot grow unbounded
+- HTTP request limits:
+  - `transports.http.streamable.max_header_bytes` oversized => `431`
+  - `transports.http.streamable.max_body_bytes` oversized => `413`
+  - `transports.http.streamable.max_concurrent_requests` caps global request concurrency
+- Sandbox tool spawn control:
+  - `sandbox.router_exec.max_concurrent_per_tool` is enforced
+  - `sandbox.router_exec.warm_pool_size_per_tool` optionally keeps idle workers
+- Server config validation:
+  - `std.mcp.toolkit.server_cfg_file` rejects unknown keys and type mismatches for both `x07.mcp.server_config@0.3.0` and legacy `@0.2.0`
+- Perf smoke:
+  - run `X07_MCP_PERF_SMOKE=1 ./scripts/ci/check_all.sh` (or the scheduled `perf-smoke` workflow) to catch process leaks/regressions
+
 ## Release checklist
 
 1. Run `x07-mcp` checks (`./scripts/ci/check_all.sh` and reference server suites).
 2. Build deterministic `.mcpb` artifact(s) and verify stable SHA-256 across repeat builds.
 3. Generate `server.json` from `x07.mcp.json` and validate schema + non-schema constraints.
 4. Run `x07 mcp publish --dry-run` for release artifacts.
-5. Run tag-only release metadata guards (`release_metadata_guard.sh`, `release_guard_trust_lock_and_sig.sh`) to enforce non-placeholder trust + hash metadata.
+5. Run tag-only release metadata guards (`release_metadata_guard.sh`, `release_guard_trust_lock_and_sig.sh`, `release_guard_server_json_mcpb_sha.sh`) to enforce non-placeholder trust + hash metadata.
 6. Confirm docs and pin tables are synchronized across `x07-mcp` and `x07`.

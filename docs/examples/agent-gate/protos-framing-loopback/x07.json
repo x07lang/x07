@@ -18,8 +18,8 @@
     },
     {
       "name": "ext-data-model",
-      "path": ".x07/deps/ext-data-model/0.1.8",
-      "version": "0.1.8"
+      "path": ".x07/deps/ext-data-model/0.1.9",
+      "version": "0.1.9"
     },
     {
       "name": "ext-ini-rs",
@@ -28,8 +28,8 @@
     },
     {
       "name": "ext-json-rs",
-      "path": ".x07/deps/ext-json-rs/0.1.4",
-      "version": "0.1.4"
+      "path": ".x07/deps/ext-json-rs/0.1.5",
+      "version": "0.1.5"
     },
     {
       "name": "ext-net",
@@ -38,8 +38,8 @@
     },
     {
       "name": "ext-net-protos-c",
-      "path": ".x07/deps/ext-net-protos-c/0.1.1",
-      "version": "0.1.1"
+      "path": ".x07/deps/ext-net-protos-c/0.1.2",
+      "version": "0.1.2"
     },
     {
       "name": "ext-sockets-c",

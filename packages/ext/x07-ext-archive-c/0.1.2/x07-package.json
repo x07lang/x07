@@ -1,0 +1,34 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-archive-c",
+  "version": "0.1.2",
+  "description": "Archive parsing/extraction helpers + pinned archive policies (tar/tgz v1).",
+  "docs": "Archive parsing/extraction helpers + pinned archive policies (tar/tgz v1).\n\nModules:\n- std.archive\n- std.archive.tar\n- std.archive.tgz\n- std.archive.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-archive-c@0.1.2\n- Use std.archive.*_from_arch_v1 helpers with repo-pinned profiles under arch/archive.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.archive",
+    "std.archive.tar",
+    "std.archive.tgz",
+    "std.archive.tests"
+  ],
+  "meta": {
+    "determinism_tier": "pure",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-kv",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-base64-rs@0.1.4",
+      "ext-compress-rs@0.1.5",
+      "ext-data-model@0.1.9",
+      "ext-json-rs@0.1.5"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

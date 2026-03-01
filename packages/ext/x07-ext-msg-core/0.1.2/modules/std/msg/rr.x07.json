@@ -1,0 +1,221 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.msg.rr",
+  "imports": [
+    "ext.data_model",
+    "std.fmt"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.msg.rr.parse_v1",
+        "std.msg.rr.record_deliver_v1",
+        "std.msg.rr.record_publish_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.rr._u32_at_or_neg_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["if", ["<", "off", 0], ["return", -1], 0],
+        ["if", [">=u", ["+", "off", 4], ["+", "n", 1]], ["return", -1], 0],
+        ["codec.read_u32_le", "b", "off"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.rr._encode_v1",
+      "params": [
+        { "name": "op_tag", "ty": "i32" },
+        { "name": "driver_kind", "ty": "i32" },
+        { "name": "endpoint_hash", "ty": "bytes_view" },
+        { "name": "env", "ty": "bytes_view" },
+        { "name": "ack_tag", "ty": "i32" },
+        { "name": "ack_bytes", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "begin",
+        ["if", ["if", ["=", "op_tag", 1], 1, ["=", "op_tag", 2]], 0, ["return", ["result_bytes.err", 9602]]],
+        ["if", ["if", ["=", "driver_kind", 1], 1, ["=", "driver_kind", 2]], 0, ["return", ["result_bytes.err", 9602]]],
+        ["if", ["if", ["=", "ack_tag", 1], 1, ["=", "ack_tag", 2]], 0, ["return", ["result_bytes.err", 9602]]],
+        ["let", "eh_len", ["view.len", "endpoint_hash"]],
+        ["let", "env_len", ["view.len", "env"]],
+        ["let", "ack_len", ["view.len", "ack_bytes"]],
+        ["if", ["if", ["<", "eh_len", 0], 1, ["if", ["<", "env_len", 0], 1, ["<", "ack_len", 0]]], ["return", ["result_bytes.err", 9601]], 0],
+        ["let", "magic", ["bytes.lit", "X7MR"]],
+        [
+          "let",
+          "payload",
+          ["vec_u8.with_capacity", ["+", 64, ["+", "eh_len", ["+", "env_len", "ack_len"]]]]
+        ],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", ["bytes.view", "magic"]]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", ["codec.write_u32_le", 1]]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", ["codec.write_u32_le", "op_tag"]]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", ["codec.write_u32_le", "driver_kind"]]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", ["codec.write_u32_le", "eh_len"]]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", "endpoint_hash"]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", ["codec.write_u32_le", "env_len"]]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", "env"]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", ["codec.write_u32_le", "ack_tag"]]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", ["codec.write_u32_le", "ack_len"]]],
+        ["set", "payload", ["vec_u8.extend_bytes", "payload", "ack_bytes"]],
+        ["let", "payload_b", ["vec_u8.into_bytes", "payload"]],
+        ["let", "payload_len", ["bytes.len", "payload_b"]],
+        ["if", ["<", "payload_len", 0], ["return", ["result_bytes.err", 9601]], 0],
+        ["let", "out", ["vec_u8.with_capacity", ["+", "payload_len", 4]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "payload_len"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["bytes.view", "payload_b"]]],
+        ["result_bytes.ok", ["vec_u8.into_bytes", "out"]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.rr.record_publish_v1",
+      "params": [
+        { "name": "driver_kind", "ty": "i32" },
+        { "name": "endpoint_hash", "ty": "bytes_view" },
+        { "name": "env", "ty": "bytes_view" },
+        { "name": "ack_tag", "ty": "i32" },
+        { "name": "ack_bytes", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "std.msg.rr._encode_v1",
+        1,
+        "driver_kind",
+        "endpoint_hash",
+        "env",
+        "ack_tag",
+        "ack_bytes"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.rr.record_deliver_v1",
+      "params": [
+        { "name": "driver_kind", "ty": "i32" },
+        { "name": "endpoint_hash", "ty": "bytes_view" },
+        { "name": "env", "ty": "bytes_view" },
+        { "name": "ack_tag", "ty": "i32" },
+        { "name": "ack_bytes", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "std.msg.rr._encode_v1",
+        2,
+        "driver_kind",
+        "endpoint_hash",
+        "env",
+        "ack_tag",
+        "ack_bytes"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.msg.rr.parse_v1",
+      "params": [
+        { "name": "entry", "ty": "bytes_view" }
+      ],
+      "result": "result_bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "entry"]],
+        ["if", ["<", "n", 4], ["return", ["result_bytes.err", 9603]], 0],
+        ["let", "payload_len", ["std.msg.rr._u32_at_or_neg_v1", "entry", 0]],
+        ["if", ["<", "payload_len", 0], ["return", ["result_bytes.err", 9603]], 0],
+        ["if", ["!=", ["+", "payload_len", 4], "n"], ["return", ["result_bytes.err", 9603]], 0],
+        ["let", "p", 4],
+        ["if", ["<", "payload_len", 24], ["return", ["result_bytes.err", 9603]], 0],
+        ["let", "magic", ["bytes.lit", "X7MR"]],
+        ["if", ["=", ["bytes.eq", ["view.to_bytes", ["view.slice", "entry", "p", 4]], "magic"], 0], ["return", ["result_bytes.err", 9604]], 0],
+        ["set", "p", ["+", "p", 4]],
+        ["let", "ver", ["std.msg.rr._u32_at_or_neg_v1", "entry", "p"]],
+        ["if", ["!=", "ver", 1], ["return", ["result_bytes.err", 9604]], 0],
+        ["set", "p", ["+", "p", 4]],
+        ["let", "op_tag", ["std.msg.rr._u32_at_or_neg_v1", "entry", "p"]],
+        ["if", ["<", "op_tag", 0], ["return", ["result_bytes.err", 9603]], 0],
+        ["set", "p", ["+", "p", 4]],
+        ["let", "driver_kind", ["std.msg.rr._u32_at_or_neg_v1", "entry", "p"]],
+        ["if", ["<", "driver_kind", 0], ["return", ["result_bytes.err", 9603]], 0],
+        ["set", "p", ["+", "p", 4]],
+        ["let", "eh_len", ["std.msg.rr._u32_at_or_neg_v1", "entry", "p"]],
+        ["if", ["<", "eh_len", 0], ["return", ["result_bytes.err", 9603]], 0],
+        ["set", "p", ["+", "p", 4]],
+        ["if", [">=u", ["+", "p", "eh_len"], ["+", "n", 1]], ["return", ["result_bytes.err", 9603]], 0],
+        ["let", "endpoint_hash", ["view.slice", "entry", "p", "eh_len"]],
+        ["set", "p", ["+", "p", "eh_len"]],
+        ["let", "env_len", ["std.msg.rr._u32_at_or_neg_v1", "entry", "p"]],
+        ["if", ["<", "env_len", 0], ["return", ["result_bytes.err", 9603]], 0],
+        ["set", "p", ["+", "p", 4]],
+        ["if", [">=u", ["+", "p", "env_len"], ["+", "n", 1]], ["return", ["result_bytes.err", 9603]], 0],
+        ["let", "env", ["view.slice", "entry", "p", "env_len"]],
+        ["set", "p", ["+", "p", "env_len"]],
+        ["let", "ack_tag", ["std.msg.rr._u32_at_or_neg_v1", "entry", "p"]],
+        ["if", ["<", "ack_tag", 0], ["return", ["result_bytes.err", 9603]], 0],
+        ["set", "p", ["+", "p", 4]],
+        ["let", "ack_len", ["std.msg.rr._u32_at_or_neg_v1", "entry", "p"]],
+        ["if", ["<", "ack_len", 0], ["return", ["result_bytes.err", 9603]], 0],
+        ["set", "p", ["+", "p", 4]],
+        ["if", [">=u", ["+", "p", "ack_len"], ["+", "n", 1]], ["return", ["result_bytes.err", 9603]], 0],
+        ["let", "ack", ["view.slice", "entry", "p", "ack_len"]],
+        ["set", "p", ["+", "p", "ack_len"]],
+        ["if", ["!=", "p", "n"], ["return", ["result_bytes.err", 9603]], 0],
+        ["let", "k_ack", ["bytes.lit", "ack"]],
+        ["let", "k_ack_tag", ["bytes.lit", "ack_tag"]],
+        ["let", "k_driver_kind", ["bytes.lit", "driver_kind"]],
+        ["let", "k_endpoint_hash", ["bytes.lit", "endpoint_hash"]],
+        ["let", "k_env", ["bytes.lit", "env"]],
+        ["let", "k_op_tag", ["bytes.lit", "op_tag"]],
+        ["let", "v_ack", ["ext.data_model.value_string", "ack"]],
+        ["let", "v_endpoint_hash", ["ext.data_model.value_string", "endpoint_hash"]],
+        ["let", "v_env", ["ext.data_model.value_string", "env"]],
+        ["let", "op_s", ["std.fmt.s32_to_dec", "op_tag"]],
+        ["let", "driver_s", ["std.fmt.s32_to_dec", "driver_kind"]],
+        ["let", "ack_s", ["std.fmt.s32_to_dec", "ack_tag"]],
+        ["let", "v_op_tag", ["ext.data_model.value_number", ["bytes.view", "op_s"]]],
+        ["let", "v_driver_kind", ["ext.data_model.value_number", ["bytes.view", "driver_s"]]],
+        ["let", "v_ack_tag", ["ext.data_model.value_number", ["bytes.view", "ack_s"]]],
+        ["let", "entries", ["vec_u8.with_capacity", 256]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", 6]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "k_ack"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "k_ack"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v_ack"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "v_ack"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "k_ack_tag"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "k_ack_tag"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v_ack_tag"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "v_ack_tag"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "k_driver_kind"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "k_driver_kind"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v_driver_kind"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "v_driver_kind"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "k_endpoint_hash"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "k_endpoint_hash"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v_endpoint_hash"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "v_endpoint_hash"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "k_env"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "k_env"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v_env"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "v_env"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "k_op_tag"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "k_op_tag"]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", ["bytes.len", "v_op_tag"]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["bytes.view", "v_op_tag"]]],
+        ["let", "entries_b", ["vec_u8.into_bytes", "entries"]],
+        ["let", "map_val", ["ext.data_model.value_map_from_entries", ["bytes.view", "entries_b"]]],
+        ["if", ["=", ["bytes.len", "map_val"], 0], ["return", ["result_bytes.err", 9603]], 0],
+        ["result_bytes.ok", ["ext.data_model.doc_ok", ["bytes.view", "map_val"]]]
+      ]
+    }
+  ]
+}

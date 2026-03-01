@@ -1,0 +1,31 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "std.web.middleware",
+  "imports": [
+    "std.bytes"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "std.web.middleware.chain_v1"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "std.web.middleware.chain_v1",
+      "params": [
+        { "name": "middlewares", "ty": "bytes_view" },
+        { "name": "handler", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        "middlewares",
+        ["std.bytes.copy", "handler"]
+      ]
+    }
+  ]
+}
+

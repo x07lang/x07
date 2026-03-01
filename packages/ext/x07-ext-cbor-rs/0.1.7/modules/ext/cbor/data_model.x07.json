@@ -1,0 +1,1456 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.cbor.data_model",
+  "imports": [
+    "ext.data_model",
+    "ext.error.context",
+    "std.math.bigint",
+    "std.math.bigint.codec_v1",
+    "std.math.bigint.fmt",
+    "std.math.bigint.parse",
+    "std.math.decimal.codec_v1",
+    "std.math.decimal.fmt",
+    "std.math.decimal.parse"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "ext.cbor.data_model.emit_v1",
+        "ext.cbor.data_model.parse_v1",
+        "ext.cbor.data_model.is_err",
+        "ext.cbor.data_model.err_code",
+        "ext.cbor.data_model.get_bytes"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model.is_err",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["begin", ["if", ["<", ["view.len", "doc"], 1], ["return", 1], 0], ["=", ["view.get_u8", "doc", 0], 0]]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model.err_code",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "i32",
+      "body": ["ext.error.context.error_code", "doc"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model.get_bytes",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["<", "n", 2], ["return", ["bytes.alloc", 0]], 0],
+        ["if", ["=", ["view.get_u8", "doc", 0], 1], 0, ["return", ["bytes.alloc", 0]]],
+        ["view.to_bytes", ["view.slice", "doc", 1, ["-", "n", 1]]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._err_from_code",
+      "params": [{ "name": "code", "ty": "i32" }],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["let", "v", ["vec_u8.with_capacity", 9]],
+        ["set", "v", ["vec_u8.push", "v", 0]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", "code"]]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", 0]]],
+        "v"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._err_from_msg",
+      "params": [{ "name": "msg", "ty": "bytes_view" }],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["let", "msg_len", ["view.len", "msg"]],
+        ["let", "v", ["vec_u8.with_capacity", ["+", 9, "msg_len"]]],
+        ["set", "v", ["vec_u8.push", "v", 0]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", 0]]],
+        ["set", "v", ["vec_u8.extend_bytes", "v", ["codec.write_u32_le", "msg_len"]]],
+        ["set", "v", ["vec_u8.extend_bytes_range", "v", "msg", 0, "msg_len"]],
+        "v"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._doc_ok",
+      "params": [{ "name": "payload", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "payload"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 1, "n"]]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "payload", 0, "n"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model.emit_v1",
+      "params": [{ "name": "doc", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "doc"]],
+        ["if", ["<", "n", 1], ["return", ["ext.error.context.err_from_code", 1]], 0],
+        ["if", ["=", ["view.get_u8", "doc", 0], 0], ["return", ["view.to_bytes", "doc"]], 0],
+        ["let", "out", ["vec_u8.push", ["vec_u8.with_capacity", ["+", 64, "n"]], 1]],
+        ["set", "out", ["ext.cbor.data_model._emit_value_into", "out", "doc", 1]],
+        ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", ["vec_u8.into_bytes", "out"]], 0],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model.parse_v1",
+      "params": [{ "name": "cbor", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "cbor"]],
+        ["let", "res", ["ext.cbor.data_model._parse_value", "cbor", 0]],
+        ["if", ["<", ["bytes.len", "res"], 1], ["return", ["ext.error.context.err_from_code", 1]], 0],
+        ["if", ["=", ["bytes.get_u8", "res", 0], 0], ["return", "res"], 0],
+        ["let", "rv", ["bytes.view", "res"]],
+        ["if", ["<", ["view.len", "rv"], 6], ["return", ["ext.error.context.err_from_code", 1]], 0],
+        ["let", "new_off", ["codec.read_u32_le", "rv", 1]],
+        ["if", ["=", "new_off", "n"], 0, ["return", ["ext.error.context.err_from_code", 2]]],
+        ["let", "val", ["view.slice", "rv", 5, ["-", ["view.len", "rv"], 5]]],
+        ["ext.cbor.data_model._doc_ok", "val"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._emit_head_into",
+      "params": [
+        { "name": "out", "ty": "vec_u8" },
+        { "name": "major", "ty": "i32" },
+        { "name": "arg", "ty": "i32" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", "out"], 0],
+        ["if", ["<", "arg", 0], ["return", ["ext.cbor.data_model._err_from_code", 3]], 0],
+        ["if", ["<", "arg", 24], ["return", ["vec_u8.push", "out", ["|", ["<<u", "major", 5], "arg"]]], 0],
+        ["if", ["<", "arg", 256], ["begin", ["set", "out", ["vec_u8.push", "out", ["|", ["<<u", "major", 5], 24]]], ["set", "out", ["vec_u8.push", "out", "arg"]], ["return", "out"]], 0],
+        ["if", ["<", "arg", 65536], ["begin", ["set", "out", ["vec_u8.push", "out", ["|", ["<<u", "major", 5], 25]]], ["set", "out", ["vec_u8.push", "out", ["&", [">>u", "arg", 8], 255]]], ["set", "out", ["vec_u8.push", "out", ["&", "arg", 255]]], ["return", "out"]], 0],
+        ["if", ["<", "arg", 0], ["return", ["ext.cbor.data_model._err_from_code", 3]], 0],
+        ["set", "out", ["vec_u8.push", "out", ["|", ["<<u", "major", 5], 26]]],
+        ["set", "out", ["vec_u8.push", "out", ["&", [">>u", "arg", 24], 255]]],
+        ["set", "out", ["vec_u8.push", "out", ["&", [">>u", "arg", 16], 255]]],
+        ["set", "out", ["vec_u8.push", "out", ["&", [">>u", "arg", 8], 255]]],
+        ["set", "out", ["vec_u8.push", "out", ["&", "arg", 255]]],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._emit_bytes_into",
+      "params": [
+        { "name": "out", "ty": "vec_u8" },
+        { "name": "b", "ty": "bytes_view" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["set", "out", ["ext.cbor.data_model._emit_head_into", "out", 2, "n"]],
+        ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", "out"], 0],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "b", 0, "n"]],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._emit_text_into",
+      "params": [
+        { "name": "out", "ty": "vec_u8" },
+        { "name": "s", "ty": "bytes_view" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "s"]],
+        ["set", "out", ["ext.cbor.data_model._emit_head_into", "out", 3, "n"]],
+        ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", "out"], 0],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "s", 0, "n"]],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._emit_uint_mag_into",
+      "params": [
+        { "name": "out", "ty": "vec_u8" },
+        { "name": "mag", "ty": "bytes_view" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", "out"], 0],
+        ["let", "n", ["view.len", "mag"]],
+        ["if", ["=", "n", 0], ["return", ["vec_u8.push", "out", 0]], 0],
+        ["if", ["<", "n", 9], 0, ["begin", ["set", "out", ["ext.cbor.data_model._emit_head_into", "out", 6, 2]], ["set", "out", ["ext.cbor.data_model._emit_bytes_into", "out", "mag"]], ["return", "out"]]],
+        [
+          "if",
+          ["=", "n", 1],
+          [
+            "begin",
+            ["let", "v", ["view.get_u8", "mag", 0]],
+            ["if", ["<", "v", 24], ["return", ["vec_u8.push", "out", "v"]], 0],
+            ["set", "out", ["vec_u8.push", "out", 24]],
+            ["set", "out", ["vec_u8.push", "out", "v"]],
+            ["return", "out"]
+          ],
+          0
+        ],
+        ["if", ["=", "n", 2], ["begin", ["set", "out", ["vec_u8.push", "out", 25]], ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, 2]], ["return", "out"]], 0],
+        ["if", ["<", "n", 5], ["begin", ["set", "out", ["vec_u8.push", "out", 26]], ["for", "i", 0, ["-", 4, "n"], ["set", "out", ["vec_u8.push", "out", 0]]], ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, "n"]], ["return", "out"]], 0],
+        ["set", "out", ["vec_u8.push", "out", 27]],
+        ["for", "i", 0, ["-", 8, "n"], ["set", "out", ["vec_u8.push", "out", 0]]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, "n"]],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._mag_sub_one_bytes",
+      "params": [{ "name": "mag", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "mag"]],
+        ["if", ["=", "n", 0], ["return", ["bytes.alloc", 0]], 0],
+        ["let", "v", ["vec_u8.with_capacity", "n"]],
+        ["set", "v", ["vec_u8.extend_bytes_range", "v", "mag", 0, "n"]],
+        ["let", "i", ["-", "n", 1]],
+        ["let", "borrow", 1],
+        [
+          "for",
+          "_",
+          0,
+          "n",
+          [
+            "if",
+            ["=", "borrow", 1],
+            [
+              "begin",
+              ["let", "b", ["vec_u8.get", "v", "i"]],
+              [
+                "if",
+                [">", "b", 0],
+                ["begin", ["set", "v", ["vec_u8.set", "v", "i", ["-", "b", 1]]], ["set", "borrow", 0]],
+                ["set", "v", ["vec_u8.set", "v", "i", 255]]
+              ],
+              ["set", "i", ["-", "i", 1]]
+            ],
+            0
+          ]
+        ],
+        ["if", ["=", "borrow", 1], ["return", ["bytes.alloc", 0]], 0],
+        ["set", "v", ["std.math.bigint._trim_mag_vec", "v"]],
+        ["vec_u8.into_bytes", "v"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._emit_nint_mag_into",
+      "params": [
+        { "name": "out", "ty": "vec_u8" },
+        { "name": "mag_minus_one", "ty": "bytes_view" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", "out"], 0],
+        ["let", "n", ["view.len", "mag_minus_one"]],
+        [
+          "if",
+          ["<", "n", 9],
+          ["ext.cbor.data_model._emit_int_mag_major_into", "out", 1, "mag_minus_one"],
+          [
+            "begin",
+            ["set", "out", ["ext.cbor.data_model._emit_head_into", "out", 6, 3]],
+            ["set", "out", ["ext.cbor.data_model._emit_bytes_into", "out", "mag_minus_one"]],
+            "out"
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._emit_int_mag_major_into",
+      "params": [
+        { "name": "out", "ty": "vec_u8" },
+        { "name": "major", "ty": "i32" },
+        { "name": "mag", "ty": "bytes_view" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", "out"], 0],
+        ["let", "n", ["view.len", "mag"]],
+        ["if", ["=", "n", 0], ["return", ["vec_u8.push", "out", ["<<u", "major", 5]]], 0],
+        ["if", ["=", "n", 1], ["begin", ["let", "v", ["view.get_u8", "mag", 0]], ["if", ["<", "v", 24], ["return", ["vec_u8.push", "out", ["|", ["<<u", "major", 5], "v"]]], 0], ["set", "out", ["vec_u8.push", "out", ["|", ["<<u", "major", 5], 24]]], ["set", "out", ["vec_u8.push", "out", "v"]], ["return", "out"]], 0],
+        ["if", ["=", "n", 2], ["begin", ["set", "out", ["vec_u8.push", "out", ["|", ["<<u", "major", 5], 25]]], ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, 2]], ["return", "out"]], 0],
+        ["if", ["<", "n", 5], ["begin", ["set", "out", ["vec_u8.push", "out", ["|", ["<<u", "major", 5], 26]]], ["for", "i", 0, ["-", 4, "n"], ["set", "out", ["vec_u8.push", "out", 0]]], ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, "n"]], ["return", "out"]], 0],
+        ["set", "out", ["vec_u8.push", "out", ["|", ["<<u", "major", 5], 27]]],
+        ["for", "i", 0, ["-", 8, "n"], ["set", "out", ["vec_u8.push", "out", 0]]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, "n"]],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._emit_bigint_into",
+      "params": [
+        { "name": "out", "ty": "vec_u8" },
+        { "name": "bi", "ty": "bytes_view" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", "out"], 0],
+        ["let", "s", ["std.math.bigint.codec_v1.sign_v1", "bi"]],
+        ["if", ["<", "s", 0], ["return", ["ext.cbor.data_model._err_from_code", 4]], 0],
+        ["if", ["=", "s", 0], ["return", ["vec_u8.push", "out", 0]], 0],
+        ["let", "mag", ["std.math.bigint.codec_v1.mag_view_v1", "bi"]],
+        ["if", ["=", "s", 1], ["return", ["ext.cbor.data_model._emit_uint_mag_into", "out", "mag"]], 0],
+        ["if", ["=", "s", 2], 0, ["return", ["ext.cbor.data_model._err_from_code", 4]]],
+        ["let", "mn", ["view.len", "mag"]],
+        ["if", ["=", "mn", 0], ["return", ["ext.cbor.data_model._err_from_code", 4]], 0],
+        ["let", "minus_one", ["ext.cbor.data_model._mag_sub_one_bytes", "mag"]],
+        ["set", "out", ["ext.cbor.data_model._emit_nint_mag_into", "out", ["bytes.view", "minus_one"]]],
+        "out"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._emit_value_into",
+      "params": [
+        { "name": "out", "ty": "vec_u8" },
+        { "name": "doc", "ty": "bytes_view" },
+        { "name": "off", "ty": "i32" }
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", "out"], 0],
+        ["let", "k", ["ext.data_model.kind_at", "doc", "off"]],
+        ["if", ["<", "k", 0], ["return", ["ext.cbor.data_model._err_from_code", 10]], 0],
+        ["if", ["=", "k", 0], ["return", ["vec_u8.push", "out", 246]], 0],
+        [
+          "if",
+          ["=", "k", 1],
+          [
+            "begin",
+            ["let", "bv", ["ext.data_model.bool_get", "doc", "off"]],
+            ["if", ["<", "bv", 0], ["return", ["ext.cbor.data_model._err_from_code", 11]], 0],
+            ["return", ["vec_u8.push", "out", ["if", ["=", "bv", 0], 244, 245]]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "k", 3],
+          [
+            "begin",
+            ["let", "s", ["ext.data_model.string_get", "doc", "off"]],
+            ["if", ["=", ["bytes.len", "s"], 0], ["return", ["ext.cbor.data_model._err_from_code", 12]], 0],
+            ["return", ["ext.cbor.data_model._emit_text_into", "out", ["bytes.view", "s"]]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "k", 2],
+          [
+            "begin",
+            ["let", "num", ["ext.data_model.number_get", "doc", "off"]],
+            ["if", ["=", ["bytes.len", "num"], 0], ["return", ["ext.cbor.data_model._err_from_code", 13]], 0],
+            ["let", "numv", ["bytes.view", "num"]],
+            ["let", "has_dot", 0],
+            ["let", "has_exp", 0],
+            ["let", "nn", ["view.len", "numv"]],
+            [
+              "for",
+              "i",
+              0,
+              "nn",
+              [
+                "begin",
+                ["let", "c", ["view.get_u8", "numv", "i"]],
+                ["if", ["=", "c", 46], ["set", "has_dot", 1], 0],
+                ["if", ["if", ["=", "c", 101], 1, ["=", "c", 69]], ["set", "has_exp", 1], 0]
+              ]
+            ],
+            ["if", ["=", "has_exp", 1], ["return", ["ext.cbor.data_model._err_from_code", 14]], 0],
+            [
+              "if",
+              ["=", "has_dot", 0],
+              [
+                "begin",
+                ["let", "bi_doc", ["std.math.bigint.parse.parse_dec_v1", "numv"]],
+                ["let", "bi_docv", ["bytes.view", "bi_doc"]],
+                ["if", ["std.math.bigint.parse.is_err", "bi_docv"], ["return", ["ext.cbor.data_model._err_from_code", 15]], 0],
+                ["let", "bi", ["std.math.bigint.parse.get_bytes", "bi_docv"]],
+                ["return", ["ext.cbor.data_model._emit_bigint_into", "out", ["bytes.view", "bi"]]]
+              ],
+              [
+                "begin",
+                ["let", "dec_doc", ["std.math.decimal.parse.parse_dec_v1", "numv"]],
+                ["let", "dec_docv", ["bytes.view", "dec_doc"]],
+                ["if", ["std.math.decimal.parse.is_err", "dec_docv"], ["return", ["ext.cbor.data_model._err_from_code", 16]], 0],
+                ["let", "dec", ["std.math.decimal.parse.get_bytes", "dec_docv"]],
+                ["let", "scale", ["std.math.decimal.codec_v1.scale_v1", ["bytes.view", "dec"]]],
+                [
+                  "if",
+                  ["<=", "scale", 0],
+                  [
+                    "begin",
+                    ["let", "bi", ["ext.cbor.data_model._decimal_to_bigint", ["bytes.view", "dec"]]],
+                    ["return", ["ext.cbor.data_model._emit_bigint_into", "out", ["bytes.view", "bi"]]]
+                  ],
+                  0
+                ],
+                ["set", "out", ["ext.cbor.data_model._emit_head_into", "out", 6, 4]],
+                ["set", "out", ["ext.cbor.data_model._emit_head_into", "out", 4, 2]],
+                ["set", "out", ["ext.cbor.data_model._emit_head_into", "out", 1, ["-", "scale", 1]]],
+                ["let", "mant", ["ext.cbor.data_model._decimal_to_bigint", ["bytes.view", "dec"]]],
+                ["return", ["ext.cbor.data_model._emit_bigint_into", "out", ["bytes.view", "mant"]]]
+              ]
+            ]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "k", 4],
+          [
+            "begin",
+            ["let", "count", ["ext.data_model.seq_len", "doc", "off"]],
+            ["if", ["<", "count", 0], ["return", ["ext.cbor.data_model._err_from_code", 20]], 0],
+            ["set", "out", ["ext.cbor.data_model._emit_head_into", "out", 4, "count"]],
+            ["for", "i", 0, "count", ["begin", ["let", "eo", ["ext.data_model.seq_get", "doc", "off", "i"]], ["if", ["<", "eo", 0], ["return", ["ext.cbor.data_model._err_from_code", 21]], 0], ["set", "out", ["ext.cbor.data_model._emit_value_into", "out", "doc", "eo"]]]],
+            ["return", "out"]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "k", 5],
+          [
+            "begin",
+            ["let", "count", ["ext.data_model.map_len", "doc", "off"]],
+            ["if", ["<", "count", 0], ["return", ["ext.cbor.data_model._err_from_code", 30]], 0],
+            ["set", "out", ["ext.cbor.data_model._emit_head_into", "out", 5, "count"]],
+            ["let", "used", ["bytes.alloc", "count"]],
+            [
+              "for",
+              "_",
+              0,
+              "count",
+              [
+                "begin",
+                ["let", "best", -1],
+                [
+                  "for",
+                  "j",
+                  0,
+                  "count",
+                  [
+                    "begin",
+                    [
+                      "if",
+                      ["=", ["bytes.get_u8", "used", "j"], 1],
+                      0,
+                      [
+                        "begin",
+                        [
+                          "if",
+                          ["=", "best", -1],
+                          ["set", "best", "j"],
+                          [
+                            "begin",
+                            ["let", "kj", ["ext.data_model.map_key_at", "doc", "off", "j"]],
+                            ["let", "kb", ["ext.data_model.map_key_at", "doc", "off", "best"]],
+                            ["let", "kjn", ["bytes.len", "kj"]],
+                            ["let", "kbn", ["bytes.len", "kb"]],
+                            [
+                              "if",
+                              ["<", "kjn", "kbn"],
+                              ["set", "best", "j"],
+                              [
+                                "if",
+                                ["=", "kjn", "kbn"],
+                                [
+                                  "if",
+                                  [
+                                    "<",
+                                    [
+                                      "bytes.cmp_range",
+                                      ["bytes.view", "kj"],
+                                      0,
+                                      "kjn",
+                                      ["bytes.view", "kb"],
+                                      0,
+                                      "kbn"
+                                    ],
+                                    0
+                                  ],
+                                  ["set", "best", "j"],
+                                  0
+                                ],
+                                0
+                              ]
+                            ]
+                          ]
+                        ],
+                        0
+                      ]
+                    ],
+                    0
+                  ]
+                ],
+                ["if", ["<", "best", 0], ["return", ["ext.cbor.data_model._err_from_code", 31]], 0],
+                ["set", "used", ["bytes.set_u8", "used", "best", 1]],
+                ["let", "key", ["ext.data_model.map_key_at", "doc", "off", "best"]],
+                ["if", ["=", ["bytes.len", "key"], 0], ["return", ["ext.cbor.data_model._err_from_code", 32]], 0],
+                ["set", "out", ["ext.cbor.data_model._emit_text_into", "out", ["bytes.view", "key"]]],
+                ["if", ["=", ["vec_u8.get", "out", 0], 0], ["return", "out"], 0],
+                ["let", "vo", ["ext.data_model.map_value_at", "doc", "off", "best"]],
+                ["if", ["<", "vo", 0], ["return", ["ext.cbor.data_model._err_from_code", 33]], 0],
+                ["set", "out", ["ext.cbor.data_model._emit_value_into", "out", "doc", "vo"]]
+              ]
+            ],
+            ["return", "out"]
+          ],
+          0
+        ],
+        ["ext.cbor.data_model._err_from_code", 40]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._decimal_to_bigint",
+      "params": [{ "name": "dec", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "s", ["view.get_u8", "dec", 0]],
+        ["if", ["=", "s", 0], ["return", ["bytes.alloc", 1]], 0],
+        ["let", "mag", ["std.math.decimal.codec_v1.mag_view_v1", "dec"]],
+        ["let", "mn", ["view.len", "mag"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 1, "mn"]]],
+        ["set", "out", ["vec_u8.push", "out", "s"]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "mag", 0, "mn"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._ok_with_off",
+      "params": [
+        { "name": "new_off", "ty": "i32" },
+        { "name": "payload", "ty": "bytes_view" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "payload"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 5, "n"]]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "new_off"]]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "payload", 0, "n"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._ok_off_u32",
+      "params": [
+        { "name": "new_off", "ty": "i32" },
+        { "name": "x", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "out", ["vec_u8.with_capacity", 9]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "new_off"]]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", "x"]]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._read_u16_be",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "b0", ["view.get_u8", "b", "off"]],
+        ["let", "b1", ["view.get_u8", "b", ["+", "off", 1]]],
+        ["|", ["<<u", "b0", 8], "b1"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._read_u32_be",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off", "ty": "i32" }
+      ],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "b0", ["view.get_u8", "b", "off"]],
+        ["let", "b1", ["view.get_u8", "b", ["+", "off", 1]]],
+        ["let", "b2", ["view.get_u8", "b", ["+", "off", 2]]],
+        ["let", "b3", ["view.get_u8", "b", ["+", "off", 3]]],
+        ["|", ["|", ["|", ["<<u", "b0", 24], ["<<u", "b1", 16]], ["<<u", "b2", 8]], "b3"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._trim_mag_bytes",
+      "params": [{ "name": "mag", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "mag"]],
+        ["let", "v", ["vec_u8.with_capacity", "n"]],
+        ["set", "v", ["vec_u8.extend_bytes_range", "v", "mag", 0, "n"]],
+        ["set", "v", ["std.math.bigint._trim_mag_vec", "v"]],
+        ["vec_u8.into_bytes", "v"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._mag_add_one_bytes",
+      "params": [{ "name": "mag", "ty": "bytes_view" }],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "mag"]],
+        [
+          "if",
+          ["=", "n", 0],
+          [
+            "begin",
+            ["let", "out", ["vec_u8.with_capacity", 1]],
+            ["set", "out", ["vec_u8.push", "out", 1]],
+            ["return", ["vec_u8.into_bytes", "out"]]
+          ],
+          0
+        ],
+        ["let", "v", ["vec_u8.with_capacity", "n"]],
+        ["set", "v", ["vec_u8.extend_bytes_range", "v", "mag", 0, "n"]],
+        ["let", "i", ["-", "n", 1]],
+        ["let", "carry", 1],
+        [
+          "for",
+          "_",
+          0,
+          "n",
+          [
+            "begin",
+            [
+              "if",
+              ["=", "carry", 1],
+              [
+                "begin",
+                ["let", "b", ["vec_u8.get", "v", "i"]],
+                [
+                  "if",
+                  ["<", "b", 255],
+                  ["begin", ["set", "v", ["vec_u8.set", "v", "i", ["+", "b", 1]]], ["set", "carry", 0]],
+                  ["begin", ["set", "v", ["vec_u8.set", "v", "i", 0]], ["set", "i", ["-", "i", 1]]]
+                ]
+              ],
+              0
+            ],
+            0
+          ]
+        ],
+        [
+          "if",
+          ["=", "carry", 1],
+          [
+            "begin",
+            ["let", "old", ["vec_u8.into_bytes", "v"]],
+            ["let", "oldv", ["bytes.view", "old"]],
+            ["let", "out", ["vec_u8.with_capacity", ["+", "n", 1]]],
+            ["set", "out", ["vec_u8.push", "out", 1]],
+            ["set", "out", ["vec_u8.extend_bytes_range", "out", "oldv", 0, "n"]],
+            ["return", ["vec_u8.into_bytes", "out"]]
+          ],
+          0
+        ],
+        ["vec_u8.into_bytes", "v"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_ai_u32",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" },
+        { "name": "ai", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["if", ["<", "ai", 24], ["return", ["ext.cbor.data_model._ok_off_u32", ["+", "off0", 1], "ai"]], 0],
+        [
+          "if",
+          ["=", "ai", 24],
+          [
+            "begin",
+            ["if", [">=u", ["+", "off0", 1], "n"], ["return", ["ext.error.context.err_from_code", 100]], 0],
+            ["let", "v", ["view.get_u8", "b", ["+", "off0", 1]]],
+            ["return", ["ext.cbor.data_model._ok_off_u32", ["+", "off0", 2], "v"]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "ai", 25],
+          [
+            "begin",
+            ["if", [">=u", ["+", "off0", 2], "n"], ["return", ["ext.error.context.err_from_code", 100]], 0],
+            ["let", "v", ["ext.cbor.data_model._read_u16_be", "b", ["+", "off0", 1]]],
+            ["return", ["ext.cbor.data_model._ok_off_u32", ["+", "off0", 3], "v"]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "ai", 26],
+          [
+            "begin",
+            ["if", [">=u", ["+", "off0", 4], "n"], ["return", ["ext.error.context.err_from_code", 100]], 0],
+            ["let", "v", ["ext.cbor.data_model._read_u32_be", "b", ["+", "off0", 1]]],
+            ["if", ["<", "v", 0], ["return", ["ext.error.context.err_from_code", 101]], 0],
+            ["return", ["ext.cbor.data_model._ok_off_u32", ["+", "off0", 5], "v"]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "ai", 27],
+          [
+            "begin",
+            ["if", [">=u", ["+", "off0", 8], "n"], ["return", ["ext.error.context.err_from_code", 100]], 0],
+            ["let", "hi", ["ext.cbor.data_model._read_u32_be", "b", ["+", "off0", 1]]],
+            ["let", "lo", ["ext.cbor.data_model._read_u32_be", "b", ["+", "off0", 5]]],
+            ["if", ["!=", "hi", 0], ["return", ["ext.error.context.err_from_code", 101]], 0],
+            ["if", ["<", "lo", 0], ["return", ["ext.error.context.err_from_code", 101]], 0],
+            ["return", ["ext.cbor.data_model._ok_off_u32", ["+", "off0", 9], "lo"]]
+          ],
+          0
+        ],
+        ["ext.error.context.err_from_code", 102]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_uint_mag_bytes_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" },
+        { "name": "ai", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        [
+          "if",
+          ["<", "ai", 24],
+          [
+            "begin",
+            ["let", "out", ["vec_u8.with_capacity", ["+", 5, ["if", ["=", "ai", 0], 0, 1]]]],
+            ["set", "out", ["vec_u8.push", "out", 1]],
+            ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", ["+", "off0", 1]]]],
+            ["if", ["=", "ai", 0], 0, ["set", "out", ["vec_u8.push", "out", "ai"]]],
+            ["return", ["vec_u8.into_bytes", "out"]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "ai", 24],
+          [
+            "begin",
+            ["if", [">=u", ["+", "off0", 1], "n"], ["return", ["ext.error.context.err_from_code", 110]], 0],
+            ["let", "v", ["view.get_u8", "b", ["+", "off0", 1]]],
+            ["let", "out", ["vec_u8.with_capacity", ["+", 5, ["if", ["=", "v", 0], 0, 1]]]],
+            ["set", "out", ["vec_u8.push", "out", 1]],
+            ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", ["+", "off0", 2]]]],
+            ["if", ["=", "v", 0], 0, ["set", "out", ["vec_u8.push", "out", "v"]]],
+            ["return", ["vec_u8.into_bytes", "out"]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "ai", 25],
+          [
+            "begin",
+            ["if", [">=u", ["+", "off0", 2], "n"], ["return", ["ext.error.context.err_from_code", 110]], 0],
+            ["let", "raw", ["view.slice", "b", ["+", "off0", 1], 2]],
+            ["let", "mag", ["ext.cbor.data_model._trim_mag_bytes", "raw"]],
+            ["let", "magv", ["bytes.view", "mag"]],
+            ["let", "mlen", ["view.len", "magv"]],
+            ["let", "out", ["vec_u8.with_capacity", ["+", 5, "mlen"]]],
+            ["set", "out", ["vec_u8.push", "out", 1]],
+            ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", ["+", "off0", 3]]]],
+            ["set", "out", ["vec_u8.extend_bytes_range", "out", "magv", 0, "mlen"]],
+            ["return", ["vec_u8.into_bytes", "out"]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "ai", 26],
+          [
+            "begin",
+            ["if", [">=u", ["+", "off0", 4], "n"], ["return", ["ext.error.context.err_from_code", 110]], 0],
+            ["let", "raw", ["view.slice", "b", ["+", "off0", 1], 4]],
+            ["let", "mag", ["ext.cbor.data_model._trim_mag_bytes", "raw"]],
+            ["let", "magv", ["bytes.view", "mag"]],
+            ["let", "mlen", ["view.len", "magv"]],
+            ["let", "out", ["vec_u8.with_capacity", ["+", 5, "mlen"]]],
+            ["set", "out", ["vec_u8.push", "out", 1]],
+            ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", ["+", "off0", 5]]]],
+            ["set", "out", ["vec_u8.extend_bytes_range", "out", "magv", 0, "mlen"]],
+            ["return", ["vec_u8.into_bytes", "out"]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "ai", 27],
+          [
+            "begin",
+            ["if", [">=u", ["+", "off0", 8], "n"], ["return", ["ext.error.context.err_from_code", 110]], 0],
+            ["let", "raw", ["view.slice", "b", ["+", "off0", 1], 8]],
+            ["let", "mag", ["ext.cbor.data_model._trim_mag_bytes", "raw"]],
+            ["let", "magv", ["bytes.view", "mag"]],
+            ["let", "mlen", ["view.len", "magv"]],
+            ["let", "out", ["vec_u8.with_capacity", ["+", 5, "mlen"]]],
+            ["set", "out", ["vec_u8.push", "out", 1]],
+            ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", ["+", "off0", 9]]]],
+            ["set", "out", ["vec_u8.extend_bytes_range", "out", "magv", 0, "mlen"]],
+            ["return", ["vec_u8.into_bytes", "out"]]
+          ],
+          0
+        ],
+        ["ext.error.context.err_from_code", 111]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_bytes_raw_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["if", [">=u", "off0", "n"], ["return", ["ext.error.context.err_from_code", 120]], 0],
+        ["let", "ib", ["view.get_u8", "b", "off0"]],
+        ["let", "major", [">>u", "ib", 5]],
+        ["let", "ai", ["&", "ib", 31]],
+        ["if", ["=", "major", 2], 0, ["return", ["ext.error.context.err_from_code", 121]]],
+        ["let", "len_doc", ["ext.cbor.data_model._parse_ai_u32", "b", "off0", "ai"]],
+        ["if", ["<", ["bytes.len", "len_doc"], 1], ["return", ["ext.error.context.err_from_code", 122]], 0],
+        ["if", ["=", ["bytes.get_u8", "len_doc", 0], 0], ["return", "len_doc"], 0],
+        ["let", "lv", ["bytes.view", "len_doc"]],
+        ["let", "start", ["codec.read_u32_le", "lv", 1]],
+        ["let", "len", ["codec.read_u32_le", "lv", 5]],
+        ["if", ["<", "len", 0], ["return", ["ext.error.context.err_from_code", 123]], 0],
+        ["if", [">=u", ["+", "start", "len"], ["+", "n", 1]], ["return", ["ext.error.context.err_from_code", 124]], 0],
+        ["let", "data", ["view.slice", "b", "start", "len"]],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 5, "len"]]],
+        ["set", "out", ["vec_u8.push", "out", 1]],
+        ["set", "out", ["vec_u8.extend_bytes", "out", ["codec.write_u32_le", ["+", "start", "len"]]]],
+        ["set", "out", ["vec_u8.extend_bytes_range", "out", "data", 0, "len"]],
+        ["vec_u8.into_bytes", "out"]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_int_i32_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["if", [">=u", "off0", "n"], ["return", ["ext.error.context.err_from_code", 130]], 0],
+        ["let", "ib", ["view.get_u8", "b", "off0"]],
+        ["let", "major", [">>u", "ib", 5]],
+        ["let", "ai", ["&", "ib", 31]],
+        ["if", ["if", ["=", "major", 0], 1, ["=", "major", 1]], 0, ["return", ["ext.error.context.err_from_code", 131]]],
+        ["let", "mag_doc", ["ext.cbor.data_model._parse_uint_mag_bytes_v1", "b", "off0", "ai"]],
+        ["if", ["<", ["bytes.len", "mag_doc"], 1], ["return", ["ext.error.context.err_from_code", 132]], 0],
+        ["if", ["=", ["bytes.get_u8", "mag_doc", 0], 0], ["return", "mag_doc"], 0],
+        ["let", "mv", ["bytes.view", "mag_doc"]],
+        ["let", "new_off", ["codec.read_u32_le", "mv", 1]],
+        ["let", "mag", ["view.slice", "mv", 5, ["-", ["view.len", "mv"], 5]]],
+        ["let", "mlen", ["view.len", "mag"]],
+        ["if", [">", "mlen", 4], ["return", ["ext.error.context.err_from_code", 133]], 0],
+        ["if", ["if", ["=", "mlen", 4], [">=u", ["view.get_u8", "mag", 0], 128], 0], ["return", ["ext.error.context.err_from_code", 133]], 0],
+        ["let", "v", 0],
+        ["for", "i", 0, "mlen", ["set", "v", ["|", ["<<u", "v", 8], ["view.get_u8", "mag", "i"]]]],
+        [
+          "if",
+          ["=", "major", 0],
+          ["ext.cbor.data_model._ok_off_u32", "new_off", "v"],
+          [
+            "begin",
+            ["if", [">=", "v", 2147483647], ["return", ["ext.error.context.err_from_code", 134]], 0],
+            ["ext.cbor.data_model._ok_off_u32", "new_off", ["-", 0, ["+", "v", 1]]]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_int_bigint_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["if", [">=u", "off0", "n"], ["return", ["ext.error.context.err_from_code", 140]], 0],
+        ["let", "ib", ["view.get_u8", "b", "off0"]],
+        ["let", "major", [">>u", "ib", 5]],
+        ["let", "ai", ["&", "ib", 31]],
+        [
+          "if",
+          ["if", ["=", "major", 0], 1, ["=", "major", 1]],
+          [
+            "begin",
+            ["let", "mag_doc", ["ext.cbor.data_model._parse_uint_mag_bytes_v1", "b", "off0", "ai"]],
+            ["if", ["<", ["bytes.len", "mag_doc"], 1], ["return", ["ext.error.context.err_from_code", 141]], 0],
+            ["if", ["=", ["bytes.get_u8", "mag_doc", 0], 0], ["return", "mag_doc"], 0],
+            ["let", "mv", ["bytes.view", "mag_doc"]],
+            ["let", "new_off", ["codec.read_u32_le", "mv", 1]],
+            ["let", "mag", ["view.slice", "mv", 5, ["-", ["view.len", "mv"], 5]]],
+            [
+              "return",
+              [
+                "if",
+                ["=", "major", 0],
+                [
+                  "begin",
+                  ["let", "mlen", ["view.len", "mag"]],
+                  [
+                    "if",
+                    ["=", "mlen", 0],
+                    [
+                      "begin",
+                      ["let", "z", ["bytes.alloc", 1]],
+                      ["return", ["ext.cbor.data_model._ok_with_off", "new_off", ["bytes.view", "z"]]]
+                    ],
+                    0
+                  ],
+                  ["let", "bi", ["vec_u8.with_capacity", ["+", 1, "mlen"]]],
+                  ["set", "bi", ["vec_u8.push", "bi", 1]],
+                  ["set", "bi", ["vec_u8.extend_bytes_range", "bi", "mag", 0, "mlen"]],
+                  ["let", "bib", ["vec_u8.into_bytes", "bi"]],
+                  ["ext.cbor.data_model._ok_with_off", "new_off", ["bytes.view", "bib"]]
+                ],
+                [
+                  "begin",
+                  ["let", "abs", ["ext.cbor.data_model._mag_add_one_bytes", "mag"]],
+                  ["let", "absv", ["bytes.view", "abs"]],
+                  ["let", "alen", ["view.len", "absv"]],
+                  ["let", "bi", ["vec_u8.with_capacity", ["+", 1, "alen"]]],
+                  ["set", "bi", ["vec_u8.push", "bi", 2]],
+                  ["set", "bi", ["vec_u8.extend_bytes_range", "bi", "absv", 0, "alen"]],
+                  ["let", "bib", ["vec_u8.into_bytes", "bi"]],
+                  ["ext.cbor.data_model._ok_with_off", "new_off", ["bytes.view", "bib"]]
+                ]
+              ]
+            ]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "major", 6],
+          [
+            "begin",
+            ["let", "tag_doc", ["ext.cbor.data_model._parse_ai_u32", "b", "off0", "ai"]],
+            ["if", ["<", ["bytes.len", "tag_doc"], 1], ["return", ["ext.error.context.err_from_code", 142]], 0],
+            ["if", ["=", ["bytes.get_u8", "tag_doc", 0], 0], ["return", "tag_doc"], 0],
+            ["let", "tv", ["bytes.view", "tag_doc"]],
+            ["let", "after_tag", ["codec.read_u32_le", "tv", 1]],
+            ["let", "tag", ["codec.read_u32_le", "tv", 5]],
+            ["if", ["if", ["=", "tag", 2], 1, ["=", "tag", 3]], 0, ["return", ["ext.error.context.err_from_code", 143]]],
+            ["let", "raw_doc", ["ext.cbor.data_model._parse_bytes_raw_v1", "b", "after_tag"]],
+            ["if", ["<", ["bytes.len", "raw_doc"], 1], ["return", ["ext.error.context.err_from_code", 144]], 0],
+            ["if", ["=", ["bytes.get_u8", "raw_doc", 0], 0], ["return", "raw_doc"], 0],
+            ["let", "rv", ["bytes.view", "raw_doc"]],
+            ["let", "new_off", ["codec.read_u32_le", "rv", 1]],
+            ["let", "raw", ["view.slice", "rv", 5, ["-", ["view.len", "rv"], 5]]],
+            ["let", "mag", ["ext.cbor.data_model._trim_mag_bytes", "raw"]],
+            ["let", "magv", ["bytes.view", "mag"]],
+            ["let", "mlen", ["view.len", "magv"]],
+            [
+              "return",
+              [
+                "if",
+                ["=", "tag", 2],
+                [
+                  "begin",
+                  [
+                    "if",
+                    ["=", "mlen", 0],
+                    [
+                      "begin",
+                      ["let", "z", ["bytes.alloc", 1]],
+                      ["return", ["ext.cbor.data_model._ok_with_off", "new_off", ["bytes.view", "z"]]]
+                    ],
+                    0
+                  ],
+                  ["let", "bi", ["vec_u8.with_capacity", ["+", 1, "mlen"]]],
+                  ["set", "bi", ["vec_u8.push", "bi", 1]],
+                  ["set", "bi", ["vec_u8.extend_bytes_range", "bi", "magv", 0, "mlen"]],
+                  ["let", "bib", ["vec_u8.into_bytes", "bi"]],
+                  ["ext.cbor.data_model._ok_with_off", "new_off", ["bytes.view", "bib"]]
+                ],
+                [
+                  "begin",
+                  ["let", "abs", ["ext.cbor.data_model._mag_add_one_bytes", "magv"]],
+                  ["let", "absv", ["bytes.view", "abs"]],
+                  ["let", "alen", ["view.len", "absv"]],
+                  ["let", "bi", ["vec_u8.with_capacity", ["+", 1, "alen"]]],
+                  ["set", "bi", ["vec_u8.push", "bi", 2]],
+                  ["set", "bi", ["vec_u8.extend_bytes_range", "bi", "absv", 0, "alen"]],
+                  ["let", "bib", ["vec_u8.into_bytes", "bi"]],
+                  ["ext.cbor.data_model._ok_with_off", "new_off", ["bytes.view", "bib"]]
+                ]
+              ]
+            ]
+          ],
+          0
+        ],
+        ["ext.error.context.err_from_code", 145]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_value_major7_v1",
+      "params": [
+        { "name": "off0", "ty": "i32" },
+        { "name": "ai", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        [
+          "if",
+          ["=", "ai", 20],
+          [
+            "begin",
+            ["let", "v", ["ext.data_model.value_bool", 0]],
+            ["return", ["ext.cbor.data_model._ok_with_off", ["+", "off0", 1], ["bytes.view", "v"]]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "ai", 21],
+          [
+            "begin",
+            ["let", "v", ["ext.data_model.value_bool", 1]],
+            ["return", ["ext.cbor.data_model._ok_with_off", ["+", "off0", 1], ["bytes.view", "v"]]]
+          ],
+          0
+        ],
+        [
+          "if",
+          ["=", "ai", 22],
+          [
+            "begin",
+            ["let", "v", ["ext.data_model.value_null"]],
+            ["return", ["ext.cbor.data_model._ok_with_off", ["+", "off0", 1], ["bytes.view", "v"]]]
+          ],
+          0
+        ],
+        ["ext.error.context.err_from_code", 201]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_value_major6_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" },
+        { "name": "n", "ty": "i32" },
+        { "name": "ai", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "tag_doc", ["ext.cbor.data_model._parse_ai_u32", "b", "off0", "ai"]],
+        ["if", ["<", ["bytes.len", "tag_doc"], 1], ["return", ["ext.error.context.err_from_code", 202]], 0],
+        ["if", ["=", ["bytes.get_u8", "tag_doc", 0], 0], ["return", "tag_doc"], 0],
+        ["let", "tv", ["bytes.view", "tag_doc"]],
+        ["let", "after_tag", ["codec.read_u32_le", "tv", 1]],
+        ["let", "tag", ["codec.read_u32_le", "tv", 5]],
+        [
+          "if",
+          ["=", "tag", 4],
+          [
+            "begin",
+            ["if", [">=u", "after_tag", "n"], ["return", ["ext.error.context.err_from_code", 203]], 0],
+            ["let", "hb", ["view.get_u8", "b", "after_tag"]],
+            ["let", "hmajor", [">>u", "hb", 5]],
+            ["let", "hai", ["&", "hb", 31]],
+            ["if", ["=", "hmajor", 4], 0, ["return", ["ext.error.context.err_from_code", 204]]],
+            ["let", "len_doc", ["ext.cbor.data_model._parse_ai_u32", "b", "after_tag", "hai"]],
+            ["if", ["<", ["bytes.len", "len_doc"], 1], ["return", ["ext.error.context.err_from_code", 205]], 0],
+            ["if", ["=", ["bytes.get_u8", "len_doc", 0], 0], ["return", "len_doc"], 0],
+            ["let", "lv", ["bytes.view", "len_doc"]],
+            ["let", "off", ["codec.read_u32_le", "lv", 1]],
+            ["let", "count", ["codec.read_u32_le", "lv", 5]],
+            ["if", ["=", "count", 2], 0, ["return", ["ext.error.context.err_from_code", 206]]],
+            ["let", "exp_doc", ["ext.cbor.data_model._parse_int_i32_v1", "b", "off"]],
+            ["if", ["<", ["bytes.len", "exp_doc"], 1], ["return", ["ext.error.context.err_from_code", 207]], 0],
+            ["if", ["=", ["bytes.get_u8", "exp_doc", 0], 0], ["return", "exp_doc"], 0],
+            ["let", "ev", ["bytes.view", "exp_doc"]],
+            ["let", "off2", ["codec.read_u32_le", "ev", 1]],
+            ["let", "exp", ["codec.read_u32_le", "ev", 5]],
+            ["let", "mant_doc", ["ext.cbor.data_model._parse_int_bigint_v1", "b", "off2"]],
+            ["if", ["<", ["bytes.len", "mant_doc"], 1], ["return", ["ext.error.context.err_from_code", 208]], 0],
+            ["if", ["=", ["bytes.get_u8", "mant_doc", 0], 0], ["return", "mant_doc"], 0],
+            ["let", "mv", ["bytes.view", "mant_doc"]],
+            ["let", "off3", ["codec.read_u32_le", "mv", 1]],
+            ["let", "mant", ["view.slice", "mv", 5, ["-", ["view.len", "mv"], 5]]],
+            ["let", "msign", ["std.math.bigint.codec_v1.sign_v1", "mant"]],
+            ["if", ["<", "msign", 0], ["return", ["ext.error.context.err_from_code", 209]], 0],
+            [
+              "if",
+              ["=", "msign", 0],
+              [
+                "begin",
+                ["let", "s0", ["bytes.lit", "0"]],
+                ["let", "v0", ["ext.data_model.value_number", ["bytes.view", "s0"]]],
+                ["return", ["ext.cbor.data_model._ok_with_off", "off3", ["bytes.view", "v0"]]]
+              ],
+              0
+            ],
+            [
+              "if",
+              [">=", "exp", 0],
+              [
+                "begin",
+                ["let", "fmt_doc", ["std.math.bigint.fmt.format_dec_v1", "mant"]],
+                ["if", ["<", ["bytes.len", "fmt_doc"], 1], ["return", ["ext.error.context.err_from_code", 210]], 0],
+                ["if", ["=", ["bytes.get_u8", "fmt_doc", 0], 0], ["return", "fmt_doc"], 0],
+                ["let", "fv", ["bytes.view", "fmt_doc"]],
+                ["let", "s", ["std.math.bigint.fmt.get_bytes", "fv"]],
+                ["let", "sv", ["bytes.view", "s"]],
+                ["let", "slen", ["view.len", "sv"]],
+                [
+                  "if",
+                  ["=", "exp", 0],
+                  [
+                    "begin",
+                    ["let", "v0", ["ext.data_model.value_number", ["bytes.view", "s"]]],
+                    ["return", ["ext.cbor.data_model._ok_with_off", "off3", ["bytes.view", "v0"]]]
+                  ],
+                  0
+                ],
+                ["let", "out", ["vec_u8.with_capacity", ["+", "slen", "exp"]]],
+                ["set", "out", ["vec_u8.extend_bytes_range", "out", "sv", 0, "slen"]],
+                ["for", "_", 0, "exp", ["set", "out", ["vec_u8.push", "out", 48]]],
+                ["let", "s2", ["vec_u8.into_bytes", "out"]],
+                ["let", "v0", ["ext.data_model.value_number", ["bytes.view", "s2"]]],
+                ["return", ["ext.cbor.data_model._ok_with_off", "off3", ["bytes.view", "v0"]]]
+              ],
+              [
+                "begin",
+                [
+                  "if",
+                  ["=", "exp", ["-", ["-", 0, 2147483647], 1]],
+                  ["return", ["ext.error.context.err_from_code", 211]],
+                  0
+                ],
+                ["let", "scale", ["-", 0, "exp"]],
+                ["let", "mag", ["std.math.bigint.codec_v1.mag_view_v1", "mant"]],
+                ["let", "mlen", ["view.len", "mag"]],
+                ["let", "d", ["vec_u8.with_capacity", ["+", 9, "mlen"]]],
+                ["set", "d", ["vec_u8.push", "d", "msign"]],
+                ["set", "d", ["vec_u8.extend_bytes", "d", ["codec.write_u32_le", "scale"]]],
+                ["set", "d", ["vec_u8.extend_bytes", "d", ["codec.write_u32_le", "mlen"]]],
+                ["set", "d", ["vec_u8.extend_bytes_range", "d", "mag", 0, "mlen"]],
+                ["let", "dec", ["vec_u8.into_bytes", "d"]],
+                ["let", "canon", ["std.math.decimal.codec_v1.canon_v1", ["bytes.view", "dec"]]],
+                ["let", "cv", ["bytes.view", "canon"]],
+                ["let", "dfmt", ["std.math.decimal.fmt.format_dec_v1", "cv"]],
+                ["if", ["<", ["bytes.len", "dfmt"], 1], ["return", ["ext.error.context.err_from_code", 212]], 0],
+                ["if", ["=", ["bytes.get_u8", "dfmt", 0], 0], ["return", "dfmt"], 0],
+                ["let", "dv", ["bytes.view", "dfmt"]],
+                ["let", "s", ["std.math.decimal.fmt.get_bytes", "dv"]],
+                ["let", "v0", ["ext.data_model.value_number", ["bytes.view", "s"]]],
+                ["return", ["ext.cbor.data_model._ok_with_off", "off3", ["bytes.view", "v0"]]]
+              ]
+            ]
+          ],
+          [
+            "begin",
+            ["let", "bi_doc", ["ext.cbor.data_model._parse_int_bigint_v1", "b", "off0"]],
+            ["if", ["<", ["bytes.len", "bi_doc"], 1], ["return", ["ext.error.context.err_from_code", 213]], 0],
+            ["if", ["=", ["bytes.get_u8", "bi_doc", 0], 0], ["return", "bi_doc"], 0],
+            ["let", "bv", ["bytes.view", "bi_doc"]],
+            ["let", "new_off", ["codec.read_u32_le", "bv", 1]],
+            ["let", "bi", ["view.slice", "bv", 5, ["-", ["view.len", "bv"], 5]]],
+            ["let", "fmt_doc", ["std.math.bigint.fmt.format_dec_v1", "bi"]],
+            ["if", ["<", ["bytes.len", "fmt_doc"], 1], ["return", ["ext.error.context.err_from_code", 214]], 0],
+            ["if", ["=", ["bytes.get_u8", "fmt_doc", 0], 0], ["return", "fmt_doc"], 0],
+            ["let", "fv", ["bytes.view", "fmt_doc"]],
+            ["let", "s", ["std.math.bigint.fmt.get_bytes", "fv"]],
+            ["let", "val", ["ext.data_model.value_number", ["bytes.view", "s"]]],
+            ["return", ["ext.cbor.data_model._ok_with_off", "new_off", ["bytes.view", "val"]]]
+          ]
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_value_major01_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "bi_doc", ["ext.cbor.data_model._parse_int_bigint_v1", "b", "off0"]],
+        ["if", ["<", ["bytes.len", "bi_doc"], 1], ["return", ["ext.error.context.err_from_code", 220]], 0],
+        ["if", ["=", ["bytes.get_u8", "bi_doc", 0], 0], ["return", "bi_doc"], 0],
+        ["let", "bv", ["bytes.view", "bi_doc"]],
+        ["let", "new_off", ["codec.read_u32_le", "bv", 1]],
+        ["let", "bi", ["view.slice", "bv", 5, ["-", ["view.len", "bv"], 5]]],
+        ["let", "fmt_doc", ["std.math.bigint.fmt.format_dec_v1", "bi"]],
+        ["if", ["<", ["bytes.len", "fmt_doc"], 1], ["return", ["ext.error.context.err_from_code", 221]], 0],
+        ["if", ["=", ["bytes.get_u8", "fmt_doc", 0], 0], ["return", "fmt_doc"], 0],
+        ["let", "fv", ["bytes.view", "fmt_doc"]],
+        ["let", "s", ["std.math.bigint.fmt.get_bytes", "fv"]],
+        ["let", "val", ["ext.data_model.value_number", ["bytes.view", "s"]]],
+        ["return", ["ext.cbor.data_model._ok_with_off", "new_off", ["bytes.view", "val"]]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_value_major23_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" },
+        { "name": "n", "ty": "i32" },
+        { "name": "ai", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "len_doc", ["ext.cbor.data_model._parse_ai_u32", "b", "off0", "ai"]],
+        ["if", ["<", ["bytes.len", "len_doc"], 1], ["return", ["ext.error.context.err_from_code", 230]], 0],
+        ["if", ["=", ["bytes.get_u8", "len_doc", 0], 0], ["return", "len_doc"], 0],
+        ["let", "lv", ["bytes.view", "len_doc"]],
+        ["let", "start", ["codec.read_u32_le", "lv", 1]],
+        ["let", "len", ["codec.read_u32_le", "lv", 5]],
+        ["if", ["<", "len", 0], ["return", ["ext.error.context.err_from_code", 231]], 0],
+        ["if", [">=u", ["+", "start", "len"], ["+", "n", 1]], ["return", ["ext.error.context.err_from_code", 232]], 0],
+        ["let", "s", ["view.slice", "b", "start", "len"]],
+        ["let", "val", ["ext.data_model.value_string", "s"]],
+        ["return", ["ext.cbor.data_model._ok_with_off", ["+", "start", "len"], ["bytes.view", "val"]]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_value_major4_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" },
+        { "name": "n", "ty": "i32" },
+        { "name": "ai", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "len_doc", ["ext.cbor.data_model._parse_ai_u32", "b", "off0", "ai"]],
+        ["if", ["<", ["bytes.len", "len_doc"], 1], ["return", ["ext.error.context.err_from_code", 240]], 0],
+        ["if", ["=", ["bytes.get_u8", "len_doc", 0], 0], ["return", "len_doc"], 0],
+        ["let", "lv", ["bytes.view", "len_doc"]],
+        ["let", "off", ["codec.read_u32_le", "lv", 1]],
+        ["let", "count", ["codec.read_u32_le", "lv", 5]],
+        ["if", ["<", "count", 0], ["return", ["ext.error.context.err_from_code", 241]], 0],
+        ["let", "elems", ["vec_u8.with_capacity", ["+", 4, ["*", "count", 8]]]],
+        ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", "count"]]],
+        ["let", "cur", "off"],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "r", ["ext.cbor.data_model._parse_value", "b", "cur"]],
+            ["if", ["<", ["bytes.len", "r"], 1], ["return", ["ext.error.context.err_from_code", 242]], 0],
+            ["if", ["=", ["bytes.get_u8", "r", 0], 0], ["return", "r"], 0],
+            ["let", "rv", ["bytes.view", "r"]],
+            ["let", "next", ["codec.read_u32_le", "rv", 1]],
+            ["let", "val", ["view.slice", "rv", 5, ["-", ["view.len", "rv"], 5]]],
+            ["let", "vlen", ["view.len", "val"]],
+            ["set", "elems", ["vec_u8.extend_bytes", "elems", ["codec.write_u32_le", "vlen"]]],
+            ["set", "elems", ["vec_u8.extend_bytes_range", "elems", "val", 0, "vlen"]],
+            ["set", "cur", "next"]
+          ]
+        ],
+        ["let", "eb", ["vec_u8.into_bytes", "elems"]],
+        ["let", "seq", ["ext.data_model.value_seq_from_elems", ["bytes.view", "eb"]]],
+        ["if", ["=", ["bytes.len", "seq"], 0], ["return", ["ext.error.context.err_from_code", 243]], 0],
+        ["return", ["ext.cbor.data_model._ok_with_off", "cur", ["bytes.view", "seq"]]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_value_major5_v1",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" },
+        { "name": "n", "ty": "i32" },
+        { "name": "ai", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "len_doc", ["ext.cbor.data_model._parse_ai_u32", "b", "off0", "ai"]],
+        ["if", ["<", ["bytes.len", "len_doc"], 1], ["return", ["ext.error.context.err_from_code", 250]], 0],
+        ["if", ["=", ["bytes.get_u8", "len_doc", 0], 0], ["return", "len_doc"], 0],
+        ["let", "lv", ["bytes.view", "len_doc"]],
+        ["let", "off", ["codec.read_u32_le", "lv", 1]],
+        ["let", "count", ["codec.read_u32_le", "lv", 5]],
+        ["if", ["<", "count", 0], ["return", ["ext.error.context.err_from_code", 251]], 0],
+        ["let", "entries", ["vec_u8.with_capacity", ["+", 4, ["*", "count", 16]]]],
+        ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", "count"]]],
+        ["let", "cur", "off"],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "kr", ["ext.cbor.data_model._parse_value", "b", "cur"]],
+            ["if", ["<", ["bytes.len", "kr"], 1], ["return", ["ext.error.context.err_from_code", 252]], 0],
+            ["if", ["=", ["bytes.get_u8", "kr", 0], 0], ["return", "kr"], 0],
+            ["let", "krv", ["bytes.view", "kr"]],
+            ["let", "after_k", ["codec.read_u32_le", "krv", 1]],
+            ["let", "kval", ["view.slice", "krv", 5, ["-", ["view.len", "krv"], 5]]],
+            ["let", "kk", ["ext.data_model.kind_at", "kval", 0]],
+            ["if", ["=", "kk", 3], 0, ["return", ["ext.error.context.err_from_code", 253]]],
+            ["let", "key_b", ["ext.data_model.string_get", "kval", 0]],
+            ["if", ["=", ["bytes.len", "key_b"], 0], ["return", ["ext.error.context.err_from_code", 254]], 0],
+            ["let", "key", ["bytes.view", "key_b"]],
+            ["let", "klen", ["view.len", "key"]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", "klen"]]],
+            ["set", "entries", ["vec_u8.extend_bytes_range", "entries", "key", 0, "klen"]],
+            ["let", "vr", ["ext.cbor.data_model._parse_value", "b", "after_k"]],
+            ["if", ["<", ["bytes.len", "vr"], 1], ["return", ["ext.error.context.err_from_code", 255]], 0],
+            ["if", ["=", ["bytes.get_u8", "vr", 0], 0], ["return", "vr"], 0],
+            ["let", "vrv", ["bytes.view", "vr"]],
+            ["let", "after_v", ["codec.read_u32_le", "vrv", 1]],
+            ["let", "vval", ["view.slice", "vrv", 5, ["-", ["view.len", "vrv"], 5]]],
+            ["let", "vlen", ["view.len", "vval"]],
+            ["set", "entries", ["vec_u8.extend_bytes", "entries", ["codec.write_u32_le", "vlen"]]],
+            ["set", "entries", ["vec_u8.extend_bytes_range", "entries", "vval", 0, "vlen"]],
+            ["set", "cur", "after_v"]
+          ]
+        ],
+        ["let", "eb", ["vec_u8.into_bytes", "entries"]],
+        ["let", "map", ["ext.data_model.value_map_from_entries", ["bytes.view", "eb"]]],
+        ["if", ["=", ["bytes.len", "map"], 0], ["return", ["ext.error.context.err_from_code", 256]], 0],
+        ["return", ["ext.cbor.data_model._ok_with_off", "cur", ["bytes.view", "map"]]]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.cbor.data_model._parse_value",
+      "params": [
+        { "name": "b", "ty": "bytes_view" },
+        { "name": "off0", "ty": "i32" }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "b"]],
+        ["if", [">=u", "off0", "n"], ["return", ["ext.error.context.err_from_code", 200]], 0],
+        ["let", "ib", ["view.get_u8", "b", "off0"]],
+        ["let", "major", [">>u", "ib", 5]],
+        ["let", "ai", ["&", "ib", 31]],
+        [
+          "if",
+          ["=", "major", 7],
+          ["return", ["ext.cbor.data_model._parse_value_major7_v1", "off0", "ai"]],
+          0
+        ],
+        [
+          "if",
+          ["=", "major", 6],
+          ["return", ["ext.cbor.data_model._parse_value_major6_v1", "b", "off0", "n", "ai"]],
+          0
+        ],
+        [
+          "if",
+          ["if", ["=", "major", 0], 1, ["=", "major", 1]],
+          ["return", ["ext.cbor.data_model._parse_value_major01_v1", "b", "off0"]],
+          0
+        ],
+        [
+          "if",
+          ["if", ["=", "major", 2], 1, ["=", "major", 3]],
+          ["return", ["ext.cbor.data_model._parse_value_major23_v1", "b", "off0", "n", "ai"]],
+          0
+        ],
+        ["if", ["=", "major", 4], ["return", ["ext.cbor.data_model._parse_value_major4_v1", "b", "off0", "n", "ai"]], 0],
+        ["if", ["=", "major", 5], ["return", ["ext.cbor.data_model._parse_value_major5_v1", "b", "off0", "n", "ai"]], 0],
+        ["ext.error.context.err_from_code", 299]
+      ]
+    }
+  ],
+  "meta": {
+    "generated_by": "manual",
+    "package": "x07:ext-cbor-rs@0.1.0"
+  }
+}

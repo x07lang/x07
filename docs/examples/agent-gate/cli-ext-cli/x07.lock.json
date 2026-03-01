@@ -3,9 +3,9 @@
   "dependencies": [
     {
       "name": "ext-cli",
-      "version": "0.1.12",
-      "path": ".x07/deps/ext-cli/0.1.12",
-      "package_manifest_sha256": "a72d7b6d076d8a42d86b5a766075b73099309d5e97ea8b8ac9077c70888a95aa",
+      "version": "0.1.13",
+      "path": ".x07/deps/ext-cli/0.1.13",
+      "package_manifest_sha256": "4bd85ecf7d1fce0fcfb6ab20a5ef8b61302fba5eceaefb1e9c245a8148eac1c7",
       "module_root": "modules",
       "modules_sha256": {
         "ext.cli": "acfd46f859a0c17d4232c9faecf22a981d12182a65bd190c259efc8a34572cc5",
@@ -29,9 +29,9 @@
     },
     {
       "name": "ext-data-model",
-      "version": "0.1.8",
-      "path": ".x07/deps/ext-data-model/0.1.8",
-      "package_manifest_sha256": "256665f4519598ef50953e7cd8fc2b18aefcdeaa4689e82f4fb832892cc3f1e8",
+      "version": "0.1.9",
+      "path": ".x07/deps/ext-data-model/0.1.9",
+      "package_manifest_sha256": "65e901c304e844fdf5e666a9dd3f46df3ca12948d25d05d8d70a8901681fa6e7",
       "module_root": "modules",
       "modules_sha256": {
         "ext.data_model": "f725211ff55a6ad1db31f174dfbdcf55beccd7a24e44f8da929ecf7d5d0c0ccb",
@@ -64,12 +64,12 @@
     },
     {
       "name": "ext-json-rs",
-      "version": "0.1.4",
-      "path": ".x07/deps/ext-json-rs/0.1.4",
-      "package_manifest_sha256": "7801ecd8a774f290c864a42e5bc3280e6ed7268bc2e79d8d66c5e1472eebe208",
+      "version": "0.1.5",
+      "path": ".x07/deps/ext-json-rs/0.1.5",
+      "package_manifest_sha256": "e7e0008cd8333bf7c0321437193ff255feadcc5c78d32933af1104e4354fd658",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.json.canon": "0748c0cc8c3ad90ea0d0352ff9c444cc2b2116fce05782866d263c2d138dea7a",
+        "ext.json.canon": "9080cd3974136213096b111c5869c38417b218fa6c013a5c2def7bb54c4543cd",
         "ext.json.data_model": "d4762aee02eadf4b35fc425b496a6829c0c0f3f389eee667cae90023a4a2a7ff",
         "ext.json.pointer": "658decbd56790023d28bd72ef5f6fe810ed69b0d1ab6275b0c6c54b1f414192a",
         "ext.json.tests": "5ad25069a57e40b87d9ace8f4821d3f2e509df3e56348bd5f4ed914a1bfcdfcd"

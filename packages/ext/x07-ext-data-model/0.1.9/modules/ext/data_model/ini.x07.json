@@ -1,0 +1,139 @@
+{
+  "schema_version": "x07.x07ast@0.3.0",
+  "kind": "module",
+  "module_id": "ext.data_model.ini",
+  "imports": ["ext.data_model"],
+  "decls": [
+    {
+      "kind": "export",
+      "names": ["ext.data_model.ini.emit_canon"]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.data_model.ini._extend_view",
+      "params": [
+        {"name": "out", "ty": "vec_u8"},
+        {"name": "b", "ty": "bytes_view"}
+      ],
+      "result": "vec_u8",
+      "body": [
+        "begin",
+        ["let", "o", "out"],
+        ["let", "n", ["view.len", "b"]],
+        ["for", "i", 0, "n", ["set", "o", ["vec_u8.push", "o", ["view.get_u8", "b", "i"]]]],
+        "o"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.data_model.ini._key_is_safe_v1",
+      "params": [{"name": "key", "ty": "bytes_view"}],
+      "result": "i32",
+      "body": [
+        "begin",
+        ["let", "n", ["view.len", "key"]],
+        [
+          "for",
+          "i",
+          0,
+          "n",
+          [
+            "begin",
+            ["let", "c", ["view.get_u8", "key", "i"]],
+            ["if", ["if", ["=", "c", 10], 1, ["if", ["=", "c", 13], 1, ["if", ["=", "c", 61], 1, ["if", ["=", "c", 58], 1, ["if", ["=", "c", 91], 1, ["=", "c", 93]]]]]], ["return", 0], 0],
+            0
+          ]
+        ],
+        1
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "ext.data_model.ini.emit_canon",
+      "params": [{"name": "doc", "ty": "bytes_view"}],
+      "result": "bytes",
+      "body": [
+        "begin",
+        ["let", "msg_root_not_map", ["bytes.lit", "data_model.ini:root_not_map"]],
+        ["let", "msg_invalid_map", ["bytes.lit", "data_model.ini:invalid_map"]],
+        ["let", "msg_invalid_key", ["bytes.lit", "data_model.ini:invalid_key"]],
+        ["let", "msg_invalid_value", ["bytes.lit", "data_model.ini:invalid_value"]],
+        ["if", ["=", ["ext.data_model.doc_is_err", "doc"], 1], ["return", ["view.to_bytes", "doc"]], 0],
+        ["if", ["!=", ["ext.data_model.root_kind", "doc"], 5], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_root_not_map"]]], 0],
+        ["let", "map_off", ["ext.data_model.root_offset", "doc"]],
+        ["if", ["<", "map_off", 0], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_map"]]], 0],
+        ["let", "count", ["ext.data_model.map_len", "doc", "map_off"]],
+        ["if", ["<", "count", 0], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_map"]]], 0],
+        ["let", "out", ["vec_u8.with_capacity", ["+", 16, ["view.len", "doc"]]]],
+        [
+          "for",
+          "i",
+          0,
+          "count",
+          [
+            "begin",
+            ["let", "key_b", ["ext.data_model.map_key_at", "doc", "map_off", "i"]],
+            ["let", "key", ["bytes.view", "key_b"]],
+            ["if", ["=", ["ext.data_model.ini._key_is_safe_v1", "key"], 0], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_key"]]], 0],
+            ["set", "out", ["ext.data_model.ini._extend_view", "out", "key"]],
+            ["set", "out", ["vec_u8.push", "out", 61]],
+            ["set", "out", ["vec_u8.push", "out", 34]],
+            ["let", "val_off", ["ext.data_model.map_value_at", "doc", "map_off", "i"]],
+            ["if", ["<", "val_off", 0], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_map"]]], 0],
+            ["if", ["!=", ["ext.data_model.kind_at", "doc", "val_off"], 3], ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_value"]]], 0],
+            ["let", "val_b", ["ext.data_model.string_get", "doc", "val_off"]],
+            ["let", "val", ["bytes.view", "val_b"]],
+            ["let", "vn", ["view.len", "val"]],
+            [
+              "for",
+              "j",
+              0,
+              "vn",
+              [
+                "begin",
+                ["let", "c", ["view.get_u8", "val", "j"]],
+                [
+                  "if",
+                  ["=", "c", 92],
+                  ["begin", ["set", "out", ["vec_u8.push", "out", 92]], ["set", "out", ["vec_u8.push", "out", 92]], 0],
+                  [
+                    "if",
+                    ["=", "c", 34],
+                    ["begin", ["set", "out", ["vec_u8.push", "out", 92]], ["set", "out", ["vec_u8.push", "out", 34]], 0],
+                    [
+                      "if",
+                      ["=", "c", 10],
+                      ["begin", ["set", "out", ["vec_u8.push", "out", 92]], ["set", "out", ["vec_u8.push", "out", 110]], 0],
+                      [
+                        "if",
+                        ["=", "c", 9],
+                        ["begin", ["set", "out", ["vec_u8.push", "out", 92]], ["set", "out", ["vec_u8.push", "out", 116]], 0],
+                        [
+                          "if",
+                          ["=", "c", 13],
+                          ["begin", ["set", "out", ["vec_u8.push", "out", 92]], ["set", "out", ["vec_u8.push", "out", 114]], 0],
+                          [
+                            "if",
+                            ["<u", "c", 32],
+                            ["return", ["ext.data_model.doc_err_from_msg", ["bytes.view", "msg_invalid_value"]]],
+                            ["begin", ["set", "out", ["vec_u8.push", "out", "c"]], 0]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ]
+                ],
+                0
+              ]
+            ],
+            ["set", "out", ["vec_u8.push", "out", 34]],
+            ["set", "out", ["vec_u8.push", "out", 10]],
+            0
+          ]
+        ],
+        ["let", "ini_bytes", ["vec_u8.into_bytes", "out"]],
+        ["ext.data_model.doc_ok", ["bytes.view", "ini_bytes"]]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-web-crawl",
+  "version": "0.1.3",
+  "description": "Robots (RFC 9309) + Sitemaps + deterministic crawl scheduling (pinned via arch/crawl).",
+  "docs": "Robots (RFC 9309) + Sitemaps + deterministic crawl scheduling (pinned via arch/crawl).\n\nModules:\n- std.crawl.robots\n- std.crawl.sitemap\n- std.crawl.urlnorm\n- std.crawl.schedule\n- std.crawl.fetch\n- std.crawl.fetch.os\n- std.crawl.tests\n\nUsage:\n- Add dependency: x07 pkg add ext-web-crawl@0.1.3\n- Pin crawl policies in arch/crawl.\n- Parse robots: std.crawl.robots.parse_v1 + std.crawl.robots.allowed_v1.\n- Parse sitemaps: std.crawl.sitemap.parse_urls_v1.\n- Plan: std.crawl.schedule.plan_v1.\n- Fetch + RR replay: std.crawl.fetch.replay_rr_v1.\n- Fetch + RR record: std.crawl.fetch.os.run_rr_v1 / std.crawl.fetch.os.run_rr_missing_v1.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.crawl.robots",
+    "std.crawl.sitemap",
+    "std.crawl.urlnorm",
+    "std.crawl.schedule",
+    "std.crawl.fetch",
+    "std.crawl.fetch.os",
+    "std.crawl.tests"
+  ],
+  "meta": {
+    "determinism_tier": "mixed",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "requires_packages": [
+      "ext-data-model@0.1.9",
+      "ext-json-rs@0.1.5",
+      "ext-net@0.1.9",
+      "ext-robots-txt-rs@0.1.3",
+      "ext-sitemap-rs@0.1.4",
+      "ext-url-rs@0.1.4"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

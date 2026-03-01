@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.arch.web.index@0.1.0",
+  "apis": [
+    {
+      "id": "service_v1",
+      "api_path": "arch/web/api/service_v1.webapi.json",
+      "openapi_profile_path": "arch/web/openapi/service_v1.openapi.profile.json",
+      "budget_profile_id": "web_core_v1"
+    }
+  ]
+}
+

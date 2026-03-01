@@ -24,7 +24,6 @@
     "import_mode": "ffi",
     "ffi_libs": [
       "rabbitmq"
-    ],
-    "visibility": "canonical"
+    ]
   }
 }
