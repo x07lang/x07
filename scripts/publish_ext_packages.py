@@ -651,6 +651,30 @@ def _closure_for_spec(seed: PackageSpec, deps: dict[PackageSpec, list[PackageSpe
     return out
 
 
+def _latest_by_name(specs: Iterable[PackageSpec], name: str) -> PackageSpec | None:
+    best: PackageSpec | None = None
+    for spec in specs:
+        if spec.name != name:
+            continue
+        if best is None or spec.sort_key() > best.sort_key():
+            best = spec
+    return best
+
+
+def _extra_test_closure_for_spec(
+    *,
+    spec: PackageSpec,
+    manifests: dict[PackageSpec, dict[str, Any]],
+    deps: dict[PackageSpec, list[PackageSpec]],
+) -> set[PackageSpec]:
+    if spec.name == "ext-json-rs":
+        dm = _latest_by_name(manifests.keys(), "ext-data-model")
+        if dm is None:
+            _die(f"ERROR: missing local manifest for ext-data-model (required to test {spec})")
+        return _closure_for_spec(dm, deps)
+    return set()
+
+
 def _run_preflight(root: Path, python_bin: str) -> None:
     changes, _changed_projects = _sync_ext_package_versions(
         root=root,
@@ -790,6 +814,11 @@ def _publish_main(argv: list[str]) -> int:
             tests_manifest = pkg_dir / "tests" / "tests.json"
             if tests_manifest.is_file():
                 closure = _closure_for_spec(spec, deps)
+                closure |= _extra_test_closure_for_spec(
+                    spec=spec,
+                    manifests=manifests,
+                    deps=deps,
+                )
                 module_roots = _module_roots_for_closure(root, manifests, closure)
                 cmd = [
                     str(x07_bin),
