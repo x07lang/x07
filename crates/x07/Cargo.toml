@@ -144,3 +144,6 @@ x07-runner-common = { path = "../x07-runner-common", features = ["clap"] }
 x07-vm = { path = "../x07-vm" }
 x07c = { path = "../x07c" }
 x07-worlds = { path = "../x07-worlds", features = ["clap"] }
+
+[dev-dependencies]
+wasmparser = "0.245.1"

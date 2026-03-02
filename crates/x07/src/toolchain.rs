@@ -145,6 +145,22 @@ pub struct BuildArgs {
     #[arg(long, value_name = "PATH")]
     pub emit_c_header: Option<PathBuf>,
 
+    /// Also emit a core wasm module (solve_pure ABI), written to this path.
+    #[arg(long = "emit-wasm", value_name = "FILE")]
+    pub emit_wasm: Option<PathBuf>,
+
+    /// WebAssembly initial memory size in bytes (must be multiple of 65536).
+    #[arg(long = "wasm-initial-memory-bytes", value_name = "N")]
+    pub wasm_initial_memory_bytes: Option<u64>,
+
+    /// WebAssembly max memory size in bytes (must be multiple of 65536).
+    #[arg(long = "wasm-max-memory-bytes", value_name = "N")]
+    pub wasm_max_memory_bytes: Option<u64>,
+
+    /// If set, emit a non-growable memory (max == initial).
+    #[arg(long = "wasm-no-growable-memory", action = clap::ArgAction::SetTrue)]
+    pub wasm_no_growable_memory: bool,
+
     /// Build in freestanding mode for library embedding (exports `x07_solve_v2`; no `main()`).
     #[arg(long)]
     pub freestanding: bool,
@@ -587,6 +603,42 @@ pub fn cmd_build(
         }
         std::fs::write(&path, h.as_bytes())
             .with_context(|| format!("write: {}", path.display()))?;
+    }
+
+    if let Some(path) = args.emit_wasm {
+        let default_initial = 16 * 1024 * 1024u64;
+        let initial = args.wasm_initial_memory_bytes.unwrap_or(default_initial);
+        let mut max = args.wasm_max_memory_bytes.unwrap_or(initial);
+        let no_growable = if args.wasm_no_growable_memory {
+            true
+        } else {
+            // Default for Phase 7 is "no growable memory" unless max>initial is explicitly set.
+            max == initial
+        };
+        if no_growable {
+            max = initial;
+        }
+
+        let wasm_opts = x07c::wasm_emit::WasmEmitOptions {
+            mem: x07c::wasm_emit::WasmMemLimits {
+                initial_memory_bytes: initial,
+                max_memory_bytes: max,
+                no_growable_memory: no_growable,
+            },
+        };
+
+        let prepared =
+            x07c::compile::compile_program_to_program_with_meta(&program_bytes, &options)
+                .map_err(|e| anyhow::anyhow!("compile failed: {:?}: {}", e.kind, e.message))?;
+        let wasm =
+            x07c::compile::compile_program_to_wasm_v1(&prepared.program, &options, &wasm_opts)
+                .map_err(|e| anyhow::anyhow!("wasm emit failed: {:?}: {}", e.kind, e.message))?;
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("create output dir: {}", parent.display()))?;
+        }
+        std::fs::write(&path, wasm).with_context(|| format!("write: {}", path.display()))?;
     }
 
     Ok(std::process::ExitCode::SUCCESS)

@@ -134,17 +134,16 @@ pub fn compile_program_to_c_with_stats(
 }
 
 #[derive(Debug, Clone)]
-pub struct CompileToCOutput {
-    pub c_src: String,
+pub struct CompileToProgramOutput {
+    pub program: Program,
     pub stats: CompileStats,
-    pub native_requires: NativeRequires,
-    pub mono_map: Option<crate::generics::MonoMapV1>,
+    pub mono_map: crate::generics::MonoMapV1,
 }
 
-pub fn compile_program_to_c_with_meta(
+pub fn compile_program_to_program_with_meta(
     program: &[u8],
     options: &CompileOptions,
-) -> Result<CompileToCOutput, CompilerError> {
+) -> Result<CompileToProgramOutput, CompilerError> {
     let FrontendOutput {
         mut parsed_program,
         mono_map,
@@ -219,6 +218,31 @@ pub fn compile_program_to_c_with_meta(
         ));
     }
 
+    Ok(CompileToProgramOutput {
+        program: parsed_program,
+        stats: CompileStats { fuel_used },
+        mono_map,
+    })
+}
+
+#[derive(Debug, Clone)]
+pub struct CompileToCOutput {
+    pub c_src: String,
+    pub stats: CompileStats,
+    pub native_requires: NativeRequires,
+    pub mono_map: Option<crate::generics::MonoMapV1>,
+}
+
+pub fn compile_program_to_c_with_meta(
+    program: &[u8],
+    options: &CompileOptions,
+) -> Result<CompileToCOutput, CompilerError> {
+    let CompileToProgramOutput {
+        program: parsed_program,
+        stats,
+        mono_map,
+    } = compile_program_to_program_with_meta(program, options)?;
+
     let (c_src, native_requires) =
         c_emit::emit_c_program_with_native_requires(&parsed_program, options)?;
 
@@ -236,7 +260,7 @@ pub fn compile_program_to_c_with_meta(
 
     Ok(CompileToCOutput {
         c_src,
-        stats: CompileStats { fuel_used },
+        stats,
         native_requires: NativeRequires {
             schema_version: NATIVE_REQUIRES_SCHEMA_VERSION.to_string(),
             world: Some(options.world.as_str().to_string()),
@@ -244,6 +268,14 @@ pub fn compile_program_to_c_with_meta(
         },
         mono_map: Some(mono_map),
     })
+}
+
+pub fn compile_program_to_wasm_v1(
+    program: &Program,
+    options: &CompileOptions,
+    wasm_opts: &crate::wasm_emit::WasmEmitOptions,
+) -> Result<Vec<u8>, CompilerError> {
+    crate::wasm_emit::emit_solve_pure_wasm_v1(program, options, wasm_opts)
 }
 
 pub fn check_program(program: &[u8], options: &CompileOptions) -> Result<(), CompilerError> {
