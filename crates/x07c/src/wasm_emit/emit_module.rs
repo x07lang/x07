@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use serde_json::Value;
 use wasm_encoder::{
     CodeSection, ConstExpr, ExportKind, ExportSection, Function, FunctionSection, GlobalSection,
     GlobalType, Instruction, MemorySection, MemoryType, Module, TypeSection, ValType,
@@ -7,8 +8,10 @@ use wasm_encoder::{
 
 use crate::ast::Expr;
 use crate::compile::{CompileErrorKind, CompileOptions, CompilerError};
+use crate::diagnostics::{Diagnostic, Location, Severity, Stage};
 use crate::program::{FunctionDef, Program};
 use crate::types::Ty;
+use crate::wasm_emit::features::WasmFeatureV1;
 use crate::wasm_emit::{layout, WasmEmitOptions};
 
 #[derive(Debug, Clone)]
@@ -38,6 +41,7 @@ impl DataBuilder {
 struct ModuleCtx {
     func_indices: BTreeMap<String, u32>,
     func_sigs: BTreeMap<String, FuncSig>,
+    features: crate::wasm_emit::features::WasmFeatureSetV1,
     data: DataBuilder,
 
     // Indices wired by emit_solve_pure_wasm_v1.
@@ -140,6 +144,16 @@ impl<'a> ExprEmitter<'a> {
         None
     }
 
+    fn require_head_feature(&self, head: &str, ptr: &str) -> Result<(), CompilerError> {
+        let Some((kind, feature)) = required_feature_for_head(head) else {
+            return Ok(());
+        };
+        if self.module.features.has(feature) {
+            return Ok(());
+        }
+        Err(wasm_unsupported(kind, head, feature, ptr))
+    }
+
     fn infer_ty(&self, expr: &Expr) -> Result<Ty, CompilerError> {
         match expr {
             Expr::Int { .. } => Ok(Ty::I32),
@@ -149,8 +163,9 @@ impl<'a> ExprEmitter<'a> {
                     format!("unknown identifier: {name:?}"),
                 )
             }),
-            Expr::List { items, .. } => {
+            Expr::List { items, ptr } => {
                 let (head, args) = split_head(items)?;
+                self.require_head_feature(head, ptr)?;
                 match head {
                     "begin" => {
                         if args.is_empty() {
@@ -161,7 +176,8 @@ impl<'a> ExprEmitter<'a> {
                         }
                         self.infer_ty(&args[args.len() - 1])
                     }
-                    "let" | "set" | "set0" | "for" => Ok(Ty::I32),
+                    "let" | "set" | "set0" => Ok(Ty::I32),
+                    "for" => Ok(Ty::I32),
                     "return" => Ok(Ty::Never),
                     "if" => {
                         if args.len() != 3 {
@@ -188,12 +204,14 @@ impl<'a> ExprEmitter<'a> {
                     }
 
                     // Minimal builtins.
+                    "i32.lit" => Ok(Ty::I32),
                     "view.len" => Ok(Ty::I32),
                     "view.get_u8" => Ok(Ty::I32),
                     "view.slice" => Ok(Ty::BytesView),
                     "view.to_bytes" => Ok(Ty::Bytes),
                     "view.eq" => Ok(Ty::I32),
                     "bytes.view" => Ok(Ty::BytesView),
+                    "bytes.subview" => Ok(Ty::BytesView),
                     "bytes.len" => Ok(Ty::I32),
                     "bytes.get_u8" => Ok(Ty::I32),
                     "bytes.set_u8" => Ok(Ty::Bytes),
@@ -217,24 +235,34 @@ impl<'a> ExprEmitter<'a> {
                     "vec_u8.into_bytes" => Ok(Ty::Bytes),
 
                     // Minimal ops.
-                    "+" | "-" | "*" | "=" | "!=" | "<" | "<u" | "<=u" | ">=u" | "<= " | ">=" => {
-                        Ok(Ty::I32)
-                    }
-                    "<=" | ">" | ">u" | ">= " => Ok(Ty::I32),
+                    "+" | "-" | "*" | "/" | "%" | "=" | "!=" | "<" | "<u" | "<=u" | ">u"
+                    | ">=u" | "<=" | ">" | ">=" => Ok(Ty::I32),
                     "&&" | "||" | "&" | "|" | "^" | "<<u" | ">>u" => Ok(Ty::I32),
 
                     // User function call.
-                    _ => self
-                        .module
-                        .func_sigs
-                        .get(head)
-                        .map(|s| s.ret)
-                        .ok_or_else(|| {
-                            CompilerError::new(
-                                CompileErrorKind::Typing,
-                                format!("unknown callee: {head:?}"),
-                            )
-                        }),
+                    _ => {
+                        if let Some(sig) = self.module.func_sigs.get(head) {
+                            return Ok(sig.ret);
+                        }
+                        if head.starts_with("bytes.")
+                            || head.starts_with("view.")
+                            || head.starts_with("codec.")
+                            || head.starts_with("vec_u8.")
+                        {
+                            return Err(wasm_unsupported(
+                                "builtin",
+                                head,
+                                required_feature_for_head(head)
+                                    .map(|(_, f)| f)
+                                    .unwrap_or(WasmFeatureV1::CoreFormsV1),
+                                ptr,
+                            ));
+                        }
+                        Err(CompilerError::new(
+                            CompileErrorKind::Typing,
+                            format!("unknown callee: {head:?}"),
+                        ))
+                    }
                 }
             }
         }
@@ -260,8 +288,9 @@ impl<'a> ExprEmitter<'a> {
                 }
                 Ok(ty)
             }
-            Expr::List { items, .. } => {
+            Expr::List { items, ptr } => {
                 let (head, args) = split_head(items)?;
+                self.require_head_feature(head, ptr)?;
                 match head {
                     "begin" => self.emit_begin(args),
                     "let" => self.emit_let(args),
@@ -275,12 +304,14 @@ impl<'a> ExprEmitter<'a> {
                     "return" => self.emit_return(args),
 
                     // Builtins (minimal set for Phase 7 gates).
+                    "i32.lit" => self.emit_i32_lit(args),
                     "view.len" => self.emit_view_len(args),
                     "view.get_u8" => self.emit_view_get_u8(args),
                     "view.slice" => self.emit_view_slice(args),
                     "view.to_bytes" => self.emit_view_to_bytes(args),
                     "view.eq" => self.emit_view_eq(args),
                     "bytes.view" => self.emit_bytes_view(args),
+                    "bytes.subview" => self.emit_bytes_subview(args),
                     "bytes.len" => self.emit_bytes_len(args),
                     "bytes.get_u8" => self.emit_bytes_get_u8(args),
                     "bytes.set_u8" => self.emit_bytes_set_u8(args),
@@ -307,6 +338,8 @@ impl<'a> ExprEmitter<'a> {
                     "+" => self.emit_i32_binop(args, Instruction::I32Add),
                     "-" => self.emit_i32_binop(args, Instruction::I32Sub),
                     "*" => self.emit_i32_binop(args, Instruction::I32Mul),
+                    "/" => self.emit_i32_binop(args, Instruction::I32DivS),
+                    "%" => self.emit_i32_binop(args, Instruction::I32RemS),
                     "&" => self.emit_i32_binop(args, Instruction::I32And),
                     "|" => self.emit_i32_binop(args, Instruction::I32Or),
                     "^" => self.emit_i32_binop(args, Instruction::I32Xor),
@@ -326,7 +359,24 @@ impl<'a> ExprEmitter<'a> {
                     ">>u" => self.emit_i32_binop(args, Instruction::I32ShrU),
 
                     // Call.
-                    _ => self.emit_call(head, args),
+                    _ => {
+                        if (head.starts_with("bytes.")
+                            || head.starts_with("view.")
+                            || head.starts_with("codec.")
+                            || head.starts_with("vec_u8."))
+                            && !self.module.func_sigs.contains_key(head)
+                        {
+                            return Err(wasm_unsupported(
+                                "builtin",
+                                head,
+                                required_feature_for_head(head)
+                                    .map(|(_, f)| f)
+                                    .unwrap_or(WasmFeatureV1::CoreFormsV1),
+                                ptr,
+                            ));
+                        }
+                        self.emit_call(head, args)
+                    }
                 }
             }
         }
@@ -587,6 +637,23 @@ impl<'a> ExprEmitter<'a> {
         }
         self.f.push(Instruction::Return);
         Ok(Ty::Never)
+    }
+
+    fn emit_i32_lit(&mut self, args: &[Expr]) -> Result<Ty, CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "i32.lit expects 1 arg".to_string(),
+            ));
+        }
+        let ty = self.emit_expr(&args[0])?;
+        if ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "i32.lit expects i32".to_string(),
+            ));
+        }
+        Ok(Ty::I32)
     }
 
     fn emit_view_len(&mut self, args: &[Expr]) -> Result<Ty, CompilerError> {
@@ -879,6 +946,61 @@ impl<'a> ExprEmitter<'a> {
                 "bytes.view expects bytes".to_string(),
             ));
         }
+        Ok(Ty::BytesView)
+    }
+
+    fn emit_bytes_subview(&mut self, args: &[Expr]) -> Result<Ty, CompilerError> {
+        if args.len() != 3 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "bytes.subview expects 3 args".to_string(),
+            ));
+        }
+        let b_ty = self.emit_expr(&args[0])?;
+        if b_ty != Ty::Bytes {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "bytes.subview expects bytes".to_string(),
+            ));
+        }
+        let start_ty = self.emit_expr(&args[1])?;
+        let len_ty = self.emit_expr(&args[2])?;
+        if start_ty != Ty::I32 || len_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "bytes.subview expects (bytes, i32, i32)".to_string(),
+            ));
+        }
+
+        let slice_len = self.f.new_i32_local();
+        let start = self.f.new_i32_local();
+        let bytes_len = self.f.new_i32_local();
+        let bytes_ptr = self.f.new_i32_local();
+        self.f.push(Instruction::LocalSet(slice_len));
+        self.f.push(Instruction::LocalSet(start));
+        self.f.push(Instruction::LocalSet(bytes_len));
+        self.f.push(Instruction::LocalSet(bytes_ptr));
+
+        // end = start + slice_len; trap if end > bytes_len (unsigned)
+        let end = self.f.new_i32_local();
+        self.f.push(Instruction::LocalGet(start));
+        self.f.push(Instruction::LocalGet(slice_len));
+        self.f.push(Instruction::I32Add);
+        self.f.push(Instruction::LocalSet(end));
+
+        self.f.push(Instruction::LocalGet(end));
+        self.f.push(Instruction::LocalGet(bytes_len));
+        self.f.push(Instruction::I32LeU);
+        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+        self.f.push(Instruction::Else);
+        self.f.push(Instruction::Unreachable);
+        self.f.push(Instruction::End);
+
+        // ptr = bytes_ptr + start
+        self.f.push(Instruction::LocalGet(bytes_ptr));
+        self.f.push(Instruction::LocalGet(start));
+        self.f.push(Instruction::I32Add);
+        self.f.push(Instruction::LocalGet(slice_len));
         Ok(Ty::BytesView)
     }
 
@@ -2154,15 +2276,150 @@ fn split_head(items: &[Expr]) -> Result<(&str, &[Expr]), CompilerError> {
     Ok((head, args))
 }
 
+fn required_feature_for_head(head: &str) -> Option<(&'static str, WasmFeatureV1)> {
+    match head {
+        // Core forms.
+        "begin" | "let" | "set" | "set0" | "return" => Some(("form", WasmFeatureV1::CoreFormsV1)),
+        "if" | "for" => Some(("form", WasmFeatureV1::ControlFlowV1)),
+
+        // Literals.
+        "i32.lit" | "bytes.lit" | "bytes.view_lit" => Some(("builtin", WasmFeatureV1::LiteralsV1)),
+
+        // View builtins.
+        "view.to_bytes" => Some(("builtin", WasmFeatureV1::ViewToBytesV1)),
+        "view.len" | "view.get_u8" | "view.slice" | "view.eq" => {
+            Some(("builtin", WasmFeatureV1::ViewReadV1))
+        }
+
+        // Codec builtins.
+        "codec.read_u32_le" | "codec.write_u32_le" => {
+            Some(("builtin", WasmFeatureV1::CodecU32LeV1))
+        }
+
+        // Operators.
+        "+" | "-" | "*" | "/" | "%" => Some(("op", WasmFeatureV1::OpsArithV1)),
+        "=" | "<u" | "<=u" | ">u" | ">=u" => Some(("op", WasmFeatureV1::OpsCmpV1)),
+        "<" | "<=" | ">" | ">=" => Some(("op", WasmFeatureV1::OpsCmpSignedV1)),
+        "!=" => Some(("op", WasmFeatureV1::OpsNeqV1)),
+        "&" | "|" | "^" => Some(("op", WasmFeatureV1::OpsBitwiseV1)),
+        "&&" | "||" => Some(("op", WasmFeatureV1::OpsLogicV1)),
+        "<<u" | ">>u" => Some(("op", WasmFeatureV1::OpsShiftV1)),
+
+        // Bytes builtins.
+        _ if head.starts_with("bytes.") || head.starts_with("vec_u8.") => {
+            Some(("builtin", WasmFeatureV1::BytesBuiltinsV1))
+        }
+        _ if head.starts_with("view.") => Some(("builtin", WasmFeatureV1::ViewReadV1)),
+        _ if head.starts_with("codec.") => Some(("builtin", WasmFeatureV1::CodecU32LeV1)),
+        _ => None,
+    }
+}
+
+fn wasm_unsupported(kind: &str, name: &str, requires: WasmFeatureV1, ptr: &str) -> CompilerError {
+    let message = format!(
+        "wasm backend unsupported {kind}: {name} (requires feature {})",
+        requires.as_str()
+    );
+
+    let mut data = BTreeMap::new();
+    data.insert("kind".to_string(), Value::String(kind.to_string()));
+    data.insert("name".to_string(), Value::String(name.to_string()));
+    data.insert(
+        "requires_feature".to_string(),
+        Value::String(requires.as_str().to_string()),
+    );
+
+    let loc = if ptr.trim().is_empty() {
+        None
+    } else {
+        Some(Location::X07Ast {
+            ptr: ptr.to_string(),
+        })
+    };
+
+    let diagnostic = match kind {
+        "form" => Diagnostic {
+            code: "X07C_WASM_BACKEND_UNSUPPORTED_FORM".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Codegen,
+            message: message.clone(),
+            loc: loc.clone(),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: data.clone(),
+            quickfix: None,
+        },
+        "builtin" => Diagnostic {
+            code: "X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Codegen,
+            message: message.clone(),
+            loc: loc.clone(),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: data.clone(),
+            quickfix: None,
+        },
+        "op" => Diagnostic {
+            code: "X07C_WASM_BACKEND_UNSUPPORTED_OP".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Codegen,
+            message: message.clone(),
+            loc: loc.clone(),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: data.clone(),
+            quickfix: None,
+        },
+        "type" => Diagnostic {
+            code: "X07C_WASM_BACKEND_UNSUPPORTED_TYPE".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Codegen,
+            message: message.clone(),
+            loc: loc.clone(),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: data.clone(),
+            quickfix: None,
+        },
+        "feature" => Diagnostic {
+            code: "X07C_WASM_BACKEND_FEATURE_REQUIRED".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Codegen,
+            message: message.clone(),
+            loc: loc.clone(),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: data.clone(),
+            quickfix: None,
+        },
+        _ => Diagnostic {
+            code: "X07C_WASM_BACKEND_FEATURE_REQUIRED".to_string(),
+            severity: Severity::Error,
+            stage: Stage::Codegen,
+            message: message.clone(),
+            loc: loc.clone(),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data: data.clone(),
+            quickfix: None,
+        },
+    };
+
+    CompilerError::with_diagnostic(CompileErrorKind::Unsupported, message.clone(), diagnostic)
+}
+
 fn flat_len_for_ty(ty: Ty) -> Result<usize, CompilerError> {
     match ty {
         Ty::I32 => Ok(1),
         Ty::Bytes | Ty::BytesView => Ok(2),
         Ty::VecU8 => Ok(3),
         Ty::Never => Ok(0),
-        other => Err(CompilerError::new(
-            CompileErrorKind::Unsupported,
-            format!("wasm backend: unsupported type: {other:?}"),
+        other => Err(wasm_unsupported(
+            "type",
+            &format!("{other:?}"),
+            WasmFeatureV1::CoreFormsV1,
+            "",
         )),
     }
 }
@@ -2288,6 +2545,7 @@ pub(super) fn emit_solve_pure_wasm_v1(
     let mut module_ctx = ModuleCtx {
         func_indices,
         func_sigs,
+        features: wasm_opts.features.clone(),
         data: DataBuilder::default(),
         rt_alloc_fn,
         solve_fn,

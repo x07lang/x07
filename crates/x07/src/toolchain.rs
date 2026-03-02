@@ -625,6 +625,7 @@ pub fn cmd_build(
                 max_memory_bytes: max,
                 no_growable_memory: no_growable,
             },
+            features: x07c::wasm_emit::features::supported_features_v1(),
         };
 
         let prepared =
@@ -945,7 +946,7 @@ pub fn cmd_check(
                 code: code.to_string(),
                 severity: diagnostics::Severity::Error,
                 stage: diagnostics::Stage::Codegen,
-                message: err.message.clone(),
+                message: err.message.to_string(),
                 loc: ptr
                     .as_ref()
                     .map(|p| diagnostics::Location::X07Ast { ptr: p.clone() }),

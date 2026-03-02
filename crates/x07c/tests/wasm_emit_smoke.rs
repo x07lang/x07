@@ -40,6 +40,7 @@ fn wasm_emit_smoke_exports_and_memory_limits() {
                 max_memory_bytes: 2 * 65536,
                 no_growable_memory: true,
             },
+            features: x07c::wasm_emit::features::supported_features_v1(),
         },
     )
     .expect("emit wasm");

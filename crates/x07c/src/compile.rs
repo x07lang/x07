@@ -105,12 +105,29 @@ pub enum CompileErrorKind {
 #[derive(Debug, Clone)]
 pub struct CompilerError {
     pub kind: CompileErrorKind,
-    pub message: String,
+    pub message: Box<str>,
+    pub diagnostic: Option<Box<crate::diagnostics::Diagnostic>>,
 }
 
 impl CompilerError {
     pub fn new(kind: CompileErrorKind, message: String) -> Self {
-        Self { kind, message }
+        Self {
+            kind,
+            message: message.into_boxed_str(),
+            diagnostic: None,
+        }
+    }
+
+    pub fn with_diagnostic(
+        kind: CompileErrorKind,
+        message: String,
+        diagnostic: crate::diagnostics::Diagnostic,
+    ) -> Self {
+        Self {
+            kind,
+            message: message.into_boxed_str(),
+            diagnostic: Some(Box::new(diagnostic)),
+        }
     }
 }
 

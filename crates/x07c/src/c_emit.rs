@@ -595,15 +595,15 @@ pub fn emit_c_program_with_native_requires(
         if let Some(name) = &emitter.current_fn_name {
             if !e.message.contains("(fn=") {
                 if let Some(ptr) = emitter.current_ptr.as_deref().filter(|p| !p.is_empty()) {
-                    e.message = format!("{} (fn={name} ptr={ptr})", e.message);
+                    e.message = format!("{} (fn={name} ptr={ptr})", e.message).into();
                 } else {
-                    e.message = format!("{} (fn={name})", e.message);
+                    e.message = format!("{} (fn={name})", e.message).into();
                 }
             }
         }
         if !e.message.contains("ptr=") {
             if let Some(ptr) = emitter.current_ptr.as_deref().filter(|p| !p.is_empty()) {
-                e.message = format!("{} (ptr={ptr})", e.message);
+                e.message = format!("{} (ptr={ptr})", e.message).into();
             }
         }
         e
@@ -619,15 +619,15 @@ pub fn check_c_program(program: &Program, options: &CompileOptions) -> Result<()
         if let Some(name) = &emitter.current_fn_name {
             if !e.message.contains("(fn=") {
                 if let Some(ptr) = emitter.current_ptr.as_deref().filter(|p| !p.is_empty()) {
-                    e.message = format!("{} (fn={name} ptr={ptr})", e.message);
+                    e.message = format!("{} (fn={name} ptr={ptr})", e.message).into();
                 } else {
-                    e.message = format!("{} (fn={name})", e.message);
+                    e.message = format!("{} (fn={name})", e.message).into();
                 }
             }
         }
         if !e.message.contains("ptr=") {
             if let Some(ptr) = emitter.current_ptr.as_deref().filter(|p| !p.is_empty()) {
-                e.message = format!("{} (ptr={ptr})", e.message);
+                e.message = format!("{} (ptr={ptr})", e.message).into();
             }
         }
         e

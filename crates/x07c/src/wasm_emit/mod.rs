@@ -1,6 +1,7 @@
 use crate::compile::{CompileOptions, CompilerError};
 use crate::program::Program;
 
+pub mod features;
 pub mod layout;
 
 mod emit_module;
@@ -12,9 +13,10 @@ pub struct WasmMemLimits {
     pub no_growable_memory: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct WasmEmitOptions {
     pub mem: WasmMemLimits,
+    pub features: features::WasmFeatureSetV1,
 }
 
 pub fn emit_solve_pure_wasm_v1(

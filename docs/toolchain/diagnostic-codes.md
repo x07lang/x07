@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 193
-- quickfix support (`sometimes` or `always`): 163
-- quickfix coverage: 84.46%
+- total codes: 198
+- quickfix support (`sometimes` or `always`): 168
+- quickfix coverage: 84.85%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -111,6 +111,11 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-WORLD-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0001`. |
 | `X07-WORLD-UNSAFE-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0002`. |
 | `X07-X07AST-PARSE-0001` | x07 / parse / error | sometimes | Core lint/schema diagnostic `X07-X07AST-PARSE-0001`. |
+| `X07C_WASM_BACKEND_FEATURE_REQUIRED` | x07c / codegen / error | sometimes | WASM backend unsupported feature diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN` | x07c / codegen / error | sometimes | WASM backend unsupported builtin diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_FORM` | x07c / codegen / error | sometimes | WASM backend unsupported form diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_FORM`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_OP` | x07c / codegen / error | sometimes | WASM backend unsupported operator diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_OP`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_TYPE` | x07c / codegen / error | sometimes | WASM backend unsupported type diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`. |
 | `X07INIT_AGENT` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_AGENT`. |
 | `X07INIT_AGENT_DIR` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_AGENT_DIR`. |
 | `X07INIT_ARGS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_ARGS`. |
@@ -2292,6 +2297,106 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07C_WASM_BACKEND_FEATURE_REQUIRED`
+
+Summary: WASM backend unsupported feature diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`.
+
+Origins:
+- x07c (stage: codegen, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+
+Agent strategy:
+
+- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
+- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
+- Re-run the build and verify the output wasm validates.
+
+
+## `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`
+
+Summary: WASM backend unsupported builtin diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`.
+
+Origins:
+- x07c (stage: codegen, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+
+Agent strategy:
+
+- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
+- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
+- Re-run the build and verify the output wasm validates.
+
+
+## `X07C_WASM_BACKEND_UNSUPPORTED_FORM`
+
+Summary: WASM backend unsupported form diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_FORM`.
+
+Origins:
+- x07c (stage: codegen, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+
+Agent strategy:
+
+- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
+- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
+- Re-run the build and verify the output wasm validates.
+
+
+## `X07C_WASM_BACKEND_UNSUPPORTED_OP`
+
+Summary: WASM backend unsupported operator diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_OP`.
+
+Origins:
+- x07c (stage: codegen, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+
+Agent strategy:
+
+- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
+- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
+- Re-run the build and verify the output wasm validates.
+
+
+## `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`
+
+Summary: WASM backend unsupported type diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`.
+
+Origins:
+- x07c (stage: codegen, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+
+Agent strategy:
+
+- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
+- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
+- Re-run the build and verify the output wasm validates.
 
 
 ## `X07INIT_AGENT`

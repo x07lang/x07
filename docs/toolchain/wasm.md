@@ -1,4 +1,4 @@
-# WASM (Phases 0–6)
+# WASM (Phases 0–7)
 
 Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
 Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
@@ -7,6 +7,7 @@ Phase 3 adds a **full-stack app bundle** loop (`app build|serve|test`) that comb
 Phase 4 adds **native backend targets** so `x07 wasm component build --emit http|cli` can produce runnable standard-world components without guest adapters and without a compose step.
 Phase 5 adds **Track-1 hardening**: toolchain pin validation, host runtime budgets, deployable app packs, and a core-wasm HTTP reducer loop.
 Phase 6 adds **operational contracts** (ops profiles, capabilities, policy), **SLO-as-code**, **deploy plan generation**, and **signed provenance** (DSSE + Ed25519).
+Phase 7 adds a **native x07→wasm backend** so `solve-pure` wasm builds no longer require `clang` / `wasm-ld` by default.
 
 Phases 0–6 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
@@ -54,12 +55,12 @@ If you need to bypass the registry (e.g. experimentation), use `--profile-file`.
 
 ## Build
 
-`x07 wasm build`:
+`x07 wasm build` delegates to `x07-wasm build` and selects a backend via the wasm profile’s `codegen_backend` field (or `--codegen-backend` override):
 
-- calls `x07 build --freestanding --emit-c-header …`
-- compiles the emitted C to `wasm32` via `clang`
-- links a reactor-style module via `wasm-ld --no-entry`
-- emits a wasm artifact manifest and a machine report
+- `native_x07_wasm_v1` (default): calls `x07 build --emit-wasm ...` and skips `clang` / `wasm-ld`
+- `c_toolchain_v1` (legacy): `x07 build --freestanding --emit-c-header ...` → `clang` → `wasm-ld`
+
+In both cases it emits a wasm artifact manifest and a machine report.
 
 Example:
 
@@ -106,18 +107,18 @@ x07 wasm component profile validate --json
 Phase 4 native targets (adapterless, no compose):
 
 ```sh
-x07 wasm component build --project examples/http_echo/x07.json --emit http --json
+x07 wasm component build --project examples/http_echo/x07.json --emit http-native --json
 x07 wasm component targets --component target/x07-wasm/component/http.component.wasm --wit wit/deps/wasi/http/0.2.8/proxy.wit --world proxy --json
 x07 wasm serve --mode canary --component target/x07-wasm/component/http.component.wasm --request-body @examples/http_echo/tests/fixtures/request_body.bin --json
 ```
 
 ```sh
-x07 wasm component build --project examples/solve_pure_echo/x07.json --emit cli --json
+x07 wasm component build --project examples/solve_pure_echo/x07.json --emit cli-native --json
 x07 wasm component targets --component target/x07-wasm/component/cli.component.wasm --wit wit/deps/wasi/cli/0.2.8/command.wit --world command --json
 x07 wasm component run --component target/x07-wasm/component/cli.component.wasm --stdin examples/solve_pure_echo/tests/fixtures/in_hello.bin --stdout-out dist/stdout.bin --json
 ```
 
-Legacy compose path (Phase 1 adapters + `wac plug`):
+Composed path (Phase 1 adapters + `wac plug`):
 
 ```sh
 x07 wasm component build --project examples/http_echo/x07.json --emit solve --json
@@ -128,7 +129,7 @@ x07 wasm component targets --component dist/app.http.component.wasm --wit wit/de
 
 Notes:
 
-- `component build --emit all` builds `solve + http + cli` (native). Build adapters explicitly via `http-adapter|cli-adapter`.
+- `component build --emit all` builds `solve + http + cli` (composed). Build adapters explicitly via `http-adapter|cli-adapter`.
 - Native HTTP components surface failures via response headers (`x-x07-diag-code`, optional `x-x07-diag-data-b64`). Native CLI components surface failures via stderr sentinel lines (`x07-diag-code: ...`).
 
 Run (legacy composed artifacts):
