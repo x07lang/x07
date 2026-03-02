@@ -222,6 +222,10 @@ impl<'a> ExprEmitter<'a> {
                     "bytes.slice" => Ok(Ty::Bytes),
                     "bytes.lit" => Ok(Ty::Bytes),
                     "bytes.view_lit" => Ok(Ty::BytesView),
+                    "fmt.u32_to_dec" => Ok(Ty::Bytes),
+                    "fmt.s32_to_dec" => Ok(Ty::Bytes),
+                    "parse.u32_dec" => Ok(Ty::I32),
+                    "parse.u32_dec_at" => Ok(Ty::I32),
                     "codec.read_u32_le" => Ok(Ty::I32),
                     "codec.write_u32_le" => Ok(Ty::Bytes),
                     "vec_u8.with_capacity" => Ok(Ty::VecU8),
@@ -246,6 +250,8 @@ impl<'a> ExprEmitter<'a> {
                         }
                         if head.starts_with("bytes.")
                             || head.starts_with("view.")
+                            || head.starts_with("fmt.")
+                            || head.starts_with("parse.")
                             || head.starts_with("codec.")
                             || head.starts_with("vec_u8.")
                         {
@@ -322,6 +328,10 @@ impl<'a> ExprEmitter<'a> {
                     "bytes.slice" => self.emit_bytes_slice(args),
                     "bytes.lit" => self.emit_bytes_lit(args),
                     "bytes.view_lit" => self.emit_bytes_view_lit(args),
+                    "fmt.u32_to_dec" => self.emit_fmt_u32_to_dec(args),
+                    "fmt.s32_to_dec" => self.emit_fmt_s32_to_dec(args),
+                    "parse.u32_dec" => self.emit_parse_u32_dec(args),
+                    "parse.u32_dec_at" => self.emit_parse_u32_dec_at(args),
                     "codec.read_u32_le" => self.emit_codec_read_u32_le(args),
                     "codec.write_u32_le" => self.emit_codec_write_u32_le(args),
                     "vec_u8.with_capacity" => self.emit_vec_u8_with_capacity(args),
@@ -362,6 +372,8 @@ impl<'a> ExprEmitter<'a> {
                     _ => {
                         if (head.starts_with("bytes.")
                             || head.starts_with("view.")
+                            || head.starts_with("fmt.")
+                            || head.starts_with("parse.")
                             || head.starts_with("codec.")
                             || head.starts_with("vec_u8."))
                             && !self.module.func_sigs.contains_key(head)
@@ -860,75 +872,85 @@ impl<'a> ExprEmitter<'a> {
         self.f.push(Instruction::LocalSet(a_len));
         self.f.push(Instruction::LocalSet(a_ptr));
 
-        // if a_len != b_len -> return 0
-        self.f.push(Instruction::LocalGet(a_len));
-        self.f.push(Instruction::LocalGet(b_len));
-        self.f.push(Instruction::I32Ne);
-        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
-        self.f.push(Instruction::I32Const(0));
-        self.f.push(Instruction::Return);
-        self.f.push(Instruction::End);
-
-        // if a_len == 0 -> return 1
-        self.f.push(Instruction::LocalGet(a_len));
-        self.f.push(Instruction::I32Eqz);
-        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+        let result = self.f.new_i32_local();
         self.f.push(Instruction::I32Const(1));
-        self.f.push(Instruction::Return);
-        self.f.push(Instruction::End);
-
-        let i = self.f.new_i32_local();
-        self.f.push(Instruction::I32Const(0));
-        self.f.push(Instruction::LocalSet(i));
+        self.f.push(Instruction::LocalSet(result));
 
         self.f
             .push(Instruction::Block(wasm_encoder::BlockType::Empty));
-        self.f
-            .push(Instruction::Loop(wasm_encoder::BlockType::Empty));
+        {
+            // if a_len != b_len -> result = 0; break
+            self.f.push(Instruction::LocalGet(a_len));
+            self.f.push(Instruction::LocalGet(b_len));
+            self.f.push(Instruction::I32Ne);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::I32Const(0));
+            self.f.push(Instruction::LocalSet(result));
+            self.f.push(Instruction::Br(1));
+            self.f.push(Instruction::End);
 
-        // if i >= a_len break
-        self.f.push(Instruction::LocalGet(i));
-        self.f.push(Instruction::LocalGet(a_len));
-        self.f.push(Instruction::I32GeU);
-        self.f.push(Instruction::BrIf(1));
+            // if a_len == 0 -> break (result already 1)
+            self.f.push(Instruction::LocalGet(a_len));
+            self.f.push(Instruction::I32Eqz);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::Br(1));
+            self.f.push(Instruction::End);
 
-        // load a[i]
-        self.f.push(Instruction::LocalGet(a_ptr));
-        self.f.push(Instruction::LocalGet(i));
-        self.f.push(Instruction::I32Add);
-        self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
-            offset: 0,
-            align: 0,
-            memory_index: 0,
-        }));
+            let i = self.f.new_i32_local();
+            self.f.push(Instruction::I32Const(0));
+            self.f.push(Instruction::LocalSet(i));
 
-        // load b[i]
-        self.f.push(Instruction::LocalGet(b_ptr));
-        self.f.push(Instruction::LocalGet(i));
-        self.f.push(Instruction::I32Add);
-        self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
-            offset: 0,
-            align: 0,
-            memory_index: 0,
-        }));
+            self.f
+                .push(Instruction::Block(wasm_encoder::BlockType::Empty));
+            self.f
+                .push(Instruction::Loop(wasm_encoder::BlockType::Empty));
 
-        self.f.push(Instruction::I32Ne);
-        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
-        self.f.push(Instruction::I32Const(0));
-        self.f.push(Instruction::Return);
-        self.f.push(Instruction::End);
+            // if i >= a_len break
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::LocalGet(a_len));
+            self.f.push(Instruction::I32GeU);
+            self.f.push(Instruction::BrIf(1));
 
-        // i += 1
-        self.f.push(Instruction::LocalGet(i));
-        self.f.push(Instruction::I32Const(1));
-        self.f.push(Instruction::I32Add);
-        self.f.push(Instruction::LocalSet(i));
+            // load a[i]
+            self.f.push(Instruction::LocalGet(a_ptr));
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
+                offset: 0,
+                align: 0,
+                memory_index: 0,
+            }));
 
-        self.f.push(Instruction::Br(0));
-        self.f.push(Instruction::End); // loop
-        self.f.push(Instruction::End); // block
+            // load b[i]
+            self.f.push(Instruction::LocalGet(b_ptr));
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
+                offset: 0,
+                align: 0,
+                memory_index: 0,
+            }));
 
-        self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::I32Ne);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::I32Const(0));
+            self.f.push(Instruction::LocalSet(result));
+            self.f.push(Instruction::Br(3));
+            self.f.push(Instruction::End);
+
+            // i += 1
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::LocalSet(i));
+
+            self.f.push(Instruction::Br(0));
+            self.f.push(Instruction::End); // loop
+            self.f.push(Instruction::End); // block
+        }
+        self.f.push(Instruction::End); // outer block
+
+        self.f.push(Instruction::LocalGet(result));
         Ok(Ty::I32)
     }
 
@@ -1271,89 +1293,102 @@ impl<'a> ExprEmitter<'a> {
         self.f.push(Instruction::I32Const(0));
         self.f.push(Instruction::LocalSet(i));
 
+        let result = self.f.new_i32_local();
+        self.f.push(Instruction::I32Const(0));
+        self.f.push(Instruction::LocalSet(result));
+
         self.f
             .push(Instruction::Block(wasm_encoder::BlockType::Empty));
-        self.f
-            .push(Instruction::Loop(wasm_encoder::BlockType::Empty));
-        self.f.push(Instruction::LocalGet(i));
-        self.f.push(Instruction::LocalGet(min));
-        self.f.push(Instruction::I32GeU);
-        self.f.push(Instruction::BrIf(1));
+        {
+            self.f
+                .push(Instruction::Block(wasm_encoder::BlockType::Empty));
+            self.f
+                .push(Instruction::Loop(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::LocalGet(min));
+            self.f.push(Instruction::I32GeU);
+            self.f.push(Instruction::BrIf(1));
 
-        // a byte
-        self.f.push(Instruction::LocalGet(a_ptr));
-        self.f.push(Instruction::LocalGet(a_off));
-        self.f.push(Instruction::I32Add);
-        self.f.push(Instruction::LocalGet(i));
-        self.f.push(Instruction::I32Add);
-        self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
-            offset: 0,
-            align: 0,
-            memory_index: 0,
-        }));
-        let ac = self.f.new_i32_local();
-        self.f.push(Instruction::LocalSet(ac));
+            // a byte
+            self.f.push(Instruction::LocalGet(a_ptr));
+            self.f.push(Instruction::LocalGet(a_off));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
+                offset: 0,
+                align: 0,
+                memory_index: 0,
+            }));
+            let ac = self.f.new_i32_local();
+            self.f.push(Instruction::LocalSet(ac));
 
-        // b byte
-        self.f.push(Instruction::LocalGet(b_ptr));
-        self.f.push(Instruction::LocalGet(b_off));
-        self.f.push(Instruction::I32Add);
-        self.f.push(Instruction::LocalGet(i));
-        self.f.push(Instruction::I32Add);
-        self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
-            offset: 0,
-            align: 0,
-            memory_index: 0,
-        }));
-        let bc = self.f.new_i32_local();
-        self.f.push(Instruction::LocalSet(bc));
+            // b byte
+            self.f.push(Instruction::LocalGet(b_ptr));
+            self.f.push(Instruction::LocalGet(b_off));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
+                offset: 0,
+                align: 0,
+                memory_index: 0,
+            }));
+            let bc = self.f.new_i32_local();
+            self.f.push(Instruction::LocalSet(bc));
 
-        // if ac < bc => return -1
-        self.f.push(Instruction::LocalGet(ac));
-        self.f.push(Instruction::LocalGet(bc));
-        self.f.push(Instruction::I32LtU);
-        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
-        self.f.push(Instruction::I32Const(-1));
-        self.f.push(Instruction::Return);
-        self.f.push(Instruction::End);
+            // if ac < bc => return -1
+            self.f.push(Instruction::LocalGet(ac));
+            self.f.push(Instruction::LocalGet(bc));
+            self.f.push(Instruction::I32LtU);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::I32Const(-1));
+            self.f.push(Instruction::LocalSet(result));
+            self.f.push(Instruction::Br(3));
+            self.f.push(Instruction::End);
 
-        // if bc < ac => return 1
-        self.f.push(Instruction::LocalGet(bc));
-        self.f.push(Instruction::LocalGet(ac));
-        self.f.push(Instruction::I32LtU);
-        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
-        self.f.push(Instruction::I32Const(1));
-        self.f.push(Instruction::Return);
-        self.f.push(Instruction::End);
+            // if bc < ac => return 1
+            self.f.push(Instruction::LocalGet(bc));
+            self.f.push(Instruction::LocalGet(ac));
+            self.f.push(Instruction::I32LtU);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::LocalSet(result));
+            self.f.push(Instruction::Br(3));
+            self.f.push(Instruction::End);
 
-        // i += 1
-        self.f.push(Instruction::LocalGet(i));
-        self.f.push(Instruction::I32Const(1));
-        self.f.push(Instruction::I32Add);
-        self.f.push(Instruction::LocalSet(i));
+            // i += 1
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::LocalSet(i));
 
-        self.f.push(Instruction::Br(0));
-        self.f.push(Instruction::End); // loop
-        self.f.push(Instruction::End); // block
+            self.f.push(Instruction::Br(0));
+            self.f.push(Instruction::End); // loop
+            self.f.push(Instruction::End); // block
 
-        // after compare: if a_len < b_len => -1; if a_len > b_len => 1 else 0
-        self.f.push(Instruction::LocalGet(a_len));
-        self.f.push(Instruction::LocalGet(b_len));
-        self.f.push(Instruction::I32LtU);
-        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
-        self.f.push(Instruction::I32Const(-1));
-        self.f.push(Instruction::Return);
-        self.f.push(Instruction::End);
+            // after compare: if a_len < b_len => -1; if a_len > b_len => 1 else 0
+            self.f.push(Instruction::LocalGet(a_len));
+            self.f.push(Instruction::LocalGet(b_len));
+            self.f.push(Instruction::I32LtU);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::I32Const(-1));
+            self.f.push(Instruction::LocalSet(result));
+            self.f.push(Instruction::Br(1));
+            self.f.push(Instruction::End);
 
-        self.f.push(Instruction::LocalGet(a_len));
-        self.f.push(Instruction::LocalGet(b_len));
-        self.f.push(Instruction::I32GtU);
-        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
-        self.f.push(Instruction::I32Const(1));
-        self.f.push(Instruction::Return);
-        self.f.push(Instruction::End);
+            self.f.push(Instruction::LocalGet(a_len));
+            self.f.push(Instruction::LocalGet(b_len));
+            self.f.push(Instruction::I32GtU);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::LocalSet(result));
+            self.f.push(Instruction::Br(1));
+            self.f.push(Instruction::End);
+        }
+        self.f.push(Instruction::End); // outer block
 
-        self.f.push(Instruction::I32Const(0));
+        self.f.push(Instruction::LocalGet(result));
         Ok(Ty::I32)
     }
 
@@ -1591,6 +1626,461 @@ impl<'a> ExprEmitter<'a> {
         self.f.push(Instruction::LocalGet(out_ptr));
         self.f.push(Instruction::I32Const(4));
         Ok(Ty::Bytes)
+    }
+
+    fn emit_fmt_u32_to_dec_impl(&mut self, x: u32) -> Result<(), CompilerError> {
+        let out_ptr = self.f.new_i32_local();
+        let out_len = self.f.new_i32_local();
+
+        // if x == 0 => "0"
+        self.f.push(Instruction::LocalGet(x));
+        self.f.push(Instruction::I32Eqz);
+        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+        {
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::Call(self.module.rt_alloc_fn));
+            self.f.push(Instruction::LocalSet(out_ptr));
+
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::LocalSet(out_len));
+
+            self.f.push(Instruction::LocalGet(out_ptr));
+            self.f.push(Instruction::I32Const('0' as i32));
+            self.f.push(Instruction::I32Store8(wasm_encoder::MemArg {
+                offset: 0,
+                align: 0,
+                memory_index: 0,
+            }));
+        }
+        self.f.push(Instruction::Else);
+        {
+            // First pass: count digits n.
+            let tmp = self.f.new_i32_local();
+            let n = self.f.new_i32_local();
+
+            self.f.push(Instruction::LocalGet(x));
+            self.f.push(Instruction::LocalSet(tmp));
+            self.f.push(Instruction::I32Const(0));
+            self.f.push(Instruction::LocalSet(n));
+
+            self.f
+                .push(Instruction::Block(wasm_encoder::BlockType::Empty));
+            self.f
+                .push(Instruction::Loop(wasm_encoder::BlockType::Empty));
+            {
+                // while tmp != 0
+                self.f.push(Instruction::LocalGet(tmp));
+                self.f.push(Instruction::I32Eqz);
+                self.f.push(Instruction::BrIf(1));
+
+                // n += 1
+                self.f.push(Instruction::LocalGet(n));
+                self.f.push(Instruction::I32Const(1));
+                self.f.push(Instruction::I32Add);
+                self.f.push(Instruction::LocalSet(n));
+
+                // tmp = tmp / 10 (unsigned)
+                self.f.push(Instruction::LocalGet(tmp));
+                self.f.push(Instruction::I32Const(10));
+                self.f.push(Instruction::I32DivU);
+                self.f.push(Instruction::LocalSet(tmp));
+
+                self.f.push(Instruction::Br(0));
+            }
+            self.f.push(Instruction::End);
+            self.f.push(Instruction::End);
+
+            // Allocate out bytes (ptr,len=n).
+            self.f.push(Instruction::LocalGet(n));
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::Call(self.module.rt_alloc_fn));
+            self.f.push(Instruction::LocalSet(out_ptr));
+
+            self.f.push(Instruction::LocalGet(n));
+            self.f.push(Instruction::LocalSet(out_len));
+
+            // Second pass: fill digits from the end.
+            let tmp2 = self.f.new_i32_local();
+            let i = self.f.new_i32_local();
+
+            self.f.push(Instruction::LocalGet(x));
+            self.f.push(Instruction::LocalSet(tmp2));
+            self.f.push(Instruction::LocalGet(n));
+            self.f.push(Instruction::LocalSet(i));
+
+            self.f
+                .push(Instruction::Block(wasm_encoder::BlockType::Empty));
+            self.f
+                .push(Instruction::Loop(wasm_encoder::BlockType::Empty));
+            {
+                self.f.push(Instruction::LocalGet(tmp2));
+                self.f.push(Instruction::I32Eqz);
+                self.f.push(Instruction::BrIf(1));
+
+                // digit = tmp2 % 10 (unsigned)
+                let digit = self.f.new_i32_local();
+                self.f.push(Instruction::LocalGet(tmp2));
+                self.f.push(Instruction::I32Const(10));
+                self.f.push(Instruction::I32RemU);
+                self.f.push(Instruction::LocalSet(digit));
+
+                // tmp2 = tmp2 / 10 (unsigned)
+                self.f.push(Instruction::LocalGet(tmp2));
+                self.f.push(Instruction::I32Const(10));
+                self.f.push(Instruction::I32DivU);
+                self.f.push(Instruction::LocalSet(tmp2));
+
+                // i -= 1
+                self.f.push(Instruction::LocalGet(i));
+                self.f.push(Instruction::I32Const(1));
+                self.f.push(Instruction::I32Sub);
+                self.f.push(Instruction::LocalSet(i));
+
+                // out_ptr[i] = '0' + digit
+                self.f.push(Instruction::LocalGet(out_ptr));
+                self.f.push(Instruction::LocalGet(i));
+                self.f.push(Instruction::I32Add);
+                self.f.push(Instruction::LocalGet(digit));
+                self.f.push(Instruction::I32Const('0' as i32));
+                self.f.push(Instruction::I32Add);
+                self.f.push(Instruction::I32Store8(wasm_encoder::MemArg {
+                    offset: 0,
+                    align: 0,
+                    memory_index: 0,
+                }));
+
+                self.f.push(Instruction::Br(0));
+            }
+            self.f.push(Instruction::End);
+            self.f.push(Instruction::End);
+        }
+        self.f.push(Instruction::End);
+
+        self.f.push(Instruction::LocalGet(out_ptr));
+        self.f.push(Instruction::LocalGet(out_len));
+        Ok(())
+    }
+
+    fn emit_fmt_u32_to_dec(&mut self, args: &[Expr]) -> Result<Ty, CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "fmt.u32_to_dec expects 1 arg".to_string(),
+            ));
+        }
+        let x_ty = self.emit_expr(&args[0])?;
+        if x_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "fmt.u32_to_dec expects i32".to_string(),
+            ));
+        }
+        let x = self.f.new_i32_local();
+        self.f.push(Instruction::LocalSet(x));
+        self.emit_fmt_u32_to_dec_impl(x)?;
+        Ok(Ty::Bytes)
+    }
+
+    fn emit_fmt_s32_to_dec(&mut self, args: &[Expr]) -> Result<Ty, CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "fmt.s32_to_dec expects 1 arg".to_string(),
+            ));
+        }
+        let x_ty = self.emit_expr(&args[0])?;
+        if x_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "fmt.s32_to_dec expects i32".to_string(),
+            ));
+        }
+        let x = self.f.new_i32_local();
+        self.f.push(Instruction::LocalSet(x));
+
+        let out_ptr = self.f.new_i32_local();
+        let out_len = self.f.new_i32_local();
+
+        // if sign bit not set: treat as u32
+        self.f.push(Instruction::LocalGet(x));
+        self.f.push(Instruction::I32Const(0x8000_0000u32 as i32));
+        self.f.push(Instruction::I32And);
+        self.f.push(Instruction::I32Eqz);
+        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+        {
+            self.emit_fmt_u32_to_dec_impl(x)?;
+            self.f.push(Instruction::LocalSet(out_len));
+            self.f.push(Instruction::LocalSet(out_ptr));
+        }
+        self.f.push(Instruction::Else);
+        {
+            // mag = 0 - x (two's complement) as u32 bits.
+            let mag = self.f.new_i32_local();
+            self.f.push(Instruction::I32Const(0));
+            self.f.push(Instruction::LocalGet(x));
+            self.f.push(Instruction::I32Sub);
+            self.f.push(Instruction::LocalSet(mag));
+
+            // digits = fmt_u32_to_dec(mag)
+            self.emit_fmt_u32_to_dec_impl(mag)?;
+            let digits_len = self.f.new_i32_local();
+            let digits_ptr = self.f.new_i32_local();
+            self.f.push(Instruction::LocalSet(digits_len));
+            self.f.push(Instruction::LocalSet(digits_ptr));
+
+            // out = bytes.alloc(digits.len + 1)
+            self.f.push(Instruction::LocalGet(digits_len));
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::LocalSet(out_len));
+
+            self.f.push(Instruction::LocalGet(out_len));
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::Call(self.module.rt_alloc_fn));
+            self.f.push(Instruction::LocalSet(out_ptr));
+
+            // out[0] = '-'
+            self.f.push(Instruction::LocalGet(out_ptr));
+            self.f.push(Instruction::I32Const('-' as i32));
+            self.f.push(Instruction::I32Store8(wasm_encoder::MemArg {
+                offset: 0,
+                align: 0,
+                memory_index: 0,
+            }));
+
+            // memcpy out[1..] = digits
+            let i = self.f.new_i32_local();
+            self.f.push(Instruction::I32Const(0));
+            self.f.push(Instruction::LocalSet(i));
+
+            self.f
+                .push(Instruction::Block(wasm_encoder::BlockType::Empty));
+            self.f
+                .push(Instruction::Loop(wasm_encoder::BlockType::Empty));
+            {
+                // if i >= digits_len break
+                self.f.push(Instruction::LocalGet(i));
+                self.f.push(Instruction::LocalGet(digits_len));
+                self.f.push(Instruction::I32LtU);
+                self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+                self.f.push(Instruction::Else);
+                self.f.push(Instruction::Br(2));
+                self.f.push(Instruction::End);
+
+                // b = load8(digits_ptr+i)
+                let b = self.f.new_i32_local();
+                self.f.push(Instruction::LocalGet(digits_ptr));
+                self.f.push(Instruction::LocalGet(i));
+                self.f.push(Instruction::I32Add);
+                self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
+                    offset: 0,
+                    align: 0,
+                    memory_index: 0,
+                }));
+                self.f.push(Instruction::LocalSet(b));
+
+                // store8(out_ptr+1+i, b)
+                self.f.push(Instruction::LocalGet(out_ptr));
+                self.f.push(Instruction::I32Const(1));
+                self.f.push(Instruction::I32Add);
+                self.f.push(Instruction::LocalGet(i));
+                self.f.push(Instruction::I32Add);
+                self.f.push(Instruction::LocalGet(b));
+                self.f.push(Instruction::I32Store8(wasm_encoder::MemArg {
+                    offset: 0,
+                    align: 0,
+                    memory_index: 0,
+                }));
+
+                // i += 1
+                self.f.push(Instruction::LocalGet(i));
+                self.f.push(Instruction::I32Const(1));
+                self.f.push(Instruction::I32Add);
+                self.f.push(Instruction::LocalSet(i));
+
+                self.f.push(Instruction::Br(0));
+            }
+            self.f.push(Instruction::End);
+            self.f.push(Instruction::End);
+        }
+        self.f.push(Instruction::End);
+
+        self.f.push(Instruction::LocalGet(out_ptr));
+        self.f.push(Instruction::LocalGet(out_len));
+        Ok(Ty::Bytes)
+    }
+
+    fn emit_parse_u32_dec_slice(&mut self, ptr: u32, len: u32) -> Result<(), CompilerError> {
+        // if len == 0 trap
+        self.f.push(Instruction::LocalGet(len));
+        self.f.push(Instruction::I32Eqz);
+        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+        self.f.push(Instruction::Unreachable);
+        self.f.push(Instruction::End);
+
+        let acc = self.f.new_i32_local();
+        let i = self.f.new_i32_local();
+        self.f.push(Instruction::I32Const(0));
+        self.f.push(Instruction::LocalSet(acc));
+        self.f.push(Instruction::I32Const(0));
+        self.f.push(Instruction::LocalSet(i));
+
+        self.f
+            .push(Instruction::Block(wasm_encoder::BlockType::Empty));
+        self.f
+            .push(Instruction::Loop(wasm_encoder::BlockType::Empty));
+        {
+            // if i >= len break
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::LocalGet(len));
+            self.f.push(Instruction::I32LtU);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::Else);
+            self.f.push(Instruction::Br(2));
+            self.f.push(Instruction::End);
+
+            // b = mem[ptr + i]
+            let b = self.f.new_i32_local();
+            self.f.push(Instruction::LocalGet(ptr));
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::I32Load8U(wasm_encoder::MemArg {
+                offset: 0,
+                align: 0,
+                memory_index: 0,
+            }));
+            self.f.push(Instruction::LocalSet(b));
+
+            // if b < '0' trap
+            self.f.push(Instruction::LocalGet(b));
+            self.f.push(Instruction::I32Const('0' as i32));
+            self.f.push(Instruction::I32LtU);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::Unreachable);
+            self.f.push(Instruction::End);
+
+            // if b > '9' trap
+            self.f.push(Instruction::LocalGet(b));
+            self.f.push(Instruction::I32Const('9' as i32));
+            self.f.push(Instruction::I32GtU);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::Unreachable);
+            self.f.push(Instruction::End);
+
+            // digit = b - '0'
+            let digit = self.f.new_i32_local();
+            self.f.push(Instruction::LocalGet(b));
+            self.f.push(Instruction::I32Const('0' as i32));
+            self.f.push(Instruction::I32Sub);
+            self.f.push(Instruction::LocalSet(digit));
+
+            // if acc > (u32::MAX - digit) / 10 trap
+            self.f.push(Instruction::I32Const(-1));
+            self.f.push(Instruction::LocalGet(digit));
+            self.f.push(Instruction::I32Sub);
+            self.f.push(Instruction::I32Const(10));
+            self.f.push(Instruction::I32DivU);
+            self.f.push(Instruction::LocalGet(acc));
+            self.f.push(Instruction::I32LtU);
+            self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+            self.f.push(Instruction::Unreachable);
+            self.f.push(Instruction::End);
+
+            // acc = acc * 10 + digit
+            self.f.push(Instruction::LocalGet(acc));
+            self.f.push(Instruction::I32Const(10));
+            self.f.push(Instruction::I32Mul);
+            self.f.push(Instruction::LocalGet(digit));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::LocalSet(acc));
+
+            // i += 1
+            self.f.push(Instruction::LocalGet(i));
+            self.f.push(Instruction::I32Const(1));
+            self.f.push(Instruction::I32Add);
+            self.f.push(Instruction::LocalSet(i));
+
+            self.f.push(Instruction::Br(0));
+        }
+        self.f.push(Instruction::End);
+        self.f.push(Instruction::End);
+
+        self.f.push(Instruction::LocalGet(acc));
+        Ok(())
+    }
+
+    fn emit_parse_u32_dec(&mut self, args: &[Expr]) -> Result<Ty, CompilerError> {
+        if args.len() != 1 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "parse.u32_dec expects 1 arg".to_string(),
+            ));
+        }
+        let v_ty = self.emit_expr(&args[0])?;
+        if v_ty != Ty::BytesView {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "parse.u32_dec expects bytes_view".to_string(),
+            ));
+        }
+
+        let len = self.f.new_i32_local();
+        let ptr = self.f.new_i32_local();
+        self.f.push(Instruction::LocalSet(len));
+        self.f.push(Instruction::LocalSet(ptr));
+
+        self.emit_parse_u32_dec_slice(ptr, len)?;
+        Ok(Ty::I32)
+    }
+
+    fn emit_parse_u32_dec_at(&mut self, args: &[Expr]) -> Result<Ty, CompilerError> {
+        if args.len() != 2 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Parse,
+                "parse.u32_dec_at expects 2 args".to_string(),
+            ));
+        }
+        let v_ty = self.emit_expr(&args[0])?;
+        let off_ty = self.emit_expr(&args[1])?;
+        if v_ty != Ty::BytesView || off_ty != Ty::I32 {
+            return Err(CompilerError::new(
+                CompileErrorKind::Typing,
+                "parse.u32_dec_at expects (bytes_view, i32)".to_string(),
+            ));
+        }
+
+        let off = self.f.new_i32_local();
+        let len = self.f.new_i32_local();
+        let ptr = self.f.new_i32_local();
+        self.f.push(Instruction::LocalSet(off));
+        self.f.push(Instruction::LocalSet(len));
+        self.f.push(Instruction::LocalSet(ptr));
+
+        // if off > len trap (unsigned)
+        self.f.push(Instruction::LocalGet(off));
+        self.f.push(Instruction::LocalGet(len));
+        self.f.push(Instruction::I32LeU);
+        self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
+        self.f.push(Instruction::Else);
+        self.f.push(Instruction::Unreachable);
+        self.f.push(Instruction::End);
+
+        let ptr2 = self.f.new_i32_local();
+        let len2 = self.f.new_i32_local();
+
+        self.f.push(Instruction::LocalGet(ptr));
+        self.f.push(Instruction::LocalGet(off));
+        self.f.push(Instruction::I32Add);
+        self.f.push(Instruction::LocalSet(ptr2));
+
+        self.f.push(Instruction::LocalGet(len));
+        self.f.push(Instruction::LocalGet(off));
+        self.f.push(Instruction::I32Sub);
+        self.f.push(Instruction::LocalSet(len2));
+
+        self.emit_parse_u32_dec_slice(ptr2, len2)?;
+        Ok(Ty::I32)
     }
 
     fn emit_vec_u8_with_capacity(&mut self, args: &[Expr]) -> Result<Ty, CompilerError> {
@@ -2291,6 +2781,12 @@ fn required_feature_for_head(head: &str) -> Option<(&'static str, WasmFeatureV1)
             Some(("builtin", WasmFeatureV1::ViewReadV1))
         }
 
+        // fmt builtins.
+        "fmt.u32_to_dec" | "fmt.s32_to_dec" => Some(("builtin", WasmFeatureV1::FmtBuiltinsV1)),
+
+        // parse builtins.
+        "parse.u32_dec" | "parse.u32_dec_at" => Some(("builtin", WasmFeatureV1::ParseBuiltinsV1)),
+
         // Codec builtins.
         "codec.read_u32_le" | "codec.write_u32_le" => {
             Some(("builtin", WasmFeatureV1::CodecU32LeV1))
@@ -2310,6 +2806,8 @@ fn required_feature_for_head(head: &str) -> Option<(&'static str, WasmFeatureV1)
             Some(("builtin", WasmFeatureV1::BytesBuiltinsV1))
         }
         _ if head.starts_with("view.") => Some(("builtin", WasmFeatureV1::ViewReadV1)),
+        _ if head.starts_with("fmt.") => Some(("builtin", WasmFeatureV1::FmtBuiltinsV1)),
+        _ if head.starts_with("parse.") => Some(("builtin", WasmFeatureV1::ParseBuiltinsV1)),
         _ if head.starts_with("codec.") => Some(("builtin", WasmFeatureV1::CodecU32LeV1)),
         _ => None,
     }

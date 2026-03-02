@@ -128,6 +128,69 @@ fn wasm_feature_gate_ops_logic_blocks_and() {
 }
 
 #[test]
+fn wasm_feature_gate_fmt_builtins_blocks_s32_to_dec() {
+    let program = program_with_solve(expr_list(vec![expr_ident("fmt.s32_to_dec"), expr_int(-1)]));
+
+    let options = default_compile_options();
+    let wasm_opts = WasmEmitOptions {
+        mem: default_mem_limits(),
+        features: WasmFeatureSetV1::new(&[WasmFeatureV1::CoreFormsV1]),
+    };
+
+    let err = x07c::wasm_emit::emit_solve_pure_wasm_v1(&program, &options, &wasm_opts)
+        .expect_err("expected feature gate error");
+    assert_eq!(err.kind, CompileErrorKind::Unsupported);
+
+    let diag = err.diagnostic.expect("expected diagnostic");
+    assert_eq!(diag.code, "X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN");
+    assert_eq!(
+        diag.data.get("kind").and_then(|v| v.as_str()),
+        Some("builtin")
+    );
+    assert_eq!(
+        diag.data.get("name").and_then(|v| v.as_str()),
+        Some("fmt.s32_to_dec")
+    );
+    assert_eq!(
+        diag.data.get("requires_feature").and_then(|v| v.as_str()),
+        Some("FmtBuiltinsV1")
+    );
+}
+
+#[test]
+fn wasm_feature_gate_parse_builtins_blocks_u32_dec() {
+    let program = program_with_solve(expr_list(vec![
+        expr_ident("parse.u32_dec"),
+        expr_ident("input"),
+    ]));
+
+    let options = default_compile_options();
+    let wasm_opts = WasmEmitOptions {
+        mem: default_mem_limits(),
+        features: WasmFeatureSetV1::new(&[WasmFeatureV1::CoreFormsV1]),
+    };
+
+    let err = x07c::wasm_emit::emit_solve_pure_wasm_v1(&program, &options, &wasm_opts)
+        .expect_err("expected feature gate error");
+    assert_eq!(err.kind, CompileErrorKind::Unsupported);
+
+    let diag = err.diagnostic.expect("expected diagnostic");
+    assert_eq!(diag.code, "X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN");
+    assert_eq!(
+        diag.data.get("kind").and_then(|v| v.as_str()),
+        Some("builtin")
+    );
+    assert_eq!(
+        diag.data.get("name").and_then(|v| v.as_str()),
+        Some("parse.u32_dec")
+    );
+    assert_eq!(
+        diag.data.get("requires_feature").and_then(|v| v.as_str()),
+        Some("ParseBuiltinsV1")
+    );
+}
+
+#[test]
 fn wasm_backend_accepts_contract_pure_surface_by_default() {
     let program = program_with_solve(expr_list(vec![
         expr_ident("begin"),

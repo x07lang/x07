@@ -23,6 +23,53 @@ fn empty_program() -> Program {
     }
 }
 
+fn expr_ident(name: &str) -> x07c::ast::Expr {
+    x07c::ast::Expr::Ident {
+        name: name.to_string(),
+        ptr: String::new(),
+    }
+}
+
+fn expr_int(value: i32) -> x07c::ast::Expr {
+    x07c::ast::Expr::Int {
+        value,
+        ptr: String::new(),
+    }
+}
+
+fn expr_list(items: Vec<x07c::ast::Expr>) -> x07c::ast::Expr {
+    x07c::ast::Expr::List {
+        items,
+        ptr: String::new(),
+    }
+}
+
+fn program_with_contract_pure_cmp() -> Program {
+    Program {
+        functions: Vec::new(),
+        async_functions: Vec::new(),
+        extern_functions: Vec::new(),
+        solve: expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![
+                expr_ident("view.eq"),
+                expr_ident("input"),
+                expr_ident("input"),
+            ]),
+            expr_list(vec![
+                expr_ident("bytes.cmp_range"),
+                expr_ident("input"),
+                expr_int(0),
+                expr_int(0),
+                expr_ident("input"),
+                expr_int(0),
+                expr_int(0),
+            ]),
+            expr_list(vec![expr_ident("view.to_bytes"), expr_ident("input")]),
+        ]),
+    }
+}
+
 #[test]
 fn wasm_emit_smoke_exports_and_memory_limits() {
     let program = empty_program();
@@ -81,4 +128,32 @@ fn wasm_emit_smoke_exports_and_memory_limits() {
 
     assert_eq!(mem_min, Some(2));
     assert_eq!(mem_max, Some(2));
+}
+
+#[test]
+fn wasm_emit_validates_view_eq_and_bytes_cmp_range() {
+    let program = program_with_contract_pure_cmp();
+    let options = CompileOptions {
+        freestanding: true,
+        world: x07_worlds::WorldId::SolvePure,
+        ..Default::default()
+    };
+
+    let wasm = x07c::wasm_emit::emit_solve_pure_wasm_v1(
+        &program,
+        &options,
+        &WasmEmitOptions {
+            mem: WasmMemLimits {
+                initial_memory_bytes: 2 * 65536,
+                max_memory_bytes: 2 * 65536,
+                no_growable_memory: true,
+            },
+            features: x07c::wasm_emit::features::supported_features_v1(),
+        },
+    )
+    .expect("emit wasm");
+
+    wasmparser::Validator::new()
+        .validate_all(&wasm)
+        .expect("validate wasm");
 }
