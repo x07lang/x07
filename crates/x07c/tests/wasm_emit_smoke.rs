@@ -2,6 +2,14 @@ use x07c::compile::CompileOptions;
 use x07c::program::Program;
 use x07c::wasm_emit::{WasmEmitOptions, WasmMemLimits};
 
+fn const_expr_i32(expr: &wasmparser::ConstExpr<'_>) -> Option<i32> {
+    let mut r = expr.get_operators_reader();
+    match (r.read().ok()?, r.read().ok()?) {
+        (wasmparser::Operator::I32Const { value }, wasmparser::Operator::End) => Some(value),
+        _ => None,
+    }
+}
+
 fn empty_program() -> Program {
     Program {
         functions: Vec::new(),
@@ -97,6 +105,9 @@ fn wasm_emit_smoke_exports_and_memory_limits() {
         .expect("validate wasm");
 
     let mut exports: Vec<String> = Vec::new();
+    let mut heap_base_global_idx: Option<u32> = None;
+    let mut data_end_global_idx: Option<u32> = None;
+    let mut global_i32_init: Vec<Option<i32>> = Vec::new();
     let mut mem_min: Option<u64> = None;
     let mut mem_max: Option<u64> = None;
 
@@ -104,7 +115,21 @@ fn wasm_emit_smoke_exports_and_memory_limits() {
         match payload.expect("parse") {
             wasmparser::Payload::ExportSection(s) => {
                 for e in s {
-                    exports.push(e.expect("export").name.to_string());
+                    let e = e.expect("export");
+                    exports.push(e.name.to_string());
+                    if e.kind == wasmparser::ExternalKind::Global {
+                        match e.name {
+                            "__heap_base" => heap_base_global_idx = Some(e.index),
+                            "__data_end" => data_end_global_idx = Some(e.index),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            wasmparser::Payload::GlobalSection(s) => {
+                for g in s {
+                    let g = g.expect("global");
+                    global_i32_init.push(const_expr_i32(&g.init_expr));
                 }
             }
             wasmparser::Payload::MemorySection(s) => {
@@ -128,6 +153,31 @@ fn wasm_emit_smoke_exports_and_memory_limits() {
 
     assert_eq!(mem_min, Some(2));
     assert_eq!(mem_max, Some(2));
+
+    let heap_base_global_idx = heap_base_global_idx.expect("missing global export: __heap_base");
+    let data_end_global_idx = data_end_global_idx.expect("missing global export: __data_end");
+
+    let heap_base = u32::try_from(
+        global_i32_init[heap_base_global_idx as usize].expect("__heap_base must be i32.const"),
+    )
+    .expect("__heap_base must be non-negative");
+    let data_end = u32::try_from(
+        global_i32_init[data_end_global_idx as usize].expect("__data_end must be i32.const"),
+    )
+    .expect("__data_end must be non-negative");
+
+    assert!(
+        heap_base.is_multiple_of(16),
+        "__heap_base must be 16-byte aligned (got {heap_base})"
+    );
+    assert!(
+        heap_base >= 16,
+        "__heap_base must reserve low memory (got {heap_base})"
+    );
+    assert!(
+        heap_base >= data_end,
+        "__heap_base must be >= __data_end (heap_base={heap_base} data_end={data_end})"
+    );
 }
 
 #[test]

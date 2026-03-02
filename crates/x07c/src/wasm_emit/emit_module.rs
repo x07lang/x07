@@ -3216,6 +3216,7 @@ pub(super) fn emit_solve_pure_wasm_v1(
         data_bytes.push(0);
     }
     let data_end = data_bytes.len() as u32;
+    let heap_base = std::cmp::max(16, data_end);
 
     // Build wasm sections.
     let mut types = TypeSection::new();
@@ -3302,7 +3303,7 @@ pub(super) fn emit_solve_pure_wasm_v1(
             mutable: false,
             shared: false,
         },
-        &ConstExpr::i32_const(data_end as i32),
+        &ConstExpr::i32_const(heap_base as i32),
     );
 
     // Mutable heap globals (base/ptr/end).
@@ -3312,7 +3313,7 @@ pub(super) fn emit_solve_pure_wasm_v1(
             mutable: true,
             shared: false,
         },
-        &ConstExpr::i32_const(data_end as i32),
+        &ConstExpr::i32_const(heap_base as i32),
     );
     globals.global(
         GlobalType {
@@ -3320,7 +3321,7 @@ pub(super) fn emit_solve_pure_wasm_v1(
             mutable: true,
             shared: false,
         },
-        &ConstExpr::i32_const(data_end as i32),
+        &ConstExpr::i32_const(heap_base as i32),
     );
     globals.global(
         GlobalType {
@@ -3328,7 +3329,7 @@ pub(super) fn emit_solve_pure_wasm_v1(
             mutable: true,
             shared: false,
         },
-        &ConstExpr::i32_const(data_end as i32),
+        &ConstExpr::i32_const(heap_base as i32),
     );
 
     let mut exports = ExportSection::new();
