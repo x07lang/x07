@@ -1,4 +1,4 @@
-# WASM (Phases 0–7)
+# WASM (Phases 0–8)
 
 Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
 Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
@@ -8,8 +8,9 @@ Phase 4 adds **native backend targets** so `x07 wasm component build --emit http
 Phase 5 adds **Track-1 hardening**: toolchain pin validation, host runtime budgets, deployable app packs, and a core-wasm HTTP reducer loop.
 Phase 6 adds **operational contracts** (ops profiles, capabilities, policy), **SLO-as-code**, **deploy plan generation**, and **signed provenance** (DSSE + Ed25519).
 Phase 7 adds a **native x07→wasm backend** so `solve-pure` wasm builds no longer require `clang` / `wasm-ld` by default.
+Phase 8 adds **device bundles** for running `std.web_ui` reducers in a system WebView host (desktop + mobile), pinned to a host ABI hash.
 
-Phases 0–6 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
+Phases 0–8 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
 ## Delegation model
 
@@ -170,6 +171,26 @@ x07 wasm web-ui build --project examples/web_ui_counter/x07.json --profile web_u
 ```
 
 Note: `web-ui build` emits `dist/wasm.profile.json` (the resolved wasm profile used for the build). `web-ui test` and replay tooling use it to apply Phase-5 runtime limits deterministically.
+
+## Phase 8: device bundles (system WebView host)
+
+Phase 8 introduces a device contract layer for running `std.web_ui` reducers in a system WebView host (desktop + mobile).
+
+The device bundle format pins a host ABI hash (from the `x07-device-host` repo) so that device apps can reject incompatible hosts deterministically.
+
+Validate contracts (offline):
+
+```sh
+x07 wasm device index validate --json
+x07 wasm device profile validate --json
+```
+
+Build + verify a bundle:
+
+```sh
+x07 wasm device build --profile device_dev --out-dir dist/device --clean --json
+x07 wasm device verify --dir dist/device --json
+```
 
 ## Phase 3: app bundle (full stack)
 
