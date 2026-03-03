@@ -170,6 +170,11 @@ x07 wasm web-ui serve --dir dist --mode listen --strict-mime --json
 x07 wasm web-ui test --dist-dir dist --case examples/web_ui_counter/tests/counter.trace.json --json
 ```
 
+Host entrypoint notes:
+
+- `web-ui build` emits `dist/index.html` which loads `dist/bootstrap.js`.
+- `dist/main.mjs` is a compatibility alias that imports `bootstrap.js`.
+
 Component build (transpiled for the browser via `jco transpile`):
 
 ```sh
@@ -196,6 +201,17 @@ Build + verify a bundle:
 ```sh
 x07 wasm device build --profile device_dev --out-dir dist/device --clean --json
 x07 wasm device verify --dir dist/device --json
+```
+
+Bundle layout notes:
+
+- The resolved device profile is embedded into the bundle under `profile/device.profile.json` and is digest-verified by `device verify`.
+
+Signed device provenance (DSSE + Ed25519):
+
+```sh
+x07 wasm device provenance attest --dir dist/device --signing-key <signing_key.b64> --out dist/device.provenance.dsse.json --json
+x07 wasm device provenance verify --attestation dist/device.provenance.dsse.json --bundle-dir dist/device --trusted-public-key <public_key.b64> --json
 ```
 
 ## Phase 9: device run + package (desktop host)
@@ -264,6 +280,11 @@ Runtime limits can be overridden per command (all optional; defaults come from t
 x07 wasm run --max-fuel 10000 --max-memory-bytes 67108864 --max-table-elements 10000 --max-wasm-stack-bytes 1048576 --json
 ```
 
+Optional profile-level host runtime knobs:
+
+- `runtime.instance_allocator`: `on_demand` (default) or `pooling`
+- `runtime.cache_config`: path to a Wasmtime cache config file (loaded by the host)
+
 App deploy artifacts:
 
 ```sh
@@ -299,10 +320,16 @@ x07 wasm slo validate --profile arch/slo/slo_min.json --json
 x07 wasm slo eval --profile arch/slo/slo_min.json --metrics examples/app_min/tests/metrics_canary_ok.json --json
 ```
 
-Deploy plan generation (writes `deploy.plan.json` + Kubernetes YAMLs under `--out-dir`):
+Deploy plan generation (writes `deploy.plan.json`; by default also emits Kubernetes YAMLs under `--out-dir`):
 
 ```sh
 x07 wasm deploy plan --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --out-dir dist/deploy_plan --json
+```
+
+Plan-only mode (no Kubernetes YAML outputs):
+
+```sh
+x07 wasm deploy plan --pack-manifest dist/app.pack/app.pack.json --ops arch/app/ops/ops_release.json --emit-k8s false --out-dir dist/deploy_plan --json
 ```
 
 Signed pack provenance (DSSE + Ed25519):

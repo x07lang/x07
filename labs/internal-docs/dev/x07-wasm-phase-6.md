@@ -1,6 +1,6 @@
 # X07 WASM — Phase 6 (Ops + Capabilities + Policy + SLO + Deploy Plans + Provenance)
 
-**Last updated:** 2026-02-28
+**Last updated:** 2026-03-03
 
 ## Goal
 
@@ -28,7 +28,7 @@ Make Phase 0–5 WASM artifacts safe to run and deploy autonomously by adding:
 - [x] Caps evidence schema + enforcement wiring (`x07.wasm.caps.evidence@0.1.0`)
 - [x] Policy cards schema + `x07-wasm policy validate` + RFC-6902 patch support
 - [x] SLO schema + metrics snapshot schema + `x07-wasm slo validate|eval` (pinned exit codes)
-- [x] Deploy plan schema + `x07-wasm deploy plan` (JSON plan + YAML outputs)
+- [x] Deploy plan schema + `x07-wasm deploy plan` (JSON plan; optional YAML outputs via `--emit-k8s true|false`)
 - [x] Provenance schema + `x07-wasm provenance attest|verify` (digest recompute; tamper negative)
 - [x] Phase 6 CI gate scripts: `scripts/ci/check_phase6.sh` + examples + diagnostic allowlists
 - [x] Always-report parse report schema (`x07.wasm.cli.parse.report@0.1.0`)

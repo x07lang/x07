@@ -1,6 +1,6 @@
 # X07 WASM — Phase 2 (Web UI)
 
-**Last updated:** 2026-02-26
+**Last updated:** 2026-03-03
 
 ## Goal
 
@@ -21,7 +21,7 @@ Run X07 UI reducers in the browser with deterministic replay and an incident-to-
 
 - [x] Create canonical `x07-web-ui` repo:
   - [x] `std-web-ui@0.1.1` package exporting `std.web_ui.*` modules
-  - [x] canonical browser host (`host/index.html`, `host/app-host.mjs`)
+  - [x] canonical browser host (`host/index.html`, `host/bootstrap.js`, `host/app-host.mjs`, `host/main.mjs`)
   - [x] canonical WIT contract (`x07:web-ui@0.2.0`, world `web-ui-app`)
   - [x] examples (`web_ui_counter`, `web_ui_form`) with deterministic trace fixtures
 - [x] Add Phase 2 schemas to `x07-wasm-backend/spec/schemas/`:
