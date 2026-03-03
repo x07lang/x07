@@ -1,4 +1,4 @@
-# WASM (Phases 0–9)
+# WASM (Phases 0–10)
 
 Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
 Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
@@ -10,8 +10,9 @@ Phase 6 adds **operational contracts** (ops profiles, capabilities, policy), **S
 Phase 7 adds a **native x07→wasm backend** so `solve-pure` wasm builds no longer require `clang` / `wasm-ld` by default.
 Phase 8 adds **device bundles** for running `std.web_ui` reducers in a system WebView host (desktop + mobile), pinned to a host ABI hash.
 Phase 9 adds a **system WebView host runner** and wires `device run` + `device package` for desktop.
+Phase 10 adds **iOS/Android project generation** via `device package --target ios|android`.
 
-Phases 0–9 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
+Phases 0–10 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
 ## Delegation model
 
@@ -209,6 +210,20 @@ Package a device bundle into a desktop payload (writes `package.manifest.json`):
 
 ```sh
 x07 wasm device package --bundle dist/device --target desktop --out-dir dist/device_package --json
+```
+
+## Phase 10: device package (iOS/Android project generation)
+
+Generate an iOS project directory (no Xcode required for generation):
+
+```sh
+x07 wasm device package --bundle dist/device --target ios --out-dir dist/device_package_ios --json
+```
+
+Generate an Android project directory (no Gradle required for generation):
+
+```sh
+x07 wasm device package --bundle dist/device --target android --out-dir dist/device_package_android --json
 ```
 
 ## Phase 3: app bundle (full stack)
