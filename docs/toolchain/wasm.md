@@ -1,4 +1,4 @@
-# WASM (Phases 0–8)
+# WASM (Phases 0–9)
 
 Phase 0 adds a build+run loop for **solve-pure** X07 programs as WASM modules, without introducing a new compiler backend.
 Phase 1 adds **WASI 0.2 components** (HTTP + CLI runnable targets) on top of Phase 0.
@@ -9,8 +9,9 @@ Phase 5 adds **Track-1 hardening**: toolchain pin validation, host runtime budge
 Phase 6 adds **operational contracts** (ops profiles, capabilities, policy), **SLO-as-code**, **deploy plan generation**, and **signed provenance** (DSSE + Ed25519).
 Phase 7 adds a **native x07→wasm backend** so `solve-pure` wasm builds no longer require `clang` / `wasm-ld` by default.
 Phase 8 adds **device bundles** for running `std.web_ui` reducers in a system WebView host (desktop + mobile), pinned to a host ABI hash.
+Phase 9 adds a **system WebView host runner** and wires `device run` + `device package` for desktop.
 
-Phases 0–8 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
+Phases 0–9 are implemented by the `x07-wasm` tool (repo: `x07-wasm-backend`).
 
 ## Delegation model
 
@@ -38,6 +39,10 @@ Phase 2 (component+ESM builds) also uses:
 
 - `node`
 - `jco` (component transpile)
+
+Phase 9 (desktop host runner + packaging) also uses:
+
+- `x07-device-host-desktop`
 
 ## Profiles (contracts-as-data)
 
@@ -190,6 +195,20 @@ Build + verify a bundle:
 ```sh
 x07 wasm device build --profile device_dev --out-dir dist/device --clean --json
 x07 wasm device verify --dir dist/device --json
+```
+
+## Phase 9: device run + package (desktop host)
+
+Run a device bundle via the desktop host:
+
+```sh
+x07 wasm device run --bundle dist/device --target desktop --json
+```
+
+Package a device bundle into a desktop payload (writes `package.manifest.json`):
+
+```sh
+x07 wasm device package --bundle dist/device --target desktop --out-dir dist/device_package --json
 ```
 
 ## Phase 3: app bundle (full stack)
