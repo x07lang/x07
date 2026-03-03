@@ -22,7 +22,8 @@ Phase 8 only defines the bundle and its verification rules; the actual desktop/m
 
 ## Phase 8 checklist
 
-- [x] Host assets + ABI hash crate (`x07-device-host`)
+- [x] Host assets + ABI hash crate + pinned snapshot contract (`x07-device-host`)
+- [x] Vendored host ABI snapshot + toolchain sync gate (`x07-wasm-backend`)
 - [x] Device schemas + `x07-wasm device index|profile validate` (`x07-wasm-backend`)
 - [x] Device bundle build + verify (`x07-wasm-backend`)
 - [x] Device provenance attest/verify (`x07-wasm-backend`)

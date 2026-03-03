@@ -174,6 +174,7 @@ Host entrypoint notes:
 
 - `web-ui build` emits `dist/index.html` which loads `dist/bootstrap.js`.
 - `dist/main.mjs` is a compatibility alias that imports `bootstrap.js`.
+- Host HTML uses a strict CSP that allows WebAssembly via `'wasm-unsafe-eval'` (without enabling general `'unsafe-eval'`).
 
 Component build (transpiled for the browser via `jco transpile`):
 
@@ -188,6 +189,8 @@ Note: `web-ui build` emits `dist/wasm.profile.json` (the resolved wasm profile u
 Phase 8 introduces a device contract layer for running `std.web_ui` reducers in a system WebView host (desktop + mobile).
 
 The device bundle format pins a host ABI hash (from the `x07-device-host` repo) so that device apps can reject incompatible hosts deterministically.
+
+The host ABI is sealed as a snapshot contract in `x07-device-host` (`arch/host_abi/host_abi.snapshot.json`) and vendored into `x07-wasm-backend`. `device verify` enforces the pin and emits `X07WASM_DEVICE_BUNDLE_HOST_ABI_HASH_MISMATCH` (exit code 3) when a bundle’s `host.host_abi_hash` does not match the vendored host ABI hash.
 
 Validate contracts (offline):
 
@@ -285,6 +288,13 @@ Optional profile-level host runtime knobs:
 - `runtime.instance_allocator`: `on_demand` (default) or `pooling`
 - `runtime.cache_config`: path to a Wasmtime cache config file (loaded by the host)
 
+Shipped WASM profiles include:
+
+- `wasm_release_cached` (enables Wasmtime compilation cache via `arch/wasm/toolchain/wasmtime_cache.toml`)
+- `wasm_release_pooling` (pooling allocator)
+- `wasm_web_ui_release_cached` (web-ui + compilation cache)
+- `wasm_web_ui_release_pooling` (web-ui + pooling allocator)
+
 App deploy artifacts:
 
 ```sh
@@ -357,3 +367,4 @@ Provenance notes:
 
 - Attestations include `predicate.x07.compatibility_hash` (matches `x07 wasm ops validate`).
 - `x07 wasm provenance verify` verifies the DSSE signature and then recomputes subject digests against `--pack-dir`.
+- `x07 wasm provenance attest` rejects unsafe pack paths (absolute paths, `..`, symlink traversal) with `X07WASM_PROVENANCE_PATH_UNSAFE` (exit code 3).
