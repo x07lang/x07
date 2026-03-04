@@ -6,7 +6,7 @@
       "summary": "Parse CLI argv (argv_v1) and define CLI interfaces.",
       "canonical": {
         "name": "ext-cli",
-        "version": "0.1.13"
+        "version": "0.1.14"
       },
       "status": "stable"
     },
@@ -253,7 +253,7 @@
       "summary": "Typed DataModel values and deterministic codecs (JSON/TOML/YAML).",
       "canonical": {
         "name": "ext-data-model",
-        "version": "0.1.9"
+        "version": "0.1.10"
       },
       "status": "stable"
     },
@@ -262,7 +262,7 @@
       "summary": "JSON parse/encode.",
       "canonical": {
         "name": "ext-json-rs",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "status": "stable"
     },
@@ -298,12 +298,12 @@
       "summary": "CBOR encode/decode + DataModel integration.",
       "canonical": {
         "name": "ext-cbor-rs",
-        "version": "0.1.7"
+        "version": "0.1.8"
       },
       "alternatives": [
         {
           "name": "ext-data-model",
-          "version": "0.1.9"
+          "version": "0.1.10"
         }
       ],
       "status": "experimental"
@@ -313,12 +313,12 @@
       "summary": "MessagePack encode/decode + DataModel integration.",
       "canonical": {
         "name": "ext-msgpack-rs",
-        "version": "0.1.7"
+        "version": "0.1.8"
       },
       "alternatives": [
         {
           "name": "ext-data-model",
-          "version": "0.1.9"
+          "version": "0.1.10"
         }
       ],
       "status": "experimental"
@@ -456,7 +456,7 @@
       "summary": "Time utilities (encoding/format).",
       "canonical": {
         "name": "ext-time-rs",
-        "version": "0.1.5"
+        "version": "0.1.6"
       },
       "status": "stable"
     },

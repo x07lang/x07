@@ -18,8 +18,8 @@
     },
     {
       "name": "ext-data-model",
-      "path": ".x07/deps/ext-data-model/0.1.9",
-      "version": "0.1.9"
+      "path": ".x07/deps/ext-data-model/0.1.10",
+      "version": "0.1.10"
     },
     {
       "name": "ext-ini-rs",
@@ -28,8 +28,8 @@
     },
     {
       "name": "ext-json-rs",
-      "path": ".x07/deps/ext-json-rs/0.1.5",
-      "version": "0.1.5"
+      "path": ".x07/deps/ext-json-rs/0.1.6",
+      "version": "0.1.6"
     },
     {
       "name": "ext-net",
