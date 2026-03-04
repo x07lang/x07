@@ -10320,15 +10320,15 @@
         {
           "module_id": "ext.time.rfc3339.tests",
           "path": "packages/ext/x07-ext-time-rs/0.1.6/modules/ext/time/rfc3339/tests.x07.json",
-          "sha256": "b89c07edc8b19ad0bff7ce70264c1517f8e04880c995f68c9af6b0e199cfe618",
-          "size_bytes": 9583
+          "sha256": "26662567b5d7ca1792bda4a0b32136ec76480874bee71c0cc85197df1aa68a5d",
+          "size_bytes": 9631
         },
         {
           "generated_by": "x07import",
           "module_id": "ext.time.rfc3339",
           "path": "packages/ext/x07-ext-time-rs/0.1.6/modules/ext/time/rfc3339.x07.json",
-          "sha256": "7e2c325c3f6b25a7b32ef2341264fd9b3636d3bdb4ad437dba9eebb240d82fb2",
-          "size_bytes": 24522,
+          "sha256": "76d2fe1104b9738af8303e51a8f14c89616cdd275411dd4795940a70f93d6821",
+          "size_bytes": 24889,
           "source_path": "tests/x07import/fixtures/import_sources/rust/ext_time@0.1.0/rfc3339.rs",
           "source_sha256": "59e9e1220778dbb4bca768c4c98af6ab12cf1f73b3d627a3f3933d24ce76e05f"
         },
@@ -12255,6 +12255,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "71447026f73d486ff8a9f5f3e30d74eaaaed0b97307dac9e54d979e1ae7d4091",
+  "packages_hash": "d7c306e1d3afba0346aa74a745eec3f8a753e4aad1baf9b03a0ebb371d575eee",
   "packages_root": "packages/ext"
 }
