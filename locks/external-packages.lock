@@ -1071,7 +1071,7 @@
         }
       ],
       "name": "ext-cbor-rs",
-      "package_manifest_sha256": "0cd5ef0be170e41e0d633d9cd83fff92ee3053389d96a27ff349b46a20523af0",
+      "package_manifest_sha256": "40c8128903ba4940b34715ddeab44c1a91f20531eba8bdc263183e8830878201",
       "path": "packages/ext/x07-ext-cbor-rs/0.1.7",
       "version": "0.1.7"
     },
@@ -6967,7 +6967,7 @@
         }
       ],
       "name": "ext-msgpack-rs",
-      "package_manifest_sha256": "0921450e609bdc1076a8447acf1c7e86ce5e3a56c218027273dd4385914cb10a",
+      "package_manifest_sha256": "f63e532bd0ff6e155b504882d42e9c726b80d99bb2667c751c0db0f31ce27e01",
       "path": "packages/ext/x07-ext-msgpack-rs/0.1.7",
       "version": "0.1.7"
     },
@@ -12255,6 +12255,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "244886e9284dd17dd954f0da351e2948c0cbee9baf019d88a02cc690e52508e8",
+  "packages_hash": "e49aab7cf660e085e6983e8eb73cd71ef7f64af2b9e049ed13e91fb980e9339d",
   "packages_root": "packages/ext"
 }
