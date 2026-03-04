@@ -41,6 +41,8 @@ Phase 2 (component+ESM builds) also uses:
 - `node`
 - `jco` (component transpile)
 
+Note: Node is used for browser-targeted tooling (for example `jco transpile`), not as a secure WASI runtime. Node’s WASI APIs are not intended to be a security sandbox for untrusted code; use Wasmtime (the `x07-wasm` baseline) for untrusted execution.
+
 Phase 9 (desktop host runner + packaging) also uses:
 
 - `x07-device-host-desktop`
@@ -209,6 +211,7 @@ x07 wasm device verify --dir dist/device --json
 Bundle layout notes:
 
 - The resolved device profile is embedded into the bundle under `profile/device.profile.json` and is digest-verified by `device verify`.
+- `device verify` streams digests and enforces hard size caps to avoid unbounded reads (bundle manifest 8 MiB; bundle files 256 MiB).
 
 Signed device provenance (DSSE + Ed25519):
 
@@ -366,5 +369,7 @@ Record/replay evidence (clocks/random + secret delivery metadata):
 Provenance notes:
 
 - Attestations include `predicate.x07.compatibility_hash` (matches `x07 wasm ops validate`).
+- `x07 wasm provenance attest` fails closed (no DSSE envelope is written) if it encounters errors while resolving subjects, and writes DSSE output atomically (`*.tmp` then rename).
 - `x07 wasm provenance verify` verifies the DSSE signature and then recomputes subject digests against `--pack-dir`.
+- Verification commands stream digests and enforce hard size caps to avoid unbounded reads (pack manifest 8 MiB; pack files/subjects 256 MiB; DSSE attestation 16 MiB).
 - `x07 wasm provenance attest` fails closed (does not write the DSSE output) when any subject path is unsafe and emits `X07WASM_PROVENANCE_SUBJECT_PATH_UNSAFE` (exit code 1).
