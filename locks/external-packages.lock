@@ -1458,8 +1458,8 @@
         {
           "module_id": "ext.cli",
           "path": "packages/ext/x07-ext-cli/0.1.14/modules/ext/cli.x07.json",
-          "sha256": "8eb234b9903c073c8636da28474043f930a9d2b94173532f40c299e553877f8c",
-          "size_bytes": 42875
+          "sha256": "41f051b7183da343fa70e05e6a2aaba6c9f110c748ef0409b65de5dcf1627110",
+          "size_bytes": 42905
         }
       ],
       "name": "ext-cli",
@@ -12255,6 +12255,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "e49aab7cf660e085e6983e8eb73cd71ef7f64af2b9e049ed13e91fb980e9339d",
+  "packages_hash": "71447026f73d486ff8a9f5f3e30d74eaaaed0b97307dac9e54d979e1ae7d4091",
   "packages_root": "packages/ext"
 }

@@ -8,7 +8,7 @@
       "package_manifest_sha256": "5d3318997115c6c7fc564ff15fb67f654eeb99062b84180dc397cffa33228e62",
       "module_root": "modules",
       "modules_sha256": {
-        "ext.cli": "8eb234b9903c073c8636da28474043f930a9d2b94173532f40c299e553877f8c",
+        "ext.cli": "41f051b7183da343fa70e05e6a2aaba6c9f110c748ef0409b65de5dcf1627110",
         "ext.cli.complete": "10b0df962057c9d4b554334e02282c02e6ab3e324d469ca0e820a6ae44f12419",
         "ext.cli.help": "97bc206f39704bfec746ff070f9c72aef52318c1b9dd914b20a597734bdbcfe7",
         "ext.cli.specrows": "c06273f55222e4aa5051a26c9dc1a670b2e429a5727a575d9f65145b07692a28",
