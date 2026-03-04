@@ -67,6 +67,36 @@ x07 doctor
 
 See also: [Install](install.md).
 
+## MCP: install the official X07 MCP server (optional)
+
+If your agent runtime supports MCP (Model Context Protocol), install the official X07 MCP server: `io.x07/x07lang-mcp`. It lets an MCP client drive the local X07 toolchain via token-efficient tools (`x07.exec_v1`, `x07.context_pack_v1`, safe patching, etc).
+
+Download the published bundle from GitHub releases:
+- Repo: https://github.com/x07lang/x07-mcp
+- Release tag: `x07lang-mcp-v0.1.1`
+- Files: `x07lang-mcp.mcpb` and `x07lang-mcp.mcpb.sha256.txt`
+
+Verify (macOS / Linux):
+
+```bash
+expected="$(cat x07lang-mcp.mcpb.sha256.txt)"
+got="$(shasum -a 256 x07lang-mcp.mcpb | awk '{print $1}')"
+test "$got" = "$expected"
+```
+
+Configure your MCP client:
+- If your client supports `.mcpb`, install the bundle.
+- If your client requires a `command`/`args` server definition, extract the bundle and run the router from the bundle root:
+
+  ```bash
+  unzip -q x07lang-mcp.mcpb -d x07lang-mcp.bundle
+  ```
+
+  Use:
+  - `command`: `.../x07lang-mcp.bundle/server/x07lang-mcp`
+  - `cwd`: `.../x07lang-mcp.bundle` (so `config/mcp.server.json` + `out/mcp-worker` resolve)
+  - env (recommended): `X07_MCP_X07_EXE=/absolute/path/to/x07` (`command -v x07`)
+
 ## 2) Create a project (canonical starting point)
 
 ```bash
