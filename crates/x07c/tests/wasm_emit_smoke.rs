@@ -65,6 +65,15 @@ fn program_with_contract_pure_cmp() -> Program {
                 expr_ident("input"),
             ]),
             expr_list(vec![
+                expr_ident("view.cmp_range"),
+                expr_ident("input"),
+                expr_int(0),
+                expr_int(0),
+                expr_ident("input"),
+                expr_int(0),
+                expr_int(0),
+            ]),
+            expr_list(vec![
                 expr_ident("bytes.cmp_range"),
                 expr_ident("input"),
                 expr_int(0),
@@ -181,7 +190,7 @@ fn wasm_emit_smoke_exports_and_memory_limits() {
 }
 
 #[test]
-fn wasm_emit_validates_view_eq_and_bytes_cmp_range() {
+fn wasm_emit_validates_view_eq_view_cmp_range_and_bytes_cmp_range() {
     let program = program_with_contract_pure_cmp();
     let options = CompileOptions {
         freestanding: true,
