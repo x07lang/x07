@@ -15,7 +15,7 @@
   "meta": {
     "determinism_tier": "os-world-only",
     "requires_packages": [
-      "ext-data-model@0.1.9"
+      "ext-data-model@0.1.10"
     ],
     "worlds_allowed": [
       "run-os",

@@ -11,11 +11,11 @@
     "worlds_allowed": ["solve-pure", "solve-rr", "run-os", "run-os-sandboxed"],
     "requires_packages": [
       "ext-crypto-rs@0.1.4",
-      "ext-data-model@0.1.9",
+      "ext-data-model@0.1.10",
       "ext-db-core@0.1.10",
       "ext-db-sqlite@0.1.10",
       "ext-hex-rs@0.1.4",
-      "ext-json-rs@0.1.5"
+      "ext-json-rs@0.1.6"
     ],
     "import_mode": "handwritten",
     "visibility": "canonical"

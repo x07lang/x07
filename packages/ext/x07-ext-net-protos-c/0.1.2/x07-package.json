@@ -16,8 +16,8 @@
     "worlds_allowed": ["run-os", "run-os-sandboxed"],
     "requires_packages": [
       "ext-byteorder-rs@0.1.4",
-      "ext-data-model@0.1.9",
-      "ext-json-rs@0.1.5"
+      "ext-data-model@0.1.10",
+      "ext-json-rs@0.1.6"
     ],
     "import_mode": "handwritten",
     "visibility": "canonical"
