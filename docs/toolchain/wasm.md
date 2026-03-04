@@ -367,4 +367,4 @@ Provenance notes:
 
 - Attestations include `predicate.x07.compatibility_hash` (matches `x07 wasm ops validate`).
 - `x07 wasm provenance verify` verifies the DSSE signature and then recomputes subject digests against `--pack-dir`.
-- `x07 wasm provenance attest` rejects unsafe pack paths (absolute paths, `..`, symlink traversal) with `X07WASM_PROVENANCE_PATH_UNSAFE` (exit code 3).
+- `x07 wasm provenance attest` fails closed (does not write the DSSE output) when any subject path is unsafe and emits `X07WASM_PROVENANCE_SUBJECT_PATH_UNSAFE` (exit code 1).
