@@ -233,6 +233,7 @@ When `publish.require_signed_prm=true`, dry-run also verifies:
 
 The kit includes these reference servers:
 
+- `x07lang-mcp`
 - `github-mcp`
 - `slack-mcp`
 - `jira-mcp`
