@@ -17,6 +17,11 @@ PROFILE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 SOLVE_WORLDS = {"solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full"}
 ALL_WORLDS = SOLVE_WORLDS | {"run-os", "run-os-sandboxed"}
 
+ALLOWED_PROJECT_SCHEMA_VERSIONS = {
+    "x07.project@0.2.0",
+    "x07.project@0.3.0",
+}
+
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -142,8 +147,10 @@ def validate_project(doc: Any, rel: str) -> list[str]:
     if not isinstance(doc, dict):
         return [f"{rel}: root must be a JSON object"]
 
-    if doc.get("schema_version") != "x07.project@0.2.0":
-        errs.append(f"{rel}: schema_version must be 'x07.project@0.2.0'")
+    schema_version = doc.get("schema_version")
+    if schema_version not in ALLOWED_PROJECT_SCHEMA_VERSIONS:
+        allowed = ", ".join(sorted(ALLOWED_PROJECT_SCHEMA_VERSIONS))
+        errs.append(f"{rel}: schema_version must be one of [{allowed}]")
 
     world = doc.get("world")
     if not isinstance(world, str) or world not in ALL_WORLDS:
