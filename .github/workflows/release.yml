@@ -36,6 +36,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install Python deps
+        shell: bash
+        run: ./scripts/ci/install_python_deps.sh
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Rust cache
