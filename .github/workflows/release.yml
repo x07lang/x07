@@ -5,12 +5,18 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        required: true
+        type: string
 
 permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
   X07_PYTHON: python
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
 
 jobs:
   verify_tag:
@@ -20,10 +26,12 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Verify tag matches repo version
         shell: bash
         run: |
-          bash scripts/release/verify-tag.sh --repo-kind x07 --tag "${GITHUB_REF_NAME}"
+          bash scripts/release/verify-tag.sh --repo-kind x07 --tag "${RELEASE_TAG}"
 
   test:
     name: test
@@ -33,6 +41,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -90,6 +100,8 @@ jobs:
       X07_CARGO_TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -157,7 +169,7 @@ jobs:
         id: pack
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${RELEASE_TAG#v}"
           TOOLCHAIN_PATH="$(bash scripts/release/build-core-archive.sh \
             --component x07 \
             --version "${VERSION}" \
@@ -194,6 +206,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -207,7 +221,7 @@ jobs:
       - name: Build and push guest runner image
         shell: bash
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${RELEASE_TAG#v}"
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             -f ci/x07-guest-runner/Dockerfile \
@@ -227,6 +241,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -240,7 +256,7 @@ jobs:
         id: meta
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${RELEASE_TAG#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "checksums=dist/release/x07-${VERSION}-checksums.txt" >> "$GITHUB_OUTPUT"
           echo "component_manifest=dist/release/x07-${VERSION}-release.json" >> "$GITHUB_OUTPUT"
@@ -253,11 +269,11 @@ jobs:
       - name: Build skills pack
         shell: bash
         run: |
-          python3 scripts/build_skills_pack.py --tag "${GITHUB_REF_NAME}" --out "dist/x07-skills-${GITHUB_REF_NAME}.tar.gz"
+          python3 scripts/build_skills_pack.py --tag "${RELEASE_TAG}" --out "dist/x07-skills-${RELEASE_TAG}.tar.gz"
       - name: Build docs bundle
         shell: bash
         run: |
-          python3 scripts/build_docs_bundle.py --tag "${GITHUB_REF_NAME}"
+          python3 scripts/build_docs_bundle.py --tag "${RELEASE_TAG}"
       - name: Export attestations bundle
         shell: bash
         run: |
@@ -277,7 +293,7 @@ jobs:
             --schema x07.component.release@0.1.0 \
             --component x07_core \
             --version "${{ steps.meta.outputs.version }}" \
-            --tag "${GITHUB_REF_NAME}" \
+            --tag "${RELEASE_TAG}" \
             --repo "https://github.com/${GITHUB_REPOSITORY}" \
             --assets-dir dist/release \
             --compat-file "releases/compat/${{ steps.meta.outputs.version }}.json" \
@@ -326,7 +342,7 @@ jobs:
         shell: bash
         run: |
           python3 scripts/build_channels_json.py \
-            --tag "${GITHUB_REF_NAME}" \
+            --tag "${RELEASE_TAG}" \
             --dist dist/release \
             --bundle "${{ steps.meta.outputs.bundle_manifest }}" \
             --out dist/channels.json \
@@ -336,12 +352,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          if ! gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            gh release create "${GITHUB_REF_NAME}" \
+          if ! gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
               --repo "${GITHUB_REPOSITORY}" \
               --draft \
               --verify-tag \
-              --title "${GITHUB_REF_NAME}" \
+              --title "${RELEASE_TAG}" \
               --generate-notes
           fi
       - name: Upload release assets
@@ -349,13 +365,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release upload "${GITHUB_REF_NAME}" \
+          gh release upload "${RELEASE_TAG}" \
             dist/release/* \
             dist/release-manifest.json \
             dist/channels.json \
             dist/channels/*.json \
-            dist/x07-docs-${GITHUB_REF_NAME}.tar.gz \
-            dist/x07-skills-${GITHUB_REF_NAME}.tar.gz \
+            dist/x07-docs-${RELEASE_TAG}.tar.gz \
+            dist/x07-skills-${RELEASE_TAG}.tar.gz \
             --repo "${GITHUB_REPOSITORY}" \
             --clobber
       - name: Publish immutable release
@@ -363,6 +379,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release edit "${GITHUB_REF_NAME}" \
+          gh release edit "${RELEASE_TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
             --draft=false
