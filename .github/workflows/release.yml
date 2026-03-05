@@ -57,7 +57,7 @@ jobs:
       - name: Run release-readiness CI
         shell: bash
         run: |
-          ./scripts/ci/check_all.sh
+          ./scripts/ci/check_release_ready.sh
 
   build_matrix:
     name: build-${{ matrix.target }}

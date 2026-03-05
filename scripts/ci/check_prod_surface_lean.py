@@ -55,6 +55,7 @@ ALLOWED_TRACKED_ROOT_ENTRIES = {
     "governance",
     "locks",
     "packages",
+    "releases",
     "schemas",
     "scripts",
     "skills",

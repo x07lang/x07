@@ -48,6 +48,9 @@ step "licenses"
 step "release manifest (check)"
 "$python_bin" scripts/build_release_manifest.py --check
 
+step "release script goldens"
+"$python_bin" scripts/ci/check_release_goldens.py
+
 step "published spec sync"
 "$python_bin" scripts/sync_published_spec.py --check
 

@@ -1003,10 +1003,7 @@ fn download_release_asset(
     Ok(archive_path)
 }
 
-fn component_reference<'a>(
-    bundle: &'a BundleManifest,
-    component: ComponentName,
-) -> &'a BundleComponentRef {
+fn component_reference(bundle: &BundleManifest, component: ComponentName) -> &BundleComponentRef {
     match component {
         ComponentName::Wasm => &bundle.x07_wasm,
         ComponentName::DeviceHost => &bundle.x07_device_host,
