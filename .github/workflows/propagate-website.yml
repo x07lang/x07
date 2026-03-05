@@ -101,6 +101,10 @@ jobs:
           tag="${{ steps.vars.outputs.tag }}"
           mkdir -p dist
           gh release download "$tag" --pattern "channels.json" --dir dist
+          mkdir -p dist/channels
+          for asset in stable.json beta.json nightly.json; do
+            gh release download "$tag" --pattern "$asset" --dir dist/channels || true
+          done
 
       - name: Checkout (x07-website)
         uses: actions/checkout@v4
@@ -124,6 +128,8 @@ jobs:
           python3 ../scripts/open_pr_website_update.py \
             --tag "$tag" \
             --bundle "../dist/x07-docs-${tag}.tar.gz" \
+            --channels-json "../dist/channels.json" \
+            --channels-dir "../dist/channels" \
             "${args[@]}"
 
       - name: Commit + push (x07-website main)
