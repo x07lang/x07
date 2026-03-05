@@ -168,6 +168,7 @@ jobs:
           echo "toolchain_path=${TOOLCHAIN_PATH}" >> "$GITHUB_OUTPUT"
           echo "x07up_path=${X07UP_PATH}" >> "$GITHUB_OUTPUT"
       - name: Attest built archives
+        continue-on-error: true
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
@@ -311,6 +312,7 @@ jobs:
             --require x07_device_host \
             --require packages
       - name: Attest manifest assets
+        continue-on-error: true
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
