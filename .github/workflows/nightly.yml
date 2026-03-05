@@ -1,0 +1,157 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  X07_PYTHON: python
+
+jobs:
+  nightly_release:
+    name: nightly-release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Linux deps
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            xz-utils
+      - name: Compute nightly version
+        id: nightly
+        shell: bash
+        run: |
+          BASE_VERSION="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path('crates/x07/Cargo.toml').read_text(encoding='utf-8')
+          m = re.search(r'^version\\s*=\\s*"([^"]+)"', text, re.M)
+          print(m.group(1))
+          PY
+          )"
+          DATE="$(date -u +%Y%m%d)"
+          VERSION="${BASE_VERSION}-nightly.${DATE}"
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+      - name: Build nightly binaries
+        shell: bash
+        run: |
+          cargo build --locked --release --target x86_64-unknown-linux-gnu \
+            -p x07 \
+            -p x07c \
+            -p x07-host-runner \
+            -p x07-os-runner \
+            -p x07-vm-launcher \
+            -p x07-vm-reaper \
+            -p x07import-cli \
+            -p x07up
+      - name: Build and stage native backends
+        shell: bash
+        run: |
+          export X07_CARGO_TARGET=x86_64-unknown-linux-gnu
+          ./scripts/build_ext_regex.sh
+          ./scripts/build_ext_fs.sh
+          ./scripts/build_ext_stdio.sh
+          ./scripts/build_ext_rand.sh
+          ./scripts/build_ext_jsonschema.sh
+          ./scripts/build_ext_math.sh
+          ./scripts/build_ext_stream_xf.sh
+          ./scripts/build_ext_time.sh
+          ./scripts/build_ext_db_sqlite.sh
+          ./scripts/build_ext_db_pg.sh
+          ./scripts/build_ext_db_mysql.sh
+          ./scripts/build_ext_db_redis.sh
+      - name: Build nightly archives
+        shell: bash
+        run: |
+          bash scripts/release/build-core-archive.sh \
+            --component x07 \
+            --version "${{ steps.nightly.outputs.version }}" \
+            --target x86_64-unknown-linux-gnu \
+            --out-dir dist/release
+          bash scripts/release/build-x07up-archive.sh \
+            --version "${{ steps.nightly.outputs.version }}" \
+            --target x86_64-unknown-linux-gnu \
+            --out-dir dist/release
+      - name: Export attestations bundle
+        shell: bash
+        run: |
+          bash scripts/release/export-attestations-jsonl.sh \
+            --in-dir dist/release \
+            --out "dist/release/x07-${{ steps.nightly.outputs.version }}-attestations.jsonl"
+      - name: Generate checksums
+        shell: bash
+        run: |
+          python3 scripts/release/gen-checksums.py \
+            --in-dir dist/release \
+            --out "dist/release/x07-${{ steps.nightly.outputs.version }}-checksums.txt"
+      - name: Generate nightly component release manifest
+        shell: bash
+        run: |
+          python3 scripts/release/gen-component-release.py \
+            --schema x07.component.release@0.1.0 \
+            --component x07_core \
+            --version "${{ steps.nightly.outputs.version }}" \
+            --tag "${{ steps.nightly.outputs.tag }}" \
+            --repo "https://github.com/${GITHUB_REPOSITORY}" \
+            --assets-dir dist/release \
+            --compat-file releases/compat/nightly.json \
+            --out "dist/release/x07-${{ steps.nightly.outputs.version }}-release.json"
+      - name: Generate nightly bundle manifest
+        shell: bash
+        run: |
+          python3 scripts/release/gen-bundle.py \
+            --schema x07.release.bundle@0.1.0 \
+            --channel nightly \
+            --input releases/bundles/nightly.input.json \
+            --core-manifest "dist/release/x07-${{ steps.nightly.outputs.version }}-release.json" \
+            --out "dist/release/x07-${{ steps.nightly.outputs.version }}-bundle.json"
+      - name: Publish nightly channel artifact
+        shell: bash
+        run: |
+          bash scripts/release/publish-channel-manifest.sh \
+            --channel nightly \
+            --bundle "dist/release/x07-${{ steps.nightly.outputs.version }}-bundle.json" \
+            --publish-dir dist/channels
+      - name: Create nightly prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if ! gh release view "${{ steps.nightly.outputs.tag }}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release create "${{ steps.nightly.outputs.tag }}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --prerelease \
+              --title "${{ steps.nightly.outputs.tag }}" \
+              --notes "Nightly installer bundle"
+          fi
+          gh release upload "${{ steps.nightly.outputs.tag }}" dist/release/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber

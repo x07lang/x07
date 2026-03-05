@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "x07.component.release@0.1.0",
+  "title": "x07 component release manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "component",
+    "version",
+    "tag",
+    "repo",
+    "published_at_utc",
+    "assets",
+    "compatibility"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "x07.component.release@0.1.0"
+    },
+    "component": {
+      "type": "string",
+      "enum": [
+        "x07_core",
+        "x07_wasm",
+        "x07_web_ui_host",
+        "x07_device_host"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "tag": {
+      "type": "string",
+      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "repo": {
+      "type": "string",
+      "pattern": "^https://github\\.com/x07lang/[A-Za-z0-9._-]+$"
+    },
+    "published_at_utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/asset"
+      }
+    },
+    "compatibility": {
+      "$ref": "#/$defs/compatibility"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host_abi_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "package_name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "package_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "url",
+        "sha256",
+        "bytes_len"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "archive",
+            "installer_archive",
+            "checksums",
+            "release_manifest",
+            "attestations",
+            "host_bundle",
+            "templates",
+            "abi_snapshot"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "bytes_len": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "target": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x07_core"
+      ],
+      "properties": {
+        "x07_core": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "x07_wasm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "std_web_ui": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "device_host": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    }
+  }
+}

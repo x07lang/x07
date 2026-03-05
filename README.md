@@ -50,7 +50,7 @@ See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) fo
 
 ### Install
 
-The recommended installer is `x07up` (toolchain manager). It installs the toolchain under `~/.x07/`, configures `~/.x07/bin/` shims, and can install the agent kit (offline docs + skills).
+The recommended installer is `x07up` (toolchain manager). It installs the toolchain under `~/.x07/`, configures `~/.x07/bin/` shims, and manages optional runtime components such as `x07-wasm` and `x07-device-host-desktop`.
 
 macOS / Linux:
 
@@ -65,6 +65,15 @@ X07 is supported on Windows via WSL2 (Ubuntu recommended). In your WSL2 shell, r
 Docs: https://x07lang.org/docs/getting-started/installer/
 
 Advanced: toolchain archives are also available under https://github.com/x07lang/x07/releases
+
+Add the WASM and device-host components when you need them:
+
+```bash
+x07up update
+x07up component add wasm
+x07up component add device-host
+x07 wasm doctor --json
+```
 
 ### Run a Program
 

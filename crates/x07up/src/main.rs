@@ -9,10 +9,12 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
+use xz2::read::XzDecoder;
 
-const DEFAULT_CHANNELS_URL: &str = "https://x07lang.org/install/channels.json";
+const DEFAULT_CHANNELS_URL: &str = "https://x07lang.org/install/channels/stable.json";
 const X07_TOOLCHAIN_TOML: &str = "x07-toolchain.toml";
 const X07_AGENT_DIR: &str = ".agent";
+const X07UP_STATE_DIR: &str = ".x07up";
 const SELF_UPDATE_GUARD_ENV: &str = "X07UP_SELF_UPDATE_GUARD";
 
 const SHOW_SCHEMA_VERSION: &str = "x07up.show@0.1.0";
@@ -50,6 +52,7 @@ enum Command {
     Show,
     List(ListArgs),
     Which { tool: String },
+    Component(ComponentArgs),
     Skills(SkillsArgs),
     Docs(DocsArgs),
     Agent(AgentArgs),
@@ -83,6 +86,32 @@ struct UpdateArgs {
 struct ListArgs {
     #[arg(long)]
     installed: bool,
+}
+
+#[derive(Debug, Args)]
+struct ComponentArgs {
+    #[command(subcommand)]
+    cmd: ComponentCmd,
+}
+
+#[derive(Debug, Subcommand)]
+enum ComponentCmd {
+    Add(ComponentSelectionArgs),
+    Update(ComponentSelectionArgs),
+    List,
+}
+
+#[derive(Debug, Args)]
+struct ComponentSelectionArgs {
+    #[arg(value_enum)]
+    components: Vec<ComponentName>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ValueEnum, PartialEq, Eq)]
+enum ComponentName {
+    Wasm,
+    #[value(name = "device-host")]
+    DeviceHost,
 }
 
 #[derive(Debug, Args)]
@@ -180,6 +209,29 @@ impl Reporter {
     }
 }
 
+impl ComponentName {
+    fn cli_name(self) -> &'static str {
+        match self {
+            Self::Wasm => "wasm",
+            Self::DeviceHost => "device-host",
+        }
+    }
+
+    fn binary_name(self) -> &'static str {
+        match self {
+            Self::Wasm => "x07-wasm",
+            Self::DeviceHost => "x07-device-host-desktop",
+        }
+    }
+
+    fn manifest_component(self) -> &'static str {
+        match self {
+            Self::Wasm => "x07_wasm",
+            Self::DeviceHost => "x07_device_host",
+        }
+    }
+}
+
 fn main() -> std::process::ExitCode {
     match try_main() {
         Ok(code) => code,
@@ -212,6 +264,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Show => cmd_show(&root, &cli.channels_url, &reporter),
         Command::List(args) => cmd_list(&root, args),
         Command::Which { tool } => cmd_which(&root, &tool),
+        Command::Component(args) => cmd_component(&root, &cli.channels_url, args, &reporter),
         Command::Skills(args) => cmd_skills(&root, args, &reporter),
         Command::Docs(args) => cmd_docs(&root, args, &reporter),
         Command::Agent(args) => cmd_agent(&root, &cli.channels_url, args, &reporter),
@@ -353,70 +406,125 @@ impl MkdirAll for Path {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct BundleComponentRef {
+    #[allow(dead_code)]
+    version: String,
+    tag: String,
+    release_manifest_url: String,
+    release_manifest_sha256: String,
+}
+
 #[derive(Debug, Deserialize)]
-struct ChannelsManifest {
+struct BundlePackages {
+    #[allow(dead_code)]
+    std_web_ui: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct BundleManifest {
     schema_version: String,
+    channel: String,
     #[allow(dead_code)]
-    updated_at: String,
-    channels: BTreeMap<String, ChannelEntry>,
-    toolchains: BTreeMap<String, ToolchainRelease>,
-    x07up: BTreeMap<String, X07upRelease>,
+    published_at_utc: String,
+    min_x07up_version: String,
+    x07_core: BundleComponentRef,
+    x07_wasm: BundleComponentRef,
+    #[allow(dead_code)]
+    x07_web_ui_host: BundleComponentRef,
+    x07_device_host: BundleComponentRef,
+    #[allow(dead_code)]
+    packages: BundlePackages,
 }
 
 #[derive(Debug, Deserialize)]
-struct ChannelEntry {
-    toolchain: String,
-    x07up: String,
+struct ComponentReleaseManifest {
+    schema_version: String,
+    component: String,
+    version: String,
+    tag: String,
     #[allow(dead_code)]
-    notes: Option<String>,
+    repo: String,
+    #[allow(dead_code)]
+    published_at_utc: String,
+    assets: Vec<ReleaseAsset>,
+    compatibility: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct ToolchainRelease {
-    #[allow(dead_code)]
-    published_at: String,
-    #[allow(dead_code)]
-    notes: Option<String>,
-    assets: BTreeMap<String, Artifact>,
-    #[allow(dead_code)]
-    components: Option<BTreeMap<String, Artifact>>,
-    min_required: Option<BTreeMap<String, String>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct X07upRelease {
-    #[allow(dead_code)]
-    published_at: String,
-    #[allow(dead_code)]
-    notes: Option<String>,
-    assets: BTreeMap<String, Artifact>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Artifact {
+#[derive(Debug, Clone, Deserialize)]
+struct ReleaseAsset {
+    name: String,
+    kind: String,
     url: String,
     sha256: String,
     #[allow(dead_code)]
-    size_bytes: Option<u64>,
-    format: String,
+    bytes_len: u64,
+    #[serde(default)]
+    target: Option<String>,
 }
 
-fn fetch_channels_manifest(url: &str) -> Result<ChannelsManifest> {
+#[derive(Debug, Serialize, Deserialize)]
+struct InstalledComponentState {
+    schema_version: String,
+    component: String,
+    version: String,
+    tag: String,
+    binary: String,
+    release_manifest_url: String,
+}
+
+fn fetch_bytes(url: &str) -> Result<Vec<u8>> {
     let resp = ureq::get(url)
         .call()
         .with_context(|| format!("GET {url}"))?;
     let mut reader = resp.into_body().into_reader();
     let mut buf = Vec::new();
     reader.read_to_end(&mut buf)?;
-    let doc: ChannelsManifest = serde_json::from_slice(&buf).context("parse channels.json")?;
-    if doc.schema_version != "x07.install.channels@0.1.0" {
+    Ok(buf)
+}
+
+fn verify_bytes_sha256(bytes: &[u8], expected_sha256: &str, url: &str) -> Result<()> {
+    let actual = hex_lower(&Sha256::digest(bytes));
+    if !eq_hex_sha256(
+        &actual,
+        expected_sha256
+            .strip_prefix("sha256:")
+            .unwrap_or(expected_sha256),
+    ) {
+        bail!("sha256 mismatch for {url}: expected {expected_sha256}, got sha256:{actual}");
+    }
+    Ok(())
+}
+
+fn fetch_bundle_manifest(url: &str) -> Result<BundleManifest> {
+    let bytes = fetch_bytes(url)?;
+    let doc: BundleManifest =
+        serde_json::from_slice(&bytes).context("parse release bundle manifest")?;
+    if doc.schema_version != "x07.release.bundle@0.1.0" {
         bail!(
-            "unsupported channels.json schema_version: {} (expected x07.install.channels@0.1.0)",
+            "unsupported bundle manifest schema_version: {} (expected x07.release.bundle@0.1.0)",
             doc.schema_version
         );
     }
-    if doc.channels.is_empty() || doc.toolchains.is_empty() || doc.x07up.is_empty() {
-        bail!("channels.json missing required keys (channels/toolchains/x07up)");
+    Ok(doc)
+}
+
+fn fetch_component_release_manifest(
+    reference: &BundleComponentRef,
+) -> Result<ComponentReleaseManifest> {
+    let bytes = fetch_bytes(&reference.release_manifest_url)?;
+    verify_bytes_sha256(
+        &bytes,
+        &reference.release_manifest_sha256,
+        &reference.release_manifest_url,
+    )?;
+    let doc: ComponentReleaseManifest =
+        serde_json::from_slice(&bytes).context("parse component release manifest")?;
+    if doc.schema_version != "x07.component.release@0.1.0" {
+        bail!(
+            "unsupported component release schema_version: {} (expected x07.component.release@0.1.0)",
+            doc.schema_version
+        );
     }
     Ok(doc)
 }
@@ -469,58 +577,52 @@ fn current_x07up_version() -> Option<SemVer> {
     parse_semver_prefix(env!("CARGO_PKG_VERSION"))
 }
 
-fn toolchain_min_required_x07up(release: &ToolchainRelease) -> Option<&str> {
-    let min = release.min_required.as_ref()?;
-    let v = min.get("x07up")?.trim();
-    if v.is_empty() {
-        return None;
-    }
-    Some(v)
-}
-
-fn choose_x07up_tag(channel: Option<&str>, min_required: Option<&str>) -> Option<String> {
-    let channel = channel.and_then(|s| {
-        let t = s.trim();
-        if t.is_empty() {
-            None
-        } else {
-            Some(t)
-        }
-    });
-    let min_required = min_required.and_then(|s| {
-        let t = s.trim();
-        if t.is_empty() {
-            None
-        } else {
-            Some(t)
-        }
-    });
-
-    match (channel, min_required) {
-        (None, None) => None,
-        (Some(c), None) => Some(c.to_string()),
-        (None, Some(r)) => Some(r.to_string()),
-        (Some(c), Some(r)) => {
-            let vc = parse_semver_prefix(c);
-            let vr = parse_semver_prefix(r);
-            match (vc, vr) {
-                (Some(vc), Some(vr)) => {
-                    if vr > vc {
-                        Some(r.to_string())
-                    } else {
-                        Some(c.to_string())
-                    }
-                }
-                (None, Some(_)) => Some(r.to_string()),
-                (Some(_), None) => Some(c.to_string()),
-                (None, None) => Some(r.to_string()),
-            }
-        }
-    }
-}
-
 fn looks_like_tag(s: &str) -> bool {
     s.starts_with('v') && s.len() >= 2
+}
+
+fn is_channel_name(s: &str) -> bool {
+    matches!(s, "stable" | "beta" | "nightly")
+}
+
+fn release_bundle_url_for_tag(tag: &str) -> Result<String> {
+    if !looks_like_tag(tag) {
+        bail!("release bundle tag must look like vX.Y.Z: {tag}");
+    }
+    let version = tag.trim_start_matches('v');
+    Ok(format!(
+        "https://github.com/x07lang/x07/releases/download/{tag}/x07-{version}-bundle.json"
+    ))
+}
+
+fn resolve_channel_bundle_url(base_url: &str, channel: &str) -> Result<String> {
+    if !is_channel_name(channel) {
+        bail!("unsupported channel: {channel}");
+    }
+    if let Some(prefix) = base_url.strip_suffix("/channels.json") {
+        return Ok(format!("{prefix}/channels/{channel}.json"));
+    }
+    for known in ["stable", "beta", "nightly"] {
+        let suffix = format!("/channels/{known}.json");
+        if let Some(prefix) = base_url.strip_suffix(&suffix) {
+            return Ok(format!("{prefix}/channels/{channel}.json"));
+        }
+    }
+    if channel == "stable" {
+        return Ok(base_url.to_string());
+    }
+    bail!(
+        "cannot derive {channel} bundle URL from {}; use --channels-url with /channels/<channel>.json",
+        base_url
+    );
+}
+
+fn bundle_url_for_spec(channels_url: &str, spec: &str) -> Result<String> {
+    if looks_like_tag(spec) {
+        release_bundle_url_for_tag(spec)
+    } else {
+        resolve_channel_bundle_url(channels_url, spec)
+    }
 }
 
 fn validate_toolchain_id(id: &str) -> Result<()> {
@@ -573,32 +675,32 @@ fn cmd_install(
         bail!("missing toolchain argument");
     }
 
-    let manifest = fetch_channels_manifest(channels_url)?;
-    let (channel, toolchain_tag, channel_x07up) = if looks_like_tag(&spec) {
-        (None, spec.clone(), None)
+    let bundle_url = bundle_url_for_spec(channels_url, &spec)?;
+    let bundle = fetch_bundle_manifest(&bundle_url)?;
+    let channel = if is_channel_name(&spec) {
+        Some(spec.clone())
     } else {
-        let entry = manifest
-            .channels
-            .get(&spec)
-            .ok_or_else(|| anyhow!("channel not found: {spec}"))?;
-        (
-            Some(spec.clone()),
-            entry.toolchain.clone(),
-            Some(entry.x07up.clone()),
-        )
+        None
     };
+    if let Some(expected_channel) = &channel {
+        if bundle.channel != *expected_channel {
+            bail!(
+                "bundle channel mismatch: expected {} got {} ({})",
+                expected_channel,
+                bundle.channel,
+                bundle_url
+            );
+        }
+    }
+    let toolchain_tag = bundle.x07_core.tag.clone();
     validate_toolchain_id(&toolchain_tag)?;
-
-    let release = manifest
-        .toolchains
-        .get(&toolchain_tag)
-        .ok_or_else(|| anyhow!("toolchain not found in manifest: {toolchain_tag}"))?;
-
-    if let Some(tag) = choose_x07up_tag(
-        channel_x07up.as_deref(),
-        toolchain_min_required_x07up(release),
-    ) {
-        maybe_self_update_and_reexec(root, &manifest, &tag, reporter)?;
+    maybe_self_update_and_reexec(root, &bundle.x07_core, &bundle.min_x07up_version, reporter)?;
+    let release = fetch_component_release_manifest(&bundle.x07_core)?;
+    if release.component != "x07_core" {
+        bail!(
+            "bundle x07_core reference does not resolve to x07_core manifest: {}",
+            bundle.x07_core.release_manifest_url
+        );
     }
 
     let out_dir = toolchains_dir(root);
@@ -610,35 +712,15 @@ fn cmd_install(
     if final_dir.is_dir() {
         reporter.progress("toolchain already installed");
     } else {
-        let asset = release.assets.get(&target).ok_or_else(|| {
-            anyhow!(
-                "no toolchain asset for target={target}; available: {}",
-                release
-                    .assets
-                    .keys()
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        })?;
-
-        reporter.progress(&format!("download toolchain: {}", asset.url));
-        let dl_dir = cache_dir(root).join("downloads");
-        dl_dir.mkdir_all()?;
-
-        let filename =
-            url_filename(&asset.url).unwrap_or_else(|| format!("x07-{toolchain_tag}-{target}"));
-        let archive_path = dl_dir.join(filename);
-
-        download_verify(&asset.url, &archive_path, &asset.sha256)?;
-
+        let asset = find_archive_asset(&release, &target)?;
+        let archive_path = download_release_asset(root, asset, reporter, "toolchain")?;
         let tmp_dir = out_dir.join(format!(".tmp_{toolchain_tag}_{}", std::process::id()));
         if tmp_dir.exists() {
             std::fs::remove_dir_all(&tmp_dir).ok();
         }
         tmp_dir.mkdir_all()?;
         reporter.progress("extract toolchain");
-        extract_archive(&archive_path, &asset.format, &tmp_dir)?;
+        extract_archive(&archive_path, archive_format(&asset.name), &tmp_dir)?;
 
         reporter.progress("finalize toolchain install");
         std::fs::rename(&tmp_dir, &final_dir)
@@ -663,9 +745,7 @@ fn cmd_install(
     match args.profile {
         InstallProfile::Full => {
             let docs_root = final_dir.join(X07_AGENT_DIR).join("docs");
-            if !docs_root.is_dir()
-                && !install_component(root, &toolchain_tag, release, "docs", reporter)?
-            {
+            if !docs_root.is_dir() {
                 return report_install_json(
                     reporter,
                     InstallReport {
@@ -686,9 +766,7 @@ fn cmd_install(
             }
 
             let skills_root = final_dir.join(X07_AGENT_DIR).join("skills");
-            if !skills_root.is_dir()
-                && !install_component(root, &toolchain_tag, release, "skills", reporter)?
-            {
+            if !skills_root.is_dir() {
                 return report_install_json(
                     reporter,
                     InstallReport {
@@ -808,20 +886,211 @@ fn create_dir_link(target: &Path, link: &Path) -> Result<()> {
     }
 }
 
-fn install_component(
+fn component_state_dir(toolchain_dir: &Path) -> PathBuf {
+    toolchain_dir.join(X07UP_STATE_DIR).join("components")
+}
+
+fn component_state_path(toolchain_dir: &Path, component: ComponentName) -> PathBuf {
+    component_state_dir(toolchain_dir).join(format!("{}.json", component.cli_name()))
+}
+
+fn load_component_state(
+    toolchain_dir: &Path,
+    component: ComponentName,
+) -> Result<Option<InstalledComponentState>> {
+    let path = component_state_path(toolchain_dir, component);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes = std::fs::read(&path).with_context(|| format!("read {}", path.display()))?;
+    let state: InstalledComponentState =
+        serde_json::from_slice(&bytes).with_context(|| format!("parse {}", path.display()))?;
+    Ok(Some(state))
+}
+
+fn save_component_state(
+    toolchain_dir: &Path,
+    component: ComponentName,
+    release: &ComponentReleaseManifest,
+    reference: &BundleComponentRef,
+) -> Result<()> {
+    let path = component_state_path(toolchain_dir, component);
+    path.parent()
+        .context("component state path missing parent")?
+        .mkdir_all()?;
+    let state = InstalledComponentState {
+        schema_version: "x07up.component.state@0.1.0".to_string(),
+        component: component.cli_name().to_string(),
+        version: release.version.clone(),
+        tag: release.tag.clone(),
+        binary: component.binary_name().to_string(),
+        release_manifest_url: reference.release_manifest_url.clone(),
+    };
+    let mut bytes = serde_json::to_vec_pretty(&state)?;
+    bytes.push(b'\n');
+    std::fs::write(&path, bytes).with_context(|| format!("write {}", path.display()))?;
+    Ok(())
+}
+
+fn archive_format(name: &str) -> &'static str {
+    if name.ends_with(".tar.gz") {
+        "tar.gz"
+    } else if name.ends_with(".tar.xz") {
+        "tar.xz"
+    } else if name.ends_with(".zip") {
+        "zip"
+    } else {
+        "unknown"
+    }
+}
+
+fn find_release_asset<'a>(
+    release: &'a ComponentReleaseManifest,
+    target: &str,
+    kind: &str,
+) -> Result<&'a ReleaseAsset> {
+    let mut available = Vec::new();
+    for asset in &release.assets {
+        if asset.kind != kind {
+            continue;
+        }
+        if let Some(asset_target) = &asset.target {
+            available.push(asset_target.clone());
+            if asset_target == target {
+                return Ok(asset);
+            }
+        }
+    }
+    bail!(
+        "no {kind} asset for target={target}; available: {}",
+        available.join(", ")
+    )
+}
+
+fn find_archive_asset<'a>(
+    release: &'a ComponentReleaseManifest,
+    target: &str,
+) -> Result<&'a ReleaseAsset> {
+    find_release_asset(release, target, "archive")
+}
+
+fn find_installer_archive_asset<'a>(
+    release: &'a ComponentReleaseManifest,
+    target: &str,
+) -> Result<&'a ReleaseAsset> {
+    find_release_asset(release, target, "installer_archive")
+}
+
+fn download_release_asset(
+    root: &Path,
+    asset: &ReleaseAsset,
+    reporter: &Reporter,
+    label: &str,
+) -> Result<PathBuf> {
+    reporter.progress(&format!("download {label}: {}", asset.url));
+    let dl_dir = cache_dir(root).join("downloads");
+    dl_dir.mkdir_all()?;
+    let filename = url_filename(&asset.url).unwrap_or_else(|| asset.name.clone());
+    let archive_path = dl_dir.join(filename);
+    download_verify(
+        &asset.url,
+        &archive_path,
+        asset
+            .sha256
+            .strip_prefix("sha256:")
+            .unwrap_or(&asset.sha256),
+    )?;
+    Ok(archive_path)
+}
+
+fn component_reference<'a>(
+    bundle: &'a BundleManifest,
+    component: ComponentName,
+) -> &'a BundleComponentRef {
+    match component {
+        ComponentName::Wasm => &bundle.x07_wasm,
+        ComponentName::DeviceHost => &bundle.x07_device_host,
+    }
+}
+
+fn ensure_release_compatibility(
+    release: &ComponentReleaseManifest,
+    toolchain_tag: &str,
+    component: ComponentName,
+) -> Result<()> {
+    if release.component != component.manifest_component() {
+        bail!(
+            "release manifest component mismatch: expected {} got {}",
+            component.manifest_component(),
+            release.component
+        );
+    }
+    let expected_core = toolchain_tag.trim_start_matches('v');
+    let actual_core = release
+        .compatibility
+        .get("x07_core")
+        .map(String::as_str)
+        .unwrap_or("");
+    if actual_core != expected_core {
+        bail!(
+            "component {} is not compatible with toolchain {} (manifest requires x07_core={})",
+            component.cli_name(),
+            toolchain_tag,
+            actual_core
+        );
+    }
+    Ok(())
+}
+
+fn extract_single_archive_root(extract_dir: &Path) -> Result<PathBuf> {
+    let entries = std::fs::read_dir(extract_dir)
+        .with_context(|| format!("read_dir {}", extract_dir.display()))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    if entries.len() == 1 && entries[0].file_type()?.is_dir() {
+        return Ok(entries[0].path());
+    }
+    Ok(extract_dir.to_path_buf())
+}
+
+fn copy_file_preserve_mode(src: &Path, dst: &Path) -> Result<()> {
+    if let Some(parent) = dst.parent() {
+        parent.mkdir_all()?;
+    }
+    std::fs::copy(src, dst)
+        .with_context(|| format!("copy {} -> {}", src.display(), dst.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let mode = std::fs::metadata(src)?.permissions().mode();
+        std::fs::set_permissions(dst, std::fs::Permissions::from_mode(mode))
+            .with_context(|| format!("chmod {}", dst.display()))?;
+    }
+    Ok(())
+}
+
+fn merge_dir_overwrite(src: &Path, dst: &Path) -> Result<()> {
+    dst.mkdir_all()?;
+    for entry in std::fs::read_dir(src).with_context(|| format!("read_dir {}", src.display()))? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if ty.is_dir() {
+            merge_dir_overwrite(&src_path, &dst_path)?;
+        } else if ty.is_file() {
+            copy_file_preserve_mode(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn install_component_from_bundle(
     root: &Path,
     toolchain_tag: &str,
-    release: &ToolchainRelease,
-    component: &str,
+    bundle: &BundleManifest,
+    component: ComponentName,
     reporter: &Reporter,
 ) -> Result<bool> {
-    let Some(components) = &release.components else {
-        return Ok(false);
-    };
-    let Some(artifact) = components.get(component) else {
-        return Ok(false);
-    };
-
     let toolchain_dir = toolchains_dir(root).join(toolchain_tag);
     if !toolchain_dir.is_dir() {
         bail!(
@@ -830,17 +1099,43 @@ fn install_component(
         );
     }
 
-    reporter.progress(&format!("download component {component}: {}", artifact.url));
-    let dl_dir = cache_dir(root).join("downloads");
-    dl_dir.mkdir_all()?;
+    let reference = component_reference(bundle, component);
+    let release = fetch_component_release_manifest(reference)?;
+    ensure_release_compatibility(&release, toolchain_tag, component)?;
 
-    let filename =
-        url_filename(&artifact.url).unwrap_or_else(|| format!("x07-{toolchain_tag}-{component}"));
-    let archive_path = dl_dir.join(filename);
-    download_verify(&artifact.url, &archive_path, &artifact.sha256)?;
+    if let Some(state) = load_component_state(&toolchain_dir, component)? {
+        let binary_path = toolchain_dir.join("bin").join(component.binary_name());
+        if state.version == release.version && binary_path.is_file() {
+            reporter.progress(&format!(
+                "component {} already installed ({})",
+                component.cli_name(),
+                state.version
+            ));
+            return Ok(false);
+        }
+    }
 
-    reporter.progress(&format!("extract component {component}"));
-    extract_archive(&archive_path, &artifact.format, &toolchain_dir)?;
+    let target = detect_target_key()?;
+    let asset = find_archive_asset(&release, &target)?;
+    let archive_path = download_release_asset(root, asset, reporter, component.cli_name())?;
+    let extract_root = cache_dir(root).join("components");
+    extract_root.mkdir_all()?;
+    let tmp_dir = extract_root.join(format!(
+        ".tmp_{}_{}_{}",
+        component.cli_name(),
+        release.tag,
+        std::process::id()
+    ));
+    if tmp_dir.exists() {
+        std::fs::remove_dir_all(&tmp_dir).ok();
+    }
+    tmp_dir.mkdir_all()?;
+    reporter.progress(&format!("extract component {}", component.cli_name()));
+    extract_archive(&archive_path, archive_format(&asset.name), &tmp_dir)?;
+    let stage_root = extract_single_archive_root(&tmp_dir)?;
+    merge_dir_overwrite(&stage_root, &toolchain_dir)?;
+    std::fs::remove_dir_all(&tmp_dir).ok();
+    save_component_state(&toolchain_dir, component, &release, reference)?;
     Ok(true)
 }
 
@@ -1025,21 +1320,177 @@ fn cmd_which(root: &Path, tool: &str) -> Result<std::process::ExitCode> {
     Ok(std::process::ExitCode::SUCCESS)
 }
 
+fn active_toolchain_bundle(root: &Path, cfg: &Config) -> Result<(String, BundleManifest)> {
+    let sel = select_active_toolchain(root, cfg)?;
+    let tag = sel
+        .resolved
+        .ok_or_else(|| anyhow!("no active toolchain resolved; run: x07up install stable"))?;
+    let bundle = fetch_bundle_manifest(&release_bundle_url_for_tag(&tag)?)?;
+    Ok((tag, bundle))
+}
+
+fn cmd_component(
+    root: &Path,
+    _channels_url: &str,
+    args: ComponentArgs,
+    reporter: &Reporter,
+) -> Result<std::process::ExitCode> {
+    match args.cmd {
+        ComponentCmd::Add(args) => cmd_component_add(root, args, reporter),
+        ComponentCmd::Update(args) => cmd_component_update(root, args, reporter),
+        ComponentCmd::List => cmd_component_list(root, reporter),
+    }
+}
+
+fn selected_or_default_components(
+    toolchain_dir: &Path,
+    selected: &[ComponentName],
+) -> Result<Vec<ComponentName>> {
+    if !selected.is_empty() {
+        return Ok(selected.to_vec());
+    }
+    let mut out = Vec::new();
+    for component in [ComponentName::Wasm, ComponentName::DeviceHost] {
+        let binary = toolchain_dir.join("bin").join(component.binary_name());
+        if binary.is_file() || load_component_state(toolchain_dir, component)?.is_some() {
+            out.push(component);
+        }
+    }
+    Ok(out)
+}
+
+fn cmd_component_add(
+    root: &Path,
+    args: ComponentSelectionArgs,
+    reporter: &Reporter,
+) -> Result<std::process::ExitCode> {
+    if args.components.is_empty() {
+        bail!("component add requires at least one component");
+    }
+    let cfg = Config::load(&config_path(root))?;
+    let (toolchain_tag, bundle) = active_toolchain_bundle(root, &cfg)?;
+    let mut changed = false;
+    for component in args.components {
+        changed |=
+            install_component_from_bundle(root, &toolchain_tag, &bundle, component, reporter)?;
+    }
+    if changed {
+        ensure_proxies(root)?;
+    }
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn cmd_component_update(
+    root: &Path,
+    args: ComponentSelectionArgs,
+    reporter: &Reporter,
+) -> Result<std::process::ExitCode> {
+    let cfg = Config::load(&config_path(root))?;
+    let (toolchain_tag, bundle) = active_toolchain_bundle(root, &cfg)?;
+    let toolchain_dir = toolchains_dir(root).join(&toolchain_tag);
+    let components = selected_or_default_components(&toolchain_dir, &args.components)?;
+    if components.is_empty() {
+        reporter.progress("no installed components to update");
+        return Ok(std::process::ExitCode::SUCCESS);
+    }
+    let mut changed = false;
+    for component in components {
+        changed |=
+            install_component_from_bundle(root, &toolchain_tag, &bundle, component, reporter)?;
+    }
+    if changed {
+        ensure_proxies(root)?;
+    }
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn cmd_component_list(root: &Path, reporter: &Reporter) -> Result<std::process::ExitCode> {
+    #[derive(Serialize)]
+    struct ComponentEntry {
+        name: String,
+        binary: String,
+        installed: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        version: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tag: Option<String>,
+    }
+
+    #[derive(Serialize)]
+    struct ComponentListReport {
+        schema_version: &'static str,
+        ok: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        toolchain: Option<String>,
+        components: Vec<ComponentEntry>,
+    }
+
+    let cfg = Config::load(&config_path(root))?;
+    let sel = select_active_toolchain(root, &cfg)?;
+    let toolchain = sel.resolved.clone();
+    let mut components = Vec::new();
+    for component in [ComponentName::Wasm, ComponentName::DeviceHost] {
+        let (installed, version, tag) = if let Some(toolchain_tag) = &toolchain {
+            let toolchain_dir = toolchains_dir(root).join(toolchain_tag);
+            let state = load_component_state(&toolchain_dir, component)?;
+            let binary = toolchain_dir.join("bin").join(component.binary_name());
+            (
+                binary.is_file() || state.is_some(),
+                state.as_ref().map(|s| s.version.clone()),
+                state.as_ref().map(|s| s.tag.clone()),
+            )
+        } else {
+            (false, None, None)
+        };
+        components.push(ComponentEntry {
+            name: component.cli_name().to_string(),
+            binary: component.binary_name().to_string(),
+            installed,
+            version,
+            tag,
+        });
+    }
+
+    if reporter.json {
+        write_json_stdout(&ComponentListReport {
+            schema_version: "x07up.component.list@0.1.0",
+            ok: true,
+            toolchain,
+            components,
+        })?;
+    } else {
+        for component in components {
+            if component.installed {
+                println!(
+                    "{}\tinstalled\t{}",
+                    component.name,
+                    component.version.unwrap_or_else(|| "unknown".to_string())
+                );
+            } else {
+                println!("{}\tnot-installed", component.name);
+            }
+        }
+    }
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
 fn cmd_update(
     root: &Path,
     channels_url: &str,
     args: UpdateArgs,
     reporter: &Reporter,
 ) -> Result<std::process::ExitCode> {
-    let manifest = fetch_channels_manifest(channels_url)?;
-    let stable_channel = manifest
-        .channels
-        .get("stable")
-        .ok_or_else(|| anyhow!("channels.json missing 'stable' channel"))?;
-    let stable = stable_channel.toolchain.clone();
-
     let cfg = Config::load(&config_path(root))?;
-    let current = cfg.channels.get("stable").cloned();
+    let sel = select_active_toolchain(root, &cfg)?;
+    let update_spec = sel.spec.clone();
+    let bundle_url = bundle_url_for_spec(channels_url, &update_spec)?;
+    let bundle = fetch_bundle_manifest(&bundle_url)?;
+    let latest = bundle.x07_core.tag.clone();
+    let current = cfg
+        .channels
+        .get(&update_spec)
+        .cloned()
+        .or_else(|| sel.resolved.clone());
 
     #[derive(Serialize)]
     struct UpdateReport {
@@ -1057,55 +1508,44 @@ fn cmd_update(
                 schema_version: "x07up.update.check@0.1.0",
                 ok: true,
                 current: current.clone(),
-                latest: stable.clone(),
-                update_available: current.as_deref() != Some(stable.as_str()),
+                latest: latest.clone(),
+                update_available: current.as_deref() != Some(latest.as_str()),
             })?;
             return Ok(std::process::ExitCode::SUCCESS);
         }
-        if current.as_deref() == Some(stable.as_str()) {
-            println!("ok: stable is up to date ({stable})");
+        if current.as_deref() == Some(latest.as_str()) {
+            println!("ok: {update_spec} is up to date ({latest})");
         } else {
-            println!("update available: {stable}");
+            println!("update available: {latest}");
         }
         return Ok(std::process::ExitCode::SUCCESS);
     }
 
-    let stable_release = manifest
-        .toolchains
-        .get(&stable)
-        .ok_or_else(|| anyhow!("toolchain not found in manifest: {stable}"))?;
-    if let Some(tag) = choose_x07up_tag(
-        Some(stable_channel.x07up.as_str()),
-        toolchain_min_required_x07up(stable_release),
-    ) {
-        maybe_self_update_and_reexec(root, &manifest, &tag, reporter)?;
-    }
-
-    reporter.progress("install latest stable");
+    reporter.progress(&format!("install latest {update_spec}"));
     cmd_install(
         root,
         channels_url,
         InstallArgs {
-            toolchain: "stable".to_string(),
+            toolchain: update_spec.clone(),
             profile: InstallProfile::Full,
             yes: true,
         },
         reporter,
     )?;
-    cmd_default(root, "stable", reporter)?;
+    cmd_default(root, &update_spec, reporter)?;
     Ok(std::process::ExitCode::SUCCESS)
 }
 
 fn maybe_self_update_and_reexec(
     root: &Path,
-    manifest: &ChannelsManifest,
-    desired_x07up_tag: &str,
+    core_ref: &BundleComponentRef,
+    min_x07up_version: &str,
     reporter: &Reporter,
 ) -> Result<()> {
     let Some(current) = current_x07up_version() else {
         return Ok(());
     };
-    let Some(desired) = parse_semver_prefix(desired_x07up_tag) else {
+    let Some(desired) = parse_semver_prefix(min_x07up_version) else {
         return Ok(());
     };
     if current >= desired {
@@ -1114,62 +1554,43 @@ fn maybe_self_update_and_reexec(
 
     if let Some(prev) = std::env::var_os(SELF_UPDATE_GUARD_ENV) {
         let prev = prev.to_string_lossy();
-        if prev == desired_x07up_tag {
+        if prev == core_ref.tag {
             bail!(
                 "x07up self-update loop detected (current={} desired={}); hint: rerun install.sh to refresh x07up",
                 env!("CARGO_PKG_VERSION"),
-                desired_x07up_tag
+                min_x07up_version
             );
         }
     }
 
-    reporter.progress(&format!("self-update x07up: {desired_x07up_tag}"));
-    let installed = install_x07up_release(root, manifest, desired_x07up_tag, reporter)?;
-    exec_updated_x07up(&installed, desired_x07up_tag)?;
+    reporter.progress(&format!(
+        "self-update x07up: {} (core {})",
+        min_x07up_version, core_ref.tag
+    ));
+    let installed = install_x07up_release(root, core_ref, reporter)?;
+    exec_updated_x07up(&installed, &core_ref.tag)?;
     Ok(())
 }
 
 fn install_x07up_release(
     root: &Path,
-    manifest: &ChannelsManifest,
-    x07up_tag: &str,
+    core_ref: &BundleComponentRef,
     reporter: &Reporter,
 ) -> Result<PathBuf> {
     let target = detect_target_key()?;
-    let release = manifest
-        .x07up
-        .get(x07up_tag)
-        .ok_or_else(|| anyhow!("x07up release not found in manifest: {x07up_tag}"))?;
-    let asset = release.assets.get(&target).ok_or_else(|| {
-        anyhow!(
-            "no x07up asset for target={target}; available: {}",
-            release
-                .assets
-                .keys()
-                .cloned()
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    })?;
-
-    reporter.progress(&format!("download x07up: {}", asset.url));
-    let dl_dir = cache_dir(root).join("downloads");
-    dl_dir.mkdir_all()?;
-
-    let filename =
-        url_filename(&asset.url).unwrap_or_else(|| format!("x07up-{x07up_tag}-{target}"));
-    let archive_path = dl_dir.join(filename);
-    download_verify(&asset.url, &archive_path, &asset.sha256)?;
+    let release = fetch_component_release_manifest(core_ref)?;
+    let asset = find_installer_archive_asset(&release, &target)?;
+    let archive_path = download_release_asset(root, asset, reporter, "x07up")?;
 
     let extract_root = cache_dir(root).join("x07up");
     extract_root.mkdir_all()?;
-    let tmp_dir = extract_root.join(format!(".tmp_{x07up_tag}_{}", std::process::id()));
+    let tmp_dir = extract_root.join(format!(".tmp_{}_{}", core_ref.tag, std::process::id()));
     if tmp_dir.exists() {
         std::fs::remove_dir_all(&tmp_dir).ok();
     }
     tmp_dir.mkdir_all()?;
     reporter.progress("extract x07up");
-    extract_archive(&archive_path, &asset.format, &tmp_dir)?;
+    extract_archive(&archive_path, archive_format(&asset.name), &tmp_dir)?;
 
     let found = find_x07up_binary(&tmp_dir)?;
 
@@ -1182,6 +1603,8 @@ fn install_x07up_release(
         "x07-host-runner",
         "x07-os-runner",
         "x07import-cli",
+        "x07-wasm",
+        "x07-device-host-desktop",
         "x07up",
     ];
     for tool in tools {
@@ -1910,6 +2333,7 @@ fn hex_lower(bytes: &[u8]) -> String {
 fn extract_archive(path: &Path, format: &str, out_dir: &Path) -> Result<()> {
     match format {
         "tar.gz" => extract_tar_gz(path, out_dir),
+        "tar.xz" => extract_tar_xz(path, out_dir),
         "zip" => extract_zip(path, out_dir),
         other => bail!("unsupported archive format: {other}"),
     }
@@ -1919,6 +2343,25 @@ fn extract_tar_gz(path: &Path, out_dir: &Path) -> Result<()> {
     let f = File::open(path).with_context(|| format!("open {}", path.display()))?;
     let gz = GzDecoder::new(f);
     let mut ar = tar::Archive::new(gz);
+    for entry in ar.entries().context("read tar entries")? {
+        let mut entry = entry?;
+        let entry_path = entry.path()?.to_path_buf();
+        let rel = sanitize_rel_path(&entry_path)?;
+        let out_path = out_dir.join(rel);
+        if let Some(parent) = out_path.parent() {
+            parent.mkdir_all()?;
+        }
+        entry
+            .unpack(&out_path)
+            .with_context(|| format!("unpack {}", out_path.display()))?;
+    }
+    Ok(())
+}
+
+fn extract_tar_xz(path: &Path, out_dir: &Path) -> Result<()> {
+    let f = File::open(path).with_context(|| format!("open {}", path.display()))?;
+    let xz = XzDecoder::new(f);
+    let mut ar = tar::Archive::new(xz);
     for entry in ar.entries().context("read tar entries")? {
         let mut entry = entry?;
         let entry_path = entry.path()?.to_path_buf();
@@ -1992,6 +2435,8 @@ fn ensure_proxies(root: &Path) -> Result<()> {
         "x07-host-runner",
         "x07-os-runner",
         "x07import-cli",
+        "x07-wasm",
+        "x07-device-host-desktop",
         "x07up",
     ];
     for tool in tools {
@@ -2030,10 +2475,21 @@ fn proxy_dispatch(invoked: &str) -> Result<std::process::ExitCode> {
         .ok_or_else(|| anyhow!("no active toolchain resolved; run: x07up install stable"))?;
     let exe = tool_path(&root, &tag, invoked)?;
     if !exe.is_file() {
+        let hint = match invoked {
+            "x07-wasm" => format!(
+                "install the wasm component: x07up component add {}",
+                ComponentName::Wasm.cli_name()
+            ),
+            "x07-device-host-desktop" => format!(
+                "install the device-host component: x07up component add {}",
+                ComponentName::DeviceHost.cli_name()
+            ),
+            _ => format!("reinstall toolchain: x07up install {}", sel.spec),
+        };
         bail!(
-            "tool missing in active toolchain: {}\nhint: reinstall toolchain: x07up install {}",
+            "tool missing in active toolchain: {}\nhint: {}",
             exe.display(),
-            sel.spec
+            hint
         );
     }
 
@@ -2128,19 +2584,19 @@ mod tests {
     }
 
     #[test]
-    fn choose_x07up_tag_prefers_higher_version() {
+    fn bundle_url_for_spec_derives_release_bundle() -> Result<()> {
         assert_eq!(
-            choose_x07up_tag(Some("v0.0.80"), Some("v0.0.82")),
-            Some("v0.0.82".to_string())
+            bundle_url_for_spec("https://x07lang.org/install/channels/stable.json", "beta")?,
+            "https://x07lang.org/install/channels/beta.json"
         );
         assert_eq!(
-            choose_x07up_tag(Some("v0.0.85"), Some("v0.0.82")),
-            Some("v0.0.85".to_string())
+            bundle_url_for_spec(
+                "https://x07lang.org/install/channels/stable.json",
+                "v0.1.56"
+            )?,
+            "https://github.com/x07lang/x07/releases/download/v0.1.56/x07-0.1.56-bundle.json"
         );
-        assert_eq!(
-            choose_x07up_tag(None, Some("v0.0.82")),
-            Some("v0.0.82".to_string())
-        );
+        Ok(())
     }
 
     #[test]

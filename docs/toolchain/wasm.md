@@ -23,11 +23,22 @@ The core toolchain delegates WASM commands:
 
 ## Install
 
-Install `x07-wasm` from the `x07-wasm-backend` repo:
+Primary path:
 
 ```sh
-cargo install --locked --git https://github.com/x07lang/x07-wasm-backend.git x07-wasm
+x07up component add wasm
+x07up component add device-host
+x07 wasm doctor --json
 ```
+
+Fallbacks:
+
+```sh
+cargo install --locked x07-wasm --version <VERSION>
+cargo install --locked x07-device-host-desktop --version <VERSION>
+```
+
+Use `cargo install --locked --git https://github.com/x07lang/x07-wasm-backend.git x07-wasm` only when you need unreleased development state from the repo.
 
 Phase 1 also requires additional tools on `PATH` (checked by `x07 wasm doctor`):
 
@@ -152,7 +163,12 @@ x07 wasm component run --component dist/app.cli.component.wasm --stdin examples/
 
 Phase 2 adds a browser host loop for X07 reducers that consume `x07.web_ui.dispatch@0.1.0` and emit `x07.web_ui.frame@0.2.0` as UTF-8 JSON bytes.
 
-The canonical `std-web-ui` package, browser host assets, and WIT contracts live in the `x07-web-ui` repo.
+The canonical `std-web-ui` package, browser host assets, and WIT contracts live in the `x07-web-ui` repo. Install/update the package with the X07 package manager:
+
+```sh
+x07 pkg versions std-web-ui
+x07 pkg add std-web-ui@0.1.5 --sync
+```
 
 Validate contracts + profile registry (offline):
 

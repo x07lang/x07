@@ -33,6 +33,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
         help="Path to channels.json to publish (default: <toolchain-repo>/dist/channels.json)",
     )
+    ap.add_argument(
+        "--channels-dir",
+        type=Path,
+        default=None,
+        help="Path to per-channel bundle manifests (default: <toolchain-repo>/dist/channels)",
+    )
     ap.add_argument("--published-at-utc", default=None)
     ap.add_argument("--set-latest", action="store_true")
     ap.add_argument("--check", action="store_true", help="Validate without writing files")
@@ -114,6 +120,17 @@ def main(argv: list[str]) -> int:
             src=channels_path.resolve(),
             dst=website_root / "site" / "static" / "install" / "channels.json",
         )
+
+        channels_dir = args.channels_dir
+        if channels_dir is None:
+            channels_dir = toolchain_repo / "dist" / "channels"
+        channels_dir = channels_dir.resolve()
+        if channels_dir.is_dir():
+            for src in sorted(channels_dir.glob("*.json")):
+                sync_file(
+                    src=src,
+                    dst=website_root / "site" / "static" / "install" / "channels" / src.name,
+                )
     except ValueError as e:
         msg = str(e)
         print(f"ERROR: {msg}", file=sys.stderr)

@@ -10,7 +10,7 @@ repo_root() {
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/build_toolchain_tarball.sh --tag vX.Y.Z [--platform <macOS|Linux>] [--target-dir <dir>] [--out <path>] [--skip-native-backends]
+  scripts/build_toolchain_tarball.sh --tag vX.Y.Z [--platform <macOS|Linux|Windows>] [--target-dir <dir>] [--out <path>] [--skip-native-backends]
 
 Builds a toolchain tarball containing:
   - bin/{x07,x07c,x07-host-runner,x07-os-runner,x07-vm-launcher,x07-vm-reaper,x07import-cli}
@@ -82,17 +82,21 @@ if [[ -z "$platform" ]]; then
   case "$(uname -s)" in
     Darwin) platform="macOS" ;;
     Linux) platform="Linux" ;;
+    MINGW*|MSYS*|CYGWIN*) platform="Windows" ;;
     *) platform="unknown" ;;
   esac
 fi
 
-if [[ "$platform" != "macOS" && "$platform" != "Linux" ]]; then
-  echo "ERROR: unsupported platform label: $platform (expected macOS or Linux)" >&2
+if [[ "$platform" != "macOS" && "$platform" != "Linux" && "$platform" != "Windows" ]]; then
+  echo "ERROR: unsupported platform label: $platform (expected macOS, Linux, or Windows)" >&2
   exit 2
 fi
 
 if [[ -z "$out" ]]; then
-  out="$root/dist/x07-${tag}-${platform}.tar.gz"
+  case "$platform" in
+    Windows) out="$root/dist/x07-${tag}-${platform}.zip" ;;
+    *) out="$root/dist/x07-${tag}-${platform}.tar.gz" ;;
+  esac
 fi
 
 stage_root="$root/dist/.tmp_toolchain_${tag}_${platform}"
@@ -106,13 +110,17 @@ mkdir -p "$stage_root/.agent/skills"
 
 install_bin() {
   local name="$1"
-  local src="$target_dir/release/$name"
+  local suffix=""
+  if [[ "$platform" == "Windows" ]]; then
+    suffix=".exe"
+  fi
+  local src="$target_dir/release/$name$suffix"
   if [[ ! -f "$src" ]]; then
     echo "ERROR: missing build output: $src" >&2
     exit 1
   fi
 
-  local dst="$stage_root/bin/$name"
+  local dst="$stage_root/bin/$name$suffix"
   if command -v install >/dev/null 2>&1; then
     install -m 0755 "$src" "$dst"
   else
@@ -194,6 +202,7 @@ platform_key=""
 case "$platform" in
   macOS) platform_key="macos" ;;
   Linux) platform_key="linux" ;;
+  Windows) platform_key="windows" ;;
   *) echo "ERROR: unsupported platform: $platform" >&2; exit 2 ;;
 esac
 
@@ -235,5 +244,21 @@ done <<<"$native_backend_files"
 find "$stage_root" -exec touch -t 200001010000.00 {} + 2>/dev/null || true
 
 mkdir -p "$(dirname "$out")"
-tar -czf "$out" -C "$stage_root" .
+if [[ "$out" == *.zip ]]; then
+  "$python_bin" - "$stage_root" "$out" <<'PY'
+import pathlib
+import sys
+import zipfile
+
+stage_root = pathlib.Path(sys.argv[1]).resolve()
+out_path = pathlib.Path(sys.argv[2]).resolve()
+
+with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    for path in sorted(stage_root.rglob("*")):
+        if path.is_file():
+            zf.write(path, arcname=path.relative_to(stage_root))
+PY
+else
+  tar -czf "$out" -C "$stage_root" .
+fi
 echo "ok: wrote $out"

@@ -277,6 +277,30 @@ json_get_x07up_asset_field() {
   return 0
 }
 
+derive_bundle_url_from_bootstrap() {
+  bootstrap_url="$1"
+  channel="$2"
+  case "$channel" in
+    stable|beta|nightly) ;;
+    *)
+      die "unsupported channel for bundle resolution: ${channel}"
+      ;;
+  esac
+  case "$bootstrap_url" in
+    */channels.json)
+      printf '%s\n' "${bootstrap_url%/channels.json}/channels/${channel}.json"
+      return 0
+      ;;
+    *)
+      if [ "$channel" = "stable" ]; then
+        printf '%s\n' "$bootstrap_url"
+        return 0
+      fi
+      die "cannot derive ${channel} bundle URL from bootstrap URL: ${bootstrap_url}"
+      ;;
+  esac
+}
+
 detect_profile_path() {
   shell="${SHELL:-}"
   shell_name="${shell##*/}"
@@ -447,13 +471,17 @@ cp "${X07UP_FOUND}" "${ROOT}/bin/x07up"
 chmod +x "${ROOT}/bin/x07up"
 
 SPEC="${TOOLCHAIN_TAG}"
+X07UP_CHANNELS_URL=""
 if [ -z "${TOOLCHAIN}" ]; then
   SPEC="${CHANNEL}"
+  X07UP_CHANNELS_URL="$(derive_bundle_url_from_bootstrap "${CHANNELS_URL}" "${CHANNEL}")"
+else
+  X07UP_CHANNELS_URL="https://github.com/x07lang/x07/releases/download/${TOOLCHAIN_TAG}/x07-${TOOLCHAIN_TAG#v}-bundle.json"
 fi
 
 X07UP_GLOBAL_ARGS=""
 X07UP_GLOBAL_ARGS="${X07UP_GLOBAL_ARGS} --root ${ROOT}"
-X07UP_GLOBAL_ARGS="${X07UP_GLOBAL_ARGS} --channels-url ${CHANNELS_URL}"
+X07UP_GLOBAL_ARGS="${X07UP_GLOBAL_ARGS} --channels-url ${X07UP_CHANNELS_URL}"
 if [ "${QUIET}" -eq 1 ]; then
   X07UP_GLOBAL_ARGS="${X07UP_GLOBAL_ARGS} --quiet"
 fi
