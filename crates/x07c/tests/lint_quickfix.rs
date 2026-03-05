@@ -199,7 +199,7 @@ fn lint_quickfix_copies_bytes_view_for_if_condition() {
         panic!("expected let binding in nested begin");
     };
     assert_eq!(let_items[0].as_ident(), Some("let"));
-    assert_eq!(let_items[1].as_ident(), Some("_x07_tmp_copy"));
+    assert_eq!(let_items[1].as_ident(), Some("_x07_tmp_copy_solve_2"));
     assert_eq!(let_items.len(), 3, "let binding must have 3 elements total");
 
     let x07c::ast::Expr::List {
@@ -245,7 +245,57 @@ fn lint_quickfix_copies_bytes_view_for_if_condition() {
     }
 
     let cond_owner = find_bytes_view_owner(&if_items[1]).expect("expected bytes.view in if cond");
-    assert_eq!(cond_owner, "_x07_tmp_copy");
+    assert_eq!(cond_owner, "_x07_tmp_copy_solve_2");
+}
+
+#[test]
+fn lint_quickfix_move_0002_converges_for_nested_if() {
+    let mut doc = parse_doc(
+        r#"
+        {
+          "kind":"entry",
+          "module_id":"main",
+          "imports":[],
+          "decls":[],
+          "solve":["begin",
+            ["let","resp",["bytes.alloc",0]],
+            ["if",
+              ["=",["view.len",["bytes.view","resp"]],0],
+              ["bytes.alloc",0],
+              ["if",
+                ["=",["view.len",["bytes.view","resp"]],0],
+                ["bytes.alloc",1],
+                ["view.to_bytes",["bytes.view","resp"]]
+              ]
+            ]
+          ]
+        }
+        "#,
+    );
+
+    // Repeatedly apply the first available quickfix until lint is clean.
+    for i in 0..8 {
+        let doc_bytes = serde_json::to_vec(&doc).expect("serialize doc");
+        let mut file = x07ast::parse_x07ast_json(&doc_bytes).expect("parse x07ast");
+        x07ast::canonicalize_x07ast_file(&mut file);
+        let report = lint::lint_file(&file, lint::LintOptions::default());
+        if report.ok {
+            compile_program_to_c(&doc_bytes, &CompileOptions::default())
+                .expect("patched program must compile");
+            return;
+        }
+
+        let d = report
+            .diagnostics
+            .iter()
+            .find(|d| d.quickfix.is_some())
+            .unwrap_or_else(|| panic!("expected a quickfix on iteration {i}: {report:?}"));
+        let q = d.quickfix.as_ref().expect("quickfix present");
+        assert_eq!(q.kind, QuickfixKind::JsonPatch);
+        json_patch::apply_patch(&mut doc, &q.patch).expect("apply quickfix patch");
+    }
+
+    panic!("expected lint quickfixes to converge within 8 iterations");
 }
 
 #[test]

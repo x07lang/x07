@@ -1332,9 +1332,9 @@ fn lint_core_arity(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut Vec<
     }
 }
 
-fn borrow_tmp_name(ptr: &str) -> String {
-    let mut out = String::with_capacity(ptr.len() + 32);
-    out.push_str("_x07_tmp_borrow");
+fn tmp_name(prefix: &str, ptr: &str) -> String {
+    let mut out = String::with_capacity(prefix.len() + ptr.len() + 8);
+    out.push_str(prefix);
     for ch in ptr.chars() {
         match ch {
             'a'..='z' | 'A'..='Z' | '0'..='9' => out.push(ch),
@@ -1342,6 +1342,14 @@ fn borrow_tmp_name(ptr: &str) -> String {
         }
     }
     out
+}
+
+fn borrow_tmp_name(ptr: &str) -> String {
+    tmp_name("_x07_tmp_borrow", ptr)
+}
+
+fn copy_tmp_name(ptr: &str) -> String {
+    tmp_name("_x07_tmp_copy", ptr)
 }
 
 fn lint_core_borrow_rules(
@@ -1614,14 +1622,14 @@ fn lint_core_move_rules(head: &str, items: &[Expr], ptr: &str, diagnostics: &mut
                 .map(|o| o.borrow_call_ptr.clone())
                 .unwrap_or_else(|| ptr.to_string());
 
-            let tmp = "_x07_tmp_copy";
-            let cond_fixed = rewrite_bytes_view_owner(cond, name, tmp);
+            let tmp = copy_tmp_name(ptr);
+            let cond_fixed = rewrite_bytes_view_owner(cond, name, &tmp);
 
             let fixed = expr_list(vec![
                 expr_ident("begin"),
                 expr_list(vec![
                     expr_ident("let"),
-                    expr_ident(tmp.to_string()),
+                    expr_ident(tmp.clone()),
                     expr_list(vec![
                         expr_ident("view.to_bytes"),
                         expr_list(vec![expr_ident("bytes.view"), expr_ident(name.to_string())]),
