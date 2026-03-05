@@ -195,7 +195,7 @@ fi
 cp -f "$native_backends_src" "$stage_root/deps/x07/native_backends.json"
 
 if [[ "$skip_native_backends" == "true" ]]; then
-  echo "warn: skipping native backend archives (--skip-native-backends)"
+  echo "warn: skipping native backend archives (--skip-native-backends)" >&2
   native_backend_files=""
 else
 platform_key=""
@@ -261,4 +261,4 @@ PY
 else
   tar -czf "$out" -C "$stage_root" .
 fi
-echo "ok: wrote $out"
+echo "ok: wrote $out" >&2
