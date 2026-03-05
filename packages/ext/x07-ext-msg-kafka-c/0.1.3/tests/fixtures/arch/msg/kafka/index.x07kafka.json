@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.arch.msg.kafka.index@0.1.0",
+  "profiles": [
+    {
+      "id": "local_dev_v1",
+      "profile_path": "arch/msg/kafka/profiles/local_dev_v1.kafka_profile.json",
+      "budget_profile_id": "msg_kafka_v1",
+      "rr_policy_id": "msg_rr_v1"
+    }
+  ]
+}

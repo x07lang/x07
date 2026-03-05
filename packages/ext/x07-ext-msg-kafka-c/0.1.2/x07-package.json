@@ -23,7 +23,6 @@
     "import_mode": "ffi",
     "ffi_libs": [
       "rdkafka"
-    ],
-    "visibility": "canonical"
+    ]
   }
 }

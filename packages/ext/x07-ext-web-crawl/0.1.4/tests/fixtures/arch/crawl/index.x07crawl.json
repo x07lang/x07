@@ -1,0 +1,12 @@
+{
+  "schema_version": "x07.arch.crawl.index@0.1.0",
+  "policies": [
+    {
+      "id": "default_v1",
+      "policy_path": "arch/crawl/policy/default_v1.crawl_policy.json",
+      "budget_profile_id": "crawl_default_v1",
+      "rr_policy_id": "crawl_rr_v1"
+    }
+  ],
+  "defaults": { "default_policy_id": "default_v1" }
+}
