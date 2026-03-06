@@ -577,6 +577,52 @@ fn current_x07up_version() -> Option<SemVer> {
     parse_semver_prefix(env!("CARGO_PKG_VERSION"))
 }
 
+fn matches_semver_requirement(requirement: &str, actual: &SemVer) -> bool {
+    let requirement = requirement.trim();
+    if requirement.is_empty() {
+        return false;
+    }
+
+    for raw_clause in requirement.split(',') {
+        let clause = raw_clause.trim();
+        if clause.is_empty() {
+            return false;
+        }
+
+        let (op, version_text) = if let Some(rest) = clause.strip_prefix(">=") {
+            (">=", rest.trim())
+        } else if let Some(rest) = clause.strip_prefix("<=") {
+            ("<=", rest.trim())
+        } else if let Some(rest) = clause.strip_prefix('>') {
+            (">", rest.trim())
+        } else if let Some(rest) = clause.strip_prefix('<') {
+            ("<", rest.trim())
+        } else if let Some(rest) = clause.strip_prefix('=') {
+            ("=", rest.trim())
+        } else {
+            ("=", clause)
+        };
+
+        let Some(expected) = parse_semver_prefix(version_text) else {
+            return false;
+        };
+
+        let matched = match op {
+            ">=" => actual >= &expected,
+            "<=" => actual <= &expected,
+            ">" => actual > &expected,
+            "<" => actual < &expected,
+            "=" => actual == &expected,
+            _ => false,
+        };
+        if !matched {
+            return false;
+        }
+    }
+
+    true
+}
+
 fn looks_like_tag(s: &str) -> bool {
     s.starts_with('v') && s.len() >= 2
 }
@@ -1022,13 +1068,15 @@ fn ensure_release_compatibility(
             release.component
         );
     }
-    let expected_core = toolchain_tag.trim_start_matches('v');
+    let expected_core = parse_semver_prefix(toolchain_tag).ok_or_else(|| {
+        anyhow!("unsupported toolchain version in compatibility check: {toolchain_tag}")
+    })?;
     let actual_core = release
         .compatibility
         .get("x07_core")
         .map(String::as_str)
         .unwrap_or("");
-    if actual_core != expected_core {
+    if !matches_semver_requirement(actual_core, &expected_core) {
         bail!(
             "component {} is not compatible with toolchain {} (manifest requires x07_core={})",
             component.cli_name(),
@@ -2578,6 +2626,30 @@ mod tests {
                 patch: 3
             })
         );
+    }
+
+    #[test]
+    fn matches_semver_requirement_accepts_exact_match() {
+        let actual = parse_semver_prefix("v0.1.56").unwrap();
+        assert!(matches_semver_requirement("0.1.56", &actual));
+        assert!(matches_semver_requirement("=0.1.56", &actual));
+        assert!(!matches_semver_requirement("0.1.57", &actual));
+    }
+
+    #[test]
+    fn matches_semver_requirement_accepts_range_match() {
+        let actual = parse_semver_prefix("v0.1.56-nightly.20260306").unwrap();
+        assert!(matches_semver_requirement(">=0.1.56,<0.1.57", &actual));
+        assert!(!matches_semver_requirement(">=0.1.57,<0.1.58", &actual));
+        assert!(!matches_semver_requirement(">=0.1.55,<0.1.56", &actual));
+    }
+
+    #[test]
+    fn matches_semver_requirement_rejects_invalid_requirement() {
+        let actual = parse_semver_prefix("v0.1.56").unwrap();
+        assert!(!matches_semver_requirement("", &actual));
+        assert!(!matches_semver_requirement(">=0.1.56,", &actual));
+        assert!(!matches_semver_requirement("wat", &actual));
     }
 
     #[test]
