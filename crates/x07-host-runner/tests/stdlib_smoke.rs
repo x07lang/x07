@@ -280,6 +280,10 @@ fn std_json_canonicalize_small_matches_suite_vectors() {
         run_exe(&exe, br#"[{"b":2,"a":1},{"k":true,"j":null}]"#),
         br#"[{"a":1,"b":2},{"j":null,"k":true}]"#
     );
+    assert_eq!(
+        run_exe(&exe, br#"{"text":"{\"project\":\"demo\"}","a":1}"#),
+        br#"{"a":1,"text":"{\"project\":\"demo\"}"}"#
+    );
     assert_eq!(run_exe(&exe, br#"{bad"#), b"ERR");
 }
 
@@ -301,6 +305,20 @@ fn std_json_extract_path_matches_suite_vectors() {
     assert_eq!(
         run_exe(&exe, b"{\"a\":[{\"b\":2,\"a\":1}]}\x00a"),
         b"[{\"a\":1,\"b\":2}]"
+    );
+    assert_eq!(
+        run_exe(
+            &exe,
+            b"{\"body\":{\"text\":\"{\\\"project\\\":\\\"demo\\\"}\"},\"source\":\"req_create\"}\x00source"
+        ),
+        b"\"req_create\""
+    );
+    assert_eq!(
+        run_exe(
+            &exe,
+            b"{\"body\":{\"text\":\"{\\\"project\\\":\\\"demo\\\"}\"},\"source\":\"req_create\"}\x00body.text"
+        ),
+        b"\"{\\\"project\\\":\\\"demo\\\"}\""
     );
     assert_eq!(run_exe(&exe, b"{\"a\":1}\x00a.b"), b"ERR");
 }

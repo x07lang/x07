@@ -167,7 +167,7 @@ The canonical `std-web-ui` package, browser host assets, and WIT contracts live 
 
 ```sh
 x07 pkg versions std-web-ui
-x07 pkg add std-web-ui@0.1.7 --sync
+x07 pkg add std-web-ui@0.1.8 --sync
 ```
 
 Validate contracts + profile registry (offline):
