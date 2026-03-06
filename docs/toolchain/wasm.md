@@ -167,7 +167,7 @@ The canonical `std-web-ui` package, browser host assets, and WIT contracts live 
 
 ```sh
 x07 pkg versions std-web-ui
-x07 pkg add std-web-ui@0.1.5 --sync
+x07 pkg add std-web-ui@0.1.7 --sync
 ```
 
 Validate contracts + profile registry (offline):
@@ -287,6 +287,8 @@ x07 wasm app build --profile app_dev --out-dir dist/app --clean --json
 x07 wasm app serve --dir dist/app --mode smoke --strict-mime --json
 x07 wasm app test --dir dist/app --trace examples/app_fullstack_hello/tests/trace_0001.json --json
 ```
+
+For backends that need server-held JSON state across one `app serve` or `app test` session, set `backend.adapter` to `wasi_http_proxy_state_doc_v1`. The adapter passes a typed `{request, state}` document into the backend and persists the returned `state` for the next request in that replay session.
 
 ## Phase 5: hardening
 
