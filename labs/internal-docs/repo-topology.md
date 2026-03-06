@@ -9,6 +9,7 @@ This document defines the roles of the X07 repositories.
 
 ## Ecosystem repos
 
+- `x07lang/x07-platform`: platform lifecycle engine, `x07lp` CLI, `x07lpd`, Command Center UI, and canonical `lp.*` schemas.
 - `x07lang/x07-registry`: registry server implementation and API contract.
 - `x07lang/x07-website`: website and documentation site build/deploy.
 - `x07lang/x07-infra-private`: production infrastructure and operational runbooks (private).

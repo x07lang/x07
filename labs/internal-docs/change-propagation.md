@@ -9,6 +9,7 @@ Toolchain releases are the primary synchronization point.
 After a release:
 
 - `x07lang/x07-website` is updated to publish the new docs/contracts version.
+- `x07lang/x07-registry-web` should mirror any newly public schemas that ship from sibling repos such as `x07-platform` so `https://x07.io/spec/...` stays aligned with the canonical repo copy.
 
 ## Current automation entrypoints
 
