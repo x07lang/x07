@@ -18,7 +18,7 @@ Quick entry points:
 - Rename note: `rename.md`
 - Stream pipe internals: `spec/stream-pipe.md`
 - MCP kit release policy: `mcp/ecosystem-release.md`
-- x07 Platform (x07lp) Phase A: see `x07lang/x07-platform`
+- x07 Platform (x07lp): see `x07lang/x07-platform`
 
 End-user package contracts live under:
 
