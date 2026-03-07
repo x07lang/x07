@@ -213,6 +213,20 @@ fn project_manifest_allows_workspace_dependency_paths_via_git_root() {
 }
 
 #[test]
+fn vendored_dep_path_detects_nested_workspace_project_cache() {
+    assert!(project::is_vendored_dep_path(".x07/deps/dep/0.1.0"));
+    assert!(project::is_vendored_dep_path(
+        "$workspace/.x07/deps/dep/0.1.0"
+    ));
+    assert!(project::is_vendored_dep_path(
+        "$workspace/frontend/.x07/deps/dep/0.1.0"
+    ));
+    assert!(!project::is_vendored_dep_path(
+        "$workspace/frontend/vendor/dep/0.1.0"
+    ));
+}
+
+#[test]
 fn project_manifest_rejects_parent_dir_entry() {
     let dir = create_temp_dir("x07_project_paths");
     let path = dir.join("x07.json");

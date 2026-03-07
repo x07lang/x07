@@ -650,6 +650,15 @@ fn compute_test_module_roots(
         return Ok(vec![manifest_dir.clone()]);
     }
 
+    let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.clone())
+        .context("hydrate project deps")?;
+    if hydrated {
+        eprintln!(
+            "x07 test: hydrated project dependencies via `x07 pkg lock --project {}`",
+            project_path.display()
+        );
+    }
+
     let project_manifest =
         project::load_project_manifest(&project_path).context("load project manifest")?;
     let lock_path = project::default_lockfile_path(&project_path, &project_manifest);

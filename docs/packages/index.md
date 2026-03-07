@@ -20,6 +20,8 @@ X07 packages are source-only (x07AST JSON), and projects pin dependencies with a
 
 When you run `x07 pkg lock`, dependencies are fetched into `.x07/deps/...` and pinned in `x07.lock.json`. Tooling that accepts `--project` (for example `x07 build --project x07.json` and `x07 run --project x07.json`) automatically adds the locked dependency module roots from the lockfile.
 
+If a dependency path points at a registry-vendored location under `.x07/deps/...` (including `$workspace/.../.x07/deps/...`) and the package is missing locally, project commands auto-sync it by running the equivalent of `x07 pkg lock --project x07.json` before build/run/test. Use `x07 pkg lock --project x07.json --check` in CI when you want missing deps or lock drift to fail instead of mutating the workspace.
+
 Do not add `.x07/deps/*/modules` paths to `module_roots` manually.
 
 If you see an `unknown module` compile error and you don’t know which package provides it, use:

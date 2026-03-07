@@ -1169,6 +1169,57 @@ pub(crate) fn pkg_add_sync_quiet(
     anyhow::bail!("{msg}");
 }
 
+pub(crate) fn ensure_project_deps_hydrated_quiet(project: PathBuf) -> Result<bool> {
+    let check_args = LockArgs {
+        project: project.clone(),
+        index: None,
+        check: true,
+        offline: true,
+        allow_yanked: false,
+        allow_advisories: false,
+    };
+    let (_code, check_report) = match pkg_lock_report(&check_args) {
+        Ok(result) => result,
+        Err(_) => return Ok(false),
+    };
+    if check_report.ok {
+        return Ok(false);
+    }
+    let should_sync = check_report
+        .error
+        .as_ref()
+        .map(|e| e.code.as_str())
+        .is_some_and(|code| {
+            matches!(
+                code,
+                "X07PKG_OFFLINE_MISSING_DEP" | "X07PKG_LOCK_MISSING" | "X07PKG_TRANSITIVE_MISSING"
+            )
+        });
+    if !should_sync {
+        return Ok(false);
+    }
+
+    let sync_args = LockArgs {
+        project,
+        index: None,
+        check: false,
+        offline: false,
+        allow_yanked: false,
+        allow_advisories: false,
+    };
+    let (_code, sync_report) = pkg_lock_report(&sync_args)?;
+    if sync_report.ok {
+        return Ok(true);
+    }
+
+    let msg = sync_report
+        .error
+        .as_ref()
+        .map(|e| e.message.clone())
+        .unwrap_or_else(|| "pkg.lock failed".to_string());
+    anyhow::bail!("{msg}");
+}
+
 fn parse_pkg_spec(spec: &str) -> Result<(String, String)> {
     let spec = spec.trim();
     let Some((name, version)) = spec.split_once('@') else {

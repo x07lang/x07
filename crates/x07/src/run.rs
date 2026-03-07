@@ -261,6 +261,19 @@ pub fn cmd_run(
 
     let (target_kind, target_path, project_manifest) = resolve_target(&cwd, &args)?;
 
+    if target_kind == TargetKind::Project {
+        if let Some(project_path) = project_manifest.as_ref() {
+            let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.clone())
+                .context("hydrate project deps")?;
+            if hydrated {
+                eprintln!(
+                    "x07 run: hydrated project dependencies via `x07 pkg lock --project {}`",
+                    project_path.display()
+                );
+            }
+        }
+    }
+
     let project_root = project_manifest.as_deref().map(|manifest| {
         let abs = if manifest.is_absolute() {
             manifest.to_path_buf()
@@ -1369,6 +1382,15 @@ fn project_lockfile_path(project_path: &Path) -> Result<PathBuf> {
 fn try_collect_project_module_roots(
     project_path: &Path,
 ) -> Result<Option<(PathBuf, Vec<PathBuf>)>> {
+    let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.to_path_buf())
+        .context("hydrate project deps")?;
+    if hydrated {
+        eprintln!(
+            "x07 run: hydrated project dependencies via `x07 pkg lock --project {}`",
+            project_path.display()
+        );
+    }
+
     let manifest = project::load_project_manifest(project_path)?;
     let lock_path = project::default_lockfile_path(project_path, &manifest);
     let lock_bytes = match std::fs::read(&lock_path) {

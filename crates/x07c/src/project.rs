@@ -20,7 +20,12 @@ fn workspace_path_remainder(raw: &str) -> Option<&str> {
 
 pub fn is_vendored_dep_path(raw: &str) -> bool {
     let raw = raw.trim();
-    raw.starts_with(".x07/deps/") || raw.starts_with("$workspace/.x07/deps/")
+    if raw.starts_with(".x07/deps/") || raw.starts_with("$workspace/.x07/deps/") {
+        return true;
+    }
+
+    workspace_path_remainder(raw)
+        .is_some_and(|remainder| remainder == ".x07/deps" || remainder.contains("/.x07/deps/"))
 }
 
 fn discover_workspace_root_from_git(base: &Path) -> Option<PathBuf> {

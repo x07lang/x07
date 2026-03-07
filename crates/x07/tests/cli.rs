@@ -4877,6 +4877,180 @@ fn x07_pkg_lock_check_hydrates_patched_vendored_deps() {
 }
 
 #[test]
+fn x07_run_hydrates_missing_vendored_deps() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_run_hydrate_vendored_dep");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    std::fs::create_dir_all(dir.join("src")).expect("create src dir");
+
+    let dep_name = "demo-dep";
+    let dep_version = "1.0.0";
+    let dep_rel = format!(".x07/deps/{dep_name}/{dep_version}");
+    let dep_dir = dir.join(&dep_rel);
+    std::fs::create_dir_all(dep_dir.join("modules/demo")).expect("create dep modules");
+    write_json(
+        &dep_dir.join("x07-package.json"),
+        &serde_json::json!({
+            "schema_version": PACKAGE_MANIFEST_SCHEMA_VERSION,
+            "name": dep_name,
+            "version": dep_version,
+            "module_root": "modules",
+            "modules": ["demo.main"]
+        }),
+    );
+    write_json(
+        &dep_dir.join("modules/demo/main.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "demo.main",
+            "imports": [],
+            "decls": [
+                {
+                    "kind": "export",
+                    "names": ["demo.main.answer_v1"]
+                },
+                {
+                    "kind": "defn",
+                    "name": "demo.main.answer_v1",
+                    "params": [{ "name": "b", "ty": "bytes_view" }],
+                    "result": "bytes",
+                    "body": ["view.to_bytes", "b"]
+                }
+            ]
+        }),
+    );
+
+    write_json(
+        &dir.join("x07.json"),
+        &serde_json::json!({
+            "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+            "world": "solve-pure",
+            "entry": "src/main.x07.json",
+            "module_roots": ["src"],
+            "dependencies": [
+                { "name": dep_name, "version": dep_version, "path": dep_rel }
+            ],
+            "lockfile": "x07.lock.json"
+        }),
+    );
+    write_json(
+        &dir.join("src/main.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": ["demo.main"],
+            "decls": [],
+            "solve": ["demo.main.answer_v1", "input"]
+        }),
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    std::fs::remove_dir_all(dir.join(".x07/deps").join(dep_name)).expect("remove vendored dep dir");
+    assert!(
+        !dep_dir.join("x07-package.json").is_file(),
+        "expected dep to be missing before hydration"
+    );
+
+    let index_dir = dir.join("fake_index");
+    std::fs::create_dir_all(&index_dir).expect("create fake index dir");
+    let index_url = write_fake_file_index_config(&index_dir);
+
+    let pkg_manifest = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": PACKAGE_MANIFEST_SCHEMA_VERSION,
+        "name": dep_name,
+        "version": dep_version,
+        "module_root": "modules",
+        "modules": ["demo.main"]
+    }))
+    .expect("encode package manifest");
+    let module_bytes = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "demo.main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "export",
+                "names": ["demo.main.answer_v1"]
+            },
+            {
+                "kind": "defn",
+                "name": "demo.main.answer_v1",
+                "params": [{ "name": "b", "ty": "bytes_view" }],
+                "result": "bytes",
+                "body": ["view.to_bytes", "b"]
+            }
+        ]
+    }))
+    .expect("encode module");
+    let archive = x07_pkg::build_tar_bytes(&[
+        (PathBuf::from("x07-package.json"), pkg_manifest),
+        (PathBuf::from("modules/demo/main.x07.json"), module_bytes),
+    ])
+    .expect("build package archive");
+    let archive_sha = sha256_hex(&archive);
+    write_bytes(
+        &index_dir.join(format!("dl/{dep_name}/{dep_version}/download")),
+        &archive,
+    );
+    write_index_entries_ndjson(
+        &index_dir,
+        dep_name,
+        &[serde_json::json!({
+            "schema_version": "x07.index-entry@0.1.0",
+            "name": dep_name,
+            "version": dep_version,
+            "cksum": archive_sha,
+            "yanked": false
+        })],
+    );
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .env("X07_PKG_INDEX_URL", index_url.as_str())
+        .args([
+            "run",
+            "--project",
+            ".",
+            "--report",
+            "wrapped",
+            "--cpu-time-limit-seconds",
+            "30",
+        ])
+        .output()
+        .expect("run x07");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["schema_version"], X07_RUN_REPORT_SCHEMA_VERSION);
+    assert!(
+        dep_dir.join("x07-package.json").is_file(),
+        "expected dep to be hydrated under .x07/deps"
+    );
+}
+
+#[test]
 fn x07_pkg_lock_check_fails_on_yanked_dep() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_check_yanked");

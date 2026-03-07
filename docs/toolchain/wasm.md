@@ -167,8 +167,10 @@ The canonical `std-web-ui` package, browser host assets, and WIT contracts live 
 
 ```sh
 x07 pkg versions std-web-ui
-x07 pkg add std-web-ui@0.1.8 --sync
+x07 pkg add std-web-ui@0.1.9 --sync
 ```
+
+If `std-web-ui` is locked under `.x07/deps/...` but missing on disk, `x07 test`, `x07 build`, `x07 run`, `x07 wasm web-ui build`, and `x07 wasm device build` auto-sync the package before they continue. Keep `x07 pkg lock --project x07.json --check` in CI when you want that state drift to fail hard instead.
 
 Validate contracts + profile registry (offline):
 
@@ -246,6 +248,15 @@ Run a device bundle via the desktop host:
 
 ```sh
 x07 wasm device run --bundle dist/device --target desktop --json
+```
+
+For a full desktop smoke loop, run:
+
+```sh
+x07 wasm device build --profile device_dev --out-dir dist/device --clean --json
+x07 wasm device verify --dir dist/device --json
+x07 wasm device package --bundle dist/device --target desktop --out-dir dist/device_package --json
+x07 wasm device run --bundle dist/device --target desktop --headless-smoke --json
 ```
 
 Testing boundary:

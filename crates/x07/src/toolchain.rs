@@ -191,7 +191,18 @@ struct ProjectCtx {
     world: WorldId,
 }
 
-fn load_project_ctx(project_path: &Path) -> Result<ProjectCtx> {
+fn load_project_ctx(project_path: &Path, hydrate_deps: bool) -> Result<ProjectCtx> {
+    if hydrate_deps {
+        let hydrated = crate::pkg::ensure_project_deps_hydrated_quiet(project_path.to_path_buf())
+            .context("hydrate project deps")?;
+        if hydrated {
+            eprintln!(
+                "x07: hydrated project dependencies via `x07 pkg lock --project {}`",
+                project_path.display()
+            );
+        }
+    }
+
     let manifest = project::load_project_manifest(project_path).context("load project manifest")?;
     let lock_path = project::default_lockfile_path(project_path, &manifest);
     let lock_bytes = std::fs::read(&lock_path)
@@ -550,7 +561,7 @@ pub fn cmd_build(
         std::env::set_var("X07_MAX_C_BYTES", max_c_bytes.to_string());
     }
 
-    let ctx = load_project_ctx(&args.project).context("load project")?;
+    let ctx = load_project_ctx(&args.project, true).context("load project")?;
     let ProjectCtx {
         base,
         manifest: _manifest,
@@ -730,7 +741,7 @@ pub fn cmd_check(
 ) -> Result<std::process::ExitCode> {
     let mut diags: Vec<diagnostics::Diagnostic> = Vec::new();
 
-    let ctx = match load_project_ctx(&args.project) {
+    let ctx = match load_project_ctx(&args.project, false) {
         Ok(ctx) => ctx,
         Err(err) => {
             diags.push(crate::reporting::diag_error(
