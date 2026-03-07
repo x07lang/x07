@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn workspace_root() -> PathBuf {
@@ -10,8 +10,8 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
-fn write_tmp_project(dir: &PathBuf, main_src: &str) {
-    let _ = std::fs::remove_dir_all(&dir);
+fn write_tmp_project(dir: &Path, main_src: &str) {
+    let _ = std::fs::remove_dir_all(dir);
     std::fs::create_dir_all(dir.join("src")).expect("create tmp project dir");
 
     std::fs::write(
@@ -41,7 +41,7 @@ fn write_tmp_project(dir: &PathBuf, main_src: &str) {
     std::fs::write(dir.join("src/main.x07.json"), main_src).expect("write main.x07.json");
 }
 
-fn build_and_validate(dir: &PathBuf) {
+fn build_and_validate(dir: &Path) {
     let exe = env!("CARGO_BIN_EXE_x07");
     let out_c = dir.join("out.c");
     let out_wasm = dir.join("out.wasm");
