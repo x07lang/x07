@@ -69,20 +69,20 @@ x07up component list
 Write `x07-toolchain.toml`:
 
 ```bash
-x07up override set v0.1.61
+x07up override set v0.1.62
 ```
 
 This writes a file like:
 
 ```toml
 [toolchain]
-channel = "v0.1.61"
+channel = "v0.1.62"
 components = ["docs", "skills"]
 ```
 
 Notes:
 
-- `channel` can be `stable` or a specific tag like `v0.1.61`.
+- `channel` can be `stable` or a specific tag like `v0.1.62`.
 - `components` controls whether `x07up` installs the offline docs and skills pack.
 
 Remove it:
