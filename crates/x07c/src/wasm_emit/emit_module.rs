@@ -2632,9 +2632,11 @@ impl<'a> ExprEmitter<'a> {
             ));
         }
         // if a != 0 then evaluate b else 0; normalize to 0/1.
+        let result = self.f.new_i32_local();
         self.f.push(Instruction::I32Eqz);
         self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
         self.f.push(Instruction::I32Const(0));
+        self.f.push(Instruction::LocalSet(result));
         self.f.push(Instruction::Else);
         let b_ty = self.emit_expr(&args[1])?;
         if b_ty != Ty::I32 {
@@ -2645,7 +2647,9 @@ impl<'a> ExprEmitter<'a> {
         }
         self.f.push(Instruction::I32Eqz);
         self.f.push(Instruction::I32Eqz);
+        self.f.push(Instruction::LocalSet(result));
         self.f.push(Instruction::End);
+        self.f.push(Instruction::LocalGet(result));
         Ok(Ty::I32)
     }
 
@@ -2664,6 +2668,7 @@ impl<'a> ExprEmitter<'a> {
             ));
         }
         // if a != 0 then 1 else evaluate b; normalize to 0/1.
+        let result = self.f.new_i32_local();
         self.f.push(Instruction::I32Eqz);
         self.f.push(Instruction::If(wasm_encoder::BlockType::Empty));
         let b_ty = self.emit_expr(&args[1])?;
@@ -2675,9 +2680,12 @@ impl<'a> ExprEmitter<'a> {
         }
         self.f.push(Instruction::I32Eqz);
         self.f.push(Instruction::I32Eqz);
+        self.f.push(Instruction::LocalSet(result));
         self.f.push(Instruction::Else);
         self.f.push(Instruction::I32Const(1));
+        self.f.push(Instruction::LocalSet(result));
         self.f.push(Instruction::End);
+        self.f.push(Instruction::LocalGet(result));
         Ok(Ty::I32)
     }
 

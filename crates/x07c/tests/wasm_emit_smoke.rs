@@ -87,6 +87,46 @@ fn program_with_contract_pure_cmp() -> Program {
     }
 }
 
+fn program_with_logic_ops() -> Program {
+    Program {
+        functions: Vec::new(),
+        async_functions: Vec::new(),
+        extern_functions: Vec::new(),
+        solve: expr_list(vec![
+            expr_ident("begin"),
+            expr_list(vec![
+                expr_ident("&&"),
+                expr_list(vec![expr_ident(">"), expr_int(3), expr_int(1)]),
+                expr_list(vec![expr_ident("<"), expr_int(2), expr_int(4)]),
+            ]),
+            expr_list(vec![
+                expr_ident("||"),
+                expr_list(vec![expr_ident("="), expr_int(0), expr_int(1)]),
+                expr_list(vec![expr_ident("="), expr_int(2), expr_int(2)]),
+            ]),
+            expr_list(vec![expr_ident("view.to_bytes"), expr_ident("input")]),
+        ]),
+    }
+}
+
+fn program_with_logic_in_if_condition() -> Program {
+    Program {
+        functions: Vec::new(),
+        async_functions: Vec::new(),
+        extern_functions: Vec::new(),
+        solve: expr_list(vec![
+            expr_ident("if"),
+            expr_list(vec![
+                expr_ident("&&"),
+                expr_list(vec![expr_ident(">="), expr_int(1), expr_int(0)]),
+                expr_list(vec![expr_ident("||"), expr_int(0), expr_int(1)]),
+            ]),
+            expr_list(vec![expr_ident("bytes.lit"), expr_ident("A")]),
+            expr_list(vec![expr_ident("bytes.lit"), expr_ident("B")]),
+        ]),
+    }
+}
+
 #[test]
 fn wasm_emit_smoke_exports_and_memory_limits() {
     let program = empty_program();
@@ -192,6 +232,62 @@ fn wasm_emit_smoke_exports_and_memory_limits() {
 #[test]
 fn wasm_emit_validates_view_eq_view_cmp_range_and_bytes_cmp_range() {
     let program = program_with_contract_pure_cmp();
+    let options = CompileOptions {
+        freestanding: true,
+        world: x07_worlds::WorldId::SolvePure,
+        ..Default::default()
+    };
+
+    let wasm = x07c::wasm_emit::emit_solve_pure_wasm_v1(
+        &program,
+        &options,
+        &WasmEmitOptions {
+            mem: WasmMemLimits {
+                initial_memory_bytes: 2 * 65536,
+                max_memory_bytes: 2 * 65536,
+                no_growable_memory: true,
+            },
+            features: x07c::wasm_emit::features::supported_features_v1(),
+        },
+    )
+    .expect("emit wasm");
+
+    wasmparser::Validator::new()
+        .validate_all(&wasm)
+        .expect("validate wasm");
+}
+
+#[test]
+fn wasm_emit_validates_logic_and_or() {
+    let program = program_with_logic_ops();
+    let options = CompileOptions {
+        freestanding: true,
+        world: x07_worlds::WorldId::SolvePure,
+        ..Default::default()
+    };
+
+    let wasm = x07c::wasm_emit::emit_solve_pure_wasm_v1(
+        &program,
+        &options,
+        &WasmEmitOptions {
+            mem: WasmMemLimits {
+                initial_memory_bytes: 2 * 65536,
+                max_memory_bytes: 2 * 65536,
+                no_growable_memory: true,
+            },
+            features: x07c::wasm_emit::features::supported_features_v1(),
+        },
+    )
+    .expect("emit wasm");
+
+    wasmparser::Validator::new()
+        .validate_all(&wasm)
+        .expect("validate wasm");
+}
+
+#[test]
+fn wasm_emit_validates_logic_in_if_condition() {
+    let program = program_with_logic_in_if_condition();
     let options = CompileOptions {
         freestanding: true,
         world: x07_worlds::WorldId::SolvePure,

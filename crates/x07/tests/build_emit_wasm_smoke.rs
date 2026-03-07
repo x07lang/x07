@@ -10,10 +10,7 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
-#[test]
-fn x07_build_emit_wasm_smoke() {
-    let root = workspace_root();
-    let dir = root.join("target/tmp_build_emit_wasm_smoke");
+fn write_tmp_project(dir: &PathBuf, main_src: &str) {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("src")).expect("create tmp project dir");
 
@@ -41,12 +38,10 @@ fn x07_build_emit_wasm_smoke() {
     )
     .expect("write x07.lock.json");
 
-    std::fs::write(
-        dir.join("src/main.x07.json"),
-        r#"{"schema_version":"x07.x07ast@0.5.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}"#,
-    )
-    .expect("write main.x07.json");
+    std::fs::write(dir.join("src/main.x07.json"), main_src).expect("write main.x07.json");
+}
 
+fn build_and_validate(dir: &PathBuf) {
     let exe = env!("CARGO_BIN_EXE_x07");
     let out_c = dir.join("out.c");
     let out_wasm = dir.join("out.wasm");
@@ -84,4 +79,26 @@ fn x07_build_emit_wasm_smoke() {
     wasmparser::Validator::new()
         .validate_all(&wasm)
         .expect("validate wasm");
+}
+
+#[test]
+fn x07_build_emit_wasm_smoke() {
+    let root = workspace_root();
+    let dir = root.join("target/tmp_build_emit_wasm_smoke");
+    write_tmp_project(
+        &dir,
+        r#"{"schema_version":"x07.x07ast@0.5.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}"#,
+    );
+    build_and_validate(&dir);
+}
+
+#[test]
+fn x07_build_emit_wasm_validates_logic_in_if_condition() {
+    let root = workspace_root();
+    let dir = root.join("target/tmp_build_emit_wasm_logic_if");
+    write_tmp_project(
+        &dir,
+        r#"{"schema_version":"x07.x07ast@0.5.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["if",["&&",[">=",["view.len","input"],2],["||",0,1]],["bytes.lit","A"],["bytes.lit","B"]]}"#,
+    );
+    build_and_validate(&dir);
 }

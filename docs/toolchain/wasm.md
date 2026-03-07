@@ -188,6 +188,8 @@ x07 wasm web-ui serve --dir dist --mode listen --strict-mime --json
 x07 wasm web-ui test --dist-dir dist --case examples/web_ui_counter/tests/counter.trace.json --json
 ```
 
+Use `x07 wasm web-ui test` or `x07 test` for reducer-semantic coverage. Device bundle commands do not replace those feature-level checks.
+
 Host entrypoint notes:
 
 - `web-ui build` emits `dist/index.html` which loads `dist/bootstrap.js`.
@@ -208,7 +210,7 @@ Phase 8 introduces a device contract layer for running `std.web_ui` reducers in 
 
 The device bundle format pins a host ABI hash (from the `x07-device-host` repo) so that device apps can reject incompatible hosts deterministically.
 
-The host ABI is sealed as a snapshot contract in `x07-device-host` (`arch/host_abi/host_abi.snapshot.json`) and vendored into `x07-wasm-backend`. `device verify` enforces the pin and emits `X07WASM_DEVICE_BUNDLE_HOST_ABI_HASH_MISMATCH` (exit code 3) when a bundle’s `host.host_abi_hash` does not match the vendored host ABI hash.
+The host ABI is sealed as a snapshot contract in `x07-device-host` (`arch/host_abi/host_abi.snapshot.json`) and pinned into `x07-wasm-backend`. `device verify` compares a bundle’s `host.host_abi_hash` against the tool-pinned ABI hash and emits `X07WASM_DEVICE_BUNDLE_HOST_ABI_HASH_MISMATCH` (exit code 3) on mismatch. It does not require a repo-local vendored host ABI snapshot in the consumer project.
 
 Validate contracts (offline):
 
@@ -228,6 +230,8 @@ Bundle layout notes:
 
 - The resolved device profile is embedded into the bundle under `profile/device.profile.json` and is digest-verified by `device verify`.
 - `device verify` streams digests and enforces hard size caps to avoid unbounded reads (bundle manifest 8 MiB; bundle files 256 MiB).
+- `web-ui build` and `device build` emit the canonical browser/WebView host assets from the tool-pinned `x07-web-ui` snapshot. Consumer repos do not need a local `vendor/x07-web-ui/` tree.
+- Use reducer-level tests for semantics. Device commands cover bundle integrity, provenance, packaging, and host smoke execution.
 
 Signed device provenance (DSSE + Ed25519):
 
@@ -243,6 +247,11 @@ Run a device bundle via the desktop host:
 ```sh
 x07 wasm device run --bundle dist/device --target desktop --json
 ```
+
+Testing boundary:
+
+- Use `x07 wasm web-ui test` when you need deterministic reducer-level trace replay and feature assertions.
+- Use `x07 wasm device build|verify|provenance|package|run` when you need bundle/package/provenance validation and desktop smoke coverage.
 
 Package a device bundle into a desktop payload (writes `package.manifest.json`):
 
