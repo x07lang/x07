@@ -7748,6 +7748,77 @@ fn x07_tool_wrapper_json_for_guide_scope() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn x07_wasm_json_emits_native_child_report() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let dir = fresh_os_tmp_dir("x07_wasm_native_json");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let bin_dir = dir.join("bin");
+    std::fs::create_dir_all(&bin_dir).expect("create bin dir");
+
+    let stub = bin_dir.join("x07-wasm");
+    let stub_src = r#"#!/usr/bin/env python3
+import json
+import sys
+
+doc = {
+    "schema_version": "x07.wasm.doctor.report@0.1.0",
+    "command": "x07-wasm.doctor",
+    "ok": True,
+    "exit_code": 0,
+    "diagnostics": [],
+    "meta": {
+        "argv": sys.argv,
+        "tool": {"name": "x07-wasm", "version": "0.1.8"}
+    },
+    "result": {
+        "doctor_ok": True,
+        "json_flag_seen": "--json" in sys.argv[1:]
+    }
+}
+
+print(json.dumps(doc))
+sys.exit(0)
+"#;
+    write_bytes(&stub, stub_src.as_bytes());
+    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755))
+        .expect("chmod x07-wasm");
+
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let existing = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths = vec![bin_dir.clone()];
+    paths.extend(std::env::split_paths(&existing));
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .env("PATH", std::env::join_paths(paths).expect("join PATH"))
+        .args(["wasm", "doctor", "--json"])
+        .output()
+        .expect("run x07 wasm doctor");
+
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse native wasm JSON");
+    assert_eq!(v["schema_version"], "x07.wasm.doctor.report@0.1.0");
+    assert_eq!(v["command"], "x07-wasm.doctor");
+    assert_eq!(v["result"]["doctor_ok"], Value::Bool(true));
+    assert_eq!(v["result"]["json_flag_seen"], Value::Bool(true));
+}
+
 #[test]
 fn x07_patch_apply_dry_run_and_write_modes() {
     let root = repo_root();

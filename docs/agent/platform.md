@@ -26,6 +26,7 @@ Current public surfaces:
 - local content-addressed store and execution state rooted at `--state-dir`
 - deterministic local deploy flow with candidate/stable slots, weighted routing, retry accounting, signed manual control actions, incident capture, and regression generation
 - self-hosted remote deploy parity in `x07-platform` using target profiles, remote CAS push, remote query/control flows, incident/regression parity, and the first OSS adapter set (`wasmcloud`, edge HTTP routing, OTLP HTTP telemetry, server-side secrets, OCI component registry)
+- the supported wasm toolchain surface for platform flows is `x07 wasm app pack|app verify|deploy plan|slo eval|app regress from-incident`
 - MCP tools for deploy, incident, regression, app, and platform control flows
 - a self-hosted Command Center and remote control-plane surface served by `x07lpd`
 

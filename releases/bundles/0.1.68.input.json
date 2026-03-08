@@ -3,7 +3,7 @@
   "packages": {
     "std_web_ui": "0.1.9"
   },
-  "published_at_utc": "2026-03-08T06:19:33Z",
+  "published_at_utc": "2026-03-08T16:28:00Z",
   "x07_device_host": {
     "release_manifest_sha256": "sha256:60119bdd6f6fdf7a7de577042eb9aa3d3e17fd7a1c306d15a4631c9606db1c5a",
     "release_manifest_url": "https://github.com/x07lang/x07-device-host/releases/download/v0.1.4/x07-device-host-0.1.4-release.json",

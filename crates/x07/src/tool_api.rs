@@ -400,7 +400,7 @@ fn schema_bytes_for_scope(scope: Option<&str>) -> Result<&'static [u8]> {
 }
 
 fn is_native_json_scope(scope: Option<&str>) -> bool {
-    matches!(scope, Some("doc"))
+    matches!(scope, Some("doc") | Some("wasm"))
 }
 
 fn run_native_json_command(parsed: &reporting::ParsedMachineFlags) -> Result<ChildOutput> {

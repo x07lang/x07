@@ -61,7 +61,19 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - `x07 wasm app build`
   - `x07 wasm app serve`
   - `x07 wasm app test`
+  - `x07 wasm app pack`
+  - `x07 wasm app verify`
   - `x07 wasm app regress from-incident`
+  - `x07 wasm deploy plan`
+  - `x07 wasm slo eval`
+
+For platform-facing remote deploy workflows, the supported wasm contract surface is:
+
+- `x07 wasm app pack`
+- `x07 wasm app verify`
+- `x07 wasm deploy plan`
+- `x07 wasm slo eval`
+- `x07 wasm app regress from-incident`
 
 See: [WASM (Phases 0–10)](wasm.md).
 

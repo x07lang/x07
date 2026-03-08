@@ -353,6 +353,14 @@ x07 wasm app pack --bundle-manifest dist/app/app.bundle.json --out-dir dist/app.
 x07 wasm app verify --pack-manifest dist/app.pack/app.pack.json --json
 ```
 
+The supported wasm integration surface for platform deploy workflows is:
+
+- `x07 wasm app pack`
+- `x07 wasm app verify`
+- `x07 wasm deploy plan`
+- `x07 wasm slo eval`
+- `x07 wasm app regress from-incident`
+
 Core-wasm HTTP reducer contracts + loop:
 
 ```sh
