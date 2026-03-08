@@ -1,0 +1,1098 @@
+{
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "studio_tests.test_init_requests_storage_get_v1",
+        "studio_tests.test_storage_hydrate_v1",
+        "studio_tests.test_note_edit_persists_v1",
+        "studio_tests.test_export_selected_v1",
+        "studio_tests.test_import_submit_valid_v1",
+        "studio_tests.test_import_submit_invalid_json_v1"
+      ]
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "head",
+          [
+            "bytes.concat",
+            [
+              "bytes.lit",
+              "{\"v\":1,\"kind\":\"x07.web_ui.dispatch\",\"state\":"
+            ],
+            [
+              "view.to_bytes",
+              "state_json"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "event_head",
+          [
+            "bytes.concat",
+            "head",
+            [
+              "bytes.lit",
+              ",\"event\":{\"type\":"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "with_type",
+          [
+            "bytes.concat",
+            "event_head",
+            [
+              "view.to_bytes",
+              "event_type_json"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "with_target_head",
+          [
+            "bytes.concat",
+            "with_type",
+            [
+              "bytes.lit",
+              ",\"target\":"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "with_target",
+          [
+            "bytes.concat",
+            "with_target_head",
+            [
+              "view.to_bytes",
+              "target_json"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "with_value_head",
+          [
+            "bytes.concat",
+            "with_target",
+            [
+              "bytes.lit",
+              ",\"value\":"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "with_value",
+          [
+            "bytes.concat",
+            "with_value_head",
+            [
+              "view.to_bytes",
+              "value_json"
+            ]
+          ]
+        ],
+        [
+          "bytes.concat",
+          "with_value",
+          [
+            "bytes.lit",
+            "}}"
+          ]
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests._dispatch_v1",
+      "params": [
+        {
+          "name": "state_json",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "event_type_json",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "target_json",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "value_json",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "studio_tests._dispatch_v1",
+        "state_json",
+        [
+          "bytes.view_lit",
+          "\"init\""
+        ],
+        [
+          "bytes.view_lit",
+          "\"\""
+        ],
+        [
+          "bytes.view_lit",
+          "\"\""
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests._dispatch_init_v1",
+      "params": [
+        {
+          "name": "state_json",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "studio_tests._dispatch_v1",
+        "state_json",
+        [
+          "bytes.view_lit",
+          "\"click\""
+        ],
+        "target_json",
+        [
+          "bytes.view_lit",
+          "\"\""
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests._dispatch_click_v1",
+      "params": [
+        {
+          "name": "state_json",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "target_json",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "studio_tests._dispatch_v1",
+        "state_json",
+        [
+          "bytes.view_lit",
+          "\"input\""
+        ],
+        "target_json",
+        "value_json"
+      ],
+      "kind": "defn",
+      "name": "studio_tests._dispatch_input_v1",
+      "params": [
+        {
+          "name": "state_json",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "target_json",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "value_json",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "path",
+          [
+            "bytes.lit",
+            "state"
+          ]
+        ],
+        [
+          "std.web_ui.test.extract_path_canon_or_err_v1",
+          "frame_json",
+          [
+            "bytes.view",
+            "path"
+          ]
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests._frame_state_v1",
+      "params": [
+        {
+          "name": "frame_json",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "got",
+          [
+            "std.web_ui.test.extract_path_canon_or_err_v1",
+            "frame_json",
+            "path"
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_bytes_eq",
+            "got",
+            [
+              "view.to_bytes",
+              "want_json"
+            ],
+            [
+              "std.test.code_assert_bytes_eq"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests._assert_path_eq_v1",
+      "params": [
+        {
+          "name": "frame_json",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "path",
+          "ty": "bytes_view"
+        },
+        {
+          "name": "want_json",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "result_i32"
+    },
+    {
+      "body": [
+        "bytes.concat",
+        [
+          "bytes.concat",
+          [
+            "bytes.lit",
+            "{\"__x07_storage\":{\"get\":{\"key\":\"x07_studio.app.v1\",\"value\":"
+          ],
+          [
+            "view.to_bytes",
+            "app_json"
+          ]
+        ],
+        [
+          "bytes.lit",
+          "}}}"
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests._storage_state_v1",
+      "params": [
+        {
+          "name": "app_json",
+          "ty": "bytes_view"
+        }
+      ],
+      "result": "bytes"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "dispatch",
+          [
+            "studio_tests._dispatch_init_v1",
+            [
+              "bytes.view_lit",
+              "{}"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch"
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame"
+            ],
+            [
+              "bytes.view_lit",
+              "state.ui.status"
+            ],
+            [
+              "bytes.view_lit",
+              "\"loading\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame"
+            ],
+            [
+              "bytes.view_lit",
+              "effects"
+            ],
+            [
+              "bytes.view_lit",
+              "[{\"key\":\"x07_studio.app.v1\",\"kind\":\"x07.web_ui.effect.storage.get\",\"v\":1}]"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests.test_init_requests_storage_get_v1",
+      "params": [],
+      "result": "result_i32"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "saved_app",
+          [
+            "bytes.lit",
+            "{\"schema_version\":\"x07_studio.app@0.1.0\",\"next_project_id\":4,\"selected_slot\":1,\"settings\":{\"search\":\"\",\"tag_filter\":\"release\"},\"projects\":{\"p0\":{\"active\":true,\"id\":\"p1\",\"name\":\"Inbox\",\"tags_csv\":\"\",\"note\":\"\"},\"p1\":{\"active\":true,\"id\":\"p2\",\"name\":\"Release Notes\",\"tags_csv\":\"release\",\"note\":\"ship checklist\"},\"p2\":{\"active\":false,\"id\":\"\",\"name\":\"\",\"tags_csv\":\"\",\"note\":\"\"},\"p3\":{\"active\":false,\"id\":\"\",\"name\":\"\",\"tags_csv\":\"\",\"note\":\"\"}}}"
+          ]
+        ],
+        [
+          "let",
+          "state",
+          [
+            "studio_tests._storage_state_v1",
+            [
+              "bytes.view",
+              "saved_app"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "dispatch",
+          [
+            "studio_tests._dispatch_init_v1",
+            [
+              "bytes.view",
+              "state"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch"
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame"
+            ],
+            [
+              "bytes.view_lit",
+              "state.ui.status"
+            ],
+            [
+              "bytes.view_lit",
+              "\"hydrated\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame"
+            ],
+            [
+              "bytes.view_lit",
+              "state.app.selected_slot"
+            ],
+            [
+              "bytes.view_lit",
+              "1"
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame"
+            ],
+            [
+              "bytes.view_lit",
+              "state.app.projects.p1.name"
+            ],
+            [
+              "bytes.view_lit",
+              "\"Release Notes\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame"
+            ],
+            [
+              "bytes.view_lit",
+              "effects"
+            ],
+            [
+              "bytes.view_lit",
+              "[]"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests.test_storage_hydrate_v1",
+      "params": [],
+      "result": "result_i32"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "dispatch_init",
+          [
+            "studio_tests._dispatch_init_v1",
+            [
+              "bytes.view_lit",
+              "{}"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_init",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_init"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "state_init",
+          [
+            "studio_tests._frame_state_v1",
+            [
+              "bytes.view",
+              "frame_init"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "dispatch_edit",
+          [
+            "studio_tests._dispatch_input_v1",
+            [
+              "bytes.view",
+              "state_init"
+            ],
+            [
+              "bytes.view_lit",
+              "\"note_editor\""
+            ],
+            [
+              "bytes.view_lit",
+              "\"ship checklist\""
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_edit",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_edit"
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_edit"
+            ],
+            [
+              "bytes.view_lit",
+              "state.app.projects.p0.note"
+            ],
+            [
+              "bytes.view_lit",
+              "\"ship checklist\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_edit"
+            ],
+            [
+              "bytes.view_lit",
+              "state.ui.status"
+            ],
+            [
+              "bytes.view_lit",
+              "\"saved\""
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests.test_note_edit_persists_v1",
+      "params": [],
+      "result": "result_i32"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "dispatch_init",
+          [
+            "studio_tests._dispatch_init_v1",
+            [
+              "bytes.view_lit",
+              "{}"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_init",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_init"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "state_init",
+          [
+            "studio_tests._frame_state_v1",
+            [
+              "bytes.view",
+              "frame_init"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "dispatch_export",
+          [
+            "studio_tests._dispatch_click_v1",
+            [
+              "bytes.view",
+              "state_init"
+            ],
+            [
+              "bytes.view_lit",
+              "\"export_selected\""
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_export",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_export"
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_export"
+            ],
+            [
+              "bytes.view_lit",
+              "state.ui.status"
+            ],
+            [
+              "bytes.view_lit",
+              "\"export_ready\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_export"
+            ],
+            [
+              "bytes.view_lit",
+              "state.ui.export_text"
+            ],
+            [
+              "bytes.view_lit",
+              "\"{\\\"schema_version\\\":\\\"x07_studio.project_export@0.1.0\\\",\\\"project\\\":{\\\"id\\\":\\\"p1\\\",\\\"name\\\":\\\"Inbox\\\",\\\"tags_csv\\\":\\\"\\\",\\\"note\\\":\\\"\\\"}}\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_export"
+            ],
+            [
+              "bytes.view_lit",
+              "effects"
+            ],
+            [
+              "bytes.view_lit",
+              "[]"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests.test_export_selected_v1",
+      "params": [],
+      "result": "result_i32"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "dispatch_init",
+          [
+            "studio_tests._dispatch_init_v1",
+            [
+              "bytes.view_lit",
+              "{}"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_init",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_init"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "state_init",
+          [
+            "studio_tests._frame_state_v1",
+            [
+              "bytes.view",
+              "frame_init"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "dispatch_input",
+          [
+            "studio_tests._dispatch_input_v1",
+            [
+              "bytes.view",
+              "state_init"
+            ],
+            [
+              "bytes.view_lit",
+              "\"import_json\""
+            ],
+            [
+              "bytes.view_lit",
+              "\"{\\\"schema_version\\\":\\\"x07_studio.project_export@0.1.0\\\",\\\"project\\\":{\\\"id\\\":\\\"p9\\\",\\\"name\\\":\\\"Imported\\\",\\\"tags_csv\\\":\\\"qa\\\",\\\"note\\\":\\\"from import\\\"}}\""
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_input",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_input"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "state_input",
+          [
+            "studio_tests._frame_state_v1",
+            [
+              "bytes.view",
+              "frame_input"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "dispatch_submit",
+          [
+            "studio_tests._dispatch_click_v1",
+            [
+              "bytes.view",
+              "state_input"
+            ],
+            [
+              "bytes.view_lit",
+              "\"import_submit\""
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_submit",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_submit"
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_submit"
+            ],
+            [
+              "bytes.view_lit",
+              "state.app.projects.p0.id"
+            ],
+            [
+              "bytes.view_lit",
+              "\"p9\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_submit"
+            ],
+            [
+              "bytes.view_lit",
+              "state.app.projects.p0.name"
+            ],
+            [
+              "bytes.view_lit",
+              "\"Imported\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_submit"
+            ],
+            [
+              "bytes.view_lit",
+              "state.app.projects.p0.tags_csv"
+            ],
+            [
+              "bytes.view_lit",
+              "\"qa\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_submit"
+            ],
+            [
+              "bytes.view_lit",
+              "state.ui.status"
+            ],
+            [
+              "bytes.view_lit",
+              "\"import_applied\""
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests.test_import_submit_valid_v1",
+      "params": [],
+      "result": "result_i32"
+    },
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "dispatch_init",
+          [
+            "studio_tests._dispatch_init_v1",
+            [
+              "bytes.view_lit",
+              "{}"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_init",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_init"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "state_init",
+          [
+            "studio_tests._frame_state_v1",
+            [
+              "bytes.view",
+              "frame_init"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "dispatch_input",
+          [
+            "studio_tests._dispatch_input_v1",
+            [
+              "bytes.view",
+              "state_init"
+            ],
+            [
+              "bytes.view_lit",
+              "\"import_json\""
+            ],
+            [
+              "bytes.view_lit",
+              "\"{bad\""
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_input",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_input"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "state_input",
+          [
+            "studio_tests._frame_state_v1",
+            [
+              "bytes.view",
+              "frame_input"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "dispatch_submit",
+          [
+            "studio_tests._dispatch_click_v1",
+            [
+              "bytes.view",
+              "state_input"
+            ],
+            [
+              "bytes.view_lit",
+              "\"import_submit\""
+            ]
+          ]
+        ],
+        [
+          "let",
+          "frame_submit",
+          [
+            "app.step_v1",
+            [
+              "bytes.view",
+              "dispatch_submit"
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_submit"
+            ],
+            [
+              "bytes.view_lit",
+              "state.ui.status"
+            ],
+            [
+              "bytes.view_lit",
+              "\"import_invalid_json\""
+            ]
+          ]
+        ],
+        [
+          "try",
+          [
+            "studio_tests._assert_path_eq_v1",
+            [
+              "bytes.view",
+              "frame_submit"
+            ],
+            [
+              "bytes.view_lit",
+              "effects"
+            ],
+            [
+              "bytes.view_lit",
+              "[]"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ],
+      "kind": "defn",
+      "name": "studio_tests.test_import_submit_invalid_json_v1",
+      "params": [],
+      "result": "result_i32"
+    }
+  ],
+  "imports": [
+    "app",
+    "std.test",
+    "std.web_ui.test"
+  ],
+  "kind": "module",
+  "module_id": "studio_tests",
+  "schema_version": "x07.x07ast@0.5.0"
+}

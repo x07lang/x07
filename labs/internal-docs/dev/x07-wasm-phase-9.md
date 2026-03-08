@@ -35,3 +35,9 @@ From `x07-wasm-backend/`:
 set -euo pipefail
 bash scripts/ci/check_phase9.sh
 ```
+
+## Canonical examples
+
+- Desktop runner and package showcase: `x07-wasm-backend/examples/x07_studio/`
+- Cross-target packaging showcase with desktop smoke: `x07-wasm-backend/examples/x07_field_notes/`
+- Source mirrors for docs and agents: `x07/docs/examples/wasm_showcases/x07_studio/` and `x07/docs/examples/wasm_showcases/x07_field_notes/`

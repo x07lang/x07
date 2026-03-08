@@ -44,3 +44,8 @@ set -euo pipefail
 export PATH="${WASI_SDK_DIR}/bin:${PATH}"
 bash scripts/ci/check_phase6.sh
 ```
+
+## Canonical examples
+
+- Runnable full-stack showcase: `x07-wasm-backend/examples/x07_atlas/`
+- Source mirror for docs and agents: `x07/docs/examples/wasm_showcases/x07_atlas/`

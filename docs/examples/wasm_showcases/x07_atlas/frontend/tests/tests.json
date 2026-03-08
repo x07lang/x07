@@ -1,0 +1,11 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "entry": "smoke.pass",
+      "expect": "pass",
+      "id": "smoke/pass",
+      "world": "run-os"
+    }
+  ]
+}

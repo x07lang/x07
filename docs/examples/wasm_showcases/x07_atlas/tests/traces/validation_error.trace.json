@@ -1,0 +1,1948 @@
+{
+  "meta": {
+    "app": {
+      "name": "x07_atlas_validation_error",
+      "version": "0.0.0"
+    },
+    "created_utc": "2026-03-06T00:00:00Z",
+    "tool": {
+      "name": "x07-wasm",
+      "version": "0.0.0"
+    }
+  },
+  "schema_version": "x07.app.trace@0.1.0",
+  "steps": [
+    {
+      "http": [
+        {
+          "request": {
+            "body": {
+              "base64": "eyJuYW1lIjoiIn0=",
+              "bytes_len": 11,
+              "text": "{\"name\":\"\"}"
+            },
+            "headers": [
+              {
+                "k": "Content-Type",
+                "v": "application/json"
+              }
+            ],
+            "id": "req_invalid_create",
+            "method": "POST",
+            "path": "/api/projects",
+            "schema_version": "x07.http.request.envelope@0.1.0"
+          },
+          "response": {
+            "body": {
+              "base64": "eyJlcnJvciI6eyJjb2RlIjoidmFsaWRhdGlvbl9lcnJvciIsIm1lc3NhZ2UiOiJwcm9qZWN0IG5hbWUgcmVxdWlyZWQiLCJkZXRhaWxzIjpbeyJmaWVsZCI6Im5hbWUiLCJjb2RlIjoicmVxdWlyZWQiLCJtZXNzYWdlIjoicHJvamVjdCBuYW1lIHJlcXVpcmVkIn1dfX0=",
+              "bytes_len": 152,
+              "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"project name required\",\"details\":[{\"field\":\"name\",\"code\":\"required\",\"message\":\"project name required\"}]}}"
+            },
+            "headers": [],
+            "request_id": "req_invalid_create",
+            "schema_version": "x07.http.response.envelope@0.1.0",
+            "status": 422
+          }
+        }
+      ],
+      "i": 0,
+      "timing": {
+        "http_ms": 0,
+        "total_ms": 0,
+        "ui_ms": 0
+      },
+      "ui_dispatch": {
+        "event": {
+          "target": "invalid-create",
+          "type": "click"
+        },
+        "kind": "x07.web_ui.dispatch",
+        "state": null,
+        "v": 1
+      },
+      "ui_frame": {
+        "effects": [],
+        "kind": "x07.web_ui.frame",
+        "patches": [
+          {
+            "op": "replace",
+            "path": "",
+            "value": {
+              "kind": "x07.web_ui.tree",
+              "root": {
+                "children": [
+                  {
+                    "k": "text",
+                    "key": "title",
+                    "text": "frontend"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "refresh",
+                                "text": "refresh"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "refresh",
+                            "on": [
+                              {
+                                "target": "refresh",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "create",
+                                "text": "create"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "create",
+                            "on": [
+                              {
+                                "target": "create",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "invalid-create",
+                                "text": "invalid-create"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "invalid-create",
+                            "on": [
+                              {
+                                "target": "invalid-create",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "row1",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "list",
+                                "text": "list"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "list",
+                            "on": [
+                              {
+                                "target": "list",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "detail",
+                                "text": "detail"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "detail",
+                            "on": [
+                              {
+                                "target": "detail",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "item1",
+                                "text": "item1"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "item1",
+                            "on": [
+                              {
+                                "target": "item1",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "row2",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "item2",
+                                "text": "item2"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "item2",
+                            "on": [
+                              {
+                                "target": "item2",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "invalid-item",
+                                "text": "invalid-item"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "invalid-item",
+                            "on": [
+                              {
+                                "target": "invalid-item",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "perf",
+                                "text": "perf"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "perf",
+                            "on": [
+                              {
+                                "target": "perf",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "row3",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "buttons_group",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "route: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": "/"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "route",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "display: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"project name required\",\"details\":[{\"field\":\"name\",\"code\":\"required\",\"message\":\"project name required\"}]}}"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "display",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "cache: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": ""
+                              }
+                            ],
+                            "k": "el",
+                            "key": "cache",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "status_row1",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "source: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": "http"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "source",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "error: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"project name required\",\"details\":[{\"field\":\"name\",\"code\":\"required\",\"message\":\"project name required\"}]}}"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "error",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "status_row2",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "status_group",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  }
+                ],
+                "k": "el",
+                "key": "root",
+                "on": [],
+                "props": {
+                  "attrs": {},
+                  "class": [],
+                  "style": {}
+                },
+                "tag": "div"
+              },
+              "v": 1
+            }
+          }
+        ],
+        "state": {
+          "cache": "",
+          "display": "{\"error\":{\"code\":\"validation_error\",\"message\":\"project name required\",\"details\":[{\"field\":\"name\",\"code\":\"required\",\"message\":\"project name required\"}]}}",
+          "error": "{\"error\":{\"code\":\"validation_error\",\"message\":\"project name required\",\"details\":[{\"field\":\"name\",\"code\":\"required\",\"message\":\"project name required\"}]}}",
+          "route": "/",
+          "source": "http"
+        },
+        "telemetry": {},
+        "ui": {
+          "kind": "x07.web_ui.tree",
+          "root": {
+            "children": [
+              {
+                "k": "text",
+                "key": "title",
+                "text": "frontend"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "refresh",
+                            "text": "refresh"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "refresh",
+                        "on": [
+                          {
+                            "target": "refresh",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "create",
+                            "text": "create"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "create",
+                        "on": [
+                          {
+                            "target": "create",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "invalid-create",
+                            "text": "invalid-create"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "invalid-create",
+                        "on": [
+                          {
+                            "target": "invalid-create",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "row1",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "list",
+                            "text": "list"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "list",
+                        "on": [
+                          {
+                            "target": "list",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "detail",
+                            "text": "detail"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "detail",
+                        "on": [
+                          {
+                            "target": "detail",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "item1",
+                            "text": "item1"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "item1",
+                        "on": [
+                          {
+                            "target": "item1",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "row2",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "item2",
+                            "text": "item2"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "item2",
+                        "on": [
+                          {
+                            "target": "item2",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "invalid-item",
+                            "text": "invalid-item"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "invalid-item",
+                        "on": [
+                          {
+                            "target": "invalid-item",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "perf",
+                            "text": "perf"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "perf",
+                        "on": [
+                          {
+                            "target": "perf",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "row3",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  }
+                ],
+                "k": "el",
+                "key": "buttons_group",
+                "on": [],
+                "props": {
+                  "attrs": {},
+                  "class": [],
+                  "style": {
+                    "display": "contents"
+                  }
+                },
+                "tag": "x07-fragment"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "route: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": "/"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "route",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "display: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"project name required\",\"details\":[{\"field\":\"name\",\"code\":\"required\",\"message\":\"project name required\"}]}}"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "display",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "cache: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": ""
+                          }
+                        ],
+                        "k": "el",
+                        "key": "cache",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "status_row1",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "source: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": "http"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "source",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "error: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"project name required\",\"details\":[{\"field\":\"name\",\"code\":\"required\",\"message\":\"project name required\"}]}}"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "error",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "status_row2",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  }
+                ],
+                "k": "el",
+                "key": "status_group",
+                "on": [],
+                "props": {
+                  "attrs": {},
+                  "class": [],
+                  "style": {
+                    "display": "contents"
+                  }
+                },
+                "tag": "x07-fragment"
+              }
+            ],
+            "k": "el",
+            "key": "root",
+            "on": [],
+            "props": {
+              "attrs": {},
+              "class": [],
+              "style": {}
+            },
+            "tag": "div"
+          },
+          "v": 1
+        },
+        "v": 1
+      }
+    },
+    {
+      "http": [
+        {
+          "request": {
+            "body": {
+              "base64": "eyJ4IjoidHJ1ZSJ9",
+              "bytes_len": 12,
+              "text": "{\"x\":\"true\"}"
+            },
+            "headers": [
+              {
+                "k": "Content-Type",
+                "v": "application/json"
+              }
+            ],
+            "id": "req_invalid_item",
+            "method": "POST",
+            "path": "/api/projects/proj_001/items",
+            "schema_version": "x07.http.request.envelope@0.1.0"
+          },
+          "response": {
+            "body": {
+              "base64": "eyJlcnJvciI6eyJjb2RlIjoidmFsaWRhdGlvbl9lcnJvciIsIm1lc3NhZ2UiOiJpdGVtIHRpdGxlIHJlcXVpcmVkIiwiZGV0YWlscyI6W3siZmllbGQiOiJ0aXRsZSIsImNvZGUiOiJyZXF1aXJlZCIsIm1lc3NhZ2UiOiJpdGVtIHRpdGxlIHJlcXVpcmVkIn1dfX0=",
+              "bytes_len": 149,
+              "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"item title required\",\"details\":[{\"field\":\"title\",\"code\":\"required\",\"message\":\"item title required\"}]}}"
+            },
+            "headers": [],
+            "request_id": "req_invalid_item",
+            "schema_version": "x07.http.response.envelope@0.1.0",
+            "status": 422
+          }
+        }
+      ],
+      "i": 1,
+      "timing": {
+        "http_ms": 0,
+        "total_ms": 0,
+        "ui_ms": 0
+      },
+      "ui_dispatch": {
+        "event": {
+          "target": "invalid-item",
+          "type": "click"
+        },
+        "kind": "x07.web_ui.dispatch",
+        "state": null,
+        "v": 1
+      },
+      "ui_frame": {
+        "effects": [],
+        "kind": "x07.web_ui.frame",
+        "patches": [
+          {
+            "op": "replace",
+            "path": "",
+            "value": {
+              "kind": "x07.web_ui.tree",
+              "root": {
+                "children": [
+                  {
+                    "k": "text",
+                    "key": "title",
+                    "text": "frontend"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "refresh",
+                                "text": "refresh"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "refresh",
+                            "on": [
+                              {
+                                "target": "refresh",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "create",
+                                "text": "create"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "create",
+                            "on": [
+                              {
+                                "target": "create",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "invalid-create",
+                                "text": "invalid-create"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "invalid-create",
+                            "on": [
+                              {
+                                "target": "invalid-create",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "row1",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "list",
+                                "text": "list"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "list",
+                            "on": [
+                              {
+                                "target": "list",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "detail",
+                                "text": "detail"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "detail",
+                            "on": [
+                              {
+                                "target": "detail",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "item1",
+                                "text": "item1"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "item1",
+                            "on": [
+                              {
+                                "target": "item1",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "row2",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "item2",
+                                "text": "item2"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "item2",
+                            "on": [
+                              {
+                                "target": "item2",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "invalid-item",
+                                "text": "invalid-item"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "invalid-item",
+                            "on": [
+                              {
+                                "target": "invalid-item",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "perf",
+                                "text": "perf"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "perf",
+                            "on": [
+                              {
+                                "target": "perf",
+                                "type": "click"
+                              }
+                            ],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "button"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "row3",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "buttons_group",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "route: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": "http://localhost/projects/proj_001/items/invalid"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "route",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "display: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"item title required\",\"details\":[{\"field\":\"title\",\"code\":\"required\",\"message\":\"item title required\"}]}}"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "display",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "cache: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": ""
+                              }
+                            ],
+                            "k": "el",
+                            "key": "cache",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "status_row1",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "source: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": "http"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "source",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          },
+                          {
+                            "children": [
+                              {
+                                "k": "text",
+                                "key": "label",
+                                "text": "error: "
+                              },
+                              {
+                                "k": "text",
+                                "key": "value",
+                                "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"item title required\",\"details\":[{\"field\":\"title\",\"code\":\"required\",\"message\":\"item title required\"}]}}"
+                              }
+                            ],
+                            "k": "el",
+                            "key": "error",
+                            "on": [],
+                            "props": {
+                              "attrs": {},
+                              "class": [],
+                              "style": {}
+                            },
+                            "tag": "div"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "status_row2",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {
+                            "display": "contents"
+                          }
+                        },
+                        "tag": "x07-fragment"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "status_group",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  }
+                ],
+                "k": "el",
+                "key": "root",
+                "on": [],
+                "props": {
+                  "attrs": {},
+                  "class": [],
+                  "style": {}
+                },
+                "tag": "div"
+              },
+              "v": 1
+            }
+          }
+        ],
+        "state": {
+          "cache": "",
+          "display": "{\"error\":{\"code\":\"validation_error\",\"message\":\"item title required\",\"details\":[{\"field\":\"title\",\"code\":\"required\",\"message\":\"item title required\"}]}}",
+          "error": "{\"error\":{\"code\":\"validation_error\",\"message\":\"item title required\",\"details\":[{\"field\":\"title\",\"code\":\"required\",\"message\":\"item title required\"}]}}",
+          "route": "http://localhost/projects/proj_001/items/invalid",
+          "source": "http"
+        },
+        "telemetry": {},
+        "ui": {
+          "kind": "x07.web_ui.tree",
+          "root": {
+            "children": [
+              {
+                "k": "text",
+                "key": "title",
+                "text": "frontend"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "refresh",
+                            "text": "refresh"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "refresh",
+                        "on": [
+                          {
+                            "target": "refresh",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "create",
+                            "text": "create"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "create",
+                        "on": [
+                          {
+                            "target": "create",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "invalid-create",
+                            "text": "invalid-create"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "invalid-create",
+                        "on": [
+                          {
+                            "target": "invalid-create",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "row1",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "list",
+                            "text": "list"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "list",
+                        "on": [
+                          {
+                            "target": "list",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "detail",
+                            "text": "detail"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "detail",
+                        "on": [
+                          {
+                            "target": "detail",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "item1",
+                            "text": "item1"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "item1",
+                        "on": [
+                          {
+                            "target": "item1",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "row2",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "item2",
+                            "text": "item2"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "item2",
+                        "on": [
+                          {
+                            "target": "item2",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "invalid-item",
+                            "text": "invalid-item"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "invalid-item",
+                        "on": [
+                          {
+                            "target": "invalid-item",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "perf",
+                            "text": "perf"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "perf",
+                        "on": [
+                          {
+                            "target": "perf",
+                            "type": "click"
+                          }
+                        ],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "button"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "row3",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  }
+                ],
+                "k": "el",
+                "key": "buttons_group",
+                "on": [],
+                "props": {
+                  "attrs": {},
+                  "class": [],
+                  "style": {
+                    "display": "contents"
+                  }
+                },
+                "tag": "x07-fragment"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "route: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": "http://localhost/projects/proj_001/items/invalid"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "route",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "display: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"item title required\",\"details\":[{\"field\":\"title\",\"code\":\"required\",\"message\":\"item title required\"}]}}"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "display",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "cache: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": ""
+                          }
+                        ],
+                        "k": "el",
+                        "key": "cache",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "status_row1",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "source: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": "http"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "source",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      },
+                      {
+                        "children": [
+                          {
+                            "k": "text",
+                            "key": "label",
+                            "text": "error: "
+                          },
+                          {
+                            "k": "text",
+                            "key": "value",
+                            "text": "{\"error\":{\"code\":\"validation_error\",\"message\":\"item title required\",\"details\":[{\"field\":\"title\",\"code\":\"required\",\"message\":\"item title required\"}]}}"
+                          }
+                        ],
+                        "k": "el",
+                        "key": "error",
+                        "on": [],
+                        "props": {
+                          "attrs": {},
+                          "class": [],
+                          "style": {}
+                        },
+                        "tag": "div"
+                      }
+                    ],
+                    "k": "el",
+                    "key": "status_row2",
+                    "on": [],
+                    "props": {
+                      "attrs": {},
+                      "class": [],
+                      "style": {
+                        "display": "contents"
+                      }
+                    },
+                    "tag": "x07-fragment"
+                  }
+                ],
+                "k": "el",
+                "key": "status_group",
+                "on": [],
+                "props": {
+                  "attrs": {},
+                  "class": [],
+                  "style": {
+                    "display": "contents"
+                  }
+                },
+                "tag": "x07-fragment"
+              }
+            ],
+            "k": "el",
+            "key": "root",
+            "on": [],
+            "props": {
+              "attrs": {},
+              "class": [],
+              "style": {}
+            },
+            "tag": "div"
+          },
+          "v": 1
+        },
+        "v": 1
+      }
+    }
+  ]
+}

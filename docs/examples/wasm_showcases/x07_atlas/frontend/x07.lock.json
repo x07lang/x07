@@ -1,0 +1,26 @@
+{
+  "schema_version": "x07.lock@0.3.0",
+  "dependencies": [
+    {
+      "name": "std-web-ui",
+      "version": "0.1.8",
+      "path": ".x07/deps/std-web-ui/0.1.8",
+      "package_manifest_sha256": "4a66d4206c28f7180031940d687805c093d2addaaf13974c4755b343214d0e28",
+      "module_root": "modules",
+      "modules_sha256": {
+        "std.web_ui.effects.http": "0b3322fd715ceba9863310807dfb03840f9b6f9d33e2e734bcda900083a12064",
+        "std.web_ui.effects.nav": "092676e77a6f1cba9f5250ae4b16903c1b94c7dea5fb9c993f7aabd9affeb085",
+        "std.web_ui.effects.storage": "1dcfea4144bb67e74e60770966b4705127f28fbb185f19ba47f2e7d5e1b22a33",
+        "std.web_ui.effects.timer": "08d5c5b9eb9af6d19eb68d4f1c9a952c4771cffb0ac38eaf5e91ce863b6e6283",
+        "std.web_ui.patch": "194420e5ed2c322c34b597aab09f9938d9dd510dd79be22ccd8017d14da7607e",
+        "std.web_ui.runtime": "7e44981b3697be46dc22d0214683a24c9ac4a0dfa91f6a9f1d0208dadaf3a3fb",
+        "std.web_ui.schema": "786569f4876db2db0414a0fb8e3852affe2db200dd55f6ad77b604d5cdc32ff8",
+        "std.web_ui.test": "23cc23f7e08e49413d10848f273bc48107dc315a2388155f6a37fce41e242cdd",
+        "std.web_ui.tests": "d131e71ddd7dd63c806f5781edf161dfe059124780f43a95d36b5ae1cc3611fe",
+        "std.web_ui.trace": "c376b1550395cee67327c918ef7039921dcd78682825afe2a2d16eb8c8f617ec",
+        "std.web_ui.vdom": "2be8650af27d75bac169a79c93350fbf94c2ec09447c943a4b8c572bc0dceaeb"
+      },
+      "yanked": false
+    }
+  ]
+}

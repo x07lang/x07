@@ -1,0 +1,29 @@
+{
+  "schema_version": "x07.slo.profile@0.1.0",
+  "id": "slo_min",
+  "v": 1,
+  "service": "x07_atlas",
+  "indicators": [
+    {
+      "id": "slo_error_rate",
+      "kind": "error_rate",
+      "metric": "http_error_rate",
+      "window_s": 60,
+      "objective": { "max": 0.01 }
+    },
+    {
+      "id": "slo_latency_p95",
+      "kind": "latency_p95_ms",
+      "metric": "http_latency_p95_ms",
+      "window_s": 60,
+      "objective": { "max_ms": 200 }
+    },
+    {
+      "id": "slo_availability",
+      "kind": "availability",
+      "metric": "http_availability",
+      "window_s": 60,
+      "objective": { "min": 0.99 }
+    }
+  ]
+}

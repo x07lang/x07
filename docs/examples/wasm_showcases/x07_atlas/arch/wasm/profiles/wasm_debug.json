@@ -1,0 +1,59 @@
+{
+  "schema_version": "x07.wasm.profile@0.3.0",
+  "id": "wasm_debug",
+  "v": 1,
+
+  "target": {
+    "triple": "wasm32-wasi",
+    "wasm_c_abi": "basic_c_abi@1",
+    "entry_export": "x07_solve_v2"
+  },
+
+  "x07_build": {
+    "freestanding": true,
+    "emit_c_header": true
+  },
+
+  "codegen_backend": "native_x07_wasm_v1",
+
+  "clang": {
+    "cflags": [
+      "--target=wasm32-wasi",
+      "-O0",
+      "-g",
+      "-std=c11",
+      "-ffunction-sections",
+      "-fdata-sections",
+      "-fvisibility=hidden"
+    ]
+  },
+
+  "wasm_ld": {
+    "ldflags": [
+      "--no-entry",
+      "--stack-first",
+      "-z",
+      "stack-size=2097152",
+
+      "--export=x07_solve_v2",
+      "--export=__heap_base",
+      "--export=__data_end",
+      "--export-memory=memory",
+
+      "--initial-memory=268435456",
+      "--no-growable-memory"
+    ]
+  },
+
+  "defaults": {
+    "arena_cap_bytes": 134217728,
+    "max_output_bytes": 16777216
+  },
+
+  "runtime": {
+    "max_fuel": 400000000,
+    "max_memory_bytes": 268435456,
+    "max_table_elements": 131072,
+    "max_wasm_stack_bytes": 2097152
+  }
+}

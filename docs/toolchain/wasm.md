@@ -40,6 +40,16 @@ cargo install --locked x07-device-host-desktop --version <VERSION>
 
 Use `cargo install --locked --git https://github.com/x07lang/x07-wasm-backend.git x07-wasm` only when you need unreleased development state from the repo.
 
+## Official showcase apps
+
+The released docs bundle mirrors the official `x07-wasm` showcase sources under [`docs/examples/wasm_showcases/`](../examples/wasm_showcases/index.md):
+
+- [`x07_atlas/`](../examples/wasm_showcases/x07_atlas/README.md): full-stack app bundle with traces, regression generation, pack verification, provenance, deploy planning, and SLO checks
+- [`x07_studio/`](../examples/wasm_showcases/x07_studio/README.md): desktop device bundle with persistent notes, import/export flows, provenance, packaging, and host smoke
+- [`x07_field_notes/`](../examples/wasm_showcases/x07_field_notes/README.md): shared desktop/mobile reducer with replay traces and iOS/Android packaging
+
+The canonical runnable projects and CI scripts live in `x07-wasm-backend/examples/`.
+
 Phase 1 also requires additional tools on `PATH` (checked by `x07 wasm doctor`):
 
 - `wasm-tools`
