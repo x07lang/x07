@@ -2,6 +2,23 @@
 
 The x07 Platform (x07-LP) is a contract-first lifecycle engine for sealed X07 artifacts. It consumes `x07.app.pack@0.1.0` plus the related policy, SLO, provenance, incident, and regression artifacts, then produces deterministic deploy, query, control, incident, and regression outputs.
 
+## Vision
+
+- Turn X07 delivery into a contract-first, machine-readable loop from change request through deploy, incident capture, and regression generation.
+- Keep the same CLI and sealed artifacts usable across local development, self-hosted remote targets, and the future hosted platform.
+- Let creators focus on making things while operators keep control through auditable artifacts, policy gates, and explicit control actions.
+
+## Audience
+
+- creators who want a default ship-and-operate path without learning provider-specific infrastructure
+- operators who need deterministic reports, policy and SLO gates, and a clear query and control surface
+
+## Current goals
+
+- maintain a strong public OSS baseline for local and self-hosted remote deploys
+- keep provider support behind adapter and conformance surfaces instead of baking cloud logic into the engine
+- preserve the public/private split so hosted-only account, tenancy, metering, and billing work can evolve without forking the public platform
+
 Repos:
 - `x07lang/x07-platform-contracts`
 - `x07lang/x07-platform`
