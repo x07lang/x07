@@ -97,7 +97,7 @@ x07 ast apply-patch --in program.x07.json --patch patch.json --out program.x07.j
 
 ### Official MCP server (for agent runtimes)
 
-If your coding agent runtime supports MCP (Model Context Protocol), install and use the official X07 MCP server: `io.x07/x07lang-mcp`. It exposes token-efficient tools like `x07.exec_v1`, `x07.context_pack_v1`, and safe patch application for x07AST JSON.
+If your coding agent runtime supports MCP (Model Context Protocol), install and use the official X07 MCP server: `io.x07/x07lang-mcp`. It exposes token-efficient core editing tools plus capability-gated ecosystem tools such as `x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.wasm.core_v1`, `x07.web_ui.exec_v1`, `x07.device.exec_v1`, `x07.app.exec_v1`, `lp.query_v1`, and safe patch application for x07AST JSON.
 
 Start here: https://x07lang.org/docs/getting-started/agent-quickstart/ (includes MCP setup).
 

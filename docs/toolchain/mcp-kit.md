@@ -233,7 +233,7 @@ When `publish.require_signed_prm=true`, dry-run also verifies:
 
 The kit includes these reference servers:
 
-- `x07lang-mcp`
+- `x07lang-mcp` (official X07 ecosystem server; core editing tools plus capability-gated pkg/wasm/web-ui/device/app/platform packs)
 - `github-mcp`
 - `slack-mcp`
 - `jira-mcp`
