@@ -29,12 +29,12 @@ MCP namespace: `lp.*`
 
 ## Current verified line
 
-- public platform contracts remain on `0.1.0`
-- `x07-platform` release line: `0.2.2`
+- public platform contracts for device release, incident, and regression now run on `0.2.0`
+- `x07-platform` release line: `0.2.5`
 - verified upstream dependency line for the self-hosted remote path:
-  - `x07 v0.1.68`
-  - `x07-wasm-backend v0.1.8`
-  - `std-web-ui 0.1.9`
+  - `x07 v0.1.69`
+  - `x07-wasm-backend v0.2.1`
+  - `std-web-ui 0.2.0`
 - the `x07` docs bundle that publishes this page is released on `v0.1.69`
 
 ## Public contract surface
@@ -49,11 +49,17 @@ MCP namespace: `lp.*`
   - `lp.deploy.push.result@0.1.0`
   - `lp.deploy.remote.result@0.1.0`
 - incident and regression contracts:
-  - `lp.incident.bundle@0.1.0`
-  - `lp.incident.bundle.meta.local@0.1.0`
-  - `lp.incident.query.result@0.1.0`
-  - `lp.regression.request@0.1.0`
-  - `lp.regression.run.result@0.1.0`
+  - `lp.incident.bundle@0.2.0`
+  - `lp.incident.bundle.meta.local@0.2.0`
+  - `lp.incident.bundle.meta.remote@0.2.0`
+  - `lp.incident.query.result@0.2.0`
+  - `lp.regression.request@0.2.0`
+  - `lp.regression.run.result@0.2.0`
+- device release contracts:
+  - `lp.device.release.plan@0.2.0`
+  - `lp.device.release.execution@0.2.0`
+  - `lp.device.release.query.result@0.2.0`
+  - `lp.device.release.run.result@0.2.0`
 - remote target and adapter contracts:
   - `lp.target.profile@0.1.0`
   - `lp.target.list.result@0.1.0`
@@ -79,6 +85,23 @@ The hardened self-hosted remote profile lives in `lp.target.profile@0.1.0`:
 
 `lp.deploy.execution.meta.remote@0.1.0` preserves the accepted target profile details needed to understand remote query artifacts later, including TLS and OCI auth/trust references.
 
+The `0.2.0` device-native line adds three normalized surfaces that matter to operators:
+
+- release records carry a frozen `native_summary` plus `release_readiness` derived from the sealed device package and `x07-wasm device package --json`
+- incidents carry `native_context` with sanitized release, permission, lifecycle, connectivity, and breadcrumb context, plus the native classification set:
+  - `native_runtime_error`
+  - `native_policy_violation`
+  - `native_bridge_timeout`
+  - `native_host_crash`
+  - `native_permission_blocked`
+- regressions carry `native_replay_hints`, `replay_target_kind`, `replay_mode`, and replay synthesis status so incident bundles can round-trip into deterministic native replay fixtures
+
+The companion `x07-wasm` report line is also `0.2.0`:
+
+- `x07.wasm.device.verify.report@0.2.0`
+- `x07.wasm.device.package.report@0.2.0`
+- `x07.wasm.device.regress.from_incident.report@0.2.0`
+
 ## Runtime surface
 
 `x07-platform` provides:
@@ -87,6 +110,7 @@ The hardened self-hosted remote profile lives in `lp.target.profile@0.1.0`:
 - deterministic local execution with candidate/stable slots, weighted routing, signed control actions, incident capture, regression generation, and query/index rebuilds
 - self-hosted remote deploy parity through `x07lpd`
 - a shared Rust driver (`x07lp-driver`) used by the CLI, MCP layer, and daemon so local and remote flows share one execution path
+- native-aware device release flows where `release-create` freezes package-derived `native_summary`, `release-observe` correlates native telemetry into linked incidents, `regress from-incident` can drive native replay generation, and Command Center exposes the same normalized release/incident/regression state
 
 The current self-hosted reference target is the wasmCloud stack under `x07-platform/examples/targets/wasmcloud/`. The verified creator-facing path uses:
 
