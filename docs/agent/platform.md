@@ -30,7 +30,7 @@ MCP namespace: `lp.*`
 ## Current verified line
 
 - public platform contracts for device release, incident, and regression now run on `0.2.0`
-- `x07-platform` release line: `0.2.5`
+- `x07-platform` release line: `0.2.6`
 - verified upstream dependency line for the self-hosted remote path:
   - `x07 v0.1.69`
   - `x07-wasm-backend v0.2.1`
