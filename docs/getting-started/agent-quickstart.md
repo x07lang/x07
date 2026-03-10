@@ -73,7 +73,7 @@ If your agent runtime supports MCP (Model Context Protocol), install the officia
 
 Download the published bundle from GitHub releases:
 - Repo: https://github.com/x07lang/x07-mcp
-- Release tag: `x07lang-mcp-v0.2.0`
+- Release tag: `x07lang-mcp-v0.2.1`
 - Files: `x07lang-mcp.mcpb` and `x07lang-mcp.mcpb.sha256.txt`
 
 Verify (macOS / Linux):
