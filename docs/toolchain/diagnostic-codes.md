@@ -2555,7 +2555,7 @@ Details:
 
 Agent strategy:
 
-- Run `x07-mcp scaffold init --template mcp-server-http-tasks --dir <DIR> --machine json` (or the specific MCP template you requested) to reproduce.
+- Run `x07-mcp scaffold init --template mcp-server-stdio --dir <DIR> --machine json` to reproduce.
 - Fix the reported issue and re-run `x07 init`.
 
 
@@ -2575,7 +2575,7 @@ The MCP server templates are provided by `x07-mcp` (an external tool).
 Agent strategy:
 
 - Install `x07-mcp` and ensure it is discoverable on PATH.
-- Re-run `x07 init --template mcp-server-http-tasks` (or another MCP template).
+- Re-run `x07 init --template mcp-server-stdio` (or another MCP template).
 
 
 ## `X07INIT_MCP_REPORT`
@@ -4199,3 +4199,4 @@ Agent strategy:
 - Reproduce `X7I0901` and capture structured context.
 - Resolve the external dependency/state.
 - Re-run the command and continue repair loop.
+
