@@ -8445,16 +8445,20 @@ fn x07_mcp_errors_when_x07_mcp_missing() {
 
 #[cfg(unix)]
 #[test]
-fn x07_init_mcp_template_delegates_to_x07_mcp_scaffold() {
+fn x07_init_mcp_templates_delegate_to_x07_mcp_scaffold() {
     use std::os::unix::fs::PermissionsExt as _;
 
-    let dir = fresh_os_tmp_dir("x07_init_mcp_delegate");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
-    let bin_dir = dir.join("bin");
-    std::fs::create_dir_all(&bin_dir).expect("create bin dir");
+    for template in ["mcp-server-stdio", "mcp-server-http-tasks"] {
+        let dir = fresh_os_tmp_dir(&format!(
+            "x07_init_mcp_delegate_{}",
+            template.replace('-', "_")
+        ));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let bin_dir = dir.join("bin");
+        std::fs::create_dir_all(&bin_dir).expect("create bin dir");
 
-    let stub = bin_dir.join("x07-mcp");
-    let stub_src = r#"#!/usr/bin/env python3
+        let stub = bin_dir.join("x07-mcp");
+        let stub_src = r#"#!/usr/bin/env python3
 import json
 import os
 import sys
@@ -8484,53 +8488,68 @@ with open(os.path.join(dst, "x07.json"), "w", encoding="utf-8") as f:
     f.write("{}\n")
 with open(os.path.join(dst, ".toolchain-version"), "w", encoding="utf-8") as f:
     f.write(ver + "\n")
+with open(os.path.join(dst, ".template"), "w", encoding="utf-8") as f:
+    f.write(tpl + "\n")
 
 print(json.dumps({"ok": True, "created": ["x07.json", ".toolchain-version"], "next_steps": []}))
 sys.exit(0)
 "#;
-    write_bytes(&stub, stub_src.as_bytes());
-    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).expect("chmod x07-mcp");
+        write_bytes(&stub, stub_src.as_bytes());
+        std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod x07-mcp");
 
-    let exe = env!("CARGO_BIN_EXE_x07");
-    let mut cmd = Command::new(exe);
-    cmd.current_dir(&dir);
-    let existing = std::env::var_os("PATH").unwrap_or_default();
-    let mut paths = vec![bin_dir.clone()];
-    paths.extend(std::env::split_paths(&existing));
-    cmd.env("PATH", std::env::join_paths(paths).expect("join PATH"));
-    cmd.args(["init", "--template", "mcp-server-stdio"]);
-    let out = cmd.output().expect("run x07 init");
+        let exe = env!("CARGO_BIN_EXE_x07");
+        let mut cmd = Command::new(exe);
+        cmd.current_dir(&dir);
+        let existing = std::env::var_os("PATH").unwrap_or_default();
+        let mut paths = vec![bin_dir.clone()];
+        paths.extend(std::env::split_paths(&existing));
+        cmd.env("PATH", std::env::join_paths(paths).expect("join PATH"));
+        cmd.args(["init", "--template", template]);
+        let out = cmd.output().expect("run x07 init");
 
-    assert_eq!(
-        out.status.code(),
-        Some(0),
-        "stdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(
-        out.stderr.is_empty(),
-        "expected empty stderr, got:\n{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let report = parse_json_stdout(&out);
-    assert_eq!(report["ok"], Value::from(true));
-    assert!(dir.join("x07.json").is_file(), "x07.json missing");
-    assert!(
-        dir.join(".toolchain-version").is_file(),
-        ".toolchain-version missing"
-    );
-    assert!(
-        dir.join(".x07")
-            .join("policies")
-            .join("base")
-            .join("worker.sandbox.base.policy.json")
-            .is_file(),
-        "worker base policy missing"
-    );
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "template={template} stdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            out.stderr.is_empty(),
+            "template={template} expected empty stderr, got:\n{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let report = parse_json_stdout(&out);
+        assert_eq!(report["ok"], Value::from(true));
+        assert!(
+            dir.join("x07.json").is_file(),
+            "template={template}: x07.json missing"
+        );
+        assert!(
+            dir.join(".toolchain-version").is_file(),
+            "template={template}: .toolchain-version missing"
+        );
+        assert!(
+            dir.join(".template").is_file(),
+            "template={template}: .template missing"
+        );
+        assert!(
+            dir.join(".x07")
+                .join("policies")
+                .join("base")
+                .join("worker.sandbox.base.policy.json")
+                .is_file(),
+            "template={template}: worker base policy missing"
+        );
 
-    let ver = std::fs::read_to_string(dir.join(".toolchain-version")).expect("read version file");
-    assert_eq!(ver.trim(), env!("CARGO_PKG_VERSION"));
+        let ver =
+            std::fs::read_to_string(dir.join(".toolchain-version")).expect("read version file");
+        assert_eq!(ver.trim(), env!("CARGO_PKG_VERSION"));
+        let recorded_template =
+            std::fs::read_to_string(dir.join(".template")).expect("read template file");
+        assert_eq!(recorded_template.trim(), template);
+    }
 }
 
 #[cfg(unix)]

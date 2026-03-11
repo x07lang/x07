@@ -69,7 +69,7 @@ See also: [Install](install.md).
 
 ## MCP: install the official X07 MCP server (optional)
 
-If your agent runtime supports MCP (Model Context Protocol), install the official X07 MCP server: `io.x07/x07lang-mcp`. It lets an MCP client drive the local X07 toolchain via token-efficient core tools plus capability-gated ecosystem tools (`x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.wasm.core_v1`, `x07.web_ui.exec_v1`, `x07.device.exec_v1`, `x07.app.exec_v1`, `lp.query_v1`, safe patching, etc).
+If your agent runtime supports MCP (Model Context Protocol), install the official X07 MCP server: `io.x07/x07lang-mcp`. It lets an MCP client drive the local X07 toolchain via token-efficient core tools plus capability-gated ecosystem tools (`x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.wasm.core_v1`, `x07.web_ui.exec_v1`, `x07.device.exec_v1`, `x07.app.exec_v1`, `lp.query_v1`, `lp.control_v1`, safe patching, etc).
 
 Download the published bundle from GitHub releases:
 - Repo: https://github.com/x07lang/x07-mcp
@@ -97,7 +97,15 @@ Configure your MCP client:
   - `cwd`: `.../x07lang-mcp.bundle` (so `config/mcp.server.json` + `out/mcp-worker` resolve)
   - env (recommended): `X07_MCP_X07_EXE=/absolute/path/to/x07` (`command -v x07`)
 
-Before optional wasm or platform actions, call `x07.ecosystem.status_v1` so the client sees which packs are actually enabled on the current machine.
+Before optional wasm or platform actions, call `x07.ecosystem.status_v1` so the client sees which packs are actually enabled on the current machine. When a workflow needs safe structured lifecycle actions, use the official MCP server path (`lp.control_v1` when the platform pack is enabled) instead of private shell glue to `x07-platform`.
+
+If you are creating a new HTTP/SSE MCP server project that needs long-running tool calls or task polling, start from:
+
+```bash
+x07 init --template mcp-server-http-tasks --dir ./my-mcp-http-tasks
+```
+
+That scaffold still comes from `x07-mcp`; `x07` only owns the delegation path and the surrounding project bootstrap.
 
 ## 2) Create a project (canonical starting point)
 

@@ -1,6 +1,6 @@
 # MCP Kit
 
-`x07-mcp` is the MCP server kit for X07. It ships templates, package modules, and a dedicated CLI for scaffold/check/bundle/conformance workflows.
+`x07-mcp` is the MCP server kit for X07. It ships templates, package modules, and a dedicated CLI for scaffold/check/inspect/catalog/bundle/conformance/publish/trust workflows.
 
 Phase 4 adds:
 
@@ -109,6 +109,12 @@ The core toolchain delegates MCP kit commands to `x07-mcp`:
 
 If `x07-mcp` is not installed on PATH, delegated commands exit with code `2`.
 
+## Official `x07lang-mcp` lifecycle path
+
+The official `io.x07/x07lang-mcp` server is the supported MCP entry point for X07 lifecycle actions. Use query surfaces such as `lp.query_v1` for read-only inspection and capability-gated control surfaces such as `lp.control_v1` for safe structured lifecycle mutations when the platform pack is enabled.
+
+`x07` does not re-implement those lifecycle actions. Its responsibility is the local delegation layer (`x07 mcp ...` and `x07 init --template ...`) plus the surrounding project bootstrap; the lifecycle mutation surface itself stays in the official MCP server.
+
 ## HTTP template quickstart
 
 ```sh
@@ -142,6 +148,8 @@ cd ./my-mcp-http-tasks
 x07 pkg lock
 x07 test --manifest tests/tests.json
 ```
+
+Use this template when the server should expose HTTP+SSE task flows, progress, or resumable task polling to MCP clients such as Forge.
 
 The HTTP Tasks template includes:
 

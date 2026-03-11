@@ -18,13 +18,19 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Delegates to `x07-mcp` on PATH.
   - Delegated commands exit with code `2` if `x07-mcp` is not installed/discoverable.
 - Common subcommands (provided by `x07-mcp`):
+  - `x07 mcp inspect initialize|tools|tool-call|prompts|prompt-get|resources|resource-read|tasks|task-poll ...`
+  - `x07 mcp catalog templates|reference-servers|conformance-suites|publish-capabilities`
   - `x07 mcp registry gen --in <x07.mcp.json> --out <server.json> [--mcpb <file>] [--schema <schema.json>]`
   - `x07 mcp publish --dry-run --server-json <server.json> --mcpb <file>`
   - `x07 mcp conformance --url <url> [--baseline <path>] [--spawn <server-id> --mode <noauth|oauth>]`
   - `x07 mcp bundle --mcpb --server-dir <servers/<id>> [--out <dist/...mcpb>]`
+  - `x07 mcp trust summary --server-dir <servers/<id>> [--x07-root <repo>]`
+  - `x07 mcp trust tlog-monitor --server-dir <servers/<id>> [--x07-root <repo>]`
 - `x07 init --template mcp-server|mcp-server-stdio|mcp-server-http|mcp-server-http-tasks`
   - Delegates template generation to `x07-mcp scaffold init ... --machine json`.
   - Creates the agent kit and a worker base policy at `.x07/policies/base/worker.sandbox.base.policy.json`.
+  - Prefer `mcp-server-http-tasks` for task-aware HTTP/SSE servers that expose long-running tool calls, progress, or `tasks/*` APIs.
+  - Official lifecycle control still flows through the official `io.x07/x07lang-mcp` server via capability-gated tools such as `lp.query_v1` and `lp.control_v1`; `x07` does not duplicate platform runtime actions here.
 
 ### WASM tooling (Phases 0–10)
 
