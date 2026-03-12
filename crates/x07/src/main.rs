@@ -303,12 +303,27 @@ fn main() -> std::process::ExitCode {
         }
     }
 
-    match try_main() {
+    let run_main = || match try_main() {
         Ok(code) => code,
         Err(err) => {
             eprintln!("{err:#}");
             std::process::ExitCode::from(2)
         }
+    };
+
+    match std::thread::Builder::new()
+        .name("x07-main".to_string())
+        .stack_size(32 * 1024 * 1024)
+        .spawn(run_main)
+    {
+        Ok(handle) => match handle.join() {
+            Ok(code) => code,
+            Err(_) => {
+                eprintln!("x07 main thread panicked");
+                std::process::ExitCode::from(101)
+            }
+        },
+        Err(_) => run_main(),
     }
 }
 
