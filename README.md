@@ -99,6 +99,8 @@ x07 ast apply-patch --in program.x07.json --patch patch.json --out program.x07.j
 
 If your coding agent runtime supports MCP (Model Context Protocol), install and use the official X07 MCP server: `io.x07/x07lang-mcp`. It exposes token-efficient core editing tools plus capability-gated ecosystem tools such as `x07.ecosystem.status_v1`, `x07.pkg.provides_v1`, `x07.wasm.core_v1`, `x07.web_ui.exec_v1`, `x07.device.exec_v1`, `x07.app.exec_v1`, `lp.query_v1`, safe lifecycle control via `lp.control_v1`, and safe patch application for x07AST JSON.
 
+For release-, incident-, and regression-aware clients, keep app-specific candidate/workspace state locally and consume operational truth from the official structured `lp.*` result contracts exposed through `x07lang-mcp`. The x07-side boundary is documented in [`docs/toolchain/mcp-kit.md`](docs/toolchain/mcp-kit.md) and [`docs/agent/platform.md`](docs/agent/platform.md).
+
 For MCP server projects, prefer `x07 init --template mcp-server-http-tasks` when you want the task-aware HTTP/SSE scaffold; `x07` delegates that template to `x07-mcp` rather than re-implementing MCP kit logic locally.
 
 Start here: https://x07lang.org/docs/getting-started/agent-quickstart/ (includes MCP setup).

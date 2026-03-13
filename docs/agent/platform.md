@@ -27,15 +27,12 @@ Repos:
 CLI: `x07lp`  
 MCP namespace: `lp.*`
 
-## Current verified line
+## Current contract line
 
-- public platform contracts for device release, incident, and regression now run on `0.2.0`
-- `x07-platform` release line: `0.2.6`
-- verified upstream dependency line for the self-hosted remote path:
-  - `x07 v0.1.69`
-  - `x07-wasm-backend v0.2.1`
-  - `std-web-ui 0.2.0`
-- the `x07` docs bundle that publishes this page is released on `v0.1.69`
+- public platform contracts for device release, incident, and regression run on the `0.2.0` line
+- deploy, environment, control, and inventory contracts remain on their current public `0.1.x` lines
+- the official MCP lifecycle path is `io.x07/x07lang-mcp` via `lp.query_v1` and `lp.control_v1`
+- use the repo release pages for exact current `x07-platform`, `x07-wasm-backend`, `x07-web-ui`, and `x07lang-mcp` bundle tags
 
 ## Public contract surface
 
@@ -101,6 +98,23 @@ The companion `x07-wasm` report line is also `0.2.0`:
 - `x07.wasm.device.verify.report@0.2.0`
 - `x07.wasm.device.package.report@0.2.0`
 - `x07.wasm.device.regress.from_incident.report@0.2.0`
+
+## Control-room client contract map
+
+Forge-style clients should keep candidate/workspace state in the client, then resolve lifecycle truth through the public `lp.*` result contracts:
+
+- control mutation receipt: `lp.control.action.result@0.1.0`
+  - stable linkage fields: `action_id`, `kind`, `scope`, `approval_state`, `target`, `affected_executions`, `decision.decision_id`, `decision.record`
+- deploy detail and deploy-linked incidents: `lp.deploy.query.result@0.1.0`
+  - stable linkage fields: `deployment_id`, `run_id`, `target.app_id`, `target.environment`, `status`, `last_incident_id`, `linked_incidents[].incident_id`, `artifacts[]`, `decisions[]`
+- environment overview: `lp.environment.list.result@0.1.0`
+  - stable linkage fields: `items[].environment_id`, `items[].display_name`, `items[].project_id`, `items[].updated_unix_ms`
+- incident inbox/detail: `lp.incident.query.result@0.2.0`
+  - stable linkage fields: `incident_id`, `deployment_id`, `release_exec_id`, `regression_id`, `target`, `captured_unix_ms`, `refs`, `trace`, `bundle`, `items[]`
+- regression generation result: `lp.regression.run.result@0.2.0`
+  - stable linkage fields: `incident_id`, `regression_id`, `incident_status_after`, `replay_mode`, `replay_synthesis_status`, `generated_trace_artifact_refs`, `generated_report_artifact_refs`
+
+This is the intended M5 boundary in `x07`: the core toolchain and docs point clients at the official machine-readable lifecycle outputs, but they do not invent a second release-candidate or incident domain on top of `x07-platform`.
 
 ## Runtime surface
 

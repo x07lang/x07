@@ -115,6 +115,16 @@ The official `io.x07/x07lang-mcp` server is the supported MCP entry point for X0
 
 `x07` does not re-implement those lifecycle actions. Its responsibility is the local delegation layer (`x07 mcp ...` and `x07 init --template ...`) plus the surrounding project bootstrap; the lifecycle mutation surface itself stays in the official MCP server.
 
+For release-control clients such as Forge, the public lifecycle read/write split is:
+
+- mutate through `lp.control_v1`, which returns `lp.control.action.result@0.1.0`
+- read deploy state through `lp.query_v1` into `lp.deploy.query.result@0.1.0`
+- read environment inventory through `lp.query_v1` into `lp.environment.list.result@0.1.0`
+- read incident inbox/detail through `lp.query_v1` into `lp.incident.query.result@0.2.0`
+- read regression generation status through `lp.query_v1` into `lp.regression.run.result@0.2.0`
+
+This is the M5 boundary on the `x07` side: release-candidate composition remains client-owned, while deploy, environment, incident, and regression truth comes from the official structured `lp.*` contracts. Consumers should cache against stable ids and artifact refs from those contracts instead of scraping CLI text or private platform internals. See [Platform (x07lp)](../agent/platform.md#control-room-client-contract-map).
+
 ## HTTP template quickstart
 
 ```sh

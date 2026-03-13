@@ -31,6 +31,7 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Creates the agent kit and a worker base policy at `.x07/policies/base/worker.sandbox.base.policy.json`.
   - Prefer `mcp-server-http-tasks` for task-aware HTTP/SSE servers that expose long-running tool calls, progress, or `tasks/*` APIs.
   - Official lifecycle control still flows through the official `io.x07/x07lang-mcp` server via capability-gated tools such as `lp.query_v1` and `lp.control_v1`; `x07` does not duplicate platform runtime actions here.
+  - Forge-style clients should treat the public `lp.control.action.result@0.1.0`, `lp.deploy.query.result@0.1.0`, `lp.environment.list.result@0.1.0`, `lp.incident.query.result@0.2.0`, and `lp.regression.run.result@0.2.0` outputs as the stable lifecycle read surface.
 
 ### WASM tooling (Phases 0–10)
 

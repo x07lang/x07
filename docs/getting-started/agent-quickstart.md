@@ -73,7 +73,7 @@ If your agent runtime supports MCP (Model Context Protocol), install the officia
 
 Download the published bundle from GitHub releases:
 - Repo: https://github.com/x07lang/x07-mcp
-- Release tag: `x07lang-mcp-v0.2.3`
+- Release tag pattern: `x07lang-mcp-v<MAJOR.MINOR.PATCH>` (download the latest published release on the releases page)
 - Files: `x07lang-mcp.mcpb` and `x07lang-mcp.mcpb.sha256.txt`
 
 Verify (macOS / Linux):
@@ -98,6 +98,8 @@ Configure your MCP client:
   - env (recommended): `X07_MCP_X07_EXE=/absolute/path/to/x07` (`command -v x07`)
 
 Before optional wasm or platform actions, call `x07.ecosystem.status_v1` so the client sees which packs are actually enabled on the current machine. When a workflow needs safe structured lifecycle actions, use the official MCP server path (`lp.control_v1` when the platform pack is enabled) instead of private shell glue to `x07-platform`.
+
+For control-room style clients, keep release-candidate or workspace state in the client and join it to the public lifecycle result contracts (`lp.control.action.result`, `lp.deploy.query.result`, `lp.environment.list.result`, `lp.incident.query.result`, `lp.regression.run.result`) rather than parsing shell output. See [Platform (x07lp)](../agent/platform.md#control-room-client-contract-map).
 
 If you are creating a new HTTP/SSE MCP server project that needs long-running tool calls or task polling, start from:
 
