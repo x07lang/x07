@@ -1527,7 +1527,7 @@ fn cmd_update(
 ) -> Result<std::process::ExitCode> {
     let cfg = Config::load(&config_path(root))?;
     let sel = select_active_toolchain(root, &cfg)?;
-    let update_spec = sel.spec.clone();
+    let update_spec = resolve_update_spec(&cfg, &sel);
     let bundle_url = bundle_url_for_spec(channels_url, &update_spec)?;
     let bundle = fetch_bundle_manifest(&bundle_url)?;
     let latest = bundle.x07_core.tag.clone();
@@ -1579,6 +1579,26 @@ fn cmd_update(
     )?;
     cmd_default(root, &update_spec, reporter)?;
     Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn resolve_update_spec(cfg: &Config, sel: &ActiveSelection) -> String {
+    if sel.source == "config" && looks_like_tag(&sel.spec) {
+        if let Some(channel) = canonical_channel_for_tag(cfg, &sel.spec) {
+            return channel;
+        }
+    }
+    sel.spec.clone()
+}
+
+fn canonical_channel_for_tag(cfg: &Config, tag: &str) -> Option<String> {
+    for preferred in ["stable", "beta", "nightly"] {
+        if cfg.channels.get(preferred).map(String::as_str) == Some(tag) {
+            return Some(preferred.to_string());
+        }
+    }
+    cfg.channels
+        .iter()
+        .find_map(|(channel, mapped)| (mapped == tag).then(|| channel.clone()))
 }
 
 fn maybe_self_update_and_reexec(
@@ -2682,5 +2702,43 @@ mod tests {
         assert_eq!(found, bin_dir.join("x07up"));
         std::fs::remove_dir_all(&base).ok();
         Ok(())
+    }
+
+    #[test]
+    fn resolve_update_spec_promotes_legacy_config_tag_to_channel() {
+        let mut cfg = Config {
+            schema_version: "x07up.config@0.1.0".to_string(),
+            default_toolchain: Some("v0.1.65".to_string()),
+            channels: BTreeMap::new(),
+        };
+        cfg.channels
+            .insert("stable".to_string(), "v0.1.65".to_string());
+        let sel = ActiveSelection {
+            spec: "v0.1.65".to_string(),
+            resolved: Some("v0.1.65".to_string()),
+            source: "config".to_string(),
+            override_file: None,
+        };
+
+        assert_eq!(resolve_update_spec(&cfg, &sel), "stable");
+    }
+
+    #[test]
+    fn resolve_update_spec_keeps_explicit_override_tag() {
+        let mut cfg = Config {
+            schema_version: "x07up.config@0.1.0".to_string(),
+            default_toolchain: Some("stable".to_string()),
+            channels: BTreeMap::new(),
+        };
+        cfg.channels
+            .insert("stable".to_string(), "v0.1.65".to_string());
+        let sel = ActiveSelection {
+            spec: "v0.1.65".to_string(),
+            resolved: Some("v0.1.65".to_string()),
+            source: "override".to_string(),
+            override_file: None,
+        };
+
+        assert_eq!(resolve_update_spec(&cfg, &sel), "v0.1.65");
     }
 }
