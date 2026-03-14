@@ -40,6 +40,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            cbmc \
             clang \
             build-essential \
             pkg-config \
@@ -47,7 +48,8 @@ jobs:
             libcurl4-openssl-dev \
             liblzma-dev \
             zlib1g-dev \
-            libsqlite3-dev
+            libsqlite3-dev \
+            z3
       - name: Stage native math backend
         shell: bash
         run: ./scripts/ci/ensure_math_backend.sh
