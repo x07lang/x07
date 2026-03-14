@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 198
-- quickfix support (`sometimes` or `always`): 168
-- quickfix coverage: 84.85%
+- total codes: 352
+- quickfix support (`sometimes` or `always`): 313
+- quickfix coverage: 88.92%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -41,10 +41,136 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `ETEST_TESTS_EMPTY` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TESTS_EMPTY`. |
 | `ETEST_TIMEOUT_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_TIMEOUT_INVALID`. |
 | `ETEST_WORLD_INVALID` | x07 / run / error | sometimes | Test manifest validation diagnostic `ETEST_WORLD_INVALID`. |
+| `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_ARCHIVE_OP_UNKNOWN` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_OP_UNKNOWN`. |
+| `E_ARCH_ARCHIVE_SCHEMA_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_ARCHIVE_SCHEMA_INVALID`. |
+| `E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED`. |
+| `E_ARCH_BOUNDARY_ERROR_SPACE_REQUIRED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_ERROR_SPACE_REQUIRED`. |
+| `E_ARCH_BOUNDARY_INDEX_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_INDEX_INVALID`. |
+| `E_ARCH_BOUNDARY_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_MISSING`. |
+| `E_ARCH_BOUNDARY_VERIFY_REQUIRED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BOUNDARY_VERIFY_REQUIRED`. |
+| `E_ARCH_BUDGETS_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGETS_DIR_MISSING`. |
+| `E_ARCH_BUDGETS_GEN_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGETS_GEN_DIR_MISSING`. |
+| `E_ARCH_BUDGETS_INDEX_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGETS_INDEX_SCHEMA_VERSION`. |
+| `E_ARCH_BUDGET_PROFILE_NOT_FOUND` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_PROFILE_NOT_FOUND`. |
+| `E_ARCH_BUDGET_PROFILE_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_PROFILE_SCHEMA_VERSION`. |
 | `E_ARCH_BUDGET_SCOPE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_SCOPE_MISSING`. |
+| `E_ARCH_BUDGET_SELECTOR_FN_NOT_FOUND` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_SELECTOR_FN_NOT_FOUND`. |
+| `E_ARCH_BUDGET_SELECTOR_MODULE_PREFIX_NOT_FOUND` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_SELECTOR_MODULE_PREFIX_NOT_FOUND`. |
+| `E_ARCH_BUDGET_WORLD_VIOLATION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_BUDGET_WORLD_VIOLATION`. |
+| `E_ARCH_CLI_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CLI_INDEX_MISSING`. |
+| `E_ARCH_CLI_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CLI_PROFILE_INVALID`. |
+| `E_ARCH_CONTRACTS_CANONICAL_JSON_UNSUPPORTED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_CANONICAL_JSON_UNSUPPORTED`. |
+| `E_ARCH_CONTRACTS_LOCK_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_INVALID`. |
+| `E_ARCH_CONTRACTS_LOCK_JSON_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_JSON_PARSE`. |
+| `E_ARCH_CONTRACTS_LOCK_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_MISMATCH`. |
+| `E_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION`. |
+| `E_ARCH_CRAWL_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRAWL_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_CRAWL_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRAWL_INDEX_MISSING`. |
+| `E_ARCH_CRAWL_POLICY_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRAWL_POLICY_INVALID`. |
+| `E_ARCH_CRYPTO_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRYPTO_INDEX_MISSING`. |
+| `E_ARCH_CRYPTO_JWT_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRYPTO_JWT_PROFILE_INVALID`. |
+| `E_ARCH_CRYPTO_KEY_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CRYPTO_KEY_MISSING`. |
+| `E_ARCH_CYCLE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_CYCLE`. |
+| `E_ARCH_DB_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_DB_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_INDEX_MISSING`. |
+| `E_ARCH_DB_MIGRATE_PLAN_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_MIGRATE_PLAN_MISSING`. |
+| `E_ARCH_DB_QUERY_CATALOG_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_QUERY_CATALOG_INVALID`. |
+| `E_ARCH_DB_SQL_HASH_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_SQL_HASH_MISMATCH`. |
+| `E_ARCH_DB_SQL_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DB_SQL_MISSING`. |
+| `E_ARCH_DEPS_DENY` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DEPS_DENY`. |
+| `E_ARCH_DUPLICATE_MODULE_ID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_DUPLICATE_MODULE_ID`. |
+| `E_ARCH_EDGE_NOT_ALLOWED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_EDGE_NOT_ALLOWED`. |
+| `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED`. |
+| `E_ARCH_IMPORT_PREFIX_DENIED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_IMPORT_PREFIX_DENIED`. |
+| `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED`. |
+| `E_ARCH_LAYERS_VIOLATION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LAYERS_VIOLATION`. |
+| `E_ARCH_LOCK_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_INVALID`. |
+| `E_ARCH_LOCK_JSON_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_JSON_PARSE`. |
+| `E_ARCH_LOCK_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_MISMATCH`. |
 | `E_ARCH_LOCK_READ` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_LOCK_READ`. |
+| `E_ARCH_MANIFEST_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MANIFEST_INVALID`. |
+| `E_ARCH_MANIFEST_JSON_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_MANIFEST_JSON_PARSE`. |
+| `E_ARCH_MANIFEST_READ` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MANIFEST_READ`. |
 | `E_ARCH_MODULE_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_MODULE_PARSE`. |
+| `E_ARCH_MSG_AMQP_BUDGET_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_AMQP_BUDGET_MISSING`. |
+| `E_ARCH_MSG_AMQP_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_AMQP_INDEX_MISSING`. |
+| `E_ARCH_MSG_AMQP_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_AMQP_PROFILE_INVALID`. |
+| `E_ARCH_MSG_AMQP_TOPOLOGY_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_AMQP_TOPOLOGY_INVALID`. |
+| `E_ARCH_MSG_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_INDEX_MISSING`. |
+| `E_ARCH_MSG_KAFKA_BUDGET_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_KAFKA_BUDGET_MISSING`. |
+| `E_ARCH_MSG_KAFKA_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_KAFKA_INDEX_MISSING`. |
+| `E_ARCH_MSG_KAFKA_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_MSG_KAFKA_PROFILE_INVALID`. |
+| `E_ARCH_NET_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NET_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_NET_GRPC_SERVICES_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NET_GRPC_SERVICES_INVALID`. |
+| `E_ARCH_NET_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NET_INDEX_MISSING`. |
+| `E_ARCH_NET_LIMITS_EXCESSIVE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NET_LIMITS_EXCESSIVE`. |
+| `E_ARCH_NODE_ORPHAN_MODULE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NODE_ORPHAN_MODULE`. |
+| `E_ARCH_NODE_OVERLAP_MODULE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_NODE_OVERLAP_MODULE`. |
+| `E_ARCH_OBS_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_OBS_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_OBS_EXPORTER_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_OBS_EXPORTER_PROFILE_INVALID`. |
+| `E_ARCH_OBS_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_OBS_INDEX_MISSING`. |
+| `E_ARCH_OBS_REGISTRY_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_OBS_REGISTRY_MISSING`. |
+| `E_ARCH_PUBLIC_BYTES_UNBRANDED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_PUBLIC_BYTES_UNBRANDED`. |
+| `E_ARCH_RR_CASSETTE_BRAND_UNSUPPORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_CASSETTE_BRAND_UNSUPPORTED`. |
+| `E_ARCH_RR_DIR_MISSING` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_DIR_MISSING`. |
+| `E_ARCH_RR_GEN_DIR_MISSING` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_GEN_DIR_MISSING`. |
+| `E_ARCH_RR_INDEX_DEFAULTS_DUP` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_INDEX_DEFAULTS_DUP`. |
+| `E_ARCH_RR_INDEX_DEFAULTS_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_INDEX_DEFAULTS_NOT_SORTED`. |
+| `E_ARCH_RR_INDEX_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_INDEX_NOT_SORTED`. |
+| `E_ARCH_RR_INDEX_SCHEMA_VERSION` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_INDEX_SCHEMA_VERSION`. |
+| `E_ARCH_RR_OP_KIND_NOT_ALLOWED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_OP_KIND_NOT_ALLOWED`. |
+| `E_ARCH_RR_OP_KIND_UNKNOWN` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_OP_KIND_UNKNOWN`. |
+| `E_ARCH_RR_OP_NOT_ALLOWED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_OP_NOT_ALLOWED`. |
+| `E_ARCH_RR_POLICY_ID_MISMATCH` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_ID_MISMATCH`. |
+| `E_ARCH_RR_POLICY_KINDS_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_KINDS_NOT_SORTED`. |
+| `E_ARCH_RR_POLICY_MODE_NOT_ALLOWED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_MODE_NOT_ALLOWED`. |
+| `E_ARCH_RR_POLICY_NOT_FOUND` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_NOT_FOUND`. |
+| `E_ARCH_RR_POLICY_OPS_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_OPS_NOT_SORTED`. |
+| `E_ARCH_RR_POLICY_REQUIRED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_REQUIRED`. |
+| `E_ARCH_RR_POLICY_SCHEMA_VERSION` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_SCHEMA_VERSION`. |
+| `E_ARCH_RR_POLICY_WORLDS_NOT_SORTED` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_POLICY_WORLDS_NOT_SORTED`. |
+| `E_ARCH_RR_SANITIZER_ID_MISMATCH` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_SANITIZER_ID_MISMATCH`. |
+| `E_ARCH_RR_SANITIZER_SCHEMA_VERSION` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_SANITIZER_SCHEMA_VERSION`. |
+| `E_ARCH_RR_WORLD_VIOLATION` | x07 / run / error | sometimes | Architecture contract diagnostic `E_ARCH_RR_WORLD_VIOLATION`. |
+| `E_ARCH_SMOKE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SMOKE_MISSING`. |
+| `E_ARCH_SM_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_DIR_MISSING`. |
+| `E_ARCH_SM_GEN_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_GEN_DIR_MISSING`. |
+| `E_ARCH_SM_GEN_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_GEN_MISSING`. |
+| `E_ARCH_SM_GEN_PARSE` | x07 / parse / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_GEN_PARSE`. |
+| `E_ARCH_SM_GEN_STALE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_GEN_STALE`. |
+| `E_ARCH_SM_IMPORT_NOT_INDEXED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_IMPORT_NOT_INDEXED`. |
+| `E_ARCH_SM_INDEX_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_INDEX_SCHEMA_VERSION`. |
+| `E_ARCH_SM_SPEC_MACHINE_ID_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_SPEC_MACHINE_ID_MISMATCH`. |
+| `E_ARCH_SM_SPEC_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_SPEC_SCHEMA_VERSION`. |
+| `E_ARCH_SM_SPEC_VERSION_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_SPEC_VERSION_MISMATCH`. |
+| `E_ARCH_SM_SPEC_WORLD_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_SM_SPEC_WORLD_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGINS_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_DIR_MISSING`. |
+| `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING`. |
+| `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID`. |
+| `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED`. |
+| `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION`. |
+| `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING`. |
+| `E_ARCH_STREAM_PLUGIN_NOT_FOUND` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_NOT_FOUND`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION`. |
+| `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`. |
+| `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`. |
 | `E_ARCH_TOOL_BUDGET_EXCEEDED` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_TOOL_BUDGET_EXCEEDED`. |
+| `E_ARCH_TRUST_ZONE_EDGE` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_TRUST_ZONE_EDGE`. |
+| `E_ARCH_VISIBILITY` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_VISIBILITY`. |
+| `E_ARCH_WEB_API_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WEB_API_INVALID`. |
+| `E_ARCH_WEB_BUDGET_PROFILE_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WEB_BUDGET_PROFILE_MISSING`. |
+| `E_ARCH_WEB_INDEX_MISSING` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WEB_INDEX_MISSING`. |
+| `E_ARCH_WEB_OPENAPI_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WEB_OPENAPI_PROFILE_INVALID`. |
+| `E_ARCH_WORLD_EDGE_FORBIDDEN` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WORLD_EDGE_FORBIDDEN`. |
+| `E_BENCH_SUITE_LOAD` | x07 / lint / error | sometimes | Diagnostic code `E_BENCH_SUITE_LOAD`. |
 | `E_DEPS_CAP_POLICY_DENY` | x07 / lint / error | never | Dependency violates capability policy. |
 | `E_SBOM_GENERATION_FAILED` | x07 / lint / error | never | SBOM generation failed. |
 | `W_ARCH_CONTRACTS_LOCK_MISSING` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`. |
@@ -62,18 +188,26 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-BOOL-0001` | x07c / lint / warning | sometimes | Eager '&' / '\|' in an if condition can trigger traps. |
 | `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
 | `X07-BORROW-0002` | x07c / lint / error | sometimes | Statement block returns a bytes_view borrowing from a local binding. |
+| `X07-CLI-ARGS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CLI-ARGS-0001`. |
+| `X07-CLI-ARGS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CLI-ARGS-0002`. |
 | `X07-CONTRACT-0001` | x07c / type / error | sometimes | Contract clause must typecheck to i32. |
 | `X07-CONTRACT-0002` | x07c / type / error | sometimes | Contract expression is not contract-pure. |
 | `X07-CONTRACT-0003` | x07c / type / error | sometimes | Reserved identifier `__result` is only available in ensures. |
 | `X07-CONTRACT-0004` | x07c / type / error | sometimes | Reserved name collision with `__result`. |
 | `X07-CONTRACT-0005` | x07c / type / error | sometimes | Contract witness has an unsupported type. |
+| `X07-FIX-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FIX-0003`. |
+| `X07-FMT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FMT-0001`. |
 | `X07-GENERICS-0001` | x07c / lint / error | sometimes | Type variable is not declared in type_params. |
 | `X07-GENERICS-0002` | x07c / lint / warning | always | Unused type parameter. |
 | `X07-INTERNAL-0001` | x07 / run / error | never | Internal tool failure `X07-INTERNAL-0001`. |
+| `X07-IO-READ-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-READ-0001`. |
+| `X07-IO-WRITE-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-WRITE-0001`. |
+| `X07-JSON-PARSE-0001` | x07c / parse / error | sometimes | Core lint/schema diagnostic `X07-JSON-PARSE-0001`. |
 | `X07-MOVE-0001` | x07c / lint / error | always | `bytes.concat` uses the same identifier on both sides (use-after-move risk). |
 | `X07-MOVE-0002` | x07c / lint / error | always | `if` condition and branch both borrow `bytes.view` from the same owner. |
 | `X07-MOVE-0901` | x07 / codegen / error | sometimes | Use-after-move detected during backend checking. |
 | `X07-MOVE-0902` | x07 / codegen / error | never | Borrow/move rule violation detected during backend checking. |
+| `X07-PATCHSET-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PATCHSET-0001`. |
 | `X07-PBT-FIX-ARGS-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-ARGS-0001`. |
 | `X07-PBT-FIX-CONFLICT-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-CONFLICT-0001`. |
 | `X07-PBT-FIX-INFO-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-INFO-0001`. |
@@ -158,6 +292,26 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07RR_LATENCY_OUT_OF_RANGE` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_LATENCY_OUT_OF_RANGE`. |
 | `X07RR_OP_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_OP_EMPTY`. |
 | `X07RR_URL_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_URL_EMPTY`. |
+| `X07TC_EARCH` | x07 / run / error | sometimes | Strict architecture evidence failed certification. |
+| `X07TC_EBOUNDARY` | x07 / run / error | sometimes | Boundary declarations or smoke coverage are incomplete for certification. |
+| `X07TC_ECOMPILE_ATTEST` | x07 / run / error | never | Compile attestation failed or could not bind the emitted binary. |
+| `X07TC_ECOVERAGE` | x07 / run / error | never | Reachable proof coverage is incomplete for certification. |
+| `X07TC_EPBT` | x07 / run / error | sometimes | Boundary-required property tests are missing, malformed, or failing. |
+| `X07TC_EPROFILE` | x07 / run / error | sometimes | Certification trust profile is missing or invalid. |
+| `X07TC_EPROJECT` | x07 / run / error | sometimes | Certification could not resolve the project manifest or source closure. |
+| `X07TC_EPROVE` | x07 / run / error | never | At least one reachable proof obligation failed. |
+| `X07TC_EREVIEW` | x07 / run / error | never | Baseline review or trust-posture diff gate failed certification. |
+| `X07TC_ESCHEMADERIVE` | x07 / run / error | sometimes | Boundary-referenced schema outputs drifted or are missing. |
+| `X07TC_ETEST` | x07 / run / error | sometimes | Deterministic certification tests are missing or failing. |
+| `X07TC_ETRUST_REPORT` | x07 / run / error | never | Trust report evidence failed certification. |
+| `X07TP_ARCH` | x07 / run / error | sometimes | Project architecture posture is weaker than the trust profile requires. |
+| `X07TP_BOUNDARY` | x07 / run / error | sometimes | Project boundary index wiring is missing or incomplete for certification. |
+| `X07TP_ENTRY` | x07 / run / error | never | Requested entrypoint is not allowed by the trust profile. |
+| `X07TP_INVALID` | x07 / run / error | sometimes | Trust profile JSON is missing or invalid. |
+| `X07TP_LANGUAGE` | x07 / run / error | never | Project uses language or policy features forbidden by the trust profile. |
+| `X07TP_NOT_CERTIFIABLE` | x07 / run / error | never | Trust profile is weaker than the Milestone A certification floor. |
+| `X07TP_PROJECT` | x07 / run / error | sometimes | Project manifest could not be resolved for trust profile validation. |
+| `X07TP_WORLD` | x07 / run / error | never | Project world is outside the trust profile allowlist. |
 | `X07T_ASSERT_BYTES_EQ` | x07 / run / error | never | `std.test.assert_bytes_eq` failed with expected vs got payload. |
 | `X07T_EPBT_MANIFEST_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_MANIFEST_INVALID`. |
 | `X07T_EPBT_PARAM_EMPTY` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`. |
@@ -866,9 +1020,929 @@ Agent strategy:
 - Re-run `x07 test`.
 
 
+## `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_ARCHIVE_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_ARCHIVE_OP_UNKNOWN`
+
+Summary: Architecture contract diagnostic `E_ARCH_ARCHIVE_OP_UNKNOWN`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_ARCHIVE_SCHEMA_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_ARCHIVE_SCHEMA_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_ERROR_SPACE_REQUIRED`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_ERROR_SPACE_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_INDEX_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_INDEX_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BOUNDARY_VERIFY_REQUIRED`
+
+Summary: Architecture contract diagnostic `E_ARCH_BOUNDARY_VERIFY_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGETS_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGETS_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGETS_GEN_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGETS_GEN_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGETS_INDEX_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGETS_INDEX_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_PROFILE_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_PROFILE_NOT_FOUND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_PROFILE_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_PROFILE_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
 ## `E_ARCH_BUDGET_SCOPE_MISSING`
 
 Summary: Architecture contract diagnostic `E_ARCH_BUDGET_SCOPE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_SELECTOR_FN_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_SELECTOR_FN_NOT_FOUND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_SELECTOR_MODULE_PREFIX_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_SELECTOR_MODULE_PREFIX_NOT_FOUND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_BUDGET_WORLD_VIOLATION`
+
+Summary: Architecture contract diagnostic `E_ARCH_BUDGET_WORLD_VIOLATION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CLI_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CLI_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CLI_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_CLI_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_CANONICAL_JSON_UNSUPPORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_CANONICAL_JSON_UNSUPPORTED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_LOCK_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_LOCK_JSON_PARSE`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_JSON_PARSE`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_LOCK_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRAWL_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRAWL_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRAWL_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRAWL_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRAWL_POLICY_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRAWL_POLICY_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRYPTO_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRYPTO_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRYPTO_JWT_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRYPTO_JWT_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CRYPTO_KEY_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_CRYPTO_KEY_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_CYCLE`
+
+Summary: Architecture contract diagnostic `E_ARCH_CYCLE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_MIGRATE_PLAN_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_MIGRATE_PLAN_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_QUERY_CATALOG_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_QUERY_CATALOG_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_SQL_HASH_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_SQL_HASH_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DB_SQL_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_DB_SQL_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DEPS_DENY`
+
+Summary: Architecture contract diagnostic `E_ARCH_DEPS_DENY`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_DUPLICATE_MODULE_ID`
+
+Summary: Architecture contract diagnostic `E_ARCH_DUPLICATE_MODULE_ID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_EDGE_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_EDGE_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_EXTERNAL_IMPORT_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_IMPORT_PREFIX_DENIED`
+
+Summary: Architecture contract diagnostic `E_ARCH_IMPORT_PREFIX_DENIED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_IMPORT_PREFIX_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_LAYERS_VIOLATION`
+
+Summary: Architecture contract diagnostic `E_ARCH_LAYERS_VIOLATION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_LOCK_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_LOCK_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_LOCK_JSON_PARSE`
+
+Summary: Architecture contract diagnostic `E_ARCH_LOCK_JSON_PARSE`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_LOCK_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_LOCK_MISMATCH`.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -906,12 +1980,1452 @@ Agent strategy:
 - Re-run `x07 arch check` until green.
 
 
+## `E_ARCH_MANIFEST_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_MANIFEST_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MANIFEST_JSON_PARSE`
+
+Summary: Architecture contract diagnostic `E_ARCH_MANIFEST_JSON_PARSE`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MANIFEST_READ`
+
+Summary: Architecture contract diagnostic `E_ARCH_MANIFEST_READ`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
 ## `E_ARCH_MODULE_PARSE`
 
 Summary: Architecture contract diagnostic `E_ARCH_MODULE_PARSE`.
 
 Origins:
 - x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_AMQP_BUDGET_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_AMQP_BUDGET_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_AMQP_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_AMQP_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_AMQP_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_AMQP_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_AMQP_TOPOLOGY_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_AMQP_TOPOLOGY_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_KAFKA_BUDGET_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_KAFKA_BUDGET_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_KAFKA_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_KAFKA_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_MSG_KAFKA_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_MSG_KAFKA_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NET_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_NET_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NET_GRPC_SERVICES_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_NET_GRPC_SERVICES_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NET_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_NET_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NET_LIMITS_EXCESSIVE`
+
+Summary: Architecture contract diagnostic `E_ARCH_NET_LIMITS_EXCESSIVE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NODE_ORPHAN_MODULE`
+
+Summary: Architecture contract diagnostic `E_ARCH_NODE_ORPHAN_MODULE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_NODE_OVERLAP_MODULE`
+
+Summary: Architecture contract diagnostic `E_ARCH_NODE_OVERLAP_MODULE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_OBS_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_OBS_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_OBS_EXPORTER_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_OBS_EXPORTER_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_OBS_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_OBS_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_OBS_REGISTRY_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_OBS_REGISTRY_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_PUBLIC_BYTES_UNBRANDED`
+
+Summary: Architecture contract diagnostic `E_ARCH_PUBLIC_BYTES_UNBRANDED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_CASSETTE_BRAND_UNSUPPORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_CASSETTE_BRAND_UNSUPPORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_DIR_MISSING`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_GEN_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_GEN_DIR_MISSING`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_INDEX_DEFAULTS_DUP`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_INDEX_DEFAULTS_DUP`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_INDEX_DEFAULTS_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_INDEX_DEFAULTS_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_INDEX_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_INDEX_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_INDEX_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_INDEX_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_OP_KIND_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_OP_KIND_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_OP_KIND_UNKNOWN`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_OP_KIND_UNKNOWN`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_OP_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_OP_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_ID_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_ID_MISMATCH`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_KINDS_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_KINDS_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_MODE_NOT_ALLOWED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_MODE_NOT_ALLOWED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_NOT_FOUND`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_OPS_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_OPS_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_REQUIRED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_REQUIRED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_POLICY_WORLDS_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_POLICY_WORLDS_NOT_SORTED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_SANITIZER_ID_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_SANITIZER_ID_MISMATCH`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_SANITIZER_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_SANITIZER_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_RR_WORLD_VIOLATION`
+
+Summary: Architecture contract diagnostic `E_ARCH_RR_WORLD_VIOLATION`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SMOKE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_SMOKE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_GEN_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_GEN_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_GEN_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_GEN_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_GEN_PARSE`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_GEN_PARSE`.
+
+Origins:
+- x07 (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_GEN_STALE`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_GEN_STALE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_IMPORT_NOT_INDEXED`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_IMPORT_NOT_INDEXED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_INDEX_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_INDEX_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_SPEC_MACHINE_ID_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_SPEC_MACHINE_ID_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_SPEC_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_SPEC_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_SPEC_VERSION_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_SPEC_VERSION_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_SM_SPEC_WORLD_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_SM_SPEC_WORLD_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_GEN_DIR_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_DUPLICATE_ID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_NOT_SORTED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_BUDGET_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_NOT_FOUND`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_NOT_FOUND`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_ABI_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_BRANDS_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_BUDGETS_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_CFG_CANON_MODE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_DETERMINISM_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_ID_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_LIMITS_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_SCHEMA_VERSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_SPEC_WORLDS_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`
+
+Summary: Architecture contract diagnostic `E_ARCH_STREAM_PLUGIN_WORLD_VIOLATION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
@@ -944,6 +3458,166 @@ Agent strategy:
 - Run `x07 arch check --write-lock`.
 - Apply suggested manifest/contracts updates.
 - Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_TRUST_ZONE_EDGE`
+
+Summary: Architecture contract diagnostic `E_ARCH_TRUST_ZONE_EDGE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_VISIBILITY`
+
+Summary: Architecture contract diagnostic `E_ARCH_VISIBILITY`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WEB_API_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_WEB_API_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WEB_BUDGET_PROFILE_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_WEB_BUDGET_PROFILE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WEB_INDEX_MISSING`
+
+Summary: Architecture contract diagnostic `E_ARCH_WEB_INDEX_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WEB_OPENAPI_PROFILE_INVALID`
+
+Summary: Architecture contract diagnostic `E_ARCH_WEB_OPENAPI_PROFILE_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_ARCH_WORLD_EDGE_FORBIDDEN`
+
+Summary: Architecture contract diagnostic `E_ARCH_WORLD_EDGE_FORBIDDEN`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The repository contracts under `arch/` or scanned module graph violate deterministic policy. Repair is often mechanical via manifest/lock/contracts updates.
+
+Agent strategy:
+
+- Run `x07 arch check --write-lock`.
+- Apply suggested manifest/contracts updates.
+- Re-run `x07 arch check` until green.
+
+
+## `E_BENCH_SUITE_LOAD`
+
+Summary: Diagnostic code `E_BENCH_SUITE_LOAD`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Fallback catalog entry for `E_BENCH_SUITE_LOAD`. Investigate producer-specific remediation.
+
+Agent strategy:
+
+- Reproduce `E_BENCH_SUITE_LOAD` with the failing command.
+- Inspect structured diagnostic fields.
+- Apply deterministic edits and re-run.
 
 
 ## `E_DEPS_CAP_POLICY_DENY`
@@ -1305,6 +3979,46 @@ Agent strategy:
 - If the borrow source is a `bytes.lit`, `x07 fix --input <file> --write` can rewrite it to `bytes.view_lit`.
 
 
+## `X07-CLI-ARGS-0001`
+
+Summary: Core lint/schema diagnostic `X07-CLI-ARGS-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-CLI-ARGS-0002`
+
+Summary: Core lint/schema diagnostic `X07-CLI-ARGS-0002`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
 ## `X07-CONTRACT-0001`
 
 Summary: Contract clause must typecheck to i32.
@@ -1406,6 +4120,46 @@ Agent strategy:
 - Re-run `x07 lint` to confirm witness types are accepted.
 
 
+## `X07-FIX-0003`
+
+Summary: Core lint/schema diagnostic `X07-FIX-0003`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-FMT-0001`
+
+Summary: Core lint/schema diagnostic `X07-FMT-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
 ## `X07-GENERICS-0001`
 
 Summary: Type variable is not declared in type_params.
@@ -1466,6 +4220,68 @@ Agent strategy:
 - Re-run with `--verbose` / `--debug` if available.
 - Reduce to a minimal repro.
 - File a toolchain bug with the machine report JSON (especially `diagnostics[].data`).
+
+
+## `X07-IO-READ-0001`
+
+Summary: Core lint/schema diagnostic `X07-IO-READ-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-IO-WRITE-0001`
+
+Summary: Core lint/schema diagnostic `X07-IO-WRITE-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-JSON-PARSE-0001`
+
+Summary: Core lint/schema diagnostic `X07-JSON-PARSE-0001`.
+
+Origins:
+- x07c (stage: parse, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-MOVE-0001`
@@ -1552,6 +4368,26 @@ Agent strategy:
 
 - Inspect the reported pointers and rewrite the expression to avoid conflicting borrows/moves.
 - Re-run `x07 check` to verify.
+
+
+## `X07-PATCHSET-0001`
+
+Summary: Core lint/schema diagnostic `X07-PATCHSET-0001`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-PBT-FIX-ARGS-0001`
@@ -3241,6 +6077,416 @@ Agent strategy:
 - Validate RR entry fields (key/url/kind/op/latency).
 - Regenerate or edit fixtures deterministically.
 - Re-run `x07 rr` operation.
+
+
+## `X07TC_EARCH`
+
+Summary: Strict architecture evidence failed certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Certification requires the arch manifest and arch check result to stay at the verified-core posture.
+
+Agent strategy:
+
+- Run `x07 arch check --manifest arch/manifest.x07arch.json` and inspect the report.
+- Align allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary wiring with `verified_core_pure_v1`.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EBOUNDARY`
+
+Summary: Boundary declarations or smoke coverage are incomplete for certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Public exports must appear in `arch/boundaries/index.x07boundary.json`, and boundary-declared smoke/PBT tests must resolve and pass.
+
+Agent strategy:
+
+- Run `x07 arch check` and inspect `target/cert/boundaries.report.json`.
+- Add or tighten entries in `arch/boundaries/index.x07boundary.json`.
+- Use `x07 schema derive --emit-boundary-stub` to scaffold missing boundary records when schemas are pinned.
+- Re-run `x07 test` and `x07 trust certify`.
+
+
+## `X07TC_ECOMPILE_ATTEST`
+
+Summary: Compile attestation failed or could not bind the emitted binary.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Depends on host toolchain state and reproducible-build behavior outside AST quickfixes.
+
+Details:
+
+The bundle step failed, no executable was produced, or the double-build digest did not match.
+
+Agent strategy:
+
+- Run `x07 doctor` and ensure a working C toolchain is available.
+- Re-run `x07 bundle --project x07.json --emit-attestation target/cert/compile.attest.json`.
+- Fix reproducibility or toolchain drift before certifying again.
+
+
+## `X07TC_ECOVERAGE`
+
+Summary: Reachable proof coverage is incomplete for certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires semantic proof work or architectural refactoring, not a mechanical patch.
+
+Details:
+
+Accepted certificates allow only `proven` or `trusted_primitive` statuses in the reachable closure.
+
+Agent strategy:
+
+- Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect `target/cert/verify.coverage.json`.
+- Move unsupported logic behind certified boundaries or refactor it into the certifiable subset.
+- Re-run `x07 verify --prove` for uncovered symbols before certifying again.
+
+
+## `X07TC_EPBT`
+
+Summary: Boundary-required property tests are missing, malformed, or failing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A required PBT harness is absent from `tests/tests.json`, is not declared with a `pbt` stanza, uses the wrong world, or did not pass.
+
+Agent strategy:
+
+- Add the missing test id under `tests/tests.json` with the required `pbt` stanza.
+- Keep the test world inside the profile/boundary allowlist.
+- Re-run `x07 test --all` and then `x07 trust certify`.
+
+
+## `X07TC_EPROFILE`
+
+Summary: Certification trust profile is missing or invalid.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The profile supplied to `x07 trust certify` could not be parsed or validated.
+
+Agent strategy:
+
+- Validate the profile with `x07 trust profile check` first.
+- Fix schema_version, required fields, or file path issues.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROJECT`
+
+Summary: Certification could not resolve the project manifest or source closure.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The project path is missing, not a project manifest, or failed project-context resolution before evidence collection completed.
+
+Agent strategy:
+
+- Pass `--project x07.json` (or a directory containing it).
+- Ensure the project manifest and lockfile resolve cleanly.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROVE`
+
+Summary: At least one reachable proof obligation failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-focused code changes rather than a deterministic quickfix.
+
+Details:
+
+A reachable symbol failed `x07 verify --prove` or returned a non-`proven` result.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove` for the reported symbol.
+- Add missing loop contracts, strengthen `requires[]`/`ensures[]`, or simplify the function into the supported subset.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EREVIEW`
+
+Summary: Baseline review or trust-posture diff gate failed certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or a semantic change to the candidate.
+
+Details:
+
+The supplied baseline comparison failed, or the candidate introduced a forbidden trust posture delta.
+
+Agent strategy:
+
+- Run `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion`.
+- Tighten the candidate change or intentionally update the baseline.
+- Re-run `x07 trust certify` with the corrected baseline.
+
+
+## `X07TC_ESCHEMADERIVE`
+
+Summary: Boundary-referenced schema outputs drifted or are missing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Certification rechecks pinned boundary schemas with `x07 schema derive --check`; missing inputs or drifted generated outputs reject the certificate.
+
+Agent strategy:
+
+- Run `x07 schema derive --input <schema> --out-dir . --write` for each boundary schema.
+- If the boundary record is missing, use `x07 schema derive --emit-boundary-stub` to scaffold it.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_ETEST`
+
+Summary: Deterministic certification tests are missing or failing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The certification profile requires smoke/unit evidence from `tests/tests.json`, but the manifest is missing, miswired, or the report contains failures.
+
+Agent strategy:
+
+- Ensure `tests/tests.json` exists and includes the boundary-required test ids.
+- Keep the test worlds inside the trust profile allowlist.
+- Re-run `x07 test --all --manifest tests/tests.json` before certifying again.
+
+
+## `X07TC_ETRUST_REPORT`
+
+Summary: Trust report evidence failed certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires capability or environment changes outside JSON quickfix application.
+
+Details:
+
+The trust report found disallowed nondeterminism/capabilities, or failed to emit the required SBOM evidence.
+
+Agent strategy:
+
+- Run `x07 trust report --project x07.json --out target/trust/trust.json --html-out target/trust/trust.html`.
+- Remove the disallowed capability surface or fix the missing SBOM/trust artifact.
+- Re-run `x07 trust certify`.
+
+
+## `X07TP_ARCH`
+
+Summary: Project architecture posture is weaker than the trust profile requires.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The arch manifest is missing, on the wrong schema line, or does not enable the strict checks required for certification.
+
+Agent strategy:
+
+- Start from the `verified_core_pure_v1` manifest posture.
+- Enable allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary contracts.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_BOUNDARY`
+
+Summary: Project boundary index wiring is missing or incomplete for certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The trust profile requires `contracts_v1.boundaries.index_path`, but the project does not expose a boundary index for the public trust surface.
+
+Agent strategy:
+
+- Add `contracts_v1.boundaries.index_path` to `arch/manifest.x07arch.json`.
+- Create `arch/boundaries/index.x07boundary.json` and keep public boundaries there.
+- Use `x07 schema derive --emit-boundary-stub` when you need deterministic boundary scaffolding.
+
+
+## `X07TP_ENTRY`
+
+Summary: Requested entrypoint is not allowed by the trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a certification policy decision (change the entry vs widen the profile).
+
+Details:
+
+The profile's `entrypoints[]` set does not permit the entry you asked to certify.
+
+Agent strategy:
+
+- Either certify one of the profile's declared entrypoints or intentionally widen the profile.
+- Keep `entrypoints[]` aligned with the reviewed trust surface.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_INVALID`
+
+Summary: Trust profile JSON is missing or invalid.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The trust profile could not be read, parsed, or validated against the certification schema.
+
+Agent strategy:
+
+- Compare the profile against `arch/trust/profiles/verified_core_pure_v1.json`.
+- Fix JSON shape, schema_version, and required fields.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_LANGUAGE`
+
+Summary: Project uses language or policy features forbidden by the trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires semantic refactoring or an intentional policy change.
+
+Details:
+
+The reachable project surface includes forbidden features such as `defasync`, `extern`, `allow_unsafe`, or `allow_ffi`.
+
+Agent strategy:
+
+- Refactor the certified entry closure into the allowed subset.
+- Keep `verified_core_pure_v1` entry closures free of `defasync`, `extern`, `unsafe`, and FFI.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_NOT_CERTIFIABLE`
+
+Summary: Trust profile is weaker than the Milestone A certification floor.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires an intentional policy change to the certification contract.
+
+Details:
+
+The profile relaxes one or more requirements needed for `verified_core_pure_v1` certification.
+
+Agent strategy:
+
+- Tighten the profile to the verified-core floor instead of weakening the certificate contract.
+- Keep the profile immutable once it is published.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_PROJECT`
+
+Summary: Project manifest could not be resolved for trust profile validation.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The `--project` path is missing, not a project manifest, or cannot be resolved into a valid X07 project.
+
+Agent strategy:
+
+- Pass `--project x07.json` (or a directory containing it).
+- Ensure `x07.json` exists and resolves cleanly.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_WORLD`
+
+Summary: Project world is outside the trust profile allowlist.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires choosing a different project world or a different trust profile.
+
+Details:
+
+The project or selected run profile resolves to a world not listed in `worlds_allowed`.
+
+Agent strategy:
+
+- Move the project to an allowed solve-world (for `verified_core_pure_v1`, `solve-pure`).
+- Or select a different trust profile that explicitly permits the current world.
+- Re-run `x07 trust profile check`.
 
 
 ## `X07T_ASSERT_BYTES_EQ`

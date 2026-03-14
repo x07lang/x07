@@ -1,0 +1,74 @@
+name: Verified Core Certify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  X07_TOOLCHAIN_TAG: "v0.1.78"
+  CBMC_DEB_URL: "https://github.com/diffblue/cbmc/releases/download/cbmc-6.8.0/ubuntu-24.04-cbmc-6.8.0-Linux.deb"
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system deps
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            clang \
+            pkg-config \
+            libcurl4-openssl-dev \
+            z3 \
+            curl
+
+      - name: Install CBMC
+        shell: bash
+        run: |
+          curl -fsSL "$CBMC_DEB_URL" -o /tmp/cbmc.deb
+          sudo apt-get install -y /tmp/cbmc.deb
+
+      - name: Install x07
+        shell: bash
+        run: cargo install --locked --git https://github.com/x07lang/x07 --tag "$X07_TOOLCHAIN_TAG" x07
+
+      - name: Trust profile check
+        shell: bash
+        run: |
+          x07 trust profile check \
+            --profile arch/trust/profiles/verified_core_pure_v1.json \
+            --project x07.json \
+            --entry example.main
+
+      - name: Deterministic tests
+        shell: bash
+        run: x07 test --all --manifest tests/tests.json
+
+      - name: Emit certificate bundle
+        shell: bash
+        run: |
+          x07 trust certify \
+            --project x07.json \
+            --profile arch/trust/profiles/verified_core_pure_v1.json \
+            --entry example.main \
+            --out-dir target/cert
+
+      - name: Upload certificate bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-core-certificate
+          path: target/cert/
+          if-no-files-found: error

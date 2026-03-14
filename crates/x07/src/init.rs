@@ -158,6 +158,10 @@ const TEMPLATE_VERIFIED_CORE_PURE_PROFILE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../docs/examples/verified_core_pure_v1/arch/trust/profiles/verified_core_pure_v1.json"
 ));
+const TEMPLATE_VERIFIED_CORE_PURE_WORKFLOW: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/.github/workflows/certify.yml"
+));
 
 fn ensure_trailing_newline(bytes: &[u8]) -> Vec<u8> {
     let mut out = bytes.to_vec();
@@ -303,6 +307,10 @@ fn verified_core_pure_template_files() -> &'static [(&'static str, &'static [u8]
         (
             "arch/trust/profiles/verified_core_pure_v1.json",
             TEMPLATE_VERIFIED_CORE_PURE_PROFILE,
+        ),
+        (
+            ".github/workflows/certify.yml",
+            TEMPLATE_VERIFIED_CORE_PURE_WORKFLOW,
         ),
     ]
 }

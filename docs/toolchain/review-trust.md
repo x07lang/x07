@@ -6,6 +6,10 @@ For the smallest certificate-first example, see:
 
 - `docs/examples/verified_core_pure_v1/`
 
+For a second certifiable example built around published packages, see:
+
+- `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/`
+
 ## Semantic diff (`x07 review diff`)
 
 ```bash
@@ -170,6 +174,7 @@ For `verified_core_pure_v1`, the reviewer flow is:
 4. Use `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion` when comparing a baseline certificate posture to a candidate change.
 
 The canonical example project at `docs/examples/verified_core_pure_v1/` is structured to exercise that flow end to end.
+The checked-in `.github/workflows/certify.yml` file in that example shows the minimal CI surface for running the same certificate flow in GitHub Actions, and `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` serves as the second certifiable example project in this train.
 
 ## CI artifact pattern
 

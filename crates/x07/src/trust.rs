@@ -28,6 +28,8 @@ const X07_TRUST_PROFILE_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-trust.profile.schema.json");
 const X07_TRUST_CERTIFICATE_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-trust.certificate.schema.json");
+const X07_VERIFY_PRIMITIVES_CATALOG_BYTES: &[u8] =
+    include_bytes!("../../../catalog/verify_primitives.json");
 const X07_DEPS_CAPABILITY_POLICY_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-deps.capability-policy.schema.json");
 
@@ -259,9 +261,17 @@ struct TrustCertificate {
     entry: String,
     out_dir: String,
     claims: Vec<String>,
+    tcb: TrustCertificateTcb,
     evidence: TrustCertificateEvidence,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     diagnostics: Vec<diagnostics::Diagnostic>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificateTcb {
+    x07_version: String,
+    host_compiler: String,
+    trusted_primitive_manifest_digest: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2135,6 +2145,7 @@ fn cmd_trust_certify(
             .as_ref()
             .map(|p| p.claims.clone())
             .unwrap_or_default(),
+        tcb: build_certificate_tcb(),
         evidence: TrustCertificateEvidence {
             boundaries_report: boundaries_ref,
             coverage_report: coverage_ref,
@@ -2239,6 +2250,23 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
     s.push_str("</code> <b>entry:</b> <code>");
     s.push_str(&report_common::html_escape(&certificate.entry));
     s.push_str("</code></p>");
+
+    s.push_str("<h2>TCB</h2><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>");
+    for (label, value) in [
+        ("x07 version", certificate.tcb.x07_version.as_str()),
+        ("host compiler", certificate.tcb.host_compiler.as_str()),
+        (
+            "trusted primitive manifest digest",
+            certificate.tcb.trusted_primitive_manifest_digest.as_str(),
+        ),
+    ] {
+        s.push_str("<tr><td>");
+        s.push_str(label);
+        s.push_str("</td><td><code>");
+        s.push_str(&report_common::html_escape(value));
+        s.push_str("</code></td></tr>");
+    }
+    s.push_str("</tbody></table>");
 
     s.push_str("<h2>Evidence</h2><table><thead><tr><th>Artifact</th><th>Path</th><th>sha256</th></tr></thead><tbody>");
     for (label, evidence) in [
@@ -3421,6 +3449,43 @@ fn trust_diag_with_path(
     diag
 }
 
+fn build_certificate_tcb() -> TrustCertificateTcb {
+    TrustCertificateTcb {
+        x07_version: env!("CARGO_PKG_VERSION").to_string(),
+        host_compiler: host_compiler_identity(),
+        trusted_primitive_manifest_digest: format!(
+            "sha256:{}",
+            util::sha256_hex(X07_VERIFY_PRIMITIVES_CATALOG_BYTES)
+        ),
+    }
+}
+
+fn host_compiler_identity() -> String {
+    let cc = std::env::var_os("X07_CC").unwrap_or_else(|| "cc".into());
+    let cc_str = cc.to_string_lossy().trim().to_string();
+    let fallback = if cc_str.is_empty() {
+        "cc".to_string()
+    } else {
+        cc_str.clone()
+    };
+    let Ok(out) = Command::new(&cc).arg("--version").output() else {
+        return fallback;
+    };
+    let version_text = String::from_utf8_lossy(&out.stdout);
+    let first_line = version_text
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("");
+    if first_line.is_empty() {
+        fallback
+    } else if fallback == first_line {
+        fallback
+    } else {
+        format!("{fallback} ({first_line})")
+    }
+}
+
 fn normalize_sensitive_namespace_set(items: &[String]) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     for raw in items {
@@ -3705,6 +3770,11 @@ mod tests {
             entry: "app.main".to_string(),
             out_dir: "target/cert".to_string(),
             claims: vec!["human_can_review_certificate_not_source".to_string()],
+            tcb: TrustCertificateTcb {
+                x07_version: "0.1.78".to_string(),
+                host_compiler: "cc (clang 18.1.0)".to_string(),
+                trusted_primitive_manifest_digest: format!("sha256:{}", "f".repeat(64)),
+            },
             evidence: TrustCertificateEvidence {
                 boundaries_report: EvidenceRef {
                     path: "boundaries.report.json".to_string(),
@@ -3740,6 +3810,12 @@ mod tests {
             .and_then(Value::as_array)
             .expect("prove_reports array");
         assert!(prove_reports.is_empty());
+        assert_eq!(
+            value
+                .pointer("/tcb/trusted_primitive_manifest_digest")
+                .and_then(Value::as_str),
+            Some(format!("sha256:{}", "f".repeat(64)).as_str())
+        );
     }
 
     #[test]

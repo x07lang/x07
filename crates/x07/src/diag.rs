@@ -950,7 +950,7 @@ fn scan_source_codes(roots: &[PathBuf]) -> Result<ExtractedCodes> {
     let re_code_field = Regex::new(r#"code\s*:\s*"([A-Z][A-Z0-9_-]{0,63})""#)
         .context("compile code-field regex")?;
     let re_diag_call = Regex::new(
-        r#"(?:diag_[A-Za-z0-9_]*|with_code|error_code|warning_code)\s*\(\s*"([A-Z][A-Z0-9_-]{0,63})""#,
+        r#"(?:diag_[A-Za-z0-9_]*|[A-Za-z0-9_]*_diag(?:_[A-Za-z0-9_]+)*|diagnostic_error|with_code|error_code|warning_code)\s*\(\s*"([A-Z][A-Z0-9_-]{0,63})""#,
     )
     .context("compile diagnostic-call regex")?;
     let re_x7i_literal =
@@ -981,22 +981,21 @@ fn scan_source_codes(roots: &[PathBuf]) -> Result<ExtractedCodes> {
         let text = std::fs::read_to_string(&path)
             .with_context(|| format!("read source: {}", path.display()))?;
         let include_x7i_literals = rel_file.ends_with("x07import-core/src/diagnostics.rs");
-        for line in text.lines() {
-            let mut line_codes: BTreeSet<String> = BTreeSet::new();
-            for cap in re_code_field.captures_iter(line) {
-                line_codes.insert(cap[1].to_string());
-            }
-            for cap in re_diag_call.captures_iter(line) {
-                line_codes.insert(cap[1].to_string());
-            }
-            if include_x7i_literals {
-                for cap in re_x7i_literal.captures_iter(line) {
-                    line_codes.insert(cap[1].to_string());
-                }
-            }
-
-            for code in line_codes {
-                let key = (code, component.clone());
+        for cap in re_code_field.captures_iter(&text) {
+            let key = (cap[1].to_string(), component.clone());
+            let entry = by_key.entry(key).or_default();
+            entry.occurrences = entry.occurrences.saturating_add(1);
+            entry.files.insert(rel_file.clone());
+        }
+        for cap in re_diag_call.captures_iter(&text) {
+            let key = (cap[1].to_string(), component.clone());
+            let entry = by_key.entry(key).or_default();
+            entry.occurrences = entry.occurrences.saturating_add(1);
+            entry.files.insert(rel_file.clone());
+        }
+        if include_x7i_literals {
+            for cap in re_x7i_literal.captures_iter(&text) {
+                let key = (cap[1].to_string(), component.clone());
                 let entry = by_key.entry(key).or_default();
                 entry.occurrences = entry.occurrences.saturating_add(1);
                 entry.files.insert(rel_file.clone());
@@ -1185,6 +1184,165 @@ struct CatalogClassification {
     no_quickfix_reason: Option<String>,
 }
 
+fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
+    let mk = |summary: &str,
+              details_md: &str,
+              agent_strategy_md: &str,
+              quickfix_support: QuickfixSupport,
+              no_quickfix_reason: Option<&str>| CatalogClassification {
+        summary: summary.to_string(),
+        details_md: details_md.to_string(),
+        agent_strategy_md: agent_strategy_md.to_string(),
+        quickfix_support,
+        quickfix_kind: Vec::new(),
+        no_quickfix_reason: no_quickfix_reason.map(str::to_string),
+    };
+
+    match code {
+        "X07TP_INVALID" => Some(mk(
+            "Trust profile JSON is missing or invalid.",
+            "The trust profile could not be read, parsed, or validated against the certification schema.",
+            "- Compare the profile against `arch/trust/profiles/verified_core_pure_v1.json`.\n- Fix JSON shape, schema_version, and required fields.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TP_PROJECT" => Some(mk(
+            "Project manifest could not be resolved for trust profile validation.",
+            "The `--project` path is missing, not a project manifest, or cannot be resolved into a valid X07 project.",
+            "- Pass `--project x07.json` (or a directory containing it).\n- Ensure `x07.json` exists and resolves cleanly.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TP_ENTRY" => Some(mk(
+            "Requested entrypoint is not allowed by the trust profile.",
+            "The profile's `entrypoints[]` set does not permit the entry you asked to certify.",
+            "- Either certify one of the profile's declared entrypoints or intentionally widen the profile.\n- Keep `entrypoints[]` aligned with the reviewed trust surface.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            Some("Requires a certification policy decision (change the entry vs widen the profile)."),
+        )),
+        "X07TP_NOT_CERTIFIABLE" => Some(mk(
+            "Trust profile is weaker than the Milestone A certification floor.",
+            "The profile relaxes one or more requirements needed for `verified_core_pure_v1` certification.",
+            "- Tighten the profile to the verified-core floor instead of weakening the certificate contract.\n- Keep the profile immutable once it is published.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            Some("Requires an intentional policy change to the certification contract."),
+        )),
+        "X07TP_WORLD" => Some(mk(
+            "Project world is outside the trust profile allowlist.",
+            "The project or selected run profile resolves to a world not listed in `worlds_allowed`.",
+            "- Move the project to an allowed solve-world (for `verified_core_pure_v1`, `solve-pure`).\n- Or select a different trust profile that explicitly permits the current world.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            Some("Requires choosing a different project world or a different trust profile."),
+        )),
+        "X07TP_LANGUAGE" => Some(mk(
+            "Project uses language or policy features forbidden by the trust profile.",
+            "The reachable project surface includes forbidden features such as `defasync`, `extern`, `allow_unsafe`, or `allow_ffi`.",
+            "- Refactor the certified entry closure into the allowed subset.\n- Keep `verified_core_pure_v1` entry closures free of `defasync`, `extern`, `unsafe`, and FFI.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Never,
+            Some("Requires semantic refactoring or an intentional policy change."),
+        )),
+        "X07TP_ARCH" => Some(mk(
+            "Project architecture posture is weaker than the trust profile requires.",
+            "The arch manifest is missing, on the wrong schema line, or does not enable the strict checks required for certification.",
+            "- Start from the `verified_core_pure_v1` manifest posture.\n- Enable allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary contracts.\n- Re-run `x07 trust profile check`.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TP_BOUNDARY" => Some(mk(
+            "Project boundary index wiring is missing or incomplete for certification.",
+            "The trust profile requires `contracts_v1.boundaries.index_path`, but the project does not expose a boundary index for the public trust surface.",
+            "- Add `contracts_v1.boundaries.index_path` to `arch/manifest.x07arch.json`.\n- Create `arch/boundaries/index.x07boundary.json` and keep public boundaries there.\n- Use `x07 schema derive --emit-boundary-stub` when you need deterministic boundary scaffolding.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TC_EPROJECT" => Some(mk(
+            "Certification could not resolve the project manifest or source closure.",
+            "The project path is missing, not a project manifest, or failed project-context resolution before evidence collection completed.",
+            "- Pass `--project x07.json` (or a directory containing it).\n- Ensure the project manifest and lockfile resolve cleanly.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TC_EPROFILE" => Some(mk(
+            "Certification trust profile is missing or invalid.",
+            "The profile supplied to `x07 trust certify` could not be parsed or validated.",
+            "- Validate the profile with `x07 trust profile check` first.\n- Fix schema_version, required fields, or file path issues.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TC_EARCH" => Some(mk(
+            "Strict architecture evidence failed certification.",
+            "Certification requires the arch manifest and arch check result to stay at the verified-core posture.",
+            "- Run `x07 arch check --manifest arch/manifest.x07arch.json` and inspect the report.\n- Align allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary wiring with `verified_core_pure_v1`.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TC_EBOUNDARY" => Some(mk(
+            "Boundary declarations or smoke coverage are incomplete for certification.",
+            "Public exports must appear in `arch/boundaries/index.x07boundary.json`, and boundary-declared smoke/PBT tests must resolve and pass.",
+            "- Run `x07 arch check` and inspect `target/cert/boundaries.report.json`.\n- Add or tighten entries in `arch/boundaries/index.x07boundary.json`.\n- Use `x07 schema derive --emit-boundary-stub` to scaffold missing boundary records when schemas are pinned.\n- Re-run `x07 test` and `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TC_EPBT" => Some(mk(
+            "Boundary-required property tests are missing, malformed, or failing.",
+            "A required PBT harness is absent from `tests/tests.json`, is not declared with a `pbt` stanza, uses the wrong world, or did not pass.",
+            "- Add the missing test id under `tests/tests.json` with the required `pbt` stanza.\n- Keep the test world inside the profile/boundary allowlist.\n- Re-run `x07 test --all` and then `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TC_ECOVERAGE" => Some(mk(
+            "Reachable proof coverage is incomplete for certification.",
+            "Accepted certificates allow only `proven` or `trusted_primitive` statuses in the reachable closure.",
+            "- Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect `target/cert/verify.coverage.json`.\n- Move unsupported logic behind certified boundaries or refactor it into the certifiable subset.\n- Re-run `x07 verify --prove` for uncovered symbols before certifying again.",
+            QuickfixSupport::Never,
+            Some("Requires semantic proof work or architectural refactoring, not a mechanical patch."),
+        )),
+        "X07TC_EPROVE" => Some(mk(
+            "At least one reachable proof obligation failed.",
+            "A reachable symbol failed `x07 verify --prove` or returned a non-`proven` result.",
+            "- Re-run `x07 verify --prove` for the reported symbol.\n- Add missing loop contracts, strengthen `requires[]`/`ensures[]`, or simplify the function into the supported subset.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Never,
+            Some("Requires proof-focused code changes rather than a deterministic quickfix."),
+        )),
+        "X07TC_ETEST" => Some(mk(
+            "Deterministic certification tests are missing or failing.",
+            "The certification profile requires smoke/unit evidence from `tests/tests.json`, but the manifest is missing, miswired, or the report contains failures.",
+            "- Ensure `tests/tests.json` exists and includes the boundary-required test ids.\n- Keep the test worlds inside the trust profile allowlist.\n- Re-run `x07 test --all --manifest tests/tests.json` before certifying again.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        "X07TC_ETRUST_REPORT" => Some(mk(
+            "Trust report evidence failed certification.",
+            "The trust report found disallowed nondeterminism/capabilities, or failed to emit the required SBOM evidence.",
+            "- Run `x07 trust report --project x07.json --out target/trust/trust.json --html-out target/trust/trust.html`.\n- Remove the disallowed capability surface or fix the missing SBOM/trust artifact.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Never,
+            Some("Requires capability or environment changes outside JSON quickfix application."),
+        )),
+        "X07TC_ECOMPILE_ATTEST" => Some(mk(
+            "Compile attestation failed or could not bind the emitted binary.",
+            "The bundle step failed, no executable was produced, or the double-build digest did not match.",
+            "- Run `x07 doctor` and ensure a working C toolchain is available.\n- Re-run `x07 bundle --project x07.json --emit-attestation target/cert/compile.attest.json`.\n- Fix reproducibility or toolchain drift before certifying again.",
+            QuickfixSupport::Never,
+            Some("Depends on host toolchain state and reproducible-build behavior outside AST quickfixes."),
+        )),
+        "X07TC_EREVIEW" => Some(mk(
+            "Baseline review or trust-posture diff gate failed certification.",
+            "The supplied baseline comparison failed, or the candidate introduced a forbidden trust posture delta.",
+            "- Run `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion`.\n- Tighten the candidate change or intentionally update the baseline.\n- Re-run `x07 trust certify` with the corrected baseline.",
+            QuickfixSupport::Never,
+            Some("Requires a baseline review decision or a semantic change to the candidate."),
+        )),
+        "X07TC_ESCHEMADERIVE" => Some(mk(
+            "Boundary-referenced schema outputs drifted or are missing.",
+            "Certification rechecks pinned boundary schemas with `x07 schema derive --check`; missing inputs or drifted generated outputs reject the certificate.",
+            "- Run `x07 schema derive --input <schema> --out-dir . --write` for each boundary schema.\n- If the boundary record is missing, use `x07 schema derive --emit-boundary-stub` to scaffold it.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            None,
+        )),
+        _ => None,
+    }
+}
+
 fn classify_catalog_entry(code: &str) -> CatalogClassification {
     if let Some(exact) = bootstrap_enrichment(code) {
         return CatalogClassification {
@@ -1195,6 +1353,10 @@ fn classify_catalog_entry(code: &str) -> CatalogClassification {
             quickfix_kind: exact.quickfix_kind.to_vec(),
             no_quickfix_reason: None,
         };
+    }
+
+    if let Some(exact) = exact_catalog_classification(code) {
+        return exact;
     }
 
     if let Some(reason) = no_quickfix_reason(code) {
@@ -1370,6 +1532,9 @@ fn no_quickfix_reason(code: &str) -> Option<&'static str> {
 
 fn infer_stage(code: &str, sample_file: Option<&str>) -> CatalogStage {
     let uc = code.to_ascii_uppercase();
+    if uc.starts_with("X07TC_") || uc.starts_with("X07TP_") {
+        return CatalogStage::Run;
+    }
     if uc.contains("PARSE") || uc.contains("JSON_PARSE") {
         return CatalogStage::Parse;
     }
@@ -1945,13 +2110,24 @@ mod tests {
             fn f() {
                 let d = Diagnostic { code: "X07PKG_SPEC_INVALID".to_string(), message: "m".to_string() };
                 let _x = diag_parse_error("E_ARCH_LOCK_READ", "m", None);
+                let _y = trust_diag("X07TC_EARCH", "m");
             }
             "#,
         )?;
         let extracted = scan_source_codes(&[tmp.join("crates")])?;
         let codes: BTreeSet<String> = extracted.codes.iter().map(|r| r.code.clone()).collect();
         assert!(codes.contains("X07PKG_SPEC_INVALID"));
+        assert!(codes.contains("X07TC_EARCH"));
         std::fs::remove_dir_all(tmp)?;
         Ok(())
+    }
+
+    #[test]
+    fn classify_catalog_entry_includes_certification_guidance() {
+        let entry = exact_catalog_classification("X07TC_EBOUNDARY").expect("trust entry");
+        assert_eq!(entry.quickfix_support, QuickfixSupport::Sometimes);
+        assert!(entry
+            .agent_strategy_md
+            .contains("x07 schema derive --emit-boundary-stub"));
     }
 }

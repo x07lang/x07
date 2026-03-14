@@ -53,6 +53,7 @@ cleanup() { rm -rf "$tmp_dir" || true; }
 trap cleanup EXIT
 
 example_dir="$root/docs/examples/verified_core_pure_v1"
+test -f "$example_dir/.github/workflows/certify.yml"
 
 echo "[check] verified_core_pure_v1 docs example: profile check"
 (
@@ -94,6 +95,7 @@ echo "[check] verified_core_pure_v1 template: init"
   cd "$scaffold_dir"
   "$x07_bin" init --template verified-core-pure >/dev/null
 )
+test -f "$scaffold_dir/.github/workflows/certify.yml"
 
 echo "[check] verified_core_pure_v1 template: profile check"
 (

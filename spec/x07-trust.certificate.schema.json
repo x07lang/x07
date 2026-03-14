@@ -12,6 +12,7 @@
     "entry",
     "out_dir",
     "claims",
+    "tcb",
     "evidence"
   ],
   "properties": {
@@ -35,6 +36,23 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1, "maxLength": 256 },
       "default": []
+    },
+    "tcb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x07_version",
+        "host_compiler",
+        "trusted_primitive_manifest_digest"
+      ],
+      "properties": {
+        "x07_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "host_compiler": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "trusted_primitive_manifest_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
     },
     "evidence": {
       "type": "object",

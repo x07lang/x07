@@ -12,7 +12,7 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Creates a publishable package repo: `x07-package.json`, a minimal `x07.json` + `x07.lock.json`, publishable `modules/` layout, and a CI-friendly `tests/tests.json`.
   - Not compatible with `--template` (templates are for app scaffolds).
 - `x07 init --template verified-core-pure`
-  - Creates a certifiable `solve-pure` project with `arch/manifest.x07arch.json`, `arch/boundaries/index.x07boundary.json`, `arch/trust/profiles/verified_core_pure_v1.json`, and a smoke + PBT harness wired for `x07 trust certify`.
+  - Creates a certifiable `solve-pure` project with `arch/manifest.x07arch.json`, `arch/boundaries/index.x07boundary.json`, `arch/trust/profiles/verified_core_pure_v1.json`, `.github/workflows/certify.yml`, and a smoke + PBT harness wired for `x07 trust certify`.
 
 ### MCP kit tooling
 

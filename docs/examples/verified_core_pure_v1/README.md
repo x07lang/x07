@@ -27,3 +27,7 @@ x07 trust certify \
   --entry example.main \
   --out-dir target/cert
 ```
+
+CI example:
+
+- `.github/workflows/certify.yml` installs `x07`, `cbmc`, and `z3`, then uploads `target/cert/` as a review artifact.
