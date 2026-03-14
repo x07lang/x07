@@ -32,6 +32,7 @@ const X07DIAG_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07diag.schema
 const VERIFY_INPUT_BUF_NAME: &str = "x07_verify_input";
 const VERIFY_HARNESS_FN: &str = "x07_verify_harness";
 const Z3_TIMEOUT_SECONDS: u64 = 10;
+const PROCESS_SUMMARY_MAX_CHARS: usize = 1024;
 
 #[derive(Debug, Clone, Args)]
 pub struct VerifyArgs {
@@ -441,17 +442,17 @@ fn cmd_verify_bmc(
         );
     }
 
-    let cbmc_args = vec![
+    let mut cbmc_args = vec![
         c_path.display().to_string(),
         "--function".to_string(),
         VERIFY_HARNESS_FN.to_string(),
         "--unwind".to_string(),
         args.unwind.to_string(),
         "--unwinding-assertions".to_string(),
-        "--no-standard-checks".to_string(),
         "--trace".to_string(),
         "--json-ui".to_string(),
     ];
+    maybe_disable_cbmc_standard_checks(&mut cbmc_args);
 
     let out = Command::new("cbmc")
         .args(&cbmc_args)
@@ -460,7 +461,7 @@ fn cmd_verify_bmc(
 
     if !out.stderr.is_empty() {
         // cbmc can print UI status to stdout (in json-ui mode), but unexpected stderr is a signal.
-        let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let msg = summarize_process_text(&out.stderr, PROCESS_SUMMARY_MAX_CHARS);
         let d = diag_verify("X07V_ECBMC_STDERR", format!("cbmc wrote to stderr: {msg}"));
         return write_report_and_exit(
             machine,
@@ -604,18 +605,18 @@ fn cmd_verify_smt(
 
     let smt2_path = work_dir.join("verify.smt2");
 
-    let cbmc_args = vec![
+    let mut cbmc_args = vec![
         c_path.display().to_string(),
         "--function".to_string(),
         VERIFY_HARNESS_FN.to_string(),
         "--unwind".to_string(),
         args.unwind.to_string(),
         "--unwinding-assertions".to_string(),
-        "--no-standard-checks".to_string(),
         "--smt2".to_string(),
         "--outfile".to_string(),
         smt2_path.display().to_string(),
     ];
+    maybe_disable_cbmc_standard_checks(&mut cbmc_args);
 
     let out = Command::new("cbmc")
         .args(&cbmc_args)
@@ -623,7 +624,7 @@ fn cmd_verify_smt(
         .context("run cbmc (smt2 emit)")?;
 
     if !out.status.success() {
-        let msg = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        let msg = summarize_process_failure(&out.stdout, &out.stderr, PROCESS_SUMMARY_MAX_CHARS);
         let diag_msg = format!("cbmc failed to emit SMT2: {msg}");
         let d = diag_verify("X07V_ECBMC_SMT2", diag_msg);
         return write_report_and_exit(
@@ -633,7 +634,7 @@ fn cmd_verify_smt(
     }
 
     if !out.stderr.is_empty() {
-        let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let msg = summarize_process_text(&out.stderr, PROCESS_SUMMARY_MAX_CHARS);
         let d = diag_verify("X07V_ECBMC_STDERR", format!("cbmc wrote to stderr: {msg}"));
         return write_report_and_exit(
             machine,
@@ -661,7 +662,7 @@ fn cmd_verify_smt(
         .context("run z3")?;
 
     if !z3_out.status.success() {
-        let msg = String::from_utf8_lossy(&z3_out.stderr).trim().to_string();
+        let msg = summarize_process_text(&z3_out.stderr, PROCESS_SUMMARY_MAX_CHARS);
         let d = diag_verify("X07V_EZ3_RUN", format!("z3 failed: {msg}"));
         return write_report_and_exit(
             machine,
@@ -2222,6 +2223,50 @@ fn command_exists(name: &str) -> bool {
     Command::new(name).arg("--version").output().is_ok()
 }
 
+fn maybe_disable_cbmc_standard_checks(cbmc_args: &mut Vec<String>) {
+    if command_supports_option("cbmc", "--help", "--no-standard-checks") {
+        cbmc_args.push("--no-standard-checks".to_string());
+    }
+}
+
+fn command_supports_option(command: &str, help_flag: &str, option: &str) -> bool {
+    let Ok(out) = Command::new(command).arg(help_flag).output() else {
+        return false;
+    };
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    stdout.contains(option) || stderr.contains(option)
+}
+
+fn summarize_process_failure(stdout: &[u8], stderr: &[u8], max_chars: usize) -> String {
+    let stderr_text = summarize_process_text(stderr, max_chars);
+    let stdout_text = summarize_process_text(stdout, max_chars);
+    match (
+        stderr_text.as_str() != "no output",
+        stdout_text.as_str() != "no output",
+    ) {
+        (true, true) => format!("stderr: {stderr_text}; stdout: {stdout_text}"),
+        (true, false) => stderr_text,
+        (false, true) => stdout_text,
+        (false, false) => "no output".to_string(),
+    }
+}
+
+fn summarize_process_text(bytes: &[u8], max_chars: usize) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return "no output".to_string();
+    }
+
+    let truncated: String = trimmed.chars().take(max_chars).collect();
+    if trimmed.chars().count() > max_chars {
+        format!("{truncated}... [truncated]")
+    } else {
+        truncated
+    }
+}
+
 fn validate_verify_report_schema(value: &Value) -> Result<Vec<x07c::diagnostics::Diagnostic>> {
     let schema_json: Value = serde_json::from_slice(X07_VERIFY_REPORT_SCHEMA_BYTES)
         .context("parse spec/x07-verify.report.schema.json")?;
@@ -2313,6 +2358,84 @@ fn diag_verify(code: &str, message: impl Into<String>) -> x07c::diagnostics::Dia
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::io::Write as _;
+
+    fn write_fake_command(script_body: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "x07_verify_fake_command_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system time")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("fake-cbmc.sh");
+        let mut file = std::fs::File::create(&path).expect("create fake command");
+        writeln!(file, "#!/bin/sh").expect("write shebang");
+        writeln!(file, "{script_body}").expect("write script");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&path).expect("metadata").permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&path, perms).expect("chmod");
+        }
+        path
+    }
+
+    #[test]
+    fn command_supports_option_detects_help_output() {
+        let fake = write_fake_command(
+            r#"
+if [ "$1" = "--help" ]; then
+  printf '%s\n' 'cbmc help --no-standard-checks'
+  exit 0
+fi
+exit 0
+"#,
+        );
+        assert!(command_supports_option(
+            fake.to_str().expect("utf-8 fake path"),
+            "--help",
+            "--no-standard-checks"
+        ));
+        std::fs::remove_file(&fake).expect("remove fake command");
+        std::fs::remove_dir(fake.parent().expect("fake parent")).expect("remove temp dir");
+    }
+
+    #[test]
+    fn command_supports_option_returns_false_when_help_lacks_option() {
+        let fake = write_fake_command(
+            r#"
+if [ "$1" = "--help" ]; then
+  printf '%s\n' 'cbmc help'
+  exit 0
+fi
+exit 0
+"#,
+        );
+        assert!(!command_supports_option(
+            fake.to_str().expect("utf-8 fake path"),
+            "--help",
+            "--no-standard-checks"
+        ));
+        std::fs::remove_file(&fake).expect("remove fake command");
+        std::fs::remove_dir(fake.parent().expect("fake parent")).expect("remove temp dir");
+    }
+
+    #[test]
+    fn summarize_process_failure_prefers_stderr_and_truncates_streams() {
+        let stdout = format!("{}\n{}", "x".repeat(1500), "tail");
+        let stderr = "Usage error!\nUnknown option: --no-standard-checks\n";
+        let summary = summarize_process_failure(stdout.as_bytes(), stderr.as_bytes(), 32);
+        assert!(
+            summary.starts_with("stderr: Usage error!\nUnknown option"),
+            "summary={summary}"
+        );
+        assert!(summary.contains("stdout: "), "summary={summary}");
+        assert!(summary.contains("[truncated]"), "summary={summary}");
+    }
 
     #[test]
     fn verify_driver_imports_std_codec_and_uses_std_codec_read() {
