@@ -16,11 +16,17 @@ X07 is a programming language built from the ground up for **100% agentic coding
 
 ## Why X07?
 
+X07 is the core repo and entrypoint for the whole ecosystem. It is the place to start if you want to understand the language, install the toolchain, or build agent-friendly software that can move from local development to browser, device, MCP, package registry, and lifecycle platform workflows without switching languages.
+
 Autonomous agents struggle with mainstream languages because of **multiple equivalent patterns**, **ambiguous diagnostics**, **nondeterministic test environments**, and **text-based patching on fragile syntax**. X07 makes these constraints first-class concerns:
 
 ### Machine-First Source Format
 
 The canonical source is **x07AST JSON** (`*.x07.json`), not text files. Patches are structural ([RFC 6902 JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902)), so agents apply changes mechanically—no parsing ambiguity, no whitespace surprises.
+
+### Memory-Safe Defaults
+
+Normal X07 programs work with checked values, bytes, views, and structured data rather than raw pointer arithmetic. Unsafe pointer surfaces are explicit, limited, and outside the standard agent workflow, which keeps day-to-day code generation safer and easier to review.
 
 ### Deterministic Execution
 
@@ -38,11 +44,49 @@ Errors are **structured identifiers with actionable fixes** designed for LLM con
 
 Side effects are opt-in. Programs run in deterministic solve worlds or OS worlds, and sandboxing is explicit and policy-driven.
 
+### Structured Concurrency
+
+X07 gives agents one clear concurrency model: structured task scopes, explicit budgets, and deterministic fixture-world execution. That keeps async code fast enough for real workloads while staying reviewable and testable.
+
 ### High Performance
 
 X07 compiles to optimized native code with competitive runtime performance. In the direct-binary benchmarks published in `x07lang/x07-perf-compare` (v0.0.3 snapshot), X07 matched or exceeded C/Rust execution times on the included workloads while compiling ~3x faster than C and ~6-7x faster than Rust. Binary sizes in that snapshot were comparable to C (~34 KiB).
 
 See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) for detailed benchmarks.
+
+## Why End Users Care
+
+- **Reliable memory model**: the default language surface avoids the raw-memory pitfalls that make systems code hard to trust.
+- **Speed**: X07 targets native execution and competitive runtime performance.
+- **Concurrency**: structured concurrency gives you parallel work without orphan-task chaos.
+- **Predictable deployment story**: the same ecosystem covers local CLIs, MCP servers, web UI, device apps, WASM backends, package publishing, and lifecycle operations.
+- **Simple mental model**: fewer equivalent ways to do the same thing means fewer hidden surprises in code reviews and maintenance.
+
+## Why Coding Agents Work Reliably With X07
+
+- **Canonical source and patching**: x07AST JSON plus JSON Patch avoids fragile text diffs.
+- **Stable diagnostics**: agents can key off structured codes and quickfixes instead of guessing from prose.
+- **Deterministic worlds and replay**: repair loops can stay reproducible until you explicitly opt into OS effects.
+- **Capability boundaries**: tools, runners, and hosts all use explicit contracts for what code is allowed to do.
+- **Single official path per capability**: fewer choices means less hallucinated glue code.
+
+## Ecosystem Overview
+
+X07 is not just a compiler. The public ecosystem is organized into focused repos with one consistent story:
+
+- [`x07lang/x07`](https://github.com/x07lang/x07): the core language, compiler, CLI, stdlib sources, schemas, and canonical docs.
+- [`x07lang/x07-mcp`](https://github.com/x07lang/x07-mcp): the MCP kit and the official `io.x07/x07lang-mcp` server for coding and operating X07 systems from agent runtimes.
+- [`x07lang/x07-wasm-backend`](https://github.com/x07lang/x07-wasm-backend): the WASM toolchain for pure modules, full-stack app bundles, browser UI, and device packaging.
+- [`x07lang/x07-web-ui`](https://github.com/x07lang/x07-web-ui): the official reducer-style web UI contracts and browser host.
+- [`x07lang/x07-device-host`](https://github.com/x07lang/x07-device-host): the desktop and mobile WebView host that runs the same X07 UI reducer across platforms.
+- [`x07lang/x07-wasi`](https://github.com/x07lang/x07-wasi): canonical `std.wasi.*` packages for WASI-facing X07 programs.
+- [`x07lang/x07-platform`](https://github.com/x07lang/x07-platform): the lifecycle platform for sealed artifacts, deploy plans, incidents, regressions, and device releases.
+- [`x07lang/x07-platform-contracts`](https://github.com/x07lang/x07-platform-contracts): the public `lp.*` contracts shared by the platform CLI, UI, APIs, and MCP tools.
+- [`x07lang/x07-registry`](https://github.com/x07lang/x07-registry): the package registry backend.
+- [`x07lang/x07-registry-web`](https://github.com/x07lang/x07-registry-web): the public package registry UI at [x07.io](https://x07.io).
+- [`x07lang/x07-website`](https://github.com/x07lang/x07-website): the documentation website at [x07lang.org](https://x07lang.org).
+
+For end users, that means one language with an official path for package distribution, WASM delivery, browser and device UI, MCP-based agent tooling, and production lifecycle control.
 
 ---
 
@@ -131,12 +175,14 @@ x07/
 └── scripts/        # Tooling and CI scripts
 ```
 
-## Related Repositories
+## Key Links
 
-- [`x07lang/x07`](https://github.com/x07lang/x07) — Toolchain + stdlib (this repo)
-- [`x07lang/x07-website`](https://github.com/x07lang/x07-website) — x07lang.org
-- [`x07lang/x07-registry`](https://github.com/x07lang/x07-registry) — Package registry
-- [`x07lang/x07-registry-web`](https://github.com/x07lang/x07-registry-web) — Registry UI (x07.io)
+- Docs: [x07lang.org](https://x07lang.org)
+- Package registry: [x07.io](https://x07.io)
+- MCP kit: [x07lang/x07-mcp](https://github.com/x07lang/x07-mcp)
+- WASM tooling: [x07lang/x07-wasm-backend](https://github.com/x07lang/x07-wasm-backend)
+- Lifecycle platform: [x07lang/x07-platform](https://github.com/x07lang/x07-platform)
+- Official docs site repo: [x07lang/x07-website](https://github.com/x07lang/x07-website)
  
  ---
 

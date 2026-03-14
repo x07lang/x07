@@ -1,12 +1,13 @@
 # X07 (x07lang)
 
-X07 is an **agent-first systems language**: it’s designed so autonomous coding agents can generate, modify, test, and repair programs reliably—without needing a human to “massage” code.
+X07 is an **agent-first systems language**. It is built so coding agents can generate, modify, test, and repair software reliably, while still giving end users the things they actually care about: memory-safe defaults, speed, explicit concurrency, predictable deployment, and clear tooling.
 
-Most languages optimize for human ergonomics (expressiveness, many equivalent ways to write the same thing). X07 optimizes for:
+Most languages optimize for human style flexibility. X07 optimizes for:
 
-- **Canonical representations** (bytes encodings, module layouts, request formats), so “the same intent” produces “the same shape”.
-- **LLM-oriented diagnostics** (structured, code-stable error IDs + machine-applicable fixes).
-- **World-based capability modeling** (especially for OS access), so agents can run safely with explicit intent.
+- **Canonical representations** so the same intent produces the same program shape.
+- **LLM-oriented diagnostics** with stable error codes and machine-applicable fixes.
+- **World-based capability modeling** so side effects stay explicit and reviewable.
+- **Structured concurrency** so async work stays fast without turning into orphan-task chaos.
 
 ## The mental model
 
@@ -26,6 +27,15 @@ Programs are stored and exchanged in a **structured AST format** (x07AST JSON). 
 - [Your first project](getting-started/first-project.md)
 - [How “worlds” work](worlds/index.md)
 - [The agent workflow](getting-started/agent-workflow.md)
+
+## Ecosystem at a glance
+
+The `x07` repo is the entrypoint, but the public ecosystem is intentionally split into focused repos:
+
+- **MCP kit + official MCP server**: [`x07-mcp`](https://github.com/x07lang/x07-mcp) gives you templates for building MCP servers in X07 and ships the official `io.x07/x07lang-mcp` server for agent runtimes. Start with [MCP kit](toolchain/mcp-kit.md).
+- **WASM, web UI, and device apps**: [`x07-wasm-backend`](https://github.com/x07lang/x07-wasm-backend), [`x07-web-ui`](https://github.com/x07lang/x07-web-ui), [`x07-device-host`](https://github.com/x07lang/x07-device-host), and [`x07-wasi`](https://github.com/x07lang/x07-wasi) cover browser UI, WASM services, packaged desktop/mobile apps, and WASI-facing contracts. Start with [WASM tooling](toolchain/wasm.md).
+- **Lifecycle platform**: [`x07-platform`](https://github.com/x07lang/x07-platform) and [`x07-platform-contracts`](https://github.com/x07lang/x07-platform-contracts) cover sealed artifacts, deploy plans, incidents, regressions, and device release control. Start with [Platform for agents](agent/platform.md).
+- **Packages and docs**: [`x07-registry`](https://github.com/x07lang/x07-registry) powers package publishing, [`x07-registry-web`](https://github.com/x07lang/x07-registry-web) serves [x07.io](https://x07.io), and [`x07-website`](https://github.com/x07lang/x07-website) serves [x07lang.org](https://x07lang.org).
 
 ## What makes X07 different?
 
@@ -48,6 +58,12 @@ When you need real OS resources (real network, real disk, real time), use `run-o
 ### 3) Production worlds are opt-in
 
 When you need real OS resources (real network, real disk, real time), you switch to OS-backed worlds. Those worlds are **never used for deterministic evaluation**, and are governed by explicit policies.
+
+## Why this matters in practice
+
+- **For end users**: you get one language and one ecosystem for CLIs, MCP servers, web UI, packaged device apps, WASM services, package publishing, and lifecycle operations.
+- **For teams**: the same contracts show up in docs, CLI reports, schema files, CI checks, and operational tooling.
+- **For coding agents**: the language removes many of the ambiguities that make autonomous edits hard to trust in mainstream languages.
 
 ## Documentation map (human)
 
