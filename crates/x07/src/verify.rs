@@ -459,7 +459,7 @@ fn cmd_verify_bmc(
         .output()
         .context("run cbmc")?;
 
-    if !out.stderr.is_empty() {
+    if !out.stderr.is_empty() && !cbmc_stderr_is_benign(&out.stderr) {
         // cbmc can print UI status to stdout (in json-ui mode), but unexpected stderr is a signal.
         let msg = summarize_process_text(&out.stderr, PROCESS_SUMMARY_MAX_CHARS);
         let d = diag_verify("X07V_ECBMC_STDERR", format!("cbmc wrote to stderr: {msg}"));
@@ -633,7 +633,7 @@ fn cmd_verify_smt(
         );
     }
 
-    if !out.stderr.is_empty() {
+    if !out.stderr.is_empty() && !cbmc_stderr_is_benign(&out.stderr) {
         let msg = summarize_process_text(&out.stderr, PROCESS_SUMMARY_MAX_CHARS);
         let d = diag_verify("X07V_ECBMC_STDERR", format!("cbmc wrote to stderr: {msg}"));
         return write_report_and_exit(
@@ -2267,6 +2267,22 @@ fn summarize_process_text(bytes: &[u8], max_chars: usize) -> String {
     }
 }
 
+fn cbmc_stderr_is_benign(stderr: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(stderr);
+    let mut saw_line = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        saw_line = true;
+        if !line.starts_with("**** WARNING: no body for function __builtin_trap") {
+            return false;
+        }
+    }
+    saw_line
+}
+
 fn validate_verify_report_schema(value: &Value) -> Result<Vec<x07c::diagnostics::Diagnostic>> {
     let schema_json: Value = serde_json::from_slice(X07_VERIFY_REPORT_SCHEMA_BYTES)
         .context("parse spec/x07-verify.report.schema.json")?;
@@ -2435,6 +2451,20 @@ exit 0
         );
         assert!(summary.contains("stdout: "), "summary={summary}");
         assert!(summary.contains("[truncated]"), "summary={summary}");
+    }
+
+    #[test]
+    fn cbmc_stderr_is_benign_for_builtin_trap_warning() {
+        assert!(cbmc_stderr_is_benign(
+            b"**** WARNING: no body for function __builtin_trap\n"
+        ));
+        assert!(cbmc_stderr_is_benign(
+            b"\n**** WARNING: no body for function __builtin_trap\n\n"
+        ));
+        assert!(!cbmc_stderr_is_benign(
+            b"**** WARNING: no body for function __builtin_trap\nunexpected\n"
+        ));
+        assert!(!cbmc_stderr_is_benign(b""));
     }
 
     #[test]
