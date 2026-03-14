@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Args;
@@ -66,6 +66,9 @@ pub struct SchemaDeriveArgs {
 
     #[arg(long, value_name = "DIR")]
     pub out_dir: PathBuf,
+
+    #[arg(long)]
+    pub emit_boundary_stub: bool,
 
     #[arg(long)]
     pub write: bool,
@@ -421,6 +424,7 @@ fn cmd_schema_derive(args: SchemaDeriveArgs) -> Result<std::process::ExitCode> {
         anyhow::bail!("set at most one of --write or --check");
     }
 
+    let cwd = std::env::current_dir().context("resolve cwd")?;
     let input_path = util::resolve_existing_path_upwards(&args.input);
     let input_bytes =
         std::fs::read(&input_path).with_context(|| format!("read: {}", input_path.display()))?;
@@ -454,6 +458,14 @@ fn cmd_schema_derive(args: SchemaDeriveArgs) -> Result<std::process::ExitCode> {
         )?);
     }
     outputs.push(generate_tests_manifest(&schema_file.package.name, &types)?);
+    if args.emit_boundary_stub {
+        outputs.push(generate_boundary_stub_output(
+            &cwd,
+            &input_path,
+            &schema_file.package.name,
+            &types,
+        )?);
+    }
 
     let report = SchemaDeriveReport {
         schema_version: "x07.schema.derive.report@0.1.0",
@@ -1952,6 +1964,101 @@ fn generate_tests_manifest(_pkg: &str, types: &[TypeDef]) -> Result<GeneratedOut
     })
 }
 
+fn generate_boundary_stub_output(
+    cwd: &Path,
+    input_path: &Path,
+    pkg: &str,
+    types: &[TypeDef],
+) -> Result<GeneratedOutput> {
+    let schema_ref = boundary_stub_schema_ref(cwd, input_path);
+    let mut boundaries = Vec::new();
+    for td in types {
+        let type_mod = derive_type_mod(&td.type_id, td.version)?;
+        let type_tag = type_mod.replace('.', "_");
+        boundaries.push(serde_json::json!({
+            "id": format!("{pkg}.{type_tag}.boundary_v1"),
+            "symbol": format!("{pkg}.boundary.{type_tag}_v1"),
+            "node_id": format!("{}_core", pkg.replace('.', "_")),
+            "kind": "public_function",
+            "from_zone": "verified_core",
+            "to_zone": "verified_core",
+            "worlds_allowed": ["solve-pure"],
+            "input": {
+                "params": [
+                    {
+                        "name": "payload",
+                        "ty": "bytes_view",
+                        "brand": td.brand_id.clone(),
+                        "schema": schema_ref.clone()
+                    }
+                ]
+            },
+            "output": {
+                "ty": "result_bytes",
+                "brand": td.brand_id.clone(),
+                "schema": schema_ref.clone(),
+                "error_space": format!("{pkg}.boundary.{type_tag}_errors_v1")
+            },
+            "smoke": {
+                "entry": format!("tests.boundary.smoke_{type_tag}_v1"),
+                "tests": [format!("smoke/{type_tag}")]
+            },
+            "pbt": {
+                "required": true,
+                "tests": [format!("pbt/{type_tag}")]
+            },
+            "verify": {
+                "required": true,
+                "mode": "prove"
+            }
+        }));
+    }
+
+    let mut value = serde_json::json!({
+        "schema_version": "x07.arch.boundaries.index@0.1.0",
+        "boundaries": boundaries
+    });
+    x07c::x07ast::canon_value_jcs(&mut value);
+    let mut bytes = serde_json::to_vec_pretty(&value)?;
+    if bytes.last() != Some(&b'\n') {
+        bytes.push(b'\n');
+    }
+
+    Ok(GeneratedOutput {
+        rel_path: PathBuf::from("arch").join("boundaries").join(format!(
+            "{}.stub.x07boundary.json",
+            boundary_stub_file_stem(input_path)
+        )),
+        kind: "boundary_stub",
+        bytes,
+    })
+}
+
+fn boundary_stub_schema_ref(cwd: &Path, input_path: &Path) -> String {
+    if let Ok(rel) = input_path.strip_prefix(cwd) {
+        let rel = rel.to_string_lossy().replace('\\', "/");
+        if !rel.is_empty() {
+            return rel;
+        }
+    }
+    input_path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "schema.x07schema.json".to_string())
+}
+
+fn boundary_stub_file_stem(input_path: &Path) -> String {
+    let file_name = input_path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| "schema.x07schema.json".to_string());
+    let trimmed = file_name
+        .strip_suffix(".x07schema.json")
+        .unwrap_or(file_name.as_str());
+    util::safe_artifact_dir_name(trimmed)
+}
+
 fn collect_type_deps(type_index: &TypeIndex, td: &TypeDef) -> Result<BTreeSet<String>> {
     fn walk(
         type_index: &TypeIndex,
@@ -2212,6 +2319,7 @@ fn generate_runtime_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Resul
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            loop_contracts: Vec::new(),
             params: f
                 .params
                 .into_iter()
@@ -2393,6 +2501,7 @@ fn generate_runtime_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            loop_contracts: Vec::new(),
             params: f
                 .params
                 .into_iter()
@@ -2475,6 +2584,7 @@ fn generate_tests_module_struct(type_index: &TypeIndex, td: &TypeDef) -> Result<
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            loop_contracts: Vec::new(),
             params: f
                 .params
                 .into_iter()
@@ -2550,6 +2660,7 @@ fn generate_tests_module_enum(type_index: &TypeIndex, td: &TypeDef) -> Result<Ve
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            loop_contracts: Vec::new(),
             params: f
                 .params
                 .into_iter()

@@ -41,6 +41,8 @@ pub enum InitTemplate {
     SqliteApp,
     PostgresClient,
     Worker,
+    #[value(help = "Certifiable solve-pure project with strict arch/trust scaffolding")]
+    VerifiedCorePure,
     McpServer,
     McpServerStdio,
     McpServerHttp,
@@ -116,6 +118,47 @@ const TEMPLATE_HTTP_CLIENT_MAIN: &[u8] = include_bytes!(concat!(
     "/../../docs/examples/agent-gate/http-client-get/src/main.x07.json"
 ));
 
+const TEMPLATE_VERIFIED_CORE_PURE_README: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/README.md"
+));
+const TEMPLATE_VERIFIED_CORE_PURE_PROJECT: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/x07.json"
+));
+const TEMPLATE_VERIFIED_CORE_PURE_LOCK: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/x07.lock.json"
+));
+const TEMPLATE_VERIFIED_CORE_PURE_SRC_EXAMPLE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/src/example.x07.json"
+));
+const TEMPLATE_VERIFIED_CORE_PURE_SRC_MAIN: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/src/main.x07.json"
+));
+const TEMPLATE_VERIFIED_CORE_PURE_TESTS_MANIFEST: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/tests/tests.json"
+));
+const TEMPLATE_VERIFIED_CORE_PURE_TESTS_CORE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/tests/core.x07.json"
+));
+const TEMPLATE_VERIFIED_CORE_PURE_ARCH_MANIFEST: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/arch/manifest.x07arch.json"
+));
+const TEMPLATE_VERIFIED_CORE_PURE_BOUNDARIES: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/arch/boundaries/index.x07boundary.json"
+));
+const TEMPLATE_VERIFIED_CORE_PURE_PROFILE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/examples/verified_core_pure_v1/arch/trust/profiles/verified_core_pure_v1.json"
+));
+
 fn ensure_trailing_newline(bytes: &[u8]) -> Vec<u8> {
     let mut out = bytes.to_vec();
     if out.last() != Some(&b'\n') {
@@ -163,6 +206,7 @@ fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str]
         InitTemplate::SqliteApp => &["db.core", "db.sqlite", "data.model", "fs.io"],
         InitTemplate::PostgresClient => &["db.core", "db.postgres", "data.model"],
         InitTemplate::Worker => &["log.basic"],
+        InitTemplate::VerifiedCorePure => &[],
         InitTemplate::McpServer
         | InitTemplate::McpServerStdio
         | InitTemplate::McpServerHttp
@@ -179,6 +223,7 @@ fn template_default_profile(template: InitTemplate) -> &'static str {
         | InitTemplate::SqliteApp
         | InitTemplate::PostgresClient
         | InitTemplate::Worker => "sandbox",
+        InitTemplate::VerifiedCorePure => "os",
         InitTemplate::McpServer
         | InitTemplate::McpServerStdio
         | InitTemplate::McpServerHttp
@@ -195,6 +240,7 @@ fn init_template_policy_template(template: InitTemplate) -> crate::policy::Polic
         InitTemplate::SqliteApp => crate::policy::PolicyTemplate::SqliteApp,
         InitTemplate::PostgresClient => crate::policy::PolicyTemplate::PostgresClient,
         InitTemplate::Worker => crate::policy::PolicyTemplate::Worker,
+        InitTemplate::VerifiedCorePure => crate::policy::PolicyTemplate::Worker,
         InitTemplate::McpServer
         | InitTemplate::McpServerStdio
         | InitTemplate::McpServerHttp
@@ -217,11 +263,48 @@ fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> 
         | InitTemplate::SqliteApp
         | InitTemplate::PostgresClient
         | InitTemplate::Worker => Ok((app_module_bytes()?, main_entry_bytes()?)),
+        InitTemplate::VerifiedCorePure => Ok((
+            ensure_trailing_newline(TEMPLATE_VERIFIED_CORE_PURE_SRC_EXAMPLE),
+            ensure_trailing_newline(TEMPLATE_VERIFIED_CORE_PURE_SRC_MAIN),
+        )),
         InitTemplate::McpServer
         | InitTemplate::McpServerStdio
         | InitTemplate::McpServerHttp
         | InitTemplate::McpServerHttpTasks => Ok((app_module_bytes()?, main_entry_bytes()?)),
     }
+}
+
+fn verified_core_pure_template_files() -> &'static [(&'static str, &'static [u8])] {
+    &[
+        ("README.md", TEMPLATE_VERIFIED_CORE_PURE_README),
+        ("x07.json", TEMPLATE_VERIFIED_CORE_PURE_PROJECT),
+        ("x07.lock.json", TEMPLATE_VERIFIED_CORE_PURE_LOCK),
+        (
+            "src/example.x07.json",
+            TEMPLATE_VERIFIED_CORE_PURE_SRC_EXAMPLE,
+        ),
+        ("src/main.x07.json", TEMPLATE_VERIFIED_CORE_PURE_SRC_MAIN),
+        (
+            "tests/tests.json",
+            TEMPLATE_VERIFIED_CORE_PURE_TESTS_MANIFEST,
+        ),
+        (
+            "tests/core.x07.json",
+            TEMPLATE_VERIFIED_CORE_PURE_TESTS_CORE,
+        ),
+        (
+            "arch/manifest.x07arch.json",
+            TEMPLATE_VERIFIED_CORE_PURE_ARCH_MANIFEST,
+        ),
+        (
+            "arch/boundaries/index.x07boundary.json",
+            TEMPLATE_VERIFIED_CORE_PURE_BOUNDARIES,
+        ),
+        (
+            "arch/trust/profiles/verified_core_pure_v1.json",
+            TEMPLATE_VERIFIED_CORE_PURE_PROFILE,
+        ),
+    ]
 }
 
 fn is_mcp_template(template: InitTemplate) -> bool {
@@ -242,6 +325,109 @@ fn mcp_template_name(template: InitTemplate) -> &'static str {
         InitTemplate::McpServerHttpTasks => "mcp-server-http-tasks",
         _ => "unknown",
     }
+}
+
+fn cmd_init_verified_core_pure_template(root: &Path) -> Result<std::process::ExitCode> {
+    let agent_paths = AgentKitPaths::new(root);
+    let mut conflicts = Vec::new();
+    for (rel_path, _) in verified_core_pure_template_files() {
+        let abs = root.join(rel_path);
+        if abs.exists() {
+            conflicts.push((*rel_path).to_string());
+        }
+    }
+    for p in [
+        &agent_paths.toolchain_toml,
+        &agent_paths.agent_docs_dir,
+        &agent_paths.agent_md,
+        &agent_paths.agent_skills_dir,
+    ] {
+        if p.exists() {
+            conflicts.push(rel(root, p));
+        }
+    }
+    if !conflicts.is_empty() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_EXISTS".to_string(),
+                message: format!(
+                    "refusing to overwrite existing paths: {}",
+                    conflicts.join(", ")
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let mut created = Vec::new();
+    for (rel_path, bytes) in verified_core_pure_template_files() {
+        let abs = root.join(rel_path);
+        if let Err(err) = write_new_file(&abs, bytes) {
+            return print_io_error(root, &created, rel_path, err);
+        }
+        created.push(rel(root, &abs));
+    }
+
+    match ensure_gitignore(&root.join(".gitignore")) {
+        Ok(true) => created.push(".gitignore".to_string()),
+        Ok(false) => {}
+        Err(err) => {
+            let report = InitReport {
+                ok: false,
+                command: "init",
+                root: root.display().to_string(),
+                created,
+                notes: Vec::new(),
+                next_steps: Vec::new(),
+                error: Some(InitError {
+                    code: "X07INIT_IO".to_string(),
+                    message: format!("update .gitignore: {err:#}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    }
+
+    if let Err(err) = init_agent_kit(root, &agent_paths, &mut created) {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created,
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_AGENT".to_string(),
+                message: format!("{err:#}"),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let report = InitReport {
+        ok: true,
+        command: "init",
+        root: root.display().to_string(),
+        created,
+        notes: vec!["Generated a certifiable solve-pure trust template.".to_string()],
+        next_steps: vec![
+            "x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry example.main".to_string(),
+            "x07 test --all --manifest tests/tests.json".to_string(),
+            "x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry example.main --out-dir target/cert".to_string(),
+        ],
+        error: None,
+    };
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(std::process::ExitCode::SUCCESS)
 }
 
 fn cmd_init_mcp_template(root: &Path, template: InitTemplate) -> Result<std::process::ExitCode> {
@@ -496,6 +682,9 @@ pub fn cmd_init(
     }
 
     if let Some(template) = args.template {
+        if template == InitTemplate::VerifiedCorePure {
+            return cmd_init_verified_core_pure_template(&root);
+        }
         if is_mcp_template(template) {
             return cmd_init_mcp_template(&root, template);
         }

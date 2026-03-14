@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-arch.boundaries.report.schema.json",
+  "title": "x07.arch.boundaries.report@0.1.0",
+  "description": "Deterministic boundary completeness report emitted during trusted arch and certification checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_path",
+    "index_path",
+    "summary",
+    "boundaries",
+    "missing_exports",
+    "diags"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.arch.boundaries.report@0.1.0" },
+    "manifest_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "index_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundaries_total",
+        "public_exports_total",
+        "covered_exports_total",
+        "missing_exports_total",
+        "invalid_boundaries_total"
+      ],
+      "properties": {
+        "boundaries_total": { "type": "integer", "minimum": 0 },
+        "public_exports_total": { "type": "integer", "minimum": 0 },
+        "covered_exports_total": { "type": "integer", "minimum": 0 },
+        "missing_exports_total": { "type": "integer", "minimum": 0 },
+        "invalid_boundaries_total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "symbol", "node_id", "status", "issues"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "node_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ok", "invalid"]
+          },
+          "issues": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 2048 },
+            "default": []
+          }
+        }
+      },
+      "default": []
+    },
+    "missing_exports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["symbol", "node_id", "module_id", "module_path"],
+        "properties": {
+          "symbol": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "node_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "module_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "module_path": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        }
+      },
+      "default": []
+    },
+    "diags": {
+      "type": "array",
+      "items": { "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/diagnostic" },
+      "default": []
+    }
+  }
+}

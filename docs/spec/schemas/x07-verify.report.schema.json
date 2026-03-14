@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-verify.report.schema.json",
-  "title": "X07 x07 verify report v0.1.0",
+  "title": "X07 x07 verify report v0.2.0",
   "description": "Machine-readable report emitted by `x07 verify`.",
   "type": "object",
   "additionalProperties": false,
@@ -16,12 +16,13 @@
     "exit_code"
   ],
   "properties": {
-    "schema_version": { "const": "x07.verify.report@0.1.0" },
-    "mode": { "type": "string", "enum": ["bmc", "smt"] },
+    "schema_version": { "const": "x07.verify.report@0.2.0" },
+    "mode": { "type": "string", "enum": ["bmc", "smt", "prove", "coverage"] },
     "ok": { "type": "boolean" },
     "entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
     "bounds": { "$ref": "#/$defs/bounds" },
     "result": { "$ref": "#/$defs/result" },
+    "coverage": { "$ref": "https://x07.io/spec/x07-verify.coverage.schema.json" },
     "artifacts": { "$ref": "#/$defs/artifacts" },
     "diagnostics_count": { "type": "integer", "minimum": 0 },
     "diagnostics": {
@@ -52,6 +53,9 @@
           "enum": [
             "verified_within_bounds",
             "counterexample_found",
+            "proven",
+            "coverage_report",
+            "unsupported",
             "inconclusive",
             "tool_missing",
             "error"
@@ -106,5 +110,26 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": { "const": "coverage" },
+          "ok": { "const": true }
+        },
+        "required": ["mode", "ok"]
+      },
+      "then": {
+        "required": ["coverage"],
+        "properties": {
+          "result": {
+            "properties": {
+              "kind": { "const": "coverage_report" }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

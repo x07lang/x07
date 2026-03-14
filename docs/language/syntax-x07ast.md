@@ -44,10 +44,11 @@ The root JSON object must include `schema_version`.
 
 Current schema version:
 
-- `x07.x07ast@0.5.0`
+- `x07.x07ast@0.6.0`
 
 The toolchain also accepts legacy schema versions:
 
+- `x07.x07ast@0.5.0` (programs with function contracts but without loop contracts)
 - `x07.x07ast@0.4.0` (programs without contracts)
 - `x07.x07ast@0.3.0` (concrete-only programs)
 
@@ -91,6 +92,33 @@ Contract expressions and witnesses may only call contract-pure builtins/operator
 - Also allowed: any builtin head with prefix `option_*` or `result_*`.
 
 Module calls (like `foo.bar`) are not allowed in contracts.
+
+## Loop contracts (v0.6)
+
+x07AST v0.6 adds `loop_contracts` on `defn` declarations so proof mode can reason about `for` loops without widening the certifiable subset to recursion.
+
+Each item points at a loop body by JSON Pointer and declares:
+
+- `invariant[]`: clauses that must hold at loop entry and every iteration
+- `decreases[]`: lexicographic rank terms used to prove termination
+
+Minimal shape:
+
+```json
+"loop_contracts": [
+  {
+    "ptr": "/decls/0/body/4",
+    "invariant": [
+      { "id": "i_nonneg", "expr": [">=", "i", 0] }
+    ],
+    "decreases": [
+      { "expr": ["-", "n", "i"] }
+    ]
+  }
+]
+```
+
+Use `x07 verify --prove` with `loop_contracts` when the certified surface needs loops but still fits the current pure, non-recursive proof subset.
 
 ## Branded bytes annotations
 

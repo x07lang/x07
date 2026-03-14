@@ -212,6 +212,15 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("trust") => Some(include_bytes!(
             "../../../spec/x07-tool-trust.report.schema.json"
         )),
+        Some("trust.certify") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-certify.report.schema.json"
+        )),
+        Some("trust.profile") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-profile.report.schema.json"
+        )),
+        Some("trust.profile.check") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-profile-check.report.schema.json"
+        )),
         Some("trust.report") => Some(include_bytes!(
             "../../../spec/x07-tool-trust-report.report.schema.json"
         )),

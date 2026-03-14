@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-trust.certificate.schema.json",
+  "title": "x07.trust.certificate@0.1.0",
+  "description": "Source-free trust certificate emitted by `x07 trust certify`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "verdict",
+    "profile",
+    "entry",
+    "out_dir",
+    "claims",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.trust.certificate@0.1.0" },
+    "verdict": {
+      "type": "string",
+      "enum": ["accepted", "rejected"]
+    },
+    "profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "entry": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "out_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "claims": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+      "default": []
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundaries_report",
+        "coverage_report",
+        "prove_reports",
+        "tests_report",
+        "trust_report",
+        "compile_attestation"
+      ],
+      "properties": {
+        "boundaries_report": { "$ref": "#/$defs/evidence_ref" },
+        "coverage_report": { "$ref": "#/$defs/evidence_ref" },
+        "schema_derive_reports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_ref" },
+          "default": []
+        },
+        "prove_reports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_ref" },
+          "default": []
+        },
+        "tests_report": { "$ref": "#/$defs/evidence_ref" },
+        "trust_report": { "$ref": "#/$defs/evidence_ref" },
+        "compile_attestation": { "$ref": "#/$defs/evidence_ref" },
+        "review_diff": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "bundle_path": {
+          "anyOf": [
+            { "type": "string", "minLength": 1, "maxLength": 4096 },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/diagnostic" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256_hex"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": "x07.verify.primitives@0.1.0",
+  "primitives": [
+    {
+      "symbol": "bytes.empty",
+      "kind": "builtin",
+      "note": "Deterministic empty-bytes constructor used by generated drivers."
+    },
+    {
+      "symbol": "bytes.lit",
+      "kind": "builtin",
+      "note": "Deterministic literal-bytes constructor."
+    },
+    {
+      "symbol": "std.codec.read_u32_le",
+      "kind": "imported",
+      "note": "Pure decoding helper used in verifier drivers."
+    },
+    {
+      "symbol": "std.mcp.auth.bearer_v1.parse_authorization_bearer_v1",
+      "kind": "imported",
+      "note": "Published ext-mcp-auth-core bearer parser treated as an imported validated summary for verified-core wrappers."
+    },
+    {
+      "symbol": "view.slice",
+      "kind": "builtin",
+      "note": "Pure slice view constructor."
+    },
+    {
+      "symbol": "view.to_bytes",
+      "kind": "builtin",
+      "note": "Deterministic bytes materialization for bounded views."
+    }
+  ]
+}

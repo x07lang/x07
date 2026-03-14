@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-verify.coverage.schema.json",
+  "title": "x07.verify.coverage@0.1.0",
+  "description": "Reachable proof-coverage report emitted by `x07 verify --coverage`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "entry", "worlds", "summary", "functions"],
+  "properties": {
+    "schema_version": { "const": "x07.verify.coverage@0.1.0" },
+    "entry": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "worlds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "solve-pure",
+          "solve-fs",
+          "solve-rr",
+          "solve-kv",
+          "solve-full",
+          "run-os",
+          "run-os-sandboxed"
+        ]
+      },
+      "default": []
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reachable_defn",
+        "proven_defn",
+        "trusted_primitives",
+        "uncovered_defn",
+        "unsupported_defn"
+      ],
+      "properties": {
+        "reachable_defn": { "type": "integer", "minimum": 0 },
+        "proven_defn": { "type": "integer", "minimum": 0 },
+        "trusted_primitives": { "type": "integer", "minimum": 0 },
+        "uncovered_defn": { "type": "integer", "minimum": 0 },
+        "unsupported_defn": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "functions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["symbol", "kind", "status"],
+        "properties": {
+          "symbol": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "kind": {
+            "type": "string",
+            "enum": ["defn", "defasync", "extern", "builtin", "imported"]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proven",
+              "trusted_primitive",
+              "unsupported",
+              "uncovered",
+              "runtime_only"
+            ]
+          },
+          "source_path": {
+            "type": ["string", "null"],
+            "maxLength": 4096
+          },
+          "details": { "type": ["string", "null"], "maxLength": 65536 }
+        }
+      },
+      "default": []
+    }
+  }
+}

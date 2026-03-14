@@ -5,7 +5,8 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::Value;
 use x07_contracts::{
-    X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07_PATCHSET_SCHEMA_VERSION,
+    X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+    X07_PATCHSET_SCHEMA_VERSION,
 };
 use x07c::ast::Expr;
 use x07c::diagnostics;
@@ -152,7 +153,9 @@ pub(crate) fn suggest_generics_patchset(input_path: &Path, bytes: &[u8]) -> Resu
     }
 
     if any_change {
-        file.schema_version = if original_version == X07AST_SCHEMA_VERSION_V0_5_0 {
+        file.schema_version = if original_version == X07AST_SCHEMA_VERSION_V0_6_0 {
+            X07AST_SCHEMA_VERSION_V0_6_0.to_string()
+        } else if original_version == X07AST_SCHEMA_VERSION_V0_5_0 {
             X07AST_SCHEMA_VERSION_V0_5_0.to_string()
         } else {
             X07AST_SCHEMA_VERSION_V0_4_0.to_string()

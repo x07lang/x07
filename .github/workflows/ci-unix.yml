@@ -70,3 +70,7 @@ jobs:
       - name: Installer smoke (local channels)
         shell: bash
         run: ./scripts/ci/check_installer_smoke.sh
+
+      - name: Verified core pure smoke
+        shell: bash
+        run: ./scripts/ci/check_verified_core_pure_example.sh

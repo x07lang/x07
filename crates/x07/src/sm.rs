@@ -563,6 +563,7 @@ fn gen_machine_module(
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            loop_contracts: Vec::new(),
             params: f
                 .params
                 .into_iter()
@@ -656,6 +657,7 @@ fn gen_tests_module(
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            loop_contracts: Vec::new(),
             params: f
                 .params
                 .into_iter()

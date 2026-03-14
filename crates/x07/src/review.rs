@@ -51,6 +51,9 @@ pub enum ReviewFailOn {
     BudgetIncrease,
     AllowUnsafe,
     AllowFfi,
+    ProofCoverageDecrease,
+    BoundaryRelaxation,
+    TrustedSubsetExpansion,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -148,6 +151,9 @@ struct Highlights {
     budget_changes: Vec<Value>,
     policy_changes: Vec<Value>,
     capability_changes: Vec<Value>,
+    proof_changes: Vec<Value>,
+    boundary_changes: Vec<Value>,
+    subset_changes: Vec<Value>,
 }
 
 impl Highlights {
@@ -157,6 +163,9 @@ impl Highlights {
             budget_changes: Vec::new(),
             policy_changes: Vec::new(),
             capability_changes: Vec::new(),
+            proof_changes: Vec::new(),
+            boundary_changes: Vec::new(),
+            subset_changes: Vec::new(),
         }
     }
 }
@@ -425,6 +434,14 @@ fn cmd_review_diff(args: ReviewDiffArgs) -> Result<std::process::ExitCode> {
                     &mut ctx,
                     &mut report.highlights,
                 ),
+                "proof" => diff_proof(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
                 "policy" => diff_policy(
                     &rel_str,
                     before_json.as_ref(),
@@ -527,6 +544,21 @@ fn fail_on_triggered(report: &ReviewDiffReport, fail_on: &[ReviewFailOn]) -> boo
                     return true;
                 }
             }
+            ReviewFailOn::ProofCoverageDecrease => {
+                if !report.highlights.proof_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::BoundaryRelaxation => {
+                if !report.highlights.boundary_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::TrustedSubsetExpansion => {
+                if !report.highlights.subset_changes.is_empty() {
+                    return true;
+                }
+            }
         }
     }
     false
@@ -589,6 +621,9 @@ fn push_simple_file_change(
 
 fn classify_file(rel: &str, before: Option<&Value>, after: Option<&Value>) -> &'static str {
     let lower = rel.to_ascii_lowercase();
+    if lower.ends_with("verify.coverage.json") {
+        return "proof";
+    }
     if lower.ends_with(".x07.json") {
         return "x07ast";
     }
@@ -1287,6 +1322,16 @@ fn diff_arch(
     ctx: &mut BuildCtx,
     highlights: &mut Highlights,
 ) {
+    if path.ends_with("index.x07boundary.json") {
+        diff_boundary_index(path, before, after, file_diff, ctx, highlights);
+        return;
+    }
+
+    if path.contains("/trust/profiles/") || path.starts_with("arch/trust/profiles/") {
+        diff_trust_profile(path, before, after, file_diff, ctx, highlights);
+        return;
+    }
+
     if path.ends_with("manifest.x07arch.json") {
         let before_nodes = arch_node_worlds(before);
         let after_nodes = arch_node_worlds(after);
@@ -1330,6 +1375,32 @@ fn diff_arch(
                     "meta": {}
                 }),
             );
+        }
+
+        let before_zones = arch_node_trust_zones(before);
+        let after_zones = arch_node_trust_zones(after);
+        let mut zone_keys: BTreeSet<String> = BTreeSet::new();
+        zone_keys.extend(before_zones.keys().cloned());
+        zone_keys.extend(after_zones.keys().cloned());
+        for node in zone_keys {
+            let b = before_zones.get(&node).cloned();
+            let a = after_zones.get(&node).cloned();
+            if b == a {
+                continue;
+            }
+            if a.as_deref() == Some("verified_core") && b.as_deref() != Some("verified_core") {
+                ctx.push(
+                    &mut highlights.subset_changes,
+                    json!({
+                        "kind": "trusted_subset",
+                        "severity": "high",
+                        "subject": format!("arch trust zone {}", node),
+                        "path": path,
+                        "before": b,
+                        "after": a,
+                    }),
+                );
+            }
         }
         return;
     }
@@ -1394,6 +1465,28 @@ fn arch_node_worlds(v: Option<&Value>) -> BTreeMap<String, String> {
     out
 }
 
+fn arch_node_trust_zones(v: Option<&Value>) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    let Some(v) = v else {
+        return out;
+    };
+    let Some(nodes) = v.get("nodes").and_then(Value::as_array) else {
+        return out;
+    };
+
+    for node in nodes {
+        let Some(node_id) = node.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(zone) = node.get("trust_zone").and_then(Value::as_str) else {
+            continue;
+        };
+        out.insert(node_id.to_string(), zone.to_string());
+    }
+
+    out
+}
+
 fn arch_budget_profiles(v: Option<&Value>) -> BTreeMap<String, Value> {
     let mut out = BTreeMap::new();
     let Some(v) = v else {
@@ -1419,6 +1512,489 @@ fn arch_budget_profiles(v: Option<&Value>) -> BTreeMap<String, Value> {
         );
     }
     out
+}
+
+fn diff_proof(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    let before_summary = proof_summary(before);
+    let after_summary = proof_summary(after);
+    if before_summary == after_summary {
+        return;
+    }
+
+    let decreased = after_summary
+        .get("proven_defn")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        < before_summary
+            .get("proven_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+        || after_summary
+            .get("unsupported_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_summary
+                .get("unsupported_defn")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+        || after_summary
+            .get("uncovered_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_summary
+                .get("uncovered_defn")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+
+    if decreased {
+        ctx.push(
+            &mut highlights.proof_changes,
+            json!({
+                "kind": "proof_coverage",
+                "severity": "high",
+                "subject": "proof coverage summary",
+                "path": path,
+                "before": before_summary,
+                "after": after_summary,
+            }),
+        );
+    }
+
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "proof_changed",
+        if decreased { "high" } else { "info" },
+        "proof coverage changed",
+    );
+}
+
+fn proof_summary(v: Option<&Value>) -> Value {
+    let summary = v
+        .and_then(|doc| doc.get("summary"))
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    json!({
+        "reachable_defn": summary.get("reachable_defn").cloned().unwrap_or(Value::from(0)),
+        "proven_defn": summary.get("proven_defn").cloned().unwrap_or(Value::from(0)),
+        "uncovered_defn": summary.get("uncovered_defn").cloned().unwrap_or(Value::from(0)),
+        "unsupported_defn": summary.get("unsupported_defn").cloned().unwrap_or(Value::from(0)),
+    })
+}
+
+fn diff_boundary_index(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    let before_boundaries = boundary_index_map(before);
+    let after_boundaries = boundary_index_map(after);
+    let mut keys: BTreeSet<String> = BTreeSet::new();
+    keys.extend(before_boundaries.keys().cloned());
+    keys.extend(after_boundaries.keys().cloned());
+
+    for id in keys {
+        let b = before_boundaries.get(&id);
+        let a = after_boundaries.get(&id);
+        if b == a {
+            continue;
+        }
+        if boundary_relaxed(b, a) {
+            ctx.push(
+                &mut highlights.boundary_changes,
+                json!({
+                    "kind": "boundary_contract",
+                    "severity": "high",
+                    "subject": id,
+                    "path": path,
+                    "before": b.cloned().unwrap_or(Value::Null),
+                    "after": a.cloned().unwrap_or(Value::Null),
+                }),
+            );
+        }
+    }
+
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "boundary_changed",
+        if highlights.boundary_changes.is_empty() {
+            "info"
+        } else {
+            "high"
+        },
+        "boundary catalog changed",
+    );
+}
+
+fn boundary_index_map(v: Option<&Value>) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(v) = v else {
+        return out;
+    };
+    let Some(boundaries) = v.get("boundaries").and_then(Value::as_array) else {
+        return out;
+    };
+    for boundary in boundaries {
+        let Some(id) = boundary.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        out.insert(id.to_string(), boundary.clone());
+    }
+    out
+}
+
+fn boundary_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let Some(after) = after else {
+        return before.is_some();
+    };
+    let Some(before) = before else {
+        return false;
+    };
+
+    if bool_relaxed(
+        before.pointer("/verify/required"),
+        after.pointer("/verify/required"),
+    ) || verify_mode_rank(after.pointer("/verify/mode"))
+        < verify_mode_rank(before.pointer("/verify/mode"))
+    {
+        return true;
+    }
+
+    if bool_relaxed(
+        before.pointer("/pbt/required"),
+        after.pointer("/pbt/required"),
+    ) || !allowlist_entries(
+        after
+            .pointer("/worlds_allowed")
+            .unwrap_or(&Value::Array(Vec::new())),
+    )
+    .is_subset(&allowlist_entries(
+        before
+            .pointer("/worlds_allowed")
+            .unwrap_or(&Value::Array(Vec::new())),
+    )) || boundary_test_list_relaxed(
+        before.pointer("/smoke/tests"),
+        after.pointer("/smoke/tests"),
+    ) || boundary_test_list_relaxed(before.pointer("/pbt/tests"), after.pointer("/pbt/tests"))
+    {
+        return true;
+    }
+
+    if before.pointer("/smoke/entry").is_some()
+        && before.pointer("/smoke/entry") != after.pointer("/smoke/entry")
+    {
+        return true;
+    }
+
+    if trust_zone_rank(after.pointer("/from_zone")) < trust_zone_rank(before.pointer("/from_zone"))
+        || trust_zone_rank(after.pointer("/to_zone")) < trust_zone_rank(before.pointer("/to_zone"))
+    {
+        return true;
+    }
+
+    if boundary_output_contract_relaxed(before.pointer("/output"), after.pointer("/output")) {
+        return true;
+    }
+
+    let before_params = boundary_input_param_map(before);
+    let after_params = boundary_input_param_map(after);
+    for (key, before_param) in before_params {
+        let after_param = after_params.get(&key);
+        if boundary_param_contract_relaxed(Some(&before_param), after_param) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn diff_trust_profile(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    let before_subset = trust_profile_subset(before);
+    let after_subset = trust_profile_subset(after);
+    if before_subset == after_subset {
+        return;
+    }
+    if trust_subset_expanded(&before_subset, &after_subset) {
+        ctx.push(
+            &mut highlights.subset_changes,
+            json!({
+                "kind": "trusted_subset",
+                "severity": "high",
+                "subject": "trust profile relaxation",
+                "path": path,
+                "before": before_subset,
+                "after": after_subset,
+            }),
+        );
+    }
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "trust_profile_changed",
+        if highlights.subset_changes.is_empty() {
+            "info"
+        } else {
+            "high"
+        },
+        "trust profile changed",
+    );
+}
+
+fn trust_profile_subset(v: Option<&Value>) -> Value {
+    let lang = v.and_then(|doc| doc.get("language_subset"));
+    let evidence = v.and_then(|doc| doc.get("evidence_requirements"));
+    let arch = v.and_then(|doc| doc.get("arch_requirements"));
+    json!({
+        "claims": v
+            .and_then(|doc| doc.get("claims"))
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new())),
+        "entrypoints": v
+            .and_then(|doc| doc.get("entrypoints"))
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new())),
+        "worlds_allowed": v
+            .and_then(|doc| doc.get("worlds_allowed"))
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new())),
+        "allow_defasync": lang.and_then(|doc| doc.get("allow_defasync")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_recursion": lang.and_then(|doc| doc.get("allow_recursion")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_extern": lang.and_then(|doc| doc.get("allow_extern")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_unsafe": lang.and_then(|doc| doc.get("allow_unsafe")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_ffi": lang.and_then(|doc| doc.get("allow_ffi")).cloned().unwrap_or(Value::Bool(false)),
+        "allow_dynamic_dispatch": lang.and_then(|doc| doc.get("allow_dynamic_dispatch")).cloned().unwrap_or(Value::Bool(false)),
+        "manifest_min_version": arch
+            .and_then(|doc| doc.get("manifest_min_version"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "require_deny_cycles": arch
+            .and_then(|doc| doc.get("require_deny_cycles"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_deny_orphans": arch
+            .and_then(|doc| doc.get("require_deny_orphans"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_visibility": arch
+            .and_then(|doc| doc.get("require_visibility"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_world_caps": arch
+            .and_then(|doc| doc.get("require_world_caps"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_brand_boundaries": arch
+            .and_then(|doc| doc.get("require_brand_boundaries"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_proof_coverage": evidence
+            .and_then(|doc| doc.get("require_proof_coverage"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "require_proof_mode": evidence
+            .and_then(|doc| doc.get("require_proof_mode"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "require_pbt": evidence
+            .and_then(|doc| doc.get("require_pbt"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "require_compile_attestation": evidence
+            .and_then(|doc| doc.get("require_compile_attestation"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_boundary_index": evidence
+            .and_then(|doc| doc.get("require_boundary_index"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_schema_derive_check": evidence
+            .and_then(|doc| doc.get("require_schema_derive_check"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_smoke_harnesses": evidence
+            .and_then(|doc| doc.get("require_smoke_harnesses"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_unit_tests": evidence
+            .and_then(|doc| doc.get("require_unit_tests"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_trust_report_clean": evidence
+            .and_then(|doc| doc.get("require_trust_report_clean"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_sbom": evidence
+            .and_then(|doc| doc.get("require_sbom"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_allowlist_mode": arch
+            .and_then(|doc| doc.get("require_allowlist_mode"))
+            .cloned()
+            .unwrap_or(Value::Bool(false))
+    })
+}
+
+fn trust_subset_expanded(before: &Value, after: &Value) -> bool {
+    for key in ["claims", "entrypoints", "worlds_allowed"] {
+        let before_set = allowlist_entries(before.get(key).unwrap_or(&Value::Null));
+        let after_set = allowlist_entries(after.get(key).unwrap_or(&Value::Null));
+        if !after_set.is_subset(&before_set) {
+            return true;
+        }
+    }
+
+    for key in [
+        "allow_defasync",
+        "allow_recursion",
+        "allow_extern",
+        "allow_unsafe",
+        "allow_ffi",
+        "allow_dynamic_dispatch",
+    ] {
+        if before.get(key).and_then(Value::as_bool) == Some(false)
+            && after.get(key).and_then(Value::as_bool) == Some(true)
+        {
+            return true;
+        }
+    }
+
+    for key in [
+        "require_deny_cycles",
+        "require_deny_orphans",
+        "require_visibility",
+        "require_world_caps",
+        "require_brand_boundaries",
+        "require_compile_attestation",
+        "require_boundary_index",
+        "require_schema_derive_check",
+        "require_smoke_harnesses",
+        "require_unit_tests",
+        "require_trust_report_clean",
+        "require_sbom",
+        "require_allowlist_mode",
+    ] {
+        if before.get(key).and_then(Value::as_bool) == Some(true)
+            && after.get(key).and_then(Value::as_bool) == Some(false)
+        {
+            return true;
+        }
+    }
+
+    if pbt_requirement_rank(after.get("require_pbt"))
+        < pbt_requirement_rank(before.get("require_pbt"))
+        || proof_coverage_rank(after.get("require_proof_coverage"))
+            < proof_coverage_rank(before.get("require_proof_coverage"))
+    {
+        return true;
+    }
+
+    false
+}
+
+fn boundary_input_param_map(v: &Value) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(params) = v.pointer("/input/params").and_then(Value::as_array) else {
+        return out;
+    };
+    for (idx, param) in params.iter().enumerate() {
+        let key = param
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_else(|| idx.to_string());
+        out.insert(key, param.clone());
+    }
+    out
+}
+
+fn boundary_param_contract_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let Some(before) = before else {
+        return false;
+    };
+    let Some(after) = after else {
+        return before.get("brand").is_some() || before.get("schema").is_some();
+    };
+    contract_field_removed(before.get("brand"), after.get("brand"))
+        || contract_field_removed(before.get("schema"), after.get("schema"))
+}
+
+fn boundary_output_contract_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let Some(before) = before else {
+        return false;
+    };
+    let Some(after) = after else {
+        return before.get("brand").is_some()
+            || before.get("schema").is_some()
+            || before.get("error_space").is_some();
+    };
+    contract_field_removed(before.get("brand"), after.get("brand"))
+        || contract_field_removed(before.get("schema"), after.get("schema"))
+        || contract_field_removed(before.get("error_space"), after.get("error_space"))
+}
+
+fn boundary_test_list_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let before_set = allowlist_entries(before.unwrap_or(&Value::Array(Vec::new())));
+    let after_set = allowlist_entries(after.unwrap_or(&Value::Array(Vec::new())));
+    !before_set.is_subset(&after_set)
+}
+
+fn contract_field_removed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    before.is_some() && after.is_none()
+}
+
+fn bool_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    before.and_then(Value::as_bool) == Some(true) && after.and_then(Value::as_bool) == Some(false)
+}
+
+fn verify_mode_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("off") {
+        "prove" => 2,
+        "runtime" => 1,
+        _ => 0,
+    }
+}
+
+fn trust_zone_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("untrusted") {
+        "verified_core" => 2,
+        "test_only" => 1,
+        _ => 0,
+    }
+}
+
+fn pbt_requirement_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("none") {
+        "all" => 3,
+        "all_public_boundaries" => 2,
+        "public_boundaries_only" => 1,
+        _ => 0,
+    }
+}
+
+fn proof_coverage_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("") {
+        "all_reachable_defn" => 2,
+        "all_reachable_user_defn" => 1,
+        _ => 0,
+    }
 }
 
 fn diff_policy(
@@ -1936,6 +2512,17 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
         "Capability Changes",
         &report.highlights.capability_changes,
     );
+    render_change_list(&mut s, "Proof Changes", &report.highlights.proof_changes);
+    render_change_list(
+        &mut s,
+        "Boundary Changes",
+        &report.highlights.boundary_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Trusted Subset Changes",
+        &report.highlights.subset_changes,
+    );
 
     s.push_str("<h2>File Diffs</h2>");
     for file in &report.files {
@@ -2003,6 +2590,9 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
                 ReviewFailOn::BudgetIncrease => "budget-increase",
                 ReviewFailOn::AllowUnsafe => "allow-unsafe",
                 ReviewFailOn::AllowFfi => "allow-ffi",
+                ReviewFailOn::ProofCoverageDecrease => "proof-coverage-decrease",
+                ReviewFailOn::BoundaryRelaxation => "boundary-relaxation",
+                ReviewFailOn::TrustedSubsetExpansion => "trusted-subset-expansion",
             })
             .collect::<Vec<&str>>()
     });
@@ -2046,6 +2636,9 @@ fn review_risk(report: &ReviewDiffReport) -> (&'static str, &'static str, &'stat
         .chain(report.highlights.budget_changes.iter())
         .chain(report.highlights.policy_changes.iter())
         .chain(report.highlights.capability_changes.iter())
+        .chain(report.highlights.proof_changes.iter())
+        .chain(report.highlights.boundary_changes.iter())
+        .chain(report.highlights.subset_changes.iter())
         .any(|v| {
             v.get("severity")
                 .and_then(Value::as_str)

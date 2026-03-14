@@ -8,12 +8,13 @@ It is deterministic and emits machine-readable diagnostics (`x07diag`) plus opti
 
 Supported schema versions:
 
-- Manifest: `arch/manifest.x07arch.json` (`schema_version: "x07.arch.manifest@0.1.0"`)
+- Manifest: `arch/manifest.x07arch.json` (`schema_version: "x07.arch.manifest@0.2.0"`)
 - Lock: `arch/manifest.lock.json` (`schema_version: "x07.arch.manifest.lock@0.1.0"`)
 
 Contracts-by-example (copy/paste):
 
 - `docs/examples/contracts_project/` (copy its `arch/` into your project root)
+- `docs/examples/verified_core_pure_v1/arch/` (strict trust zones + boundary index suitable for `x07 trust certify`)
 
 ## Command
 
@@ -57,6 +58,12 @@ Scan configuration comes from:
 ## Nodes and assignment
 
 `manifest.nodes[]` defines named architecture groups (“nodes”) over modules.
+
+Each node now also declares a `trust_zone`:
+
+- `verified_core`
+- `test_only`
+- `untrusted`
 
 A module belongs to a node if it matches **any** of:
 
@@ -124,6 +131,12 @@ Each node declares a `world` (one of X07’s worlds, for example `solve-pure` or
 If `checks.world_of_imported_v1.enabled=true`, `solve-*` nodes must not depend on `run-os*` nodes.
 
 Violations: `E_ARCH_WORLD_EDGE_FORBIDDEN`.
+
+### Trust zones
+
+`verified_core` nodes may only depend on other `verified_core` nodes.
+
+Violations: `E_ARCH_TRUST_ZONE_EDGE`.
 
 ### Smoke entry contract (v1.1)
 
@@ -198,6 +211,12 @@ If `manifest.contracts_v1` is present, `x07 arch check` can also validate repo-l
   - validates referenced JWT profiles (when declared under the crypto contract group)
 - `contracts_v1.canonical_json` (canonical JSON enforcement)
   - enforces canonical JSON at contract file boundaries (for example, JCS / RFC 8785)
+- `contracts_v1.boundaries` (public boundary contracts)
+  - validates `arch/boundaries/index.x07boundary.json`
+  - requires every public export in a `verified_core` node to be pinned in the boundary index
+  - emits `boundaries_report` inside the arch report for certification flows
+
+When you are preparing a certifiable pure project, start from the `docs/examples/verified_core_pure_v1/arch/` layout and keep the boundary index, smoke entries, and trust zones in the same repo-local `arch/` tree.
 
 ### Cross-contract dependencies
 
@@ -208,6 +227,7 @@ Several contracts validate `budget_profile_id` references against `arch/budgets/
 By default, `x07 arch check` prints a report JSON object to stdout:
 
 - `schema_version: "x07.arch.report@0.1.0"`
+- optional `boundaries_report` when `contracts_v1.boundaries` is enabled
 - `diags[]`: `x07diag` diagnostics (`spec/x07diag.schema.json`)
 - `suggested_patches[]`: multi-file JSON Patch suggestions (optional)
 

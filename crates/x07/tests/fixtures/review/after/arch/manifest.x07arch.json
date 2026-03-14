@@ -7,6 +7,7 @@
       "id": "app",
       "match": { "module_prefixes": ["app."], "path_globs": [] },
       "world": "run-os-sandboxed",
+      "trust_zone": "verified_core",
       "visibility": { "mode": "public", "visible_to": [] },
       "imports": { "deny_prefixes": [], "allow_prefixes": ["std.", "app."] }
     }

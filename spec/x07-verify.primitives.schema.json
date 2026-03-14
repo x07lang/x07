@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-verify.primitives.schema.json",
+  "title": "x07.verify.primitives@0.1.0",
+  "description": "Trusted primitive manifest consumed by proof-coverage and certification flows.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "primitives"],
+  "properties": {
+    "schema_version": { "const": "x07.verify.primitives@0.1.0" },
+    "primitives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["symbol", "kind"],
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["builtin", "imported"]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        }
+      },
+      "default": []
+    }
+  }
+}

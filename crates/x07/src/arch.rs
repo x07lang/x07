@@ -10,25 +10,25 @@ use serde_json::Value;
 use walkdir::WalkDir;
 use x07_contracts::{
     X07_ARCH_ARCHIVE_INDEX_SCHEMA_VERSION, X07_ARCH_ARCHIVE_PROFILE_SCHEMA_VERSION,
-    X07_ARCH_BUDGETS_INDEX_SCHEMA_VERSION, X07_ARCH_CLI_INDEX_SCHEMA_VERSION,
-    X07_ARCH_CLI_PROFILE_SCHEMA_VERSION, X07_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION,
-    X07_ARCH_CRAWL_INDEX_SCHEMA_VERSION, X07_ARCH_CRAWL_POLICY_SCHEMA_VERSION,
-    X07_ARCH_CRYPTO_INDEX_SCHEMA_VERSION, X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_VERSION,
-    X07_ARCH_DB_INDEX_SCHEMA_VERSION, X07_ARCH_DB_QUERIES_SCHEMA_VERSION,
-    X07_ARCH_MANIFEST_LOCK_SCHEMA_VERSION, X07_ARCH_MANIFEST_SCHEMA_VERSION,
-    X07_ARCH_MSG_AMQP_INDEX_SCHEMA_VERSION, X07_ARCH_MSG_AMQP_PROFILE_SCHEMA_VERSION,
-    X07_ARCH_MSG_AMQP_TOPOLOGY_SCHEMA_VERSION, X07_ARCH_MSG_INDEX_SCHEMA_VERSION,
-    X07_ARCH_MSG_KAFKA_INDEX_SCHEMA_VERSION, X07_ARCH_MSG_KAFKA_PROFILE_SCHEMA_VERSION,
-    X07_ARCH_NET_GRPC_SERVICES_SCHEMA_VERSION, X07_ARCH_NET_INDEX_SCHEMA_VERSION,
-    X07_ARCH_OBS_INDEX_SCHEMA_VERSION, X07_ARCH_PATCHSET_SCHEMA_VERSION,
-    X07_ARCH_REPORT_SCHEMA_VERSION, X07_ARCH_RR_INDEX_SCHEMA_VERSION,
-    X07_ARCH_RR_POLICY_SCHEMA_VERSION, X07_ARCH_RR_SANITIZE_SCHEMA_VERSION,
-    X07_ARCH_SM_INDEX_SCHEMA_VERSION, X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION,
-    X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION, X07_ARCH_WEB_API_SCHEMA_VERSION,
-    X07_ARCH_WEB_INDEX_SCHEMA_VERSION, X07_ARCH_WEB_OPENAPI_PROFILE_SCHEMA_VERSION,
-    X07_BUDGET_PROFILE_SCHEMA_VERSION, X07_DB_MIGRATE_PLAN_SCHEMA_VERSION,
-    X07_OBS_EXPORTER_PROFILE_SCHEMA_VERSION, X07_OBS_METRICS_REGISTRY_SCHEMA_VERSION,
-    X07_SM_SPEC_SCHEMA_VERSION,
+    X07_ARCH_BOUNDARIES_REPORT_SCHEMA_VERSION, X07_ARCH_BUDGETS_INDEX_SCHEMA_VERSION,
+    X07_ARCH_CLI_INDEX_SCHEMA_VERSION, X07_ARCH_CLI_PROFILE_SCHEMA_VERSION,
+    X07_ARCH_CONTRACTS_LOCK_SCHEMA_VERSION, X07_ARCH_CRAWL_INDEX_SCHEMA_VERSION,
+    X07_ARCH_CRAWL_POLICY_SCHEMA_VERSION, X07_ARCH_CRYPTO_INDEX_SCHEMA_VERSION,
+    X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_VERSION, X07_ARCH_DB_INDEX_SCHEMA_VERSION,
+    X07_ARCH_DB_QUERIES_SCHEMA_VERSION, X07_ARCH_MANIFEST_LOCK_SCHEMA_VERSION,
+    X07_ARCH_MANIFEST_SCHEMA_VERSION, X07_ARCH_MSG_AMQP_INDEX_SCHEMA_VERSION,
+    X07_ARCH_MSG_AMQP_PROFILE_SCHEMA_VERSION, X07_ARCH_MSG_AMQP_TOPOLOGY_SCHEMA_VERSION,
+    X07_ARCH_MSG_INDEX_SCHEMA_VERSION, X07_ARCH_MSG_KAFKA_INDEX_SCHEMA_VERSION,
+    X07_ARCH_MSG_KAFKA_PROFILE_SCHEMA_VERSION, X07_ARCH_NET_GRPC_SERVICES_SCHEMA_VERSION,
+    X07_ARCH_NET_INDEX_SCHEMA_VERSION, X07_ARCH_OBS_INDEX_SCHEMA_VERSION,
+    X07_ARCH_PATCHSET_SCHEMA_VERSION, X07_ARCH_REPORT_SCHEMA_VERSION,
+    X07_ARCH_RR_INDEX_SCHEMA_VERSION, X07_ARCH_RR_POLICY_SCHEMA_VERSION,
+    X07_ARCH_RR_SANITIZE_SCHEMA_VERSION, X07_ARCH_SM_INDEX_SCHEMA_VERSION,
+    X07_ARCH_STREAM_PLUGINS_INDEX_SCHEMA_VERSION, X07_ARCH_STREAM_PLUGIN_SCHEMA_VERSION,
+    X07_ARCH_WEB_API_SCHEMA_VERSION, X07_ARCH_WEB_INDEX_SCHEMA_VERSION,
+    X07_ARCH_WEB_OPENAPI_PROFILE_SCHEMA_VERSION, X07_BUDGET_PROFILE_SCHEMA_VERSION,
+    X07_DB_MIGRATE_PLAN_SCHEMA_VERSION, X07_OBS_EXPORTER_PROFILE_SCHEMA_VERSION,
+    X07_OBS_METRICS_REGISTRY_SCHEMA_VERSION, X07_SM_SPEC_SCHEMA_VERSION,
 };
 use x07_worlds::WorldId;
 use x07c::diagnostics;
@@ -42,6 +42,8 @@ const X07_ARCH_MANIFEST_LOCK_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-arch.manifest.lock.schema.json");
 const X07_ARCH_CONTRACTS_LOCK_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-arch.contracts.lock.schema.json");
+const X07_ARCH_BOUNDARIES_INDEX_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-arch.boundaries.index.schema.json");
 const X07_ARCH_RR_INDEX_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-arch.rr.index.schema.json");
 const X07_ARCH_RR_POLICY_SCHEMA_BYTES: &[u8] =
@@ -237,10 +239,19 @@ struct ArchNode {
     #[serde(rename = "match")]
     matcher: ArchNodeMatch,
     world: String,
+    trust_zone: ArchTrustZone,
     visibility: ArchNodeVisibility,
     imports: ArchNodeImports,
     #[serde(default)]
     contracts: Option<ArchNodeContracts>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum ArchTrustZone {
+    VerifiedCore,
+    TestOnly,
+    Untrusted,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -345,6 +356,8 @@ struct ArchContractsBudgets {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ArchContractsV1 {
+    #[serde(default)]
+    boundaries: Option<ArchContractsIndexV1>,
     rr: Option<ArchContractsRrV1>,
     sm: Option<ArchContractsSmV1>,
     budgets: Option<ArchContractsBudgetsV1>,
@@ -1414,6 +1427,7 @@ struct NodeMatcher {
     module_prefixes: Vec<String>,
     path_globs: GlobSet,
     world: WorldId,
+    trust_zone: ArchTrustZone,
     visibility: ArchNodeVisibility,
     imports: ArchNodeImports,
     smoke_entry: Option<String>,
@@ -1424,8 +1438,122 @@ struct ArchReport {
     schema_version: &'static str,
     manifest: ArchReportManifest,
     stats: ArchReportStats,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    boundaries_report: Option<ArchBoundariesReport>,
     diags: Vec<diagnostics::Diagnostic>,
     suggested_patches: Vec<ArchPatchTarget>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ArchBoundariesReport {
+    schema_version: &'static str,
+    ok: bool,
+    index_path: String,
+    summary: ArchBoundariesSummary,
+    boundaries: Vec<ArchBoundaryStatus>,
+    diagnostics: Vec<diagnostics::Diagnostic>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+struct ArchBoundariesSummary {
+    boundaries_total: usize,
+    public_exports_scanned: usize,
+    missing_boundaries: usize,
+    missing_smoke: usize,
+    missing_pbt: usize,
+    missing_verify: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ArchBoundaryStatus {
+    id: String,
+    symbol: String,
+    node_id: String,
+    status: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchBoundariesIndex {
+    #[serde(rename = "schema_version")]
+    _schema_version: String,
+    #[serde(default)]
+    boundaries: Vec<ArchBoundaryEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchBoundaryEntry {
+    id: String,
+    symbol: String,
+    node_id: String,
+    #[serde(rename = "kind")]
+    _kind: String,
+    #[serde(rename = "from_zone")]
+    _from_zone: ArchTrustZone,
+    #[serde(rename = "to_zone")]
+    _to_zone: ArchTrustZone,
+    #[serde(rename = "worlds_allowed")]
+    _worlds_allowed: Vec<String>,
+    input: ArchBoundaryInput,
+    output: ArchBoundaryOutput,
+    smoke: ArchBoundarySmoke,
+    pbt: ArchBoundaryPbt,
+    verify: ArchBoundaryVerify,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchBoundaryInput {
+    #[serde(default)]
+    params: Vec<ArchBoundaryParam>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchBoundaryParam {
+    name: String,
+    ty: String,
+    #[serde(default)]
+    brand: Option<String>,
+    #[serde(default)]
+    schema: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchBoundaryOutput {
+    ty: String,
+    #[serde(default)]
+    brand: Option<String>,
+    #[serde(default)]
+    schema: Option<String>,
+    #[serde(default)]
+    error_space: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchBoundarySmoke {
+    #[serde(rename = "entry")]
+    _entry: String,
+    #[serde(default)]
+    tests: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchBoundaryPbt {
+    required: bool,
+    #[serde(default)]
+    tests: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchBoundaryVerify {
+    required: bool,
+    mode: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1587,6 +1715,11 @@ struct ArchCheckOutcome {
     exit_code: std::process::ExitCode,
 }
 
+struct ArchContractsOutcome {
+    lock: Option<ArchContractsLock>,
+    boundaries_report: Option<ArchBoundariesReport>,
+}
+
 fn arch_check_once(
     repo_root: &Path,
     manifest_path: &Path,
@@ -1613,6 +1746,7 @@ fn arch_check_once(
                     module_edges: 0,
                     node_edges: 0,
                 },
+                boundaries_report: None,
                 diags: vec![diag_parse_error(
                     "E_ARCH_MANIFEST_READ",
                     &format!("read manifest: {err}"),
@@ -1642,6 +1776,7 @@ fn arch_check_once(
                     module_edges: 0,
                     node_edges: 0,
                 },
+                boundaries_report: None,
                 diags: vec![diag_budget_exceeded(
                     &format!(
                         "max_bytes_in exceeded while reading manifest ({bytes_in_total} > {max})"
@@ -1673,6 +1808,7 @@ fn arch_check_once(
                     module_edges: 0,
                     node_edges: 0,
                 },
+                boundaries_report: None,
                 diags: vec![diag_parse_error(
                     "E_ARCH_MANIFEST_JSON_PARSE",
                     &format!("parse manifest JSON: {err}"),
@@ -1710,6 +1846,7 @@ fn arch_check_once(
                 module_edges: 0,
                 node_edges: 0,
             },
+            boundaries_report: None,
             diags,
             suggested_patches: Vec::new(),
         };
@@ -1735,6 +1872,7 @@ fn arch_check_once(
                     module_edges: 0,
                     node_edges: 0,
                 },
+                boundaries_report: None,
                 diags: vec![diag_parse_error(
                     "E_ARCH_MANIFEST_INVALID",
                     &format!("parse manifest: {err}"),
@@ -1807,6 +1945,7 @@ fn arch_check_once(
                             module_edges: 0,
                             node_edges: 0,
                         },
+                        boundaries_report: None,
                         diags: vec![diag_parse_error(
                             "E_ARCH_LOCK_READ",
                             &format!("read lock: {err}"),
@@ -1841,6 +1980,7 @@ fn arch_check_once(
                                 module_edges: 0,
                                 node_edges: 0,
                             },
+            boundaries_report: None,
                             diags: vec![diag_budget_exceeded(
                                 &format!(
                                     "max_bytes_in exceeded while reading lock ({bytes_in_total} > {max})"
@@ -1872,6 +2012,7 @@ fn arch_check_once(
                                 module_edges: 0,
                                 node_edges: 0,
                             },
+                            boundaries_report: None,
                             diags: vec![diag_parse_error(
                                 "E_ARCH_LOCK_JSON_PARSE",
                                 &format!("parse lock JSON: {err}"),
@@ -1907,6 +2048,7 @@ fn arch_check_once(
                             module_edges: 0,
                             node_edges: 0,
                         },
+                        boundaries_report: None,
                         diags,
                         suggested_patches: Vec::new(),
                     };
@@ -1932,6 +2074,7 @@ fn arch_check_once(
                                 module_edges: 0,
                                 node_edges: 0,
                             },
+                            boundaries_report: None,
                             diags: vec![diag_parse_error(
                                 "E_ARCH_LOCK_INVALID",
                                 &format!("parse lock: {err}"),
@@ -1991,6 +2134,7 @@ fn arch_check_once(
                 module_edges: 0,
                 node_edges: 0,
             },
+            boundaries_report: None,
             diags: vec![diag_parse_error(
                 "E_ARCH_MANIFEST_INVALID",
                 "duplicate node id in manifest.nodes",
@@ -2022,6 +2166,7 @@ fn arch_check_once(
                         module_edges: 0,
                         node_edges: 0,
                     },
+                    boundaries_report: None,
                     diags: vec![diag_parse_error(
                         "E_ARCH_MANIFEST_INVALID",
                         &format!(
@@ -2054,6 +2199,7 @@ fn arch_check_once(
                         module_edges: 0,
                         node_edges: 0,
                     },
+                    boundaries_report: None,
                     diags: vec![diag_parse_error(
                         "E_ARCH_MANIFEST_INVALID",
                         &format!("invalid node match glob (node={}): {err}", node.id),
@@ -2073,6 +2219,7 @@ fn arch_check_once(
             module_prefixes: node.matcher.module_prefixes.clone(),
             path_globs,
             world,
+            trust_zone: node.trust_zone.clone(),
             visibility: node.visibility.clone(),
             imports: node.imports.clone(),
             smoke_entry: node.contracts.as_ref().map(|c| c.smoke_entry.clone()),
@@ -2098,6 +2245,7 @@ fn arch_check_once(
                         module_edges: 0,
                         node_edges: 0,
                     },
+                    boundaries_report: None,
                     diags: vec![diag_parse_error(
                         "E_ARCH_LOCK_INVALID",
                         &format!("lock unusable: {err}"),
@@ -2157,6 +2305,7 @@ fn arch_check_once(
                     module_edges: 0,
                     node_edges: 0,
                 },
+                boundaries_report: None,
                 diags: vec![diag_parse_error(
                     "E_ARCH_LOCK_INVALID",
                     &format!("invalid module_scan.include_globs: {err}"),
@@ -2186,6 +2335,7 @@ fn arch_check_once(
                     module_edges: 0,
                     node_edges: 0,
                 },
+                boundaries_report: None,
                 diags: vec![diag_parse_error(
                     "E_ARCH_LOCK_INVALID",
                     &format!("invalid module_scan.exclude_globs: {err}"),
@@ -2262,6 +2412,7 @@ fn arch_check_once(
                 module_edges: 0,
                 node_edges: 0,
             },
+            boundaries_report: None,
             diags: diags.diags,
             suggested_patches: Vec::new(),
         };
@@ -2359,6 +2510,7 @@ fn arch_check_once(
                 module_edges: 0,
                 node_edges: 0,
             },
+            boundaries_report: None,
             diags: diags.diags,
             suggested_patches: Vec::new(),
         };
@@ -2615,6 +2767,7 @@ fn arch_check_once(
                 module_edges: module_edges.len(),
                 node_edges: node_edges.len(),
             },
+            boundaries_report: None,
             diags: diags.diags,
             suggested_patches: Vec::new(),
         };
@@ -2856,6 +3009,44 @@ fn arch_check_once(
         }
     }
 
+    for (from, to) in &node_edges {
+        let Some(from_node) = node_by_id.get(from) else {
+            continue;
+        };
+        let Some(to_node) = node_by_id.get(to) else {
+            continue;
+        };
+        if from_node.trust_zone == ArchTrustZone::VerifiedCore
+            && to_node.trust_zone != ArchTrustZone::VerifiedCore
+        {
+            let mut data = BTreeMap::new();
+            data.insert("node_from".to_string(), Value::String(from.clone()));
+            data.insert("node_to".to_string(), Value::String(to.clone()));
+            data.insert(
+                "from_zone".to_string(),
+                serde_json::to_value(&from_node.trust_zone).unwrap_or(Value::Null),
+            );
+            data.insert(
+                "to_zone".to_string(),
+                serde_json::to_value(&to_node.trust_zone).unwrap_or(Value::Null),
+            );
+            if let Some(ev) = node_edge_evidence.get(&(from.clone(), to.clone())) {
+                data.insert(
+                    "module_path".to_string(),
+                    Value::String(ev.module_path.clone()),
+                );
+                data.insert("module_id".to_string(), Value::String(ev.module_id.clone()));
+                data.insert("import".to_string(), Value::String(ev.import.clone()));
+            }
+            diags.push(diag_lint_error(
+                "E_ARCH_TRUST_ZONE_EDGE",
+                "verified_core nodes may only depend on verified_core nodes",
+                None,
+                data,
+            ));
+        }
+    }
+
     // smoke_entry contract (v1.1)
     for node in node_by_id.values() {
         let Some(smoke_entry) = &node.smoke_entry else {
@@ -2913,8 +3104,9 @@ fn arch_check_once(
 
     // contracts checks (v1 + v1.1)
     let mut contracts_lock: Option<ArchContractsLock> = None;
+    let mut boundaries_report: Option<ArchBoundariesReport> = None;
     if let Some(contracts) = &manifest.contracts_v1 {
-        contracts_lock = check_contracts_v1(
+        let contracts_outcome = check_contracts_v1(
             repo_root,
             manifest_path,
             &budgets,
@@ -2926,6 +3118,8 @@ fn arch_check_once(
             &mut diags,
             &mut suggested,
         )?;
+        contracts_lock = contracts_outcome.lock;
+        boundaries_report = contracts_outcome.boundaries_report;
     }
 
     if !external_imports_not_allowed.is_empty() {
@@ -3056,6 +3250,7 @@ fn arch_check_once(
             module_edges: module_edges.len(),
             node_edges: node_edges.len(),
         },
+        boundaries_report,
         diags: out_diags.clone(),
         suggested_patches: suggested_patches.clone(),
     };
@@ -3159,7 +3354,7 @@ fn check_contracts_v1(
     node_by_id: &BTreeMap<String, NodeMatcher>,
     diags: &mut DiagSink,
     suggested: &mut BTreeMap<String, ArchPatchTarget>,
-) -> Result<Option<ArchContractsLock>> {
+) -> Result<ArchContractsOutcome> {
     if contracts.canonical_json.mode.trim() != "jcs_rfc8785_v1" {
         let mut data = BTreeMap::new();
         data.insert(
@@ -3172,7 +3367,10 @@ fn check_contracts_v1(
             None,
             data,
         ));
-        return Ok(None);
+        return Ok(ArchContractsOutcome {
+            lock: None,
+            boundaries_report: None,
+        });
     }
 
     #[derive(Default)]
@@ -3307,6 +3505,259 @@ fn check_contracts_v1(
             _ => {}
         }
         diags.push(d);
+    }
+
+    let mut boundaries_report: Option<ArchBoundariesReport> = None;
+    if let Some(boundaries_cfg) = &contracts.boundaries {
+        let mut boundary_diags: Vec<diagnostics::Diagnostic> = Vec::new();
+        let mut summary = ArchBoundariesSummary::default();
+        let mut statuses: Vec<ArchBoundaryStatus> = Vec::new();
+
+        if let Some((_path, index_rel, doc)) = load_contract_json_enforced(
+            repo_root,
+            budgets,
+            &mut budget_state,
+            diags,
+            &boundaries_cfg.enforce,
+            &boundaries_cfg.index_path,
+            "E_ARCH_BOUNDARY_INDEX_INVALID",
+            "E_ARCH_BOUNDARY_INDEX_INVALID",
+        )? {
+            let schema_diags = validate_schema(
+                "E_ARCH_BOUNDARY_INDEX_INVALID",
+                X07_ARCH_BOUNDARIES_INDEX_SCHEMA_BYTES,
+                &doc,
+            )?;
+            for diag in schema_diags {
+                boundary_diags.push(diag.clone());
+                push_contract_diag(diags, &boundaries_cfg.enforce, diag);
+            }
+            if boundary_diags.is_empty() {
+                match serde_json::from_value::<ArchBoundariesIndex>(doc.clone()) {
+                    Ok(index) => {
+                        indexes.insert("boundaries".to_string(), lock_entry_for_doc(&doc)?);
+                        files.insert(index_rel.clone(), lock_entry_for_doc(&doc)?);
+                        summary.boundaries_total = index.boundaries.len();
+                        let by_symbol: BTreeMap<String, &ArchBoundaryEntry> = index
+                            .boundaries
+                            .iter()
+                            .map(|entry| (entry.symbol.clone(), entry))
+                            .collect();
+
+                        for entry in &index.boundaries {
+                            let mut status = "ok".to_string();
+                            let mut entry_diags: Vec<diagnostics::Diagnostic> = Vec::new();
+
+                            for param in &entry.input.params {
+                                if boundary_ty_is_bytesish(&param.ty)
+                                    && param.brand.is_none()
+                                    && param.schema.is_none()
+                                {
+                                    let mut data = BTreeMap::new();
+                                    data.insert(
+                                        "boundary_id".to_string(),
+                                        Value::String(entry.id.clone()),
+                                    );
+                                    data.insert(
+                                        "symbol".to_string(),
+                                        Value::String(entry.symbol.clone()),
+                                    );
+                                    data.insert(
+                                        "param".to_string(),
+                                        Value::String(param.name.clone()),
+                                    );
+                                    entry_diags.push(diag_lint_error(
+                                        "E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED",
+                                        "bytes-like boundary params require a brand or schema",
+                                        Some(&boundaries_cfg.index_path),
+                                        data,
+                                    ));
+                                    status = "invalid".to_string();
+                                }
+                            }
+                            if boundary_ty_is_bytesish(&entry.output.ty)
+                                && entry.output.brand.is_none()
+                                && entry.output.schema.is_none()
+                            {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "boundary_id".to_string(),
+                                    Value::String(entry.id.clone()),
+                                );
+                                data.insert(
+                                    "symbol".to_string(),
+                                    Value::String(entry.symbol.clone()),
+                                );
+                                entry_diags.push(diag_lint_error(
+                                    "E_ARCH_BOUNDARY_BRAND_OR_SCHEMA_REQUIRED",
+                                    "bytes-like boundary outputs require a brand or schema",
+                                    Some(&boundaries_cfg.index_path),
+                                    data,
+                                ));
+                                status = "invalid".to_string();
+                            }
+                            if boundary_ty_is_resultish(&entry.output.ty)
+                                && entry.output.error_space.is_none()
+                            {
+                                let mut data = BTreeMap::new();
+                                data.insert(
+                                    "boundary_id".to_string(),
+                                    Value::String(entry.id.clone()),
+                                );
+                                data.insert(
+                                    "symbol".to_string(),
+                                    Value::String(entry.symbol.clone()),
+                                );
+                                entry_diags.push(diag_lint_error(
+                                    "E_ARCH_BOUNDARY_ERROR_SPACE_REQUIRED",
+                                    "result-like boundary outputs require an error_space",
+                                    Some(&boundaries_cfg.index_path),
+                                    data,
+                                ));
+                                status = "invalid".to_string();
+                            }
+                            if entry.smoke.tests.is_empty() {
+                                summary.missing_smoke += 1;
+                                status = "missing_smoke".to_string();
+                            }
+                            if entry.pbt.required && entry.pbt.tests.is_empty() {
+                                summary.missing_pbt += 1;
+                                status = "missing_pbt".to_string();
+                            }
+                            if !entry.verify.required || entry.verify.mode != "prove" {
+                                summary.missing_verify += 1;
+                                entry_diags.push(diag_lint_error(
+                                    "E_ARCH_BOUNDARY_VERIFY_REQUIRED",
+                                    "boundaries must require prove-mode verification",
+                                    Some(&boundaries_cfg.index_path),
+                                    BTreeMap::from([
+                                        (
+                                            "boundary_id".to_string(),
+                                            Value::String(entry.id.clone()),
+                                        ),
+                                        ("symbol".to_string(), Value::String(entry.symbol.clone())),
+                                    ]),
+                                ));
+                                status = if status == "ok" {
+                                    "missing_verify".to_string()
+                                } else {
+                                    status
+                                };
+                            }
+
+                            for diag in entry_diags {
+                                boundary_diags.push(diag.clone());
+                                push_contract_diag(diags, &boundaries_cfg.enforce, diag);
+                            }
+                            statuses.push(ArchBoundaryStatus {
+                                id: entry.id.clone(),
+                                symbol: entry.symbol.clone(),
+                                node_id: entry.node_id.clone(),
+                                status,
+                            });
+                        }
+
+                        for (module_id, module) in modules_by_id {
+                            let Some(node_id) = module_to_node.get(module_id) else {
+                                continue;
+                            };
+                            let Some(node) = node_by_id.get(node_id) else {
+                                continue;
+                            };
+                            if node.visibility.mode.trim() != "public"
+                                || node.trust_zone != ArchTrustZone::VerifiedCore
+                            {
+                                continue;
+                            }
+                            for function in &module.parsed.functions {
+                                if !module.parsed.exports.contains(&function.name) {
+                                    continue;
+                                }
+                                summary.public_exports_scanned += 1;
+                                if !by_symbol.contains_key(&function.name) {
+                                    summary.missing_boundaries += 1;
+                                    let mut data = BTreeMap::new();
+                                    data.insert(
+                                        "symbol".to_string(),
+                                        Value::String(function.name.clone()),
+                                    );
+                                    data.insert(
+                                        "node_id".to_string(),
+                                        Value::String(node_id.clone()),
+                                    );
+                                    data.insert(
+                                        "module_path".to_string(),
+                                        Value::String(module.rel_path.clone()),
+                                    );
+                                    let diag = diag_lint_error(
+                                        "E_ARCH_BOUNDARY_MISSING",
+                                        "public verified_core export is missing from boundaries index",
+                                        Some(&module.rel_path),
+                                        data,
+                                    );
+                                    boundary_diags.push(diag.clone());
+                                    push_contract_diag(diags, &boundaries_cfg.enforce, diag);
+                                }
+                            }
+                            for function in &module.parsed.async_functions {
+                                if !module.parsed.exports.contains(&function.name) {
+                                    continue;
+                                }
+                                summary.public_exports_scanned += 1;
+                                if !by_symbol.contains_key(&function.name) {
+                                    summary.missing_boundaries += 1;
+                                    let mut data = BTreeMap::new();
+                                    data.insert(
+                                        "symbol".to_string(),
+                                        Value::String(function.name.clone()),
+                                    );
+                                    data.insert(
+                                        "node_id".to_string(),
+                                        Value::String(node_id.clone()),
+                                    );
+                                    data.insert(
+                                        "module_path".to_string(),
+                                        Value::String(module.rel_path.clone()),
+                                    );
+                                    let diag = diag_lint_error(
+                                        "E_ARCH_BOUNDARY_MISSING",
+                                        "public verified_core export is missing from boundaries index",
+                                        Some(&module.rel_path),
+                                        data,
+                                    );
+                                    boundary_diags.push(diag.clone());
+                                    push_contract_diag(diags, &boundaries_cfg.enforce, diag);
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        let diag = diag_parse_error(
+                            "E_ARCH_BOUNDARY_INDEX_INVALID",
+                            &format!("parse boundaries index: {err}"),
+                            Some(&boundaries_cfg.index_path),
+                        );
+                        boundary_diags.push(diag.clone());
+                        push_contract_diag(diags, &boundaries_cfg.enforce, diag);
+                    }
+                }
+            }
+        }
+
+        statuses.sort_by(|a, b| {
+            (&a.node_id, &a.symbol, &a.id, &a.status)
+                .cmp(&(&b.node_id, &b.symbol, &b.id, &b.status))
+        });
+        boundaries_report = Some(ArchBoundariesReport {
+            schema_version: X07_ARCH_BOUNDARIES_REPORT_SCHEMA_VERSION,
+            ok: boundary_diags
+                .iter()
+                .all(|diag| diag.severity != diagnostics::Severity::Error),
+            index_path: boundaries_cfg.index_path.clone(),
+            summary,
+            boundaries: statuses,
+            diagnostics: boundary_diags,
+        });
     }
 
     fn load_contract_json_enforced(
@@ -5580,7 +6031,10 @@ fn check_contracts_v1(
                                     diags,
                                     sql_bytes.len(),
                                 ) {
-                                    return Ok(None);
+                                    return Ok(ArchContractsOutcome {
+                                        lock: None,
+                                        boundaries_report: boundaries_report.clone(),
+                                    });
                                 }
 
                                 let got = util::sha256_hex(&sql_bytes);
@@ -5657,7 +6111,10 @@ fn check_contracts_v1(
                                         diags,
                                         down_bytes.len(),
                                     ) {
-                                        return Ok(None);
+                                        return Ok(ArchContractsOutcome {
+                                            lock: None,
+                                            boundaries_report: boundaries_report.clone(),
+                                        });
                                     }
                                     if !step.down_sha256_hex.is_empty() {
                                         let got = util::sha256_hex(&down_bytes);
@@ -6052,7 +6509,10 @@ fn check_contracts_v1(
                                 diags,
                                 proto_bytes.len(),
                             ) {
-                                return Ok(None);
+                                return Ok(ArchContractsOutcome {
+                                    lock: None,
+                                    boundaries_report: boundaries_report.clone(),
+                                });
                             }
                         }
                     }
@@ -6137,7 +6597,10 @@ fn check_contracts_v1(
                         }
                     };
                     if !bump_contract_budget(budgets, &mut budget_state, diags, key_bytes.len()) {
-                        return Ok(None);
+                        return Ok(ArchContractsOutcome {
+                            lock: None,
+                            boundaries_report: boundaries_report.clone(),
+                        });
                     }
                 }
 
@@ -6682,7 +7145,10 @@ fn check_contracts_v1(
     };
 
     if write_lock {
-        return Ok(Some(contracts_lock_doc));
+        return Ok(ArchContractsOutcome {
+            lock: Some(contracts_lock_doc),
+            boundaries_report,
+        });
     }
 
     let contracts_lock_path = repo_root.join("arch/contracts.lock.json");
@@ -6691,7 +7157,10 @@ fn check_contracts_v1(
         let lock_bytes = std::fs::read(&contracts_lock_path)
             .with_context(|| format!("read contracts lock: {}", contracts_lock_path.display()))?;
         if !bump_contract_budget(budgets, &mut budget_state, diags, lock_bytes.len()) {
-            return Ok(Some(contracts_lock_doc));
+            return Ok(ArchContractsOutcome {
+                lock: Some(contracts_lock_doc),
+                boundaries_report,
+            });
         }
         let lock_value: Value = match serde_json::from_slice(&lock_bytes) {
             Ok(v) => v,
@@ -6701,7 +7170,10 @@ fn check_contracts_v1(
                     &format!("parse contracts lock JSON: {err}"),
                     Some(&lock_rel),
                 ));
-                return Ok(Some(contracts_lock_doc));
+                return Ok(ArchContractsOutcome {
+                    lock: Some(contracts_lock_doc),
+                    boundaries_report,
+                });
             }
         };
 
@@ -6722,7 +7194,10 @@ fn check_contracts_v1(
                     &format!("parse contracts lock: {err}"),
                     Some(&lock_rel),
                 ));
-                return Ok(Some(contracts_lock_doc));
+                return Ok(ArchContractsOutcome {
+                    lock: Some(contracts_lock_doc),
+                    boundaries_report,
+                });
             }
         };
 
@@ -6786,7 +7261,10 @@ fn check_contracts_v1(
     // Ensure `contracts_v1` stays anchored to the manifest (arch-check is invoked on it).
     let _ = manifest_path;
 
-    Ok(Some(contracts_lock_doc))
+    Ok(ArchContractsOutcome {
+        lock: Some(contracts_lock_doc),
+        boundaries_report,
+    })
 }
 
 fn fn_body_is_budget_scope_from_arch(profile_id: &str, body: &x07c::ast::Expr) -> bool {
@@ -7519,6 +7997,23 @@ fn is_bytesish(ty: &x07c::x07ast::TypeRef) -> bool {
                 | x07c::types::Ty::ResultResultBytes
         )
     )
+}
+
+fn boundary_ty_is_bytesish(ty: &str) -> bool {
+    matches!(
+        ty,
+        "bytes"
+            | "bytes_view"
+            | "option_bytes"
+            | "option_bytes_view"
+            | "result_bytes"
+            | "result_bytes_view"
+            | "result_result_bytes"
+    )
+}
+
+fn boundary_ty_is_resultish(ty: &str) -> bool {
+    ty.starts_with("result_")
 }
 
 fn orphan_node_value(module_id: &str, module_path: &str) -> Value {

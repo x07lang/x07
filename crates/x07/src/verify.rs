@@ -1,12 +1,16 @@
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::Args;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use x07_contracts::{X07_VERIFY_CEX_SCHEMA_VERSION, X07_VERIFY_REPORT_SCHEMA_VERSION};
+use x07_contracts::{
+    X07_VERIFY_CEX_SCHEMA_VERSION, X07_VERIFY_COVERAGE_SCHEMA_VERSION,
+    X07_VERIFY_PRIMITIVES_SCHEMA_VERSION, X07_VERIFY_REPORT_SCHEMA_VERSION,
+};
 use x07_worlds::WorldId;
 
 use crate::report_common;
@@ -15,21 +19,37 @@ use crate::util;
 
 const X07_VERIFY_REPORT_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-verify.report.schema.json");
+const X07_VERIFY_COVERAGE_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-verify.coverage.schema.json");
 const X07_VERIFY_CEX_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07.verify.cex@0.1.0.schema.json");
+const X07_VERIFY_PRIMITIVES_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-verify.primitives.schema.json");
+const X07_VERIFY_PRIMITIVES_CATALOG_BYTES: &[u8] =
+    include_bytes!("../../../catalog/verify_primitives.json");
+const X07DIAG_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07diag.schema.json");
 
 const VERIFY_INPUT_BUF_NAME: &str = "x07_verify_input";
 const VERIFY_HARNESS_FN: &str = "x07_verify_harness";
+const Z3_TIMEOUT_SECONDS: u64 = 10;
 
 #[derive(Debug, Clone, Args)]
 pub struct VerifyArgs {
     /// Bounded model checking via CBMC (compile-to-C + assertions).
-    #[arg(long, conflicts_with = "smt")]
+    #[arg(long, conflicts_with_all = ["smt", "prove", "coverage"])]
     pub bmc: bool,
 
     /// Emit an SMT-LIB2 formula (via CBMC) and optionally solve with Z3.
-    #[arg(long, conflicts_with = "bmc")]
+    #[arg(long, conflicts_with_all = ["bmc", "prove", "coverage"])]
     pub smt: bool,
+
+    /// Attempt an unbounded proof for a certifiable pure target via the SMT flow.
+    #[arg(long, conflicts_with_all = ["bmc", "smt", "coverage"])]
+    pub prove: bool,
+
+    /// Emit a lightweight coverage summary for the requested entry target.
+    #[arg(long, conflicts_with_all = ["bmc", "smt", "prove"])]
+    pub coverage: bool,
 
     /// Fully qualified function name to verify (must include a '.' module separator).
     #[arg(long, value_name = "SYM")]
@@ -65,6 +85,8 @@ pub struct VerifyArgs {
 enum Mode {
     Bmc,
     Smt,
+    Prove,
+    Coverage,
 }
 
 impl Mode {
@@ -72,6 +94,8 @@ impl Mode {
         match self {
             Mode::Bmc => "bmc",
             Mode::Smt => "smt",
+            Mode::Prove => "prove",
+            Mode::Coverage => "coverage",
         }
     }
 }
@@ -119,6 +143,74 @@ struct Artifacts {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct VerifyCoverage {
+    schema_version: &'static str,
+    entry: String,
+    worlds: Vec<String>,
+    summary: VerifyCoverageSummary,
+    functions: Vec<VerifyCoverageFunction>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct VerifyCoverageSummary {
+    reachable_defn: u64,
+    proven_defn: u64,
+    trusted_primitives: u64,
+    uncovered_defn: u64,
+    unsupported_defn: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct VerifyCoverageFunction {
+    symbol: String,
+    kind: String,
+    status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VerifyPrimitiveCatalog {
+    schema_version: String,
+    primitives: Vec<VerifyPrimitiveEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VerifyPrimitiveEntry {
+    symbol: String,
+    kind: String,
+    #[allow(dead_code)]
+    note: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct TrustedPrimitiveStub {
+    symbol: String,
+    params: Vec<String>,
+    result: String,
+}
+
+#[derive(Debug, Clone)]
+struct CoverageModule {
+    alias_map: BTreeMap<String, String>,
+    decls: BTreeMap<String, CoverageDecl>,
+}
+
+#[derive(Debug, Clone)]
+struct CoverageDecl {
+    kind: String,
+    params: Vec<String>,
+    has_contracts: bool,
+    body: Option<Value>,
+    contract_exprs: Vec<Value>,
+    source_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct VerifyReport {
     schema_version: &'static str,
     mode: &'static str,
@@ -126,6 +218,8 @@ struct VerifyReport {
     entry: String,
     bounds: Bounds,
     result: VerifyResult,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    coverage: Option<VerifyCoverage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     artifacts: Option<Artifacts>,
     diagnostics_count: u64,
@@ -159,16 +253,15 @@ pub fn cmd_verify(
     machine: &crate::reporting::MachineArgs,
     args: VerifyArgs,
 ) -> Result<std::process::ExitCode> {
-    let mode = if args.smt { Mode::Smt } else { Mode::Bmc };
-    let bounds0 = Bounds {
-        unwind: args.unwind,
-        max_bytes_len: args.max_bytes_len,
-        input_len_bytes: 0,
-    };
+    let mode = selected_mode(&args).unwrap_or(Mode::Bmc);
+    let bounds0 = Bounds::for_args(&args);
     let entry = args.entry.clone();
 
-    if !args.bmc && !args.smt {
-        let d = diag_verify("X07V_EARGS", "set exactly one of --bmc or --smt");
+    if mode_count(&args) != 1 {
+        let d = diag_verify(
+            "X07V_EARGS",
+            "set exactly one of --bmc, --smt, --prove, or --coverage",
+        );
         return write_report_and_exit(machine, VerifyReport::error(mode, &entry, bounds0, d, 1));
     }
 
@@ -225,66 +318,33 @@ fn cmd_verify_inner(
             );
         }
     };
-    if target.is_async {
-        let msg = "x07 verify does not support defasync targets (use a defn wrapper)";
-        let d = diag_verify("X07V_UNSUPPORTED_ASYNC", msg);
-        return write_report_and_exit(
-            machine,
-            VerifyReport::error(
-                mode,
-                &args.entry,
-                Bounds {
-                    unwind: args.unwind,
-                    max_bytes_len: args.max_bytes_len,
-                    input_len_bytes: 0,
-                },
-                d,
-                1,
-            ),
-        );
+
+    if mode == Mode::Coverage {
+        return cmd_verify_coverage(machine, &args, project_path.as_deref(), &target);
     }
 
-    if !target.has_contracts {
-        let msg = "target function has no requires/ensures/invariant clauses";
-        let d = diag_verify("X07V_NO_CONTRACTS", msg);
-        return write_report_and_exit(
-            machine,
-            VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
-        );
-    }
-
-    if contains_direct_recursion(&target.body, &args.entry) {
-        let msg = "x07 verify v0.1 does not support recursive targets";
-        let d = diag_verify("X07V_UNSUPPORTED_RECURSION", msg);
-        return write_report_and_exit(
-            machine,
-            VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
-        );
-    }
-
-    if let Some(msg) = find_for_with_non_literal_bounds(&target.body) {
-        return write_report_and_exit(
-            machine,
-            VerifyReport::error(
-                mode,
-                &args.entry,
-                Bounds::for_args(&args),
-                diag_verify("X07V_UNSUPPORTED_FOR_BOUNDS", msg),
-                1,
-            ),
-        );
-    }
-
-    let input_len_bytes = match compute_input_len_bytes(&target, args.max_bytes_len) {
-        Ok(v) => v,
-        Err(err) => {
-            let d = diag_verify("X07V_UNSUPPORTED_PARAM", err.to_string());
+    if mode == Mode::Prove {
+        if let Some((code, msg)) =
+            prove_unsupported_reason(&target, &args.entry, args.max_bytes_len)
+        {
             return write_report_and_exit(
                 machine,
-                VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
+                VerifyReport::unsupported(mode, &args.entry, Bounds::for_args(&args), code, msg, 2),
             );
         }
-    };
+    } else if let Some(d) = verify_precheck_diag(&target, &args.entry, args.max_bytes_len) {
+        return write_report_and_exit(
+            machine,
+            VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
+        );
+    }
+
+    let input_len_bytes = compute_input_len_bytes(&target, args.max_bytes_len).map_err(|err| {
+        anyhow::anyhow!(
+            "internal verify precheck mismatch for {:?}: {err}",
+            args.entry
+        )
+    })?;
     let bounds = Bounds {
         unwind: args.unwind,
         max_bytes_len: args.max_bytes_len,
@@ -305,6 +365,11 @@ fn cmd_verify_inner(
             .join("verify")
             .join("smt")
             .join(util::safe_artifact_dir_name(&args.entry)),
+        Mode::Prove => artifact_base
+            .join("verify")
+            .join("prove")
+            .join(util::safe_artifact_dir_name(&args.entry)),
+        Mode::Coverage => unreachable!("coverage returns before artifact generation"),
     };
     std::fs::create_dir_all(&work_dir)
         .with_context(|| format!("create artifact dir: {}", work_dir.display()))?;
@@ -315,7 +380,35 @@ fn cmd_verify_inner(
         .with_context(|| format!("write verify driver: {}", driver_path.display()))?;
     artifacts.driver_path = Some(driver_path.display().to_string());
 
-    let c_src = compile_driver_to_c(&driver_src, &module_roots)?;
+    let trusted_primitive_stubs = if mode == Mode::Prove {
+        trusted_primitive_stubs_for_prove(&args, project_path.as_deref(), &target, &module_roots)?
+    } else {
+        Vec::new()
+    };
+
+    let c_src = match compile_driver_to_c(&driver_src, &module_roots) {
+        Ok(v) => v,
+        Err(err) if mode == Mode::Prove => {
+            return write_report_and_exit(
+                machine,
+                VerifyReport::unsupported(
+                    mode,
+                    &args.entry,
+                    bounds,
+                    "X07V_PROVE_UNSUPPORTED",
+                    format!("target is outside the certifiable pure subset: {err}"),
+                    2,
+                )
+                .with_artifacts(artifacts),
+            );
+        }
+        Err(err) => return Err(err),
+    };
+    let c_src = if mode == Mode::Prove {
+        apply_trusted_primitive_stubs(&c_src, &trusted_primitive_stubs)?
+    } else {
+        c_src
+    };
     let c_with_harness = format!("{c_src}\n\n{}\n", build_c_harness(bounds.input_len_bytes));
     let c_path = work_dir.join("verify.c");
     util::write_atomic(&c_path, c_with_harness.as_bytes())
@@ -324,7 +417,10 @@ fn cmd_verify_inner(
 
     match mode {
         Mode::Bmc => cmd_verify_bmc(machine, &args, bounds, &work_dir, &c_path, artifacts),
-        Mode::Smt => cmd_verify_smt(machine, &args, bounds, &work_dir, &c_path, artifacts),
+        Mode::Smt | Mode::Prove => {
+            cmd_verify_smt(machine, &args, bounds, &work_dir, &c_path, artifacts, mode)
+        }
+        Mode::Coverage => unreachable!("coverage returns before solver dispatch"),
     }
 }
 
@@ -476,6 +572,7 @@ fn cmd_verify_bmc(
             contract: Some(contract_failure.payload),
             details: None,
         },
+        coverage: None,
         artifacts: Some(artifacts),
         diagnostics_count: 0,
         diagnostics: Vec::new(),
@@ -491,13 +588,17 @@ fn cmd_verify_smt(
     work_dir: &Path,
     c_path: &Path,
     mut artifacts: Artifacts,
+    mode: Mode,
 ) -> Result<std::process::ExitCode> {
     if !command_exists("cbmc") {
-        let msg = "cbmc is required for `x07 verify --smt` (install: `brew install cbmc` or see https://diffblue.github.io/cbmc/)";
+        let msg = format!(
+            "cbmc is required for `x07 verify --{}` (install: `brew install cbmc` or see https://diffblue.github.io/cbmc/)",
+            mode.as_str()
+        );
         let d = diag_verify("X07V_ECBMC_MISSING", msg);
         return write_report_and_exit(
             machine,
-            VerifyReport::tool_missing(Mode::Smt, &args.entry, bounds, d, artifacts, 1),
+            VerifyReport::tool_missing(mode, &args.entry, bounds, d, artifacts, 1),
         );
     }
 
@@ -527,7 +628,7 @@ fn cmd_verify_smt(
         let d = diag_verify("X07V_ECBMC_SMT2", diag_msg);
         return write_report_and_exit(
             machine,
-            VerifyReport::error(Mode::Smt, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+            VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
         );
     }
 
@@ -536,10 +637,11 @@ fn cmd_verify_smt(
         let d = diag_verify("X07V_ECBMC_STDERR", format!("cbmc wrote to stderr: {msg}"));
         return write_report_and_exit(
             machine,
-            VerifyReport::error(Mode::Smt, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+            VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
         );
     }
 
+    normalize_smt2_logic_for_z3(&smt2_path)?;
     artifacts.smt2_path = Some(smt2_path.display().to_string());
 
     if !command_exists("z3") {
@@ -547,11 +649,12 @@ fn cmd_verify_smt(
         let d = diag_verify("X07V_EZ3_MISSING", msg);
         return write_report_and_exit(
             machine,
-            VerifyReport::inconclusive(Mode::Smt, &args.entry, bounds, d, artifacts, 2),
+            VerifyReport::inconclusive(mode, &args.entry, bounds, d, artifacts, 2),
         );
     }
 
     let z3_out = Command::new("z3")
+        .arg(format!("-T:{Z3_TIMEOUT_SECONDS}"))
         .arg("-smt2")
         .arg(&smt2_path)
         .output()
@@ -562,7 +665,7 @@ fn cmd_verify_smt(
         let d = diag_verify("X07V_EZ3_RUN", format!("z3 failed: {msg}"));
         return write_report_and_exit(
             machine,
-            VerifyReport::error(Mode::Smt, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+            VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
         );
     }
 
@@ -576,12 +679,16 @@ fn cmd_verify_smt(
     match status {
         "unsat" => write_report_and_exit(
             machine,
-            VerifyReport::verified(Mode::Smt, &args.entry, bounds, artifacts),
+            if mode == Mode::Prove {
+                VerifyReport::proven(&args.entry, bounds, artifacts)
+            } else {
+                VerifyReport::verified(mode, &args.entry, bounds, artifacts)
+            },
         ),
         "sat" => write_report_and_exit(
             machine,
             VerifyReport::counterexample_found(
-                Mode::Smt,
+                mode,
                 &args.entry,
                 bounds,
                 diag_verify("X07V_SMT_SAT", "solver reported SAT (counterexample found)"),
@@ -592,7 +699,7 @@ fn cmd_verify_smt(
         other => write_report_and_exit(
             machine,
             VerifyReport::inconclusive(
-                Mode::Smt,
+                mode,
                 &args.entry,
                 bounds,
                 diag_verify("X07V_SMT_UNKNOWN", format!("solver returned {other:?}")),
@@ -601,6 +708,44 @@ fn cmd_verify_smt(
             ),
         ),
     }
+}
+
+fn normalize_smt2_logic_for_z3(path: &Path) -> Result<()> {
+    let raw = std::fs::read(path).with_context(|| format!("read smt2: {}", path.display()))?;
+    let text = String::from_utf8(raw).context("SMT2 output is not valid UTF-8")?;
+    let has_quantifiers = text.contains("(forall") || text.contains("(exists");
+
+    let mut changed = false;
+    let mut lines = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("(get-") {
+            changed = true;
+            continue;
+        }
+        if has_quantifiers && !changed {
+            if trimmed.starts_with("(set-logic QF_") {
+                let prefix_len = line.len() - trimmed.len();
+                let indent = &line[..prefix_len];
+                let rest = trimmed.trim_start_matches("(set-logic QF_");
+                lines.push(format!("{indent}(set-logic {rest}"));
+                changed = true;
+                continue;
+            }
+        }
+        lines.push(line.to_string());
+    }
+
+    if !changed {
+        return Ok(());
+    }
+
+    let mut normalized = lines.join("\n");
+    if text.ends_with('\n') {
+        normalized.push('\n');
+    }
+    util::write_atomic(path, normalized.as_bytes())
+        .with_context(|| format!("rewrite smt2 logic: {}", path.display()))
 }
 
 fn resolve_project_manifest(cwd: &Path, explicit: Option<&Path>) -> Result<Option<PathBuf>> {
@@ -680,27 +825,20 @@ fn resolve_artifact_base_dir(
 #[derive(Debug, Clone)]
 struct TargetSig {
     params: Vec<String>,
+    result: String,
     is_async: bool,
     has_contracts: bool,
     body: Value,
+    source_path: PathBuf,
 }
 
 fn load_target_info(module_roots: &[PathBuf], entry: &str) -> Result<TargetSig> {
     let (module_id, _) = entry.rsplit_once('.').context("--entry must contain '.'")?;
-    let rel = format!("{}.x07.json", module_id.replace('.', "/"));
-    let mut found: Option<PathBuf> = None;
-    for root in module_roots {
-        let cand = root.join(&rel);
-        if cand.is_file() {
-            found = Some(cand);
-            break;
-        }
-    }
-    let path = found
-        .with_context(|| format!("could not resolve module {module_id:?} (looked for {rel:?})"))?;
-    let bytes = std::fs::read(&path).with_context(|| format!("read module: {}", path.display()))?;
-    let doc: Value = serde_json::from_slice(&bytes)
-        .with_context(|| format!("parse module JSON: {}", path.display()))?;
+    let source =
+        x07c::module_source::load_module_source(module_id, WorldId::SolvePure, module_roots)
+            .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
+    let doc: Value = serde_json::from_str(&source.src)
+        .with_context(|| format!("parse module JSON for {module_id:?}"))?;
 
     let decls = doc
         .get("decls")
@@ -731,16 +869,230 @@ fn load_target_info(module_roots: &[PathBuf], entry: &str) -> Result<TargetSig> 
         let body = d.get("body").cloned().context("defn missing body")?;
         return Ok(TargetSig {
             params: out,
+            result: d
+                .get("result")
+                .and_then(Value::as_str)
+                .context("defn missing result")?
+                .to_string(),
             is_async: kind == "defasync",
             has_contracts,
             body,
+            source_path: source
+                .path
+                .clone()
+                .unwrap_or_else(|| PathBuf::from(format!("{module_id}.x07.json"))),
         });
     }
 
-    anyhow::bail!(
-        "could not find function {entry:?} in module {}",
-        path.display()
-    )
+    anyhow::bail!("could not find function {entry:?} in resolved module {module_id:?}")
+}
+
+fn load_coverage_module<'a>(
+    module_roots: &[PathBuf],
+    world: WorldId,
+    module_id: &str,
+    cache: &'a mut BTreeMap<String, CoverageModule>,
+) -> Result<&'a CoverageModule> {
+    if !cache.contains_key(module_id) {
+        let source = x07c::module_source::load_module_source(module_id, world, module_roots)
+            .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
+        let doc: Value = serde_json::from_str(&source.src)
+            .with_context(|| format!("parse module JSON for {module_id:?}"))?;
+
+        let imports = doc
+            .get("imports")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let mut alias_map = BTreeMap::new();
+        let local_alias = module_id.rsplit('.').next().unwrap_or(module_id);
+        alias_map.insert(local_alias.to_string(), module_id.to_string());
+        for import in imports {
+            let Some(import) = import.as_str() else {
+                continue;
+            };
+            let alias = import.rsplit('.').next().unwrap_or(import);
+            alias_map
+                .entry(alias.to_string())
+                .or_insert_with(|| import.to_string());
+        }
+
+        let decls = doc
+            .get("decls")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let mut out_decls = BTreeMap::new();
+        for decl in decls {
+            let Some(kind) = decl.get("kind").and_then(Value::as_str) else {
+                continue;
+            };
+            if kind != "defn" && kind != "defasync" && kind != "extern" {
+                continue;
+            }
+            let Some(name) = decl.get("name").and_then(Value::as_str) else {
+                continue;
+            };
+            let params = decl
+                .get("params")
+                .and_then(Value::as_array)
+                .map(|params| {
+                    params
+                        .iter()
+                        .filter_map(|p| p.get("ty").and_then(Value::as_str))
+                        .map(str::to_string)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            out_decls.insert(
+                name.to_string(),
+                CoverageDecl {
+                    kind: kind.to_string(),
+                    params,
+                    has_contracts: has_any_contracts(&decl),
+                    body: decl.get("body").cloned(),
+                    contract_exprs: collect_contract_exprs(&decl),
+                    source_path: source
+                        .path
+                        .clone()
+                        .unwrap_or_else(|| PathBuf::from(format!("{module_id}.x07.json"))),
+                },
+            );
+        }
+
+        cache.insert(
+            module_id.to_string(),
+            CoverageModule {
+                alias_map,
+                decls: out_decls,
+            },
+        );
+    }
+
+    Ok(cache.get(module_id).expect("coverage module inserted"))
+}
+
+fn load_verify_primitive_catalog() -> Result<BTreeMap<String, String>> {
+    let doc: Value = serde_json::from_slice(X07_VERIFY_PRIMITIVES_CATALOG_BYTES)
+        .context("parse catalog/verify_primitives.json")?;
+    let diags = report_common::validate_schema(
+        X07_VERIFY_PRIMITIVES_SCHEMA_BYTES,
+        "spec/x07-verify.primitives.schema.json",
+        &doc,
+    )?;
+    if !diags.is_empty() {
+        anyhow::bail!(
+            "verify primitives catalog is not schema-valid: {}",
+            diags[0].message
+        );
+    }
+    let catalog: VerifyPrimitiveCatalog =
+        serde_json::from_value(doc).context("decode verify primitives catalog")?;
+    if catalog.schema_version.trim() != X07_VERIFY_PRIMITIVES_SCHEMA_VERSION {
+        anyhow::bail!(
+            "verify primitives schema_version mismatch: expected {:?} got {:?}",
+            X07_VERIFY_PRIMITIVES_SCHEMA_VERSION,
+            catalog.schema_version
+        );
+    }
+
+    let mut out = BTreeMap::new();
+    for primitive in catalog.primitives {
+        out.insert(primitive.symbol, primitive.kind);
+    }
+    Ok(out)
+}
+
+fn enqueue_decl_refs(
+    module_id: &str,
+    module: &CoverageModule,
+    decl: &CoverageDecl,
+    queue: &mut VecDeque<String>,
+) {
+    if let Some(body) = decl.body.as_ref() {
+        collect_decl_refs(module_id, module, body, queue);
+    }
+    for expr in &decl.contract_exprs {
+        collect_decl_refs(module_id, module, expr, queue);
+    }
+}
+
+fn collect_decl_refs(
+    module_id: &str,
+    module: &CoverageModule,
+    value: &Value,
+    queue: &mut VecDeque<String>,
+) {
+    match value {
+        Value::Array(items) => {
+            if let Some(head) = items.first().and_then(Value::as_str) {
+                if head == "tapp" {
+                    if let Some(callee) = items.get(1).and_then(Value::as_str) {
+                        if let Some(resolved) =
+                            resolve_ref_symbol(module_id, &module.alias_map, callee)
+                        {
+                            queue.push_back(resolved);
+                        }
+                    }
+                } else {
+                    if let Some(resolved) = resolve_ref_symbol(module_id, &module.alias_map, head) {
+                        queue.push_back(resolved);
+                    }
+                    if head.ends_with(".fn_v1") {
+                        if let Some(callee) = items.get(1).and_then(Value::as_str) {
+                            if let Some(resolved) =
+                                resolve_ref_symbol(module_id, &module.alias_map, callee)
+                            {
+                                queue.push_back(resolved);
+                            }
+                        }
+                    }
+                }
+            }
+            for item in items {
+                collect_decl_refs(module_id, module, item, queue);
+            }
+        }
+        Value::Object(obj) => {
+            for child in obj.values() {
+                collect_decl_refs(module_id, module, child, queue);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn resolve_ref_symbol(
+    module_id: &str,
+    alias_map: &BTreeMap<String, String>,
+    raw: &str,
+) -> Option<String> {
+    let (prefix, suffix) = raw.rsplit_once('.')?;
+    if prefix == module_id || prefix.contains('.') {
+        return Some(raw.to_string());
+    }
+    alias_map
+        .get(prefix)
+        .map(|target| format!("{target}.{suffix}"))
+        .or_else(|| Some(raw.to_string()))
+}
+
+fn collect_contract_exprs(defn: &Value) -> Vec<Value> {
+    let mut out = Vec::new();
+    for key in ["requires", "ensures", "invariant"] {
+        let Some(clauses) = defn.get(key).and_then(Value::as_array) else {
+            continue;
+        };
+        for clause in clauses {
+            if let Some(expr) = clause.get("expr") {
+                out.push(expr.clone());
+            }
+            if let Some(witness) = clause.get("witness").and_then(Value::as_array) {
+                out.extend(witness.iter().cloned());
+            }
+        }
+    }
+    out
 }
 
 fn compute_input_len_bytes(sig: &TargetSig, max_bytes_len: u32) -> Result<u32> {
@@ -758,6 +1110,348 @@ fn compute_input_len_bytes(sig: &TargetSig, max_bytes_len: u32) -> Result<u32> {
         anyhow::bail!("verify input encoding too large: {total} bytes");
     }
     Ok(total as u32)
+}
+
+fn prove_unsupported_reason(
+    target: &TargetSig,
+    entry: &str,
+    max_bytes_len: u32,
+) -> Option<(&'static str, String)> {
+    if target.is_async {
+        return Some((
+            "X07V_UNSUPPORTED_ASYNC",
+            "x07 verify --prove does not support defasync targets (use a defn wrapper)".to_string(),
+        ));
+    }
+    if !target.has_contracts {
+        return Some((
+            "X07V_NO_CONTRACTS",
+            "target function has no requires/ensures/invariant clauses".to_string(),
+        ));
+    }
+    if contains_direct_recursion(&target.body, entry) {
+        return Some((
+            "X07V_UNSUPPORTED_RECURSION",
+            "x07 verify v0.1 does not support recursive targets".to_string(),
+        ));
+    }
+    if let Some(msg) = find_for_with_non_literal_bounds(&target.body) {
+        return Some(("X07V_UNSUPPORTED_FOR_BOUNDS", msg));
+    }
+    if let Err(err) = compute_input_len_bytes(target, max_bytes_len) {
+        return Some(("X07V_UNSUPPORTED_PARAM", err.to_string()));
+    }
+    None
+}
+
+fn verify_precheck_diag(
+    target: &TargetSig,
+    entry: &str,
+    max_bytes_len: u32,
+) -> Option<x07c::diagnostics::Diagnostic> {
+    if target.is_async {
+        return Some(diag_verify(
+            "X07V_UNSUPPORTED_ASYNC",
+            "x07 verify does not support defasync targets (use a defn wrapper)",
+        ));
+    }
+    let (code, msg) = prove_unsupported_reason(target, entry, max_bytes_len)?;
+    Some(diag_verify(code, msg))
+}
+
+fn cmd_verify_coverage(
+    machine: &crate::reporting::MachineArgs,
+    args: &VerifyArgs,
+    project_path: Option<&Path>,
+    target: &TargetSig,
+) -> Result<std::process::ExitCode> {
+    let coverage = match coverage_report_for_entry(args, project_path, target) {
+        Ok(coverage) => coverage,
+        Err(err) => coverage_report_fallback(
+            &args.entry,
+            project_path,
+            target,
+            args.max_bytes_len,
+            Some(format!("could not materialize reachable closure: {err:#}")),
+        ),
+    };
+    write_report_and_exit(
+        machine,
+        VerifyReport::coverage_report(&args.entry, Bounds::for_args(args), coverage),
+    )
+}
+
+fn coverage_worlds(project_path: Option<&Path>) -> Vec<String> {
+    let Some(project_path) = project_path else {
+        return vec![WorldId::SolvePure.as_str().to_string()];
+    };
+    match x07c::project::load_project_manifest(project_path) {
+        Ok(manifest) if !manifest.world.trim().is_empty() => vec![manifest.world],
+        _ => vec![WorldId::SolvePure.as_str().to_string()],
+    }
+}
+
+fn coverage_world(project_path: Option<&Path>) -> WorldId {
+    coverage_worlds(project_path)
+        .first()
+        .and_then(|world| WorldId::parse(world))
+        .unwrap_or(WorldId::SolvePure)
+}
+
+fn coverage_function_for_target(
+    entry: &str,
+    target: &TargetSig,
+    max_bytes_len: u32,
+) -> VerifyCoverageFunction {
+    let (kind, status, details) = if target.is_async {
+        (
+            "defasync".to_string(),
+            "runtime_only".to_string(),
+            Some(
+                "defasync targets are runtime-only and are not certifiable by x07 verify"
+                    .to_string(),
+            ),
+        )
+    } else if !target.has_contracts {
+        (
+            "defn".to_string(),
+            "uncovered".to_string(),
+            Some("target function has no requires/ensures/invariant clauses".to_string()),
+        )
+    } else if let Some((_, msg)) = prove_unsupported_reason(target, entry, max_bytes_len) {
+        ("defn".to_string(), "unsupported".to_string(), Some(msg))
+    } else {
+        ("defn".to_string(), "proven".to_string(), None)
+    };
+
+    VerifyCoverageFunction {
+        symbol: entry.to_string(),
+        kind,
+        status,
+        source_path: Some(target.source_path.display().to_string()),
+        details,
+    }
+}
+
+fn coverage_report_for_entry(
+    args: &VerifyArgs,
+    project_path: Option<&Path>,
+    _target: &TargetSig,
+) -> Result<VerifyCoverage> {
+    let cwd = std::env::current_dir().context("get cwd")?;
+    let module_roots = resolve_module_roots(&cwd, project_path, &args.module_root)?;
+    let world = coverage_world(project_path);
+    let primitive_catalog = load_verify_primitive_catalog()?;
+    let mut module_cache: BTreeMap<String, CoverageModule> = BTreeMap::new();
+    let mut queue = VecDeque::from([args.entry.clone()]);
+    let mut visited = BTreeSet::new();
+    let mut functions = BTreeMap::new();
+
+    while let Some(symbol) = queue.pop_front() {
+        if !visited.insert(symbol.clone()) {
+            continue;
+        }
+
+        if let Some(kind) = primitive_catalog.get(&symbol) {
+            functions.insert(
+                symbol.clone(),
+                VerifyCoverageFunction {
+                    symbol,
+                    kind: kind.clone(),
+                    status: "trusted_primitive".to_string(),
+                    source_path: None,
+                    details: None,
+                },
+            );
+            continue;
+        }
+
+        let Some((module_id, _)) = symbol.rsplit_once('.') else {
+            functions.insert(
+                symbol.clone(),
+                VerifyCoverageFunction {
+                    symbol,
+                    kind: "imported".to_string(),
+                    status: "unsupported".to_string(),
+                    source_path: None,
+                    details: Some("symbol is not fully qualified".to_string()),
+                },
+            );
+            continue;
+        };
+
+        let module = match load_coverage_module(&module_roots, world, module_id, &mut module_cache)
+        {
+            Ok(module) => module,
+            Err(_err) if is_builtin_like_symbol(&symbol) => {
+                functions.insert(
+                    symbol.clone(),
+                    VerifyCoverageFunction {
+                        symbol,
+                        kind: "builtin".to_string(),
+                        status: "trusted_primitive".to_string(),
+                        source_path: None,
+                        details: None,
+                    },
+                );
+                continue;
+            }
+            Err(err) => {
+                functions.insert(
+                    symbol.clone(),
+                    VerifyCoverageFunction {
+                        symbol,
+                        kind: "imported".to_string(),
+                        status: "unsupported".to_string(),
+                        source_path: None,
+                        details: Some(err.to_string()),
+                    },
+                );
+                continue;
+            }
+        };
+        let Some(decl) = module.decls.get(&symbol) else {
+            if is_builtin_like_symbol(&symbol) {
+                functions.insert(
+                    symbol.clone(),
+                    VerifyCoverageFunction {
+                        symbol,
+                        kind: "builtin".to_string(),
+                        status: "trusted_primitive".to_string(),
+                        source_path: None,
+                        details: None,
+                    },
+                );
+                continue;
+            }
+            functions.insert(
+                symbol.clone(),
+                VerifyCoverageFunction {
+                    symbol,
+                    kind: "imported".to_string(),
+                    status: "unsupported".to_string(),
+                    source_path: None,
+                    details: Some(
+                        "referenced symbol could not be resolved in the loaded module graph"
+                            .to_string(),
+                    ),
+                },
+            );
+            continue;
+        };
+
+        functions.insert(
+            symbol.clone(),
+            coverage_function_for_decl(&symbol, decl, args.max_bytes_len),
+        );
+        enqueue_decl_refs(module_id, module, decl, &mut queue);
+    }
+
+    let functions = functions.into_values().collect::<Vec<_>>();
+    Ok(VerifyCoverage {
+        schema_version: X07_VERIFY_COVERAGE_SCHEMA_VERSION,
+        entry: args.entry.clone(),
+        worlds: coverage_worlds(project_path),
+        summary: summarize_coverage_functions(&functions),
+        functions,
+    })
+}
+
+fn coverage_report_fallback(
+    entry: &str,
+    project_path: Option<&Path>,
+    target: &TargetSig,
+    max_bytes_len: u32,
+    extra_details: Option<String>,
+) -> VerifyCoverage {
+    let mut function = coverage_function_for_target(entry, target, max_bytes_len);
+    match extra_details {
+        Some(details) if function.status == "proven" => {
+            function.status = "unsupported".to_string();
+            function.details = Some(details);
+        }
+        Some(details) if function.details.is_none() => {
+            function.details = Some(details);
+        }
+        _ => {}
+    }
+    let functions = vec![function];
+    VerifyCoverage {
+        schema_version: X07_VERIFY_COVERAGE_SCHEMA_VERSION,
+        entry: entry.to_string(),
+        worlds: coverage_worlds(project_path),
+        summary: summarize_coverage_functions(&functions),
+        functions,
+    }
+}
+
+fn coverage_function_for_decl(
+    symbol: &str,
+    decl: &CoverageDecl,
+    max_bytes_len: u32,
+) -> VerifyCoverageFunction {
+    let source_path = Some(decl.source_path.display().to_string());
+    match decl.kind.as_str() {
+        "defasync" => VerifyCoverageFunction {
+            symbol: symbol.to_string(),
+            kind: "defasync".to_string(),
+            status: "runtime_only".to_string(),
+            source_path,
+            details: Some(
+                "defasync targets are runtime-only and are not certifiable by x07 verify"
+                    .to_string(),
+            ),
+        },
+        "extern" => VerifyCoverageFunction {
+            symbol: symbol.to_string(),
+            kind: "extern".to_string(),
+            status: "unsupported".to_string(),
+            source_path,
+            details: Some(
+                "extern declarations are outside the certifiable pure subset".to_string(),
+            ),
+        },
+        _ => {
+            let body = decl.body.clone().unwrap_or(Value::Null);
+            let target = TargetSig {
+                params: decl.params.clone(),
+                result: "i32".to_string(),
+                is_async: false,
+                has_contracts: decl.has_contracts,
+                body,
+                source_path: decl.source_path.clone(),
+            };
+            coverage_function_for_target(symbol, &target, max_bytes_len)
+        }
+    }
+}
+
+fn summarize_coverage_functions(functions: &[VerifyCoverageFunction]) -> VerifyCoverageSummary {
+    VerifyCoverageSummary {
+        reachable_defn: functions.iter().filter(|f| f.kind == "defn").count() as u64,
+        proven_defn: functions
+            .iter()
+            .filter(|f| f.kind == "defn" && f.status == "proven")
+            .count() as u64,
+        trusted_primitives: functions
+            .iter()
+            .filter(|f| f.status == "trusted_primitive")
+            .count() as u64,
+        uncovered_defn: functions
+            .iter()
+            .filter(|f| f.kind == "defn" && f.status == "uncovered")
+            .count() as u64,
+        unsupported_defn: functions
+            .iter()
+            .filter(|f| f.kind == "defn" && f.status == "unsupported")
+            .count() as u64,
+    }
+}
+
+fn is_builtin_like_symbol(symbol: &str) -> bool {
+    symbol
+        .rsplit_once('.')
+        .is_some_and(|(prefix, _)| !prefix.contains('.'))
 }
 
 fn build_verify_driver_x07ast_json(
@@ -866,9 +1560,186 @@ fn compile_driver_to_c(driver_src: &[u8], module_roots: &[PathBuf]) -> Result<St
     Ok(out.c_src)
 }
 
+fn trusted_primitive_stubs_for_prove(
+    args: &VerifyArgs,
+    project_path: Option<&Path>,
+    target: &TargetSig,
+    module_roots: &[PathBuf],
+) -> Result<Vec<TrustedPrimitiveStub>> {
+    let coverage = coverage_report_for_entry(args, project_path, target)?;
+    let mut out = Vec::new();
+    for function in coverage.functions {
+        if function.kind != "imported" || function.status != "trusted_primitive" {
+            continue;
+        }
+        let sig = load_target_info(module_roots, &function.symbol)?;
+        out.push(TrustedPrimitiveStub {
+            symbol: function.symbol,
+            params: sig.params,
+            result: sig.result,
+        });
+    }
+    Ok(out)
+}
+
+fn c_user_fn_name(name: &str) -> String {
+    let mut out = String::with_capacity(name.len() + 8);
+    out.push_str("user_");
+    for ch in name.chars() {
+        match ch {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => out.push(ch),
+            '.' => out.push('_'),
+            _ => out.push('_'),
+        }
+    }
+    out
+}
+
+fn trusted_primitive_stub_body(stub: &TrustedPrimitiveStub) -> Result<String> {
+    let mut lines = Vec::new();
+    lines.push("  (void)ctx;".to_string());
+    lines.push("  (void)input;".to_string());
+    for (idx, _) in stub.params.iter().enumerate() {
+        lines.push(format!("  (void)p{idx};"));
+    }
+    match stub.result.as_str() {
+        "i32" | "u32" => {
+            lines.push("  return UINT32_C(0);".to_string());
+        }
+        "bytes" => {
+            lines.push("  return (bytes_t){ .ptr = NULL, .len = UINT32_C(0) };".to_string());
+        }
+        "bytes_view" => {
+            lines.push("  return (bytes_view_t){ .ptr = NULL, .len = UINT32_C(0) };".to_string());
+        }
+        "option_i32" => {
+            lines.push("  option_i32_t out;".to_string());
+            lines.push("  memset(&out, 0, sizeof(out));".to_string());
+            lines.push("  return out;".to_string());
+        }
+        "option_bytes" => {
+            lines.push("  option_bytes_t out;".to_string());
+            lines.push("  memset(&out, 0, sizeof(out));".to_string());
+            lines.push("  return out;".to_string());
+        }
+        "option_bytes_view" => {
+            lines.push("  option_bytes_view_t out;".to_string());
+            lines.push("  memset(&out, 0, sizeof(out));".to_string());
+            lines.push("  return out;".to_string());
+        }
+        "result_i32" => {
+            lines.push("  result_i32_t out;".to_string());
+            lines.push("  memset(&out, 0, sizeof(out));".to_string());
+            lines.push("  return out;".to_string());
+        }
+        "result_bytes" => {
+            lines.push("  result_bytes_t out;".to_string());
+            lines.push("  memset(&out, 0, sizeof(out));".to_string());
+            lines.push("  return out;".to_string());
+        }
+        "result_bytes_view" => {
+            lines.push("  result_bytes_view_t out;".to_string());
+            lines.push("  memset(&out, 0, sizeof(out));".to_string());
+            lines.push("  return out;".to_string());
+        }
+        other => {
+            anyhow::bail!(
+                "trusted primitive prove stub does not support result type {other:?} for {:?}",
+                stub.symbol
+            );
+        }
+    }
+    Ok(lines.join("\n"))
+}
+
+fn find_matching_delimiter(text: &str, open_idx: usize, open: u8, close: u8) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    for (idx, byte) in bytes.iter().enumerate().skip(open_idx) {
+        if *byte == open {
+            depth += 1;
+        } else if *byte == close {
+            depth = depth.saturating_sub(1);
+            if depth == 0 {
+                return Some(idx);
+            }
+        }
+    }
+    None
+}
+
+fn find_c_function_definition(text: &str, c_name: &str) -> Result<Option<(usize, usize)>> {
+    let needle = format!("{c_name}(");
+    let mut search_from = 0usize;
+    while let Some(rel) = text[search_from..].find(&needle) {
+        let name_idx = search_from + rel;
+        let open_paren_idx = name_idx + c_name.len();
+        let close_paren_idx = match find_matching_delimiter(text, open_paren_idx, b'(', b')') {
+            Some(idx) => idx,
+            None => {
+                anyhow::bail!("could not match parameter list for generated C function {c_name}");
+            }
+        };
+        let mut cursor = close_paren_idx + 1;
+        while cursor < text.len() && text.as_bytes()[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= text.len() {
+            break;
+        }
+        match text.as_bytes()[cursor] {
+            b';' => {
+                search_from = cursor + 1;
+                continue;
+            }
+            b'{' => {
+                let close_brace_idx = find_matching_delimiter(text, cursor, b'{', b'}')
+                    .with_context(|| {
+                        format!("could not match body for generated C function {c_name}")
+                    })?;
+                return Ok(Some((cursor, close_brace_idx)));
+            }
+            _ => {
+                search_from = cursor + 1;
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn apply_trusted_primitive_stubs(c_src: &str, stubs: &[TrustedPrimitiveStub]) -> Result<String> {
+    if stubs.is_empty() {
+        return Ok(c_src.to_string());
+    }
+
+    let mut replacements: Vec<(usize, usize, String)> = Vec::new();
+    for stub in stubs {
+        let c_name = c_user_fn_name(&stub.symbol);
+        let Some((open_brace_idx, close_brace_idx)) = find_c_function_definition(c_src, &c_name)?
+        else {
+            anyhow::bail!(
+                "could not locate generated C body for trusted primitive {:?}",
+                stub.symbol
+            );
+        };
+        let body = trusted_primitive_stub_body(stub)?;
+        replacements.push((open_brace_idx, close_brace_idx, format!("{{\n{body}\n}}")));
+    }
+
+    replacements.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut out = c_src.to_string();
+    for (start, end, replacement) in replacements {
+        out.replace_range(start..=end, &replacement);
+    }
+    Ok(out)
+}
+
 fn build_c_harness(input_len: u32) -> String {
     let mut out = String::new();
-    out.push_str("extern unsigned char x07_nondet_u8(void);\n");
+    out.push_str("static unsigned char x07_nondet_u8(void) {\n");
+    out.push_str("  unsigned char value;\n");
+    out.push_str("  return value;\n");
+    out.push_str("}\n");
     out.push_str(&format!("static void {VERIFY_HARNESS_FN}(void) {{\n"));
     out.push_str("  uint8_t arena_mem[65536];\n");
     out.push_str("  ctx_t ctx;\n");
@@ -1128,6 +1999,27 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            coverage: None,
+            artifacts: Some(artifacts),
+            diagnostics_count: 0,
+            diagnostics: Vec::new(),
+            exit_code: 0,
+        }
+    }
+
+    fn proven(entry: &str, bounds: Bounds, artifacts: Artifacts) -> Self {
+        Self {
+            schema_version: X07_VERIFY_REPORT_SCHEMA_VERSION,
+            mode: Mode::Prove.as_str(),
+            ok: true,
+            entry: entry.to_string(),
+            bounds,
+            result: VerifyResult {
+                kind: "proven".to_string(),
+                contract: None,
+                details: None,
+            },
+            coverage: None,
             artifacts: Some(artifacts),
             diagnostics_count: 0,
             diagnostics: Vec::new(),
@@ -1154,6 +2046,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            coverage: None,
             artifacts: Some(artifacts),
             diagnostics_count: 1,
             diagnostics: vec![d],
@@ -1180,6 +2073,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            coverage: None,
             artifacts: Some(artifacts),
             diagnostics_count: 1,
             diagnostics: vec![d],
@@ -1206,10 +2100,59 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            coverage: None,
             artifacts: Some(artifacts),
             diagnostics_count: 1,
             diagnostics: vec![d],
             exit_code,
+        }
+    }
+
+    fn unsupported(
+        mode: Mode,
+        entry: &str,
+        bounds: Bounds,
+        code: &'static str,
+        details: String,
+        exit_code: u8,
+    ) -> Self {
+        let d = diag_verify(code, details.clone());
+        Self {
+            schema_version: X07_VERIFY_REPORT_SCHEMA_VERSION,
+            mode: mode.as_str(),
+            ok: false,
+            entry: entry.to_string(),
+            bounds,
+            result: VerifyResult {
+                kind: "unsupported".to_string(),
+                contract: None,
+                details: Some(details),
+            },
+            coverage: None,
+            artifacts: None,
+            diagnostics_count: 1,
+            diagnostics: vec![d],
+            exit_code,
+        }
+    }
+
+    fn coverage_report(entry: &str, bounds: Bounds, coverage: VerifyCoverage) -> Self {
+        Self {
+            schema_version: X07_VERIFY_REPORT_SCHEMA_VERSION,
+            mode: Mode::Coverage.as_str(),
+            ok: true,
+            entry: entry.to_string(),
+            bounds,
+            result: VerifyResult {
+                kind: "coverage_report".to_string(),
+                contract: None,
+                details: None,
+            },
+            coverage: Some(coverage),
+            artifacts: None,
+            diagnostics_count: 0,
+            diagnostics: Vec::new(),
+            exit_code: 0,
         }
     }
 
@@ -1231,6 +2174,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            coverage: None,
             artifacts: None,
             diagnostics_count: 1,
             diagnostics: vec![d],
@@ -1249,11 +2193,7 @@ fn write_report_and_exit(
     report: VerifyReport,
 ) -> Result<std::process::ExitCode> {
     let v = serde_json::to_value(&report).context("serialize verify report JSON")?;
-    let diags = report_common::validate_schema(
-        X07_VERIFY_REPORT_SCHEMA_BYTES,
-        "spec/x07-verify.report.schema.json",
-        &v,
-    )?;
+    let diags = validate_verify_report_schema(&v)?;
     if !diags.is_empty() {
         anyhow::bail!(
             "internal error: verify report JSON is not schema-valid: {}",
@@ -1284,6 +2224,79 @@ fn command_exists(name: &str) -> bool {
     Command::new(name).arg("--version").output().is_ok()
 }
 
+fn validate_verify_report_schema(value: &Value) -> Result<Vec<x07c::diagnostics::Diagnostic>> {
+    let schema_json: Value = serde_json::from_slice(X07_VERIFY_REPORT_SCHEMA_BYTES)
+        .context("parse spec/x07-verify.report.schema.json")?;
+    let x07diag_schema_json: Value =
+        serde_json::from_slice(X07DIAG_SCHEMA_BYTES).context("parse spec/x07diag.schema.json")?;
+    let coverage_schema_json: Value = serde_json::from_slice(X07_VERIFY_COVERAGE_SCHEMA_BYTES)
+        .context("parse spec/x07-verify.coverage.schema.json")?;
+    let validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .with_resource(
+            "x07diag.schema.json",
+            jsonschema::Resource::from_contents(x07diag_schema_json.clone()),
+        )
+        .with_resource(
+            "https://x07.io/spec/x07diag.schema.json",
+            jsonschema::Resource::from_contents(x07diag_schema_json),
+        )
+        .with_resource(
+            "x07-verify.coverage.schema.json",
+            jsonschema::Resource::from_contents(coverage_schema_json.clone()),
+        )
+        .with_resource(
+            "https://x07.io/spec/x07-verify.coverage.schema.json",
+            jsonschema::Resource::from_contents(coverage_schema_json),
+        )
+        .build(&schema_json)
+        .context("build spec/x07-verify.report.schema.json validator")?;
+
+    let mut out = Vec::new();
+    for error in validator.iter_errors(value) {
+        let mut data = std::collections::BTreeMap::new();
+        data.insert(
+            "schema_path".to_string(),
+            Value::String(error.schema_path().to_string()),
+        );
+        out.push(x07c::diagnostics::Diagnostic {
+            code: "X07-SCHEMA-0001".to_string(),
+            severity: x07c::diagnostics::Severity::Error,
+            stage: x07c::diagnostics::Stage::Parse,
+            message: error.to_string(),
+            loc: Some(x07c::diagnostics::Location::X07Ast {
+                ptr: error.instance_path().to_string(),
+            }),
+            notes: Vec::new(),
+            related: Vec::new(),
+            data,
+            quickfix: None,
+        });
+    }
+    Ok(out)
+}
+
+fn mode_count(args: &VerifyArgs) -> usize {
+    [args.bmc, args.smt, args.prove, args.coverage]
+        .into_iter()
+        .filter(|enabled| *enabled)
+        .count()
+}
+
+fn selected_mode(args: &VerifyArgs) -> Option<Mode> {
+    if args.bmc {
+        Some(Mode::Bmc)
+    } else if args.smt {
+        Some(Mode::Smt)
+    } else if args.prove {
+        Some(Mode::Prove)
+    } else if args.coverage {
+        Some(Mode::Coverage)
+    } else {
+        None
+    }
+}
+
 fn diag_verify(code: &str, message: impl Into<String>) -> x07c::diagnostics::Diagnostic {
     x07c::diagnostics::Diagnostic {
         code: code.to_string(),
@@ -1307,9 +2320,11 @@ mod tests {
     fn verify_driver_imports_std_codec_and_uses_std_codec_read() {
         let sig = TargetSig {
             params: vec!["i32".to_string()],
+            result: "bytes".to_string(),
             is_async: false,
             has_contracts: true,
             body: json!(0),
+            source_path: PathBuf::from("verify_fixture.x07.json"),
         };
         let bytes =
             build_verify_driver_x07ast_json("verify_fixture.f", &sig, 16).expect("build driver");
@@ -1378,5 +2393,63 @@ mod tests {
         ];
         let bytes = extract_input_bytes_from_trace(&trace, "x07_verify_input", 3);
         assert_eq!(bytes, vec![1u8, 2u8, 255u8]);
+    }
+
+    #[test]
+    fn normalize_smt2_logic_for_z3_drops_qf_prefix_when_quantifiers_present() {
+        let dir =
+            std::env::temp_dir().join(format!("x07_verify_smt2_quant_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("verify.smt2");
+        std::fs::write(
+            &path,
+            "(set-logic QF_AUFBV)\n(assert (forall ((x Int)) true))\n(get-model)\n",
+        )
+        .expect("write smt2");
+
+        normalize_smt2_logic_for_z3(&path).expect("normalize smt2");
+        let text = std::fs::read_to_string(&path).expect("read smt2");
+        assert!(text.starts_with("(set-logic AUFBV)\n"));
+        assert!(!text.contains("(get-model)"));
+        std::fs::remove_dir_all(&dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn normalize_smt2_logic_for_z3_leaves_quantifier_free_files_unchanged() {
+        let dir = std::env::temp_dir().join(format!("x07_verify_smt2_qf_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("verify.smt2");
+        let original = "(set-logic QF_AUFBV)\n(assert true)\n";
+        std::fs::write(&path, original).expect("write smt2");
+
+        normalize_smt2_logic_for_z3(&path).expect("normalize smt2");
+        let text = std::fs::read_to_string(&path).expect("read smt2");
+        assert_eq!(text, original);
+        std::fs::remove_dir_all(&dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn normalize_smt2_logic_for_z3_strips_model_queries_without_touching_logic() {
+        let dir = std::env::temp_dir().join(format!(
+            "x07_verify_smt2_model_queries_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("verify.smt2");
+        std::fs::write(
+            &path,
+            "(set-logic QF_AUFBV)\n(assert true)\n(check-sat)\n(get-value (x))\n(exit)\n",
+        )
+        .expect("write smt2");
+
+        normalize_smt2_logic_for_z3(&path).expect("normalize smt2");
+        let text = std::fs::read_to_string(&path).expect("read smt2");
+        assert!(text.contains("(check-sat)\n"));
+        assert!(!text.contains("(get-value (x))"));
+        assert!(text.contains("(exit)\n"));
+        std::fs::remove_dir_all(&dir).expect("cleanup temp dir");
     }
 }

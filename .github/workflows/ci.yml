@@ -181,6 +181,36 @@ jobs:
         shell: bash
         run: ./scripts/ci/check_x07test_smoke.sh
 
+  verified-core-pure:
+    name: ci / verified-core-pure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cbmc \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            z3
+      - name: verified_core_pure_v1 certify
+        shell: bash
+        env:
+          X07_REQUIRE_SOLVERS: "1"
+        run: ./scripts/ci/check_verified_core_pure_example.sh
+
   determinism:
     name: ci / determinism
     runs-on: ubuntu-latest

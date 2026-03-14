@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde_json::Value;
 use x07_contracts::{
     X07AST_SCHEMA_VERSION, X07AST_SCHEMA_VERSIONS_SUPPORTED, X07AST_SCHEMA_VERSION_V0_3_0,
-    X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0,
+    X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
 };
 use x07_worlds::WorldId;
 use x07c::diagnostics;
@@ -25,6 +25,7 @@ const X07AST_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.schema.j
 const X07AST_SCHEMA_V0_3_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.v0.3.0.schema.json");
 const X07AST_SCHEMA_V0_4_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.v0.4.0.schema.json");
 const X07AST_SCHEMA_V0_5_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.v0.5.0.schema.json");
+const X07AST_SCHEMA_V0_6_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.v0.6.0.schema.json");
 const X07AST_MIN_GBNF_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.min.gbnf");
 const X07AST_PRETTY_GBNF_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.pretty.gbnf");
 const X07AST_SEMANTIC_BYTES: &[u8] = include_bytes!("../../../spec/x07ast.semantic.json");
@@ -289,6 +290,7 @@ fn cmd_init(
         Some(X07AST_SCHEMA_VERSION_V0_3_0) => X07AST_SCHEMA_VERSION_V0_3_0,
         Some(X07AST_SCHEMA_VERSION_V0_4_0) => X07AST_SCHEMA_VERSION_V0_4_0,
         Some(X07AST_SCHEMA_VERSION_V0_5_0) => X07AST_SCHEMA_VERSION_V0_5_0,
+        Some(X07AST_SCHEMA_VERSION_V0_6_0) => X07AST_SCHEMA_VERSION_V0_6_0,
         Some(other) => {
             anyhow::bail!(
                 "unsupported schema_version: expected {} got {other:?}",
@@ -1332,6 +1334,7 @@ fn cmd_schema(
         Some(X07AST_SCHEMA_VERSION_V0_3_0) => X07AST_SCHEMA_V0_3_BYTES,
         Some(X07AST_SCHEMA_VERSION_V0_4_0) => X07AST_SCHEMA_V0_4_BYTES,
         Some(X07AST_SCHEMA_VERSION_V0_5_0) => X07AST_SCHEMA_V0_5_BYTES,
+        Some(X07AST_SCHEMA_VERSION_V0_6_0) => X07AST_SCHEMA_V0_6_BYTES,
         Some(other) => {
             anyhow::bail!(
                 "unsupported schema_version: expected {} got {other:?}",
@@ -1721,6 +1724,7 @@ fn validate_x07ast_doc(doc: &Value) -> Result<Vec<diagnostics::Diagnostic>> {
         Some(X07AST_SCHEMA_VERSION_V0_3_0) => X07AST_SCHEMA_V0_3_BYTES,
         Some(X07AST_SCHEMA_VERSION_V0_4_0) => X07AST_SCHEMA_V0_4_BYTES,
         Some(X07AST_SCHEMA_VERSION_V0_5_0) => X07AST_SCHEMA_V0_5_BYTES,
+        Some(X07AST_SCHEMA_VERSION_V0_6_0) => X07AST_SCHEMA_V0_6_BYTES,
         Some(other) => {
             let mut data = BTreeMap::new();
             data.insert("got".to_string(), Value::String(other.to_string()));

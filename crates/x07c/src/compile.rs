@@ -14,7 +14,9 @@ use crate::program::Program;
 use crate::stream_pipe;
 use crate::types::Ty;
 use crate::x07ast;
-use x07_contracts::{NATIVE_REQUIRES_SCHEMA_VERSION, X07AST_SCHEMA_VERSION_V0_5_0};
+use x07_contracts::{
+    NATIVE_REQUIRES_SCHEMA_VERSION, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ContractMode {
@@ -1167,7 +1169,9 @@ fn file_has_contracts(file: &x07ast::X07AstFile) -> bool {
 }
 
 fn enforce_contract_typecheck(label: &str, file: &x07ast::X07AstFile) -> Result<(), CompilerError> {
-    if file.schema_version != X07AST_SCHEMA_VERSION_V0_5_0 {
+    if file.schema_version != X07AST_SCHEMA_VERSION_V0_5_0
+        && file.schema_version != X07AST_SCHEMA_VERSION_V0_6_0
+    {
         return Ok(());
     }
     if !file_has_contracts(file) {

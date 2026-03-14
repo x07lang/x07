@@ -71,3 +71,10 @@ jobs:
 
           bash ./scripts/ci/install_python_deps.sh
           bash ./scripts/ci/check_all.sh
+
+      - name: Verified core pure smoke (WSL2 Ubuntu-24.04)
+        run: |
+          set -euo pipefail
+          . "$HOME/.cargo/env"
+          cd /root/evolang-wsl
+          bash ./scripts/ci/check_verified_core_pure_example.sh

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand, ValueEnum};
@@ -8,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use x07_contracts::{
     PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
-    X07DIAG_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
+    X07DIAG_SCHEMA_VERSION, X07_TRUST_CERTIFICATE_SCHEMA_VERSION, X07_TRUST_PROFILE_SCHEMA_VERSION,
+    X07_TRUST_REPORT_SCHEMA_VERSION,
 };
 use x07_worlds::WorldId;
 use x07c::diagnostics;
@@ -22,6 +24,10 @@ use crate::util;
 
 const X07_TRUST_REPORT_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-trust.report.schema.json");
+const X07_TRUST_PROFILE_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-trust.profile.schema.json");
+const X07_TRUST_CERTIFICATE_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-trust.certificate.schema.json");
 const X07_DEPS_CAPABILITY_POLICY_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-deps.capability-policy.schema.json");
 
@@ -39,6 +45,23 @@ pub struct TrustArgs {
 pub enum TrustCommand {
     /// Emit a CI trust report artifact (budgets/caps, capabilities, nondeterminism, SBOM).
     Report(TrustReportArgs),
+    /// Validate trust profiles and project compatibility.
+    Profile(TrustProfileArgs),
+    /// Emit a certificate bundle for a certifiable entrypoint.
+    Certify(TrustCertifyArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+#[command(subcommand_required = false)]
+pub struct TrustProfileArgs {
+    #[command(subcommand)]
+    pub cmd: Option<TrustProfileCommand>,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum TrustProfileCommand {
+    /// Validate a trust profile and optional project compatibility.
+    Check(TrustProfileCheckArgs),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -104,6 +127,183 @@ pub struct TrustReportArgs {
     /// CI gating: fail if any matching condition is true.
     #[arg(long, value_enum)]
     pub fail_on: Vec<TrustFailOn>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TrustProfileCheckArgs {
+    /// Trust profile JSON path.
+    #[arg(long, value_name = "PATH")]
+    pub profile: PathBuf,
+
+    /// Optional project manifest path (`x07.json`) or directory containing it.
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
+
+    /// Optional entry symbol to validate against the profile entry allowlist.
+    #[arg(long, value_name = "SYM")]
+    pub entry: Option<String>,
+
+    /// Treat advisories as hard errors.
+    #[arg(long)]
+    pub strict: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TrustCertifyArgs {
+    /// Project manifest path (`x07.json`) or directory containing it.
+    #[arg(long, value_name = "PATH")]
+    pub project: PathBuf,
+
+    /// Trust profile JSON path.
+    #[arg(long, value_name = "PATH")]
+    pub profile: PathBuf,
+
+    /// Fully-qualified entry symbol to certify.
+    #[arg(long, value_name = "SYM")]
+    pub entry: String,
+
+    /// Output directory for the certificate bundle.
+    #[arg(long, value_name = "DIR")]
+    pub out_dir: PathBuf,
+
+    /// Tests manifest path.
+    #[arg(long, value_name = "PATH", default_value = "tests/tests.json")]
+    pub tests_manifest: PathBuf,
+
+    /// Optional review baseline path for `x07 review diff`.
+    #[arg(long, value_name = "PATH")]
+    pub baseline: Option<PathBuf>,
+
+    /// Optional output path for the bundled native executable.
+    #[arg(long, value_name = "PATH")]
+    pub bundle_out: Option<PathBuf>,
+
+    /// Keep intermediate work directories.
+    #[arg(long)]
+    pub keep_workdir: bool,
+
+    /// Do not write summary.html.
+    #[arg(long)]
+    pub no_html: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustProfile {
+    schema_version: String,
+    id: String,
+    claims: Vec<String>,
+    entrypoints: Vec<String>,
+    worlds_allowed: Vec<String>,
+    language_subset: TrustLanguageSubset,
+    arch_requirements: TrustArchRequirements,
+    evidence_requirements: TrustEvidenceRequirements,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustLanguageSubset {
+    allow_defasync: bool,
+    allow_recursion: bool,
+    allow_extern: bool,
+    allow_unsafe: bool,
+    allow_ffi: bool,
+    allow_dynamic_dispatch: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustArchRequirements {
+    manifest_min_version: String,
+    require_allowlist_mode: bool,
+    require_deny_cycles: bool,
+    require_deny_orphans: bool,
+    require_visibility: bool,
+    require_world_caps: bool,
+    require_brand_boundaries: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustEvidenceRequirements {
+    require_boundary_index: bool,
+    require_schema_derive_check: bool,
+    require_smoke_harnesses: bool,
+    require_unit_tests: bool,
+    require_pbt: String,
+    require_proof_mode: String,
+    require_proof_coverage: String,
+    require_compile_attestation: bool,
+    require_trust_report_clean: bool,
+    require_sbom: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustProfileCheckReport {
+    schema_version: &'static str,
+    ok: bool,
+    profile: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entry: Option<String>,
+    diagnostics: Vec<diagnostics::Diagnostic>,
+    exit_code: u8,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificate {
+    schema_version: &'static str,
+    verdict: String,
+    profile: String,
+    entry: String,
+    out_dir: String,
+    claims: Vec<String>,
+    evidence: TrustCertificateEvidence,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    diagnostics: Vec<diagnostics::Diagnostic>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificateEvidence {
+    boundaries_report: EvidenceRef,
+    coverage_report: EvidenceRef,
+    #[serde(default)]
+    schema_derive_reports: Vec<EvidenceRef>,
+    #[serde(default)]
+    prove_reports: Vec<EvidenceRef>,
+    tests_report: EvidenceRef,
+    trust_report: EvidenceRef,
+    compile_attestation: EvidenceRef,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    review_diff: Option<EvidenceRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bundle_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct EvidenceRef {
+    path: String,
+    sha256_hex: String,
+}
+
+#[derive(Debug, Clone, Default)]
+struct BoundaryEvidenceRequirements {
+    schema_paths: BTreeSet<String>,
+    required_tests: BTreeMap<String, BoundaryTestRequirement>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct BoundaryTestRequirement {
+    expects_pbt: bool,
+    boundary_ids: BTreeSet<String>,
+    worlds_allowed: BTreeSet<String>,
+}
+
+#[derive(Debug, Clone)]
+struct ManifestTestRequirement {
+    world: String,
+    has_pbt: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -315,6 +515,20 @@ pub fn cmd_trust(
 
     match cmd {
         TrustCommand::Report(args) => cmd_trust_report(machine, args),
+        TrustCommand::Profile(args) => cmd_trust_profile(machine, args),
+        TrustCommand::Certify(args) => cmd_trust_certify(machine, args),
+    }
+}
+
+fn cmd_trust_profile(
+    machine: &crate::reporting::MachineArgs,
+    args: TrustProfileArgs,
+) -> Result<std::process::ExitCode> {
+    let Some(cmd) = args.cmd else {
+        anyhow::bail!("missing trust profile subcommand (try --help)");
+    };
+    match cmd {
+        TrustProfileCommand::Check(args) => cmd_trust_profile_check(machine, args),
     }
 }
 
@@ -1535,6 +1749,1678 @@ fn render_trust_html(
     s
 }
 
+#[derive(Debug, Clone, Default)]
+struct LanguageFeatureScan {
+    has_defasync: bool,
+    has_extern: bool,
+}
+
+#[derive(Debug)]
+struct ToolRunOutcome {
+    exit_code: i32,
+    stderr: Vec<u8>,
+}
+
+fn cmd_trust_profile_check(
+    machine: &crate::reporting::MachineArgs,
+    args: TrustProfileCheckArgs,
+) -> Result<std::process::ExitCode> {
+    let profile_path = util::resolve_existing_path_upwards(&args.profile);
+    let mut diagnostics = Vec::new();
+
+    let profile = match load_trust_profile(&profile_path) {
+        Ok(profile) => Some(profile),
+        Err(err) => {
+            diagnostics.push(trust_diag_with_path(
+                "X07TP_INVALID",
+                format!("{err:#}"),
+                &profile_path,
+            ));
+            None
+        }
+    };
+
+    let project_path = match args.project.as_deref() {
+        Some(path) => match resolve_project_manifest_arg(path) {
+            Ok(path) => Some(path),
+            Err(err) => {
+                diagnostics.push(trust_diag_with_path(
+                    "X07TP_PROJECT",
+                    format!("{err:#}"),
+                    path,
+                ));
+                None
+            }
+        },
+        None => None,
+    };
+
+    if let Some(profile) = &profile {
+        diagnostics.extend(validate_trust_profile_strength(profile));
+        if let Some(entry) = args.entry.as_deref() {
+            if !profile
+                .entrypoints
+                .iter()
+                .any(|candidate| candidate == entry)
+            {
+                diagnostics.push(trust_diag(
+                    "X07TP_ENTRY",
+                    format!(
+                        "entry {entry:?} is not allowed by trust profile {}",
+                        profile.id
+                    ),
+                ));
+            }
+        }
+
+        if let Some(project_path) = project_path.as_deref() {
+            let ctx = resolve_project_context(Some(project_path), None)?;
+            diagnostics.extend(validate_profile_against_context(
+                profile,
+                project_path,
+                &ctx,
+                args.entry.as_deref(),
+            )?);
+        }
+    }
+
+    let exit_code = if diagnostics.is_empty() { 0 } else { 20 };
+    let report = TrustProfileCheckReport {
+        schema_version: "x07.trust.profile.check@0.1.0",
+        ok: diagnostics.is_empty(),
+        profile: profile
+            .as_ref()
+            .map(|p| p.id.clone())
+            .unwrap_or_else(|| profile_path.display().to_string()),
+        project: project_path.as_ref().map(|p| p.display().to_string()),
+        entry: args.entry,
+        diagnostics,
+        exit_code,
+    };
+
+    let value = serde_json::to_value(&report).context("serialize trust profile check report")?;
+    write_machine_json(
+        machine,
+        &value,
+        exit_code,
+        &format!(
+            "trust profile check: ok={} diagnostics={}",
+            report.ok,
+            report.diagnostics.len()
+        ),
+    )
+}
+
+fn cmd_trust_certify(
+    machine: &crate::reporting::MachineArgs,
+    args: TrustCertifyArgs,
+) -> Result<std::process::ExitCode> {
+    let cwd = std::env::current_dir().context("resolve current working directory")?;
+    let mut diagnostics = Vec::new();
+    let project_path = match resolve_project_manifest_arg(&args.project) {
+        Ok(path) => Some(path),
+        Err(err) => {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_EPROJECT",
+                format!("{err:#}"),
+                &args.project,
+            ));
+            None
+        }
+    };
+    let project_root = project_path
+        .as_deref()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| cwd.clone());
+    let out_dir = if args.out_dir.is_absolute() {
+        args.out_dir.clone()
+    } else {
+        cwd.join(&args.out_dir)
+    };
+    let bundle_dir = out_dir.join("bundle");
+    let profile_path = util::resolve_existing_path_upwards(&args.profile);
+    std::fs::create_dir_all(&out_dir)
+        .with_context(|| format!("create certificate dir: {}", out_dir.display()))?;
+    std::fs::create_dir_all(&bundle_dir)
+        .with_context(|| format!("create bundle dir: {}", bundle_dir.display()))?;
+
+    let profile = match load_trust_profile(&profile_path) {
+        Ok(profile) => Some(profile),
+        Err(err) => {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_EPROFILE",
+                format!("{err:#}"),
+                &profile_path,
+            ));
+            None
+        }
+    };
+
+    let ctx = match project_path.as_deref() {
+        Some(project_path) => match resolve_project_context(Some(project_path), None) {
+            Ok(ctx) => Some(ctx),
+            Err(err) => {
+                diagnostics.push(trust_diag(
+                    "X07TC_EPROJECT",
+                    format!("resolve project context: {err:#}"),
+                ));
+                None
+            }
+        },
+        None => None,
+    };
+    if let (Some(profile), Some(project_path), Some(ctx)) =
+        (&profile, project_path.as_deref(), &ctx)
+    {
+        diagnostics.extend(validate_trust_profile_strength(profile));
+        diagnostics.extend(validate_profile_against_context(
+            profile,
+            project_path,
+            ctx,
+            Some(&args.entry),
+        )?);
+    }
+
+    let tests_manifest = if args.tests_manifest.is_absolute() {
+        args.tests_manifest.clone()
+    } else {
+        project_root.join(&args.tests_manifest)
+    };
+    if let Some(baseline) = args.baseline.as_deref() {
+        let resolved = util::resolve_existing_path_upwards(baseline);
+        if !resolved.exists() {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_EREVIEW",
+                "review baseline path is missing",
+                &resolved,
+            ));
+        }
+    }
+    let default_bundle_out = bundle_dir.join(util::safe_artifact_dir_name(&args.entry));
+    let (
+        boundaries_ref,
+        coverage_ref,
+        schema_derive_refs,
+        prove_refs,
+        tests_ref,
+        trust_report_ref,
+        compile_attestation_ref,
+        review_diff_ref,
+        bundle_path,
+    ) = if let Some(project_path) = project_path.as_deref() {
+        let (boundaries_ref, boundaries_doc) =
+            build_boundaries_evidence(&project_root, &out_dir, &mut diagnostics)?;
+        if let Some(profile) = &profile {
+            if profile.evidence_requirements.require_smoke_harnesses
+                && boundaries_doc
+                    .pointer("/summary/missing_smoke")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    > 0
+            {
+                diagnostics.push(trust_diag(
+                    "X07TC_EBOUNDARY",
+                    "boundary coverage is missing required smoke test declarations",
+                ));
+            }
+            if profile.evidence_requirements.require_pbt.trim() != "none"
+                && boundaries_doc
+                    .pointer("/summary/missing_pbt")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    > 0
+            {
+                diagnostics.push(trust_diag(
+                    "X07TC_EPBT",
+                    "boundary coverage is missing required property-test declarations",
+                ));
+            }
+        }
+        let boundary_requirements = match load_boundary_requirements(&project_root) {
+            Ok(requirements) => requirements,
+            Err(err) => {
+                diagnostics.push(trust_diag(
+                    "X07TC_EBOUNDARY",
+                    format!("load boundary requirements: {err:#}"),
+                ));
+                BoundaryEvidenceRequirements::default()
+            }
+        };
+
+        let (coverage_ref, coverage_doc, prove_targets) =
+            build_coverage_evidence(project_path, &args.entry, &out_dir, &mut diagnostics)?;
+        if coverage_doc
+            .get("functions")
+            .and_then(Value::as_array)
+            .is_some_and(|functions| {
+                functions.iter().any(|function| {
+                    !matches!(
+                        function.get("status").and_then(Value::as_str),
+                        Some("proven" | "trusted_primitive")
+                    )
+                })
+            })
+        {
+            diagnostics.push(trust_diag(
+                "X07TC_ECOVERAGE",
+                "coverage report contains reachable symbols outside the certifiable pure subset",
+            ));
+        }
+        let schema_derive_refs = if profile
+            .as_ref()
+            .is_some_and(|p| p.evidence_requirements.require_schema_derive_check)
+        {
+            build_schema_derive_evidence(
+                &project_root,
+                &boundary_requirements,
+                &out_dir,
+                &mut diagnostics,
+            )?
+        } else {
+            Vec::new()
+        };
+        let prove_refs =
+            build_prove_evidence(project_path, &prove_targets, &out_dir, &mut diagnostics)?;
+        let tests_ref = build_tests_evidence(
+            &project_root,
+            &tests_manifest,
+            profile.as_ref(),
+            &boundary_requirements,
+            &out_dir,
+            &mut diagnostics,
+        )?;
+        let trust_report_ref = build_trust_report_evidence(
+            project_path,
+            profile.as_ref(),
+            &out_dir,
+            &mut diagnostics,
+        )?;
+        let (compile_attestation_ref, bundle_path) = build_bundle_evidence(
+            project_path,
+            &args.entry,
+            Some(
+                args.bundle_out
+                    .as_deref()
+                    .unwrap_or(default_bundle_out.as_path()),
+            ),
+            &out_dir,
+            &mut diagnostics,
+        )?;
+        let review_diff_ref = build_review_evidence(
+            args.baseline.as_deref(),
+            &project_root,
+            &out_dir,
+            &mut diagnostics,
+        )?;
+
+        if let Some(profile) = &profile {
+            if profile.evidence_requirements.require_compile_attestation
+                && bundle_path.as_ref().is_none_or(|path| !path.is_file())
+            {
+                diagnostics.push(trust_diag(
+                    "X07TC_ECOMPILE_ATTEST",
+                    "compile attestation bundle step did not produce a native executable",
+                ));
+            }
+        }
+
+        (
+            boundaries_ref,
+            coverage_ref,
+            schema_derive_refs,
+            prove_refs,
+            tests_ref,
+            trust_report_ref,
+            compile_attestation_ref,
+            review_diff_ref,
+            bundle_path,
+        )
+    } else {
+        (
+            write_stub_artifact(
+                &out_dir.join("boundaries.report.json"),
+                "boundaries_report",
+                "project resolution failed before evidence collection",
+            )?,
+            write_stub_artifact(
+                &out_dir.join("verify.coverage.json"),
+                "coverage_report",
+                "project resolution failed before evidence collection",
+            )?,
+            Vec::new(),
+            Vec::new(),
+            write_stub_artifact(
+                &out_dir.join("tests.report.json"),
+                "tests_report",
+                "project resolution failed before evidence collection",
+            )?,
+            write_stub_artifact(
+                &out_dir.join("trust.report.json"),
+                "trust_report",
+                "project resolution failed before evidence collection",
+            )?,
+            write_stub_artifact(
+                &out_dir.join("compile.attest.json"),
+                "compile_attestation",
+                "project resolution failed before evidence collection",
+            )?,
+            if args.baseline.is_some() {
+                Some(write_stub_artifact(
+                    &out_dir.join("review.diff.json"),
+                    "review_diff",
+                    "project resolution failed before evidence collection",
+                )?)
+            } else {
+                None
+            },
+            None,
+        )
+    };
+
+    let certificate = TrustCertificate {
+        schema_version: X07_TRUST_CERTIFICATE_SCHEMA_VERSION,
+        verdict: if diagnostics.is_empty() {
+            "accepted".to_string()
+        } else {
+            "rejected".to_string()
+        },
+        profile: profile
+            .as_ref()
+            .map(|p| p.id.clone())
+            .unwrap_or_else(|| profile_path.display().to_string()),
+        entry: args.entry,
+        out_dir: out_dir.display().to_string(),
+        claims: profile
+            .as_ref()
+            .map(|p| p.claims.clone())
+            .unwrap_or_default(),
+        evidence: TrustCertificateEvidence {
+            boundaries_report: boundaries_ref,
+            coverage_report: coverage_ref,
+            schema_derive_reports: schema_derive_refs,
+            prove_reports: prove_refs,
+            tests_report: tests_ref,
+            trust_report: trust_report_ref,
+            compile_attestation: compile_attestation_ref,
+            review_diff: review_diff_ref,
+            bundle_path: bundle_path.map(|path| path.display().to_string()),
+        },
+        diagnostics,
+    };
+
+    write_certificate_bundle(&out_dir, &certificate, !args.no_html)?;
+    let value = serde_json::to_value(&certificate).context("serialize trust certificate JSON")?;
+    write_machine_json(
+        machine,
+        &value,
+        if certificate.verdict == "accepted" {
+            0
+        } else {
+            20
+        },
+        &format!(
+            "trust certify: verdict={} diagnostics={}",
+            certificate.verdict,
+            certificate.diagnostics.len()
+        ),
+    )
+}
+
+fn write_certificate_bundle(
+    out_dir: &Path,
+    certificate: &TrustCertificate,
+    emit_html: bool,
+) -> Result<()> {
+    let certificate_path = out_dir.join("certificate.json");
+    let summary_path = out_dir.join("summary.html");
+    let value = serde_json::to_value(certificate).context("serialize trust certificate JSON")?;
+    let schema_diags = report_common::validate_schema(
+        X07_TRUST_CERTIFICATE_SCHEMA_BYTES,
+        "spec/x07-trust.certificate.schema.json",
+        &value,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "internal error: trust certificate JSON is not schema-valid: {}",
+            schema_diags[0].message
+        );
+    }
+    let bytes = report_common::canonical_pretty_json_bytes(&value)?;
+    util::write_atomic(&certificate_path, &bytes)
+        .with_context(|| format!("write certificate: {}", certificate_path.display()))?;
+    if emit_html {
+        let html = render_certificate_summary(certificate);
+        util::write_atomic(&summary_path, html.as_bytes())
+            .with_context(|| format!("write certificate summary: {}", summary_path.display()))?;
+    }
+    Ok(())
+}
+
+fn write_machine_json(
+    machine: &crate::reporting::MachineArgs,
+    value: &Value,
+    exit_code: u8,
+    text_fallback: &str,
+) -> Result<std::process::ExitCode> {
+    let bytes = report_common::canonical_pretty_json_bytes(value)?;
+    if let Some(path) = machine.out.as_deref() {
+        util::write_atomic(path, &bytes)
+            .with_context(|| format!("write output: {}", path.display()))?;
+    }
+    if let Some(path) = machine.report_out.as_deref() {
+        reporting::write_bytes(path, &bytes)?;
+    }
+    if machine.quiet_json {
+        return Ok(std::process::ExitCode::from(exit_code));
+    }
+    if matches!(machine.json, Some(crate::reporting::JsonArg::Off)) {
+        println!("{text_fallback}");
+    } else {
+        std::io::stdout()
+            .write_all(&bytes)
+            .context("write stdout")?;
+    }
+    Ok(std::process::ExitCode::from(exit_code))
+}
+
+fn render_certificate_summary(certificate: &TrustCertificate) -> String {
+    let mut s = String::new();
+    s.push_str("<!doctype html>\n<html><head><meta charset=\"utf-8\">");
+    s.push_str("<title>x07 trust certificate</title>");
+    s.push_str("<style>body{font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif;margin:24px;line-height:1.45}code,pre{background:#f6f8fa;padding:2px 4px;border-radius:4px}pre{padding:12px;overflow:auto}table{border-collapse:collapse}td,th{padding:6px 8px;border:1px solid #ddd}h2{margin-top:28px}</style>");
+    s.push_str("</head><body>");
+    s.push_str("<h1>x07 trust certificate</h1>");
+    s.push_str("<p><b>verdict:</b> <code>");
+    s.push_str(&report_common::html_escape(&certificate.verdict));
+    s.push_str("</code></p>");
+    s.push_str("<p><b>profile:</b> <code>");
+    s.push_str(&report_common::html_escape(&certificate.profile));
+    s.push_str("</code> <b>entry:</b> <code>");
+    s.push_str(&report_common::html_escape(&certificate.entry));
+    s.push_str("</code></p>");
+
+    s.push_str("<h2>Evidence</h2><table><thead><tr><th>Artifact</th><th>Path</th><th>sha256</th></tr></thead><tbody>");
+    for (label, evidence) in [
+        ("boundaries", &certificate.evidence.boundaries_report),
+        ("coverage", &certificate.evidence.coverage_report),
+        ("tests", &certificate.evidence.tests_report),
+        ("trust report", &certificate.evidence.trust_report),
+        (
+            "compile attestation",
+            &certificate.evidence.compile_attestation,
+        ),
+    ] {
+        s.push_str("<tr><td>");
+        s.push_str(label);
+        s.push_str("</td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
+    for evidence in &certificate.evidence.schema_derive_reports {
+        s.push_str("<tr><td>schema derive</td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
+    for evidence in &certificate.evidence.prove_reports {
+        s.push_str("<tr><td>prove</td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
+    if let Some(review) = &certificate.evidence.review_diff {
+        s.push_str("<tr><td>review diff</td><td><code>");
+        s.push_str(&report_common::html_escape(&review.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&review.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
+    s.push_str("</tbody></table>");
+
+    if !certificate.diagnostics.is_empty() {
+        s.push_str("<h2>Diagnostics</h2><ul>");
+        for diag in &certificate.diagnostics {
+            s.push_str("<li><code>");
+            s.push_str(&report_common::html_escape(&diag.code));
+            s.push_str("</code>: ");
+            s.push_str(&report_common::html_escape(&diag.message));
+            s.push_str("</li>");
+        }
+        s.push_str("</ul>");
+    }
+
+    s.push_str("</body></html>\n");
+    s
+}
+
+fn load_trust_profile(path: &Path) -> Result<TrustProfile> {
+    let doc = report_common::read_json_file(path)?;
+    let schema_diags = report_common::validate_schema(
+        X07_TRUST_PROFILE_SCHEMA_BYTES,
+        "spec/x07-trust.profile.schema.json",
+        &doc,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!("trust profile schema invalid: {}", schema_diags[0].message);
+    }
+    let profile: TrustProfile =
+        serde_json::from_value(doc).with_context(|| format!("parse {}", path.display()))?;
+    if profile.schema_version.trim() != X07_TRUST_PROFILE_SCHEMA_VERSION {
+        anyhow::bail!(
+            "trust profile schema_version mismatch: expected {:?} got {:?}",
+            X07_TRUST_PROFILE_SCHEMA_VERSION,
+            profile.schema_version
+        );
+    }
+    Ok(profile)
+}
+
+fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::Diagnostic> {
+    let mut diags = Vec::new();
+    if profile.language_subset.allow_defasync
+        || profile.language_subset.allow_recursion
+        || profile.language_subset.allow_extern
+        || profile.language_subset.allow_unsafe
+        || profile.language_subset.allow_ffi
+        || profile.language_subset.allow_dynamic_dispatch
+        || profile.arch_requirements.manifest_min_version != "x07.arch.manifest@0.2.0"
+        || !profile.arch_requirements.require_allowlist_mode
+        || !profile.arch_requirements.require_deny_cycles
+        || !profile.arch_requirements.require_deny_orphans
+        || !profile.arch_requirements.require_visibility
+        || !profile.arch_requirements.require_world_caps
+        || !profile.arch_requirements.require_brand_boundaries
+        || !profile.evidence_requirements.require_boundary_index
+        || !profile.evidence_requirements.require_schema_derive_check
+        || !profile.evidence_requirements.require_smoke_harnesses
+        || !profile.evidence_requirements.require_unit_tests
+        || profile.evidence_requirements.require_pbt == "none"
+        || profile.evidence_requirements.require_proof_mode != "prove"
+        || !profile
+            .evidence_requirements
+            .require_proof_coverage
+            .starts_with("all_reachable_")
+        || !profile.evidence_requirements.require_compile_attestation
+        || !profile.evidence_requirements.require_trust_report_clean
+        || !profile.evidence_requirements.require_sbom
+    {
+        diags.push(trust_diag(
+            "X07TP_NOT_CERTIFIABLE",
+            "trust profile is weaker than the Milestone A certification floor",
+        ));
+    }
+    diags
+}
+
+fn validate_profile_against_context(
+    profile: &TrustProfile,
+    project_path: &Path,
+    ctx: &ProjectContext,
+    entry: Option<&str>,
+) -> Result<Vec<diagnostics::Diagnostic>> {
+    let mut diags = Vec::new();
+    if let Some(entry) = entry {
+        if !profile
+            .entrypoints
+            .iter()
+            .any(|candidate| candidate == entry)
+        {
+            diags.push(trust_diag(
+                "X07TP_ENTRY",
+                format!(
+                    "entry {entry:?} is not allowed by trust profile {}",
+                    profile.id
+                ),
+            ));
+        }
+    }
+
+    if !profile
+        .worlds_allowed
+        .iter()
+        .any(|world| world == ctx.world.as_str())
+    {
+        diags.push(trust_diag(
+            "X07TP_WORLD",
+            format!(
+                "project world {:?} is not allowed by trust profile {}",
+                ctx.world.as_str(),
+                profile.id
+            ),
+        ));
+    }
+
+    let features = scan_language_features(&ctx.module_roots);
+    if !profile.language_subset.allow_defasync && features.has_defasync {
+        diags.push(trust_diag(
+            "X07TP_LANGUAGE",
+            "project contains defasync declarations but the trust profile forbids them",
+        ));
+    }
+    if !profile.language_subset.allow_extern && features.has_extern {
+        diags.push(trust_diag(
+            "X07TP_LANGUAGE",
+            "project contains extern declarations but the trust profile forbids them",
+        ));
+    }
+    if !profile.language_subset.allow_unsafe
+        && ctx
+            .policy_doc
+            .as_ref()
+            .and_then(|doc| doc.pointer("/language/allow_unsafe"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diags.push(trust_diag(
+            "X07TP_LANGUAGE",
+            "project policy enables allow_unsafe but the trust profile forbids it",
+        ));
+    }
+    if !profile.language_subset.allow_ffi
+        && ctx
+            .policy_doc
+            .as_ref()
+            .and_then(|doc| doc.pointer("/language/allow_ffi"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diags.push(trust_diag(
+            "X07TP_LANGUAGE",
+            "project policy enables allow_ffi but the trust profile forbids it",
+        ));
+    }
+
+    let Some(arch_manifest_path) = ctx.arch_manifest_path.as_deref() else {
+        diags.push(trust_diag(
+            "X07TP_ARCH",
+            format!(
+                "project {:?} does not expose arch/manifest.x07arch.json required by trust profile",
+                project_path.display()
+            ),
+        ));
+        return Ok(diags);
+    };
+
+    let arch_doc = report_common::read_json_file(arch_manifest_path)?;
+    let schema_version = arch_doc
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if schema_version != profile.arch_requirements.manifest_min_version {
+        diags.push(trust_diag_with_path(
+            "X07TP_ARCH",
+            format!(
+                "arch manifest schema_version mismatch: expected {:?} got {:?}",
+                profile.arch_requirements.manifest_min_version, schema_version
+            ),
+            arch_manifest_path,
+        ));
+    }
+
+    if profile.arch_requirements.require_allowlist_mode
+        && !arch_doc
+            .pointer("/checks/allowlist_mode/enabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diags.push(trust_diag_with_path(
+            "X07TP_ARCH",
+            "arch checks.allowlist_mode.enabled must be true for this trust profile",
+            arch_manifest_path,
+        ));
+    }
+    if profile.arch_requirements.require_deny_cycles
+        && !arch_doc
+            .pointer("/checks/deny_cycles")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diags.push(trust_diag_with_path(
+            "X07TP_ARCH",
+            "arch checks.deny_cycles must be true for this trust profile",
+            arch_manifest_path,
+        ));
+    }
+    if profile.arch_requirements.require_deny_orphans
+        && !arch_doc
+            .pointer("/checks/deny_orphans")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diags.push(trust_diag_with_path(
+            "X07TP_ARCH",
+            "arch checks.deny_orphans must be true for this trust profile",
+            arch_manifest_path,
+        ));
+    }
+    if profile.arch_requirements.require_visibility
+        && !arch_doc
+            .pointer("/checks/enforce_visibility")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diags.push(trust_diag_with_path(
+            "X07TP_ARCH",
+            "arch checks.enforce_visibility must be true for this trust profile",
+            arch_manifest_path,
+        ));
+    }
+    if profile.arch_requirements.require_world_caps
+        && !arch_doc
+            .pointer("/checks/enforce_world_caps")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diags.push(trust_diag_with_path(
+            "X07TP_ARCH",
+            "arch checks.enforce_world_caps must be true for this trust profile",
+            arch_manifest_path,
+        ));
+    }
+    if profile.arch_requirements.require_brand_boundaries
+        && !arch_doc
+            .pointer("/checks/brand_boundary_v1/enabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diags.push(trust_diag_with_path(
+            "X07TP_ARCH",
+            "arch checks.brand_boundary_v1.enabled must be true for this trust profile",
+            arch_manifest_path,
+        ));
+    }
+    if profile.evidence_requirements.require_boundary_index
+        && arch_doc
+            .pointer("/contracts_v1/boundaries/index_path")
+            .and_then(Value::as_str)
+            .is_none()
+    {
+        diags.push(trust_diag_with_path(
+            "X07TP_BOUNDARY",
+            "contracts_v1.boundaries.index_path is required by this trust profile",
+            arch_manifest_path,
+        ));
+    }
+
+    Ok(diags)
+}
+
+fn scan_language_features(module_roots: &[PathBuf]) -> LanguageFeatureScan {
+    let mut scan = LanguageFeatureScan::default();
+    for root in module_roots {
+        if !root.is_dir() {
+            continue;
+        }
+        for entry in walkdir::WalkDir::new(root).into_iter().flatten() {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if !path
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy().ends_with(".x07.json"))
+            {
+                continue;
+            }
+            let Ok(doc) = report_common::read_json_file(path) else {
+                continue;
+            };
+            if let Some(decls) = doc.get("decls").and_then(Value::as_array) {
+                for decl in decls {
+                    match decl.get("kind").and_then(Value::as_str).unwrap_or("") {
+                        "defasync" => scan.has_defasync = true,
+                        "extern" => scan.has_extern = true,
+                        _ => {}
+                    }
+                }
+            }
+            if scan.has_defasync && scan.has_extern {
+                return scan;
+            }
+        }
+    }
+    scan
+}
+
+fn resolve_project_manifest_arg(path: &Path) -> Result<PathBuf> {
+    let resolved = util::resolve_existing_path_upwards(path);
+    if resolved.is_dir() {
+        let manifest = resolved.join("x07.json");
+        if manifest.is_file() {
+            return Ok(manifest);
+        }
+        anyhow::bail!(
+            "project dir does not contain x07.json: {}",
+            resolved.display()
+        );
+    }
+    if resolved.is_file() {
+        return Ok(resolved);
+    }
+    anyhow::bail!("project path not found: {}", resolved.display())
+}
+
+fn build_boundaries_evidence(
+    project_root: &Path,
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(EvidenceRef, Value)> {
+    let manifest_path = project_root.join("arch/manifest.x07arch.json");
+    let boundaries_path = out_dir.join("boundaries.report.json");
+    if !manifest_path.is_file() {
+        diagnostics.push(trust_diag(
+            "X07TC_EARCH",
+            "arch/manifest.x07arch.json is missing",
+        ));
+        let evidence = write_stub_artifact(
+            &boundaries_path,
+            "boundaries_report",
+            "arch manifest is missing",
+        )?;
+        return Ok((evidence, json!({})));
+    }
+
+    let arch_report_path = out_dir.join("arch.report.json");
+    let args = vec![
+        "--out".to_string(),
+        arch_report_path.display().to_string(),
+        "arch".to_string(),
+        "check".to_string(),
+        "--repo-root".to_string(),
+        project_root.display().to_string(),
+        "--manifest".to_string(),
+        manifest_path.display().to_string(),
+    ];
+    let run = run_self_command(project_root, &args)?;
+    if run.exit_code != 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_EARCH",
+            format!(
+                "x07 arch check exited with {}: {}",
+                run.exit_code,
+                stderr_summary(&run.stderr)
+            ),
+        ));
+    }
+    let doc = if arch_report_path.is_file() {
+        report_common::read_json_file(&arch_report_path)?
+    } else {
+        json!({})
+    };
+    let boundaries_doc = doc.get("boundaries_report").cloned().unwrap_or_else(|| {
+        diagnostics.push(trust_diag(
+            "X07TC_EBOUNDARY",
+            "arch report did not include boundaries_report",
+        ));
+        json!({"ok": false, "message": "boundaries_report missing from arch report"})
+    });
+    write_json_artifact(&boundaries_path, &boundaries_doc)?;
+    Ok((evidence_ref_for_path(&boundaries_path)?, boundaries_doc))
+}
+
+fn build_coverage_evidence(
+    project_path: &Path,
+    entry: &str,
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(EvidenceRef, Value, Vec<String>)> {
+    let verify_report_path = out_dir.join("verify.coverage.report.json");
+    let coverage_path = out_dir.join("verify.coverage.json");
+    let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let args = vec![
+        "verify".to_string(),
+        "--coverage".to_string(),
+        "--entry".to_string(),
+        entry.to_string(),
+        "--project".to_string(),
+        project_path.display().to_string(),
+        "--report-out".to_string(),
+        verify_report_path.display().to_string(),
+        "--quiet-json".to_string(),
+    ];
+    let run = run_self_command(cwd, &args)?;
+    if run.exit_code != 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_ECOVERAGE",
+            format!(
+                "x07 verify --coverage exited with {}: {}",
+                run.exit_code,
+                stderr_summary(&run.stderr)
+            ),
+        ));
+    }
+
+    let report_doc = if verify_report_path.is_file() {
+        report_common::read_json_file(&verify_report_path)?
+    } else {
+        json!({})
+    };
+    let coverage_doc = report_doc
+        .get("coverage")
+        .cloned()
+        .unwrap_or_else(|| json!({"summary": {}, "functions": []}));
+    write_json_artifact(&coverage_path, &coverage_doc)?;
+
+    if report_doc.pointer("/result/kind").and_then(Value::as_str) != Some("coverage_report") {
+        diagnostics.push(trust_diag(
+            "X07TC_ECOVERAGE",
+            "verify coverage report did not report result.kind = coverage_report",
+        ));
+    }
+
+    let mut prove_targets = Vec::new();
+    if let Some(functions) = coverage_doc.get("functions").and_then(Value::as_array) {
+        for function in functions {
+            if function.get("kind").and_then(Value::as_str) == Some("defn")
+                && function.get("status").and_then(Value::as_str) == Some("proven")
+            {
+                if let Some(symbol) = function.get("symbol").and_then(Value::as_str) {
+                    prove_targets.push(symbol.to_string());
+                }
+            }
+        }
+    }
+
+    Ok((
+        evidence_ref_for_path(&coverage_path)?,
+        coverage_doc,
+        prove_targets,
+    ))
+}
+
+fn build_prove_evidence(
+    project_path: &Path,
+    prove_targets: &[String],
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<Vec<EvidenceRef>> {
+    let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let prove_dir = out_dir.join("prove");
+    std::fs::create_dir_all(&prove_dir)
+        .with_context(|| format!("create prove dir: {}", prove_dir.display()))?;
+
+    let mut refs = Vec::new();
+    for symbol in prove_targets {
+        let report_path = prove_dir.join(format!("{}.json", util::safe_artifact_dir_name(symbol)));
+        let args = vec![
+            "verify".to_string(),
+            "--prove".to_string(),
+            "--entry".to_string(),
+            symbol.clone(),
+            "--project".to_string(),
+            project_path.display().to_string(),
+            "--report-out".to_string(),
+            report_path.display().to_string(),
+            "--quiet-json".to_string(),
+        ];
+        let run = run_self_command(cwd, &args)?;
+        if run.exit_code != 0 {
+            diagnostics.push(trust_diag(
+                "X07TC_EPROVE",
+                format!(
+                    "x07 verify --prove for {:?} exited with {}: {}",
+                    symbol,
+                    run.exit_code,
+                    stderr_summary(&run.stderr)
+                ),
+            ));
+        }
+        let report_doc = if report_path.is_file() {
+            report_common::read_json_file(&report_path)?
+        } else {
+            json!({})
+        };
+        if report_doc.pointer("/result/kind").and_then(Value::as_str) != Some("proven") {
+            diagnostics.push(trust_diag(
+                "X07TC_EPROVE",
+                format!(
+                    "proof report for {:?} did not return result.kind = proven",
+                    symbol
+                ),
+            ));
+        }
+        refs.push(if report_path.is_file() {
+            evidence_ref_for_path(&report_path)?
+        } else {
+            write_stub_artifact(
+                &report_path,
+                "prove_report",
+                &format!("missing proof report for {symbol}"),
+            )?
+        });
+    }
+    Ok(refs)
+}
+
+fn build_tests_evidence(
+    project_root: &Path,
+    tests_manifest: &Path,
+    profile: Option<&TrustProfile>,
+    boundary_requirements: &BoundaryEvidenceRequirements,
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<EvidenceRef> {
+    let tests_report_path = out_dir.join("tests.report.json");
+    let require_tests = profile.is_some_and(|p| {
+        p.evidence_requirements.require_unit_tests
+            || p.evidence_requirements.require_smoke_harnesses
+            || p.evidence_requirements.require_pbt.trim() != "none"
+    });
+
+    if !tests_manifest.is_file() {
+        if require_tests {
+            diagnostics.push(trust_diag(
+                "X07TC_ETEST",
+                "tests/tests.json is missing but the trust profile requires tests",
+            ));
+        }
+        return write_stub_artifact(&tests_report_path, "tests_report", "tests manifest missing");
+    }
+    if let Err(err) = validate_boundary_tests_against_manifest(
+        tests_manifest,
+        profile,
+        boundary_requirements,
+        diagnostics,
+    ) {
+        diagnostics.push(trust_diag(
+            "X07TC_ETEST",
+            format!("validate boundary test requirements: {err:#}"),
+        ));
+    }
+
+    let mut args = vec![
+        "test".to_string(),
+        "--manifest".to_string(),
+        tests_manifest.display().to_string(),
+        "--report-out".to_string(),
+        tests_report_path.display().to_string(),
+        "--quiet-json".to_string(),
+    ];
+    if profile.is_some_and(|p| p.evidence_requirements.require_pbt.trim() != "none") {
+        args.push("--all".to_string());
+    }
+    let run = run_self_command(project_root, &args)?;
+    if run.exit_code != 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_ETEST",
+            format!(
+                "x07 test exited with {}: {}",
+                run.exit_code,
+                stderr_summary(&run.stderr)
+            ),
+        ));
+    }
+    if tests_report_path.is_file() {
+        let report_doc = report_common::read_json_file(&tests_report_path)?;
+        let failed = report_doc
+            .pointer("/summary/failed")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let errors = report_doc
+            .pointer("/summary/errors")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        if failed > 0 || errors > 0 {
+            diagnostics.push(trust_diag(
+                "X07TC_ETEST",
+                "x07 test report indicates failing tests",
+            ));
+        }
+        validate_boundary_tests_against_report(&report_doc, boundary_requirements, diagnostics);
+        evidence_ref_for_path(&tests_report_path)
+    } else {
+        write_stub_artifact(
+            &tests_report_path,
+            "tests_report",
+            "x07 test did not emit a report",
+        )
+    }
+}
+
+fn build_trust_report_evidence(
+    project_path: &Path,
+    profile: Option<&TrustProfile>,
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<EvidenceRef> {
+    let trust_report_path = out_dir.join("trust.report.json");
+    let trust_report_html = out_dir.join("trust.report.html");
+    let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let args = vec![
+        "--out".to_string(),
+        trust_report_path.display().to_string(),
+        "trust".to_string(),
+        "report".to_string(),
+        "--project".to_string(),
+        project_path.display().to_string(),
+        "--html-out".to_string(),
+        trust_report_html.display().to_string(),
+    ];
+    let run = run_self_command(cwd, &args)?;
+    if run.exit_code != 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_ETRUST_REPORT",
+            format!(
+                "x07 trust report exited with {}: {}",
+                run.exit_code,
+                stderr_summary(&run.stderr)
+            ),
+        ));
+    }
+
+    if trust_report_path.is_file() {
+        let report_doc = report_common::read_json_file(&trust_report_path)?;
+        if profile.is_some_and(|p| p.evidence_requirements.require_trust_report_clean)
+            && report_doc
+                .pointer("/nondeterminism/flags")
+                .and_then(Value::as_array)
+                .is_some_and(|flags| !flags.is_empty())
+        {
+            diagnostics.push(trust_diag(
+                "X07TC_ETRUST_REPORT",
+                "trust report contains nondeterminism flags",
+            ));
+        }
+        if profile.is_some_and(|p| p.evidence_requirements.require_sbom)
+            && !report_doc
+                .pointer("/sbom/generated")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        {
+            diagnostics.push(trust_diag(
+                "X07TC_ETRUST_REPORT",
+                "trust report did not generate an SBOM artifact",
+            ));
+        }
+        evidence_ref_for_path(&trust_report_path)
+    } else {
+        write_stub_artifact(
+            &trust_report_path,
+            "trust_report",
+            "x07 trust report did not emit a report",
+        )
+    }
+}
+
+fn build_bundle_evidence(
+    project_path: &Path,
+    entry: &str,
+    bundle_out: Option<&Path>,
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(EvidenceRef, Option<PathBuf>)> {
+    let bundle_path = bundle_out
+        .map(PathBuf::from)
+        .unwrap_or_else(|| out_dir.join(util::safe_artifact_dir_name(entry)));
+    let attestation_path = out_dir.join("compile.attest.json");
+    let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let args = vec![
+        "--out".to_string(),
+        bundle_path.display().to_string(),
+        "bundle".to_string(),
+        "--project".to_string(),
+        project_path.display().to_string(),
+        "--emit-attestation".to_string(),
+        attestation_path.display().to_string(),
+    ];
+    let run = run_self_command(cwd, &args)?;
+    if run.exit_code != 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_ECOMPILE_ATTEST",
+            format!(
+                "x07 bundle exited with {}: {}",
+                run.exit_code,
+                stderr_summary(&run.stderr)
+            ),
+        ));
+    }
+
+    let attestation_ref = if attestation_path.is_file() {
+        let doc = report_common::read_json_file(&attestation_path)?;
+        if !doc
+            .pointer("/rebuild/deterministic_match")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            diagnostics.push(trust_diag(
+                "X07TC_ECOMPILE_ATTEST",
+                "compile attestation does not report a deterministic rebuild match",
+            ));
+        }
+        evidence_ref_for_path(&attestation_path)?
+    } else {
+        write_stub_artifact(
+            &attestation_path,
+            "compile_attestation",
+            "bundle step did not emit compile attestation",
+        )?
+    };
+
+    let bundle_path = if bundle_path.is_file() {
+        Some(bundle_path)
+    } else {
+        diagnostics.push(trust_diag(
+            "X07TC_ECOMPILE_ATTEST",
+            "bundle step did not produce an output executable",
+        ));
+        None
+    };
+
+    Ok((attestation_ref, bundle_path))
+}
+
+fn build_review_evidence(
+    baseline: Option<&Path>,
+    project_root: &Path,
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<Option<EvidenceRef>> {
+    let Some(baseline) = baseline else {
+        return Ok(None);
+    };
+    let baseline = util::resolve_existing_path_upwards(baseline);
+    let review_json = out_dir.join("review.diff.json");
+    let review_html = out_dir.join("review.diff.html");
+    let args = vec![
+        "review".to_string(),
+        "diff".to_string(),
+        "--from".to_string(),
+        baseline.display().to_string(),
+        "--to".to_string(),
+        project_root.display().to_string(),
+        "--mode".to_string(),
+        "project".to_string(),
+        "--json-out".to_string(),
+        review_json.display().to_string(),
+        "--html-out".to_string(),
+        review_html.display().to_string(),
+    ];
+    let run = run_self_command(project_root, &args)?;
+    if run.exit_code != 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_EREVIEW",
+            format!(
+                "x07 review diff exited with {}: {}",
+                run.exit_code,
+                stderr_summary(&run.stderr)
+            ),
+        ));
+    }
+    if review_json.is_file() {
+        Ok(Some(evidence_ref_for_path(&review_json)?))
+    } else {
+        Ok(Some(write_stub_artifact(
+            &review_json,
+            "review_diff",
+            "review diff did not emit a JSON report",
+        )?))
+    }
+}
+
+fn load_boundary_requirements(project_root: &Path) -> Result<BoundaryEvidenceRequirements> {
+    let manifest_path = project_root.join("arch/manifest.x07arch.json");
+    if !manifest_path.is_file() {
+        return Ok(BoundaryEvidenceRequirements::default());
+    }
+    let manifest_doc = report_common::read_json_file(&manifest_path)?;
+    let Some(index_path) = manifest_doc
+        .pointer("/contracts_v1/boundaries/index_path")
+        .and_then(Value::as_str)
+    else {
+        return Ok(BoundaryEvidenceRequirements::default());
+    };
+    let index_path = project_root.join(index_path);
+    if !index_path.is_file() {
+        return Ok(BoundaryEvidenceRequirements::default());
+    }
+    let index_doc = report_common::read_json_file(&index_path)?;
+    let mut requirements = BoundaryEvidenceRequirements::default();
+    if let Some(boundaries) = index_doc.get("boundaries").and_then(Value::as_array) {
+        for boundary in boundaries {
+            let boundary_id = boundary
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown_boundary");
+            let worlds_allowed = boundary
+                .get("worlds_allowed")
+                .and_then(Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_string)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            if let Some(params) = boundary.pointer("/input/params").and_then(Value::as_array) {
+                for param in params {
+                    if let Some(schema_path) = param.get("schema").and_then(Value::as_str) {
+                        requirements.schema_paths.insert(schema_path.to_string());
+                    }
+                }
+            }
+            if let Some(schema_path) = boundary.pointer("/output/schema").and_then(Value::as_str) {
+                requirements.schema_paths.insert(schema_path.to_string());
+            }
+            if let Some(tests) = boundary.pointer("/smoke/tests").and_then(Value::as_array) {
+                for test_id in tests.iter().filter_map(Value::as_str) {
+                    add_boundary_test_requirement(
+                        &mut requirements,
+                        test_id,
+                        false,
+                        boundary_id,
+                        &worlds_allowed,
+                    );
+                }
+            }
+            if boundary
+                .pointer("/pbt/required")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                if let Some(tests) = boundary.pointer("/pbt/tests").and_then(Value::as_array) {
+                    for test_id in tests.iter().filter_map(Value::as_str) {
+                        add_boundary_test_requirement(
+                            &mut requirements,
+                            test_id,
+                            true,
+                            boundary_id,
+                            &worlds_allowed,
+                        );
+                    }
+                }
+            }
+        }
+    }
+    Ok(requirements)
+}
+
+fn add_boundary_test_requirement(
+    requirements: &mut BoundaryEvidenceRequirements,
+    test_id: &str,
+    expects_pbt: bool,
+    boundary_id: &str,
+    worlds_allowed: &[String],
+) {
+    let entry = requirements
+        .required_tests
+        .entry(test_id.to_string())
+        .or_default();
+    entry.expects_pbt |= expects_pbt;
+    entry.boundary_ids.insert(boundary_id.to_string());
+    entry.worlds_allowed.extend(worlds_allowed.iter().cloned());
+}
+
+fn load_tests_manifest_requirements(
+    tests_manifest: &Path,
+) -> Result<BTreeMap<String, ManifestTestRequirement>> {
+    let manifest_doc = report_common::read_json_file(tests_manifest)?;
+    let mut tests = BTreeMap::new();
+    if let Some(entries) = manifest_doc.get("tests").and_then(Value::as_array) {
+        for entry in entries {
+            let Some(id) = entry.get("id").and_then(Value::as_str) else {
+                continue;
+            };
+            let world = entry
+                .get("world")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            let has_pbt = entry.get("pbt").is_some();
+            tests.insert(id.to_string(), ManifestTestRequirement { world, has_pbt });
+        }
+    }
+    Ok(tests)
+}
+
+fn validate_boundary_tests_against_manifest(
+    tests_manifest: &Path,
+    profile: Option<&TrustProfile>,
+    boundary_requirements: &BoundaryEvidenceRequirements,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<()> {
+    let manifest_tests = load_tests_manifest_requirements(tests_manifest)?;
+    if let Some(profile) = profile {
+        for (test_id, info) in &manifest_tests {
+            if !profile
+                .worlds_allowed
+                .iter()
+                .any(|world| world == &info.world)
+            {
+                diagnostics.push(trust_diag(
+                    "X07TC_ETEST",
+                    format!(
+                        "test {:?} uses world {:?} outside trust profile {}",
+                        test_id, info.world, profile.id
+                    ),
+                ));
+            }
+        }
+    }
+    for (test_id, requirement) in &boundary_requirements.required_tests {
+        let code = if requirement.expects_pbt {
+            "X07TC_EPBT"
+        } else {
+            "X07TC_ETEST"
+        };
+        let Some(info) = manifest_tests.get(test_id) else {
+            diagnostics.push(trust_diag(
+                code,
+                format!(
+                    "boundary-required test {:?} is missing from {}",
+                    test_id,
+                    tests_manifest.display()
+                ),
+            ));
+            continue;
+        };
+        if requirement.expects_pbt && !info.has_pbt {
+            diagnostics.push(trust_diag(
+                "X07TC_EPBT",
+                format!(
+                    "boundary-required property test {:?} is not declared as a pbt test",
+                    test_id
+                ),
+            ));
+        }
+        if !requirement.worlds_allowed.is_empty()
+            && !requirement.worlds_allowed.contains(&info.world)
+        {
+            diagnostics.push(trust_diag(
+                code,
+                format!(
+                    "boundary-required test {:?} uses world {:?}, expected one of {:?}",
+                    test_id, info.world, requirement.worlds_allowed
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_boundary_tests_against_report(
+    report_doc: &Value,
+    boundary_requirements: &BoundaryEvidenceRequirements,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) {
+    let mut statuses = BTreeMap::new();
+    if let Some(entries) = report_doc.get("tests").and_then(Value::as_array) {
+        for entry in entries {
+            let Some(id) = entry.get("id").and_then(Value::as_str) else {
+                continue;
+            };
+            let status = entry
+                .get("status")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown")
+                .to_string();
+            statuses.insert(id.to_string(), status);
+        }
+    }
+
+    for (test_id, requirement) in &boundary_requirements.required_tests {
+        let code = if requirement.expects_pbt {
+            "X07TC_EPBT"
+        } else {
+            "X07TC_ETEST"
+        };
+        match statuses.get(test_id).map(String::as_str) {
+            Some("pass") => {}
+            Some(status) => diagnostics.push(trust_diag(
+                code,
+                format!(
+                    "boundary-required test {:?} did not pass (status = {:?})",
+                    test_id, status
+                ),
+            )),
+            None => diagnostics.push(trust_diag(
+                code,
+                format!(
+                    "boundary-required test {:?} was not present in tests.report.json",
+                    test_id
+                ),
+            )),
+        }
+    }
+}
+
+fn build_schema_derive_evidence(
+    project_root: &Path,
+    boundary_requirements: &BoundaryEvidenceRequirements,
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<Vec<EvidenceRef>> {
+    let reports_dir = out_dir.join("schema-derive");
+    std::fs::create_dir_all(&reports_dir)
+        .with_context(|| format!("create schema derive dir: {}", reports_dir.display()))?;
+
+    let mut refs = Vec::new();
+    for schema_path in &boundary_requirements.schema_paths {
+        let report_path = reports_dir.join(format!(
+            "{}.json",
+            util::safe_artifact_dir_name(schema_path)
+        ));
+        let input_path = project_root.join(schema_path);
+        if !input_path.is_file() {
+            diagnostics.push(trust_diag(
+                "X07TC_ESCHEMADERIVE",
+                format!(
+                    "boundary-referenced schema is missing: {}",
+                    input_path.display()
+                ),
+            ));
+            refs.push(write_stub_artifact(
+                &report_path,
+                "schema_derive",
+                &format!("missing schema input {}", input_path.display()),
+            )?);
+            continue;
+        }
+
+        let args = vec![
+            "schema".to_string(),
+            "derive".to_string(),
+            "--input".to_string(),
+            schema_path.clone(),
+            "--out-dir".to_string(),
+            ".".to_string(),
+            "--check".to_string(),
+            "--report-out".to_string(),
+            report_path.display().to_string(),
+            "--quiet-json".to_string(),
+        ];
+        let run = run_self_command(project_root, &args)?;
+        if run.exit_code != 0 {
+            diagnostics.push(trust_diag(
+                "X07TC_ESCHEMADERIVE",
+                format!(
+                    "x07 schema derive --check failed for {:?}: {}",
+                    schema_path,
+                    stderr_summary(&run.stderr)
+                ),
+            ));
+        }
+        refs.push(if report_path.is_file() {
+            evidence_ref_for_path(&report_path)?
+        } else {
+            write_stub_artifact(
+                &report_path,
+                "schema_derive",
+                &format!("missing schema derive report for {schema_path}"),
+            )?
+        });
+    }
+    Ok(refs)
+}
+
+fn run_self_command(cwd: &Path, args: &[String]) -> Result<ToolRunOutcome> {
+    let exe = std::env::current_exe().context("resolve current x07 executable")?;
+    let out = Command::new(exe)
+        .current_dir(cwd)
+        .args(args)
+        .output()
+        .with_context(|| format!("run x07 command in {}", cwd.display()))?;
+    Ok(ToolRunOutcome {
+        exit_code: out.status.code().unwrap_or(-1),
+        stderr: out.stderr,
+    })
+}
+
+fn write_json_artifact(path: &Path, value: &Value) -> Result<()> {
+    let bytes = report_common::canonical_pretty_json_bytes(value)?;
+    util::write_atomic(path, &bytes).with_context(|| format!("write artifact: {}", path.display()))
+}
+
+fn write_stub_artifact(path: &Path, artifact: &str, message: &str) -> Result<EvidenceRef> {
+    let value = json!({
+        "ok": false,
+        "artifact": artifact,
+        "message": message,
+    });
+    write_json_artifact(path, &value)?;
+    evidence_ref_for_path(path)
+}
+
+fn evidence_ref_for_path(path: &Path) -> Result<EvidenceRef> {
+    let bytes =
+        std::fs::read(path).with_context(|| format!("read artifact: {}", path.display()))?;
+    Ok(EvidenceRef {
+        path: path.display().to_string(),
+        sha256_hex: util::sha256_hex(&bytes),
+    })
+}
+
+fn stderr_summary(stderr: &[u8]) -> String {
+    let text = String::from_utf8_lossy(stderr).trim().to_string();
+    if text.is_empty() {
+        "no stderr output".to_string()
+    } else {
+        text
+    }
+}
+
+fn trust_diag(code: &str, message: impl Into<String>) -> diagnostics::Diagnostic {
+    reporting::diag_error(code, diagnostics::Stage::Run, &message.into())
+}
+
+fn trust_diag_with_path(
+    code: &str,
+    message: impl Into<String>,
+    path: &Path,
+) -> diagnostics::Diagnostic {
+    let mut diag = trust_diag(code, message);
+    diag.data.insert(
+        "path".to_string(),
+        Value::String(path.display().to_string()),
+    );
+    diag
+}
+
 fn normalize_sensitive_namespace_set(items: &[String]) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     for raw in items {
@@ -1788,4 +3674,223 @@ fn stdlib_sbom_components(path: &Path) -> Vec<SbomComponent> {
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_test_dir(prefix: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "x07_trust_{prefix}_{}_{}",
+            std::process::id(),
+            unique
+        ));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    #[test]
+    fn trust_certificate_serialization_keeps_empty_prove_reports() {
+        let certificate = TrustCertificate {
+            schema_version: X07_TRUST_CERTIFICATE_SCHEMA_VERSION,
+            verdict: "rejected".to_string(),
+            profile: "verified_core_pure_v1".to_string(),
+            entry: "app.main".to_string(),
+            out_dir: "target/cert".to_string(),
+            claims: vec!["human_can_review_certificate_not_source".to_string()],
+            evidence: TrustCertificateEvidence {
+                boundaries_report: EvidenceRef {
+                    path: "boundaries.report.json".to_string(),
+                    sha256_hex: "0".repeat(64),
+                },
+                coverage_report: EvidenceRef {
+                    path: "verify.coverage.json".to_string(),
+                    sha256_hex: "1".repeat(64),
+                },
+                schema_derive_reports: Vec::new(),
+                prove_reports: Vec::new(),
+                tests_report: EvidenceRef {
+                    path: "tests.report.json".to_string(),
+                    sha256_hex: "2".repeat(64),
+                },
+                trust_report: EvidenceRef {
+                    path: "trust.report.json".to_string(),
+                    sha256_hex: "3".repeat(64),
+                },
+                compile_attestation: EvidenceRef {
+                    path: "compile.attest.json".to_string(),
+                    sha256_hex: "4".repeat(64),
+                },
+                review_diff: None,
+                bundle_path: None,
+            },
+            diagnostics: Vec::new(),
+        };
+
+        let value = serde_json::to_value(&certificate).expect("serialize certificate");
+        let prove_reports = value
+            .pointer("/evidence/prove_reports")
+            .and_then(Value::as_array)
+            .expect("prove_reports array");
+        assert!(prove_reports.is_empty());
+    }
+
+    #[test]
+    fn load_boundary_requirements_collects_schema_paths_and_required_tests() {
+        let dir = temp_test_dir("boundary_requirements");
+        std::fs::create_dir_all(dir.join("arch/boundaries")).expect("create boundaries dir");
+        std::fs::write(
+            dir.join("arch/manifest.x07arch.json"),
+            serde_json::to_vec_pretty(&json!({
+                "schema_version": "x07.arch.manifest@0.2.0",
+                "repo": {"id": "fixture", "root": "."},
+                "nodes": [],
+                "rules": [],
+                "checks": {
+                    "deny_cycles": true,
+                    "deny_orphans": true,
+                    "enforce_visibility": true,
+                    "enforce_world_caps": true
+                },
+                "contracts_v1": {
+                    "boundaries": {
+                        "index_path": "arch/boundaries/index.x07boundary.json",
+                        "enforce": "error"
+                    }
+                }
+            }))
+            .expect("serialize manifest"),
+        )
+        .expect("write manifest");
+        std::fs::write(
+            dir.join("arch/boundaries/index.x07boundary.json"),
+            serde_json::to_vec_pretty(&json!({
+                "schema_version": "x07.arch.boundaries.index@0.1.0",
+                "boundaries": [
+                    {
+                        "id": "app.main_v1",
+                        "symbol": "app.main_v1",
+                        "node_id": "app_core",
+                        "kind": "public_function",
+                        "from_zone": "verified_core",
+                        "to_zone": "verified_core",
+                        "worlds_allowed": ["solve-pure"],
+                        "input": {
+                            "params": [
+                                {
+                                    "name": "req",
+                                    "ty": "bytes_view",
+                                    "schema": "arch/schemas/request.x07schema.json"
+                                }
+                            ]
+                        },
+                        "output": {
+                            "ty": "result_bytes",
+                            "schema": "arch/schemas/response.x07schema.json",
+                            "error_space": "app.main_errors_v1"
+                        },
+                        "smoke": {
+                            "entry": "tests.core.smoke_main_v1",
+                            "tests": ["smoke/main"]
+                        },
+                        "pbt": {
+                            "required": true,
+                            "tests": ["pbt/main"]
+                        },
+                        "verify": {
+                            "required": true,
+                            "mode": "prove"
+                        }
+                    }
+                ]
+            }))
+            .expect("serialize boundaries"),
+        )
+        .expect("write boundaries");
+
+        let requirements = load_boundary_requirements(&dir).expect("load boundary requirements");
+        assert!(requirements
+            .schema_paths
+            .contains("arch/schemas/request.x07schema.json"));
+        assert!(requirements
+            .schema_paths
+            .contains("arch/schemas/response.x07schema.json"));
+        assert!(requirements
+            .required_tests
+            .get("smoke/main")
+            .is_some_and(|req| !req.expects_pbt));
+        assert!(requirements
+            .required_tests
+            .get("pbt/main")
+            .is_some_and(|req| req.expects_pbt));
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn validate_boundary_tests_against_manifest_requires_pbt_entries() {
+        let dir = temp_test_dir("boundary_test_manifest");
+        let tests_manifest = dir.join("tests.json");
+        std::fs::write(
+            &tests_manifest,
+            serde_json::to_vec_pretty(&json!({
+                "schema_version": "x07.tests_manifest@0.2.0",
+                "tests": [
+                    {
+                        "id": "smoke/main",
+                        "entry": "tests.core.smoke_main_v1",
+                        "expect": "pass",
+                        "world": "solve-pure"
+                    },
+                    {
+                        "id": "pbt/main",
+                        "entry": "tests.core.pbt_main_v1",
+                        "expect": "pass",
+                        "world": "solve-pure"
+                    }
+                ]
+            }))
+            .expect("serialize tests manifest"),
+        )
+        .expect("write tests manifest");
+
+        let mut diagnostics = Vec::new();
+        let mut requirements = BoundaryEvidenceRequirements::default();
+        add_boundary_test_requirement(
+            &mut requirements,
+            "smoke/main",
+            false,
+            "app.main_v1",
+            &["solve-pure".to_string()],
+        );
+        add_boundary_test_requirement(
+            &mut requirements,
+            "pbt/main",
+            true,
+            "app.main_v1",
+            &["solve-pure".to_string()],
+        );
+
+        validate_boundary_tests_against_manifest(
+            &tests_manifest,
+            None,
+            &requirements,
+            &mut diagnostics,
+        )
+        .expect("validate manifest requirements");
+
+        assert!(diagnostics.iter().any(|diag| {
+            diag.code == "X07TC_EPBT"
+                && diag.message.contains(
+                    "boundary-required property test \"pbt/main\" is not declared as a pbt test",
+                )
+        }));
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
 }

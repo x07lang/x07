@@ -141,6 +141,14 @@ If your project uses pinned rr policies, archive policies, DB migrations, or arc
 
 If you are creating a publishable package repo (for `x07 pkg publish`), use `x07 init --package` instead of `x07 init`.
 
+If you want the smallest certificate-first pure project instead of the default app skeleton, start from:
+
+```bash
+x07 init --template verified-core-pure
+```
+
+That template wires `arch/`, smoke/PBT tests, and `verified_core_pure_v1` so you can go straight to `x07 trust profile check` and `x07 trust certify`.
+
 See also: [Available skills](available-skills.md).
 
 ## 3) The core loop: run → test (auto-repair)
@@ -218,6 +226,7 @@ If you need a human-reviewable artifact for an agent patchset, use:
 
 - `x07 review diff` (semantic diff; HTML)
 - `x07 trust report` (budgets/worlds/nondeterminism summary)
+- `x07 trust certify` (certificate bundle for `verified_core_pure_v1` projects)
 
 See: [Review & trust artifacts](../toolchain/review-trust.md).
 

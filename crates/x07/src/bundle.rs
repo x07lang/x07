@@ -10,7 +10,7 @@ use serde::Serialize;
 use serde_json::Value;
 use x07_contracts::{
     PROJECT_LOCKFILE_SCHEMA_VERSION, X07_BUNDLE_REPORT_SCHEMA_VERSION,
-    X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
+    X07_COMPILE_ATTEST_SCHEMA_VERSION, X07_HOST_RUNNER_REPORT_SCHEMA_VERSION,
 };
 use x07_host_runner::{apply_cc_profile, CcProfile, NativeCliWrapperOpts, NativeToolchainConfig};
 use x07_runner_common::sandbox_backend::{
@@ -27,11 +27,15 @@ use x07c::project;
 
 use crate::policy_overrides::{PolicyOverrides, PolicyResolution};
 use crate::repair::RepairArgs;
+use crate::report_common;
+use crate::util;
 
 const DEFAULT_SOLVE_FUEL: u64 = 50_000_000;
 const DEFAULT_MAX_MEMORY_BYTES: usize = 64 * 1024 * 1024;
 
 static VM_RUN_COUNTER: AtomicU64 = AtomicU64::new(0);
+const X07_COMPILE_ATTEST_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-compile.attest.schema.json");
 
 #[derive(Debug, Clone, Args)]
 pub struct BundleArgs {
@@ -121,6 +125,10 @@ pub struct BundleArgs {
     /// Emit intermediate C sources and report JSON for debugging/CI.
     #[arg(long, value_name = "DIR", alias = "emit")]
     pub emit_dir: Option<PathBuf>,
+
+    /// Emit source-to-binary attestation JSON.
+    #[arg(long, value_name = "PATH")]
+    pub emit_attestation: Option<PathBuf>,
 
     /// Module root directory for resolving module ids (required for --program).
     /// May be passed multiple times.
@@ -218,6 +226,52 @@ struct BundleReport {
     target: BundleTarget,
     bundle: BundleSection,
     report: Value,
+}
+
+#[derive(Debug, Serialize)]
+struct CompileAttestation {
+    schema_version: &'static str,
+    world: &'static str,
+    bundle_kind: &'static str,
+    output_path: String,
+    inputs: CompileAttestInputs,
+    artifacts: CompileAttestArtifacts,
+    compiler: CompileAttestCompiler,
+    rebuild: CompileAttestRebuild,
+}
+
+#[derive(Debug, Serialize)]
+struct CompileAttestInputs {
+    target_kind: &'static str,
+    target_path: String,
+    project_path: Option<String>,
+    lockfile_path: Option<String>,
+    program_sha256: String,
+    lockfile_sha256: Option<String>,
+    module_roots: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct CompileAttestArtifacts {
+    freestanding_c_sha256: Option<String>,
+    wrapper_c_sha256: Option<String>,
+    combined_c_sha256: String,
+    binary_sha256: String,
+}
+
+#[derive(Debug, Serialize)]
+struct CompileAttestCompiler {
+    lang_id: String,
+    ok: bool,
+    exit_status: Option<i32>,
+    stdout_sha256: Option<String>,
+    stderr_sha256: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct CompileAttestRebuild {
+    deterministic_match: bool,
+    binary_sha256: Option<String>,
 }
 
 #[derive(Debug)]
@@ -400,6 +454,9 @@ pub fn cmd_bundle(
         .and_then(|p| p.cpu_time_limit_seconds));
 
     if sandbox_backend == Some(EffectiveSandboxBackend::Vm) {
+        if args.emit_attestation.is_some() {
+            anyhow::bail!("--emit-attestation is not supported for VM bundles");
+        }
         let base_policy = base_policy
             .as_deref()
             .context("internal error: base_policy missing")?;
@@ -459,6 +516,56 @@ pub fn cmd_bundle(
         &out_path,
         &wrapper,
     )?;
+
+    if let Some(attestation_path) = &args.emit_attestation {
+        if !compile_out.compile.ok {
+            anyhow::bail!("--emit-attestation requires a successful bundle");
+        }
+        let binary_sha256 = sha256_hex_for_path(&out_path)?;
+        let rebuild = compute_double_build_rebuild(
+            &program_bytes,
+            &compile_options,
+            &toolchain,
+            &wrapper,
+            &out_path,
+        )?;
+        let attestation = CompileAttestation {
+            schema_version: X07_COMPILE_ATTEST_SCHEMA_VERSION,
+            world: world.as_str(),
+            bundle_kind: "native",
+            output_path: out_path.display().to_string(),
+            inputs: CompileAttestInputs {
+                target_kind: target_kind.as_str(),
+                target_path: target_path.display().to_string(),
+                project_path: project_manifest.as_ref().map(|p| p.display().to_string()),
+                lockfile_path: lockfile.as_ref().map(|p| p.display().to_string()),
+                program_sha256: util::sha256_hex(&program_bytes),
+                lockfile_sha256: lockfile
+                    .as_ref()
+                    .map(|p| std::fs::read(p))
+                    .transpose()?
+                    .map(|bytes| util::sha256_hex(&bytes)),
+                module_roots: resolved_module_roots.clone(),
+            },
+            artifacts: CompileAttestArtifacts {
+                freestanding_c_sha256: Some(util::sha256_hex(
+                    compile_out.freestanding_c.as_bytes(),
+                )),
+                wrapper_c_sha256: Some(util::sha256_hex(compile_out.wrapper_c.as_bytes())),
+                combined_c_sha256: util::sha256_hex(compile_out.combined_c.as_bytes()),
+                binary_sha256,
+            },
+            compiler: CompileAttestCompiler {
+                lang_id: compile_out.compile.lang_id.clone(),
+                ok: compile_out.compile.ok,
+                exit_status: Some(compile_out.compile.exit_status),
+                stdout_sha256: Some(util::sha256_hex(&compile_out.compile.stdout)),
+                stderr_sha256: Some(util::sha256_hex(&compile_out.compile.stderr)),
+            },
+            rebuild,
+        };
+        write_compile_attestation(attestation_path, &attestation)?;
+    }
 
     let host_report_mode = match target_kind {
         TargetKind::Project => "project-compile",
@@ -1422,4 +1529,81 @@ fn host_compile_report_json(
         },
         "solve": serde_json::Value::Null,
     }))
+}
+
+fn write_compile_attestation(path: &Path, attestation: &CompileAttestation) -> Result<()> {
+    let value = serde_json::to_value(attestation).context("serialize compile attestation JSON")?;
+    let diags = report_common::validate_schema(
+        X07_COMPILE_ATTEST_SCHEMA_BYTES,
+        "spec/x07-compile.attest.schema.json",
+        &value,
+    )?;
+    if !diags.is_empty() {
+        anyhow::bail!(
+            "internal error: compile attestation JSON is not schema-valid: {}",
+            diags[0].message
+        );
+    }
+    let bytes = report_common::canonical_pretty_json_bytes(&value)
+        .context("canon compile attestation JSON")?;
+    util::write_atomic(path, &bytes)
+        .with_context(|| format!("write compile attestation: {}", path.display()))
+}
+
+fn sha256_hex_for_path(path: &Path) -> Result<String> {
+    let bytes =
+        std::fs::read(path).with_context(|| format!("read file for sha256: {}", path.display()))?;
+    Ok(util::sha256_hex(&bytes))
+}
+
+fn compute_double_build_rebuild(
+    program: &[u8],
+    compile_options: &x07c::compile::CompileOptions,
+    toolchain: &NativeToolchainConfig,
+    wrapper: &NativeCliWrapperOpts,
+    out_path: &Path,
+) -> Result<CompileAttestRebuild> {
+    let first_sha256 = sha256_hex_for_path(out_path)?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "x07-bundle-attest-{}-{}",
+        std::process::id(),
+        nonce
+    ));
+    std::fs::create_dir_all(&tmp_dir)
+        .with_context(|| format!("create temp attestation dir: {}", tmp_dir.display()))?;
+    let tmp_out = tmp_dir.join(
+        out_path
+            .file_name()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("x07-rebuild")),
+    );
+
+    let rebuild_result =
+        x07_host_runner::compile_bundle_exe(program, compile_options, toolchain, &tmp_out, wrapper);
+
+    let rebuild = match rebuild_result {
+        Ok(rebuild) if rebuild.compile.ok && tmp_out.is_file() => {
+            let second_sha256 = sha256_hex_for_path(&tmp_out)?;
+            CompileAttestRebuild {
+                deterministic_match: second_sha256 == first_sha256,
+                binary_sha256: Some(second_sha256),
+            }
+        }
+        Ok(_) => CompileAttestRebuild {
+            deterministic_match: false,
+            binary_sha256: None,
+        },
+        Err(_) => CompileAttestRebuild {
+            deterministic_match: false,
+            binary_sha256: None,
+        },
+    };
+
+    let _ = std::fs::remove_file(&tmp_out);
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    Ok(rebuild)
 }

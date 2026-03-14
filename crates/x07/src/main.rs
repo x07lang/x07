@@ -419,6 +419,13 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Trust(args)) => match &args.cmd {
                 None => vec!["trust"],
                 Some(trust::TrustCommand::Report(_)) => vec!["trust", "report"],
+                Some(trust::TrustCommand::Profile(args)) => match &args.cmd {
+                    None => vec!["trust", "profile"],
+                    Some(trust::TrustProfileCommand::Check(_)) => {
+                        vec!["trust", "profile", "check"]
+                    }
+                },
+                Some(trust::TrustCommand::Certify(_)) => vec!["trust", "certify"],
             },
             Some(Command::Patch(args)) => match &args.cmd {
                 None => vec!["patch"],

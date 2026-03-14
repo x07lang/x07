@@ -1,0 +1,31 @@
+{
+  "schema_version": "x07.arch.boundaries.index@0.1.0",
+  "boundaries": [
+    {
+      "id": "app.main_v1",
+      "symbol": "app.main",
+      "node_id": "app",
+      "kind": "public_function",
+      "from_zone": "verified_core",
+      "to_zone": "verified_core",
+      "worlds_allowed": ["solve-pure"],
+      "input": { "params": [] },
+      "output": {
+        "ty": "bytes",
+        "schema": "arch/schemas/app.main.out.x07schema.json"
+      },
+      "smoke": {
+        "entry": "app.tests.main_smoke_v1",
+        "tests": ["smoke/app_main"]
+      },
+      "pbt": {
+        "required": true,
+        "tests": ["pbt/app_main"]
+      },
+      "verify": {
+        "required": true,
+        "mode": "prove"
+      }
+    }
+  ]
+}

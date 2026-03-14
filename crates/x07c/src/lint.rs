@@ -9,7 +9,9 @@ use crate::mem_provenance::{
     Violation, ViolationKind,
 };
 use crate::x07ast::{self, X07AstFile, X07AstKind};
-use x07_contracts::{X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0};
+use x07_contracts::{
+    X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+};
 
 fn expr_ident(name: impl Into<String>) -> Expr {
     Expr::Ident {
@@ -190,6 +192,13 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
             &ctx,
             &mut diagnostics,
         );
+        lint_loop_contracts(
+            &f.loop_contracts,
+            &format!("/decls/{decl_idx}/loop_contracts"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
 
         let ptr = format!("/decls/{decl_idx}/body");
         lint_expr(&f.body, &ptr, options, &ctx, &mut diagnostics);
@@ -217,6 +226,13 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
             &ctx,
             &mut diagnostics,
         );
+        lint_loop_contracts(
+            &f.loop_contracts,
+            &format!("/decls/{decl_idx}/loop_contracts"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
 
         let ptr = format!("/decls/{decl_idx}/body");
         lint_expr(&f.body, &ptr, options, &ctx, &mut diagnostics);
@@ -224,7 +240,8 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
 
     if run_typecheck
         && (file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0
-            || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0)
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_6_0)
     {
         let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
         diagnostics.extend(tc.diagnostics);
@@ -257,6 +274,32 @@ fn lint_contract_clauses(
                 diagnostics,
             );
         }
+    }
+}
+
+fn lint_loop_contracts(
+    loop_contracts: &[x07ast::LoopContractAst],
+    base_ptr: &str,
+    options: LintOptions,
+    ctx: &LintCtx,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for (idx, loop_contract) in loop_contracts.iter().enumerate() {
+        let lcptr = format!("{base_ptr}/{idx}");
+        lint_contract_clauses(
+            &loop_contract.invariant,
+            &format!("{lcptr}/invariant"),
+            options,
+            ctx,
+            diagnostics,
+        );
+        lint_contract_clauses(
+            &loop_contract.decreases,
+            &format!("{lcptr}/decreases"),
+            options,
+            ctx,
+            diagnostics,
+        );
     }
 }
 

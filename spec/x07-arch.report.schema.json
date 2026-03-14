@@ -30,6 +30,12 @@
         "node_edges": { "type": "integer", "minimum": 0 }
       }
     },
+    "boundaries_report": {
+      "oneOf": [
+        { "$ref": "https://x07.io/spec/x07-arch.boundaries.report.schema.json" },
+        { "type": "null" }
+      ]
+    },
     "diags": { "type": "array", "items": { "$ref": "x07diag.schema.json#/$defs/diagnostic" } },
     "suggested_patches": {
       "type": "array",
@@ -51,4 +57,3 @@
     }
   }
 }
-

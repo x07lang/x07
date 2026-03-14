@@ -2,6 +2,10 @@
 
 `x07 review diff` and `x07 trust report` generate deterministic review artifacts for agent-authored changes.
 
+For the smallest certificate-first example, see:
+
+- `docs/examples/verified_core_pure_v1/`
+
 ## Semantic diff (`x07 review diff`)
 
 ```bash
@@ -22,11 +26,14 @@ Notes:
   - `budget-increase`
   - `allow-unsafe`
   - `allow-ffi`
+  - `proof-coverage-decrease`
+  - `boundary-relaxation`
+  - `trusted-subset-expansion`
 
 JSON schema:
 
 - `spec/x07-review.diff.schema.json`
-- `schema_version: "x07.review.diff@0.1.0"`
+- `schema_version: "x07.review.diff@0.2.0"`
 
 ## Trust report (`x07 trust report`)
 
@@ -107,6 +114,62 @@ JSON schema:
 
 - `spec/x07-trust.report.schema.json`
 - `schema_version: "x07.trust.report@0.1.0"`
+
+## Trust profile check (`x07 trust profile check`)
+
+```bash
+x07 trust profile check \
+  --profile arch/trust/profiles/verified_core_pure_v1.json \
+  --project x07.json \
+  --entry app.main
+```
+
+This validates:
+
+- allowed entrypoints,
+- allowed worlds,
+- language subset restrictions (`defasync`, `extern`, `allow_unsafe`, `allow_ffi`),
+- arch manifest posture (`allowlist_mode`, cycles/orphans/visibility/world-caps),
+- boundary index wiring for the certifiable trust surface.
+
+## Trust certify (`x07 trust certify`)
+
+```bash
+x07 trust certify \
+  --project x07.json \
+  --profile arch/trust/profiles/verified_core_pure_v1.json \
+  --entry app.main \
+  --out-dir target/cert
+```
+
+The certificate bundle includes:
+
+- `certificate.json`
+- `summary.html`
+- `boundaries.report.json`
+- `schema-derive/*.json` when boundary schemas are referenced
+- `verify.coverage.json`
+- per-symbol prove reports under `prove/`
+- `tests.report.json`
+- `trust.report.json`
+- `compile.attest.json`
+
+`x07 trust certify` rejects if proof coverage regresses, required boundary metadata is missing, boundary-declared smoke/PBT tests do not resolve and pass, schema-derived outputs drift, trust report cleanliness fails, or compile attestation cannot bind the emitted native artifact.
+
+For `verified_core_pure_v1`, boundary-referenced schemas are rechecked with `x07 schema derive --check --out-dir .`, so certified projects should derive those schema outputs into the project root.
+
+When a certified entry depends on reviewed imported helpers, `x07 verify --prove` uses the trusted primitive catalog in `catalog/verify_primitives.json` to model those calls in the proof harness. The coverage report still lists each trusted primitive explicitly so the certificate makes that trust boundary visible.
+
+## Certificate-first review flow
+
+For `verified_core_pure_v1`, the reviewer flow is:
+
+1. Run `x07 trust certify ... --out-dir target/cert`.
+2. Read `target/cert/summary.html` for the human overview.
+3. Inspect `target/cert/certificate.json` for the machine-readable evidence bundle.
+4. Use `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion` when comparing a baseline certificate posture to a candidate change.
+
+The canonical example project at `docs/examples/verified_core_pure_v1/` is structured to exercise that flow end to end.
 
 ## CI artifact pattern
 

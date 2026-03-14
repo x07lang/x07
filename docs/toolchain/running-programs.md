@@ -135,6 +135,8 @@ The sidecar includes a versioned manifest (`x07.vm.bundle.manifest@0.2.0`) that 
 
 The bundled binary encodes `argc/argv` to `argv_v1` input bytes and writes the program output bytes directly to stdout.
 
+For native host bundles, `x07 bundle --emit-attestation <path>` writes a compile attestation artifact (`spec/x07-compile.attest.schema.json`) that records input digests, emitted artifacts, compiler output digests, and a deterministic rebuild check. VM-backed sandbox bundles do not support `--emit-attestation`.
+
 ### Sandbox bundle environment overrides
 
 For sandbox bundles, the generated native wrapper always forces sandboxing on:

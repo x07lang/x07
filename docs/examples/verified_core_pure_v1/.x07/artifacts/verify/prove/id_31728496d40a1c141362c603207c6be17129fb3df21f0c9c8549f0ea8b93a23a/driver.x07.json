@@ -1,0 +1,47 @@
+{
+  "decls": [],
+  "imports": [
+    "example",
+    "std.codec"
+  ],
+  "kind": "entry",
+  "module_id": "main",
+  "schema_version": "x07.x07ast@0.6.0",
+  "solve": [
+    "begin",
+    [
+      "let",
+      "off",
+      0
+    ],
+    [
+      "let",
+      "p0",
+      [
+        "std.codec.read_u32_le",
+        "input",
+        "off"
+      ]
+    ],
+    [
+      "set",
+      "off",
+      [
+        "+",
+        "off",
+        4
+      ]
+    ],
+    [
+      "let",
+      "_",
+      [
+        "example.main",
+        "p0"
+      ]
+    ],
+    [
+      "bytes.empty"
+    ]
+  ]
+}

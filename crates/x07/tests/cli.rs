@@ -14,7 +14,7 @@ use x07_contracts::{
     X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_PATCHSET_SCHEMA_VERSION,
     X07_PKG_ADVISORY_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
     X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
-    X07_VERIFY_REPORT_SCHEMA_VERSION,
+    X07_VERIFY_COVERAGE_SCHEMA_VERSION, X07_VERIFY_REPORT_SCHEMA_VERSION,
 };
 use x07_runner_common::sandbox_backend::{ENV_ACCEPT_WEAKER_ISOLATION, ENV_SANDBOX_BACKEND};
 use x07c::json_patch;
@@ -2230,6 +2230,584 @@ fn x07_verify_bmc_missing_cbmc_emits_tool_missing_report() {
 }
 
 #[test]
+fn x07_verify_prove_without_contracts_emits_unsupported_report() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_unsupported");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    let module = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "verify_fixture",
+        "imports": [],
+        "decls": [
+            {"kind":"export", "names":["verify_fixture.f"]},
+            {
+                "kind": "defn",
+                "name": "verify_fixture.f",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "body": "x"
+            }
+        ]
+    }))
+    .expect("serialize x07AST module");
+    write_bytes(&dir.join("verify_fixture.x07.json"), &module);
+
+    let out = run_x07_in_dir(&dir, &["verify", "--prove", "--entry", "verify_fixture.f"]);
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"]["kind"], "unsupported");
+    assert_eq!(v["diagnostics_count"], 1);
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert_eq!(diags[0]["code"], "X07V_NO_CONTRACTS");
+    assert_eq!(
+        v["result"]["details"],
+        "target function has no requires/ensures/invariant clauses"
+    );
+}
+
+#[test]
+fn x07_verify_prove_simple_contract_returns_proven() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_simple");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_json(
+        &dir.join("x07.json"),
+        &serde_json::json!({
+            "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+            "world": "solve-pure",
+            "entry": "verify_fixture.x07.json",
+            "module_roots": ["."],
+            "dependencies": [],
+            "lockfile": "x07.lock.json"
+        }),
+    );
+    write_json(
+        &dir.join("x07.lock.json"),
+        &serde_json::json!({
+            "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
+            "dependencies": []
+        }),
+    );
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": "x"
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["result"]["kind"], "proven");
+    assert!(v["artifacts"]["smt2_path"].as_str().is_some());
+    assert!(v["artifacts"]["z3_out_path"].as_str().is_some());
+}
+
+#[test]
+fn x07_verify_coverage_emits_schema_shaped_report() {
+    let dir = fresh_os_tmp_dir("x07_verify_coverage");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    let module = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "verify_fixture",
+        "imports": [],
+        "decls": [
+            {"kind":"export", "names":["verify_fixture.f"]},
+            {
+                "kind": "defn",
+                "name": "verify_fixture.f",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "requires": [{"id":"r0","expr":["=","x","x"]}],
+                "body": "x"
+            }
+        ]
+    }))
+    .expect("serialize x07AST module");
+    write_bytes(&dir.join("verify_fixture.x07.json"), &module);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &["verify", "--coverage", "--entry", "verify_fixture.f"],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["mode"], "coverage");
+    assert_eq!(v["result"]["kind"], "coverage_report");
+    assert_eq!(
+        v["coverage"]["schema_version"],
+        X07_VERIFY_COVERAGE_SCHEMA_VERSION
+    );
+    assert_eq!(v["coverage"]["entry"], "verify_fixture.f");
+    assert_eq!(v["coverage"]["summary"]["reachable_defn"], 1);
+    assert_eq!(v["coverage"]["summary"]["proven_defn"], 1);
+    assert_eq!(v["coverage"]["summary"]["uncovered_defn"], 0);
+    assert_eq!(v["coverage"]["summary"]["unsupported_defn"], 0);
+    let functions = v["coverage"]["functions"].as_array().expect("functions[]");
+    assert_eq!(functions.len(), 1);
+    assert_eq!(functions[0]["symbol"], "verify_fixture.f");
+    assert_eq!(functions[0]["kind"], "defn");
+    assert_eq!(functions[0]["status"], "proven");
+    assert!(functions[0]["source_path"].as_str().is_some());
+}
+
+#[test]
+fn x07_verify_coverage_with_invalid_project_returns_error_report() {
+    let dir = fresh_os_tmp_dir("x07_verify_coverage_invalid_project");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    let module = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "verify_fixture",
+        "imports": [],
+        "decls": [
+            {"kind":"export", "names":["verify_fixture.f"]},
+            {
+                "kind": "defn",
+                "name": "verify_fixture.f",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "requires": [{"id":"r0","expr":["=","x","x"]}],
+                "body": "x"
+            }
+        ]
+    }))
+    .expect("serialize x07AST module");
+    write_bytes(&dir.join("verify_fixture.x07.json"), &module);
+
+    let out = Command::new(env!("CARGO_BIN_EXE_x07"))
+        .current_dir(&dir)
+        .args([
+            "verify",
+            "--coverage",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            dir.to_str().expect("utf-8 temp dir"),
+        ])
+        .output()
+        .expect("run x07 verify coverage");
+
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["mode"], "coverage");
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"]["kind"], "error");
+    assert_eq!(v["diagnostics_count"], 1);
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert_eq!(diags[0]["code"], "X07V_EPROJECT");
+}
+
+fn scaffold_trust_profile_fixture(dir: &Path) {
+    std::fs::create_dir_all(dir.join("src")).expect("create src");
+    std::fs::create_dir_all(dir.join("arch/boundaries")).expect("create boundaries");
+    std::fs::create_dir_all(dir.join("arch/trust/profiles")).expect("create trust profiles");
+
+    write_json(
+        &dir.join("x07.json"),
+        &serde_json::json!({
+            "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+            "world": "solve-pure",
+            "entry": "src/main.x07.json",
+            "module_roots": ["src"],
+            "dependencies": [],
+            "lockfile": "x07.lock.json"
+        }),
+    );
+    write_json(
+        &dir.join("x07.lock.json"),
+        &serde_json::json!({
+            "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
+            "dependencies": []
+        }),
+    );
+    write_json(
+        &dir.join("src/main.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["main.id_v1"]},
+                {
+                    "kind":"defn",
+                    "name":"main.id_v1",
+                    "params":[{"name":"x","ty":"i32"}],
+                    "result":"i32",
+                    "requires":[{"id":"r0","expr":["=","x","x"]}],
+                    "body":"x"
+                }
+            ],
+            "solve":["main.id_v1", 7]
+        }),
+    );
+    write_json(
+        &dir.join("arch/manifest.x07arch.json"),
+        &serde_json::json!({
+            "schema_version": "x07.arch.manifest@0.2.0",
+            "repo": {"id": "cli-fixture", "root": "."},
+            "externals": {"allowed_import_prefixes": ["std."], "allowed_exact": []},
+            "nodes": [
+                {
+                    "id": "app_core",
+                    "match": {"module_prefixes": ["main"]},
+                    "world": "solve-pure",
+                    "trust_zone": "verified_core",
+                    "visibility": {"mode": "public", "visible_to": []},
+                    "imports": {
+                        "deny_prefixes": ["std.os."],
+                        "allow_prefixes": ["main", "std."]
+                    },
+                    "contracts": {"smoke_entry": "main.id_v1"}
+                }
+            ],
+            "rules": [
+                {"kind": "deny_cycles_v1", "id": "deny_cycles.nodes_v1", "scope": "nodes"}
+            ],
+            "checks": {
+                "deny_cycles": true,
+                "deny_orphans": true,
+                "enforce_visibility": true,
+                "enforce_world_caps": true,
+                "allowlist_mode": {
+                    "enabled": true,
+                    "default_allow_external": false,
+                    "default_allow_internal": false
+                },
+                "brand_boundary_v1": {"enabled": true},
+                "world_of_imported_v1": {"enabled": true}
+            },
+            "contracts_v1": {
+                "boundaries": {
+                    "index_path": "arch/boundaries/index.x07boundary.json",
+                    "enforce": "error"
+                }
+            }
+        }),
+    );
+    write_json(
+        &dir.join("arch/boundaries/index.x07boundary.json"),
+        &serde_json::json!({
+            "schema_version": "x07.arch.boundaries.index@0.1.0",
+            "boundaries": [
+                {
+                    "id": "main.id_v1",
+                    "symbol": "main.id_v1",
+                    "node_id": "app_core",
+                    "kind": "public_function",
+                    "worlds_allowed": ["solve-pure"],
+                    "input": {"params": [{"name": "x", "ty": "i32"}]},
+                    "output": {"ty": "i32"},
+                    "smoke": {"entry": "main.id_v1", "tests": ["smoke_main"]},
+                    "pbt": {"required": false, "tests": []},
+                    "verify": {"required": true, "mode": "prove"}
+                }
+            ]
+        }),
+    );
+    write_json(
+        &dir.join("arch/trust/profiles/verified_core_pure_v1.json"),
+        &serde_json::json!({
+            "schema_version": "x07.trust.profile@0.1.0",
+            "id": "verified_core_pure_v1",
+            "claims": ["human_can_review_certificate_not_source"],
+            "entrypoints": ["main.id_v1"],
+            "worlds_allowed": ["solve-pure"],
+            "language_subset": {
+                "allow_defasync": false,
+                "allow_recursion": false,
+                "allow_extern": false,
+                "allow_unsafe": false,
+                "allow_ffi": false,
+                "allow_dynamic_dispatch": false
+            },
+            "arch_requirements": {
+                "manifest_min_version": "x07.arch.manifest@0.2.0",
+                "require_allowlist_mode": true,
+                "require_deny_cycles": true,
+                "require_deny_orphans": true,
+                "require_visibility": true,
+                "require_world_caps": true,
+                "require_brand_boundaries": true
+            },
+            "evidence_requirements": {
+                "require_boundary_index": true,
+                "require_schema_derive_check": true,
+                "require_smoke_harnesses": true,
+                "require_unit_tests": true,
+                "require_pbt": "public_boundaries_only",
+                "require_proof_mode": "prove",
+                "require_proof_coverage": "all_reachable_defn",
+                "require_compile_attestation": true,
+                "require_trust_report_clean": true,
+                "require_sbom": true
+            }
+        }),
+    );
+}
+
+#[test]
+fn x07_trust_profile_check_accepts_matching_profile() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_profile_check");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    scaffold_trust_profile_fixture(&dir);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "profile",
+            "check",
+            "--profile",
+            "arch/trust/profiles/verified_core_pure_v1.json",
+            "--project",
+            "x07.json",
+            "--entry",
+            "main.id_v1",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse trust profile report");
+    assert_eq!(v["schema_version"], "x07.trust.profile.check@0.1.0");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["profile"], "verified_core_pure_v1");
+    assert_eq!(v["entry"], "main.id_v1");
+}
+
+#[test]
+fn x07_verify_coverage_walks_reachable_functions_and_primitives() {
+    let dir = fresh_os_tmp_dir("x07_verify_coverage_graph");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    let module = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "verify_fixture",
+        "imports": [],
+        "decls": [
+            {"kind":"export", "names":["verify_fixture.f", "verify_fixture.g"]},
+            {
+                "kind": "defn",
+                "name": "verify_fixture.g",
+                "params": [],
+                "result": "bytes",
+                "requires": [{"id":"r0","expr":["=",0,0]}],
+                "body": ["bytes.empty"]
+            },
+            {
+                "kind": "defn",
+                "name": "verify_fixture.f",
+                "params": [],
+                "result": "bytes",
+                "requires": [{"id":"r1","expr":["=",1,1]}],
+                "body": ["verify_fixture.g"]
+            }
+        ]
+    }))
+    .expect("serialize x07AST module");
+    write_bytes(&dir.join("verify_fixture.x07.json"), &module);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &["verify", "--coverage", "--entry", "verify_fixture.f"],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    let summary = &v["coverage"]["summary"];
+    assert_eq!(summary["reachable_defn"], 2);
+    assert_eq!(summary["proven_defn"], 2);
+    assert_eq!(summary["trusted_primitives"], 1);
+
+    let functions = v["coverage"]["functions"].as_array().expect("functions[]");
+    assert!(
+        functions
+            .iter()
+            .any(|f| f["symbol"] == "verify_fixture.f" && f["status"] == "proven"),
+        "expected verify_fixture.f in coverage graph"
+    );
+    assert!(
+        functions
+            .iter()
+            .any(|f| f["symbol"] == "verify_fixture.g" && f["status"] == "proven"),
+        "expected verify_fixture.g in coverage graph"
+    );
+    assert!(
+        functions
+            .iter()
+            .any(|f| f["symbol"] == "bytes.empty" && f["status"] == "trusted_primitive"),
+        "expected bytes.empty trusted primitive in coverage graph"
+    );
+}
+
+#[test]
+fn x07_verify_prove_stubs_trusted_imported_primitives_in_generated_c() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_trusted_stub");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    let module = serde_json::to_vec_pretty(&serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "verify_fixture",
+        "imports": ["std.codec"],
+        "decls": [
+            {"kind":"export", "names":["verify_fixture.f"]},
+            {
+                "kind": "defn",
+                "name": "verify_fixture.f",
+                "params": [],
+                "result": "i32",
+                "requires": [{"id":"r0","expr":["=",0,0]}],
+                "ensures": [{"id":"e0","expr":["=","__result",0]}],
+                "body": ["begin",
+                    ["let","payload",["bytes.lit","ABCD"]],
+                    ["let","payload_v",["bytes.view","payload"]],
+                    ["let","_",["std.codec.read_u32_le","payload_v",0]],
+                    0
+                ]
+            }
+        ]
+    }))
+    .expect("serialize x07AST module");
+    write_bytes(&dir.join("verify_fixture.x07.json"), &module);
+
+    let out = run_x07_in_dir(&dir, &["verify", "--prove", "--entry", "verify_fixture.f"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["result"]["kind"], "proven");
+
+    let c_path = PathBuf::from(
+        v["artifacts"]["c_path"]
+            .as_str()
+            .expect("c_path in verify report"),
+    );
+    let c_src = std::fs::read_to_string(&c_path).expect("read generated C");
+    assert!(
+        c_src.contains("static uint32_t user_std_codec_read_u32_le"),
+        "expected generated C to contain trusted primitive symbol, got:\n{c_src}"
+    );
+    assert!(
+        c_src.contains(
+            "static uint32_t user_std_codec_read_u32_le(ctx_t* ctx, bytes_view_t input, bytes_view_t p0, uint32_t p1) {\n  (void)ctx;\n  (void)input;\n  (void)p0;\n  (void)p1;\n  return UINT32_C(0);\n}"
+        ),
+        "expected trusted primitive body to be stubbed in generated C, got:\n{c_src}"
+    );
+}
+
+#[test]
 fn x07_test_json_false_prints_human_output() {
     let root = repo_root();
     let manifest = root.join("tests/tests.json");
@@ -2447,7 +3025,7 @@ fn arch_manifest_doc(
     externals: Value,
 ) -> Value {
     serde_json::json!({
-      "schema_version": "x07.arch.manifest@0.1.0",
+      "schema_version": "x07.arch.manifest@0.2.0",
       "repo": {"id":"test-repo","root":"."},
       "externals": externals,
       "nodes": nodes,
@@ -2478,6 +3056,10 @@ fn arch_node_doc(
         }),
     );
     node.insert("world".to_string(), Value::String(world.to_string()));
+    node.insert(
+        "trust_zone".to_string(),
+        Value::String("verified_core".to_string()),
+    );
     node.insert(
         "visibility".to_string(),
         serde_json::json!({"mode": visibility_mode, "visible_to": visible_to}),
@@ -3204,6 +3786,85 @@ fn x07_schema_derive_020_smoke() {
 }
 
 #[test]
+fn x07_schema_derive_emits_boundary_stub() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_schema_boundary_stub");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let fixture = root.join("tests/fixtures/schema_derive/example_020.x07schema.json");
+    let schema_bytes = std::fs::read(&fixture).expect("read schema fixture");
+    let schema_path = dir.join("schemas").join("example.x07schema.json");
+    write_bytes(&schema_path, &schema_bytes);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "schema",
+            "derive",
+            "--input",
+            "schemas/example.x07schema.json",
+            "--out-dir",
+            ".",
+            "--emit-boundary-stub",
+            "--write",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let stub_path = std::fs::read_dir(dir.join("arch/boundaries"))
+        .expect("read boundary stub dir")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".stub.x07boundary.json"))
+        })
+        .expect("locate generated boundary stub");
+    let stub_doc: Value =
+        serde_json::from_slice(&std::fs::read(&stub_path).expect("read boundary stub"))
+            .expect("parse boundary stub");
+    assert_eq!(
+        stub_doc["schema_version"],
+        "x07.arch.boundaries.index@0.1.0"
+    );
+    assert!(
+        stub_doc["boundaries"]
+            .as_array()
+            .is_some_and(|boundaries| !boundaries.is_empty()),
+        "expected generated boundary stub entries"
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "schema",
+            "derive",
+            "--input",
+            "schemas/example.x07schema.json",
+            "--out-dir",
+            ".",
+            "--emit-boundary-stub",
+            "--check",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
 fn x07_fix_applies_multiple_borrow_quickfixes() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_fix_borrow_quickfixes");
@@ -3919,6 +4580,121 @@ fn x07_init_creates_project_skeleton() {
     let v = parse_json_stdout(&out);
     assert_eq!(v["ok"], false);
     assert_eq!(v["error"]["code"], "X07INIT_EXISTS");
+}
+
+#[test]
+fn x07_init_verified_core_pure_template_creates_certifiable_project() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_init_verified_core_pure");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init", "--template", "verified-core-pure"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "init");
+    assert_eq!(
+        v["notes"]
+            .as_array()
+            .expect("notes[]")
+            .iter()
+            .map(|v| v.as_str().expect("notes[] string"))
+            .collect::<Vec<_>>(),
+        vec!["Generated a certifiable solve-pure trust template."]
+    );
+    assert_eq!(
+        v["next_steps"]
+            .as_array()
+            .expect("next_steps[]")
+            .iter()
+            .map(|v| v.as_str().expect("next_steps[] string"))
+            .collect::<Vec<_>>(),
+        vec![
+            "x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry example.main",
+            "x07 test --all --manifest tests/tests.json",
+            "x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry example.main --out-dir target/cert",
+        ]
+    );
+
+    for rel in [
+        "README.md",
+        "x07.json",
+        "x07.lock.json",
+        "src/example.x07.json",
+        "src/main.x07.json",
+        "tests/tests.json",
+        "tests/core.x07.json",
+        "arch/manifest.x07arch.json",
+        "arch/boundaries/index.x07boundary.json",
+        "arch/trust/profiles/verified_core_pure_v1.json",
+        "x07-toolchain.toml",
+        "AGENT.md",
+        ".agent/docs/index.md",
+        ".agent/skills/README.md",
+        ".gitignore",
+    ] {
+        assert!(dir.join(rel).is_file(), "missing {}", rel);
+    }
+
+    let proj_doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    assert_eq!(proj_doc["schema_version"], PROJECT_MANIFEST_SCHEMA_VERSION);
+    assert_eq!(proj_doc["world"], "solve-pure");
+    assert_eq!(proj_doc["entry"], "src/main.x07.json");
+
+    let lock_doc: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("x07.lock.json")).unwrap())
+            .expect("parse x07.lock.json");
+    assert_eq!(lock_doc["schema_version"], PROJECT_LOCKFILE_SCHEMA_VERSION);
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "profile",
+            "check",
+            "--project",
+            "x07.json",
+            "--profile",
+            "arch/trust/profiles/verified_core_pure_v1.json",
+            "--entry",
+            "example.main",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["profile"], "verified_core_pure_v1");
+    assert_eq!(report["entry"], "example.main");
+
+    let out = run_x07_in_dir(&dir, &["test", "--all", "--manifest", "tests/tests.json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["summary"]["failed"], 0);
+    assert_eq!(report["summary"]["errors"], 0);
+    assert_eq!(report["summary"]["passed"], 2);
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
 }
 
 #[test]
@@ -6960,7 +7736,7 @@ fn x07_ast_grammar_cfg_emits_bundle_and_materializes_out_dir() {
 
     let bundle = parse_json_stdout(&out);
     assert_eq!(bundle["schema_version"], "x07.ast.grammar_bundle@0.1.0");
-    assert_eq!(bundle["x07ast_schema_version"], "x07.x07ast@0.5.0");
+    assert_eq!(bundle["x07ast_schema_version"], X07AST_SCHEMA_VERSION);
     assert_eq!(bundle["format"], "gbnf_v1");
 
     let variants = bundle["variants"].as_array().expect("variants[]");
@@ -7060,7 +7836,7 @@ fn x07_ast_grammar_cfg_emits_bundle_and_materializes_out_dir() {
     assert_eq!(manifest["schema_version"], "x07.genpack.manifest@0.1.0");
     assert_eq!(manifest["pack"], "x07-genpack-x07ast");
     assert_eq!(manifest["pack_version"], "0.1.0");
-    assert_eq!(manifest["x07ast_schema_version"], "x07.x07ast@0.5.0");
+    assert_eq!(manifest["x07ast_schema_version"], X07AST_SCHEMA_VERSION);
     let artifacts = manifest["artifacts"].as_array().expect("artifacts[]");
     assert_eq!(artifacts.len(), 4);
     let get_sha = |name: &str| {
@@ -7313,6 +8089,75 @@ fn x07_review_diff_fail_on_allow_unsafe_returns_20() {
 }
 
 #[test]
+fn x07_review_diff_fail_on_formal_verification_posture_returns_20() {
+    let root = repo_root();
+    let fixtures = fixtures_root().join("review");
+    let before = fixtures.join("before");
+    let after = fixtures.join("after");
+
+    let work = fresh_tmp_dir(&root, "tmp_x07_review_diff_formal_fail_on");
+    let before_copy = work.join("before");
+    let after_copy = work.join("after");
+    copy_dir_recursive(&before, &before_copy);
+    copy_dir_recursive(&after, &after_copy);
+
+    let json_out = work.join("review_formal.json");
+    let html_out = work.join("review_formal.html");
+
+    let out = run_x07(&[
+        "review",
+        "diff",
+        "--from",
+        before_copy.to_str().unwrap(),
+        "--to",
+        after_copy.to_str().unwrap(),
+        "--mode",
+        "project",
+        "--json-out",
+        json_out.to_str().unwrap(),
+        "--html-out",
+        html_out.to_str().unwrap(),
+        "--fail-on",
+        "proof-coverage-decrease",
+        "--fail-on",
+        "boundary-relaxation",
+        "--fail-on",
+        "trusted-subset-expansion",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report: Value =
+        serde_json::from_slice(&std::fs::read(&json_out).expect("read review json"))
+            .expect("parse review json");
+    assert!(
+        !report["highlights"]["proof_changes"]
+            .as_array()
+            .expect("proof_changes[]")
+            .is_empty(),
+        "expected proof coverage changes"
+    );
+    assert!(
+        !report["highlights"]["boundary_changes"]
+            .as_array()
+            .expect("boundary_changes[]")
+            .is_empty(),
+        "expected boundary contract changes"
+    );
+    assert!(
+        !report["highlights"]["subset_changes"]
+            .as_array()
+            .expect("subset_changes[]")
+            .is_empty(),
+        "expected trusted subset changes"
+    );
+}
+
+#[test]
 fn x07_trust_report_outputs_expected_schema_and_flags() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_trust_report");
@@ -7544,6 +8389,177 @@ fn x07_trust_report_outputs_expected_schema_and_flags() {
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+#[test]
+fn x07_trust_profile_check_accepts_strict_pure_project() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_profile_check");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(dir.join("src")).expect("create src dir");
+    std::fs::create_dir_all(dir.join("arch/trust/profiles")).expect("create trust dir");
+
+    write_json(
+        &dir.join("x07.json"),
+        &serde_json::json!({
+            "schema_version": "x07.project@0.2.0",
+            "world": "solve-pure",
+            "entry": "src/main.x07.json",
+            "module_roots": ["src"],
+            "dependencies": []
+        }),
+    );
+    write_json(
+        &dir.join("x07.lock.json"),
+        &serde_json::json!({
+            "schema_version": "x07.lock@0.2.0",
+            "dependencies": []
+        }),
+    );
+    write_json(
+        &dir.join("src/app.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "app",
+            "imports": [],
+            "decls": [
+                {"kind":"export","names":["app.main"]},
+                {
+                    "kind": "defn",
+                    "name": "app.main",
+                    "params": [],
+                    "result": "bytes",
+                    "requires": [{"id":"r0","expr":["=",0,0]}],
+                    "body": ["bytes.lit","OK"]
+                }
+            ]
+        }),
+    );
+    write_json(
+        &dir.join("src/main.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": ["app"],
+            "decls": [],
+            "solve": ["app.main"]
+        }),
+    );
+    write_json(
+        &dir.join("arch/manifest.x07arch.json"),
+        &serde_json::json!({
+            "schema_version": "x07.arch.manifest@0.2.0",
+            "repo": { "id": "fixture", "root": "." },
+            "externals": { "allowed_import_prefixes": ["std."], "allowed_exact": [] },
+            "nodes": [
+                {
+                    "id": "app_core",
+                    "match": { "module_prefixes": ["app."], "path_globs": ["src/**/*.x07.json"] },
+                    "world": "solve-pure",
+                    "trust_zone": "verified_core",
+                    "visibility": { "mode": "public", "visible_to": [] },
+                    "imports": { "deny_prefixes": ["std.os.", "ext."], "allow_prefixes": ["app.", "std."] }
+                }
+            ],
+            "rules": [
+                { "kind": "deny_cycles_v1", "id": "deny_cycles.nodes_v1", "scope": "nodes" }
+            ],
+            "checks": {
+                "deny_cycles": true,
+                "deny_orphans": true,
+                "enforce_visibility": true,
+                "enforce_world_caps": true,
+                "allowlist_mode": {
+                    "enabled": true,
+                    "default_allow_external": false,
+                    "default_allow_internal": false
+                },
+                "brand_boundary_v1": { "enabled": true },
+                "world_of_imported_v1": { "enabled": true }
+            },
+            "contracts_v1": {
+                "boundaries": {
+                    "index_path": "arch/boundaries/index.x07boundary.json",
+                    "enforce": "error"
+                }
+            },
+            "tool_budgets": {
+                "max_modules": 1000,
+                "max_edges": 1000,
+                "max_diags": 1000
+            }
+        }),
+    );
+    write_json(
+        &dir.join("arch/trust/profiles/verified_core_pure_v1.json"),
+        &serde_json::json!({
+            "schema_version": "x07.trust.profile@0.1.0",
+            "id": "verified_core_pure_v1",
+            "claims": ["human_can_review_certificate_not_source"],
+            "entrypoints": ["app.main"],
+            "worlds_allowed": ["solve-pure"],
+            "language_subset": {
+                "allow_defasync": false,
+                "allow_recursion": false,
+                "allow_extern": false,
+                "allow_unsafe": false,
+                "allow_ffi": false,
+                "allow_dynamic_dispatch": false
+            },
+            "arch_requirements": {
+                "manifest_min_version": "x07.arch.manifest@0.2.0",
+                "require_allowlist_mode": true,
+                "require_deny_cycles": true,
+                "require_deny_orphans": true,
+                "require_visibility": true,
+                "require_world_caps": true,
+                "require_brand_boundaries": true
+            },
+            "evidence_requirements": {
+                "require_boundary_index": true,
+                "require_schema_derive_check": true,
+                "require_smoke_harnesses": true,
+                "require_unit_tests": true,
+                "require_pbt": "public_boundaries_only",
+                "require_proof_mode": "prove",
+                "require_proof_coverage": "all_reachable_defn",
+                "require_compile_attestation": true,
+                "require_trust_report_clean": true,
+                "require_sbom": true
+            }
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "profile",
+            "check",
+            "--project",
+            "x07.json",
+            "--profile",
+            "arch/trust/profiles/verified_core_pure_v1.json",
+            "--entry",
+            "app.main",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], Value::Bool(true));
+    assert_eq!(report["profile"], "verified_core_pure_v1");
+    assert_eq!(report["entry"], "app.main");
+    assert_eq!(report["exit_code"], 0);
 }
 
 fn scaffold_deps_capability_fixture(dir: &Path) -> (String, String, String) {

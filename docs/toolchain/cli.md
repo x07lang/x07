@@ -11,6 +11,8 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
 - `x07 init --package`
   - Creates a publishable package repo: `x07-package.json`, a minimal `x07.json` + `x07.lock.json`, publishable `modules/` layout, and a CI-friendly `tests/tests.json`.
   - Not compatible with `--template` (templates are for app scaffolds).
+- `x07 init --template verified-core-pure`
+  - Creates a certifiable `solve-pure` project with `arch/manifest.x07arch.json`, `arch/boundaries/index.x07boundary.json`, `arch/trust/profiles/verified_core_pure_v1.json`, and a smoke + PBT harness wired for `x07 trust certify`.
 
 ### MCP kit tooling
 
@@ -171,8 +173,8 @@ See: [Architecture check](arch-check.md).
 - `x07 review diff --from <path> --to <path> --html-out <path>`
 - `x07 review diff --from <path> --to <path> --html-out <path> --json-out <path>`
   - Produces an intent-level semantic diff for x07AST/project/arch/policy changes.
-  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi`.
-  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.1.0"`).
+  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion`.
+  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.2.0"`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -186,6 +188,10 @@ See: [Review & trust artifacts](review-trust.md).
   - Dependency capability policy: `--deps-cap-policy <path>` (safe relative path) + CI gate `--fail-on deps-capability`.
   - Supports CI gates via `--strict` and `--fail-on ...`.
   - JSON schema: `spec/x07-trust.report.schema.json` (`schema_version: "x07.trust.report@0.1.0"`).
+- `x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry <sym>`
+  - Validates a certification profile against the current project posture.
+- `x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry <sym> --out-dir target/cert`
+  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, trust report, tests report, and compile attestation evidence.
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -257,6 +263,8 @@ See: [Property-based testing](pbt.md).
 
 - `x07 verify --bmc --entry <sym>`
 - `x07 verify --smt --entry <sym>`
+- `x07 verify --prove --entry <sym>`
+- `x07 verify --coverage --entry <sym>`
   - `--project <path>` (or one/more `--module-root <dir>`)
   - `--unwind <n>` (CBMC loop unwinding bound)
   - `--max-bytes-len <n>` (bound for `bytes` / `bytes_view` params)
@@ -266,9 +274,11 @@ Notes:
 - v0.1 verifies only a selected subset: `defn` targets only (no `defasync`), no recursion, and `for` loops must have literal bounds.
 - v0.1 supports params: `i32`, `u32`, `bytes`, `bytes_view` (use a wrapper if you need other types).
 - `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant`) on the target function.
+- `--prove` is the certifiable mode for accepted trust certificates; unsupported targets return `result.kind = "unsupported"`.
+- `--coverage` emits a reachable-closure coverage artifact under `coverage` using `spec/x07-verify.coverage.schema.json`.
 - Artifacts are written under `.x07/artifacts/verify/<mode>/<entry>/` (driver module, emitted C, CBMC output, counterexample/SMT artifacts when present).
 
-Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.1.0"`).
+Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.2.0"`).
 
 ### Agent correctness benchmarks (`x07bench` JSON)
 
@@ -304,6 +314,7 @@ Doc report schema: `docs/spec/schemas/x07-doc.report.schema.json`.
 
 - `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --write`
 - `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --check`
+- `x07 schema derive --input <schema.x07schema.json> --out-dir <dir> --emit-boundary-stub --write`
 - `x07 schema derive --json ...`
 
 See: [Schema derive](schema-derive.md).
