@@ -1795,7 +1795,7 @@ fn cmd_trust_profile_check(
             Ok(path) => Some(path),
             Err(err) => {
                 diagnostics.push(trust_diag_with_path(
-                    "X07TP_PROJECT",
+                    "X07TP_PROJECT_MISMATCH",
                     format!("{err:#}"),
                     path,
                 ));
@@ -1814,7 +1814,7 @@ fn cmd_trust_profile_check(
                 .any(|candidate| candidate == entry)
             {
                 diagnostics.push(trust_diag(
-                    "X07TP_ENTRY",
+                    "X07TP_ENTRY_FORBIDDEN",
                     format!(
                         "entry {entry:?} is not allowed by trust profile {}",
                         profile.id
@@ -1941,7 +1941,7 @@ fn cmd_trust_certify(
         let resolved = util::resolve_existing_path_upwards(baseline);
         if !resolved.exists() {
             diagnostics.push(trust_diag_with_path(
-                "X07TC_EREVIEW",
+                "X07TC_EDIFF_POSTURE",
                 "review baseline path is missing",
                 &resolved,
             ));
@@ -1970,7 +1970,7 @@ fn cmd_trust_certify(
                     > 0
             {
                 diagnostics.push(trust_diag(
-                    "X07TC_EBOUNDARY",
+                    "X07TC_ETESTS",
                     "boundary coverage is missing required smoke test declarations",
                 ));
             }
@@ -1991,7 +1991,7 @@ fn cmd_trust_certify(
             Ok(requirements) => requirements,
             Err(err) => {
                 diagnostics.push(trust_diag(
-                    "X07TC_EBOUNDARY",
+                    "X07TC_EBOUNDARY_MISSING",
                     format!("load boundary requirements: {err:#}"),
                 ));
                 BoundaryEvidenceRequirements::default()
@@ -2000,23 +2000,7 @@ fn cmd_trust_certify(
 
         let (coverage_ref, coverage_doc, prove_targets) =
             build_coverage_evidence(project_path, &args.entry, &out_dir, &mut diagnostics)?;
-        if coverage_doc
-            .get("functions")
-            .and_then(Value::as_array)
-            .is_some_and(|functions| {
-                functions.iter().any(|function| {
-                    !matches!(
-                        function.get("status").and_then(Value::as_str),
-                        Some("proven" | "trusted_primitive")
-                    )
-                })
-            })
-        {
-            diagnostics.push(trust_diag(
-                "X07TC_ECOVERAGE",
-                "coverage report contains reachable symbols outside the certifiable pure subset",
-            ));
-        }
+        add_coverage_diagnostics(&coverage_doc, &mut diagnostics);
         let schema_derive_refs = if profile
             .as_ref()
             .is_some_and(|p| p.evidence_requirements.require_schema_derive_check)
@@ -2399,7 +2383,7 @@ fn validate_profile_against_context(
             .any(|candidate| candidate == entry)
         {
             diags.push(trust_diag(
-                "X07TP_ENTRY",
+                "X07TP_ENTRY_FORBIDDEN",
                 format!(
                     "entry {entry:?} is not allowed by trust profile {}",
                     profile.id
@@ -2578,6 +2562,132 @@ fn validate_profile_against_context(
     Ok(diags)
 }
 
+fn add_coverage_diagnostics(coverage_doc: &Value, diagnostics: &mut Vec<diagnostics::Diagnostic>) {
+    let Some(functions) = coverage_doc.get("functions").and_then(Value::as_array) else {
+        return;
+    };
+    let mut issues: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
+    for function in functions {
+        if matches!(
+            function.get("status").and_then(Value::as_str),
+            Some("proven" | "trusted_primitive")
+        ) {
+            continue;
+        }
+        let code = coverage_issue_code(function);
+        let symbol = function
+            .get("symbol")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown_symbol")
+            .to_string();
+        issues.entry(code).or_default().push(symbol);
+    }
+    for (code, symbols) in issues {
+        diagnostics.push(trust_diag(code, coverage_issue_message(code, &symbols)));
+    }
+}
+
+fn coverage_issue_code(function: &Value) -> &'static str {
+    let kind = function.get("kind").and_then(Value::as_str).unwrap_or("");
+    let status = function.get("status").and_then(Value::as_str).unwrap_or("");
+    let details = function
+        .get("details")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if kind == "defasync" || status == "runtime_only" {
+        return "X07TC_EUNSUPPORTED_DEFASYNC";
+    }
+    if status == "uncovered" {
+        return "X07TC_EPROOF_COVERAGE";
+    }
+    if status == "unsupported" && details.contains("recursive") {
+        return "X07TC_EUNSUPPORTED_RECURSION";
+    }
+    if status == "unsupported" {
+        return "X07TC_EPROVE_UNSUPPORTED";
+    }
+    "X07TC_EPROOF_COVERAGE"
+}
+
+fn coverage_issue_message(code: &str, symbols: &[String]) -> String {
+    let listed = summarize_symbol_list(symbols);
+    match code {
+        "X07TC_EUNSUPPORTED_DEFASYNC" => format!(
+            "coverage report includes reachable defasync symbols outside the certifiable subset: {listed}"
+        ),
+        "X07TC_EUNSUPPORTED_RECURSION" => format!(
+            "coverage report includes reachable recursive symbols outside the certifiable subset: {listed}"
+        ),
+        "X07TC_EPROVE_UNSUPPORTED" => format!(
+            "coverage report includes reachable symbols outside the supported proof subset: {listed}"
+        ),
+        _ => format!(
+            "coverage report includes reachable symbols without complete proof coverage: {listed}"
+        ),
+    }
+}
+
+fn summarize_symbol_list(symbols: &[String]) -> String {
+    let preview = symbols.iter().take(3).cloned().collect::<Vec<_>>();
+    let head = preview.join(", ");
+    if symbols.len() > preview.len() {
+        format!("{head} (+{} more)", symbols.len() - preview.len())
+    } else {
+        head
+    }
+}
+
+fn prove_issue_code(report_doc: &Value) -> &'static str {
+    let diagnostics = report_doc
+        .get("diagnostics")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten();
+    for diag in diagnostics {
+        match diag.get("code").and_then(Value::as_str).unwrap_or("") {
+            "X07V_UNSUPPORTED_ASYNC" => return "X07TC_EUNSUPPORTED_DEFASYNC",
+            "X07V_UNSUPPORTED_RECURSION" => return "X07TC_EUNSUPPORTED_RECURSION",
+            _ => {}
+        }
+    }
+    if report_doc.pointer("/result/kind").and_then(Value::as_str) == Some("unsupported") {
+        return "X07TC_EPROVE_UNSUPPORTED";
+    }
+    "X07TC_EPROVE"
+}
+
+fn add_review_diff_diagnostics(review_doc: &Value, diagnostics: &mut Vec<diagnostics::Diagnostic>) {
+    let proof_changes = review_highlight_count(review_doc, "/highlights/proof_changes");
+    let boundary_changes = review_highlight_count(review_doc, "/highlights/boundary_changes");
+    let subset_changes = review_highlight_count(review_doc, "/highlights/subset_changes");
+
+    if proof_changes > 0 || subset_changes > 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_EDIFF_POSTURE",
+            format!(
+                "review diff detected forbidden trust posture changes (proof_changes={proof_changes}, subset_changes={subset_changes})"
+            ),
+        ));
+    }
+    if boundary_changes > 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_EBOUNDARY_RELAXED",
+            format!(
+                "review diff detected {boundary_changes} boundary contract relaxation(s) relative to the baseline"
+            ),
+        ));
+    }
+}
+
+fn review_highlight_count(review_doc: &Value, ptr: &str) -> usize {
+    review_doc
+        .pointer(ptr)
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0)
+}
+
 fn scan_language_features(module_roots: &[PathBuf]) -> LanguageFeatureScan {
     let mut scan = LanguageFeatureScan::default();
     for root in module_roots {
@@ -2642,7 +2752,7 @@ fn build_boundaries_evidence(
     let boundaries_path = out_dir.join("boundaries.report.json");
     if !manifest_path.is_file() {
         diagnostics.push(trust_diag(
-            "X07TC_EARCH",
+            "X07TC_EARCH_STRICT",
             "arch/manifest.x07arch.json is missing",
         ));
         let evidence = write_stub_artifact(
@@ -2667,7 +2777,7 @@ fn build_boundaries_evidence(
     let run = run_self_command(project_root, &args)?;
     if run.exit_code != 0 {
         diagnostics.push(trust_diag(
-            "X07TC_EARCH",
+            "X07TC_EARCH_STRICT",
             format!(
                 "x07 arch check exited with {}: {}",
                 run.exit_code,
@@ -2682,7 +2792,7 @@ fn build_boundaries_evidence(
     };
     let boundaries_doc = doc.get("boundaries_report").cloned().unwrap_or_else(|| {
         diagnostics.push(trust_diag(
-            "X07TC_EBOUNDARY",
+            "X07TC_EBOUNDARY_MISSING",
             "arch report did not include boundaries_report",
         ));
         json!({"ok": false, "message": "boundaries_report missing from arch report"})
@@ -2714,7 +2824,7 @@ fn build_coverage_evidence(
     let run = run_self_command(cwd, &args)?;
     if run.exit_code != 0 {
         diagnostics.push(trust_diag(
-            "X07TC_ECOVERAGE",
+            "X07TC_EPROOF_COVERAGE",
             format!(
                 "x07 verify --coverage exited with {}: {}",
                 run.exit_code,
@@ -2736,7 +2846,7 @@ fn build_coverage_evidence(
 
     if report_doc.pointer("/result/kind").and_then(Value::as_str) != Some("coverage_report") {
         diagnostics.push(trust_diag(
-            "X07TC_ECOVERAGE",
+            "X07TC_EPROOF_COVERAGE",
             "verify coverage report did not report result.kind = coverage_report",
         ));
     }
@@ -2787,9 +2897,14 @@ fn build_prove_evidence(
             "--quiet-json".to_string(),
         ];
         let run = run_self_command(cwd, &args)?;
+        let report_doc = if report_path.is_file() {
+            report_common::read_json_file(&report_path)?
+        } else {
+            json!({})
+        };
         if run.exit_code != 0 {
             diagnostics.push(trust_diag(
-                "X07TC_EPROVE",
+                prove_issue_code(&report_doc),
                 format!(
                     "x07 verify --prove for {:?} exited with {}: {}",
                     symbol,
@@ -2798,14 +2913,9 @@ fn build_prove_evidence(
                 ),
             ));
         }
-        let report_doc = if report_path.is_file() {
-            report_common::read_json_file(&report_path)?
-        } else {
-            json!({})
-        };
         if report_doc.pointer("/result/kind").and_then(Value::as_str) != Some("proven") {
             diagnostics.push(trust_diag(
-                "X07TC_EPROVE",
+                prove_issue_code(&report_doc),
                 format!(
                     "proof report for {:?} did not return result.kind = proven",
                     symbol
@@ -2843,7 +2953,7 @@ fn build_tests_evidence(
     if !tests_manifest.is_file() {
         if require_tests {
             diagnostics.push(trust_diag(
-                "X07TC_ETEST",
+                "X07TC_ETESTS",
                 "tests/tests.json is missing but the trust profile requires tests",
             ));
         }
@@ -2856,7 +2966,7 @@ fn build_tests_evidence(
         diagnostics,
     ) {
         diagnostics.push(trust_diag(
-            "X07TC_ETEST",
+            "X07TC_ETESTS",
             format!("validate boundary test requirements: {err:#}"),
         ));
     }
@@ -2875,7 +2985,7 @@ fn build_tests_evidence(
     let run = run_self_command(project_root, &args)?;
     if run.exit_code != 0 {
         diagnostics.push(trust_diag(
-            "X07TC_ETEST",
+            "X07TC_ETESTS",
             format!(
                 "x07 test exited with {}: {}",
                 run.exit_code,
@@ -2895,7 +3005,7 @@ fn build_tests_evidence(
             .unwrap_or(0);
         if failed > 0 || errors > 0 {
             diagnostics.push(trust_diag(
-                "X07TC_ETEST",
+                "X07TC_ETESTS",
                 "x07 test report indicates failing tests",
             ));
         }
@@ -2950,7 +3060,7 @@ fn build_trust_report_evidence(
                 .is_some_and(|flags| !flags.is_empty())
         {
             diagnostics.push(trust_diag(
-                "X07TC_ETRUST_REPORT",
+                "X07TC_ENONDET",
                 "trust report contains nondeterminism flags",
             ));
         }
@@ -3063,6 +3173,12 @@ fn build_review_evidence(
         project_root.display().to_string(),
         "--mode".to_string(),
         "project".to_string(),
+        "--fail-on".to_string(),
+        "proof-coverage-decrease".to_string(),
+        "--fail-on".to_string(),
+        "boundary-relaxation".to_string(),
+        "--fail-on".to_string(),
+        "trusted-subset-expansion".to_string(),
         "--json-out".to_string(),
         review_json.display().to_string(),
         "--html-out".to_string(),
@@ -3071,7 +3187,7 @@ fn build_review_evidence(
     let run = run_self_command(project_root, &args)?;
     if run.exit_code != 0 {
         diagnostics.push(trust_diag(
-            "X07TC_EREVIEW",
+            "X07TC_EDIFF_POSTURE",
             format!(
                 "x07 review diff exited with {}: {}",
                 run.exit_code,
@@ -3080,6 +3196,8 @@ fn build_review_evidence(
         ));
     }
     if review_json.is_file() {
+        let review_doc = report_common::read_json_file(&review_json)?;
+        add_review_diff_diagnostics(&review_doc, diagnostics);
         Ok(Some(evidence_ref_for_path(&review_json)?))
     } else {
         Ok(Some(write_stub_artifact(
@@ -3221,7 +3339,7 @@ fn validate_boundary_tests_against_manifest(
                 .any(|world| world == &info.world)
             {
                 diagnostics.push(trust_diag(
-                    "X07TC_ETEST",
+                    "X07TC_ETESTS",
                     format!(
                         "test {:?} uses world {:?} outside trust profile {}",
                         test_id, info.world, profile.id
@@ -3234,7 +3352,7 @@ fn validate_boundary_tests_against_manifest(
         let code = if requirement.expects_pbt {
             "X07TC_EPBT"
         } else {
-            "X07TC_ETEST"
+            "X07TC_ETESTS"
         };
         let Some(info) = manifest_tests.get(test_id) else {
             diagnostics.push(trust_diag(
@@ -3295,7 +3413,7 @@ fn validate_boundary_tests_against_report(
         let code = if requirement.expects_pbt {
             "X07TC_EPBT"
         } else {
-            "X07TC_ETEST"
+            "X07TC_ETESTS"
         };
         match statuses.get(test_id).map(String::as_str) {
             Some("pass") => {}
@@ -3336,7 +3454,7 @@ fn build_schema_derive_evidence(
         let input_path = project_root.join(schema_path);
         if !input_path.is_file() {
             diagnostics.push(trust_diag(
-                "X07TC_ESCHEMADERIVE",
+                "X07TC_ESCHEMA_DRIFT",
                 format!(
                     "boundary-referenced schema is missing: {}",
                     input_path.display()
@@ -3365,7 +3483,7 @@ fn build_schema_derive_evidence(
         let run = run_self_command(project_root, &args)?;
         if run.exit_code != 0 {
             diagnostics.push(trust_diag(
-                "X07TC_ESCHEMADERIVE",
+                "X07TC_ESCHEMA_DRIFT",
                 format!(
                     "x07 schema derive --check failed for {:?}: {}",
                     schema_path,
@@ -3968,5 +4086,70 @@ mod tests {
                 )
         }));
         std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn add_coverage_diagnostics_splits_certification_failures() {
+        let mut diagnostics = Vec::new();
+        add_coverage_diagnostics(
+            &json!({
+                "functions": [
+                    {
+                        "symbol": "example.async_main",
+                        "kind": "defasync",
+                        "status": "runtime_only"
+                    },
+                    {
+                        "symbol": "example.loop_missing_contracts",
+                        "kind": "defn",
+                        "status": "uncovered"
+                    },
+                    {
+                        "symbol": "example.recursive_main",
+                        "kind": "defn",
+                        "status": "unsupported",
+                        "details": "recursive targets are not certifiable"
+                    },
+                    {
+                        "symbol": "example.unsupported_param",
+                        "kind": "defn",
+                        "status": "unsupported",
+                        "details": "unsupported verify param type"
+                    }
+                ]
+            }),
+            &mut diagnostics,
+        );
+
+        let codes = diagnostics
+            .iter()
+            .map(|diag| diag.code.as_str())
+            .collect::<BTreeSet<_>>();
+        assert!(codes.contains("X07TC_EUNSUPPORTED_DEFASYNC"));
+        assert!(codes.contains("X07TC_EPROOF_COVERAGE"));
+        assert!(codes.contains("X07TC_EUNSUPPORTED_RECURSION"));
+        assert!(codes.contains("X07TC_EPROVE_UNSUPPORTED"));
+    }
+
+    #[test]
+    fn add_review_diff_diagnostics_splits_boundary_and_posture_failures() {
+        let mut diagnostics = Vec::new();
+        add_review_diff_diagnostics(
+            &json!({
+                "highlights": {
+                    "proof_changes": [{"subject": "proof coverage summary"}],
+                    "boundary_changes": [{"subject": "example.api.sum_v1"}],
+                    "subset_changes": [{"subject": "trust profile relaxation"}]
+                }
+            }),
+            &mut diagnostics,
+        );
+
+        assert!(diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07TC_EDIFF_POSTURE"));
+        assert!(diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07TC_EBOUNDARY_RELAXED"));
     }
 }

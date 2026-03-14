@@ -28,6 +28,9 @@ x07 trust certify \
   --out-dir target/cert
 ```
 
+A tracked reference certificate snapshot is kept at `target/cert/certificate.json`.
+The rest of `target/cert/` remains generated local output.
+
 CI example:
 
 - `.github/workflows/certify.yml` installs `x07`, `cbmc`, and `z3`, then uploads `target/cert/` as a review artifact.

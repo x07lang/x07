@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 352
-- quickfix support (`sometimes` or `always`): 313
-- quickfix coverage: 88.92%
+- total codes: 344
+- quickfix support (`sometimes` or `always`): 326
+- quickfix coverage: 94.77%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -171,11 +171,11 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `E_ARCH_WEB_OPENAPI_PROFILE_INVALID` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WEB_OPENAPI_PROFILE_INVALID`. |
 | `E_ARCH_WORLD_EDGE_FORBIDDEN` | x07 / lint / error | sometimes | Architecture contract diagnostic `E_ARCH_WORLD_EDGE_FORBIDDEN`. |
 | `E_BENCH_SUITE_LOAD` | x07 / lint / error | sometimes | Diagnostic code `E_BENCH_SUITE_LOAD`. |
-| `E_DEPS_CAP_POLICY_DENY` | x07 / lint / error | never | Dependency violates capability policy. |
-| `E_SBOM_GENERATION_FAILED` | x07 / lint / error | never | SBOM generation failed. |
+| `E_DEPS_CAP_POLICY_DENY` | x07 / lint / error | sometimes | Diagnostic code `E_DEPS_CAP_POLICY_DENY`. |
+| `E_SBOM_GENERATION_FAILED` | x07 / lint / error | sometimes | Diagnostic code `E_SBOM_GENERATION_FAILED`. |
 | `W_ARCH_CONTRACTS_LOCK_MISSING` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACTS_LOCK_MISSING`. |
 | `W_ARCH_CONTRACT_OPAQUE_USAGE` | x07 / lint / warning | sometimes | Architecture contract diagnostic `W_ARCH_CONTRACT_OPAQUE_USAGE`. |
-| `W_DEPS_CAP_POLICY_MISSING` | x07 / lint / warning | never | Dependency capability policy missing. |
+| `W_DEPS_CAP_POLICY_MISSING` | x07 / lint / warning | sometimes | Diagnostic code `W_DEPS_CAP_POLICY_MISSING`. |
 | `X07-ARITY-0000` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-0000`. |
 | `X07-ARITY-BEGIN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-BEGIN-0001`. |
 | `X07-ARITY-FOR-0001` | x07c / lint / error | sometimes | `for` has invalid arity. |
@@ -184,29 +184,26 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-RETURN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-RETURN-0001`. |
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
-| `X07-AST-SLICE-0001` | x07 / run / info | never | AST slice truncated `X07-AST-SLICE-0001`. |
-| `X07-BOOL-0001` | x07c / lint / warning | sometimes | Eager '&' / '\|' in an if condition can trigger traps. |
+| `X07-BOOL-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-BOOL-0001`. |
 | `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
-| `X07-BORROW-0002` | x07c / lint / error | sometimes | Statement block returns a bytes_view borrowing from a local binding. |
+| `X07-BORROW-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-BORROW-0002`. |
 | `X07-CLI-ARGS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CLI-ARGS-0001`. |
 | `X07-CLI-ARGS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CLI-ARGS-0002`. |
-| `X07-CONTRACT-0001` | x07c / type / error | sometimes | Contract clause must typecheck to i32. |
-| `X07-CONTRACT-0002` | x07c / type / error | sometimes | Contract expression is not contract-pure. |
-| `X07-CONTRACT-0003` | x07c / type / error | sometimes | Reserved identifier `__result` is only available in ensures. |
-| `X07-CONTRACT-0004` | x07c / type / error | sometimes | Reserved name collision with `__result`. |
-| `X07-CONTRACT-0005` | x07c / type / error | sometimes | Contract witness has an unsupported type. |
+| `X07-CONTRACT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0001`. |
+| `X07-CONTRACT-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0002`. |
+| `X07-CONTRACT-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0003`. |
+| `X07-CONTRACT-0004` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0004`. |
+| `X07-CONTRACT-0005` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0005`. |
 | `X07-FIX-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FIX-0003`. |
 | `X07-FMT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FMT-0001`. |
-| `X07-GENERICS-0001` | x07c / lint / error | sometimes | Type variable is not declared in type_params. |
-| `X07-GENERICS-0002` | x07c / lint / warning | always | Unused type parameter. |
-| `X07-INTERNAL-0001` | x07 / run / error | never | Internal tool failure `X07-INTERNAL-0001`. |
+| `X07-GENERICS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0001`. |
+| `X07-GENERICS-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0002`. |
+| `X07-INTERNAL-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-INTERNAL-0001`. |
 | `X07-IO-READ-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-READ-0001`. |
 | `X07-IO-WRITE-0001` | x07 / lint / error<br/>x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-IO-WRITE-0001`. |
 | `X07-JSON-PARSE-0001` | x07c / parse / error | sometimes | Core lint/schema diagnostic `X07-JSON-PARSE-0001`. |
 | `X07-MOVE-0001` | x07c / lint / error | always | `bytes.concat` uses the same identifier on both sides (use-after-move risk). |
 | `X07-MOVE-0002` | x07c / lint / error | always | `if` condition and branch both borrow `bytes.view` from the same owner. |
-| `X07-MOVE-0901` | x07 / codegen / error | sometimes | Use-after-move detected during backend checking. |
-| `X07-MOVE-0902` | x07 / codegen / error | never | Borrow/move rule violation detected during backend checking. |
 | `X07-PATCHSET-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PATCHSET-0001`. |
 | `X07-PBT-FIX-ARGS-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-ARGS-0001`. |
 | `X07-PBT-FIX-CONFLICT-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-FIX-CONFLICT-0001`. |
@@ -219,21 +216,21 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-PBT-REPRO-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-PBT-REPRO-SCHEMA-0001`. |
 | `X07-POLICY-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-POLICY-SCHEMA-0001`. |
 | `X07-SCHEMA-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-SCHEMA-0001`. |
-| `X07-SCHEMA-0002` | x07 / parse / error | always | Unsupported x07AST schema_version. |
-| `X07-TAPP-ELAB-0001` | x07c / rewrite / error | always | Typechecker inferred generic type arguments and proposes inserting an explicit `tapp`. |
-| `X07-TAPP-INFER-0001` | x07c / type / info | never | Typechecker cannot infer generic type arguments; explicit `tapp` is required. |
-| `X07-TOOL-ARGS-0001` | x07 / parse / error | never | Tool wrapper argument error `X07-TOOL-ARGS-0001`. |
-| `X07-TOOL-EXEC-0001` | x07 / run / error | never | Tool wrapper execution error `X07-TOOL-EXEC-0001`. |
-| `X07-TYPE-0001` | x07c / type / info | never | Unknown identifier during local typechecking. |
-| `X07-TYPE-CALL-0001` | x07c / type / info | never | Call refers to an unknown callee during local typechecking. |
-| `X07-TYPE-CALL-0002` | x07c / type / info | never | Call argument type mismatch during local typechecking. |
-| `X07-TYPE-CALL-0003` | x07c / type / info | never | Call arity mismatch during local typechecking. |
-| `X07-TYPE-IF-0001` | x07c / type / info | never | `if` condition must be an `i32` (boolean-as-i32) during local typechecking. |
-| `X07-TYPE-IF-0002` | x07c / type / info | never | `if` branches have incompatible types during local typechecking. |
-| `X07-TYPE-RET-0001` | x07c / type / info | never | Return expression type does not match the function result type. |
-| `X07-TYPE-SET-0001` | x07c / type / info | never | `set` references an unknown local during local typechecking. |
-| `X07-TYPE-SET-0002` | x07c / type / info | never | `set` assignment type mismatch during local typechecking. |
-| `X07-TYPE-UNIFY-0001` | x07c / type / info | never | Type unification failed during local inference. |
+| `X07-SCHEMA-0002` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-SCHEMA-0002`. |
+| `X07-TAPP-ELAB-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-TAPP-ELAB-0001`. |
+| `X07-TAPP-INFER-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-TAPP-INFER-0001`. |
+| `X07-TOOL-ARGS-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-TOOL-ARGS-0001`. |
+| `X07-TOOL-EXEC-0001` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07-TOOL-EXEC-0001`. |
+| `X07-TYPE-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-0001`. |
+| `X07-TYPE-CALL-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0001`. |
+| `X07-TYPE-CALL-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0002`. |
+| `X07-TYPE-CALL-0003` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-CALL-0003`. |
+| `X07-TYPE-IF-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-IF-0001`. |
+| `X07-TYPE-IF-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-IF-0002`. |
+| `X07-TYPE-RET-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-RET-0001`. |
+| `X07-TYPE-SET-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-SET-0001`. |
+| `X07-TYPE-SET-0002` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-SET-0002`. |
+| `X07-TYPE-UNIFY-0001` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07-TYPE-UNIFY-0001`. |
 | `X07-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-UNSAFE-0001`. |
 | `X07-WORLD-0001` | x07c / lint / error | always | Program imports capabilities not allowed by the selected world flags. |
 | `X07-WORLD-FFI-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-FFI-0001`. |
@@ -244,12 +241,12 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-WORLD-RR-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-RR-0001`. |
 | `X07-WORLD-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0001`. |
 | `X07-WORLD-UNSAFE-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0002`. |
-| `X07-X07AST-PARSE-0001` | x07 / parse / error | sometimes | Core lint/schema diagnostic `X07-X07AST-PARSE-0001`. |
-| `X07C_WASM_BACKEND_FEATURE_REQUIRED` | x07c / codegen / error | sometimes | WASM backend unsupported feature diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`. |
-| `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN` | x07c / codegen / error | sometimes | WASM backend unsupported builtin diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`. |
-| `X07C_WASM_BACKEND_UNSUPPORTED_FORM` | x07c / codegen / error | sometimes | WASM backend unsupported form diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_FORM`. |
-| `X07C_WASM_BACKEND_UNSUPPORTED_OP` | x07c / codegen / error | sometimes | WASM backend unsupported operator diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_OP`. |
-| `X07C_WASM_BACKEND_UNSUPPORTED_TYPE` | x07c / codegen / error | sometimes | WASM backend unsupported type diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`. |
+| `X07-X07AST-PARSE-0001` | x07 / parse / error<br/>x07c / parse / error | sometimes | Core lint/schema diagnostic `X07-X07AST-PARSE-0001`. |
+| `X07C_WASM_BACKEND_FEATURE_REQUIRED` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_FORM` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_FORM`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_OP` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_OP`. |
+| `X07C_WASM_BACKEND_UNSUPPORTED_TYPE` | x07c / type / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`. |
 | `X07INIT_AGENT` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_AGENT`. |
 | `X07INIT_AGENT_DIR` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_AGENT_DIR`. |
 | `X07INIT_ARGS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_ARGS`. |
@@ -272,7 +269,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_INDEX_CONFIG` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_CONFIG`. |
 | `X07PKG_INDEX_FETCH` | x07 / lint / error | never | Diagnostic code `X07PKG_INDEX_FETCH`. |
 | `X07PKG_INDEX_NO_MATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_INDEX_NO_MATCH`. |
-| `X07PKG_LOCAL_MISSING_DEP` | x07 / lint / error | sometimes | Local dependency is missing on disk. |
+| `X07PKG_LOCAL_MISSING_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCAL_MISSING_DEP`. |
 | `X07PKG_LOCK_MISMATCH` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISMATCH`. |
 | `X07PKG_LOCK_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_LOCK_MISSING`. |
 | `X07PKG_LOGIN_FAILED` | x07 / lint / error | never | Diagnostic code `X07PKG_LOGIN_FAILED`. |
@@ -292,53 +289,48 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07RR_LATENCY_OUT_OF_RANGE` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_LATENCY_OUT_OF_RANGE`. |
 | `X07RR_OP_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_OP_EMPTY`. |
 | `X07RR_URL_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_URL_EMPTY`. |
-| `X07TC_EARCH` | x07 / run / error | sometimes | Strict architecture evidence failed certification. |
-| `X07TC_EBOUNDARY` | x07 / run / error | sometimes | Boundary declarations or smoke coverage are incomplete for certification. |
+| `X07TC_EARCH_STRICT` | x07 / run / error | sometimes | Strict architecture evidence failed certification. |
+| `X07TC_EBOUNDARY_MISSING` | x07 / run / error | sometimes | Boundary declarations are missing or incomplete for certification. |
+| `X07TC_EBOUNDARY_RELAXED` | x07 / run / error | never | The candidate relaxes a certified boundary contract relative to the baseline. |
 | `X07TC_ECOMPILE_ATTEST` | x07 / run / error | never | Compile attestation failed or could not bind the emitted binary. |
-| `X07TC_ECOVERAGE` | x07 / run / error | never | Reachable proof coverage is incomplete for certification. |
+| `X07TC_EDIFF_POSTURE` | x07 / run / error | never | Baseline review or trust-posture diff gate failed certification. |
+| `X07TC_ENONDET` | x07 / run / error | never | Trust report detected nondeterminism in the certified closure. |
 | `X07TC_EPBT` | x07 / run / error | sometimes | Boundary-required property tests are missing, malformed, or failing. |
 | `X07TC_EPROFILE` | x07 / run / error | sometimes | Certification trust profile is missing or invalid. |
 | `X07TC_EPROJECT` | x07 / run / error | sometimes | Certification could not resolve the project manifest or source closure. |
-| `X07TC_EPROVE` | x07 / run / error | never | At least one reachable proof obligation failed. |
-| `X07TC_EREVIEW` | x07 / run / error | never | Baseline review or trust-posture diff gate failed certification. |
-| `X07TC_ESCHEMADERIVE` | x07 / run / error | sometimes | Boundary-referenced schema outputs drifted or are missing. |
-| `X07TC_ETEST` | x07 / run / error | sometimes | Deterministic certification tests are missing or failing. |
+| `X07TC_EPROOF_COVERAGE` | x07 / run / error | never | Reachable proof coverage is incomplete for certification. |
+| `X07TC_ESCHEMA_DRIFT` | x07 / run / error | sometimes | Boundary-referenced schema outputs drifted or are missing. |
+| `X07TC_ETESTS` | x07 / run / error | sometimes | Deterministic certification tests are missing or failing. |
 | `X07TC_ETRUST_REPORT` | x07 / run / error | never | Trust report evidence failed certification. |
 | `X07TP_ARCH` | x07 / run / error | sometimes | Project architecture posture is weaker than the trust profile requires. |
 | `X07TP_BOUNDARY` | x07 / run / error | sometimes | Project boundary index wiring is missing or incomplete for certification. |
-| `X07TP_ENTRY` | x07 / run / error | never | Requested entrypoint is not allowed by the trust profile. |
+| `X07TP_ENTRY_FORBIDDEN` | x07 / run / error | never | Requested entrypoint is not allowed by the trust profile. |
 | `X07TP_INVALID` | x07 / run / error | sometimes | Trust profile JSON is missing or invalid. |
 | `X07TP_LANGUAGE` | x07 / run / error | never | Project uses language or policy features forbidden by the trust profile. |
 | `X07TP_NOT_CERTIFIABLE` | x07 / run / error | never | Trust profile is weaker than the Milestone A certification floor. |
-| `X07TP_PROJECT` | x07 / run / error | sometimes | Project manifest could not be resolved for trust profile validation. |
+| `X07TP_PROJECT_MISMATCH` | x07 / run / error | sometimes | Project manifest could not be resolved for trust profile validation. |
 | `X07TP_WORLD` | x07 / run / error | never | Project world is outside the trust profile allowlist. |
-| `X07T_ASSERT_BYTES_EQ` | x07 / run / error | never | `std.test.assert_bytes_eq` failed with expected vs got payload. |
 | `X07T_EPBT_MANIFEST_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_MANIFEST_INVALID`. |
 | `X07T_EPBT_PARAM_EMPTY` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`. |
 | `X07T_EPBT_UNKNOWN_GEN_KIND` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNKNOWN_GEN_KIND`. |
 | `X07T_EPBT_UNSUPPORTED_WORLD` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNSUPPORTED_WORLD`. |
-| `X07T_RUN_TRAP` | x07 / run / error | never | Runner trapped; trap string surfaced in test diagnostics. |
-| `X07V_EARGS` | x07 / run / error | sometimes | Invalid `x07 verify` arguments. |
-| `X07V_ECBMC_ERROR` | x07 / run / error | sometimes | CBMC reported an error. |
-| `X07V_ECBMC_FAILURE` | x07 / run / error | sometimes | CBMC reported a failing property that is not a contract. |
-| `X07V_ECBMC_JSON_PARSE` | x07 / run / error | sometimes | Failed to parse CBMC JSON output. |
-| `X07V_ECBMC_MISSING` | x07 / run / error | sometimes | CBMC is missing. |
-| `X07V_ECBMC_SMT2` | x07 / run / error | sometimes | CBMC failed to emit SMT2. |
-| `X07V_ECBMC_STDERR` | x07 / run / error | sometimes | CBMC wrote unexpected stderr output. |
-| `X07V_EMODULE_ROOTS` | x07 / run / error | sometimes | Could not resolve module roots for `x07 verify`. |
-| `X07V_EPROJECT` | x07 / run / error | sometimes | Could not resolve project manifest for `x07 verify`. |
-| `X07V_ETARGET` | x07 / run / error | sometimes | Verification target could not be loaded. |
-| `X07V_EZ3_MISSING` | x07 / run / error | sometimes | Z3 is missing. |
-| `X07V_EZ3_RUN` | x07 / run / error | sometimes | Z3 failed to run. |
-| `X07V_INTERNAL` | x07 / run / error | never | Internal `x07 verify` error. |
-| `X07V_NO_CONTRACTS` | x07 / run / error | sometimes | Target has no contracts to verify. |
-| `X07V_SMT_SAT` | x07 / run / error | sometimes | SMT solver returned SAT (counterexample found). |
-| `X07V_SMT_UNKNOWN` | x07 / run / error | sometimes | SMT solver returned an unknown status. |
-| `X07V_UNSUPPORTED_ASYNC` | x07 / run / error | sometimes | `x07 verify` does not support `defasync` targets. |
-| `X07V_UNSUPPORTED_FOR_BOUNDS` | x07 / run / error | sometimes | `for` loop bounds must be literal for `x07 verify` v0.1. |
-| `X07V_UNSUPPORTED_PARAM` | x07 / run / error | sometimes | Unsupported parameter type for `x07 verify`. |
-| `X07V_UNSUPPORTED_RECURSION` | x07 / run / error | sometimes | Recursive targets are not supported by `x07 verify` v0.1. |
-| `X07V_UNWIND_INCOMPLETE` | x07 / run / error | sometimes | CBMC unwinding is incomplete. |
+| `X07V_EARGS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EARGS`. |
+| `X07V_ECBMC_ERROR` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_ERROR`. |
+| `X07V_ECBMC_FAILURE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_FAILURE`. |
+| `X07V_ECBMC_JSON_PARSE` | x07 / parse / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_JSON_PARSE`. |
+| `X07V_ECBMC_MISSING` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_MISSING`. |
+| `X07V_ECBMC_SMT2` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_SMT2`. |
+| `X07V_ECBMC_STDERR` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_STDERR`. |
+| `X07V_EMODULE_ROOTS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EMODULE_ROOTS`. |
+| `X07V_EPROJECT` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EPROJECT`. |
+| `X07V_ETARGET` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ETARGET`. |
+| `X07V_EZ3_MISSING` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EZ3_MISSING`. |
+| `X07V_EZ3_RUN` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07V_EZ3_RUN`. |
+| `X07V_INTERNAL` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_INTERNAL`. |
+| `X07V_SMT_SAT` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_SAT`. |
+| `X07V_SMT_UNKNOWN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_UNKNOWN`. |
+| `X07V_UNSUPPORTED_ASYNC` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNSUPPORTED_ASYNC`. |
+| `X07V_UNWIND_INCOMPLETE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNWIND_INCOMPLETE`. |
 | `X7I0001` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0001`. |
 | `X7I0100` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0100`. |
 | `X7I0110` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0110`. |
@@ -952,11 +944,12 @@ Quickfix support: `sometimes`
 
 Details:
 
-The test entry contains an invalid `solve_fuel` value. `solve_fuel` must be an integer greater than 0.
+The issue is deterministic in `tests/tests.json` or related test assets. It can usually be repaired by structured edits to manifest fields or fixture/policy paths.
 
 Agent strategy:
 
-- Edit the test manifest entry to set `solve_fuel` to an integer greater than 0.
+- Validate `tests/tests.json` fields and world requirements.
+- Apply canonical manifest edits (id/world/entry/expect/returns/paths).
 - Re-run `x07 test`.
 
 
@@ -3622,49 +3615,42 @@ Agent strategy:
 
 ## `E_DEPS_CAP_POLICY_DENY`
 
-Summary: Dependency violates capability policy.
+Summary: Diagnostic code `E_DEPS_CAP_POLICY_DENY`.
 
 Origins:
 - x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires a policy decision (allow vs deny) and/or changing the dependency code.
+Quickfix support: `sometimes`
 
 Details:
 
-A locked dependency statically uses one or more sensitive namespaces that are denied by the dependency capability policy.
-
-This gate is based on the same sensitive namespace scan surfaced in `x07 trust report` (for example `std.os.net.` or `std.os.process.`).
+Fallback catalog entry for `E_DEPS_CAP_POLICY_DENY`. Investigate producer-specific remediation.
 
 Agent strategy:
 
-- Inspect `diagnostics[].data.offending_namespaces` and the `policy` fields (path/rule).
-- If the dependency is expected to use the capability, add an explicit allow entry for that package.
-- Otherwise, replace the dependency or remove the sensitive namespace usage.
-- Re-run `x07 trust report --fail-on deps-capability` to verify the policy is enforced.
+- Reproduce `E_DEPS_CAP_POLICY_DENY` with the failing command.
+- Inspect structured diagnostic fields.
+- Apply deterministic edits and re-run.
 
 
 ## `E_SBOM_GENERATION_FAILED`
 
-Summary: SBOM generation failed.
+Summary: Diagnostic code `E_SBOM_GENERATION_FAILED`.
 
 Origins:
 - x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: SBOM output depends on filesystem availability and explicit configuration.
+Quickfix support: `sometimes`
 
 Details:
 
-`x07 trust report` failed to generate or write a deterministic SBOM artifact (CycloneDX/SPDX).
-
-If CI is gating on `--fail-on sbom-missing`, this will cause the trust report command to fail.
+Fallback catalog entry for `E_SBOM_GENERATION_FAILED`. Investigate producer-specific remediation.
 
 Agent strategy:
 
-- Check the `diagnostics[].data.path` and filesystem permissions for the output directory.
-- If SBOM output is intentionally disabled, avoid gating on `sbom-missing` or remove `--sbom-format none`.
-- Re-run `x07 trust report` to confirm the SBOM artifact is generated and stable.
+- Reproduce `E_SBOM_GENERATION_FAILED` with the failing command.
+- Inspect structured diagnostic fields.
+- Apply deterministic edits and re-run.
 
 
 ## `W_ARCH_CONTRACTS_LOCK_MISSING`
@@ -3709,25 +3695,22 @@ Agent strategy:
 
 ## `W_DEPS_CAP_POLICY_MISSING`
 
-Summary: Dependency capability policy missing.
+Summary: Diagnostic code `W_DEPS_CAP_POLICY_MISSING`.
 
 Origins:
 - x07 (stage: lint, severity: warning)
 
-Quickfix support: `never`
-No quickfix reason: Requires author intent (define a deny/allow policy for the project dependencies).
+Quickfix support: `sometimes`
 
 Details:
 
-The project declares dependencies but `x07 trust report` did not find a dependency capability policy file.
-
-By default, the policy is discovered at `x07.deps.capability-policy.json` in the project root (or overridden via `--deps-cap-policy`).
+Fallback catalog entry for `W_DEPS_CAP_POLICY_MISSING`. Investigate producer-specific remediation.
 
 Agent strategy:
 
-- Create `x07.deps.capability-policy.json` in the project root (schema: `x07.deps.capability_policy@0.1.0`).
-- Or pass `--deps-cap-policy <path>` to point at an existing policy file.
-- To enforce in CI, add `--fail-on deps-capability`.
+- Reproduce `W_DEPS_CAP_POLICY_MISSING` with the failing command.
+- Inspect structured diagnostic fields.
+- Apply deterministic edits and re-run.
 
 
 ## `X07-ARITY-0000`
@@ -3892,46 +3875,24 @@ Agent strategy:
 - Re-run compile/test.
 
 
-## `X07-AST-SLICE-0001`
-
-Summary: AST slice truncated `X07-AST-SLICE-0001`.
-
-Origins:
-- x07 (stage: run, severity: info)
-
-Quickfix support: `never`
-No quickfix reason: Truncation is controlled by slice bounds.
-
-Details:
-
-Emitted when `x07 ast slice` truncates the output due to `--max_nodes` or `--max_bytes`. The slice remains deterministic but may omit context needed for repair.
-
-Agent strategy:
-
-- Re-run with a higher `--max_nodes` / `--max_bytes` bound.
-- Use `--enclosure=module` and/or `--closure=all` if more context is required.
-
-
 ## `X07-BOOL-0001`
 
-Summary: Eager '&' / '|' in an if condition can trigger traps.
+Summary: Core lint/schema diagnostic `X07-BOOL-0001`.
 
 Origins:
-- x07c (stage: lint, severity: warning)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
-Quickfix kinds: `json_patch`
 
 Details:
 
-`&` and `|` evaluate both sides eagerly (no short-circuit). When used in `if` conditions with trap-prone view ops, this can evaluate a failing RHS even when a LHS guard would otherwise reject.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Prefer `&&` / `||` in `if` conditions that guard trap-prone ops.
-- Keep guards ordered so cheap checks run before trap-prone checks.
-- Re-run `x07 lint` to confirm the warning is resolved.
-- Optionally run `x07 fix --input <file> --write` to rewrite the first eager boolean operator to `&&` / `||`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-BORROW-0001`
@@ -3950,33 +3911,29 @@ Quickfix is context-dependent: when a safe insertion point exists, linter emits 
 
 Agent strategy:
 
-- Read `diagnostics[].data.mem_provenance` to identify the temporary owner and the borrow call.
 - Prefer binding owner expressions to locals before `bytes.view`/`bytes.subview`/`vec_u8.as_view`.
-- If `mem_provenance.hints[]` contains `bind_owner_to_local`, introduce `let tmp = <owner>` and borrow from `tmp`.
 - Apply quickfix when present.
 - If quickfix is absent, perform equivalent manual rewrite and re-run lint.
 
 
 ## `X07-BORROW-0002`
 
-Summary: Statement block returns a bytes_view borrowing from a local binding.
+Summary: Core lint/schema diagnostic `X07-BORROW-0002`.
 
 Origins:
 - x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
-Quickfix kinds: `json_patch`
 
 Details:
 
-A `begin`/`unsafe` statement block returned a `bytes_view` that borrows from a value bound inside that block. The local owner does not outlive the block, so the view would escape its borrow source.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Hoist the owned value `let` binding outside the statement block so the borrow source outlives the view.
-- Or return owned `bytes` instead of a `bytes_view`.
-- Re-run `x07 lint` (and `x07 check --project ...` if applicable).
-- If the borrow source is a `bytes.lit`, `x07 fix --input <file> --write` can rewrite it to `bytes.view_lit`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-CLI-ARGS-0001`
@@ -4021,103 +3978,102 @@ Agent strategy:
 
 ## `X07-CONTRACT-0001`
 
-Summary: Contract clause must typecheck to i32.
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0001`.
 
 Origins:
-- x07c (stage: type, severity: error)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-Contract expressions in `requires[]`, `ensures[]`, and `invariant[]` must typecheck to `i32` (x07 uses `i32` as a boolean: `0` = false, non-zero = true).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Locate the reported clause expression and ensure it evaluates to an `i32` predicate.
-- Add an explicit comparison (for example `i32.eq`, `i32.lt`, etc.) when the expression currently returns a non-`i32` value.
-- Re-run `x07 lint` / `x07 test` to confirm the contract typechecks.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-CONTRACT-0002`
 
-Summary: Contract expression is not contract-pure.
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0002`.
 
 Origins:
-- x07c (stage: type, severity: error)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-Contract clause expressions (and witness expressions) must be contract-pure so they do not change program semantics. Disallowed operations include `world.*`, `task.*`, mutation forms (for example `set`, `unsafe`), module calls, and other impure/nondeterministic constructs. The diagnostic includes a note enumerating the allowed contract-pure builtins/operators.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect the main message for the disallowed head/operator and the allowlist note in `notes[]`.
-- Replace the impure subexpression with a contract-pure computation (or compute in the main body and reference the pure value in the contract).
-- If the clause needs external state, move that check into program logic/tests instead of a contract.
-- Re-run `x07 lint` to confirm the impurity is gone.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-CONTRACT-0003`
 
-Summary: Reserved identifier `__result` is only available in ensures.
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0003`.
 
 Origins:
-- x07c (stage: type, severity: error)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`__result` is reserved for postconditions: it is bound to the function return value only while checking `ensures[]`. It is an error to reference `__result` in `requires[]`, `invariant[]`, or their witnesses.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- If you need the return value, move the clause to `ensures[]`.
-- Otherwise, remove/replace the `__result` reference with an expression over parameters/locals available at the clause site.
-- Re-run `x07 lint` to confirm the contract is valid.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-CONTRACT-0004`
 
-Summary: Reserved name collision with `__result`.
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0004`.
 
 Origins:
-- x07c (stage: type, severity: error)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-When a function has contracts, `__result` is reserved for the postcondition binding used in `ensures[]`. It is an error for a parameter or local binding to be named `__result`.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Rename the parameter/local to a non-reserved name.
-- If you need a local alias of the return value, use a different identifier and reference `__result` only inside `ensures[]`.
-- Re-run `x07 lint` to confirm there are no remaining collisions.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-CONTRACT-0005`
 
-Summary: Contract witness has an unsupported type.
+Summary: Core lint/schema diagnostic `X07-CONTRACT-0005`.
 
 Origins:
-- x07c (stage: type, severity: error)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-Witness expressions are evaluated only on contract failure and are recorded in the failure payload. In v0.1, witnesses are restricted to simple, serializable types (currently `i32`, `bytes`, `bytes_view`, and `result_*`).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Change the witness expression to an allowed type (for example witness `view.len` as `i32`, or include a `bytes_view` slice).
-- If you need richer context, encode it into `bytes`/`bytes_view` explicitly.
-- Re-run `x07 lint` to confirm witness types are accepted.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-FIX-0003`
@@ -4162,64 +4118,62 @@ Agent strategy:
 
 ## `X07-GENERICS-0001`
 
-Summary: Type variable is not declared in type_params.
+Summary: Core lint/schema diagnostic `X07-GENERICS-0001`.
 
 Origins:
 - x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
-Quickfix kinds: `json_patch`
 
 Details:
 
-A type expression references a type variable like `["t","A"]`, but the surrounding function does not declare `A` in `type_params`.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- If the function should be generic, add `{"name":"A"}` (and optional `bound`) to `type_params`.
-- Otherwise, replace the type variable with a concrete type name (e.g. `"u32"`).
-- Re-run `x07 lint` to confirm the signature is consistent.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-GENERICS-0002`
 
-Summary: Unused type parameter.
+Summary: Core lint/schema diagnostic `X07-GENERICS-0002`.
 
 Origins:
-- x07c (stage: lint, severity: warning)
+- x07c (stage: lint, severity: error)
 
-Quickfix support: `always`
-Quickfix kinds: `json_patch`
+Quickfix support: `sometimes`
 
 Details:
 
-A function declares a `type_params` entry that is never referenced in its signature types.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Remove the unused type param from `type_params`, or reference it from `params[].ty` / `result`.
-- Re-run `x07 lint`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-INTERNAL-0001`
 
-Summary: Internal tool failure `X07-INTERNAL-0001`.
+Summary: Core lint/schema diagnostic `X07-INTERNAL-0001`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires a toolchain fix; no safe source-level quickfix exists.
+Quickfix support: `sometimes`
 
 Details:
 
-The toolchain encountered an internal error or panic while producing a machine report. In machine mode, the wrapper emits this stable code with `exit_code=3`.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Re-run with `--verbose` / `--debug` if available.
-- Reduce to a minimal repro.
-- File a toolchain bug with the machine report JSON (especially `diagnostics[].data`).
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-IO-READ-0001`
@@ -4300,8 +4254,6 @@ Linter emits a JSON Patch quickfix that copies one side using `view.to_bytes(byt
 
 Agent strategy:
 
-- Read `diagnostics[].data.mem_provenance` to confirm the use-after-move chain.
-- If `mem_provenance.hints[]` contains `clone_before_use`, copy one side (for example via `view.to_bytes(bytes.view(name))`) before reuse.
 - Apply quickfix.
 - Confirm resulting expression keeps ownership semantics.
 - Re-run lint/build.
@@ -4319,55 +4271,13 @@ Quickfix kinds: `json_patch`
 
 Details:
 
-Linter emits a JSON Patch quickfix that copies bytes for condition use (`_x07_tmp_copy`) and rewrites the condition to use the copy (via `view.to_bytes(bytes.view(name))`) to avoid move conflicts.
+Linter emits a JSON Patch quickfix that copies bytes for condition use (`_x07_tmp_copy`) and rewrites the condition to avoid move conflicts.
 
 Agent strategy:
 
-- Read `diagnostics[].data.mem_provenance` to see the conflicting `bytes.view` borrows across condition/branch.
-- If `mem_provenance.hints[]` contains `introduce_tmp_copy`, copy bytes for the `if` condition and use the copy in the condition.
 - Apply quickfix.
 - Validate condition logic still matches intent.
 - Re-run lint/build.
-
-
-## `X07-MOVE-0901`
-
-Summary: Use-after-move detected during backend checking.
-
-Origins:
-- x07 (stage: codegen, severity: error)
-
-Quickfix support: `sometimes`
-Quickfix kinds: `json_patch`
-
-Details:
-
-`x07 check` runs a backend-check pass that can detect ownership errors that are not caught by front-end lint patterns. The compiler error message typically includes `moved_ptr=/...` pointing at the moved identifier.
-
-Agent strategy:
-
-- If a `quickfix` is present, apply it (it replaces the moved identifier at `moved_ptr` with `view.to_bytes(bytes.view(name))`).
-- Otherwise, insert a copy before the move site and re-run `x07 check`.
-
-
-## `X07-MOVE-0902`
-
-Summary: Borrow/move rule violation detected during backend checking.
-
-Origins:
-- x07 (stage: codegen, severity: error)
-
-Quickfix support: `never`
-No quickfix reason: Backend-check borrow diagnostics are not safely auto-fixable in general.
-
-Details:
-
-`x07 check` runs a backend-check pass that can detect borrow-rule violations during lowering/codegen. See the compiler message for pointer fields like `ptr=/...` and `borrowed_ptr=/...` when present.
-
-Agent strategy:
-
-- Inspect the reported pointers and rewrite the expression to avoid conflicting borrows/moves.
-- Re-run `x07 check` to verify.
 
 
 ## `X07-PATCHSET-0001`
@@ -4612,305 +4522,302 @@ Agent strategy:
 
 ## `X07-SCHEMA-0002`
 
-Summary: Unsupported x07AST schema_version.
+Summary: Core lint/schema diagnostic `X07-SCHEMA-0002`.
 
 Origins:
-- x07 (stage: parse, severity: error)
+- x07 (stage: lint, severity: error)
 
-Quickfix support: `always`
-Quickfix kinds: `json_patch`
+Quickfix support: `sometimes`
 
 Details:
 
-The x07AST file declares a `schema_version` that is not supported by this toolchain.
-
-Use one of the supported schema versions, or upgrade/downgrade your toolchain to match the file.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect `/schema_version` in the failing `*.x07.json` file.
-- Replace it with a supported value (see the diagnostic `data.supported`).
-- Re-run `x07 ast validate` (or `x07 fmt` / `x07 lint`).
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TAPP-ELAB-0001`
 
-Summary: Typechecker inferred generic type arguments and proposes inserting an explicit `tapp`.
+Summary: Core lint/schema diagnostic `X07-TAPP-ELAB-0001`.
 
 Origins:
-- x07c (stage: rewrite, severity: error)
+- x07c (stage: lint, severity: error)
 
-Quickfix support: `always`
-Quickfix kinds: `json_patch`
+Quickfix support: `sometimes`
 
 Details:
 
-The local typecheck pass inferred concrete type arguments for a generic call that omitted `tapp`. Applying the quickfix rewrites the call into the canonical `tapp` form so later compiler stages see an explicit specialization.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Run `x07 fix --write` to apply the JSON Patch quickfix.
-- Re-run `x07 lint` or `x07 build` to confirm the rewrite eliminated the diagnostic.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TAPP-INFER-0001`
 
-Summary: Typechecker cannot infer generic type arguments; explicit `tapp` is required.
+Summary: Core lint/schema diagnostic `X07-TAPP-INFER-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires choosing explicit type arguments; cannot be inferred deterministically from local constraints.
+Quickfix support: `sometimes`
 
 Details:
 
-The local type inference pass could not determine one or more type arguments for a generic call from the available argument and expected-result constraints.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Add an explicit `tapp` with concrete type arguments.
-- Or rewrite the code to provide additional constraints so inference can resolve the type parameters deterministically.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TOOL-ARGS-0001`
 
-Summary: Tool wrapper argument error `X07-TOOL-ARGS-0001`.
+Summary: Core lint/schema diagnostic `X07-TOOL-ARGS-0001`.
 
 Origins:
-- x07 (stage: parse, severity: error)
+- x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires changing the CLI invocation.
+Quickfix support: `sometimes`
 
 Details:
 
-The invocation requested machine output (`--json`, `--jsonl`, `--json-schema`, etc.) but the wrapper flags were invalid or inconsistent.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Fix the CLI flags (for example: add a missing path for `--report-out`, remove conflicting flags).
-- Re-run the command.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TOOL-EXEC-0001`
 
-Summary: Tool wrapper execution error `X07-TOOL-EXEC-0001`.
+Summary: Core lint/schema diagnostic `X07-TOOL-EXEC-0001`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Depends on the underlying wrapped command failure.
+Quickfix support: `sometimes`
 
 Details:
 
-The wrapped command exited non-zero but did not produce a structured diagnostic. The wrapper emitted this stable tool-level error and captured stdout/stderr in the report payload.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect `diagnostics[].message` and any captured stderr/stdout fields in the report.
-- Fix the underlying failure and re-run the command.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-0001`
 
-Summary: Unknown identifier during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires a semantic choice (rename vs introduce a binding).
+Quickfix support: `sometimes`
 
 Details:
 
-A referenced identifier was not found in the local environment (parameters or `let` bindings).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Check spelling and scope.
-- If the name is intended to be a local, introduce it with `let` before use.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-CALL-0001`
 
-Summary: Call refers to an unknown callee during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-CALL-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires selecting the intended callee symbol or updating imports/exports.
+Quickfix support: `sometimes`
 
 Details:
 
-The typechecker could not find a signature for the callee symbol and cannot typecheck the call.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Check the callee name and module prefix.
-- Ensure the defining module is imported and the symbol is exported.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-CALL-0002`
 
-Summary: Call argument type mismatch during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-CALL-0002`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires changing program semantics; no single deterministic patch applies.
+Quickfix support: `sometimes`
 
 Details:
 
-An argument did not match the expected parameter type for the callee signature.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Adjust the argument expression so its inferred type matches the parameter.
-- Or call a different function whose signature matches the provided arguments.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-CALL-0003`
 
-Summary: Call arity mismatch during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-CALL-0003`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires selecting the correct argument list for the intended call.
+Quickfix support: `sometimes`
 
 Details:
 
-The number of arguments at a call site does not match the callee signature.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Add or remove arguments to match the function signature.
-- Or switch to a different callee with the intended arity.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-IF-0001`
 
-Summary: `if` condition must be an `i32` (boolean-as-i32) during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-IF-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires choosing the intended condition semantics.
+Quickfix support: `sometimes`
 
 Details:
 
-The condition expression of an `if` was inferred to a non-`i32` type.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Rewrite the condition to produce an `i32` (for example, comparisons yield `i32`).
-- Or adjust the condition expression so it matches boolean-as-i32 conventions.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-IF-0002`
 
-Summary: `if` branches have incompatible types during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-IF-0002`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires changing program structure or semantics to align branch result types.
+Quickfix support: `sometimes`
 
 Details:
 
-The then/else branches could not be unified to a single result type for the `if` expression.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Make both branches produce the same type.
-- Or add an explicit structure that normalizes types (for example, return in one branch and a value in the other).
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-RET-0001`
 
-Summary: Return expression type does not match the function result type.
+Summary: Core lint/schema diagnostic `X07-TYPE-RET-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires deciding whether to change the expression or the function signature.
+Quickfix support: `sometimes`
 
 Details:
 
-A `return` expression was inferred to a type that does not match the declared function result type.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Adjust the returned expression to match the function result type.
-- Or update the function signature if the intended return type is different.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-SET-0001`
 
-Summary: `set` references an unknown local during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-SET-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires choosing whether to introduce a new binding or rename the target.
+Quickfix support: `sometimes`
 
 Details:
 
-A `set` attempted to assign to a local name that is not currently bound in the environment.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Introduce the local with `let` before `set`.
-- Or correct the target name to an existing binding.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-SET-0002`
 
-Summary: `set` assignment type mismatch during local typechecking.
+Summary: Core lint/schema diagnostic `X07-TYPE-SET-0002`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires changing program semantics (assignment or variable structure).
+Quickfix support: `sometimes`
 
 Details:
 
-The assigned expression type does not match the previously inferred type of the target local.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Keep locals monomorphic: assign the same type across all `set` uses.
-- If a new value of a different type is needed, introduce a new local with `let`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-TYPE-UNIFY-0001`
 
-Summary: Type unification failed during local inference.
+Summary: Core lint/schema diagnostic `X07-TYPE-UNIFY-0001`.
 
 Origins:
-- x07c (stage: type, severity: info)
+- x07c (stage: type, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Unification failures are context-dependent and do not have a single deterministic fix.
+Quickfix support: `sometimes`
 
 Details:
 
-The local type inference engine encountered an unsatisfiable constraint while unifying types.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect the diagnostic data payload for the conflicting types.
-- Rewrite the expression(s) at the reported ptr so the inferred types unify.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07-UNSAFE-0001`
@@ -5121,6 +5028,7 @@ Summary: Core lint/schema diagnostic `X07-X07AST-PARSE-0001`.
 
 Origins:
 - x07 (stage: parse, severity: error)
+- x07c (stage: parse, severity: error)
 
 Quickfix support: `sometimes`
 
@@ -5137,102 +5045,102 @@ Agent strategy:
 
 ## `X07C_WASM_BACKEND_FEATURE_REQUIRED`
 
-Summary: WASM backend unsupported feature diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`.
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`.
 
 Origins:
-- x07c (stage: codegen, severity: error)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
-- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
-- Re-run the build and verify the output wasm validates.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`
 
-Summary: WASM backend unsupported builtin diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`.
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`.
 
 Origins:
-- x07c (stage: codegen, severity: error)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
-- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
-- Re-run the build and verify the output wasm validates.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07C_WASM_BACKEND_UNSUPPORTED_FORM`
 
-Summary: WASM backend unsupported form diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_FORM`.
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_FORM`.
 
 Origins:
-- x07c (stage: codegen, severity: error)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
-- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
-- Re-run the build and verify the output wasm validates.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07C_WASM_BACKEND_UNSUPPORTED_OP`
 
-Summary: WASM backend unsupported operator diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_OP`.
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_OP`.
 
 Origins:
-- x07c (stage: codegen, severity: error)
+- x07c (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
-- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
-- Re-run the build and verify the output wasm validates.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`
 
-Summary: WASM backend unsupported type diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`.
+Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_TYPE`.
 
 Origins:
-- x07c (stage: codegen, severity: error)
+- x07c (stage: type, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The native WebAssembly backend cannot emit code for this program shape. The diagnostic payload includes `data.kind`, `data.name`, and `data.requires_feature` to support deterministic repair or fallback.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Rewrite the program to the supported subset for `--emit-wasm` (see `data.name`).
-- If you are building via `x07-wasm`, switch the wasm profile `codegen_backend` to `c_toolchain_v1` or use a profile that supports the desired feature.
-- Re-run the build and verify the output wasm validates.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07INIT_AGENT`
@@ -5387,12 +5295,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-`x07-mcp scaffold init` returned a non-success result or error report.
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
 
 Agent strategy:
 
-- Run `x07-mcp scaffold init --template mcp-server-stdio --dir <DIR> --machine json` to reproduce.
-- Fix the reported issue and re-run `x07 init`.
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
 
 
 ## `X07INIT_MCP_MISSING`
@@ -5406,12 +5315,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-The MCP server templates are provided by `x07-mcp` (an external tool).
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
 
 Agent strategy:
 
-- Install `x07-mcp` and ensure it is discoverable on PATH.
-- Re-run `x07 init --template mcp-server-stdio` (or another MCP template).
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
 
 
 ## `X07INIT_MCP_REPORT`
@@ -5425,12 +5335,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-The `x07-mcp scaffold init --machine json` report could not be parsed as JSON.
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
 
 Agent strategy:
 
-- Ensure `x07-mcp` is up to date and on PATH.
-- Re-run the command and capture stdout/stderr for debugging.
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
 
 
 ## `X07INIT_MODULES`
@@ -5524,14 +5435,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-A resolved dependency has active advisories in the package index. Use an updated version or an explicit override (`project.patch`) to move to a safe version, or explicitly allow advisories if you have audited and accept the risk.
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
 
 Agent strategy:
 
-- Inspect the advisory IDs/summaries in the error output.
-- Run `x07 pkg versions <name>` and pick an unaffected version.
-- Update `x07.json` or `project.patch` to use the chosen version.
-- Re-run `x07 pkg lock` (or `x07 pkg lock --check --allow-advisories` if you intentionally accept the advisories).
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
 
 
 ## `X07PKG_API_URL`
@@ -5678,7 +5588,7 @@ Agent strategy:
 
 ## `X07PKG_LOCAL_MISSING_DEP`
 
-Summary: Local dependency is missing on disk.
+Summary: Package workflow diagnostic `X07PKG_LOCAL_MISSING_DEP`.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -5687,12 +5597,12 @@ Quickfix support: `sometimes`
 
 Details:
 
-A dependency whose `path` is not under `.x07/deps/` is treated as local-only. The package directory must exist and contain `x07-package.json`.
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
 
 Agent strategy:
 
-- Verify the dependency `path` exists and contains `x07-package.json`.
-- If this dep should be fetched from the registry, use a `.x07/deps/...` path and rerun `x07 pkg lock`.
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
 - Re-run the original package command.
 
 
@@ -5808,13 +5718,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-A `project.patch` entry uses a local `path` override, but the dependency is missing on disk or does not contain `x07-package.json`. Local overrides are not downloaded automatically.
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
 
 Agent strategy:
 
-- Ensure the patched dependency exists at the configured `path` and contains `x07-package.json`.
-- If you intended a registry dependency, remove `project.patch[<name>].path` so `x07 pkg lock` can fetch it.
-- Re-run `x07 pkg lock`.
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
 
 
 ## `X07PKG_PUBLISH_FAILED`
@@ -5929,13 +5839,13 @@ Quickfix support: `sometimes`
 
 Details:
 
-A resolved dependency is currently yanked in the package index. Use an updated version or an explicit override (`project.patch`) to move off the yanked version, or explicitly allow yanked deps if you have a reason to keep it.
+The package/index/lock workflow needs deterministic command-level remediation (dependency spec, lock refresh, credentials/config, or index selection).
 
 Agent strategy:
 
-- Run `x07 pkg versions <name>` and choose a non-yanked version.
-- Update `x07.json` (direct dep) or `project.patch` (transitive) to use the chosen version.
-- Re-run `x07 pkg lock` (or `x07 pkg lock --check --allow-yanked` if you intentionally accept the yank).
+- Normalize dependency specs and run `x07 pkg lock`.
+- Use `x07 pkg add/remove/versions/login/publish` as needed.
+- Re-run the original package command.
 
 
 ## `X07RR_ENTRY_EXISTS`
@@ -6079,7 +5989,7 @@ Agent strategy:
 - Re-run `x07 rr` operation.
 
 
-## `X07TC_EARCH`
+## `X07TC_EARCH_STRICT`
 
 Summary: Strict architecture evidence failed certification.
 
@@ -6087,6 +5997,7 @@ Origins:
 - x07 (stage: run, severity: error)
 
 Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
 
 Details:
 
@@ -6095,29 +6006,50 @@ Certification requires the arch manifest and arch check result to stay at the ve
 Agent strategy:
 
 - Run `x07 arch check --manifest arch/manifest.x07arch.json` and inspect the report.
-- Align allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary wiring with `verified_core_pure_v1`.
+- Apply the deterministic manifest JSON Patch scaffolding to align allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary wiring with `verified_core_pure_v1`.
 - Re-run `x07 trust certify`.
 
 
-## `X07TC_EBOUNDARY`
+## `X07TC_EBOUNDARY_MISSING`
 
-Summary: Boundary declarations or smoke coverage are incomplete for certification.
+Summary: Boundary declarations are missing or incomplete for certification.
 
 Origins:
 - x07 (stage: run, severity: error)
 
 Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
 
 Details:
 
-Public exports must appear in `arch/boundaries/index.x07boundary.json`, and boundary-declared smoke/PBT tests must resolve and pass.
+Public exports must appear in `arch/boundaries/index.x07boundary.json`, and certification requires the boundary index wiring to resolve cleanly.
 
 Agent strategy:
 
 - Run `x07 arch check` and inspect `target/cert/boundaries.report.json`.
-- Add or tighten entries in `arch/boundaries/index.x07boundary.json`.
-- Use `x07 schema derive --emit-boundary-stub` to scaffold missing boundary records when schemas are pinned.
-- Re-run `x07 test` and `x07 trust certify`.
+- Apply the deterministic boundary-index JSON Patch or use `x07 schema derive --emit-boundary-stub` to scaffold missing records.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EBOUNDARY_RELAXED`
+
+Summary: The candidate relaxes a certified boundary contract relative to the baseline.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or a semantic boundary-contract change.
+
+Details:
+
+Boundary contract review found a trust-surface relaxation in a pinned public boundary.
+
+Agent strategy:
+
+- Run `x07 review diff --fail-on boundary-relaxation` and inspect the highlighted boundary changes.
+- Tighten the candidate boundary contract or explicitly reset the baseline after review.
+- Re-run `x07 trust certify` with the corrected baseline.
 
 
 ## `X07TC_ECOMPILE_ATTEST`
@@ -6141,25 +6073,46 @@ Agent strategy:
 - Fix reproducibility or toolchain drift before certifying again.
 
 
-## `X07TC_ECOVERAGE`
+## `X07TC_EDIFF_POSTURE`
 
-Summary: Reachable proof coverage is incomplete for certification.
+Summary: Baseline review or trust-posture diff gate failed certification.
 
 Origins:
 - x07 (stage: run, severity: error)
 
 Quickfix support: `never`
-No quickfix reason: Requires semantic proof work or architectural refactoring, not a mechanical patch.
+No quickfix reason: Requires a baseline review decision or a semantic change to the candidate.
 
 Details:
 
-Accepted certificates allow only `proven` or `trusted_primitive` statuses in the reachable closure.
+The supplied baseline comparison failed, or the candidate introduced a forbidden trust posture delta.
 
 Agent strategy:
 
-- Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect `target/cert/verify.coverage.json`.
-- Move unsupported logic behind certified boundaries or refactor it into the certifiable subset.
-- Re-run `x07 verify --prove` for uncovered symbols before certifying again.
+- Run `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion`.
+- Tighten the candidate change or intentionally update the baseline.
+- Re-run `x07 trust certify` with the corrected baseline.
+
+
+## `X07TC_ENONDET`
+
+Summary: Trust report detected nondeterminism in the certified closure.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires capability removal or architectural refactoring rather than a deterministic quickfix.
+
+Details:
+
+The trust report found nondeterminism flags or other forbidden runtime effects in the candidate certificate surface.
+
+Agent strategy:
+
+- Run `x07 trust report --project x07.json` and inspect the nondeterminism flags.
+- Split the nondeterministic logic out of the certified closure or remove the forbidden capability.
+- Re-run `x07 trust certify`.
 
 
 ## `X07TC_EPBT`
@@ -6170,6 +6123,7 @@ Origins:
 - x07 (stage: run, severity: error)
 
 Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
 
 Details:
 
@@ -6177,7 +6131,7 @@ A required PBT harness is absent from `tests/tests.json`, is not declared with a
 
 Agent strategy:
 
-- Add the missing test id under `tests/tests.json` with the required `pbt` stanza.
+- Add the missing test id under `tests/tests.json` with the required `pbt` stanza using the deterministic JSON Patch scaffolding.
 - Keep the test world inside the profile/boundary allowlist.
 - Re-run `x07 test --all` and then `x07 trust certify`.
 
@@ -6222,49 +6176,28 @@ Agent strategy:
 - Re-run `x07 trust certify`.
 
 
-## `X07TC_EPROVE`
+## `X07TC_EPROOF_COVERAGE`
 
-Summary: At least one reachable proof obligation failed.
-
-Origins:
-- x07 (stage: run, severity: error)
-
-Quickfix support: `never`
-No quickfix reason: Requires proof-focused code changes rather than a deterministic quickfix.
-
-Details:
-
-A reachable symbol failed `x07 verify --prove` or returned a non-`proven` result.
-
-Agent strategy:
-
-- Re-run `x07 verify --prove` for the reported symbol.
-- Add missing loop contracts, strengthen `requires[]`/`ensures[]`, or simplify the function into the supported subset.
-- Re-run `x07 trust certify`.
-
-
-## `X07TC_EREVIEW`
-
-Summary: Baseline review or trust-posture diff gate failed certification.
+Summary: Reachable proof coverage is incomplete for certification.
 
 Origins:
 - x07 (stage: run, severity: error)
 
 Quickfix support: `never`
-No quickfix reason: Requires a baseline review decision or a semantic change to the candidate.
+No quickfix reason: Requires semantic proof work or architectural refactoring, not a mechanical patch.
 
 Details:
 
-The supplied baseline comparison failed, or the candidate introduced a forbidden trust posture delta.
+Accepted certificates allow only `proven` or `trusted_primitive` statuses in the reachable closure.
 
 Agent strategy:
 
-- Run `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion`.
-- Tighten the candidate change or intentionally update the baseline.
-- Re-run `x07 trust certify` with the corrected baseline.
+- Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect `target/cert/verify.coverage.json`.
+- Move unsupported logic behind certified boundaries or refactor it into the certifiable subset.
+- Re-run `x07 verify --prove` for uncovered symbols before certifying again.
 
 
-## `X07TC_ESCHEMADERIVE`
+## `X07TC_ESCHEMA_DRIFT`
 
 Summary: Boundary-referenced schema outputs drifted or are missing.
 
@@ -6284,7 +6217,7 @@ Agent strategy:
 - Re-run `x07 trust certify`.
 
 
-## `X07TC_ETEST`
+## `X07TC_ETESTS`
 
 Summary: Deterministic certification tests are missing or failing.
 
@@ -6292,6 +6225,7 @@ Origins:
 - x07 (stage: run, severity: error)
 
 Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
 
 Details:
 
@@ -6300,6 +6234,7 @@ The certification profile requires smoke/unit evidence from `tests/tests.json`, 
 Agent strategy:
 
 - Ensure `tests/tests.json` exists and includes the boundary-required test ids.
+- Apply the deterministic manifest JSON Patch when adding missing smoke/unit test declarations.
 - Keep the test worlds inside the trust profile allowlist.
 - Re-run `x07 test --all --manifest tests/tests.json` before certifying again.
 
@@ -6333,6 +6268,7 @@ Origins:
 - x07 (stage: run, severity: error)
 
 Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
 
 Details:
 
@@ -6341,7 +6277,7 @@ The arch manifest is missing, on the wrong schema line, or does not enable the s
 Agent strategy:
 
 - Start from the `verified_core_pure_v1` manifest posture.
-- Enable allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary contracts.
+- Apply the deterministic manifest JSON Patch scaffolding to enable allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary contracts.
 - Re-run `x07 trust profile check`.
 
 
@@ -6353,6 +6289,7 @@ Origins:
 - x07 (stage: run, severity: error)
 
 Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
 
 Details:
 
@@ -6360,12 +6297,12 @@ The trust profile requires `contracts_v1.boundaries.index_path`, but the project
 
 Agent strategy:
 
-- Add `contracts_v1.boundaries.index_path` to `arch/manifest.x07arch.json`.
+- Add `contracts_v1.boundaries.index_path` to `arch/manifest.x07arch.json` with the deterministic manifest JSON Patch.
 - Create `arch/boundaries/index.x07boundary.json` and keep public boundaries there.
 - Use `x07 schema derive --emit-boundary-stub` when you need deterministic boundary scaffolding.
 
 
-## `X07TP_ENTRY`
+## `X07TP_ENTRY_FORBIDDEN`
 
 Summary: Requested entrypoint is not allowed by the trust profile.
 
@@ -6448,7 +6385,7 @@ Agent strategy:
 - Re-run `x07 trust profile check`.
 
 
-## `X07TP_PROJECT`
+## `X07TP_PROJECT_MISMATCH`
 
 Summary: Project manifest could not be resolved for trust profile validation.
 
@@ -6487,26 +6424,6 @@ Agent strategy:
 - Move the project to an allowed solve-world (for `verified_core_pure_v1`, `solve-pure`).
 - Or select a different trust profile that explicitly permits the current world.
 - Re-run `x07 trust profile check`.
-
-
-## `X07T_ASSERT_BYTES_EQ`
-
-Summary: `std.test.assert_bytes_eq` failed with expected vs got payload.
-
-Origins:
-- x07 (stage: run, severity: error)
-
-Quickfix support: `never`
-No quickfix reason: Test assertion failures require intent; no safe automatic source-level patch exists.
-
-Details:
-
-When a test fails with code `1003`, the runtime may append an assertion payload to the `X7TEST_STATUS_V1` bytes. `x07 test` decodes it and emits this diagnostic with bounded prefixes of `got` and `expected`.
-
-Agent strategy:
-
-- Use `details.got` and `details.expected` to update expected bytes or fix serialization/encoding logic.
-- Keep fixes deterministic and re-run `x07 test`.
 
 
 ## `X07T_EPBT_MANIFEST_INVALID`
@@ -6589,248 +6506,229 @@ Agent strategy:
 - Re-run compile/test.
 
 
-## `X07T_RUN_TRAP`
-
-Summary: Runner trapped; trap string surfaced in test diagnostics.
-
-Origins:
-- x07 (stage: run, severity: error)
-
-Quickfix support: `never`
-No quickfix reason: Runner traps require intent and/or environment changes; no safe automatic patch exists.
-
-Details:
-
-This diagnostic is emitted by `x07 test` when the runner reports a trap (for example `fuel exhausted`, `wall timeout`, or a runtime trap such as a filesystem open failure). The raw trap string is surfaced under `details.trap`.
-
-Agent strategy:
-
-- Inspect `details.trap` to identify the failing subsystem (fuel, timeout, fs, rr, kv, etc.).
-- If the trap is `fuel exhausted`, increase per-test `solve_fuel` in the test manifest or the invocation fuel cap.
-- For filesystem traps, verify the attempted path exists under the test fixture root / sandbox policy roots.
-- Re-run `x07 test` (use `--verbose` to see the currently-running test id).
-
-
 ## `X07V_EARGS`
 
-Summary: Invalid `x07 verify` arguments.
+Summary: Core lint/schema diagnostic `X07V_EARGS`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` requires selecting exactly one verification mode.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Pass exactly one of `--bmc` or `--smt`.
-- Re-run the command with the corrected flags.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_ERROR`
 
-Summary: CBMC reported an error.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_ERROR`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-CBMC reported one or more `ERROR` messages while running the verification.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect the saved `cbmc.json` artifact (when present) for the reported error messages.
-- Adjust bounds or simplify the target to stay within the supported subset.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_FAILURE`
 
-Summary: CBMC reported a failing property that is not a contract.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_FAILURE`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` expects verification failures to correspond to X07 contract assertions. This diagnostic indicates CBMC reported a failing property that could not be mapped to a contract clause.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect `cbmc.json` and the generated `verify.c` harness to identify the failing property.
-- Simplify the target program and retry.
-- If the failure is reproducible, file a toolchain issue with the artifacts.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_JSON_PARSE`
 
-Summary: Failed to parse CBMC JSON output.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_JSON_PARSE`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: parse, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-CBMC did not produce valid JSON output under `--json-ui`.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Check the installed CBMC version supports `--json-ui`.
-- Re-run with the same bounds and inspect the raw stdout.
-- If the output is not JSON, upgrade/downgrade CBMC and retry.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_MISSING`
 
-Summary: CBMC is missing.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_MISSING`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` uses CBMC for `--bmc` and to emit SMT2 for `--smt`.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Install CBMC (for example `brew install cbmc`) and ensure `cbmc` is on `PATH`.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_SMT2`
 
-Summary: CBMC failed to emit SMT2.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_SMT2`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-CBMC returned a non-zero status while emitting an SMT-LIB2 formula (`--smt2`).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Re-run `x07 verify --smt` and inspect CBMC output.
-- Check the installed CBMC version and upgrade/downgrade if needed.
-- Keep the target within the supported subset.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ECBMC_STDERR`
 
-Summary: CBMC wrote unexpected stderr output.
+Summary: Core lint/schema diagnostic `X07V_ECBMC_STDERR`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-In JSON UI mode, `x07 verify` expects CBMC to write its report to stdout. Stderr output is treated as an error to avoid silently ignoring tool issues.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Re-run the same command and capture stderr.
-- Check the installed CBMC version and consider upgrading/downgrading.
-- If reproducible, file a toolchain issue with the stderr and the generated `verify.c` artifact.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_EMODULE_ROOTS`
 
-Summary: Could not resolve module roots for `x07 verify`.
+Summary: Core lint/schema diagnostic `X07V_EMODULE_ROOTS`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-When `--module-root` is not provided, `x07 verify` attempts to infer module roots from the project manifest and lockfile. This diagnostic indicates that inference failed (for example due to a missing/invalid lockfile).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Provide explicit `--module-root` directories.
-- Or ensure the project has a valid lockfile (`x07.lock.json`) by running `x07 pkg lock`.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_EPROJECT`
 
-Summary: Could not resolve project manifest for `x07 verify`.
+Summary: Core lint/schema diagnostic `X07V_EPROJECT`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` resolves module roots from a project manifest (`x07.json`) when available. This diagnostic indicates the `--project` path is invalid or a manifest could not be found.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Pass `--project <path-to-x07.json>` (or a directory containing it).
-- If running outside a project, pass one or more `--module-root <dir>` values.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_ETARGET`
 
-Summary: Verification target could not be loaded.
+Summary: Core lint/schema diagnostic `X07V_ETARGET`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The `--entry` symbol could not be resolved to a `defn` in the module roots (module file not found, function not found, or module JSON invalid).
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Ensure `--entry` is a fully qualified name with a module separator (`mod.fn`).
-- Ensure the module file exists at `<module-root>/<module-id>.x07.json`.
-- Re-run `x07 verify` after fixing the module roots or entry name.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_EZ3_MISSING`
 
-Summary: Z3 is missing.
+Summary: Core lint/schema diagnostic `X07V_EZ3_MISSING`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-In `--smt` mode, `x07 verify` can emit SMT2 even without Z3 installed, but solving requires Z3.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Install Z3 (for example `brew install z3`) and ensure `z3` is on `PATH`.
-- Re-run `x07 verify --smt`, or consume the emitted SMT2 artifact with another solver.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_EZ3_RUN`
 
-Summary: Z3 failed to run.
+Summary: Core lint/schema diagnostic `X07V_EZ3_RUN`.
 
 Origins:
 - x07 (stage: run, severity: error)
@@ -6839,191 +6737,113 @@ Quickfix support: `sometimes`
 
 Details:
 
-Z3 returned a non-zero exit status while solving the emitted SMT2 formula.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Inspect the saved `verify.smt2` and `z3.out.txt` artifacts.
-- Check the installed Z3 version and retry.
-- If the solver crashes, simplify the target or reduce bounds.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_INTERNAL`
 
-Summary: Internal `x07 verify` error.
+Summary: Core lint/schema diagnostic `X07V_INTERNAL`.
 
 Origins:
-- x07 (stage: run, severity: error)
-
-Quickfix support: `never`
-No quickfix reason: Internal tool failure; requires toolchain fix.
-
-Details:
-
-`x07 verify` encountered an unexpected internal error.
-
-Agent strategy:
-
-- Capture the full error text and the generated artifacts under `.x07/artifacts/verify/...`.
-- Minimize a repro (smallest program + bounds).
-- File a toolchain issue; this typically requires a toolchain fix.
-
-
-## `X07V_NO_CONTRACTS`
-
-Summary: Target has no contracts to verify.
-
-Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` requires at least one `requires[]`, `ensures[]`, or `invariant[]` clause on the target function.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Add at least one contract clause to the target `defn`.
-- Re-run `x07 verify` in the desired mode.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_SMT_SAT`
 
-Summary: SMT solver returned SAT (counterexample found).
+Summary: Core lint/schema diagnostic `X07V_SMT_SAT`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The SMT solver found a satisfying model, which indicates a counterexample within the current bounds.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Treat the result as a counterexample: tighten contracts or fix the function logic.
-- If needed, reduce the search space by strengthening `requires[]` or adding `invariant[]` clauses.
-- Re-run `x07 verify` to confirm the fix.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_SMT_UNKNOWN`
 
-Summary: SMT solver returned an unknown status.
+Summary: Core lint/schema diagnostic `X07V_SMT_UNKNOWN`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-The SMT solver did not return `sat` or `unsat` (for example `unknown`). The result is inconclusive.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Treat the result as inconclusive: adjust bounds or simplify the target.
-- If available, use a different solver or solver version.
-- Keep the function within the supported subset and retry.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_UNSUPPORTED_ASYNC`
 
-Summary: `x07 verify` does not support `defasync` targets.
+Summary: Core lint/schema diagnostic `X07V_UNSUPPORTED_ASYNC`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-`x07 verify` v0.1 only supports verifying `defn` targets.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Verify a `defn` wrapper around the async logic (or refactor the core logic into a `defn` helper).
-- Keep the verified function within the supported subset (no async/concurrency).
-- Re-run `x07 verify`.
-
-
-## `X07V_UNSUPPORTED_FOR_BOUNDS`
-
-Summary: `for` loop bounds must be literal for `x07 verify` v0.1.
-
-Origins:
-- x07 (stage: run, severity: error)
-
-Quickfix support: `sometimes`
-
-Details:
-
-The verification subset supports `for` loops only when bounds are statically known (literal) so CBMC unwinding is well-defined.
-
-Agent strategy:
-
-- Replace variable bounds with a literal bound and add a contract that relates the literal bound to input sizes.
-- Or restructure the logic so loops are statically bounded.
-- Re-run `x07 verify`.
-
-
-## `X07V_UNSUPPORTED_PARAM`
-
-Summary: Unsupported parameter type for `x07 verify`.
-
-Origins:
-- x07 (stage: run, severity: error)
-
-Quickfix support: `sometimes`
-
-Details:
-
-The verification subset currently supports only `i32`, `u32`, `bytes`, and `bytes_view` parameters.
-
-Agent strategy:
-
-- Introduce a `defn` wrapper that encodes unsupported types into supported types (for example into `bytes`).
-- Keep the verified target within the supported subset.
-- Re-run `x07 verify`.
-
-
-## `X07V_UNSUPPORTED_RECURSION`
-
-Summary: Recursive targets are not supported by `x07 verify` v0.1.
-
-Origins:
-- x07 (stage: run, severity: error)
-
-Quickfix support: `sometimes`
-
-Details:
-
-The verification subset currently rejects recursion.
-
-Agent strategy:
-
-- Refactor recursion into an iterative loop with a statically bounded `for`, or split the function into a non-recursive helper.
-- Re-run `x07 verify`.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07V_UNWIND_INCOMPLETE`
 
-Summary: CBMC unwinding is incomplete.
+Summary: Core lint/schema diagnostic `X07V_UNWIND_INCOMPLETE`.
 
 Origins:
-- x07 (stage: run, severity: error)
+- x07 (stage: lint, severity: error)
 
 Quickfix support: `sometimes`
 
 Details:
 
-CBMC reported an unwinding assertion failure, which means the verification result is inconclusive at the current `--unwind` bound.
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
 
 Agent strategy:
 
-- Increase `--unwind` until unwinding assertions no longer fail.
-- If the function needs unbounded iteration, refactor it to a statically bounded form for v0.1 verification.
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X7I0001`
