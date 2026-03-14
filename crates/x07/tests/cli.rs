@@ -559,7 +559,7 @@ fn arch_check_suggests_and_applies_patches_for_rr_sorting_and_sanitizer_defaults
     std::fs::create_dir_all(&root).expect("create root");
 
     let manifest = r#"{
-  "schema_version": "x07.arch.manifest@0.1.0",
+  "schema_version": "x07.arch.manifest@0.2.0",
   "repo": { "id": "tmp_arch_check", "root": "." },
   "externals": { "allowed_import_prefixes": ["std.", "ext."], "allowed_exact": [] },
   "nodes": [],
@@ -720,7 +720,7 @@ fn arch_check_rr_sanitizer_schema_version_diag_includes_expected_and_got() {
     std::fs::create_dir_all(&root).expect("create root");
 
     let manifest = r#"{
-  "schema_version": "x07.arch.manifest@0.1.0",
+  "schema_version": "x07.arch.manifest@0.2.0",
   "repo": { "id": "tmp_arch_check", "root": "." },
   "externals": { "allowed_import_prefixes": ["std.", "ext."], "allowed_exact": [] },
   "nodes": [],

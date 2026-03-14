@@ -3595,9 +3595,7 @@ fn host_compiler_identity() -> String {
         .map(str::trim)
         .find(|line| !line.is_empty())
         .unwrap_or("");
-    if first_line.is_empty() {
-        fallback
-    } else if fallback == first_line {
+    if first_line.is_empty() || fallback == first_line {
         fallback
     } else {
         format!("{fallback} ({first_line})")

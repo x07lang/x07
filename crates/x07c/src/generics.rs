@@ -2778,6 +2778,7 @@ mod tests {
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            loop_contracts: Vec::new(),
             params: vec![AstFunctionParam {
                 name: "x".to_string(),
                 ty: TypeRef::Var("A".to_string()),

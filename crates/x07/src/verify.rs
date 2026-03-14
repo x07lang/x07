@@ -723,15 +723,13 @@ fn normalize_smt2_logic_for_z3(path: &Path) -> Result<()> {
             changed = true;
             continue;
         }
-        if has_quantifiers && !changed {
-            if trimmed.starts_with("(set-logic QF_") {
-                let prefix_len = line.len() - trimmed.len();
-                let indent = &line[..prefix_len];
-                let rest = trimmed.trim_start_matches("(set-logic QF_");
-                lines.push(format!("{indent}(set-logic {rest}"));
-                changed = true;
-                continue;
-            }
+        if has_quantifiers && !changed && trimmed.starts_with("(set-logic QF_") {
+            let prefix_len = line.len() - trimmed.len();
+            let indent = &line[..prefix_len];
+            let rest = trimmed.trim_start_matches("(set-logic QF_");
+            lines.push(format!("{indent}(set-logic {rest}"));
+            changed = true;
+            continue;
         }
         lines.push(line.to_string());
     }

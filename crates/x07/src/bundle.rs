@@ -542,7 +542,7 @@ pub fn cmd_bundle(
                 program_sha256: util::sha256_hex(&program_bytes),
                 lockfile_sha256: lockfile
                     .as_ref()
-                    .map(|p| std::fs::read(p))
+                    .map(std::fs::read)
                     .transpose()?
                     .map(|bytes| util::sha256_hex(&bytes)),
                 module_roots: resolved_module_roots.clone(),
