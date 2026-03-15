@@ -582,16 +582,27 @@ struct CapsuleAttestationDoc {
     response_contract_digest: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PeerPolicyDoc {
     schema_version: String,
     policy_id: String,
+    role: String,
+    host: String,
+    ports: Vec<u16>,
+    transport: String,
     tls_mode: String,
+    #[serde(default)]
+    sni: Option<String>,
+    #[serde(default)]
+    alpn: Vec<String>,
     #[serde(default)]
     ca_paths: Vec<String>,
     #[serde(default)]
     spki_sha256: Vec<String>,
+    #[serde(default)]
+    mtls_alias: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1121,10 +1132,7 @@ fn cmd_trust_capsule_check(
     )
 }
 
-fn cmd_trust_capsule_attest(
-    machine: &crate::reporting::MachineArgs,
-    args: TrustCapsuleAttestArgs,
-) -> Result<std::process::ExitCode> {
+pub(crate) fn emit_capsule_attestation(args: &TrustCapsuleAttestArgs) -> Result<Value> {
     let contract_path = util::resolve_existing_path_upwards(&args.contract);
     let contract = load_capsule_contract(&contract_path)?;
     let contract_root = contract_path.parent().unwrap_or_else(|| Path::new("."));
@@ -1199,6 +1207,14 @@ fn cmd_trust_capsule_attest(
     let bytes = report_common::canonical_pretty_json_bytes(&value)?;
     util::write_atomic(&args.out, &bytes)
         .with_context(|| format!("write capsule attestation: {}", args.out.display()))?;
+    Ok(value)
+}
+
+fn cmd_trust_capsule_attest(
+    machine: &crate::reporting::MachineArgs,
+    args: TrustCapsuleAttestArgs,
+) -> Result<std::process::ExitCode> {
+    let value = emit_capsule_attestation(&args)?;
     write_machine_json(machine, &value, 0, "trust capsule attest: ok")
 }
 

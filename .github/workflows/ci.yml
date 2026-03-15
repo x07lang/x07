@@ -213,6 +213,38 @@ jobs:
           X07_REQUIRE_SOLVERS: "1"
         run: ./scripts/ci/check_verified_core_pure_example.sh
 
+  network-trust-static:
+    name: ci / network-trust-static / ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - check_trusted_network_service_static.sh
+          - check_certified_network_capsule_static.sh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev
+      - name: Network trust static check
+        shell: bash
+        run: ./scripts/ci/${{ matrix.check }}
+
   determinism:
     name: ci / determinism
     runs-on: ubuntu-latest

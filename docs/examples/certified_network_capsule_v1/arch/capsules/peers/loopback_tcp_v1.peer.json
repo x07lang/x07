@@ -1,0 +1,9 @@
+{
+  "schema_version": "x07.peer.policy@0.1.0",
+  "policy_id": "loopback_tcp_v1",
+  "role": "outbound",
+  "host": "127.0.0.1",
+  "ports": [30030],
+  "transport": "tcp",
+  "tls_mode": "none"
+}

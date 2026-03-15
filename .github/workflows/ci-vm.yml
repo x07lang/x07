@@ -55,6 +55,14 @@ jobs:
         shell: bash
         run: ./scripts/ci/check_vm_sandbox_smoke.sh
 
+      - name: Network trust VZ smoke
+        shell: bash
+        env:
+          X07_SKIP_CERTIFY: "1"
+        run: |
+          ./scripts/ci/check_trusted_network_service_example.sh
+          ./scripts/ci/check_certified_network_capsule_example.sh
+
   linux-vm:
     name: vm / linux (firecracker)
     runs-on: [self-hosted, x07-vm-linux-firecracker]
@@ -100,7 +108,9 @@ jobs:
       matrix:
         check:
           - check_trusted_sandbox_program_example.sh
+          - check_trusted_network_service_example.sh
           - check_certified_capsule_example.sh
+          - check_certified_network_capsule_example.sh
     env:
       X07_VM_BACKEND: firecracker-ctr
     steps:

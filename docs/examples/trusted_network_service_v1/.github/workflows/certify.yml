@@ -1,0 +1,84 @@
+name: Trusted Network Service Certify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  X07_TOOLCHAIN_TAG: "v0.1.78"
+
+jobs:
+  certify:
+    runs-on: [self-hosted, x07-vm-linux-firecracker]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system deps
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cbmc \
+            clang \
+            build-essential \
+            pkg-config \
+            libcurl4-openssl-dev \
+            z3
+
+      - name: Install x07
+        shell: bash
+        run: cargo install --locked --git https://github.com/x07lang/x07 --tag "$X07_TOOLCHAIN_TAG" x07
+
+      - name: Trust posture checks
+        shell: bash
+        run: |
+          x07 trust profile check \
+            --project x07.json \
+            --profile arch/trust/profiles/trusted_program_sandboxed_net_v1.json \
+            --entry example.main
+          x07 trust capsule check \
+            --project x07.json \
+            --index arch/capsules/index.x07capsule.json
+          x07 pkg attest-closure \
+            --project x07.json \
+            --out target/dep-closure.attest.json
+
+      - name: Sandboxed tests and certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/tcp_echo_server.py --host 127.0.0.1 --port 30030 --timeout-s 120 &
+          server_pid="$!"
+          trap 'kill "$server_pid" >/dev/null 2>&1 || true' EXIT
+          x07 test --all --manifest tests/tests.json
+          x07 trust certify \
+            --project x07.json \
+            --profile arch/trust/profiles/trusted_program_sandboxed_net_v1.json \
+            --entry example.main \
+            --out-dir target/cert
+
+      - name: Upload certificate bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trusted-network-service-certificate
+          path: target/cert/
+          if-no-files-found: error
+
+      - name: Upload dependency closure attestation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trusted-network-service-dep-closure
+          path: target/dep-closure.attest.json
+          if-no-files-found: error

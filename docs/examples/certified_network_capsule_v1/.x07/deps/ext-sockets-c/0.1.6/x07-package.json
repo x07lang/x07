@@ -1,0 +1,28 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-sockets-c",
+  "description": "Sockets + TLS FFI backend for std.net (run-os only).",
+  "docs": "Sockets + TLS FFI backend for std.net (run-os only).\n\nModules:\n- ext.sockets._ffi\n- ext.sockets.net\n\nFFI libs:\n- ssl\n- crypto\n\nUsage:\n- Add dependency: x07 pkg add ext-sockets-c@0.1.6\n- Import the modules listed above.\n",
+  "version": "0.1.6",
+  "module_root": "modules",
+  "modules": [
+    "ext.sockets._ffi",
+    "ext.sockets.net"
+  ],
+  "meta": {
+    "determinism_tier": "os-world-only",
+    "worlds_allowed": [
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "ffi",
+    "ffi_libs": [
+      "ssl",
+      "crypto"
+    ],
+    "capabilities": [
+      "ffi",
+      "unsafe"
+    ]
+  }
+}

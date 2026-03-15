@@ -8,7 +8,9 @@ For the smallest certificate-first example, see:
 
 - `docs/examples/verified_core_pure_v1/`
 - `docs/examples/trusted_sandbox_program_v1/`
+- `docs/examples/trusted_network_service_v1/`
 - `docs/examples/certified_capsule_v1/`
+- `docs/examples/certified_network_capsule_v1/`
 
 For a second certifiable example built around published packages, see:
 
@@ -254,7 +256,7 @@ For the networked sandbox profile, add the Milestone C posture gates:
 - `lockfile-hash-change`
 - `advisory-allowance-enabled`
 
-The canonical example projects at `docs/examples/verified_core_pure_v1/`, `docs/examples/trusted_sandbox_program_v1/`, and `docs/examples/certified_capsule_v1/` are structured to exercise those certificate flows end to end.
+The canonical example projects at `docs/examples/verified_core_pure_v1/`, `docs/examples/trusted_sandbox_program_v1/`, `docs/examples/trusted_network_service_v1/`, `docs/examples/certified_capsule_v1/`, and `docs/examples/certified_network_capsule_v1/` are structured to exercise those certificate flows end to end.
 The checked-in `.github/workflows/certify.yml` files in those examples show the minimal CI surface for running the same flows in GitHub Actions, and `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` plus `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/` serve as the first-party package-backed dogfood examples in this train.
 
 ## CI artifact pattern

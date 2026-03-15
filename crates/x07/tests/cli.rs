@@ -6108,6 +6108,155 @@ fn x07_init_trusted_sandbox_program_template_creates_capsule_backed_project() {
 }
 
 #[test]
+fn x07_init_trusted_network_service_template_creates_network_capsule_project() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_init_trusted_network_service");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init", "--template", "trusted-network-service"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "init");
+    assert_eq!(
+        v["notes"]
+            .as_array()
+            .expect("notes[]")
+            .iter()
+            .map(|v| v.as_str().expect("notes[] string"))
+            .collect::<Vec<_>>(),
+        vec!["Generated a sandboxed network-service template with peer-policy capsule evidence."]
+    );
+    assert_eq!(
+        v["next_steps"]
+            .as_array()
+            .expect("next_steps[]")
+            .iter()
+            .map(|v| v.as_str().expect("next_steps[] string"))
+            .collect::<Vec<_>>(),
+        vec![
+            "x07 trust profile check --project x07.json --profile arch/trust/profiles/trusted_program_sandboxed_net_v1.json --entry example.main",
+            "x07 trust capsule check --project x07.json --index arch/capsules/index.x07capsule.json",
+            "python3 tests/tcp_echo_server.py --host 127.0.0.1 --port 30030",
+            "x07 test --all --manifest tests/tests.json",
+            "x07 trust certify --project x07.json --profile arch/trust/profiles/trusted_program_sandboxed_net_v1.json --entry example.main --out-dir target/cert",
+        ]
+    );
+
+    for rel in [
+        "README.md",
+        "x07.json",
+        "x07.lock.json",
+        "src/capsule.x07.json",
+        "src/example.x07.json",
+        "src/main.x07.json",
+        "tests/tests.json",
+        "tests/core.x07.json",
+        "tests/policy/run-os.json",
+        "tests/tcp_echo_server.py",
+        "arch/manifest.x07arch.json",
+        "arch/boundaries/index.x07boundary.json",
+        "arch/capsules/index.x07capsule.json",
+        "arch/capsules/capsule.main.contract.json",
+        "arch/capsules/capsule.main.effect_log.json",
+        "arch/capsules/capsule.main.conformance.json",
+        "arch/capsules/capsule.main.attest.json",
+        "arch/capsules/peers/loopback_tcp_v1.peer.json",
+        "arch/trust/profiles/trusted_program_sandboxed_net_v1.json",
+        "policy/run-os.json",
+        ".github/workflows/certify.yml",
+        "x07-toolchain.toml",
+        "AGENT.md",
+        ".agent/docs/index.md",
+        ".agent/skills/README.md",
+        ".gitignore",
+    ] {
+        assert!(dir.join(rel).is_file(), "missing {}", rel);
+    }
+
+    let proj_doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    assert_eq!(proj_doc["schema_version"], PROJECT_MANIFEST_SCHEMA_VERSION);
+    assert_eq!(proj_doc["world"], "run-os-sandboxed");
+    assert_eq!(proj_doc["default_profile"], "sandbox");
+    assert_eq!(proj_doc["entry"], "src/main.x07.json");
+
+    let tests_doc: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("tests/tests.json")).unwrap())
+            .expect("parse tests/tests.json");
+    let tests = tests_doc["tests"].as_array().expect("tests[]");
+    assert_eq!(tests.len(), 2);
+    assert_eq!(tests[0]["id"], "smoke/tcp_echo");
+    assert_eq!(tests[0]["sandbox_smoke"], true);
+    assert_eq!(tests[0]["require_runtime_attestation"], true);
+    assert_eq!(
+        tests[0]["required_capsules"]
+            .as_array()
+            .expect("required_capsules[]"),
+        &vec![Value::String("capsule.main_v1".to_string())]
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "profile",
+            "check",
+            "--project",
+            "x07.json",
+            "--profile",
+            "arch/trust/profiles/trusted_program_sandboxed_net_v1.json",
+            "--entry",
+            "example.main",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["profile"], "trusted_program_sandboxed_net_v1");
+    assert_eq!(report["entry"], "example.main");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "capsule",
+            "check",
+            "--project",
+            "x07.json",
+            "--index",
+            "arch/capsules/index.x07capsule.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["checked_capsules"], 1);
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
 fn x07_init_certified_capsule_template_creates_attested_capsule_project() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_init_certified_capsule");
@@ -6222,6 +6371,154 @@ fn x07_init_certified_capsule_template_creates_attested_capsule_project() {
     let report = parse_json_stdout(&out);
     assert_eq!(report["ok"], true);
     assert_eq!(report["profile"], "certified_capsule_v1");
+    assert_eq!(report["entry"], "capsule.main");
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "capsule",
+            "check",
+            "--project",
+            "x07.json",
+            "--index",
+            "arch/capsules/index.x07capsule.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["checked_capsules"], 1);
+
+    std::fs::remove_dir_all(&dir).expect("cleanup tmp dir");
+}
+
+#[test]
+fn x07_init_certified_network_capsule_template_creates_network_attested_capsule_project() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_init_certified_network_capsule");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init", "--template", "certified-network-capsule"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["command"], "init");
+    assert_eq!(
+        v["notes"]
+            .as_array()
+            .expect("notes[]")
+            .iter()
+            .map(|v| v.as_str().expect("notes[] string"))
+            .collect::<Vec<_>>(),
+        vec!["Generated a certified network capsule template with peer-policy attestation scaffolding."]
+    );
+    assert_eq!(
+        v["next_steps"]
+            .as_array()
+            .expect("next_steps[]")
+            .iter()
+            .map(|v| v.as_str().expect("next_steps[] string"))
+            .collect::<Vec<_>>(),
+        vec![
+            "x07 trust profile check --project x07.json --profile arch/trust/profiles/trusted_program_sandboxed_net_v1.json --entry capsule.main",
+            "x07 trust capsule check --project x07.json --index arch/capsules/index.x07capsule.json",
+            "python3 tests/tcp_echo_server.py --host 127.0.0.1 --port 30030",
+            "x07 test --all --manifest tests/tests.json",
+            "x07 trust certify --project x07.json --profile arch/trust/profiles/trusted_program_sandboxed_net_v1.json --entry capsule.main --out-dir target/cert",
+        ]
+    );
+
+    for rel in [
+        "README.md",
+        "x07.json",
+        "x07.lock.json",
+        "src/capsule.x07.json",
+        "src/main.x07.json",
+        "tests/tests.json",
+        "tests/core.x07.json",
+        "tests/policy/run-os.json",
+        "tests/tcp_echo_server.py",
+        "arch/manifest.x07arch.json",
+        "arch/boundaries/index.x07boundary.json",
+        "arch/capsules/index.x07capsule.json",
+        "arch/capsules/capsule.main.contract.json",
+        "arch/capsules/capsule.main.effect_log.json",
+        "arch/capsules/capsule.main.conformance.json",
+        "arch/capsules/capsule.main.attest.json",
+        "arch/capsules/peers/loopback_tcp_v1.peer.json",
+        "arch/trust/profiles/trusted_program_sandboxed_net_v1.json",
+        "policy/run-os.json",
+        ".github/workflows/certify.yml",
+        "x07-toolchain.toml",
+        "AGENT.md",
+        ".agent/docs/index.md",
+        ".agent/skills/README.md",
+        ".gitignore",
+    ] {
+        assert!(dir.join(rel).is_file(), "missing {}", rel);
+    }
+
+    let proj_doc: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    assert_eq!(proj_doc["schema_version"], PROJECT_MANIFEST_SCHEMA_VERSION);
+    assert_eq!(proj_doc["world"], "run-os-sandboxed");
+    assert_eq!(proj_doc["default_profile"], "sandbox");
+    assert_eq!(proj_doc["entry"], "src/main.x07.json");
+
+    let tests_doc: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("tests/tests.json")).unwrap())
+            .expect("parse tests/tests.json");
+    let tests = tests_doc["tests"].as_array().expect("tests[]");
+    assert_eq!(tests.len(), 1);
+    assert_eq!(tests[0]["id"], "smoke/capsule_tcp_echo");
+    assert_eq!(tests[0]["sandbox_smoke"], true);
+    assert_eq!(tests[0]["require_runtime_attestation"], true);
+    assert_eq!(
+        tests[0]["required_capsules"]
+            .as_array()
+            .expect("required_capsules[]"),
+        &vec![Value::String("capsule.main_v1".to_string())]
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "profile",
+            "check",
+            "--project",
+            "x07.json",
+            "--profile",
+            "arch/trust/profiles/trusted_program_sandboxed_net_v1.json",
+            "--entry",
+            "capsule.main",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["profile"], "trusted_program_sandboxed_net_v1");
     assert_eq!(report["entry"], "capsule.main");
 
     let out = run_x07_in_dir(

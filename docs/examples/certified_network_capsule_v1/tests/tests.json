@@ -1,0 +1,15 @@
+{
+  "schema_version": "x07.tests_manifest@0.2.0",
+  "tests": [
+    {
+      "id": "smoke/capsule_tcp_echo",
+      "entry": "tests.core.smoke_capsule_tcp_echo",
+      "expect": "pass",
+      "world": "run-os-sandboxed",
+      "policy_json": "policy/run-os.json",
+      "require_runtime_attestation": true,
+      "required_capsules": ["capsule.main_v1"],
+      "sandbox_smoke": true
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": "x07.capsule.contract@0.2.0",
+  "id": "capsule.main_v1",
+  "worlds_allowed": ["run-os-sandboxed"],
+  "capabilities": [],
+  "language": {
+    "allow_unsafe": false,
+    "allow_ffi": false
+  },
+  "input": {
+    "shape": {
+      "brand": "trusted_network_service.request_v1"
+    }
+  },
+  "output": {
+    "shape": {
+      "brand": "trusted_network_service.response_v1"
+    }
+  },
+  "error_spaces": ["trusted_network_service.error_v1"],
+  "effect_log": {
+    "schema_path": "capsule.main.effect_log.json",
+    "redaction": "metadata_only",
+    "replay_safe": true
+  },
+  "replay": {
+    "mode": "deterministic"
+  },
+  "conformance": {
+    "tests": ["capsule/tcp_echo_identity"],
+    "report_path": "capsule.main.conformance.json"
+  },
+  "network": {
+    "peer_policy_paths": ["peers/loopback_tcp_v1.peer.json"],
+    "request_contract_path": null,
+    "response_contract_path": null,
+    "conformance_tests": ["capsule/tcp_echo_identity"]
+  }
+}

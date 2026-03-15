@@ -141,16 +141,22 @@ Start from the scaffold that matches the trust claim you want:
 ```bash
 x07 init --template verified-core-pure
 x07 init --template trusted-sandbox-program
+x07 init --template trusted-network-service
 x07 init --template certified-capsule
+x07 init --template certified-network-capsule
 ```
 
 Canonical examples:
 
 - `docs/examples/verified_core_pure_v1/`
 - `docs/examples/trusted_sandbox_program_v1/`
+- `docs/examples/trusted_network_service_v1/`
 - `docs/examples/certified_capsule_v1/`
+- `docs/examples/certified_network_capsule_v1/`
 - `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/`
 - `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/`
+
+The standalone network capsule scaffold reuses `trusted_program_sandboxed_net_v1`; the network trust claim is about the profile posture and required evidence, not a separate capsule-only profile id.
 
 ## Where to go next
 

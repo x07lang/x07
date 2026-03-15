@@ -101,7 +101,17 @@ Use the matching template for the trust claim you want:
 
 - `x07 init --template verified-core-pure`
 - `x07 init --template trusted-sandbox-program`
+- `x07 init --template trusted-network-service`
 - `x07 init --template certified-capsule`
+- `x07 init --template certified-network-capsule`
+
+Canonical certificate-first examples live in:
+
+- `docs/examples/verified_core_pure_v1/`
+- `docs/examples/trusted_sandbox_program_v1/`
+- `docs/examples/trusted_network_service_v1/`
+- `docs/examples/certified_capsule_v1/`
+- `docs/examples/certified_network_capsule_v1/`
 
 ## Ecosystem Overview
 

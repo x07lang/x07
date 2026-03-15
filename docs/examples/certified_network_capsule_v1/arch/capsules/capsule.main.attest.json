@@ -1,0 +1,21 @@
+{
+  "capsule_id": "capsule.main_v1",
+  "conformance_report_digest": "sha256:f6783242cf896face3e6ff5ac8c312d0c54076043e0b0d4fc89e17b153266448",
+  "contract_digest": "sha256:1b04d523852d3564bc9855cfaf8954677ac3a633446edabd4076a3557bc41752",
+  "lockfile_digest": "sha256:3381e3077b949a91303e2553042cb35ed7bd76fcbc613b9ae039f1bc93b4da24",
+  "module_digests": [
+    {
+      "digest": "sha256:ea1b2dfe7b803d39f1760a6bf4f40a78b28074a22e90a5bc9e860ed8fc794dcf",
+      "path": "/Users/webik/projects/x07lang/x07/docs/examples/certified_network_capsule_v1/src/capsule.x07.json"
+    }
+  ],
+  "peer_policy_digests": [
+    {
+      "digest": "sha256:06bb6e52153d2ebf42952b9de3e628b519e84f2a8114dc061cb329d82f8c466c",
+      "path": "/Users/webik/projects/x07lang/x07/docs/examples/certified_network_capsule_v1/arch/capsules/peers/loopback_tcp_v1.peer.json"
+    }
+  ],
+  "request_contract_digest": null,
+  "response_contract_digest": null,
+  "schema_version": "x07.capsule.attest@0.2.0"
+}

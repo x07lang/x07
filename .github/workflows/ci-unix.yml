@@ -74,3 +74,11 @@ jobs:
       - name: Verified core pure smoke
         shell: bash
         run: ./scripts/ci/check_verified_core_pure_example.sh
+
+      - name: Trusted network service static smoke
+        shell: bash
+        run: ./scripts/ci/check_trusted_network_service_static.sh
+
+      - name: Certified network capsule static smoke
+        shell: bash
+        run: ./scripts/ci/check_certified_network_capsule_static.sh

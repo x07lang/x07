@@ -15,8 +15,12 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Creates a certifiable `solve-pure` project with `arch/manifest.x07arch.json`, `arch/boundaries/index.x07boundary.json`, `arch/trust/profiles/verified_core_pure_v1.json`, `.github/workflows/certify.yml`, and a smoke + PBT harness wired for `x07 trust certify`.
 - `x07 init --template trusted-sandbox-program`
   - Creates a certifiable `run-os-sandboxed` async project with a certified capsule boundary, capsule attestations, sandbox smoke tests, and a self-hosted VM certification workflow wired for `x07 trust certify`.
+- `x07 init --template trusted-network-service`
+  - Creates a certifiable `run-os-sandboxed` network service project under `trusted_program_sandboxed_net_v1`, with pinned peer-policy files, attested network capsule metadata, a loopback TCP smoke harness, and a self-hosted VM certification workflow.
 - `x07 init --template certified-capsule`
   - Creates a minimal certified-capsule project with capsule contract/effect-log/attestation surfaces plus a self-hosted VM certification workflow.
+- `x07 init --template certified-network-capsule`
+  - Creates a standalone network capsule project under `trusted_program_sandboxed_net_v1`, with peer-policy evidence, effect-log attestations, a loopback TCP smoke harness, and a self-hosted VM certification workflow.
 
 ### MCP kit tooling
 
