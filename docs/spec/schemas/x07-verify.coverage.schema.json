@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-verify.coverage.schema.json",
-  "title": "x07.verify.coverage@0.1.0",
+  "title": "x07.verify.coverage@0.2.0",
   "description": "Reachable proof-coverage report emitted by `x07 verify --coverage`.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "entry", "worlds", "summary", "functions"],
   "properties": {
-    "schema_version": { "const": "x07.verify.coverage@0.1.0" },
+    "schema_version": { "const": "x07.verify.coverage@0.2.0" },
     "entry": {
       "type": "string",
       "minLength": 1,
@@ -35,16 +35,30 @@
       "required": [
         "reachable_defn",
         "proven_defn",
+        "reachable_async",
+        "proven_async",
         "trusted_primitives",
+        "trusted_scheduler_models",
+        "capsule_boundaries",
         "uncovered_defn",
         "unsupported_defn"
       ],
       "properties": {
         "reachable_defn": { "type": "integer", "minimum": 0 },
         "proven_defn": { "type": "integer", "minimum": 0 },
+        "reachable_async": { "type": "integer", "minimum": 0 },
+        "proven_async": { "type": "integer", "minimum": 0 },
         "trusted_primitives": { "type": "integer", "minimum": 0 },
+        "trusted_scheduler_models": { "type": "integer", "minimum": 0 },
+        "capsule_boundaries": { "type": "integer", "minimum": 0 },
         "uncovered_defn": { "type": "integer", "minimum": 0 },
-        "unsupported_defn": { "type": "integer", "minimum": 0 }
+        "unsupported_defn": { "type": "integer", "minimum": 0 },
+        "async_model": {
+          "anyOf": [
+            { "type": "string", "minLength": 1, "maxLength": 256 },
+            { "type": "null" }
+          ]
+        }
       }
     },
     "functions": {
@@ -63,10 +77,12 @@
             "type": "string",
             "enum": [
               "proven",
+              "proven_async",
               "trusted_primitive",
+              "trusted_scheduler_model",
+              "capsule_boundary",
               "unsupported",
-              "uncovered",
-              "runtime_only"
+              "uncovered"
             ]
           },
           "source_path": {

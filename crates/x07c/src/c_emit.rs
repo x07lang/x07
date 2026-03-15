@@ -337,6 +337,11 @@ fn parse_value_suffix_pair<'a>(head: &'a str, prefix: &str) -> Option<(&'a str, 
 #[cfg(test)]
 mod tests {
     use super::c_escape_string;
+    use super::program_uses_contracts;
+    use crate::ast::Expr;
+    use crate::program::{AsyncFunctionDef, Program};
+    use crate::types::Ty;
+    use crate::x07ast::{AsyncProtocolAst, ContractClauseAst};
 
     #[test]
     fn escapes_do_not_greedily_consume_following_hex_digits() {
@@ -351,6 +356,45 @@ mod tests {
         let bytes = [b'\n', b'\r', b'\t', b'\\', b'"'];
         let escaped = c_escape_string(&bytes);
         assert_eq!(escaped, "\\n\\r\\t\\\\\\\"");
+    }
+
+    #[test]
+    fn program_uses_contracts_counts_async_protocol_clauses() {
+        let clause = ContractClauseAst {
+            id: Some("a0".to_string()),
+            expr: Expr::Int {
+                value: 1,
+                ptr: "/decls/0/protocol/await_invariant/0/expr".to_string(),
+            },
+            witness: Vec::new(),
+        };
+        let program = Program {
+            functions: Vec::new(),
+            async_functions: vec![AsyncFunctionDef {
+                name: "async_fixture.main_v1".to_string(),
+                requires: Vec::new(),
+                ensures: Vec::new(),
+                invariant: Vec::new(),
+                protocol: Some(AsyncProtocolAst {
+                    await_invariant: vec![clause],
+                    scope_invariant: Vec::new(),
+                    cancellation_ensures: Vec::new(),
+                }),
+                params: Vec::new(),
+                ret_ty: Ty::Bytes,
+                ret_brand: None,
+                body: Expr::Int {
+                    value: 0,
+                    ptr: "/decls/0/body".to_string(),
+                },
+            }],
+            extern_functions: Vec::new(),
+            solve: Expr::Int {
+                value: 0,
+                ptr: "/solve".to_string(),
+            },
+        };
+        assert!(program_uses_contracts(&program));
     }
 }
 
@@ -538,10 +582,16 @@ fn program_uses_contracts(program: &Program) -> bool {
         .functions
         .iter()
         .any(|f| !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty())
-        || program
-            .async_functions
-            .iter()
-            .any(|f| !f.requires.is_empty() || !f.ensures.is_empty() || !f.invariant.is_empty())
+        || program.async_functions.iter().any(|f| {
+            !f.requires.is_empty()
+                || !f.ensures.is_empty()
+                || !f.invariant.is_empty()
+                || f.protocol.as_ref().is_some_and(|protocol| {
+                    !protocol.await_invariant.is_empty()
+                        || !protocol.scope_invariant.is_empty()
+                        || !protocol.cancellation_ensures.is_empty()
+                })
+        })
 }
 
 fn trim_preamble_section(

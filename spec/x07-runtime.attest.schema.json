@@ -12,6 +12,12 @@
     "weaker_isolation",
     "artifact_path",
     "input_len_bytes",
+    "guest_image_digest",
+    "effective_policy_digest",
+    "bundled_binary_digest",
+    "compile_attestation_digest",
+    "capsule_attestation_digests",
+    "effect_log_digests",
     "outcome"
   ],
   "properties": {
@@ -44,6 +50,30 @@
         { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         { "type": "null" }
       ]
+    },
+    "effective_policy_digest": {
+      "anyOf": [
+        { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "bundled_binary_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "compile_attestation_digest": {
+      "anyOf": [
+        { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "capsule_attestation_digests": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+    },
+    "effect_log_digests": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
     },
     "outcome": {
       "type": "object",

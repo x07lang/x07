@@ -231,6 +231,7 @@ impl Elaborator<'_> {
                         requires: Vec::new(),
                         ensures: Vec::new(),
                         invariant: Vec::new(),
+                        protocol: None,
                         params: parsed
                             .params
                             .iter()

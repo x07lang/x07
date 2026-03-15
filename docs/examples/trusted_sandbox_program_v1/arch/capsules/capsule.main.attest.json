@@ -1,0 +1,13 @@
+{
+  "capsule_id": "capsule.main_v1",
+  "conformance_report_digest": "sha256:6e38e65f5f96e9cf9ff472ab47612a9c7cca26b4a2987a8853b58da230c960cc",
+  "contract_digest": "sha256:37c426a615e535a9070d9314e7dc5f68ab8ec0f3e4f738c43fb3b000e37f03d9",
+  "lockfile_digest": "sha256:3381e3077b949a91303e2553042cb35ed7bd76fcbc613b9ae039f1bc93b4da24",
+  "module_digests": [
+    {
+      "digest": "sha256:7da0ff0edc9eb5e648913eda19778914fb034426d0bf0d111661f3261f0bdd9b",
+      "path": "/Users/webik/projects/x07lang/x07/docs/examples/trusted_sandbox_program_v1/src/capsule.x07.json"
+    }
+  ],
+  "schema_version": "x07.capsule.attest@0.1.0"
+}

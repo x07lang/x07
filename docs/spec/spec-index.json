@@ -1394,8 +1394,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-verify.coverage.schema.json",
       "schema_id": "https://x07.io/spec/x07-verify.coverage.schema.json",
-      "schema_version": "x07.verify.coverage@0.1.0",
-      "title": "x07.verify.coverage@0.1.0"
+      "schema_version": "x07.verify.coverage@0.2.0",
+      "title": "x07.verify.coverage@0.2.0"
     },
     {
       "kind": "schema",
@@ -1408,8 +1408,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-verify.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-verify.report.schema.json",
-      "schema_version": "x07.verify.report@0.2.0",
-      "title": "X07 x07 verify report v0.2.0"
+      "schema_version": "x07.verify.report@0.3.0",
+      "title": "X07 x07 verify report v0.3.0"
     },
     {
       "kind": "schema",
@@ -1473,6 +1473,13 @@
       "schema_id": "https://x07.io/spec/x07.verify.cex@0.1.0.schema.json",
       "schema_version": "x07.verify.cex@0.1.0",
       "title": "X07 Verify Counterexample v0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07.verify.cex@0.2.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07.verify.cex@0.2.0.schema.json",
+      "schema_version": "x07.verify.cex@0.2.0",
+      "title": "X07 Verify Counterexample v0.2.0"
     },
     {
       "kind": "schema",

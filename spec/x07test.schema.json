@@ -87,6 +87,10 @@
       "type": "string",
       "enum": ["pass", "fail", "skip", "error", "xfail_pass", "xfail_fail"]
     },
+    "entry_kind": {
+      "type": "string",
+      "enum": ["defn", "defasync"]
+    },
     "diag": {
       "type": "object",
       "additionalProperties": false,
@@ -205,7 +209,15 @@
         "stderr_b64": { "type": "string" },
         "failure_code_u32": { "type": "integer", "minimum": 0 },
         "sandbox_backend": { "$ref": "#/$defs/sandbox_backend" },
-        "runtime_attestation": { "$ref": "#/$defs/runtime_attestation_ref" }
+        "runtime_attestation": { "$ref": "#/$defs/runtime_attestation_ref" },
+        "effect_log_digests": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+        },
+        "capsule_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
+        }
       }
     },
     "runtime_attestation_ref": {
@@ -221,13 +233,14 @@
     "test_case_result": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "world", "expect", "status", "duration_ms"],
+      "required": ["id", "world", "expect", "status", "duration_ms", "entry_kind"],
       "properties": {
         "id": { "type": "string", "minLength": 1, "maxLength": 2048 },
         "world": { "$ref": "#/$defs/world" },
         "expect": { "$ref": "#/$defs/expect" },
         "status": { "$ref": "#/$defs/test_status" },
         "duration_ms": { "type": "integer", "minimum": 0 },
+        "entry_kind": { "$ref": "#/$defs/entry_kind" },
         "failure_kind": {
           "type": "string",
           "minLength": 1,

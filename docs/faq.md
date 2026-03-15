@@ -63,20 +63,22 @@ x07AST v0.6 supports `requires` / `ensures` / `invariant` on `defn`/`defasync` d
 - For certification-oriented proof artifacts, run `x07 verify --prove --entry <sym>` and `x07 verify --coverage --entry <sym>`.
 - `x07 verify --prove` now honors `catalog/verify_primitives.json` when it builds the proof harness, so trusted imported helpers can stay outside the local proof closure while still being listed in coverage artifacts.
 
-See: [Syntax & x07AST](language/syntax-x07ast.md) and [CLI](toolchain/cli.md).
+See: [Formal verification & certification](toolchain/formal-verification.md), [Syntax & x07AST](language/syntax-x07ast.md), and [CLI](toolchain/cli.md).
 
 ## How do I start a project that can be reviewed from a certificate instead of source?
 
 Use:
 
 - `x07 init --template verified-core-pure`
+- `x07 init --template trusted-sandbox-program`
+- `x07 init --template certified-capsule`
 
 Then run:
 
 - `x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry example.main`
 - `x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry example.main --out-dir target/cert`
 
-The current strong claim is intentionally narrow: humans can review the certificate bundle instead of source for projects that satisfy `verified_core_pure_v1`.
+For the sandboxed trust line, use `trusted_program_sandboxed_local_v1` on a host with a supported VM backend. For capsule-only certification, use `certified_capsule_v1`.
 
 ## How do humans review agent patches?
 

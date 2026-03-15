@@ -863,10 +863,10 @@ fn resolve_builtin_stdlib_doc_result(query: &str) -> Result<Option<DocResult>> {
 }
 
 fn resolve_toolchain_stdlib_doc_result(query: &str, cwd: &Path) -> Result<Option<DocResult>> {
-    let Some(toolchain_root) = detect_toolchain_root_best_effort(cwd) else {
+    let Some(toolchain_root) = util::detect_toolchain_root_best_effort(cwd) else {
         return Ok(None);
     };
-    let module_roots = toolchain_stdlib_module_roots(&toolchain_root);
+    let module_roots = util::toolchain_stdlib_module_roots(&toolchain_root);
     if module_roots.is_empty() {
         return Ok(None);
     }
@@ -1541,101 +1541,11 @@ fn try_print_builtin_stdlib_docs(query: &str) -> Result<bool> {
     Ok(false)
 }
 
-fn parse_semver_triplet(v: &str) -> Option<(u32, u32, u32)> {
-    let parts: Vec<&str> = v.trim().split('.').collect();
-    if parts.len() != 3 {
-        return None;
-    }
-    let major: u32 = parts[0].parse().ok()?;
-    let minor: u32 = parts[1].parse().ok()?;
-    let patch: u32 = parts[2].parse().ok()?;
-    Some((major, minor, patch))
-}
-
-fn detect_toolchain_root_best_effort(cwd: &Path) -> Option<PathBuf> {
-    let cand = util::resolve_existing_path_upwards_from(cwd, Path::new("stdlib.lock"));
-    if cand.is_file() {
-        return cand.parent().map(|p| p.to_path_buf());
-    }
-
-    if let Ok(exe) = std::env::current_exe() {
-        for anc in exe.ancestors() {
-            if anc.join("stdlib.lock").is_file() {
-                return Some(anc.to_path_buf());
-            }
-        }
-    }
-
-    let home = std::env::var_os("HOME").map(PathBuf::from)?;
-    let toolchains_dir = home.join(".x07").join("toolchains");
-    let mut best: Option<((u32, u32, u32), PathBuf)> = None;
-    for entry in std::fs::read_dir(&toolchains_dir).ok()? {
-        let entry = entry.ok()?;
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
-        }
-        let dir_name = path.file_name()?.to_string_lossy();
-        let dir_name = dir_name.strip_prefix('v').unwrap_or(&dir_name);
-        let Some(ver) = parse_semver_triplet(dir_name) else {
-            continue;
-        };
-        if !path.join("stdlib.lock").is_file() {
-            continue;
-        }
-        if best.as_ref().map(|(b, _)| ver > *b).unwrap_or(true) {
-            best = Some((ver, path));
-        }
-    }
-
-    best.map(|(_, p)| p)
-}
-
-fn semver_dirs_sorted_desc(base: &Path) -> Vec<PathBuf> {
-    let mut out: Vec<((u32, u32, u32), PathBuf)> = Vec::new();
-    let Ok(entries) = std::fs::read_dir(base) else {
-        return Vec::new();
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
-        }
-        let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
-            continue;
-        };
-        let Some(v) = parse_semver_triplet(name) else {
-            continue;
-        };
-        out.push((v, path));
-    }
-    out.sort_by(|(a, _), (b, _)| b.cmp(a));
-    out.into_iter().map(|(_, p)| p).collect()
-}
-
-fn toolchain_stdlib_module_roots(toolchain_root: &Path) -> Vec<PathBuf> {
-    let mut roots: Vec<PathBuf> = Vec::new();
-    let stdlib_dir = toolchain_root.join("stdlib");
-    for family in ["os", "std"] {
-        let base = stdlib_dir.join(family);
-        if !base.is_dir() {
-            continue;
-        }
-        for ver in semver_dirs_sorted_desc(&base) {
-            let modules = ver.join("modules");
-            if modules.is_dir() {
-                roots.push(modules);
-            }
-        }
-    }
-    roots
-}
-
 fn try_print_stdlib_docs(query: &str, cwd: &Path) -> Result<bool> {
-    let Some(toolchain_root) = detect_toolchain_root_best_effort(cwd) else {
+    let Some(toolchain_root) = util::detect_toolchain_root_best_effort(cwd) else {
         return Ok(false);
     };
-    let module_roots = toolchain_stdlib_module_roots(&toolchain_root);
+    let module_roots = util::toolchain_stdlib_module_roots(&toolchain_root);
     if module_roots.is_empty() {
         return Ok(false);
     }

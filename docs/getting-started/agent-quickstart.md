@@ -149,6 +149,18 @@ x07 init --template verified-core-pure
 
 That template wires `arch/`, smoke/PBT tests, and `verified_core_pure_v1` so you can go straight to `x07 trust profile check` and `x07 trust certify`.
 
+If you want the sandboxed Milestone B line instead, use:
+
+```bash
+x07 init --template trusted-sandbox-program
+```
+
+For a capsule-only starting point, use:
+
+```bash
+x07 init --template certified-capsule
+```
+
 See also: [Available skills](available-skills.md).
 
 ## 3) The core loop: run → test (auto-repair)

@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use base64::Engine;
 use clap::Parser;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 #[cfg(test)]
 use x07_contracts::RUN_OS_POLICY_SCHEMA_VERSION;
 use x07_contracts::{X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_RUNTIME_ATTEST_SCHEMA_VERSION};
@@ -1458,6 +1459,14 @@ struct RuntimeAttestation {
     run_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     guest_image_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effective_policy_digest: Option<String>,
+    bundled_binary_digest: String,
+    compile_attestation_digest: Option<String>,
+    #[serde(default)]
+    capsule_attestation_digests: Vec<String>,
+    #[serde(default)]
+    effect_log_digests: Vec<String>,
     outcome: RuntimeAttestationOutcome,
 }
 
@@ -1474,6 +1483,15 @@ struct RuntimeAttestationRef {
     path: String,
     sandbox_backend: &'static str,
     weaker_isolation: bool,
+}
+
+#[derive(Debug, Clone)]
+struct RuntimeAttestationBindings {
+    effective_policy_digest: Option<String>,
+    bundled_binary_digest: String,
+    compile_attestation_digest: Option<String>,
+    capsule_attestation_digests: Vec<String>,
+    effect_log_digests: Vec<String>,
 }
 
 fn sandbox_backend_label(
@@ -1512,6 +1530,78 @@ fn attach_runtime_fields(
     }
 }
 
+fn sha256_prefixed(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("sha256:{:x}", hasher.finalize())
+}
+
+fn sha256_prefixed_for_path(path: &Path) -> Result<String> {
+    let bytes = std::fs::read(path)
+        .with_context(|| format!("read attested artifact bytes: {}", path.display()))?;
+    Ok(sha256_prefixed(&bytes))
+}
+
+fn load_runtime_policy_digest(policy_path: Option<&Path>) -> Result<(Option<String>, bool)> {
+    let Some(path) = policy_path else {
+        anyhow::bail!(
+            "X07RA_EPOLICY_DIGEST: runtime attestation requires an effective policy path"
+        );
+    };
+    let bytes = std::fs::read(path).with_context(|| {
+        format!(
+            "X07RA_EPOLICY_DIGEST: read effective policy: {}",
+            path.display()
+        )
+    })?;
+    let policy: policy::Policy = serde_json::from_slice(&bytes).with_context(|| {
+        format!(
+            "X07RA_EPOLICY_DIGEST: parse effective policy JSON: {}",
+            path.display()
+        )
+    })?;
+    Ok((Some(sha256_prefixed(&bytes)), policy.net.enabled))
+}
+
+fn build_runtime_attestation_bindings(
+    sandbox_backend: &'static str,
+    weaker_isolation: bool,
+    artifact_path: &Path,
+    policy_path: Option<&Path>,
+    guest_image_digest: Option<&str>,
+) -> Result<RuntimeAttestationBindings> {
+    if sandbox_backend != "vm" || weaker_isolation {
+        anyhow::bail!(
+            "X07RA_EWEAKER_ISOLATION: runtime attestation requires sandbox_backend=vm without weaker isolation"
+        );
+    }
+    if guest_image_digest.is_none() {
+        anyhow::bail!("X07RA_EGUEST_DIGEST: runtime attestation requires a VM guest image digest");
+    }
+
+    let (effective_policy_digest, network_enabled) = load_runtime_policy_digest(policy_path)?;
+    if network_enabled {
+        anyhow::bail!(
+            "X07RA_ENET_FORBIDDEN_IN_LOCAL_PROFILE: runtime attestation requires policy.net.enabled=false for the local sandbox profile"
+        );
+    }
+
+    let bundled_binary_digest = sha256_prefixed_for_path(artifact_path).with_context(|| {
+        format!(
+            "X07RA_EWRITE: compute bundled binary digest for {}",
+            artifact_path.display()
+        )
+    })?;
+
+    Ok(RuntimeAttestationBindings {
+        effective_policy_digest,
+        bundled_binary_digest,
+        compile_attestation_digest: None,
+        capsule_attestation_digests: Vec::new(),
+        effect_log_digests: Vec::new(),
+    })
+}
+
 fn write_runtime_attestation(
     path: &Path,
     sandbox_backend: &'static str,
@@ -1525,9 +1615,20 @@ fn write_runtime_attestation(
     solve_exit_status: i32,
     solve_trap: Option<&str>,
 ) -> Result<RuntimeAttestationRef> {
+    let bindings = build_runtime_attestation_bindings(
+        sandbox_backend,
+        weaker_isolation,
+        artifact_path,
+        policy_path,
+        guest_image_digest,
+    )?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create runtime attestation dir: {}", parent.display()))?;
+        std::fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "X07RA_EWRITE: create runtime attestation dir: {}",
+                parent.display()
+            )
+        })?;
     }
 
     let attestation = RuntimeAttestation {
@@ -1540,6 +1641,11 @@ fn write_runtime_attestation(
         input_len_bytes: input_len_bytes as u64,
         run_dir: run_dir.map(|p| p.display().to_string()),
         guest_image_digest: guest_image_digest.map(|digest| digest.to_string()),
+        effective_policy_digest: bindings.effective_policy_digest,
+        bundled_binary_digest: bindings.bundled_binary_digest,
+        compile_attestation_digest: bindings.compile_attestation_digest,
+        capsule_attestation_digests: bindings.capsule_attestation_digests,
+        effect_log_digests: bindings.effect_log_digests,
         outcome: RuntimeAttestationOutcome {
             ok: solve_ok,
             exit_status: solve_exit_status,
@@ -1547,11 +1653,15 @@ fn write_runtime_attestation(
         },
     };
 
-    let mut bytes =
-        serde_json::to_vec_pretty(&attestation).context("serialize runtime attestation JSON")?;
+    let mut bytes = serde_json::to_vec_pretty(&attestation)
+        .context("X07RA_EWRITE: serialize runtime attestation JSON")?;
     bytes.push(b'\n');
-    std::fs::write(path, bytes)
-        .with_context(|| format!("write runtime attestation: {}", path.display()))?;
+    std::fs::write(path, bytes).with_context(|| {
+        format!(
+            "X07RA_EWRITE: write runtime attestation: {}",
+            path.display()
+        )
+    })?;
 
     Ok(RuntimeAttestationRef {
         path: path.display().to_string(),
@@ -2150,11 +2260,73 @@ mod tests {
         let artifact_path = dir.join("solver");
         let policy_path = dir.join("policy.json");
         let run_dir = dir.join("run");
+        std::fs::create_dir_all(&run_dir).expect("create run dir");
+        std::fs::write(&artifact_path, b"solver-bytes").expect("write artifact");
+        std::fs::write(
+            &policy_path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+                "policy_id": "sandbox.local",
+                "limits": {
+                    "cpu_ms": 1000,
+                    "wall_ms": 1000,
+                    "mem_bytes": 1048576,
+                    "fds": 16,
+                    "procs": 4
+                },
+                "env": {
+                    "enabled": false,
+                    "allow_keys": [],
+                    "deny_keys": []
+                },
+                "fs": {
+                    "enabled": false,
+                    "read_roots": [],
+                    "write_roots": [],
+                    "deny_hidden": true
+                },
+                "net": {
+                    "enabled": false,
+                    "allow_dns": false,
+                    "allow_tcp": false,
+                    "allow_udp": false,
+                    "allow_hosts": []
+                },
+                "time": {
+                    "enabled": false,
+                    "allow_monotonic": false,
+                    "allow_wall_clock": false,
+                    "allow_sleep": false,
+                    "max_sleep_ms": 0,
+                    "allow_local_tzid": false
+                },
+                "process": {
+                    "enabled": false,
+                    "allow_spawn": false,
+                    "max_live": 0,
+                    "max_spawns": 0,
+                    "allow_exec": false,
+                    "allow_exit": false
+                },
+                "language": {
+                    "allow_unsafe": false,
+                    "allow_ffi": false
+                },
+                "threads": {
+                    "enabled": false,
+                    "max_workers": 0,
+                    "max_blocking": 0,
+                    "max_queue": 0
+                }
+            }))
+            .expect("serialize policy"),
+        )
+        .expect("write policy");
 
         let attestation_ref = write_runtime_attestation(
             &path,
             "vm",
-            true,
+            false,
             &artifact_path,
             Some(&policy_path),
             3,
@@ -2172,7 +2344,7 @@ mod tests {
         assert_eq!(doc["schema_version"], X07_RUNTIME_ATTEST_SCHEMA_VERSION);
         assert_eq!(doc["world"], WorldId::RunOsSandboxed.as_str());
         assert_eq!(doc["sandbox_backend"], "vm");
-        assert_eq!(doc["weaker_isolation"], true);
+        assert_eq!(doc["weaker_isolation"], false);
         assert_eq!(doc["artifact_path"], artifact_path.display().to_string());
         assert_eq!(doc["policy_path"], policy_path.display().to_string());
         assert_eq!(doc["input_len_bytes"], 3);
@@ -2181,15 +2353,169 @@ mod tests {
             doc["guest_image_digest"],
             "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         );
+        assert_eq!(
+            doc["effective_policy_digest"],
+            sha256_prefixed(&std::fs::read(&policy_path).expect("read policy bytes"))
+        );
+        assert_eq!(
+            doc["bundled_binary_digest"],
+            sha256_prefixed(&std::fs::read(&artifact_path).expect("read artifact bytes"))
+        );
+        assert_eq!(doc["capsule_attestation_digests"], serde_json::json!([]));
+        assert_eq!(doc["effect_log_digests"], serde_json::json!([]));
         assert_eq!(doc["outcome"]["ok"], false);
         assert_eq!(doc["outcome"]["exit_status"], 17);
         assert_eq!(doc["outcome"]["trap"], "runtime trap");
 
         assert_eq!(attestation_ref.path, path.display().to_string());
         assert_eq!(attestation_ref.sandbox_backend, "vm");
-        assert!(attestation_ref.weaker_isolation);
+        assert!(!attestation_ref.weaker_isolation);
 
         std::fs::remove_dir_all(&dir).expect("remove runtime attestation test dir");
+    }
+
+    #[test]
+    fn write_runtime_attestation_requires_guest_digest() {
+        let dir = workspace_root()
+            .join("target")
+            .join("runtime-attest-tests")
+            .join(format!("guest-digest-{}", std::process::id()));
+        let path = dir.join("runtime-attest.json");
+        let artifact_path = dir.join("solver");
+        let policy_path = dir.join("policy.json");
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        std::fs::write(&artifact_path, b"solver-bytes").expect("write artifact");
+        std::fs::write(
+            &policy_path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+                "policy_id": "sandbox.local",
+                "limits": { "cpu_ms": 1000, "wall_ms": 1000, "mem_bytes": 1048576, "fds": 16, "procs": 4 },
+                "fs": { "enabled": false, "read_roots": [], "write_roots": [], "deny_hidden": true },
+                "net": { "enabled": false, "allow_dns": false, "allow_tcp": false, "allow_udp": false, "allow_hosts": [] },
+                "db": { "enabled": false },
+                "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
+                "time": { "enabled": false, "allow_monotonic": false, "allow_wall_clock": false, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
+                "language": { "allow_unsafe": false, "allow_ffi": false },
+                "threads": { "enabled": false, "max_workers": 0, "max_blocking": 0, "max_queue": 0 },
+                "process": { "enabled": false, "allow_spawn": false, "max_live": 0, "max_spawns": 0, "allow_exec": false, "allow_exit": false }
+            }))
+            .expect("serialize policy"),
+        )
+        .expect("write policy");
+
+        let err = write_runtime_attestation(
+            &path,
+            "vm",
+            false,
+            &artifact_path,
+            Some(&policy_path),
+            0,
+            None,
+            None,
+            true,
+            0,
+            None,
+        )
+        .expect_err("missing guest digest must fail");
+        assert!(format!("{err:#}").contains("X07RA_EGUEST_DIGEST"));
+        std::fs::remove_dir_all(&dir).expect("remove temp dir");
+    }
+
+    #[test]
+    fn write_runtime_attestation_rejects_weaker_isolation() {
+        let dir = workspace_root()
+            .join("target")
+            .join("runtime-attest-tests")
+            .join(format!("weaker-isolation-{}", std::process::id()));
+        let path = dir.join("runtime-attest.json");
+        let artifact_path = dir.join("solver");
+        let policy_path = dir.join("policy.json");
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        std::fs::write(&artifact_path, b"solver-bytes").expect("write artifact");
+        std::fs::write(
+            &policy_path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+                "policy_id": "sandbox.local",
+                "limits": { "cpu_ms": 1000, "wall_ms": 1000, "mem_bytes": 1048576, "fds": 16, "procs": 4 },
+                "fs": { "enabled": false, "read_roots": [], "write_roots": [], "deny_hidden": true },
+                "net": { "enabled": false, "allow_dns": false, "allow_tcp": false, "allow_udp": false, "allow_hosts": [] },
+                "db": { "enabled": false },
+                "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
+                "time": { "enabled": false, "allow_monotonic": false, "allow_wall_clock": false, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
+                "language": { "allow_unsafe": false, "allow_ffi": false },
+                "threads": { "enabled": false, "max_workers": 0, "max_blocking": 0, "max_queue": 0 },
+                "process": { "enabled": false, "allow_spawn": false, "max_live": 0, "max_spawns": 0, "allow_exec": false, "allow_exit": false }
+            }))
+            .expect("serialize policy"),
+        )
+        .expect("write policy");
+
+        let err = write_runtime_attestation(
+            &path,
+            "vm",
+            true,
+            &artifact_path,
+            Some(&policy_path),
+            0,
+            None,
+            Some("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            true,
+            0,
+            None,
+        )
+        .expect_err("weaker isolation must fail");
+        assert!(format!("{err:#}").contains("X07RA_EWEAKER_ISOLATION"));
+        std::fs::remove_dir_all(&dir).expect("remove temp dir");
+    }
+
+    #[test]
+    fn write_runtime_attestation_rejects_network_enabled_policy() {
+        let dir = workspace_root()
+            .join("target")
+            .join("runtime-attest-tests")
+            .join(format!("network-enabled-{}", std::process::id()));
+        let path = dir.join("runtime-attest.json");
+        let artifact_path = dir.join("solver");
+        let policy_path = dir.join("policy.json");
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        std::fs::write(&artifact_path, b"solver-bytes").expect("write artifact");
+        std::fs::write(
+            &policy_path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": RUN_OS_POLICY_SCHEMA_VERSION,
+                "policy_id": "sandbox.local",
+                "limits": { "cpu_ms": 1000, "wall_ms": 1000, "mem_bytes": 1048576, "fds": 16, "procs": 4 },
+                "fs": { "enabled": false, "read_roots": [], "write_roots": [], "deny_hidden": true },
+                "net": { "enabled": true, "allow_dns": true, "allow_tcp": true, "allow_udp": false, "allow_hosts": [] },
+                "db": { "enabled": false },
+                "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
+                "time": { "enabled": false, "allow_monotonic": false, "allow_wall_clock": false, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
+                "language": { "allow_unsafe": false, "allow_ffi": false },
+                "threads": { "enabled": false, "max_workers": 0, "max_blocking": 0, "max_queue": 0 },
+                "process": { "enabled": false, "allow_spawn": false, "max_live": 0, "max_spawns": 0, "allow_exec": false, "allow_exit": false }
+            }))
+            .expect("serialize policy"),
+        )
+        .expect("write policy");
+
+        let err = write_runtime_attestation(
+            &path,
+            "vm",
+            false,
+            &artifact_path,
+            Some(&policy_path),
+            0,
+            None,
+            Some("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            true,
+            0,
+            None,
+        )
+        .expect_err("network-enabled policy must fail");
+        assert!(format!("{err:#}").contains("X07RA_ENET_FORBIDDEN_IN_LOCAL_PROFILE"));
+        std::fs::remove_dir_all(&dir).expect("remove temp dir");
     }
 
     fn base_runner_config(max_output_bytes: usize) -> RunnerConfig {

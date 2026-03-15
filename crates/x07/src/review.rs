@@ -10,6 +10,7 @@ use x07_contracts::X07_REVIEW_DIFF_SCHEMA_VERSION;
 use x07c::diagnostics;
 
 use crate::report_common;
+use crate::reporting;
 use crate::util;
 
 const X07_REVIEW_DIFF_SCHEMA_BYTES: &[u8] =
@@ -515,6 +516,12 @@ fn cmd_review_diff(args: ReviewDiffArgs) -> Result<std::process::ExitCode> {
         report_value = serde_json::to_value(&report)?;
     }
 
+    let mut posture_diags = posture_gate_diags(&report, &args.fail_on);
+    if !posture_diags.is_empty() {
+        report.diags.append(&mut posture_diags);
+        report_value = serde_json::to_value(&report)?;
+    }
+
     if let Some(out) = &args.json_out {
         let bytes = report_common::canonical_pretty_json_bytes(&report_value)?;
         util::write_atomic(out, &bytes)
@@ -635,6 +642,106 @@ fn fail_on_triggered(report: &ReviewDiffReport, fail_on: &[ReviewFailOn]) -> boo
         }
     }
     false
+}
+
+fn posture_gate_diags(
+    report: &ReviewDiffReport,
+    fail_on: &[ReviewFailOn],
+) -> Vec<diagnostics::Diagnostic> {
+    let mut diags = Vec::new();
+    for flag in fail_on {
+        match flag {
+            ReviewFailOn::AsyncProofCoverageDecrease => {
+                if !report.highlights.async_proof_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_ASYNC_PROOF_COVERAGE_DECREASE",
+                        format!(
+                            "async proof coverage regressed across {} reviewed file(s)",
+                            report.highlights.async_proof_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::CapsuleContractRelaxation => {
+                let count = report
+                    .highlights
+                    .capsule_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("capsule_contract")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_CAPSULE_CONTRACT_RELAXATION",
+                        format!("capsule contract review detected {count} relaxation candidate(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::CapsuleSetChange => {
+                let count = report
+                    .highlights
+                    .capsule_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("capsule_set")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_CAPSULE_SET_CHANGE",
+                        format!("capsule index membership changed in {count} reviewed file(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::SandboxPolicyWiden => {
+                if !report.highlights.sandbox_policy_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_SANDBOX_POLICY_WIDEN",
+                        format!(
+                            "sandbox policy widened across {} reviewed change(s)",
+                            report.highlights.sandbox_policy_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::WeakerIsolationEnabled => {
+                if report
+                    .highlights
+                    .sandbox_policy_changes
+                    .iter()
+                    .any(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("weaker_isolation")
+                    })
+                    && !diags
+                        .iter()
+                        .any(|diag| diag.code == "X07RD_SANDBOX_POLICY_WIDEN")
+                {
+                    diags.push(review_diag(
+                        "X07RD_SANDBOX_POLICY_WIDEN",
+                        "weaker isolation was enabled for a reviewed sandbox policy",
+                    ));
+                }
+            }
+            ReviewFailOn::RuntimeAttestationRegression => {
+                if !report.highlights.runtime_attestation_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_RUNTIME_ATTEST_REGRESSION",
+                        format!(
+                            "runtime attestation posture regressed across {} reviewed file(s)",
+                            report.highlights.runtime_attestation_changes.len()
+                        ),
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    diags
+}
+
+fn review_diag(code: &str, message: impl Into<String>) -> diagnostics::Diagnostic {
+    reporting::diag_error(code, diagnostics::Stage::Run, &message.into())
 }
 
 fn budget_change_is_increase(v: &Value) -> bool {
@@ -1674,11 +1781,11 @@ fn diff_proof(
             .and_then(Value::as_u64)
             .unwrap_or(0)
         || after_async
-            .get("runtime_only_async")
+            .get("unsupported_async")
             .and_then(Value::as_u64)
             .unwrap_or(0)
             > before_async
-                .get("runtime_only_async")
+                .get("unsupported_async")
                 .and_then(Value::as_u64)
                 .unwrap_or(0)
         || after_async
@@ -1732,8 +1839,8 @@ fn proof_summary(v: Option<&Value>) -> Value {
 fn proof_async_summary(v: Option<&Value>) -> Value {
     let mut reachable_async = 0u64;
     let mut proven_async = 0u64;
-    let mut runtime_only_async = 0u64;
     let mut uncovered_async = 0u64;
+    let mut unsupported_async = 0u64;
 
     if let Some(functions) = v
         .and_then(|doc| doc.get("functions"))
@@ -1746,8 +1853,8 @@ fn proof_async_summary(v: Option<&Value>) -> Value {
             reachable_async += 1;
             match function.get("status").and_then(Value::as_str).unwrap_or("") {
                 "proven" | "proven_async" => proven_async += 1,
-                "runtime_only" => runtime_only_async += 1,
                 "uncovered" => uncovered_async += 1,
+                "unsupported" => unsupported_async += 1,
                 _ => {}
             }
         }
@@ -1756,8 +1863,8 @@ fn proof_async_summary(v: Option<&Value>) -> Value {
     json!({
         "reachable_async": reachable_async,
         "proven_async": proven_async,
-        "runtime_only_async": runtime_only_async,
         "uncovered_async": uncovered_async,
+        "unsupported_async": unsupported_async,
     })
 }
 

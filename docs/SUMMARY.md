@@ -53,6 +53,7 @@
 - [Agent context packs](toolchain/agent-context.md)
 - [Diagnostics & repair](toolchain/diagnostics-repair.md)
 - [Diagnostic codes](toolchain/diagnostic-codes.md)
+- [Formal verification & certification](toolchain/formal-verification.md)
 - [Review & trust artifacts](toolchain/review-trust.md)
 - [Testing](toolchain/testing.md)
 - [Property-based testing](toolchain/pbt.md)

@@ -707,6 +707,7 @@ fn lower_defasync(f: AstAsyncFunctionDef) -> Result<AsyncFunctionDef, CompilerEr
         requires: f.requires,
         ensures: f.ensures,
         invariant: f.invariant,
+        protocol: f.protocol,
         params: f
             .params
             .into_iter()

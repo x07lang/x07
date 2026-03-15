@@ -15,7 +15,9 @@ Output is an `x07test` JSON report including:
 - pass/fail summary
 - failures with diagnostic codes
 - failure classification (`failure_kind`, for example `contract_violation`)
+- resolved `entry_kind` for each test entry
 - optional `mem_stats` / `sched_stats`
+- sandbox evidence when present: `sandbox_backend`, `runtime_attestation`, `effect_log_digests`, and `capsule_ids`
 
 See also:
 

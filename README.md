@@ -70,6 +70,35 @@ See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) fo
 - **Capability boundaries**: tools, runners, and hosts all use explicit contracts for what code is allowed to do.
 - **Single official path per capability**: fewer choices means less hallucinated glue code.
 
+## Formal verification & certification
+
+X07 exposes formal verification as a public toolchain surface, not an internal experiment.
+
+- `x07 verify` proves contract properties and emits machine-readable proof/coverage artifacts.
+- `x07 trust capsule` attests effectful capsule boundaries.
+- `x07 trust certify` binds proofs, tests, boundaries, capsules, and runtime evidence into a certificate bundle that reviewers can consume directly.
+
+```mermaid
+flowchart LR
+    A[x07AST + arch + policies] --> B[x07 verify]
+    A --> C[x07 trust capsule]
+    A --> D[x07 test / x07 run]
+    A --> E[x07 trust report]
+    B --> F[x07 trust certify]
+    C --> F
+    D --> F
+    E --> F
+    F --> G[certificate.json + summary.html]
+```
+
+The public overview, design decisions, and starter paths live in
+[`docs/toolchain/formal-verification.md`](docs/toolchain/formal-verification.md).
+Use the matching template for the trust claim you want:
+
+- `x07 init --template verified-core-pure`
+- `x07 init --template trusted-sandbox-program`
+- `x07 init --template certified-capsule`
+
 ## Ecosystem Overview
 
 X07 is not just a compiler. The public ecosystem is organized into focused repos with one consistent story:

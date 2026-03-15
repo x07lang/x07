@@ -2,13 +2,18 @@
 
 `x07 review diff` and `x07 trust report` generate deterministic review artifacts for agent-authored changes.
 
+For the public overview of how proofs, capsules, runtime attestation, and certificates fit together, start with [Formal verification & certification](formal-verification.md).
+
 For the smallest certificate-first example, see:
 
 - `docs/examples/verified_core_pure_v1/`
+- `docs/examples/trusted_sandbox_program_v1/`
+- `docs/examples/certified_capsule_v1/`
 
 For a second certifiable example built around published packages, see:
 
 - `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/`
+- `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/`
 
 ## Semantic diff (`x07 review diff`)
 
@@ -202,9 +207,9 @@ For `verified_core_pure_v1`, boundary-referenced schemas are rechecked with `x07
 
 When a certified entry depends on reviewed imported helpers, `x07 verify --prove` uses the trusted primitive catalog in `catalog/verify_primitives.json` to model those calls in the proof harness. The coverage report still lists each trusted primitive explicitly so the certificate makes that trust boundary visible.
 
-Current limitation:
+Runtime requirement:
 
-- `trusted_program_sandboxed_local_v1` and other async/capsule-backed profiles can already validate profile posture and bundle runtime/capsule evidence, but accepted async certification is still blocked until `x07 verify` gains certifiable `defasync` proof and coverage support.
+- sandboxed certification flows require a supported `run-os-sandboxed` VM backend so the certificate can bind runtime attestation to the observed execution.
 
 ## Certificate-first review flow
 
@@ -224,8 +229,8 @@ For sandboxed or capsule-backed projects, add the Milestone B posture gates as n
 - `runtime-attestation-regression`
 - `weaker-isolation-enabled`
 
-The canonical example project at `docs/examples/verified_core_pure_v1/` is structured to exercise that flow end to end.
-The checked-in `.github/workflows/certify.yml` file in that example shows the minimal CI surface for running the same certificate flow in GitHub Actions, and `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` serves as the second certifiable example project in this train.
+The canonical example projects at `docs/examples/verified_core_pure_v1/`, `docs/examples/trusted_sandbox_program_v1/`, and `docs/examples/certified_capsule_v1/` are structured to exercise those certificate flows end to end.
+The checked-in `.github/workflows/certify.yml` files in those examples show the minimal CI surface for running the same flows in GitHub Actions, and `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` plus `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/` serve as the first-party package-backed dogfood examples in this train.
 
 ## CI artifact pattern
 

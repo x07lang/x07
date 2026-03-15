@@ -1,0 +1,51 @@
+{
+  "schema_version": "x07.trust.profile@0.2.0",
+  "id": "trusted_program_sandboxed_local_v1",
+  "claims": [
+    "human_can_review_certificate_not_source"
+  ],
+  "entrypoints": [
+    "example.main"
+  ],
+  "worlds_allowed": [
+    "run-os-sandboxed"
+  ],
+  "language_subset": {
+    "allow_defasync": true,
+    "allow_recursion": false,
+    "allow_extern": false,
+    "allow_unsafe": false,
+    "allow_ffi": false,
+    "allow_dynamic_dispatch": false
+  },
+  "arch_requirements": {
+    "manifest_min_version": "x07.arch.manifest@0.3.0",
+    "require_allowlist_mode": true,
+    "require_deny_cycles": true,
+    "require_deny_orphans": true,
+    "require_visibility": true,
+    "require_world_caps": true,
+    "require_brand_boundaries": true
+  },
+  "evidence_requirements": {
+    "require_boundary_index": true,
+    "require_schema_derive_check": true,
+    "require_smoke_harnesses": true,
+    "require_unit_tests": true,
+    "require_pbt": "public_boundaries_only",
+    "require_proof_mode": "prove",
+    "require_proof_coverage": "all_reachable_defn",
+    "require_async_proof_coverage": true,
+    "require_capsule_attestations": true,
+    "require_runtime_attestation": true,
+    "require_effect_log_digests": true,
+    "require_compile_attestation": true,
+    "require_trust_report_clean": true,
+    "require_sbom": true
+  },
+  "sandbox_requirements": {
+    "sandbox_backend": "vm",
+    "forbid_weaker_isolation": true,
+    "network_mode": "none"
+  }
+}

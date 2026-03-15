@@ -13,6 +13,10 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Not compatible with `--template` (templates are for app scaffolds).
 - `x07 init --template verified-core-pure`
   - Creates a certifiable `solve-pure` project with `arch/manifest.x07arch.json`, `arch/boundaries/index.x07boundary.json`, `arch/trust/profiles/verified_core_pure_v1.json`, `.github/workflows/certify.yml`, and a smoke + PBT harness wired for `x07 trust certify`.
+- `x07 init --template trusted-sandbox-program`
+  - Creates a certifiable `run-os-sandboxed` async project with a certified capsule boundary, capsule attestations, sandbox smoke tests, and a self-hosted VM certification workflow wired for `x07 trust certify`.
+- `x07 init --template certified-capsule`
+  - Creates a minimal certified-capsule project with capsule contract/effect-log/attestation surfaces plus a self-hosted VM certification workflow.
 
 ### MCP kit tooling
 
@@ -276,14 +280,16 @@ See: [Property-based testing](pbt.md).
 
 Notes:
 
-- v0.1 verifies only a selected subset: `defn` targets only (no `defasync`), no recursion, and `for` loops must have literal bounds.
+- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets; recursion is still unsupported, and `for` loops must have literal bounds.
 - v0.1 supports params: `i32`, `u32`, `bytes`, `bytes_view` (use a wrapper if you need other types).
 - `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant`) on the target function.
 - `--prove` is the certifiable mode for accepted trust certificates; unsupported targets return `result.kind = "unsupported"`.
-- `--coverage` emits a reachable-closure coverage artifact under `coverage` using `spec/x07-verify.coverage.schema.json`.
+- `--coverage` emits a reachable-closure coverage artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including `proven_async`, `trusted_scheduler_model`, and `capsule_boundary` statuses when they apply.
+- Async `--prove` failures emit `x07.verify.cex@0.2.0`, including `await_invariant`, `scope_invariant`, and `cancellation_ensures` counterexamples when those checks fail.
 - Artifacts are written under `.x07/artifacts/verify/<mode>/<entry>/` (driver module, emitted C, CBMC output, counterexample/SMT artifacts when present).
+- Async proof coverage is lowered through the trusted scheduler model catalog at `catalog/verify_scheduler_model.json`.
 
-Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.2.0"`).
+Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.3.0"`).
 
 ### Agent correctness benchmarks (`x07bench` JSON)
 

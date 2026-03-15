@@ -43,6 +43,10 @@ pub enum InitTemplate {
     Worker,
     #[value(help = "Certifiable solve-pure project with strict arch/trust scaffolding")]
     VerifiedCorePure,
+    #[value(help = "Sandboxed async trusted-program project with capsule evidence")]
+    TrustedSandboxProgram,
+    #[value(help = "Standalone certified capsule project with attestation scaffolding")]
+    CertifiedCapsule,
     McpServer,
     McpServerStdio,
     McpServerHttp,
@@ -211,6 +215,8 @@ fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str]
         InitTemplate::PostgresClient => &["db.core", "db.postgres", "data.model"],
         InitTemplate::Worker => &["log.basic"],
         InitTemplate::VerifiedCorePure => &[],
+        InitTemplate::TrustedSandboxProgram => &[],
+        InitTemplate::CertifiedCapsule => &[],
         InitTemplate::McpServer
         | InitTemplate::McpServerStdio
         | InitTemplate::McpServerHttp
@@ -228,6 +234,8 @@ fn template_default_profile(template: InitTemplate) -> &'static str {
         | InitTemplate::PostgresClient
         | InitTemplate::Worker => "sandbox",
         InitTemplate::VerifiedCorePure => "os",
+        InitTemplate::TrustedSandboxProgram => "sandbox",
+        InitTemplate::CertifiedCapsule => "sandbox",
         InitTemplate::McpServer
         | InitTemplate::McpServerStdio
         | InitTemplate::McpServerHttp
@@ -245,6 +253,8 @@ fn init_template_policy_template(template: InitTemplate) -> crate::policy::Polic
         InitTemplate::PostgresClient => crate::policy::PolicyTemplate::PostgresClient,
         InitTemplate::Worker => crate::policy::PolicyTemplate::Worker,
         InitTemplate::VerifiedCorePure => crate::policy::PolicyTemplate::Worker,
+        InitTemplate::TrustedSandboxProgram => crate::policy::PolicyTemplate::Worker,
+        InitTemplate::CertifiedCapsule => crate::policy::PolicyTemplate::Worker,
         InitTemplate::McpServer
         | InitTemplate::McpServerStdio
         | InitTemplate::McpServerHttp
@@ -271,6 +281,9 @@ fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> 
             ensure_trailing_newline(TEMPLATE_VERIFIED_CORE_PURE_SRC_EXAMPLE),
             ensure_trailing_newline(TEMPLATE_VERIFIED_CORE_PURE_SRC_MAIN),
         )),
+        InitTemplate::TrustedSandboxProgram | InitTemplate::CertifiedCapsule => {
+            Ok((app_module_bytes()?, main_entry_bytes()?))
+        }
         InitTemplate::McpServer
         | InitTemplate::McpServerStdio
         | InitTemplate::McpServerHttp
@@ -315,6 +328,275 @@ fn verified_core_pure_template_files() -> &'static [(&'static str, &'static [u8]
     ]
 }
 
+fn trusted_sandbox_program_template_files() -> &'static [(&'static str, &'static [u8])] {
+    &[
+        (
+            "README.md",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/README.md"
+            )),
+        ),
+        (
+            "x07.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/x07.json"
+            )),
+        ),
+        (
+            "x07.lock.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/x07.lock.json"
+            )),
+        ),
+        (
+            "src/capsule.x07.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/src/capsule.x07.json"
+            )),
+        ),
+        (
+            "src/example.x07.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/src/example.x07.json"
+            )),
+        ),
+        (
+            "src/main.x07.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/src/main.x07.json"
+            )),
+        ),
+        (
+            "tests/tests.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/tests/tests.json"
+            )),
+        ),
+        (
+            "tests/core.x07.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/tests/core.x07.json"
+            )),
+        ),
+        (
+            "tests/policy/run-os.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/tests/policy/run-os.json"
+            )),
+        ),
+        (
+            "arch/manifest.x07arch.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/arch/manifest.x07arch.json"
+            )),
+        ),
+        (
+            "arch/boundaries/index.x07boundary.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/arch/boundaries/index.x07boundary.json"
+            )),
+        ),
+        (
+            "arch/capsules/index.x07capsule.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/arch/capsules/index.x07capsule.json"
+            )),
+        ),
+        (
+            "arch/capsules/capsule.main.contract.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/arch/capsules/capsule.main.contract.json"
+            )),
+        ),
+        (
+            "arch/capsules/capsule.main.effect_log.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/arch/capsules/capsule.main.effect_log.json"
+            )),
+        ),
+        (
+            "arch/capsules/capsule.main.conformance.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/arch/capsules/capsule.main.conformance.json"
+            )),
+        ),
+        (
+            "arch/capsules/capsule.main.attest.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/arch/capsules/capsule.main.attest.json"
+            )),
+        ),
+        (
+            "arch/trust/profiles/trusted_program_sandboxed_local_v1.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/arch/trust/profiles/trusted_program_sandboxed_local_v1.json"
+            )),
+        ),
+        (
+            "policy/run-os.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/policy/run-os.json"
+            )),
+        ),
+        (
+            ".github/workflows/certify.yml",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/trusted_sandbox_program_v1/.github/workflows/certify.yml"
+            )),
+        ),
+    ]
+}
+
+fn certified_capsule_template_files() -> &'static [(&'static str, &'static [u8])] {
+    &[
+        (
+            "README.md",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/README.md"
+            )),
+        ),
+        (
+            "x07.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/x07.json"
+            )),
+        ),
+        (
+            "x07.lock.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/x07.lock.json"
+            )),
+        ),
+        (
+            "src/capsule.x07.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/src/capsule.x07.json"
+            )),
+        ),
+        (
+            "src/main.x07.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/src/main.x07.json"
+            )),
+        ),
+        (
+            "tests/tests.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/tests/tests.json"
+            )),
+        ),
+        (
+            "tests/core.x07.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/tests/core.x07.json"
+            )),
+        ),
+        (
+            "tests/policy/run-os.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/tests/policy/run-os.json"
+            )),
+        ),
+        (
+            "arch/manifest.x07arch.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/arch/manifest.x07arch.json"
+            )),
+        ),
+        (
+            "arch/boundaries/index.x07boundary.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/arch/boundaries/index.x07boundary.json"
+            )),
+        ),
+        (
+            "arch/capsules/index.x07capsule.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/arch/capsules/index.x07capsule.json"
+            )),
+        ),
+        (
+            "arch/capsules/capsule.main.contract.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/arch/capsules/capsule.main.contract.json"
+            )),
+        ),
+        (
+            "arch/capsules/capsule.main.effect_log.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/arch/capsules/capsule.main.effect_log.json"
+            )),
+        ),
+        (
+            "arch/capsules/capsule.main.conformance.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/arch/capsules/capsule.main.conformance.json"
+            )),
+        ),
+        (
+            "arch/capsules/capsule.main.attest.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/arch/capsules/capsule.main.attest.json"
+            )),
+        ),
+        (
+            "arch/trust/profiles/certified_capsule_v1.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/arch/trust/profiles/certified_capsule_v1.json"
+            )),
+        ),
+        (
+            "policy/run-os.json",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/policy/run-os.json"
+            )),
+        ),
+        (
+            ".github/workflows/certify.yml",
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../docs/examples/certified_capsule_v1/.github/workflows/certify.yml"
+            )),
+        ),
+    ]
+}
+
 fn is_mcp_template(template: InitTemplate) -> bool {
     matches!(
         template,
@@ -335,10 +617,15 @@ fn mcp_template_name(template: InitTemplate) -> &'static str {
     }
 }
 
-fn cmd_init_verified_core_pure_template(root: &Path) -> Result<std::process::ExitCode> {
+fn cmd_init_static_template(
+    root: &Path,
+    template_files: &[(&str, &[u8])],
+    note: &str,
+    next_steps: &[&str],
+) -> Result<std::process::ExitCode> {
     let agent_paths = AgentKitPaths::new(root);
     let mut conflicts = Vec::new();
-    for (rel_path, _) in verified_core_pure_template_files() {
+    for (rel_path, _) in template_files {
         let abs = root.join(rel_path);
         if abs.exists() {
             conflicts.push((*rel_path).to_string());
@@ -375,7 +662,7 @@ fn cmd_init_verified_core_pure_template(root: &Path) -> Result<std::process::Exi
     }
 
     let mut created = Vec::new();
-    for (rel_path, bytes) in verified_core_pure_template_files() {
+    for (rel_path, bytes) in template_files {
         let abs = root.join(rel_path);
         if let Err(err) = write_new_file(&abs, bytes) {
             return print_io_error(root, &created, rel_path, err);
@@ -426,16 +713,53 @@ fn cmd_init_verified_core_pure_template(root: &Path) -> Result<std::process::Exi
         command: "init",
         root: root.display().to_string(),
         created,
-        notes: vec!["Generated a certifiable solve-pure trust template.".to_string()],
-        next_steps: vec![
-            "x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry example.main".to_string(),
-            "x07 test --all --manifest tests/tests.json".to_string(),
-            "x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry example.main --out-dir target/cert".to_string(),
-        ],
+        notes: vec![note.to_string()],
+        next_steps: next_steps.iter().map(|step| (*step).to_string()).collect(),
         error: None,
     };
     println!("{}", serde_json::to_string(&report)?);
     Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn cmd_init_verified_core_pure_template(root: &Path) -> Result<std::process::ExitCode> {
+    cmd_init_static_template(
+        root,
+        verified_core_pure_template_files(),
+        "Generated a certifiable solve-pure trust template.",
+        &[
+            "x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry example.main",
+            "x07 test --all --manifest tests/tests.json",
+            "x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry example.main --out-dir target/cert",
+        ],
+    )
+}
+
+fn cmd_init_trusted_sandbox_program_template(root: &Path) -> Result<std::process::ExitCode> {
+    cmd_init_static_template(
+        root,
+        trusted_sandbox_program_template_files(),
+        "Generated a sandboxed trusted-program template with capsule evidence.",
+        &[
+            "x07 trust profile check --project x07.json --profile arch/trust/profiles/trusted_program_sandboxed_local_v1.json --entry example.main",
+            "x07 trust capsule check --project x07.json --index arch/capsules/index.x07capsule.json",
+            "x07 test --all --manifest tests/tests.json",
+            "x07 trust certify --project x07.json --profile arch/trust/profiles/trusted_program_sandboxed_local_v1.json --entry example.main --out-dir target/cert",
+        ],
+    )
+}
+
+fn cmd_init_certified_capsule_template(root: &Path) -> Result<std::process::ExitCode> {
+    cmd_init_static_template(
+        root,
+        certified_capsule_template_files(),
+        "Generated a certified capsule template with attestation scaffolding.",
+        &[
+            "x07 trust profile check --project x07.json --profile arch/trust/profiles/certified_capsule_v1.json --entry capsule.main",
+            "x07 trust capsule check --project x07.json --index arch/capsules/index.x07capsule.json",
+            "x07 test --all --manifest tests/tests.json",
+            "x07 trust certify --project x07.json --profile arch/trust/profiles/certified_capsule_v1.json --entry capsule.main --out-dir target/cert",
+        ],
+    )
 }
 
 fn cmd_init_mcp_template(root: &Path, template: InitTemplate) -> Result<std::process::ExitCode> {
@@ -692,6 +1016,12 @@ pub fn cmd_init(
     if let Some(template) = args.template {
         if template == InitTemplate::VerifiedCorePure {
             return cmd_init_verified_core_pure_template(&root);
+        }
+        if template == InitTemplate::TrustedSandboxProgram {
+            return cmd_init_trusted_sandbox_program_template(&root);
+        }
+        if template == InitTemplate::CertifiedCapsule {
+            return cmd_init_certified_capsule_template(&root);
         }
         if is_mcp_template(template) {
             return cmd_init_mcp_template(&root, template);

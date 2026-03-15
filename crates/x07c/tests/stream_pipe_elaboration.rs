@@ -223,6 +223,7 @@ fn pipe_elaboration_injects_async_helper_and_rewrites_call_site_to_await() {
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            protocol: None,
             params: vec![
                 x07c::program::FunctionParam {
                     name: "ctx".to_string(),
@@ -398,6 +399,7 @@ fn pipe_elaboration_rejects_concurrency_pipes_inside_defn() {
             requires: Vec::new(),
             ensures: Vec::new(),
             invariant: Vec::new(),
+            protocol: None,
             params: vec![
                 x07c::program::FunctionParam {
                     name: "ctx".to_string(),

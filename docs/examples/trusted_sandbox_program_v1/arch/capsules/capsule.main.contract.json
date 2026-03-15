@@ -1,0 +1,33 @@
+{
+  "schema_version": "x07.capsule.contract@0.1.0",
+  "id": "capsule.main_v1",
+  "worlds_allowed": ["run-os-sandboxed"],
+  "capabilities": [],
+  "language": {
+    "allow_unsafe": false,
+    "allow_ffi": false
+  },
+  "input": {
+    "shape": {
+      "brand": "trusted_sandbox_program.request_v1"
+    }
+  },
+  "output": {
+    "shape": {
+      "brand": "trusted_sandbox_program.response_v1"
+    }
+  },
+  "error_spaces": ["trusted_sandbox_program.error_v1"],
+  "effect_log": {
+    "schema_path": "capsule.main.effect_log.json",
+    "redaction": "metadata_only",
+    "replay_safe": true
+  },
+  "replay": {
+    "mode": "deterministic"
+  },
+  "conformance": {
+    "tests": ["capsule/echo_identity"],
+    "report_path": "capsule.main.conformance.json"
+  }
+}

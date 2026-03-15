@@ -3114,6 +3114,7 @@ dependencies = [
  "libc",
  "serde",
  "serde_json",
+ "sha2",
  "x07-contracts",
  "x07-host-runner",
  "x07-runner-common",

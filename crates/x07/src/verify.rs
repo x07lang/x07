@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::Args;
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use x07_contracts::{
@@ -22,17 +23,21 @@ const X07_VERIFY_REPORT_SCHEMA_BYTES: &[u8] =
 const X07_VERIFY_COVERAGE_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-verify.coverage.schema.json");
 const X07_VERIFY_CEX_SCHEMA_BYTES: &[u8] =
-    include_bytes!("../../../spec/x07.verify.cex@0.1.0.schema.json");
+    include_bytes!("../../../spec/x07.verify.cex@0.2.0.schema.json");
 const X07_VERIFY_PRIMITIVES_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-verify.primitives.schema.json");
 const X07_VERIFY_PRIMITIVES_CATALOG_BYTES: &[u8] =
     include_bytes!("../../../catalog/verify_primitives.json");
+const X07_VERIFY_SCHEDULER_MODEL_BYTES: &[u8] =
+    include_bytes!("../../../catalog/verify_scheduler_model.json");
 const X07DIAG_SCHEMA_BYTES: &[u8] = include_bytes!("../../../spec/x07diag.schema.json");
 
 const VERIFY_INPUT_BUF_NAME: &str = "x07_verify_input";
 const VERIFY_HARNESS_FN: &str = "x07_verify_harness";
 const Z3_TIMEOUT_SECONDS: u64 = 10;
+const Z3_ASYNC_PROVE_TIMEOUT_SECONDS: u64 = 30;
 const PROCESS_SUMMARY_MAX_CHARS: usize = 1024;
+const CBMC_OBJECT_BITS_RETRY_VALUES: [u32; 2] = [12, 16];
 
 #[derive(Debug, Clone, Args)]
 pub struct VerifyArgs {
@@ -156,9 +161,15 @@ struct VerifyCoverage {
 struct VerifyCoverageSummary {
     reachable_defn: u64,
     proven_defn: u64,
+    reachable_async: u64,
+    proven_async: u64,
     trusted_primitives: u64,
+    trusted_scheduler_models: u64,
+    capsule_boundaries: u64,
     uncovered_defn: u64,
     unsupported_defn: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    async_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -205,10 +216,33 @@ struct CoverageModule {
 struct CoverageDecl {
     kind: String,
     params: Vec<String>,
+    result: String,
     has_contracts: bool,
     body: Option<Value>,
     contract_exprs: Vec<Value>,
     source_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VerifySchedulerModel {
+    schema_version: String,
+    id: String,
+    guarantees: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct CoverageTrustZoneIndex {
+    project_root: PathBuf,
+    nodes: Vec<CoverageTrustZoneNode>,
+}
+
+#[derive(Debug, Clone)]
+struct CoverageTrustZoneNode {
+    id: String,
+    module_prefixes: Vec<String>,
+    path_globs: GlobSet,
+    trust_zone: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -333,6 +367,21 @@ fn cmd_verify_inner(
                 VerifyReport::unsupported(mode, &args.entry, Bounds::for_args(&args), code, msg, 2),
             );
         }
+        if target.is_async {
+            if let Err(err) = load_verify_scheduler_model() {
+                return write_report_and_exit(
+                    machine,
+                    VerifyReport::unsupported(
+                        mode,
+                        &args.entry,
+                        Bounds::for_args(&args),
+                        "X07V_SCHEDULER_MODEL_UNTRUSTED",
+                        format!("trusted scheduler model is unavailable: {err:#}"),
+                        2,
+                    ),
+                );
+            }
+        }
     } else if let Some(d) = verify_precheck_diag(&target, &args.entry, args.max_bytes_len) {
         return write_report_and_exit(
             machine,
@@ -375,7 +424,25 @@ fn cmd_verify_inner(
     std::fs::create_dir_all(&work_dir)
         .with_context(|| format!("create artifact dir: {}", work_dir.display()))?;
 
-    let driver_src = build_verify_driver_x07ast_json(&args.entry, &target, args.max_bytes_len)?;
+    let driver_src = match build_verify_driver_x07ast_json(&args.entry, &target, args.max_bytes_len)
+    {
+        Ok(src) => src,
+        Err(err) if mode == Mode::Prove && target.is_async => {
+            return write_report_and_exit(
+                machine,
+                VerifyReport::unsupported(
+                    mode,
+                    &args.entry,
+                    bounds.clone(),
+                    "X07V_UNSUPPORTED_DEFASYNC_FORM",
+                    format!("defasync target uses an unsupported proof form: {err:#}"),
+                    2,
+                )
+                .with_artifacts(artifacts),
+            );
+        }
+        Err(err) => return Err(err),
+    };
     let driver_path = work_dir.join("driver.x07.json");
     util::write_atomic(&driver_path, &driver_src)
         .with_context(|| format!("write verify driver: {}", driver_path.display()))?;
@@ -389,6 +456,20 @@ fn cmd_verify_inner(
 
     let c_src = match compile_driver_to_c(&driver_src, &module_roots) {
         Ok(v) => v,
+        Err(err) if mode == Mode::Prove && target.is_async => {
+            return write_report_and_exit(
+                machine,
+                VerifyReport::unsupported(
+                    mode,
+                    &args.entry,
+                    bounds,
+                    "X07V_UNSUPPORTED_DEFASYNC_FORM",
+                    format!("defasync target uses an unsupported proof form: {err}"),
+                    2,
+                )
+                .with_artifacts(artifacts),
+            );
+        }
         Err(err) if mode == Mode::Prove => {
             return write_report_and_exit(
                 machine,
@@ -418,9 +499,9 @@ fn cmd_verify_inner(
 
     match mode {
         Mode::Bmc => cmd_verify_bmc(machine, &args, bounds, &work_dir, &c_path, artifacts),
-        Mode::Smt | Mode::Prove => {
-            cmd_verify_smt(machine, &args, bounds, &work_dir, &c_path, artifacts, mode)
-        }
+        Mode::Smt | Mode::Prove => cmd_verify_smt(
+            machine, &args, &target, bounds, &work_dir, &c_path, artifacts, mode,
+        ),
         Mode::Coverage => unreachable!("coverage returns before solver dispatch"),
     }
 }
@@ -454,10 +535,7 @@ fn cmd_verify_bmc(
     ];
     maybe_disable_cbmc_standard_checks(&mut cbmc_args);
 
-    let out = Command::new("cbmc")
-        .args(&cbmc_args)
-        .output()
-        .context("run cbmc")?;
+    let (out, used_cbmc_args) = run_cbmc_with_object_bits_retry(&cbmc_args, "run cbmc")?;
 
     if !out.stderr.is_empty() && !cbmc_stderr_is_benign(&out.stderr) {
         // cbmc can print UI status to stdout (in json-ui mode), but unexpected stderr is a signal.
@@ -548,7 +626,7 @@ fn cmd_verify_bmc(
         cbmc: CbmcInfo {
             version: cbmc_version,
             argv: std::iter::once("cbmc".to_string())
-                .chain(cbmc_args)
+                .chain(used_cbmc_args)
                 .collect(),
             exit_code: out.status.code().unwrap_or(-1),
             stdout_json_path: "cbmc.json".to_string(),
@@ -585,6 +663,7 @@ fn cmd_verify_bmc(
 fn cmd_verify_smt(
     machine: &crate::reporting::MachineArgs,
     args: &VerifyArgs,
+    target: &TargetSig,
     bounds: Bounds,
     work_dir: &Path,
     c_path: &Path,
@@ -618,10 +697,7 @@ fn cmd_verify_smt(
     ];
     maybe_disable_cbmc_standard_checks(&mut cbmc_args);
 
-    let out = Command::new("cbmc")
-        .args(&cbmc_args)
-        .output()
-        .context("run cbmc (smt2 emit)")?;
+    let (out, _) = run_cbmc_with_object_bits_retry(&cbmc_args, "run cbmc (smt2 emit)")?;
 
     if !out.status.success() {
         let msg = summarize_process_failure(&out.stdout, &out.stderr, PROCESS_SUMMARY_MAX_CHARS);
@@ -655,7 +731,7 @@ fn cmd_verify_smt(
     }
 
     let z3_out = Command::new("z3")
-        .arg(format!("-T:{Z3_TIMEOUT_SECONDS}"))
+        .arg(format!("-T:{}", z3_timeout_seconds(mode, target)))
         .arg("-smt2")
         .arg(&smt2_path)
         .output()
@@ -686,17 +762,126 @@ fn cmd_verify_smt(
                 VerifyReport::verified(mode, &args.entry, bounds, artifacts)
             },
         ),
-        "sat" => write_report_and_exit(
-            machine,
-            VerifyReport::counterexample_found(
-                mode,
-                &args.entry,
-                bounds,
-                diag_verify("X07V_SMT_SAT", "solver reported SAT (counterexample found)"),
-                artifacts,
-                10,
-            ),
-        ),
+        "sat" => {
+            if mode == Mode::Prove && target.is_async {
+                let mut cbmc_args = vec![
+                    c_path.display().to_string(),
+                    "--function".to_string(),
+                    VERIFY_HARNESS_FN.to_string(),
+                    "--unwind".to_string(),
+                    args.unwind.to_string(),
+                    "--unwinding-assertions".to_string(),
+                    "--trace".to_string(),
+                    "--json-ui".to_string(),
+                ];
+                maybe_disable_cbmc_standard_checks(&mut cbmc_args);
+                let (out, used_cbmc_args) = run_cbmc_with_object_bits_retry(
+                    &cbmc_args,
+                    "run cbmc (async counterexample capture)",
+                )?;
+                if !out.stderr.is_empty() && !cbmc_stderr_is_benign(&out.stderr) {
+                    let msg = summarize_process_text(&out.stderr, PROCESS_SUMMARY_MAX_CHARS);
+                    let d =
+                        diag_verify("X07V_ECBMC_STDERR", format!("cbmc wrote to stderr: {msg}"));
+                    return write_report_and_exit(
+                        machine,
+                        VerifyReport::error(mode, &args.entry, bounds, d, 1)
+                            .with_artifacts(artifacts),
+                    );
+                }
+                let cbmc_json: Value = match serde_json::from_slice(&out.stdout) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        let d = diag_verify(
+                            "X07V_ECBMC_JSON_PARSE",
+                            format!("failed to parse cbmc --json-ui output: {err}"),
+                        );
+                        return write_report_and_exit(
+                            machine,
+                            VerifyReport::error(mode, &args.entry, bounds, d, 1)
+                                .with_artifacts(artifacts),
+                        );
+                    }
+                };
+                let cbmc_json_path = work_dir.join("cbmc.json");
+                let cbmc_json_bytes = report_common::canonical_pretty_json_bytes(&cbmc_json)
+                    .context("canon cbmc.json")?;
+                util::write_atomic(&cbmc_json_path, cbmc_json_bytes.as_slice())
+                    .with_context(|| format!("write cbmc output: {}", cbmc_json_path.display()))?;
+                artifacts.cbmc_json_path = Some(cbmc_json_path.display().to_string());
+
+                let failures = cbmc_failures(&cbmc_json);
+                if let Some(contract_failure) = failures.iter().find_map(parse_contract_failure) {
+                    let trace = contract_failure
+                        .trace
+                        .as_ref()
+                        .and_then(Value::as_array)
+                        .map(|v| v.as_slice())
+                        .unwrap_or(&[]);
+                    let input_bytes = extract_input_bytes_from_trace(
+                        trace,
+                        VERIFY_INPUT_BUF_NAME,
+                        bounds.input_len_bytes as usize,
+                    );
+                    let cex = VerifyCex {
+                        schema_version: X07_VERIFY_CEX_SCHEMA_VERSION.to_string(),
+                        tool: crate::repro::tool_info(),
+                        entry: args.entry.clone(),
+                        bounds: bounds.clone(),
+                        input_bytes_b64: base64::engine::general_purpose::STANDARD
+                            .encode(&input_bytes),
+                        contract: contract_failure.payload.clone(),
+                        cbmc: CbmcInfo {
+                            version: cbmc_program_version(&cbmc_json),
+                            argv: std::iter::once("cbmc".to_string())
+                                .chain(used_cbmc_args)
+                                .collect(),
+                            exit_code: out.status.code().unwrap_or(-1),
+                            stdout_json_path: "cbmc.json".to_string(),
+                            stdout_json_sha256: util::sha256_hex(cbmc_json_bytes.as_slice()),
+                        },
+                    };
+                    let cex_path = work_dir.join("cex.json");
+                    let cex_bytes = verify_cex_to_pretty_canon_bytes(&cex)?;
+                    util::write_atomic(&cex_path, &cex_bytes)
+                        .with_context(|| format!("write verify cex: {}", cex_path.display()))?;
+                    artifacts.cex_path = Some(cex_path.display().to_string());
+
+                    let diag = async_counterexample_diag(&contract_failure.payload);
+                    return write_report_and_exit(
+                        machine,
+                        VerifyReport {
+                            schema_version: X07_VERIFY_REPORT_SCHEMA_VERSION,
+                            mode: mode.as_str(),
+                            ok: false,
+                            entry: args.entry.clone(),
+                            bounds,
+                            result: VerifyResult {
+                                kind: "counterexample_found".to_string(),
+                                contract: Some(contract_failure.payload),
+                                details: None,
+                            },
+                            coverage: None,
+                            artifacts: Some(artifacts),
+                            diagnostics_count: 1,
+                            diagnostics: vec![diag],
+                            exit_code: 10,
+                        },
+                    );
+                }
+            }
+            write_report_and_exit(
+                machine,
+                VerifyReport::counterexample_found(
+                    mode,
+                    &args.entry,
+                    bounds,
+                    diag_verify("X07V_SMT_SAT", "solver reported SAT (counterexample found)"),
+                    artifacts,
+                    10,
+                ),
+            )
+        }
         other => write_report_and_exit(
             machine,
             VerifyReport::inconclusive(
@@ -707,6 +892,27 @@ fn cmd_verify_smt(
                 artifacts,
                 2,
             ),
+        ),
+    }
+}
+
+fn async_counterexample_diag(payload: &Value) -> x07c::diagnostics::Diagnostic {
+    match payload
+        .get("contract_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+    {
+        "scope_invariant" => diag_verify(
+            "X07V_SCOPE_INVARIANT_FAILED",
+            "async scope invariant failed under the scheduler model",
+        ),
+        "cancellation_ensures" => diag_verify(
+            "X07V_CANCELLATION_ENSURE_FAILED",
+            "async cancellation ensure failed under the scheduler model",
+        ),
+        _ => diag_verify(
+            "X07V_ASYNC_COUNTEREXAMPLE",
+            "async counterexample found under the scheduler model",
         ),
     }
 }
@@ -800,10 +1006,25 @@ fn resolve_module_roots(
         if !roots.contains(&cwd.to_path_buf()) {
             roots.push(cwd.to_path_buf());
         }
+        if let Some(toolchain_root) = util::detect_toolchain_root_best_effort(cwd) {
+            for root in util::toolchain_stdlib_module_roots(&toolchain_root) {
+                if !roots.contains(&root) {
+                    roots.push(root);
+                }
+            }
+        }
         return Ok(roots);
     }
 
-    Ok(vec![cwd.to_path_buf()])
+    let mut roots = vec![cwd.to_path_buf()];
+    if let Some(toolchain_root) = util::detect_toolchain_root_best_effort(cwd) {
+        for root in util::toolchain_stdlib_module_roots(&toolchain_root) {
+            if !roots.contains(&root) {
+                roots.push(root);
+            }
+        }
+    }
+    Ok(roots)
 }
 
 fn resolve_artifact_base_dir(
@@ -948,6 +1169,11 @@ fn load_coverage_module<'a>(
                 CoverageDecl {
                     kind: kind.to_string(),
                     params,
+                    result: decl
+                        .get("result")
+                        .and_then(Value::as_str)
+                        .unwrap_or("i32")
+                        .to_string(),
                     has_contracts: has_any_contracts(&decl),
                     body: decl.get("body").cloned(),
                     contract_exprs: collect_contract_exprs(&decl),
@@ -1000,6 +1226,134 @@ fn load_verify_primitive_catalog() -> Result<BTreeMap<String, String>> {
         out.insert(primitive.symbol, primitive.kind);
     }
     Ok(out)
+}
+
+fn load_verify_scheduler_model() -> Result<VerifySchedulerModel> {
+    let doc: VerifySchedulerModel = serde_json::from_slice(X07_VERIFY_SCHEDULER_MODEL_BYTES)
+        .context("parse catalog/verify_scheduler_model.json")?;
+    if doc.schema_version.trim() != "x07.verify.scheduler_model@0.1.0" {
+        anyhow::bail!(
+            "verify scheduler model schema_version mismatch: expected {:?} got {:?}",
+            "x07.verify.scheduler_model@0.1.0",
+            doc.schema_version
+        );
+    }
+    if doc.id.trim().is_empty() {
+        anyhow::bail!("verify scheduler model id must not be empty");
+    }
+    if doc.guarantees.is_empty() {
+        anyhow::bail!("verify scheduler model must declare at least one guarantee");
+    }
+    Ok(doc)
+}
+
+fn load_coverage_trust_zone_index(
+    project_path: Option<&Path>,
+) -> Result<Option<CoverageTrustZoneIndex>> {
+    let Some(project_path) = project_path else {
+        return Ok(None);
+    };
+    let Some(project_root) = project_path.parent() else {
+        return Ok(None);
+    };
+    let manifest_path = project_root.join("arch").join("manifest.x07arch.json");
+    if !manifest_path.is_file() {
+        return Ok(None);
+    }
+
+    let doc = report_common::read_json_file(&manifest_path)?;
+    let mut nodes = Vec::new();
+    for node in doc
+        .get("nodes")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let trust_zone = node
+            .get("trust_zone")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        if trust_zone != "certified_capsule" {
+            continue;
+        }
+        let id = node
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown_capsule")
+            .to_string();
+        let module_prefixes = node
+            .pointer("/match/module_prefixes")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let mut builder = GlobSetBuilder::new();
+        let mut has_globs = false;
+        for glob in node
+            .pointer("/match/path_globs")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+        {
+            builder.add(Glob::new(glob).with_context(|| {
+                format!(
+                    "invalid capsule path_glob {glob:?} in {}",
+                    manifest_path.display()
+                )
+            })?);
+            has_globs = true;
+        }
+        let path_globs = if has_globs {
+            builder
+                .build()
+                .context("build capsule trust-zone globset")?
+        } else {
+            GlobSetBuilder::new()
+                .build()
+                .context("build empty capsule trust-zone globset")?
+        };
+        nodes.push(CoverageTrustZoneNode {
+            id,
+            module_prefixes,
+            path_globs,
+            trust_zone,
+        });
+    }
+
+    Ok(Some(CoverageTrustZoneIndex {
+        project_root: project_root.to_path_buf(),
+        nodes,
+    }))
+}
+
+fn capsule_boundary_node<'a>(
+    index: Option<&'a CoverageTrustZoneIndex>,
+    symbol: &str,
+    source_path: &Path,
+) -> Option<&'a CoverageTrustZoneNode> {
+    let index = index?;
+    let module_id = symbol.rsplit_once('.').map(|(m, _)| m).unwrap_or(symbol);
+    let rel_path = if source_path.is_absolute() {
+        source_path
+            .strip_prefix(&index.project_root)
+            .ok()
+            .map(|p| p.to_path_buf())
+    } else {
+        Some(source_path.to_path_buf())
+    }?;
+    let rel_str = rel_path.to_string_lossy().replace('\\', "/");
+    index.nodes.iter().find(|node| {
+        node.trust_zone == "certified_capsule"
+            && (node
+                .module_prefixes
+                .iter()
+                .any(|prefix| module_id == prefix || module_id.starts_with(&format!("{prefix}.")))
+                || node.path_globs.is_match(rel_str.as_str()))
+    })
 }
 
 fn enqueue_decl_refs(
@@ -1091,6 +1445,21 @@ fn collect_contract_exprs(defn: &Value) -> Vec<Value> {
             }
         }
     }
+    if let Some(protocol) = defn.get("protocol") {
+        for key in ["await_invariant", "scope_invariant", "cancellation_ensures"] {
+            let Some(clauses) = protocol.get(key).and_then(Value::as_array) else {
+                continue;
+            };
+            for clause in clauses {
+                if let Some(expr) = clause.get("expr") {
+                    out.push(expr.clone());
+                }
+                if let Some(witness) = clause.get("witness").and_then(Value::as_array) {
+                    out.extend(witness.iter().cloned());
+                }
+            }
+        }
+    }
     out
 }
 
@@ -1116,12 +1485,6 @@ fn prove_unsupported_reason(
     entry: &str,
     max_bytes_len: u32,
 ) -> Option<(&'static str, String)> {
-    if target.is_async {
-        return Some((
-            "X07V_UNSUPPORTED_ASYNC",
-            "x07 verify --prove does not support defasync targets (use a defn wrapper)".to_string(),
-        ));
-    }
     if !target.has_contracts {
         return Some((
             "X07V_NO_CONTRACTS",
@@ -1140,6 +1503,15 @@ fn prove_unsupported_reason(
     if let Err(err) = compute_input_len_bytes(target, max_bytes_len) {
         return Some(("X07V_UNSUPPORTED_PARAM", err.to_string()));
     }
+    if target.is_async && target.result != "bytes" && target.result != "result_bytes" {
+        return Some((
+            "X07V_UNSUPPORTED_DEFASYNC_FORM",
+            format!(
+                "defasync target {:?} must return bytes or result_bytes for proof support",
+                entry
+            ),
+        ));
+    }
     None
 }
 
@@ -1148,12 +1520,6 @@ fn verify_precheck_diag(
     entry: &str,
     max_bytes_len: u32,
 ) -> Option<x07c::diagnostics::Diagnostic> {
-    if target.is_async {
-        return Some(diag_verify(
-            "X07V_UNSUPPORTED_ASYNC",
-            "x07 verify does not support defasync targets (use a defn wrapper)",
-        ));
-    }
     let (code, msg) = prove_unsupported_reason(target, entry, max_bytes_len)?;
     Some(diag_verify(code, msg))
 }
@@ -1203,14 +1569,20 @@ fn coverage_function_for_target(
     max_bytes_len: u32,
 ) -> VerifyCoverageFunction {
     let (kind, status, details) = if target.is_async {
-        (
-            "defasync".to_string(),
-            "runtime_only".to_string(),
-            Some(
-                "defasync targets are runtime-only and are not certifiable by x07 verify"
-                    .to_string(),
-            ),
-        )
+        if !target.has_contracts {
+            (
+                "defasync".to_string(),
+                "uncovered".to_string(),
+                Some(
+                    "target function has no requires/ensures/invariant/protocol clauses"
+                        .to_string(),
+                ),
+            )
+        } else if let Some((_, msg)) = prove_unsupported_reason(target, entry, max_bytes_len) {
+            ("defasync".to_string(), "unsupported".to_string(), Some(msg))
+        } else {
+            ("defasync".to_string(), "proven_async".to_string(), None)
+        }
     } else if !target.has_contracts {
         (
             "defn".to_string(),
@@ -1241,10 +1613,12 @@ fn coverage_report_for_entry(
     let module_roots = resolve_module_roots(&cwd, project_path, &args.module_root)?;
     let world = coverage_world(project_path);
     let primitive_catalog = load_verify_primitive_catalog()?;
+    let trust_zones = load_coverage_trust_zone_index(project_path)?;
     let mut module_cache: BTreeMap<String, CoverageModule> = BTreeMap::new();
     let mut queue = VecDeque::from([args.entry.clone()]);
     let mut visited = BTreeSet::new();
     let mut functions = BTreeMap::new();
+    let mut saw_async = false;
 
     while let Some(symbol) = queue.pop_front() {
         if !visited.insert(symbol.clone()) {
@@ -1339,6 +1713,26 @@ fn coverage_report_for_entry(
             continue;
         };
 
+        if decl.kind == "defasync" {
+            saw_async = true;
+        }
+        if let Some(node) = capsule_boundary_node(trust_zones.as_ref(), &symbol, &decl.source_path)
+        {
+            functions.insert(
+                symbol.clone(),
+                VerifyCoverageFunction {
+                    symbol,
+                    kind: decl.kind.clone(),
+                    status: "capsule_boundary".to_string(),
+                    source_path: Some(decl.source_path.display().to_string()),
+                    details: Some(format!(
+                        "reachable closure terminates at certified capsule node {:?}",
+                        node.id
+                    )),
+                },
+            );
+            continue;
+        }
         functions.insert(
             symbol.clone(),
             coverage_function_for_decl(&symbol, decl, args.max_bytes_len),
@@ -1346,12 +1740,27 @@ fn coverage_report_for_entry(
         enqueue_decl_refs(module_id, module, decl, &mut queue);
     }
 
-    let functions = functions.into_values().collect::<Vec<_>>();
+    let mut functions = functions.into_values().collect::<Vec<_>>();
+    let async_model = if saw_async {
+        let model = load_verify_scheduler_model()?;
+        functions.push(VerifyCoverageFunction {
+            symbol: format!("x07.verify.scheduler_model.{}", model.id),
+            kind: "builtin".to_string(),
+            status: "trusted_scheduler_model".to_string(),
+            source_path: None,
+            details: Some(model.guarantees.join("; ")),
+        });
+        Some(model.id)
+    } else {
+        None
+    };
+    let mut summary = summarize_coverage_functions(&functions);
+    summary.async_model = async_model;
     Ok(VerifyCoverage {
         schema_version: X07_VERIFY_COVERAGE_SCHEMA_VERSION,
         entry: args.entry.clone(),
         worlds: coverage_worlds(project_path),
-        summary: summarize_coverage_functions(&functions),
+        summary,
         functions,
     })
 }
@@ -1365,7 +1774,7 @@ fn coverage_report_fallback(
 ) -> VerifyCoverage {
     let mut function = coverage_function_for_target(entry, target, max_bytes_len);
     match extra_details {
-        Some(details) if function.status == "proven" => {
+        Some(details) if function.status == "proven" || function.status == "proven_async" => {
             function.status = "unsupported".to_string();
             function.details = Some(details);
         }
@@ -1391,16 +1800,6 @@ fn coverage_function_for_decl(
 ) -> VerifyCoverageFunction {
     let source_path = Some(decl.source_path.display().to_string());
     match decl.kind.as_str() {
-        "defasync" => VerifyCoverageFunction {
-            symbol: symbol.to_string(),
-            kind: "defasync".to_string(),
-            status: "runtime_only".to_string(),
-            source_path,
-            details: Some(
-                "defasync targets are runtime-only and are not certifiable by x07 verify"
-                    .to_string(),
-            ),
-        },
         "extern" => VerifyCoverageFunction {
             symbol: symbol.to_string(),
             kind: "extern".to_string(),
@@ -1414,8 +1813,8 @@ fn coverage_function_for_decl(
             let body = decl.body.clone().unwrap_or(Value::Null);
             let target = TargetSig {
                 params: decl.params.clone(),
-                result: "i32".to_string(),
-                is_async: false,
+                result: decl.result.clone(),
+                is_async: decl.kind == "defasync",
                 has_contracts: decl.has_contracts,
                 body,
                 source_path: decl.source_path.clone(),
@@ -1432,9 +1831,22 @@ fn summarize_coverage_functions(functions: &[VerifyCoverageFunction]) -> VerifyC
             .iter()
             .filter(|f| f.kind == "defn" && f.status == "proven")
             .count() as u64,
+        reachable_async: functions.iter().filter(|f| f.kind == "defasync").count() as u64,
+        proven_async: functions
+            .iter()
+            .filter(|f| f.kind == "defasync" && f.status == "proven_async")
+            .count() as u64,
         trusted_primitives: functions
             .iter()
             .filter(|f| f.status == "trusted_primitive")
+            .count() as u64,
+        trusted_scheduler_models: functions
+            .iter()
+            .filter(|f| f.status == "trusted_scheduler_model")
+            .count() as u64,
+        capsule_boundaries: functions
+            .iter()
+            .filter(|f| f.status == "capsule_boundary")
             .count() as u64,
         uncovered_defn: functions
             .iter()
@@ -1444,6 +1856,7 @@ fn summarize_coverage_functions(functions: &[VerifyCoverageFunction]) -> VerifyC
             .iter()
             .filter(|f| f.kind == "defn" && f.status == "unsupported")
             .count() as u64,
+        async_model: None,
     }
 }
 
@@ -1522,7 +1935,48 @@ fn build_verify_driver_x07ast_json(
     call_items.push(Value::String(entry.to_string()));
     call_items.extend(call_args);
 
-    stmts.push(serde_json::json!(["let", "_", Value::Array(call_items)]));
+    if sig.is_async {
+        stmts.push(serde_json::json!([
+            "let",
+            "t_normal",
+            Value::Array(call_items.clone())
+        ]));
+        stmts.push(serde_json::json!([
+            "let",
+            "_spawn0",
+            ["task.spawn", "t_normal"]
+        ]));
+        let normal_join = if sig.result == "result_bytes" {
+            serde_json::json!(["task.join.result_bytes", "t_normal"])
+        } else {
+            serde_json::json!(["task.join.bytes", "t_normal"])
+        };
+        stmts.push(serde_json::json!(["let", "_normal", normal_join]));
+
+        stmts.push(serde_json::json!([
+            "let",
+            "t_cancel",
+            Value::Array(call_items)
+        ]));
+        stmts.push(serde_json::json!([
+            "let",
+            "_spawn1",
+            ["task.spawn", "t_cancel"]
+        ]));
+        stmts.push(serde_json::json!([
+            "let",
+            "_cancel",
+            ["task.cancel", "t_cancel"]
+        ]));
+        let cancel_join = if sig.result == "result_bytes" {
+            serde_json::json!(["task.join.result_bytes", "t_cancel"])
+        } else {
+            serde_json::json!(["task.join.bytes", "t_cancel"])
+        };
+        stmts.push(serde_json::json!(["let", "_canceled", cancel_join]));
+    } else {
+        stmts.push(serde_json::json!(["let", "_", Value::Array(call_items)]));
+    }
     stmts.push(serde_json::json!(["bytes.empty"]));
 
     let mut solve_items = Vec::with_capacity(1 + stmts.len());
@@ -1836,6 +2290,17 @@ fn has_any_contracts(defn: &Value) -> bool {
             return true;
         }
     }
+    if let Some(protocol) = defn.get("protocol") {
+        for k in ["await_invariant", "scope_invariant", "cancellation_ensures"] {
+            if protocol
+                .get(k)
+                .and_then(Value::as_array)
+                .is_some_and(|v| !v.is_empty())
+            {
+                return true;
+            }
+        }
+    }
     false
 }
 
@@ -1973,7 +2438,7 @@ fn verify_cex_to_pretty_canon_bytes(cex: &VerifyCex) -> Result<Vec<u8>> {
     let v = serde_json::to_value(cex).context("serialize verify cex JSON")?;
     let diags = report_common::validate_schema(
         X07_VERIFY_CEX_SCHEMA_BYTES,
-        "spec/x07.verify.cex@0.1.0.schema.json",
+        "spec/x07.verify.cex@0.2.0.schema.json",
         &v,
     )?;
     if !diags.is_empty() {
@@ -2223,6 +2688,46 @@ fn command_exists(name: &str) -> bool {
     Command::new(name).arg("--version").output().is_ok()
 }
 
+fn run_cbmc_with_object_bits_retry(
+    cbmc_args: &[String],
+    context: &'static str,
+) -> Result<(Output, Vec<String>)> {
+    run_cbmc_command_with_object_bits_retry("cbmc", cbmc_args, context)
+}
+
+fn run_cbmc_command_with_object_bits_retry(
+    cbmc_command: &str,
+    cbmc_args: &[String],
+    context: &'static str,
+) -> Result<(Output, Vec<String>)> {
+    let mut used_args = cbmc_args.to_vec();
+    let mut out = Command::new(cbmc_command)
+        .args(&used_args)
+        .output()
+        .context(context)?;
+    if !cbmc_too_many_addressed_objects(&out.stdout, &out.stderr)
+        || used_args.iter().any(|arg| arg == "--object-bits")
+    {
+        return Ok((out, used_args));
+    }
+
+    for object_bits in CBMC_OBJECT_BITS_RETRY_VALUES {
+        let mut retry_args = cbmc_args.to_vec();
+        retry_args.push("--object-bits".to_string());
+        retry_args.push(object_bits.to_string());
+        out = Command::new(cbmc_command)
+            .args(&retry_args)
+            .output()
+            .context(context)?;
+        used_args = retry_args;
+        if !cbmc_too_many_addressed_objects(&out.stdout, &out.stderr) {
+            break;
+        }
+    }
+
+    Ok((out, used_args))
+}
+
 fn maybe_disable_cbmc_standard_checks(cbmc_args: &mut Vec<String>) {
     if command_supports_option("cbmc", "--help", "--no-standard-checks") {
         cbmc_args.push("--no-standard-checks".to_string());
@@ -2264,6 +2769,20 @@ fn summarize_process_text(bytes: &[u8], max_chars: usize) -> String {
         format!("{truncated}... [truncated]")
     } else {
         truncated
+    }
+}
+
+fn cbmc_too_many_addressed_objects(stdout: &[u8], stderr: &[u8]) -> bool {
+    let needle = "too many addressed objects";
+    String::from_utf8_lossy(stdout).contains(needle)
+        || String::from_utf8_lossy(stderr).contains(needle)
+}
+
+fn z3_timeout_seconds(mode: Mode, target: &TargetSig) -> u64 {
+    if mode == Mode::Prove && target.is_async {
+        Z3_ASYNC_PROVE_TIMEOUT_SECONDS
+    } else {
+        Z3_TIMEOUT_SECONDS
     }
 }
 
@@ -2454,6 +2973,83 @@ exit 0
     }
 
     #[test]
+    fn cbmc_too_many_addressed_objects_detects_known_exhaustion_message() {
+        assert!(cbmc_too_many_addressed_objects(
+            b"",
+            b"too many addressed objects: maximum number of objects is set to 2^n=256"
+        ));
+        assert!(cbmc_too_many_addressed_objects(
+            b"too many addressed objects",
+            b""
+        ));
+        assert!(!cbmc_too_many_addressed_objects(b"", b"unrelated failure"));
+    }
+
+    #[test]
+    fn z3_timeout_seconds_uses_longer_budget_for_async_prove() {
+        let async_target = TargetSig {
+            params: Vec::new(),
+            result: "bytes".to_string(),
+            is_async: true,
+            has_contracts: true,
+            body: json!(0),
+            source_path: PathBuf::from("async_fixture.x07.json"),
+        };
+        let sync_target = TargetSig {
+            is_async: false,
+            source_path: PathBuf::from("sync_fixture.x07.json"),
+            ..async_target.clone()
+        };
+        assert_eq!(
+            z3_timeout_seconds(Mode::Prove, &async_target),
+            Z3_ASYNC_PROVE_TIMEOUT_SECONDS
+        );
+        assert_eq!(
+            z3_timeout_seconds(Mode::Smt, &async_target),
+            Z3_TIMEOUT_SECONDS
+        );
+        assert_eq!(
+            z3_timeout_seconds(Mode::Prove, &sync_target),
+            Z3_TIMEOUT_SECONDS
+        );
+    }
+
+    #[test]
+    fn run_cbmc_with_object_bits_retry_retries_exhaustion() {
+        let fake = write_fake_command(
+            r#"
+prev=''
+for arg in "$@"; do
+  if [ "$prev" = "--object-bits" ] && [ "$arg" = "12" ]; then
+    printf '%s\n' 'ok after retry'
+    exit 0
+  fi
+  prev="$arg"
+done
+printf '%s\n' 'too many addressed objects: maximum number of objects is set to 2^n=256' >&2
+exit 1
+"#,
+        );
+        let result = run_cbmc_command_with_object_bits_retry(
+            fake.to_str().expect("utf-8 fake path"),
+            &["--flag".to_string()],
+            "run fake cbmc",
+        )
+        .expect("run fake cbmc");
+        assert!(result.0.status.success());
+        assert_eq!(
+            result.1,
+            vec![
+                "--flag".to_string(),
+                "--object-bits".to_string(),
+                "12".to_string()
+            ]
+        );
+        std::fs::remove_file(&fake).expect("remove fake command");
+        std::fs::remove_dir(fake.parent().expect("fake parent")).expect("remove temp dir");
+    }
+
+    #[test]
     fn cbmc_stderr_is_benign_for_builtin_trap_warning() {
         assert!(cbmc_stderr_is_benign(
             b"**** WARNING: no body for function __builtin_trap\n"
@@ -2495,6 +3091,21 @@ exit 0
         assert!(
             imports.iter().any(|x| x.as_str() == Some("verify_fixture")),
             "missing target module import"
+        );
+    }
+
+    #[test]
+    fn resolve_module_roots_adds_toolchain_stdlib_roots_for_project() {
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/examples/trusted_sandbox_program_v1/x07.json");
+        let cwd = manifest.parent().expect("example dir").to_path_buf();
+        let roots = resolve_module_roots(&cwd, Some(&manifest), &[]).expect("module roots");
+        assert!(
+            roots
+                .iter()
+                .any(|root| root.join("std/os/env.x07.json").is_file()),
+            "expected stdlib os module root in {:?}",
+            roots
         );
     }
 

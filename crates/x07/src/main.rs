@@ -10,6 +10,7 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::{Args, Parser};
+use serde_json::Value;
 use x07_contracts::{
     PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
     X07AST_SCHEMA_VERSION, X07TEST_SCHEMA_VERSION,
@@ -181,17 +182,37 @@ enum TestReturns {
     BytesStatusV1,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestEntryKind {
+    Defn,
+    Defasync,
+}
+
+impl TestEntryKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            TestEntryKind::Defn => "defn",
+            TestEntryKind::Defasync => "defasync",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct TestDecl {
     id: String,
     world: WorldId,
     entry: String,
+    entry_kind: TestEntryKind,
+    entry_result_ty: String,
     expect: Expect,
     returns: TestReturns,
     pbt: Option<pbt::PbtDecl>,
     input: Option<Vec<u8>>,
     fixture_root: Option<PathBuf>,
     policy_json: Option<PathBuf>,
+    require_runtime_attestation: bool,
+    required_capsules: Vec<String>,
+    sandbox_smoke: bool,
     timeout_ms: Option<u64>,
     solve_fuel: Option<u64>,
 }
@@ -559,6 +580,14 @@ fn cmd_test(machine: &reporting::MachineArgs, args: TestArgs) -> Result<std::pro
     let module_roots = compute_test_module_roots(&args, &validated)?;
 
     let mut tests = validated.tests;
+    let entry_diags = hydrate_test_entry_info(&module_roots, &mut tests);
+    if !entry_diags.is_empty() {
+        for d in &entry_diags {
+            eprintln!("{}: {} ({})", d.code, d.message, d.path);
+        }
+        let report = X07TestReport::error_from_manifest(&args, started.elapsed(), entry_diags);
+        return write_report_and_exit(machine, args, report, 12);
+    }
     let total_tests = tests.len();
     if let Some(world) = args.world {
         tests.retain(|t| t.world == world);
@@ -759,6 +788,282 @@ fn normalize_module_root_path(path: &Path) -> PathBuf {
     out
 }
 
+#[derive(Debug, Clone)]
+struct ResolvedTestEntry {
+    kind: TestEntryKind,
+    result: String,
+}
+
+fn resolve_test_entry(module_roots: &[PathBuf], entry: &str) -> Result<ResolvedTestEntry> {
+    let (module_id, _) = entry
+        .rsplit_once('.')
+        .context("test entry must contain '.'")?;
+    let rel = format!("{}.x07.json", module_id.replace('.', "/"));
+    for root in module_roots {
+        let path = root.join(&rel);
+        if !path.is_file() {
+            continue;
+        }
+        let doc = report_common::read_json_file(&path)
+            .with_context(|| format!("read test entry module: {}", path.display()))?;
+        let decls = doc
+            .get("decls")
+            .and_then(Value::as_array)
+            .context("test entry module is missing decls[]")?;
+        for decl in decls {
+            if decl.get("name").and_then(Value::as_str) != Some(entry) {
+                continue;
+            }
+            let kind = match decl.get("kind").and_then(Value::as_str).unwrap_or("") {
+                "defn" => TestEntryKind::Defn,
+                "defasync" => TestEntryKind::Defasync,
+                other => anyhow::bail!("unsupported test entry declaration kind: {other}"),
+            };
+            let result = decl
+                .get("result")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            return Ok(ResolvedTestEntry { kind, result });
+        }
+    }
+    anyhow::bail!("entry {entry:?} was not found under the resolved module roots");
+}
+
+fn hydrate_test_entry_info(module_roots: &[PathBuf], tests: &mut [TestDecl]) -> Vec<ManifestDiag> {
+    let mut diags = Vec::new();
+    for test in tests {
+        match resolve_test_entry(module_roots, &test.entry) {
+            Ok(resolved) => {
+                test.entry_kind = resolved.kind;
+                test.entry_result_ty = resolved.result.clone();
+                if resolved.kind == TestEntryKind::Defasync {
+                    let returns_supported = match test.returns {
+                        TestReturns::ResultI32 => resolved.result == "result_i32",
+                        TestReturns::BytesStatusV1 => {
+                            resolved.result == "bytes" || resolved.result == "result_bytes"
+                        }
+                    };
+                    if !returns_supported {
+                        diags.push(ManifestDiag {
+                            code: "X07TEST_ASYNC_ENTRY_UNSUPPORTED",
+                            message: format!(
+                                "async entry {:?} returns {:?}, which is incompatible with x07 test returns={:?}",
+                                test.entry,
+                                resolved.result,
+                                match test.returns {
+                                    TestReturns::ResultI32 => "result_i32",
+                                    TestReturns::BytesStatusV1 => "bytes_status_v1",
+                                }
+                            ),
+                            path: test.entry.clone(),
+                        });
+                    }
+                }
+            }
+            Err(err) => diags.push(ManifestDiag {
+                code: "ETEST_ENTRY_INVALID",
+                message: err.to_string(),
+                path: test.entry.clone(),
+            }),
+        }
+    }
+    diags
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TestCapsuleIndex {
+    #[serde(default)]
+    capsules: Vec<TestCapsuleRef>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TestCapsuleRef {
+    id: String,
+    contract_path: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TestCapsuleContract {
+    effect_log: TestCapsuleEffectLog,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TestCapsuleEffectLog {
+    schema_path: String,
+}
+
+fn resolve_runtime_attestation_path(manifest_path: &Path, raw_path: &str) -> PathBuf {
+    let candidate = PathBuf::from(raw_path);
+    if candidate.is_absolute() {
+        candidate
+    } else {
+        manifest_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(candidate)
+    }
+}
+
+fn collect_required_capsule_effect_log_digests(
+    manifest_path: &Path,
+    required_capsules: &[String],
+) -> Result<Vec<String>> {
+    if required_capsules.is_empty() {
+        return Ok(Vec::new());
+    }
+    let manifest_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    let project_path =
+        util::resolve_existing_path_upwards_from(manifest_dir, Path::new("x07.json"));
+    if !project_path.is_file() {
+        anyhow::bail!(
+            "could not resolve project root for capsule evidence from {}",
+            manifest_path.display()
+        );
+    }
+    let project_root = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let index_path = project_root
+        .join("arch")
+        .join("capsules")
+        .join("index.x07capsule.json");
+    let index: TestCapsuleIndex = serde_json::from_slice(
+        &std::fs::read(&index_path)
+            .with_context(|| format!("read capsule index: {}", index_path.display()))?,
+    )
+    .with_context(|| format!("parse capsule index JSON: {}", index_path.display()))?;
+    let index_root = index_path.parent().unwrap_or_else(|| Path::new("."));
+    let by_id = index
+        .capsules
+        .into_iter()
+        .map(|capsule| (capsule.id.clone(), capsule))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut digests = Vec::new();
+    for capsule_id in required_capsules {
+        let Some(capsule) = by_id.get(capsule_id) else {
+            anyhow::bail!(
+                "required capsule {:?} is missing from {}",
+                capsule_id,
+                index_path.display()
+            );
+        };
+        let contract_path = index_root.join(&capsule.contract_path);
+        let contract: TestCapsuleContract = serde_json::from_slice(
+            &std::fs::read(&contract_path)
+                .with_context(|| format!("read capsule contract: {}", contract_path.display()))?,
+        )
+        .with_context(|| format!("parse capsule contract JSON: {}", contract_path.display()))?;
+        let effect_log_path = index_root.join(&contract.effect_log.schema_path);
+        let bytes = std::fs::read(&effect_log_path).with_context(|| {
+            format!(
+                "read capsule effect-log schema: {}",
+                effect_log_path.display()
+            )
+        })?;
+        digests.push(format!("sha256:{}", util::sha256_hex(&bytes)));
+    }
+    digests.sort();
+    digests.dedup();
+    Ok(digests)
+}
+
+fn attach_test_sandbox_evidence(
+    manifest_path: &Path,
+    test: &TestDecl,
+    result: &mut TestCaseResult,
+) -> bool {
+    let Some(run) = result.run.as_ref() else {
+        return false;
+    };
+    let mut failed = false;
+
+    let runtime_attestation = run.runtime_attestation.clone();
+    let mut effect_log_digests = Vec::new();
+
+    if test.require_runtime_attestation && runtime_attestation.is_none() {
+        result.diags.push(Diag::new(
+            "X07TEST_RUNTIME_ATTEST_REQUIRED",
+            if test.sandbox_smoke {
+                "sandbox_smoke test requires runtime attestation evidence, but no runtime attestation was emitted"
+            } else {
+                "test requires runtime attestation evidence, but no runtime attestation was emitted"
+            },
+        ));
+        result.failure_kind = Some("runtime_attestation_missing".to_string());
+        result.status = "error".to_string();
+        failed = true;
+    }
+    if let Some(attestation_ref) = runtime_attestation.as_ref() {
+        let resolved = resolve_runtime_attestation_path(manifest_path, &attestation_ref.path);
+        match std::fs::read(&resolved) {
+            Ok(bytes) => match serde_json::from_slice::<RuntimeAttestationDoc>(&bytes) {
+                Ok(doc) => effect_log_digests = doc.effect_log_digests,
+                Err(err) => {
+                    if test.require_runtime_attestation {
+                        result.diags.push(Diag::new(
+                            "X07TEST_RUNTIME_ATTEST_REQUIRED",
+                            format!(
+                                "required runtime attestation is not valid JSON: {} ({err})",
+                                resolved.display()
+                            ),
+                        ));
+                        result.failure_kind = Some("runtime_attestation_missing".to_string());
+                        result.status = "error".to_string();
+                        failed = true;
+                    }
+                }
+            },
+            Err(err) => {
+                if test.require_runtime_attestation {
+                    result.diags.push(Diag::new(
+                        "X07TEST_RUNTIME_ATTEST_REQUIRED",
+                        format!(
+                            "required runtime attestation is missing or unreadable: {} ({err})",
+                            resolved.display()
+                        ),
+                    ));
+                    result.failure_kind = Some("runtime_attestation_missing".to_string());
+                    result.status = "error".to_string();
+                    failed = true;
+                }
+            }
+        }
+    }
+    if effect_log_digests.is_empty() && !test.required_capsules.is_empty() {
+        match collect_required_capsule_effect_log_digests(manifest_path, &test.required_capsules) {
+            Ok(digests) => effect_log_digests = digests,
+            Err(err) => {
+                result.diags.push(Diag::new(
+                    "X07TEST_CAPSULE_EVIDENCE_MISSING",
+                    err.to_string(),
+                ));
+                result.failure_kind = Some("capsule_evidence_missing".to_string());
+                result.status = "error".to_string();
+                failed = true;
+            }
+        }
+    }
+    if !test.required_capsules.is_empty() && effect_log_digests.len() < test.required_capsules.len()
+    {
+        result.diags.push(Diag::new(
+            "X07TEST_CAPSULE_EVIDENCE_MISSING",
+            format!(
+                "test requires capsule evidence for {:?}, but only {} effect-log digest(s) were available",
+                test.required_capsules,
+                effect_log_digests.len()
+            ),
+        ));
+        result.failure_kind = Some("capsule_evidence_missing".to_string());
+        result.status = "error".to_string();
+        failed = true;
+    }
+    if let Some(run) = result.run.as_mut() {
+        run.capsule_ids = test.required_capsules.clone();
+        run.effect_log_digests = effect_log_digests;
+    }
+    failed
+}
+
 fn run_tests(
     args: &TestArgs,
     module_roots: &[PathBuf],
@@ -926,6 +1231,7 @@ fn run_one_test(
             expect: test.expect.as_str().to_string(),
             status: "skip".to_string(),
             duration_ms: start.elapsed().as_millis() as u64,
+            entry_kind: test.entry_kind.as_str().to_string(),
             failure_kind: None,
             contract_repro_path: None,
             entry: Some(test.entry.clone()),
@@ -985,6 +1291,7 @@ fn run_one_test(
         expect: test.expect.as_str().to_string(),
         status: "error".to_string(),
         duration_ms: 0,
+        entry_kind: test.entry_kind.as_str().to_string(),
         failure_kind: None,
         contract_repro_path: None,
         entry: Some(test.entry.clone()),
@@ -1256,6 +1563,7 @@ fn run_one_pbt_test(
         expect: test.expect.as_str().to_string(),
         status: "error".to_string(),
         duration_ms: 0,
+        entry_kind: test.entry_kind.as_str().to_string(),
         failure_kind: None,
         contract_repro_path: None,
         entry: Some(test.entry.clone()),
@@ -1490,6 +1798,12 @@ struct RuntimeAttestationRef {
     weaker_isolation: bool,
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct RuntimeAttestationDoc {
+    #[serde(default)]
+    effect_log_digests: Vec<String>,
+}
+
 static X07TEST_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 const X07TEST_SOLVE_FUEL: u64 = 400_000_000;
 
@@ -1527,6 +1841,7 @@ fn run_one_test_os(
             expect: test.expect.as_str().to_string(),
             status: "error".to_string(),
             duration_ms: start.elapsed().as_millis() as u64,
+            entry_kind: test.entry_kind.as_str().to_string(),
             failure_kind: None,
             contract_repro_path: None,
             entry: Some(test.entry.clone()),
@@ -1679,6 +1994,7 @@ fn run_one_test_os(
         expect: test.expect.as_str().to_string(),
         status: "error".to_string(),
         duration_ms: 0,
+        entry_kind: test.entry_kind.as_str().to_string(),
         failure_kind: None,
         contract_repro_path: None,
         entry: Some(test.entry.clone()),
@@ -1762,7 +2078,17 @@ fn run_one_test_os(
         failure_code_u32: None,
         sandbox_backend,
         runtime_attestation,
+        effect_log_digests: Vec::new(),
+        capsule_ids: Vec::new(),
     });
+
+    if attach_test_sandbox_evidence(&args.manifest, test, &mut result) {
+        result.duration_ms = start.elapsed().as_millis() as u64;
+        if cleanup_dir {
+            rm_rf(&out_dir);
+        }
+        return Ok(result);
+    }
 
     if !solve.ok || solve.exit_status != 0 {
         if let Some(trap) = solve.trap.as_deref() {
@@ -2112,11 +2438,33 @@ fn build_test_driver_x07ast_json(test: &TestDecl) -> Result<Vec<u8>> {
     imports.dedup();
 
     let call_entry = serde_json::json!([test.entry]);
-    let solve = match test.returns {
-        TestReturns::ResultI32 => {
+    let solve = match (test.entry_kind, test.returns) {
+        (TestEntryKind::Defn, TestReturns::ResultI32) => {
             serde_json::json!(["std.test.status_from_result_i32", call_entry])
         }
-        TestReturns::BytesStatusV1 => call_entry,
+        (TestEntryKind::Defn, TestReturns::BytesStatusV1) => call_entry,
+        (TestEntryKind::Defasync, TestReturns::ResultI32) => serde_json::json!([
+            "begin",
+            ["let", "task", call_entry],
+            ["task.spawn", "task"],
+            ["std.test.status_from_result_i32", ["await", "task"]]
+        ]),
+        (TestEntryKind::Defasync, TestReturns::BytesStatusV1) => serde_json::json!([
+            "begin",
+            ["let", "task", call_entry],
+            ["task.spawn", "task"],
+            ["let", "out", ["await", "task"]],
+            if test.entry_result_ty == "result_bytes" {
+                serde_json::json!([
+                    "if",
+                    ["result_bytes.is_ok", "out"],
+                    ["std.test.status_ok"],
+                    ["std.test.status_fail", ["result_bytes.err_code", "out"]]
+                ])
+            } else {
+                serde_json::json!(["std.test.status_ok"])
+            }
+        ]),
     };
 
     let file = serde_json::json!({
@@ -2161,6 +2509,12 @@ struct TestRaw {
     fixture_root: Option<String>,
     #[serde(default)]
     policy_json: Option<String>,
+    #[serde(default)]
+    require_runtime_attestation: bool,
+    #[serde(default)]
+    required_capsules: Vec<String>,
+    #[serde(default)]
+    sandbox_smoke: bool,
     #[serde(default)]
     timeout_ms: Option<u64>,
 }
@@ -2833,16 +3187,52 @@ fn validate_manifest_json(manifest_path: &Path) -> Result<ValidatedManifest, Vec
             }
         };
 
+        if (t.require_runtime_attestation || t.sandbox_smoke) && world != WorldId::RunOsSandboxed {
+            diags.push(ManifestDiag {
+                code: "X07TEST_RUNTIME_ATTEST_REQUIRED",
+                message: "sandbox smoke and runtime attestation evidence are only supported for run-os-sandboxed tests".to_string(),
+                path: format!("{base}/world"),
+            });
+            continue;
+        }
+
+        let mut required_capsules = t.required_capsules.clone();
+        required_capsules.sort();
+        required_capsules.dedup();
+        for (ci, capsule_id) in required_capsules.iter().enumerate() {
+            if capsule_id.trim().is_empty() {
+                diags.push(ManifestDiag {
+                    code: "X07TEST_CAPSULE_EVIDENCE_MISSING",
+                    message: "required_capsules entries must be non-empty".to_string(),
+                    path: format!("{base}/required_capsules/{ci}"),
+                });
+                continue;
+            }
+            if let Err(msg) = x07c::validate::validate_symbol(capsule_id) {
+                diags.push(ManifestDiag {
+                    code: "X07TEST_CAPSULE_EVIDENCE_MISSING",
+                    message: format!("invalid required_capsules entry: {msg}"),
+                    path: format!("{base}/required_capsules/{ci}"),
+                });
+                continue;
+            }
+        }
+
         out.push(TestDecl {
             id: t.id.clone(),
             world,
             entry: t.entry.clone(),
+            entry_kind: TestEntryKind::Defn,
+            entry_result_ty: "result_i32".to_string(),
             expect,
             returns,
             pbt: pbt_decl,
             input,
             fixture_root,
             policy_json,
+            require_runtime_attestation: t.require_runtime_attestation || t.sandbox_smoke,
+            required_capsules,
+            sandbox_smoke: t.sandbox_smoke,
             timeout_ms: t.timeout_ms,
             solve_fuel: match t.solve_fuel {
                 Some(0) => {
@@ -2963,6 +3353,7 @@ struct TestCaseResult {
     expect: String,
     status: String,
     duration_ms: u64,
+    entry_kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     failure_kind: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2987,6 +3378,7 @@ impl TestCaseResult {
             expect: test.expect.as_str().to_string(),
             status: "skip".to_string(),
             duration_ms: 0,
+            entry_kind: test.entry_kind.as_str().to_string(),
             failure_kind: None,
             contract_repro_path: None,
             entry: Some(test.entry.clone()),
@@ -3036,6 +3428,10 @@ struct RunSection {
     sandbox_backend: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     runtime_attestation: Option<RuntimeAttestationRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    effect_log_digests: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    capsule_ids: Vec<String>,
 }
 
 impl RunSection {
@@ -3053,6 +3449,8 @@ impl RunSection {
             failure_code_u32: None,
             sandbox_backend: None,
             runtime_attestation: None,
+            effect_log_digests: Vec::new(),
+            capsule_ids: Vec::new(),
         }
     }
 }

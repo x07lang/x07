@@ -91,6 +91,7 @@ When you need real OS resources (real network, real disk, real time), you switch
   - [Diagnostics & repair](toolchain/diagnostics-repair.md)
   - [Testing](toolchain/testing.md)
   - [Property-based testing](toolchain/pbt.md)
+  - [Formal verification & certification](toolchain/formal-verification.md)
   - [Review & trust artifacts](toolchain/review-trust.md)
 - Packages:
   - [Workspaces, packages, lockfiles](packages/index.md)

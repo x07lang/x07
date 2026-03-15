@@ -2888,7 +2888,7 @@ fn collect_async_proof_summary(coverage_path: &Path) -> Result<TrustCertificateA
                 continue;
             }
             reachable += 1;
-            if function.get("status").and_then(Value::as_str) == Some("proven") {
+            if function.get("status").and_then(Value::as_str) == Some("proven_async") {
                 covered += 1;
             }
         }
@@ -2959,7 +2959,7 @@ fn collect_capsule_artifacts(
     let index_root = index_path.parent().unwrap_or_else(|| Path::new("."));
     let mut capsule_ids = Vec::new();
     let mut capsule_attestations = Vec::new();
-    let effect_logs = Vec::new();
+    let mut effect_logs = Vec::new();
 
     for capsule in &index.capsules {
         capsule_ids.push(capsule.id.clone());
@@ -2977,6 +2977,8 @@ fn collect_capsule_artifacts(
                         ),
                         &effect_log_schema,
                     ));
+                } else {
+                    effect_logs.push(evidence_ref_for_path(&effect_log_schema)?);
                 }
             }
             Err(err) => diagnostics.push(trust_diag_with_path(
@@ -3003,6 +3005,7 @@ fn collect_capsule_artifacts(
 
     capsule_ids.sort();
     capsule_attestations.sort_by(|a, b| a.path.cmp(&b.path));
+    effect_logs.sort_by(|a, b| a.path.cmp(&b.path));
 
     if profile.is_some_and(|p| p.evidence_requirements.require_capsule_attestations)
         && capsule_attestations.len() < capsule_ids.len()
@@ -3094,9 +3097,20 @@ fn collect_runtime_attestation(
             "trust profile requires runtime attestation, but x07 test did not produce one",
         ));
     }
+    if profile.is_some_and(|p| p.sandbox_requirements.sandbox_backend == "vm")
+        && backend.as_deref().is_some_and(|value| value != "vm")
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_ESANDBOX_PROFILE",
+            format!(
+                "runtime attestation reports sandbox_backend={:?}, but the trust profile requires vm",
+                backend.as_deref().unwrap_or("none")
+            ),
+        ));
+    }
     if profile.is_some_and(|p| p.sandbox_requirements.forbid_weaker_isolation) && weaker_isolation {
         diagnostics.push(trust_diag(
-            "X07TC_ERUNTIME_ATTEST",
+            "X07TC_ESANDBOX_PROFILE",
             "runtime attestation reports weaker isolation, which the trust profile forbids",
         ));
     }
@@ -3123,6 +3137,17 @@ fn collect_runtime_attestation(
     } else {
         None
     };
+
+    if profile.is_some_and(|p| p.sandbox_requirements.network_mode == "none")
+        && network_mode != "none"
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_ESANDBOX_PROFILE",
+            format!(
+                "runtime policy reports network_mode={network_mode:?}, but the trust profile requires none"
+            ),
+        ));
+    }
 
     Ok((runtime, runtime_attestation))
 }
@@ -3490,7 +3515,13 @@ fn add_coverage_diagnostics(coverage_doc: &Value, diagnostics: &mut Vec<diagnost
     for function in functions {
         if matches!(
             function.get("status").and_then(Value::as_str),
-            Some("proven" | "trusted_primitive")
+            Some(
+                "proven"
+                    | "proven_async"
+                    | "trusted_primitive"
+                    | "trusted_scheduler_model"
+                    | "capsule_boundary"
+            )
         ) {
             continue;
         }
@@ -3515,8 +3546,11 @@ fn coverage_issue_code(function: &Value) -> &'static str {
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_ascii_lowercase();
-    if kind == "defasync" || status == "runtime_only" {
+    if kind == "defasync" && status == "unsupported" {
         return "X07TC_EUNSUPPORTED_DEFASYNC";
+    }
+    if kind == "defasync" && status == "uncovered" {
+        return "X07TC_EASYNC_PROOF";
     }
     if status == "uncovered" {
         return "X07TC_EPROOF_COVERAGE";
@@ -3533,6 +3567,9 @@ fn coverage_issue_code(function: &Value) -> &'static str {
 fn coverage_issue_message(code: &str, symbols: &[String]) -> String {
     let listed = summarize_symbol_list(symbols);
     match code {
+        "X07TC_EASYNC_PROOF" => format!(
+            "coverage report includes reachable defasync symbols without complete async proof coverage: {listed}"
+        ),
         "X07TC_EUNSUPPORTED_DEFASYNC" => format!(
             "coverage report includes reachable defasync symbols outside the certifiable subset: {listed}"
         ),
@@ -3566,7 +3603,11 @@ fn prove_issue_code(report_doc: &Value) -> &'static str {
         .flatten();
     for diag in diagnostics {
         match diag.get("code").and_then(Value::as_str).unwrap_or("") {
-            "X07V_UNSUPPORTED_ASYNC" => return "X07TC_EUNSUPPORTED_DEFASYNC",
+            "X07V_UNSUPPORTED_DEFASYNC_FORM" => return "X07TC_EUNSUPPORTED_DEFASYNC",
+            "X07V_ASYNC_COUNTEREXAMPLE"
+            | "X07V_SCOPE_INVARIANT_FAILED"
+            | "X07V_CANCELLATION_ENSURE_FAILED"
+            | "X07V_SCHEDULER_MODEL_UNTRUSTED" => return "X07TC_EASYNC_PROOF",
             "X07V_UNSUPPORTED_RECURSION" => return "X07TC_EUNSUPPORTED_RECURSION",
             _ => {}
         }
@@ -3974,10 +4015,7 @@ fn build_trust_report_evidence(
     if trust_report_path.is_file() {
         let report_doc = report_common::read_json_file(&trust_report_path)?;
         if profile.is_some_and(|p| p.evidence_requirements.require_trust_report_clean)
-            && report_doc
-                .pointer("/nondeterminism/flags")
-                .and_then(Value::as_array)
-                .is_some_and(|flags| !flags.is_empty())
+            && trust_report_has_blocking_nondeterminism(profile, &report_doc)
         {
             diagnostics.push(trust_diag(
                 "X07TC_ENONDET",
@@ -4003,6 +4041,28 @@ fn build_trust_report_evidence(
             "x07 trust report did not emit a report",
         )
     }
+}
+
+fn trust_report_has_blocking_nondeterminism(
+    profile: Option<&TrustProfile>,
+    report_doc: &Value,
+) -> bool {
+    let Some(flags) = report_doc
+        .pointer("/nondeterminism/flags")
+        .and_then(Value::as_array)
+    else {
+        return false;
+    };
+
+    flags.iter().filter_map(Value::as_object).any(|flag| {
+        let kind = flag.get("kind").and_then(Value::as_str).unwrap_or("");
+        if matches!(kind, "world_non_deterministic" | "process_enabled")
+            && profile.is_some_and(|p| p.sandbox_requirements.sandbox_backend == "vm")
+        {
+            return false;
+        }
+        true
+    })
 }
 
 fn build_bundle_evidence(
@@ -5064,7 +5124,12 @@ mod tests {
                     {
                         "symbol": "example.async_main",
                         "kind": "defasync",
-                        "status": "runtime_only"
+                        "status": "unsupported"
+                    },
+                    {
+                        "symbol": "example.async_worker",
+                        "kind": "defasync",
+                        "status": "uncovered"
                     },
                     {
                         "symbol": "example.loop_missing_contracts",
@@ -5092,6 +5157,7 @@ mod tests {
             .iter()
             .map(|diag| diag.code.as_str())
             .collect::<BTreeSet<_>>();
+        assert!(codes.contains("X07TC_EASYNC_PROOF"));
         assert!(codes.contains("X07TC_EUNSUPPORTED_DEFASYNC"));
         assert!(codes.contains("X07TC_EPROOF_COVERAGE"));
         assert!(codes.contains("X07TC_EUNSUPPORTED_RECURSION"));
@@ -5118,5 +5184,107 @@ mod tests {
         assert!(diagnostics
             .iter()
             .any(|diag| diag.code == "X07TC_EBOUNDARY_RELAXED"));
+    }
+
+    #[test]
+    fn prove_issue_code_maps_async_verify_failures() {
+        assert_eq!(
+            prove_issue_code(&json!({
+                "diagnostics": [
+                    { "code": "X07V_SCOPE_INVARIANT_FAILED" }
+                ]
+            })),
+            "X07TC_EASYNC_PROOF"
+        );
+        assert_eq!(
+            prove_issue_code(&json!({
+                "diagnostics": [
+                    { "code": "X07V_UNSUPPORTED_DEFASYNC_FORM" }
+                ]
+            })),
+            "X07TC_EUNSUPPORTED_DEFASYNC"
+        );
+    }
+
+    #[test]
+    fn collect_runtime_attestation_reports_sandbox_profile_mismatch() {
+        let dir = temp_test_dir("runtime_attestation_profile_mismatch");
+        let tests_report = dir.join("tests.report.json");
+        std::fs::write(
+            &tests_report,
+            serde_json::to_vec_pretty(&json!({
+                "tests": [
+                    {
+                        "id": "smoke/runtime",
+                        "run": {
+                            "sandbox_backend": "os"
+                        }
+                    }
+                ]
+            }))
+            .expect("serialize tests report"),
+        )
+        .expect("write tests report");
+
+        let profile = TrustProfile {
+            schema_version: "x07.trust.profile@0.2.0".to_string(),
+            id: "trusted_program_sandboxed_local_v1".to_string(),
+            claims: Vec::new(),
+            entrypoints: Vec::new(),
+            worlds_allowed: vec!["run-os-sandboxed".to_string()],
+            language_subset: TrustLanguageSubset {
+                allow_defasync: true,
+                allow_recursion: false,
+                allow_extern: false,
+                allow_unsafe: false,
+                allow_ffi: false,
+                allow_dynamic_dispatch: false,
+            },
+            arch_requirements: TrustArchRequirements {
+                manifest_min_version: "x07.arch.manifest@0.3.0".to_string(),
+                require_allowlist_mode: true,
+                require_deny_cycles: true,
+                require_deny_orphans: true,
+                require_visibility: true,
+                require_world_caps: true,
+                require_brand_boundaries: true,
+            },
+            evidence_requirements: TrustEvidenceRequirements {
+                require_boundary_index: true,
+                require_schema_derive_check: true,
+                require_smoke_harnesses: true,
+                require_unit_tests: true,
+                require_pbt: "required".to_string(),
+                require_proof_mode: "prove".to_string(),
+                require_proof_coverage: "all_reachable_symbols".to_string(),
+                require_async_proof_coverage: true,
+                require_capsule_attestations: true,
+                require_runtime_attestation: false,
+                require_effect_log_digests: true,
+                require_compile_attestation: true,
+                require_trust_report_clean: true,
+                require_sbom: true,
+            },
+            sandbox_requirements: TrustSandboxRequirements {
+                sandbox_backend: "vm".to_string(),
+                forbid_weaker_isolation: true,
+                network_mode: "none".to_string(),
+            },
+        };
+
+        let mut diagnostics = Vec::new();
+        let _ = collect_runtime_attestation(
+            &tests_report,
+            &dir,
+            None,
+            Some(&profile),
+            &mut diagnostics,
+        )
+        .expect("collect runtime attestation");
+
+        assert!(diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07TC_ESANDBOX_PROFILE"));
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
     }
 }

@@ -89,3 +89,59 @@ jobs:
       - name: VM sandbox smoke
         shell: bash
         run: ./scripts/ci/check_vm_sandbox_smoke.sh
+
+  trust-vm-examples:
+    name: vm / trust examples / ${{ matrix.check }}
+    runs-on: [self-hosted, x07-vm-linux-firecracker]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - check_trusted_sandbox_program_example.sh
+          - check_certified_capsule_example.sh
+    env:
+      X07_VM_BACKEND: firecracker-ctr
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust (rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system deps
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cbmc \
+            clang \
+            build-essential \
+            pkg-config \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            z3
+
+      - name: Build and import guest runner image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/build_guest_runner_image.sh --image x07-guest-runner --tag vm-ci
+
+          tmp="$(mktemp -d 2>/dev/null || mktemp -d -t x07_guest_image)"
+          image_tar="${tmp}/guest-runner.tar"
+          docker save "x07-guest-runner:vm-ci" -o "$image_tar"
+
+          sock="${X07_VM_FIRECRACKER_CONTAINERD_SOCK:-/run/firecracker-containerd/containerd.sock}"
+          ns="${X07_VM_CONTAINERD_NAMESPACE:-x07}"
+          firecracker-ctr --address "$sock" --namespace "$ns" images import "$image_tar"
+
+          echo "X07_VM_GUEST_IMAGE=x07-guest-runner:vm-ci" >> "$GITHUB_ENV"
+
+      - name: Run trust example check
+        shell: bash
+        run: ./scripts/ci/${{ matrix.check }}

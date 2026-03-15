@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::Args;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use x07_contracts::{
     PROJECT_LOCKFILE_SCHEMA_VERSION, X07_BUNDLE_REPORT_SCHEMA_VERSION,
@@ -228,7 +228,7 @@ struct BundleReport {
     report: Value,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct CompileAttestation {
     schema_version: &'static str,
     world: &'static str,
@@ -240,7 +240,7 @@ struct CompileAttestation {
     rebuild: CompileAttestRebuild,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct CompileAttestInputs {
     target_kind: &'static str,
     target_path: String,
@@ -251,7 +251,7 @@ struct CompileAttestInputs {
     module_roots: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct CompileAttestArtifacts {
     freestanding_c_sha256: Option<String>,
     wrapper_c_sha256: Option<String>,
@@ -259,7 +259,7 @@ struct CompileAttestArtifacts {
     binary_sha256: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct CompileAttestCompiler {
     lang_id: String,
     ok: bool,
@@ -268,8 +268,44 @@ struct CompileAttestCompiler {
     stderr_sha256: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct CompileAttestRebuild {
+    deterministic_match: bool,
+    binary_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestation {
+    inputs: GuestCompileAttestInputs,
+    artifacts: GuestCompileAttestArtifacts,
+    compiler: GuestCompileAttestCompiler,
+    rebuild: GuestCompileAttestRebuild,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestInputs {
+    program_sha256: String,
+    lockfile_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestArtifacts {
+    freestanding_c_sha256: Option<String>,
+    wrapper_c_sha256: Option<String>,
+    combined_c_sha256: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestCompiler {
+    lang_id: String,
+    ok: bool,
+    exit_status: Option<i32>,
+    stdout_sha256: Option<String>,
+    stderr_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuestCompileAttestRebuild {
     deterministic_match: bool,
     binary_sha256: Option<String>,
 }
@@ -454,9 +490,6 @@ pub fn cmd_bundle(
         .and_then(|p| p.cpu_time_limit_seconds));
 
     if sandbox_backend == Some(EffectiveSandboxBackend::Vm) {
-        if args.emit_attestation.is_some() {
-            anyhow::bail!("--emit-attestation is not supported for VM bundles");
-        }
         let base_policy = base_policy
             .as_deref()
             .context("internal error: base_policy missing")?;
@@ -672,6 +705,10 @@ struct CmdBundleVmParams<'a> {
     cpu_time_limit_seconds: Option<u64>,
 }
 
+fn vm_compile_attestation_path(sidecar: &Path) -> PathBuf {
+    sidecar.join("compile.attest.json")
+}
+
 fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode> {
     let CmdBundleVmParams {
         args,
@@ -764,6 +801,48 @@ fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode
     })?;
 
     copy_executable_atomic(&guest_payload.payload_path, &payload_dst)?;
+
+    if let Some(attestation) = guest_payload.compile_attestation {
+        let payload_sha256 = sha256_hex_for_path(&payload_dst)?;
+        let attestation = CompileAttestation {
+            schema_version: X07_COMPILE_ATTEST_SCHEMA_VERSION,
+            world: world.as_str(),
+            bundle_kind: "vm",
+            output_path: payload_dst.display().to_string(),
+            inputs: CompileAttestInputs {
+                target_kind: target_kind.as_str(),
+                target_path: target_path.display().to_string(),
+                project_path: project_root.map(|p| p.display().to_string()),
+                lockfile_path: lockfile.map(|p| p.display().to_string()),
+                program_sha256: attestation.inputs.program_sha256,
+                lockfile_sha256: attestation.inputs.lockfile_sha256,
+                module_roots: resolved_module_roots.to_vec(),
+            },
+            artifacts: CompileAttestArtifacts {
+                freestanding_c_sha256: attestation.artifacts.freestanding_c_sha256,
+                wrapper_c_sha256: attestation.artifacts.wrapper_c_sha256,
+                combined_c_sha256: attestation.artifacts.combined_c_sha256,
+                binary_sha256: payload_sha256.clone(),
+            },
+            compiler: CompileAttestCompiler {
+                lang_id: attestation.compiler.lang_id,
+                ok: attestation.compiler.ok,
+                exit_status: attestation.compiler.exit_status,
+                stdout_sha256: attestation.compiler.stdout_sha256,
+                stderr_sha256: attestation.compiler.stderr_sha256,
+            },
+            rebuild: CompileAttestRebuild {
+                deterministic_match: attestation.rebuild.deterministic_match,
+                binary_sha256: attestation.rebuild.binary_sha256.map(|_| payload_sha256),
+            },
+        };
+
+        let sidecar_attestation = vm_compile_attestation_path(&sidecar);
+        write_compile_attestation(&sidecar_attestation, &attestation)?;
+        if let Some(attestation_path) = &args.emit_attestation {
+            write_compile_attestation(attestation_path, &attestation)?;
+        }
+    }
 
     let guest_report = guest_payload.report;
 
@@ -876,6 +955,7 @@ fn cmd_bundle_vm(params: CmdBundleVmParams<'_>) -> Result<std::process::ExitCode
 struct VmPayloadBundleOut {
     report: Value,
     payload_path: PathBuf,
+    compile_attestation: Option<GuestCompileAttestation>,
 }
 
 struct VmPayloadBundleParams<'a> {
@@ -1077,6 +1157,10 @@ fn build_vm_payload_bundle(params: VmPayloadBundleParams<'_>) -> Result<VmPayloa
         guest_argv.push("--emit-dir".to_string());
         guest_argv.push("/x07/out/emit".to_string());
     }
+    if args.emit_attestation.is_some() {
+        guest_argv.push("--emit-attestation".to_string());
+        guest_argv.push("/x07/out/compile.attest.json".to_string());
+    }
 
     let mounts: Vec<MountSpec> = vec![
         MountSpec {
@@ -1172,10 +1256,31 @@ fn build_vm_payload_bundle(params: VmPayloadBundleParams<'_>) -> Result<VmPayloa
         .get("report")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
+    let compile_attestation = if args.emit_attestation.is_some() {
+        let path = job_out.join("compile.attest.json");
+        if path.is_file() {
+            Some({
+                let bytes = std::fs::read(&path).with_context(|| {
+                    format!("read guest compile attestation: {}", path.display())
+                })?;
+                serde_json::from_slice::<GuestCompileAttestation>(&bytes).with_context(|| {
+                    format!("parse guest compile attestation JSON: {}", path.display())
+                })?
+            })
+        } else {
+            anyhow::bail!(
+                "guest x07 bundle did not emit compile attestation at {}",
+                path.display()
+            );
+        }
+    } else {
+        None
+    };
 
     Ok(VmPayloadBundleOut {
         report: runner_report,
         payload_path,
+        compile_attestation,
     })
 }
 

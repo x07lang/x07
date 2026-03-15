@@ -36,6 +36,14 @@ Each entry in `tests[]` is an object with:
 - `policy_json` (optional/required depending on world):
   - required for `run-os-sandboxed`
   - forbidden for all other worlds
+- `require_runtime_attestation` (optional): require the sandboxed run to emit a runtime attestation reference.
+  - allowed only for `run-os-sandboxed`
+- `required_capsules` (optional): capsule ids that must surface effect-log evidence for this test.
+  - allowed only for `run-os-sandboxed`
+  - entries must be non-empty strings; duplicates are ignored
+- `sandbox_smoke` (optional): marks the test as a sandbox smoke gate for certification flows.
+  - allowed only for `run-os-sandboxed`
+  - implies `require_runtime_attestation: true`
 
 ## Property-based tests (`pbt`)
 
@@ -67,6 +75,20 @@ Exactly one of:
 Inputs are only supported for deterministic `solve-*` worlds.
 
 For integration-style checks that need filesystem/network access, prefer running `x07 run` (or a bundled executable via `x07 bundle`) in the sandbox profile and asserting on the runner report.
+
+For certification-oriented sandbox tests, the common pattern is:
+
+- set `sandbox_smoke: true`
+- set `require_runtime_attestation: true`
+- list the expected `required_capsules`
+
+The `x07test` report then records the resolved `entry_kind`, plus sandbox evidence such as `runtime_attestation`, `effect_log_digests`, and `capsule_ids` when those are available.
+
+If you keep additional local smoke or convenience checks that run in a
+different world, put them in a separate manifest instead of mixing them into
+the certification manifest. `x07 trust certify` validates its selected
+`--tests-manifest` against the trust profile, so helper `run-os` entries should
+not live in the same manifest as evidence-bearing `run-os-sandboxed` tests.
 
 ## Module roots
 
