@@ -701,6 +701,32 @@ struct CapsuleModuleDigest {
     digest: String,
 }
 
+fn path_components_for_compare(path: &Path) -> Vec<String> {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect()
+}
+
+fn attested_path_matches_declared_path(
+    attested_path: &str,
+    declared_path: &str,
+    root: &Path,
+) -> bool {
+    let attested = Path::new(attested_path);
+    let declared = Path::new(declared_path);
+    if attested == declared {
+        return true;
+    }
+    if let Ok(rel) = attested.strip_prefix(root) {
+        if rel == declared {
+            return true;
+        }
+    }
+    let attested_components = path_components_for_compare(attested);
+    let declared_components = path_components_for_compare(declared);
+    attested_components.ends_with(&declared_components)
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct TrustReport {
     schema_version: &'static str,
@@ -1085,7 +1111,7 @@ fn cmd_trust_capsule_check(
                             ));
                         }
                         if let Some(network) = &contract.network {
-                            let mut expected_peer_policy_digests = network
+                            let expected_peer_policy_digests = network
                                 .peer_policy_paths
                                 .iter()
                                 .filter_map(|path| {
@@ -1093,28 +1119,45 @@ fn cmd_trust_capsule_check(
                                     if !abs.is_file() {
                                         return None;
                                     }
-                                    Some(json!({
-                                        "path": abs.display().to_string(),
-                                        "digest": format!("sha256:{}", sha256_hex_for_path(&abs).ok()?)
-                                    }))
+                                    Some((
+                                        path.clone(),
+                                        format!("sha256:{}", sha256_hex_for_path(&abs).ok()?),
+                                    ))
                                 })
                                 .collect::<Vec<_>>();
-                            expected_peer_policy_digests.sort_by(|a, b| {
-                                a.get("path")
-                                    .and_then(Value::as_str)
-                                    .cmp(&b.get("path").and_then(Value::as_str))
-                            });
                             let mut got_peer_policy_digests = doc
                                 .get("peer_policy_digests")
                                 .and_then(Value::as_array)
                                 .cloned()
                                 .unwrap_or_default();
-                            got_peer_policy_digests.sort_by(|a, b| {
-                                a.get("path")
-                                    .and_then(Value::as_str)
-                                    .cmp(&b.get("path").and_then(Value::as_str))
-                            });
-                            if expected_peer_policy_digests != got_peer_policy_digests {
+                            let peer_policy_match = expected_peer_policy_digests.iter().all(
+                                |(expected_path, expected_digest)| {
+                                    let maybe_idx =
+                                        got_peer_policy_digests.iter().position(|value| {
+                                            let got_path = value
+                                                .get("path")
+                                                .and_then(Value::as_str)
+                                                .unwrap_or("");
+                                            let got_digest = value
+                                                .get("digest")
+                                                .and_then(Value::as_str)
+                                                .unwrap_or("");
+                                            got_digest == expected_digest
+                                                && attested_path_matches_declared_path(
+                                                    got_path,
+                                                    expected_path,
+                                                    index_root,
+                                                )
+                                        });
+                                    if let Some(idx) = maybe_idx {
+                                        got_peer_policy_digests.remove(idx);
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
+                            );
+                            if !peer_policy_match || !got_peer_policy_digests.is_empty() {
                                 diagnostics.push(trust_diag_with_path(
                                     "X07CAP_PEER_POLICY_REQUIRED",
                                     "capsule attestation peer-policy digests do not match the contract peer-policy set",
@@ -1161,7 +1204,11 @@ pub(crate) fn emit_capsule_attestation(args: &TrustCapsuleAttestArgs) -> Result<
     for module in &args.module {
         let path = util::resolve_existing_path_upwards(module);
         module_digests.push(CapsuleModuleDigest {
-            path: path.display().to_string(),
+            path: if module.is_absolute() {
+                path.display().to_string()
+            } else {
+                module.display().to_string()
+            },
             digest: format!("sha256:{}", sha256_hex_for_path(&path)?),
         });
     }
@@ -1172,7 +1219,7 @@ pub(crate) fn emit_capsule_attestation(args: &TrustCapsuleAttestArgs) -> Result<
             for peer_policy_path in &network.peer_policy_paths {
                 let path = contract_root.join(peer_policy_path);
                 peer_policy_digests.push(CapsuleModuleDigest {
-                    path: path.display().to_string(),
+                    path: peer_policy_path.clone(),
                     digest: format!("sha256:{}", sha256_hex_for_path(&path)?),
                 });
             }

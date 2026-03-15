@@ -7527,6 +7527,63 @@ fn x07_init_creates_package_skeleton() {
 }
 
 #[test]
+fn x07_trust_capsule_check_accepts_relocated_network_examples() {
+    let root = repo_root();
+    let parent = fresh_tmp_dir(&root, "tmp_x07_trust_capsule_network_examples");
+    if parent.exists() {
+        std::fs::remove_dir_all(&parent).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&parent).expect("create tmp dir");
+
+    for example in [
+        "docs/examples/trusted_network_service_v1",
+        "docs/examples/certified_network_capsule_v1",
+    ] {
+        let src = root.join(example);
+        let dir = parent.join(src.file_name().expect("example dir name"));
+        copy_dir_recursive(&src, &dir);
+        let target_dir = dir.join("target");
+        if target_dir.exists() {
+            std::fs::remove_dir_all(&target_dir).expect("remove copied target dir");
+        }
+
+        let out = run_x07_in_dir(&dir, &["pkg", "lock", "--project", "x07.json"]);
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "example={example}\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+
+        let out = run_x07_in_dir(
+            &dir,
+            &[
+                "trust",
+                "capsule",
+                "check",
+                "--project",
+                "x07.json",
+                "--index",
+                "arch/capsules/index.x07capsule.json",
+            ],
+        );
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "example={example}\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let report = parse_json_stdout(&out);
+        assert_eq!(report["ok"], true, "example={example}");
+        assert_eq!(report["checked_capsules"], 1, "example={example}");
+    }
+
+    std::fs::remove_dir_all(&parent).expect("cleanup tmp dir");
+}
+
+#[test]
 fn x07_init_package_rejects_template() {
     let root = repo_root();
     let parent = fresh_tmp_dir(&root, "tmp_x07_init_package_template_reject");
