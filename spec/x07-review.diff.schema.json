@@ -121,6 +121,7 @@
         "network_policy_changes",
         "capability_changes",
         "proof_changes",
+        "recursive_proof_changes",
         "boundary_changes",
         "subset_changes",
         "async_proof_changes",
@@ -165,6 +166,11 @@
         "proof_changes": {
           "type": "array",
           "items": { "$ref": "#/$defs/proof_change" },
+          "default": []
+        },
+        "recursive_proof_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/recursive_proof_change" },
           "default": []
         },
         "boundary_changes": {
@@ -246,6 +252,19 @@
       "required": ["kind", "severity", "subject", "path", "before", "after"],
       "properties": {
         "kind": { "type": "string", "enum": ["proof_coverage"] },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "before": { "$ref": "#/$defs/json_value" },
+        "after": { "$ref": "#/$defs/json_value" }
+      }
+    },
+    "recursive_proof_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "subject", "path", "before", "after"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["recursive_proof"] },
         "severity": { "$ref": "#/$defs/review_severity" },
         "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
         "path": { "type": ["string", "null"], "maxLength": 4096 },

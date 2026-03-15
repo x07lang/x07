@@ -1161,6 +1161,13 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-pkg-attest-closure.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-pkg-attest-closure.report.schema.json",
+      "schema_version": "x07.tool.pkg.attest-closure.report@0.1.0",
+      "title": "x07.tool.pkg.attest-closure.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-pkg-lock.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-pkg-lock.report.schema.json",
       "schema_version": "x07.tool.pkg.lock.report@0.1.0",
@@ -1315,6 +1322,27 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-trust-capsule-attest.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-trust-capsule-attest.report.schema.json",
+      "schema_version": "x07.tool.trust.capsule.attest.report@0.1.0",
+      "title": "x07.tool.trust.capsule.attest.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-trust-capsule-check.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-trust-capsule-check.report.schema.json",
+      "schema_version": "x07.tool.trust.capsule.check.report@0.1.0",
+      "title": "x07.tool.trust.capsule.check.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-trust-capsule.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-trust-capsule.report.schema.json",
+      "schema_version": "x07.tool.trust.capsule.report@0.1.0",
+      "title": "x07.tool.trust.capsule.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-trust-certify.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-trust-certify.report.schema.json",
       "schema_version": "x07.tool.trust.certify.report@0.1.0",
@@ -1424,6 +1452,13 @@
       "schema_id": "https://x07.io/spec/x07-verify.report.schema.json",
       "schema_version": "x07.verify.report@0.4.0",
       "title": "X07 x07 verify report v0.4.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-verify.summary.schema.json",
+      "schema_id": "https://x07.io/spec/x07-verify.summary.schema.json",
+      "schema_version": "x07.verify.summary@0.1.0",
+      "title": "x07.verify.summary@0.1.0"
     },
     {
       "kind": "schema",

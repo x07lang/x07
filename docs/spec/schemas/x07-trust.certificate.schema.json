@@ -15,6 +15,8 @@
     "capsules",
     "network_capsules",
     "runtime",
+    "recursive_proof_summary",
+    "imported_summary_inventory",
     "package_set_digest",
     "dependency_closure",
     "tcb",
@@ -54,6 +56,29 @@
           "maxLength": 256
         }
       }
+    },
+    "recursive_proof_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recursive_defn",
+        "proven_recursive_defn",
+        "imported_summary_defn",
+        "termination_proven_defn",
+        "unsupported_recursive_defn"
+      ],
+      "properties": {
+        "recursive_defn": { "type": "integer", "minimum": 0 },
+        "proven_recursive_defn": { "type": "integer", "minimum": 0 },
+        "imported_summary_defn": { "type": "integer", "minimum": 0 },
+        "termination_proven_defn": { "type": "integer", "minimum": 0 },
+        "unsupported_recursive_defn": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "imported_summary_inventory": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/imported_summary_ref" },
+      "default": []
     },
     "capsules": {
       "type": "object",
@@ -205,6 +230,7 @@
       "required": [
         "boundaries_report",
         "coverage_report",
+        "verify_summary_report",
         "prove_reports",
         "tests_report",
         "trust_report",
@@ -213,6 +239,12 @@
       "properties": {
         "boundaries_report": { "$ref": "#/$defs/evidence_ref" },
         "coverage_report": { "$ref": "#/$defs/evidence_ref" },
+        "verify_summary_report": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
         "schema_derive_reports": {
           "type": "array",
           "items": { "$ref": "#/$defs/evidence_ref" },
@@ -296,6 +328,20 @@
       "properties": {
         "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
         "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "imported_summary_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256_hex"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "symbols": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "default": []
+        }
       }
     }
   }

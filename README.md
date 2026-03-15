@@ -80,6 +80,8 @@ X07 exposes formal verification as a public toolchain surface, not an internal e
 - `x07 trust certify` binds proofs, tests, boundaries, capsules, dependency closure, peer policies, and runtime evidence into a certificate bundle that reviewers can consume directly.
 
 The current certifiable proof subset includes pure self-recursive `defn` targets when they declare `decreases[]`; proof and coverage artifacts expose that recursion posture explicitly instead of hiding it behind a pass/fail bit.
+Imported proof summaries are public artifacts (`x07.verify.summary@0.1.0`): reviewers and downstream prove runs can reuse them through `x07 verify --summary <path>` instead of treating reviewed subgraphs as hidden local state.
+Direct prove inputs currently accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` and `result_*`, and schema-derived `bytes_view@brand` documents when the reachable module graph exposes `meta.brands_v1.validate`. That lets proved cores take branded record/tagged-union views directly while keeping validation explicit in the generated driver, and it now admits direct `vec_u8` boundary values without falling back to an unsupported richer-data diagnostic. Owned branded `bytes` and nested result carriers remain outside the current direct prove-input subset.
 The networked sandbox certification line is `trusted_program_sandboxed_net_v1`: it requires attested network capsules, pinned peer-policy files, a non-empty runtime allowlist, dependency-closure attestation, and VM-boundary network enforcement in the runtime attestation.
 
 ```mermaid

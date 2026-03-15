@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://x07.io/spec/x07-verify.coverage.schema.json",
-  "title": "x07.verify.coverage@0.3.0",
-  "description": "Reachable proof-coverage report emitted by `x07 verify --coverage`.",
+  "$id": "https://x07.io/spec/x07-verify.summary.schema.json",
+  "title": "x07.verify.summary@0.1.0",
+  "description": "Standalone proof-summary artifact emitted by `x07 verify` for reusable coverage posture review.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "entry", "worlds", "summary", "functions"],
   "properties": {
-    "schema_version": { "const": "x07.verify.coverage@0.3.0" },
+    "schema_version": { "const": "x07.verify.summary@0.1.0" },
     "entry": {
       "type": "string",
       "minLength": 1,
@@ -109,6 +109,11 @@
         }
       },
       "default": []
+    },
+    "imported_summaries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/imported_summary_ref" },
+      "default": []
     }
   },
   "$defs": {
@@ -158,6 +163,23 @@
         "has_decreases": { "type": "boolean" },
         "decreases_count": { "type": "integer", "minimum": 0 },
         "prove_supported": { "type": "boolean" }
+      }
+    },
+    "imported_summary_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256_hex"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "symbols": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "default": []
+        }
       }
     }
   }

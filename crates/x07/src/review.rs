@@ -53,7 +53,9 @@ pub enum ReviewFailOn {
     AllowUnsafe,
     AllowFfi,
     ProofCoverageDecrease,
+    RecursionProofCoverageDecrease,
     AsyncProofCoverageDecrease,
+    SummaryDowngrade,
     BoundaryRelaxation,
     CapsuleContractRelaxation,
     CapsuleSetChange,
@@ -167,6 +169,7 @@ struct Highlights {
     network_policy_changes: Vec<Value>,
     capability_changes: Vec<Value>,
     proof_changes: Vec<Value>,
+    recursive_proof_changes: Vec<Value>,
     boundary_changes: Vec<Value>,
     subset_changes: Vec<Value>,
     async_proof_changes: Vec<Value>,
@@ -188,6 +191,7 @@ impl Highlights {
             network_policy_changes: Vec::new(),
             capability_changes: Vec::new(),
             proof_changes: Vec::new(),
+            recursive_proof_changes: Vec::new(),
             boundary_changes: Vec::new(),
             subset_changes: Vec::new(),
             async_proof_changes: Vec::new(),
@@ -625,8 +629,23 @@ fn fail_on_triggered(report: &ReviewDiffReport, fail_on: &[ReviewFailOn]) -> boo
                     return true;
                 }
             }
+            ReviewFailOn::RecursionProofCoverageDecrease => {
+                if !report.highlights.recursive_proof_changes.is_empty() {
+                    return true;
+                }
+            }
             ReviewFailOn::AsyncProofCoverageDecrease => {
                 if !report.highlights.async_proof_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::SummaryDowngrade => {
+                if report
+                    .highlights
+                    .summary_changes
+                    .iter()
+                    .any(summary_change_is_downgrade)
+                {
                     return true;
                 }
             }
@@ -740,6 +759,17 @@ fn posture_gate_diags(
     let mut diags = Vec::new();
     for flag in fail_on {
         match flag {
+            ReviewFailOn::RecursionProofCoverageDecrease => {
+                if !report.highlights.recursive_proof_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_RECURSION_PROOF_COVERAGE_DECREASE",
+                        format!(
+                            "recursive proof coverage regressed across {} reviewed file(s)",
+                            report.highlights.recursive_proof_changes.len()
+                        ),
+                    ));
+                }
+            }
             ReviewFailOn::AsyncProofCoverageDecrease => {
                 if !report.highlights.async_proof_changes.is_empty() {
                     diags.push(review_diag(
@@ -748,6 +778,20 @@ fn posture_gate_diags(
                             "async proof coverage regressed across {} reviewed file(s)",
                             report.highlights.async_proof_changes.len()
                         ),
+                    ));
+                }
+            }
+            ReviewFailOn::SummaryDowngrade => {
+                let count = report
+                    .highlights
+                    .summary_changes
+                    .iter()
+                    .filter(|change| summary_change_is_downgrade(change))
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_SUMMARY_DOWNGRADE",
+                        format!("proof summary posture downgraded in {count} reviewed file(s)"),
                     ));
                 }
             }
@@ -1915,10 +1959,6 @@ fn diff_proof(
 ) {
     let before_summary = proof_summary(before);
     let after_summary = proof_summary(after);
-    if before_summary == after_summary {
-        return;
-    }
-
     let decreased = after_summary
         .get("proven_defn")
         .and_then(Value::as_u64)
@@ -1944,7 +1984,7 @@ fn diff_proof(
                 .and_then(Value::as_u64)
                 .unwrap_or(0);
 
-    if decreased {
+    if before_summary != after_summary && decreased {
         ctx.push(
             &mut highlights.proof_changes,
             json!({
@@ -1954,6 +1994,38 @@ fn diff_proof(
                 "path": path,
                 "before": before_summary,
                 "after": after_summary,
+            }),
+        );
+    }
+
+    let before_recursive = recursive_proof_summary(&before_summary);
+    let after_recursive = recursive_proof_summary(&after_summary);
+    let recursive_regressed = after_recursive
+        .get("proven_recursive_defn")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        < before_recursive
+            .get("proven_recursive_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+        || after_recursive
+            .get("unsupported_recursive_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_recursive
+                .get("unsupported_recursive_defn")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+    if before_recursive != after_recursive && recursive_regressed {
+        ctx.push(
+            &mut highlights.recursive_proof_changes,
+            json!({
+                "kind": "recursive_proof",
+                "severity": "high",
+                "subject": "recursive proof coverage summary",
+                "path": path,
+                "before": before_recursive,
+                "after": after_recursive,
             }),
         );
     }
@@ -1998,11 +2070,44 @@ fn diff_proof(
         );
     }
 
+    let before_function_summaries = proof_function_summaries(before);
+    let after_function_summaries = proof_function_summaries(after);
+    let summary_symbols = before_function_summaries
+        .keys()
+        .chain(after_function_summaries.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for symbol in summary_symbols {
+        let before_function = before_function_summaries
+            .get(&symbol)
+            .cloned()
+            .unwrap_or(Value::Null);
+        let after_function = after_function_summaries
+            .get(&symbol)
+            .cloned()
+            .unwrap_or(Value::Null);
+        if before_function == after_function {
+            continue;
+        }
+        let downgraded = proof_function_summary_regressed(&before_function, &after_function);
+        ctx.push(
+            &mut highlights.summary_changes,
+            json!({
+                "kind": "proof_summary",
+                "severity": if downgraded { "high" } else { "info" },
+                "subject": format!("proof summary for {symbol}"),
+                "path": path,
+                "before": before_function,
+                "after": after_function,
+            }),
+        );
+    }
+
     push_simple_file_change(
         file_diff,
         ctx,
         "proof_changed",
-        if decreased || async_regressed {
+        if decreased || recursive_regressed || async_regressed {
             "high"
         } else {
             "info"
@@ -2024,6 +2129,14 @@ fn proof_summary(v: Option<&Value>) -> Value {
         "unsupported_recursive_defn": summary.get("unsupported_recursive_defn").cloned().unwrap_or(Value::from(0)),
         "uncovered_defn": summary.get("uncovered_defn").cloned().unwrap_or(Value::from(0)),
         "unsupported_defn": summary.get("unsupported_defn").cloned().unwrap_or(Value::from(0)),
+    })
+}
+
+fn recursive_proof_summary(summary: &Value) -> Value {
+    json!({
+        "recursive_defn": summary.get("recursive_defn").cloned().unwrap_or(Value::from(0)),
+        "proven_recursive_defn": summary.get("proven_recursive_defn").cloned().unwrap_or(Value::from(0)),
+        "unsupported_recursive_defn": summary.get("unsupported_recursive_defn").cloned().unwrap_or(Value::from(0)),
     })
 }
 
@@ -2057,6 +2170,108 @@ fn proof_async_summary(v: Option<&Value>) -> Value {
         "uncovered_async": uncovered_async,
         "unsupported_async": unsupported_async,
     })
+}
+
+fn proof_function_summaries(v: Option<&Value>) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(functions) = v
+        .and_then(|doc| doc.get("functions"))
+        .and_then(Value::as_array)
+    else {
+        return out;
+    };
+
+    for function in functions {
+        let Some(symbol) = function.get("symbol").and_then(Value::as_str) else {
+            continue;
+        };
+        out.insert(
+            symbol.to_string(),
+            json!({
+                "kind": function.get("kind").cloned().unwrap_or(Value::Null),
+                "status": function.get("status").cloned().unwrap_or(Value::Null),
+                "proof_summary": function.get("proof_summary").cloned().unwrap_or(Value::Null),
+            }),
+        );
+    }
+    out
+}
+
+fn summary_change_is_downgrade(change: &Value) -> bool {
+    proof_function_summary_regressed(
+        change.get("before").unwrap_or(&Value::Null),
+        change.get("after").unwrap_or(&Value::Null),
+    )
+}
+
+fn proof_function_summary_regressed(before: &Value, after: &Value) -> bool {
+    if before.is_null() {
+        return false;
+    }
+    if after.is_null() {
+        return true;
+    }
+
+    let before_status = before.get("status").and_then(Value::as_str).unwrap_or("");
+    let after_status = after.get("status").and_then(Value::as_str).unwrap_or("");
+    if proof_status_rank(after_status) < proof_status_rank(before_status) {
+        return true;
+    }
+
+    let before_prove_supported = before
+        .pointer("/proof_summary/prove_supported")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let after_prove_supported = after
+        .pointer("/proof_summary/prove_supported")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if before_prove_supported && !after_prove_supported {
+        return true;
+    }
+
+    let before_decreases = before
+        .pointer("/proof_summary/has_decreases")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let after_decreases = after
+        .pointer("/proof_summary/has_decreases")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if before_decreases && !after_decreases {
+        return true;
+    }
+
+    let before_recursive = before
+        .pointer("/proof_summary/recursion_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("none");
+    let after_recursive = after
+        .pointer("/proof_summary/recursion_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("none");
+    recursion_kind_rank(after_recursive) < recursion_kind_rank(before_recursive)
+}
+
+fn proof_status_rank(status: &str) -> u8 {
+    match status {
+        "proven_recursive" => 5,
+        "proven" | "proven_async" => 4,
+        "termination_proven" | "imported_summary" => 3,
+        "trusted_primitive" | "trusted_scheduler_model" | "capsule_boundary" => 2,
+        "uncovered" => 1,
+        "unsupported" => 0,
+        _ => 0,
+    }
+}
+
+fn recursion_kind_rank(kind: &str) -> u8 {
+    match kind {
+        "self_recursive" => 2,
+        "none" => 1,
+        "mutual" => 0,
+        _ => 0,
+    }
 }
 
 fn diff_boundary_index(
@@ -3504,6 +3719,11 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
     render_change_list(&mut s, "Proof Changes", &report.highlights.proof_changes);
     render_change_list(
         &mut s,
+        "Recursive Proof Changes",
+        &report.highlights.recursive_proof_changes,
+    );
+    render_change_list(
+        &mut s,
         "Async Proof Changes",
         &report.highlights.async_proof_changes,
     );
@@ -3615,7 +3835,11 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
                 ReviewFailOn::AllowUnsafe => "allow-unsafe",
                 ReviewFailOn::AllowFfi => "allow-ffi",
                 ReviewFailOn::ProofCoverageDecrease => "proof-coverage-decrease",
+                ReviewFailOn::RecursionProofCoverageDecrease => {
+                    "recursion-proof-coverage-decrease"
+                }
                 ReviewFailOn::AsyncProofCoverageDecrease => "async-proof-coverage-decrease",
+                ReviewFailOn::SummaryDowngrade => "summary-downgrade",
                 ReviewFailOn::BoundaryRelaxation => "boundary-relaxation",
                 ReviewFailOn::CapsuleContractRelaxation => "capsule-contract-relaxation",
                 ReviewFailOn::CapsuleSetChange => "capsule-set-change",
@@ -3675,6 +3899,7 @@ fn review_risk(report: &ReviewDiffReport) -> (&'static str, &'static str, &'stat
         .chain(report.highlights.network_policy_changes.iter())
         .chain(report.highlights.capability_changes.iter())
         .chain(report.highlights.proof_changes.iter())
+        .chain(report.highlights.recursive_proof_changes.iter())
         .chain(report.highlights.async_proof_changes.iter())
         .chain(report.highlights.boundary_changes.iter())
         .chain(report.highlights.capsule_changes.iter())

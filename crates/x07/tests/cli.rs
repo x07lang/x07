@@ -15,6 +15,7 @@ use x07_contracts::{
     X07_PKG_ADVISORY_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
     X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
     X07_VERIFY_COVERAGE_SCHEMA_VERSION, X07_VERIFY_REPORT_SCHEMA_VERSION,
+    X07_VERIFY_SUMMARY_SCHEMA_VERSION,
 };
 use x07_runner_common::sandbox_backend::{ENV_ACCEPT_WEAKER_ISOLATION, ENV_SANDBOX_BACKEND};
 use x07c::json_patch;
@@ -2468,7 +2469,7 @@ fn x07_verify_prove_self_recursive_with_decreases_returns_proven() {
                     "kind": "defn",
                     "name": "verify_fixture.f",
                     "params": [{"name":"n","ty":"i32"}],
-                    "result": "i32",
+                    "result": "u32",
                     "requires": [
                         {"id":"r0","expr":[">=","n",0]},
                         {"id":"r1","expr":["<=","n",3]}
@@ -2553,7 +2554,7 @@ fn x07_verify_prove_self_recursive_with_decreases_returns_proven() {
         .as_array()
         .expect("functions[]");
     assert_eq!(functions.len(), 1);
-    assert_eq!(functions[0]["status"], "proven");
+    assert_eq!(functions[0]["status"], "proven_recursive");
     assert_eq!(
         functions[0]["proof_summary"]["recursion_kind"],
         "self_recursive"
@@ -2698,6 +2699,723 @@ fn x07_verify_prove_mutual_recursion_is_unsupported() {
         "expected mutual recursion details, got:\n{}",
         serde_json::to_string_pretty(&v).unwrap()
     );
+}
+
+#[test]
+fn x07_verify_prove_self_recursive_without_obvious_decrease_is_unsupported() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_recursive_non_decreasing");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [{"name":"n","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":[">=","n",0]}],
+                    "ensures": [{"id":"e0","expr":[">=","__result",0]}],
+                    "decreases": [{"id":"d0","expr":"n"}],
+                    "body": ["if",["=","n",0],0,["verify_fixture.f","n"]]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"]["kind"], "unsupported");
+    assert_eq!(
+        v["result"]["details"],
+        "recursive self-call does not obviously decrease \"n\""
+    );
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert_eq!(diags[0]["code"], "X07V_RECURSION_TERMINATION_FAILED");
+}
+
+#[test]
+fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
+    let dir = fresh_os_tmp_dir("x07_verify_imported_summary");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.main","verify_fixture.helper"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.helper",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": "x"
+                },
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.main",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r1","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e1","expr":["=","__result","x"]}],
+                    "body": ["verify_fixture.helper","x"]
+                }
+            ]
+        }),
+    );
+
+    let helper_out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--coverage",
+            "--entry",
+            "verify_fixture.helper",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        helper_out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&helper_out.stderr)
+    );
+    let helper_report: Value =
+        serde_json::from_slice(&helper_out.stdout).expect("parse helper coverage JSON");
+    let helper_summary_path = helper_report["artifacts"]["verify_summary_path"]
+        .as_str()
+        .expect("helper verify summary path");
+    assert!(
+        Path::new(helper_summary_path).is_file(),
+        "missing {}",
+        helper_summary_path
+    );
+    let helper_summary: Value = serde_json::from_slice(
+        &std::fs::read(helper_summary_path).expect("read helper verify summary"),
+    )
+    .expect("parse helper verify summary");
+    assert_eq!(helper_summary["schema_version"], X07_VERIFY_SUMMARY_SCHEMA_VERSION);
+
+    let main_out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--coverage",
+            "--entry",
+            "verify_fixture.main",
+            "--project",
+            "x07.json",
+            "--summary",
+            helper_summary_path,
+        ],
+    );
+    assert_eq!(
+        main_out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&main_out.stderr)
+    );
+    let main_report: Value =
+        serde_json::from_slice(&main_out.stdout).expect("parse main coverage JSON");
+    assert_eq!(main_report["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(main_report["coverage"]["summary"]["imported_summary_defn"], 1);
+    let functions = main_report["coverage"]["functions"]
+        .as_array()
+        .expect("functions[]");
+    assert!(
+        functions.iter().any(|function| {
+            function["symbol"] == "verify_fixture.helper"
+                && function["status"] == "imported_summary"
+        }),
+        "expected imported summary status, got:\n{}",
+        serde_json::to_string_pretty(&main_report).unwrap()
+    );
+    let main_summary_path = main_report["artifacts"]["verify_summary_path"]
+        .as_str()
+        .expect("main verify summary path");
+    let main_summary: Value = serde_json::from_slice(
+        &std::fs::read(main_summary_path).expect("read main verify summary"),
+    )
+    .expect("parse main verify summary");
+    assert_eq!(main_summary["schema_version"], X07_VERIFY_SUMMARY_SCHEMA_VERSION);
+    assert!(
+        main_summary["imported_summaries"]
+            .as_array()
+            .expect("imported_summaries[]")
+            .iter()
+            .any(|summary| {
+                summary["path"] == helper_summary_path
+                    && summary["symbols"]
+                        .as_array()
+                        .expect("summary symbols[]")
+                        .iter()
+                        .any(|symbol| symbol == "verify_fixture.helper")
+            }),
+        "expected imported summary inventory, got:\n{}",
+        serde_json::to_string_pretty(&main_summary).unwrap()
+    );
+}
+
+#[test]
+fn x07_verify_prove_rejects_mismatched_imported_summary() {
+    let dir = fresh_os_tmp_dir("x07_verify_imported_summary_mismatch");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_verify_project_files(&dir);
+    let initial_module = serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": "verify_fixture",
+        "imports": [],
+        "decls": [
+            {"kind":"export", "names":["verify_fixture.main","verify_fixture.helper"]},
+            {
+                "kind": "defn",
+                "name": "verify_fixture.helper",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "requires": [{"id":"r0","expr":["=","x","x"]}],
+                "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                "body": "x"
+            },
+            {
+                "kind": "defn",
+                "name": "verify_fixture.main",
+                "params": [{"name":"x","ty":"i32"}],
+                "result": "i32",
+                "requires": [{"id":"r1","expr":["=","x","x"]}],
+                "ensures": [{"id":"e1","expr":["=","__result","x"]}],
+                "body": ["verify_fixture.helper","x"]
+            }
+        ]
+    });
+    write_json(&dir.join("verify_fixture.x07.json"), &initial_module);
+
+    let helper_out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--coverage",
+            "--entry",
+            "verify_fixture.helper",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        helper_out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&helper_out.stderr)
+    );
+    let helper_report: Value =
+        serde_json::from_slice(&helper_out.stdout).expect("parse helper coverage JSON");
+    let helper_summary_path = helper_report["artifacts"]["verify_summary_path"]
+        .as_str()
+        .expect("helper verify summary path")
+        .to_string();
+
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.main","verify_fixture.helper"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.helper",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result",["+","x",1]]}],
+                    "body": ["+","x",1]
+                },
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.main",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r1","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e1","expr":["=","__result",["+","x",1]]}],
+                    "body": ["verify_fixture.helper","x"]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.main",
+            "--project",
+            "x07.json",
+            "--summary",
+            &helper_summary_path,
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"]["kind"], "error");
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert_eq!(diags[0]["code"], "X07V_SUMMARY_MISMATCH");
+}
+
+#[test]
+fn x07_verify_prove_supports_views_and_result_views() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_rich_signature");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [
+                        {"name":"doc","ty":"bytes_view"},
+                        {"name":"maybe_doc","ty":"option_bytes_view"},
+                        {"name":"maybe_result","ty":"result_bytes_view"}
+                    ],
+                    "result": "u32",
+                    "requires": [{"id":"r0","expr":["=",0,0]}],
+                    "ensures": [{"id":"e0","expr":[">=","__result",0]}],
+                    "body": 0
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--max-bytes-len",
+            "4",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["result"]["kind"], "proven");
+}
+
+#[test]
+fn x07_verify_prove_rejects_nested_result_param_with_explicit_diag() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_nested_result_param");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [
+                        {"name":"nested","ty":"result_result_bytes"}
+                    ],
+                    "result": "u32",
+                    "requires": [{"id":"r0","expr":["=",0,0]}],
+                    "ensures": [{"id":"e0","expr":[">=","__result",0]}],
+                    "body": 0
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"]["kind"], "unsupported");
+    assert!(
+        v["result"]["details"]
+            .as_str()
+            .expect("details string")
+            .contains("param type \"result_result_bytes\"")
+    );
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert_eq!(diags[0]["code"], "X07V_UNSUPPORTED_RICH_TYPE");
+}
+
+#[test]
+fn x07_verify_prove_supports_vec_param_and_result_via_std_vec() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_vec_param");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": ["std.vec"],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [
+                        {"name":"raw","ty":"vec_u8"}
+                    ],
+                    "result": "vec_u8",
+                    "requires": [{"id":"r0","expr":["=",0,0]}],
+                    "ensures": [{"id":"e0","expr":["=",0,0]}],
+                    "body": "raw"
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--max-bytes-len",
+            "4",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["result"]["kind"], "proven");
+    assert_eq!(v["diagnostics_count"], 0);
+}
+
+#[test]
+fn x07_verify_prove_supports_schema_record_brand_view_param() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_schema_record_brand");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::create_dir_all(dir.join("schema")).expect("create schema dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("schema").join("event_line_v1.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "schema.event_line_v1",
+            "imports": [],
+            "meta": {
+                "brands_v1": {
+                    "schema.event_line_v1": {
+                        "validate": "schema.event_line_v1.validate_doc_v1"
+                    }
+                }
+            },
+            "decls": [
+                {"kind":"export", "names":["schema.event_line_v1.validate_doc_v1", "schema.event_line_v1.first_byte_v1"]},
+                {
+                    "kind": "defn",
+                    "name": "schema.event_line_v1.validate_doc_v1",
+                    "params": [
+                        {"name":"doc","ty":"bytes_view"}
+                    ],
+                    "result": "result_i32",
+                    "body": ["if",[">",["view.len","doc"],0],["result_i32.ok",0],["result_i32.err",1]]
+                },
+                {
+                    "kind": "defn",
+                    "name": "schema.event_line_v1.first_byte_v1",
+                    "params": [
+                        {"name":"doc","ty":"bytes_view","brand":"schema.event_line_v1"}
+                    ],
+                    "result": "i32",
+                    "body": ["view.get_u8","doc",0]
+                }
+            ]
+        }),
+    );
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": ["schema.event_line_v1"],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [
+                        {"name":"doc","ty":"bytes_view","brand":"schema.event_line_v1"}
+                    ],
+                    "result": "u32",
+                    "requires": [{"id":"r0","expr":[">",["view.len","doc"],0]}],
+                    "ensures": [{"id":"e0","expr":[">=","__result",0]}],
+                    "body": ["schema.event_line_v1.first_byte_v1","doc"]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+            "--max-bytes-len",
+            "4",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["result"]["kind"], "proven");
+    assert_eq!(v["diagnostics_count"], 0);
+}
+
+#[test]
+fn x07_verify_prove_supports_schema_variant_brand_view_param() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_schema_variant_brand");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::create_dir_all(dir.join("schema")).expect("create schema dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("schema").join("choice_v1.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "schema.choice_v1",
+            "imports": [],
+            "meta": {
+                "brands_v1": {
+                    "schema.choice_v1": {
+                        "validate": "schema.choice_v1.validate_doc_v1"
+                    }
+                }
+            },
+            "decls": [
+                {"kind":"export", "names":["schema.choice_v1.validate_doc_v1", "schema.choice_v1.variant_tag_v1", "schema.choice_v1.payload_byte_v1"]},
+                {
+                    "kind": "defn",
+                    "name": "schema.choice_v1.validate_doc_v1",
+                    "params": [{"name":"doc","ty":"bytes_view"}],
+                    "result": "result_i32",
+                    "body": [
+                        "if",
+                        [">",["view.len","doc"],1],
+                        [
+                            "if",
+                            ["<",["view.get_u8","doc",0],2],
+                            ["result_i32.ok",0],
+                            ["result_i32.err",2]
+                        ],
+                        ["result_i32.err",1]
+                    ]
+                },
+                {
+                    "kind": "defn",
+                    "name": "schema.choice_v1.variant_tag_v1",
+                    "params": [{"name":"doc","ty":"bytes_view","brand":"schema.choice_v1"}],
+                    "result": "i32",
+                    "body": ["view.get_u8","doc",0]
+                },
+                {
+                    "kind": "defn",
+                    "name": "schema.choice_v1.payload_byte_v1",
+                    "params": [{"name":"doc","ty":"bytes_view","brand":"schema.choice_v1"}],
+                    "result": "i32",
+                    "body": ["view.get_u8","doc",1]
+                }
+            ]
+        }),
+    );
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": ["schema.choice_v1"],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [{"name":"doc","ty":"bytes_view","brand":"schema.choice_v1"}],
+                    "result": "u32",
+                    "requires": [{"id":"r0","expr":[">",["view.len","doc"],1]}],
+                    "ensures": [{"id":"e0","expr":[">=","__result",0]}],
+                    "body": [
+                        "if",
+                        ["=",["schema.choice_v1.variant_tag_v1","doc"],0],
+                        ["schema.choice_v1.payload_byte_v1","doc"],
+                        0
+                    ]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+            "--max-bytes-len",
+            "4",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["result"]["kind"], "proven");
+    assert_eq!(v["diagnostics_count"], 0);
 }
 
 #[test]
@@ -3914,6 +4632,102 @@ fn x07_trust_profile_check_rejects_weakened_sandbox_profile_contract() {
     assert!(diags
         .iter()
         .any(|diag| diag["code"] == "X07TP_NETWORK_MODE_FORBIDDEN"));
+}
+
+#[test]
+fn x07_trust_profile_check_rejects_weakened_network_sandbox_profile_contract() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(
+        &root,
+        "tmp_x07_trust_profile_check_network_sandbox_contract",
+    );
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    scaffold_sandbox_trust_profile_fixture(&dir, "run-os-sandboxed", true);
+    write_json(
+        &dir.join("bad_profile.json"),
+        &serde_json::json!({
+            "schema_version": "x07.trust.profile@0.3.0",
+            "id": "trusted_program_sandboxed_net_v1",
+            "claims": ["human_can_review_certificate_not_source"],
+            "entrypoints": ["main.id_v1"],
+            "worlds_allowed": ["run-os", "run-os-sandboxed"],
+            "language_subset": {
+                "allow_defasync": true,
+                "allow_recursion": false,
+                "allow_extern": false,
+                "allow_unsafe": false,
+                "allow_ffi": false,
+                "allow_dynamic_dispatch": false
+            },
+            "arch_requirements": {
+                "manifest_min_version": "x07.arch.manifest@0.3.0",
+                "require_allowlist_mode": true,
+                "require_deny_cycles": true,
+                "require_deny_orphans": true,
+                "require_visibility": true,
+                "require_world_caps": true,
+                "require_brand_boundaries": true
+            },
+            "evidence_requirements": {
+                "require_boundary_index": true,
+                "require_schema_derive_check": true,
+                "require_smoke_harnesses": true,
+                "require_unit_tests": true,
+                "require_pbt": "public_boundaries_only",
+                "require_proof_mode": "prove",
+                "require_proof_coverage": "all_reachable_defn",
+                "require_async_proof_coverage": true,
+                "require_capsule_attestations": true,
+                "require_runtime_attestation": true,
+                "require_effect_log_digests": true,
+                "require_peer_policies": false,
+                "require_network_capsules": false,
+                "require_dependency_closure_attestation": false,
+                "require_compile_attestation": true,
+                "require_trust_report_clean": true,
+                "require_sbom": true
+            },
+            "sandbox_requirements": {
+                "sandbox_backend": "os",
+                "forbid_weaker_isolation": false,
+                "network_mode": "allowlist",
+                "network_enforcement": "unsupported"
+            }
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "profile",
+            "check",
+            "--profile",
+            "bad_profile.json",
+            "--project",
+            "x07.json",
+            "--entry",
+            "main.id_v1",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse trust profile report");
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_BACKEND_NOT_CERTIFIABLE"));
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_NETWORK_PROFILE_REQUIRED"));
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_PEER_POLICY_REQUIRED"));
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_DEP_CLOSURE_REQUIRED"));
 }
 
 #[test]
@@ -10005,6 +10819,145 @@ fn x07_review_diff_fail_on_formal_verification_posture_returns_20() {
             .is_empty(),
         "expected trusted subset changes"
     );
+}
+
+#[test]
+fn x07_review_diff_fail_on_recursive_proof_and_summary_posture_returns_20() {
+    let root = repo_root();
+    let fixtures = fixtures_root().join("review");
+    let before = fixtures.join("before");
+    let after = fixtures.join("after");
+
+    let work = fresh_tmp_dir(&root, "tmp_x07_review_diff_recursive_summary");
+    let before_copy = work.join("before");
+    let after_copy = work.join("after");
+    copy_dir_recursive(&before, &before_copy);
+    copy_dir_recursive(&after, &after_copy);
+
+    write_json(
+        &before_copy.join("arch/verify.coverage.json"),
+        &serde_json::json!({
+            "schema_version": "x07.verify.coverage@0.3.0",
+            "entry": "app.main",
+            "worlds": ["solve-pure"],
+            "summary": {
+                "reachable_defn": 1,
+                "proven_defn": 1,
+                "recursive_defn": 1,
+                "proven_recursive_defn": 1,
+                "unsupported_recursive_defn": 0,
+                "reachable_async": 0,
+                "proven_async": 0,
+                "trusted_primitives": 0,
+                "trusted_scheduler_models": 0,
+                "capsule_boundaries": 0,
+                "uncovered_defn": 0,
+                "unsupported_defn": 0
+            },
+            "functions": [
+                {
+                    "symbol": "app.main",
+                    "kind": "defn",
+                    "status": "proven_recursive",
+                    "proof_summary": {
+                        "recursion_kind": "self_recursive",
+                        "has_decreases": true,
+                        "decreases_count": 1,
+                        "prove_supported": true
+                    }
+                }
+            ]
+        }),
+    );
+    write_json(
+        &after_copy.join("arch/verify.coverage.json"),
+        &serde_json::json!({
+            "schema_version": "x07.verify.coverage@0.3.0",
+            "entry": "app.main",
+            "worlds": ["solve-pure"],
+            "summary": {
+                "reachable_defn": 1,
+                "proven_defn": 0,
+                "recursive_defn": 1,
+                "proven_recursive_defn": 0,
+                "unsupported_recursive_defn": 1,
+                "reachable_async": 0,
+                "proven_async": 0,
+                "trusted_primitives": 0,
+                "trusted_scheduler_models": 0,
+                "capsule_boundaries": 0,
+                "uncovered_defn": 0,
+                "unsupported_defn": 1
+            },
+            "functions": [
+                {
+                    "symbol": "app.main",
+                    "kind": "defn",
+                    "status": "unsupported",
+                    "proof_summary": {
+                        "recursion_kind": "self_recursive",
+                        "has_decreases": false,
+                        "decreases_count": 0,
+                        "prove_supported": false
+                    }
+                }
+            ]
+        }),
+    );
+
+    let json_out = work.join("review_recursive_summary.json");
+    let html_out = work.join("review_recursive_summary.html");
+    let out = run_x07(&[
+        "review",
+        "diff",
+        "--from",
+        before_copy.to_str().unwrap(),
+        "--to",
+        after_copy.to_str().unwrap(),
+        "--mode",
+        "project",
+        "--json-out",
+        json_out.to_str().unwrap(),
+        "--html-out",
+        html_out.to_str().unwrap(),
+        "--fail-on",
+        "recursion-proof-coverage-decrease",
+        "--fail-on",
+        "summary-downgrade",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report: Value =
+        serde_json::from_slice(&std::fs::read(&json_out).expect("read review json"))
+            .expect("parse review json");
+    assert!(
+        !report["highlights"]["recursive_proof_changes"]
+            .as_array()
+            .expect("recursive_proof_changes[]")
+            .is_empty(),
+        "expected recursive proof coverage changes"
+    );
+    assert!(
+        report["highlights"]["summary_changes"]
+            .as_array()
+            .expect("summary_changes[]")
+            .iter()
+            .any(|change| change["kind"] == "proof_summary"),
+        "expected proof summary downgrade changes"
+    );
+    let diag_codes = report["diags"]
+        .as_array()
+        .expect("diags[]")
+        .iter()
+        .filter_map(|diag| diag.get("code").and_then(Value::as_str))
+        .collect::<std::collections::BTreeSet<_>>();
+    assert!(diag_codes.contains("X07RD_RECURSION_PROOF_COVERAGE_DECREASE"));
+    assert!(diag_codes.contains("X07RD_SUMMARY_DOWNGRADE"));
 }
 
 #[test]

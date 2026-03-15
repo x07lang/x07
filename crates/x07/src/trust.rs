@@ -349,6 +349,9 @@ struct TrustCertificate {
     out_dir: String,
     claims: Vec<String>,
     async_proof: TrustCertificateAsyncProof,
+    recursive_proof_summary: TrustCertificateRecursiveProofSummary,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    imported_summary_inventory: Vec<TrustCertificateImportedSummary>,
     capsules: TrustCertificateCapsules,
     network_capsules: TrustCertificateNetworkCapsules,
     runtime: Option<TrustCertificateRuntime>,
@@ -367,6 +370,23 @@ struct TrustCertificateAsyncProof {
     reachable: u64,
     covered: u64,
     model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificateRecursiveProofSummary {
+    recursive_defn: u64,
+    proven_recursive_defn: u64,
+    imported_summary_defn: u64,
+    termination_proven_defn: u64,
+    unsupported_recursive_defn: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificateImportedSummary {
+    path: String,
+    sha256_hex: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    symbols: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -422,6 +442,8 @@ struct TrustCertificateTcb {
 struct TrustCertificateEvidence {
     boundaries_report: EvidenceRef,
     coverage_report: EvidenceRef,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    verify_summary_report: Option<EvidenceRef>,
     #[serde(default)]
     schema_derive_reports: Vec<EvidenceRef>,
     #[serde(default)]
@@ -2627,6 +2649,8 @@ fn cmd_trust_certify(
     let (
         boundaries_ref,
         coverage_ref,
+        verify_summary_ref,
+        imported_summary_inventory,
         schema_derive_refs,
         prove_refs,
         tests_ref,
@@ -2677,7 +2701,13 @@ fn cmd_trust_certify(
             }
         };
 
-        let (coverage_ref, coverage_doc, prove_targets) =
+        let (
+            coverage_ref,
+            coverage_doc,
+            prove_targets,
+            verify_summary_ref,
+            imported_summary_inventory,
+        ) =
             build_coverage_evidence(project_path, &args.entry, &out_dir, &mut diagnostics)?;
         add_coverage_diagnostics(&coverage_doc, &mut diagnostics);
         let schema_derive_refs = if profile
@@ -2748,6 +2778,8 @@ fn cmd_trust_certify(
         (
             boundaries_ref,
             coverage_ref,
+            verify_summary_ref,
+            imported_summary_inventory,
             schema_derive_refs,
             prove_refs,
             tests_ref,
@@ -2771,6 +2803,8 @@ fn cmd_trust_certify(
                 "coverage_report",
                 "project resolution failed before evidence collection",
             )?,
+            None,
+            Vec::new(),
             Vec::new(),
             Vec::new(),
             write_stub_artifact(
@@ -2805,6 +2839,7 @@ fn cmd_trust_certify(
     };
 
     let async_proof = collect_async_proof_summary(Path::new(&coverage_ref.path))?;
+    let recursive_proof_summary = collect_recursive_proof_summary(Path::new(&coverage_ref.path))?;
     if profile
         .as_ref()
         .is_some_and(|p| p.evidence_requirements.require_async_proof_coverage)
@@ -2845,6 +2880,8 @@ fn cmd_trust_certify(
             .map(|p| p.claims.clone())
             .unwrap_or_default(),
         async_proof,
+        recursive_proof_summary,
+        imported_summary_inventory,
         capsules: capsules.capsules,
         network_capsules: capsules.network_capsules,
         runtime,
@@ -2855,6 +2892,7 @@ fn cmd_trust_certify(
         evidence: TrustCertificateEvidence {
             boundaries_report: boundaries_ref,
             coverage_report: coverage_ref,
+            verify_summary_report: verify_summary_ref,
             schema_derive_reports: schema_derive_refs,
             prove_reports: prove_refs,
             tests_report: tests_ref,
@@ -3002,6 +3040,16 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
         certificate.network_capsules.ids.join(", ")
     )));
     s.push_str("</code></td></tr>");
+    s.push_str("<tr><td>recursive proof</td><td><code>");
+    s.push_str(&report_common::html_escape(&format!(
+        "reachable={} proven={} imported={} termination_only={} unsupported={}",
+        certificate.recursive_proof_summary.recursive_defn,
+        certificate.recursive_proof_summary.proven_recursive_defn,
+        certificate.recursive_proof_summary.imported_summary_defn,
+        certificate.recursive_proof_summary.termination_proven_defn,
+        certificate.recursive_proof_summary.unsupported_recursive_defn
+    )));
+    s.push_str("</code></td></tr>");
     if let Some(runtime) = &certificate.runtime {
         s.push_str("<tr><td>runtime</td><td><code>");
         s.push_str(&report_common::html_escape(&format!(
@@ -3027,6 +3075,14 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
         )));
         s.push_str("</code></td></tr>");
     }
+    if !certificate.imported_summary_inventory.is_empty() {
+        s.push_str("<tr><td>imported summaries</td><td><code>");
+        s.push_str(&report_common::html_escape(&format!(
+            "{} artifact(s)",
+            certificate.imported_summary_inventory.len()
+        )));
+        s.push_str("</code></td></tr>");
+    }
     s.push_str("</tbody></table>");
 
     s.push_str("<h2>Evidence</h2><table><thead><tr><th>Artifact</th><th>Path</th><th>sha256</th></tr></thead><tbody>");
@@ -3043,6 +3099,13 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
         s.push_str("<tr><td>");
         s.push_str(label);
         s.push_str("</td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
+    if let Some(evidence) = &certificate.evidence.verify_summary_report {
+        s.push_str("<tr><td>verify summary</td><td><code>");
         s.push_str(&report_common::html_escape(&evidence.path));
         s.push_str("</code></td><td><code>");
         s.push_str(&report_common::html_escape(&evidence.sha256_hex));
@@ -3105,6 +3168,20 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
         s.push_str("</code></td></tr>");
     }
     s.push_str("</tbody></table>");
+
+    if !certificate.imported_summary_inventory.is_empty() {
+        s.push_str("<h2>Imported Summary Inventory</h2><table><thead><tr><th>Path</th><th>sha256</th><th>Symbols</th></tr></thead><tbody>");
+        for entry in &certificate.imported_summary_inventory {
+            s.push_str("<tr><td><code>");
+            s.push_str(&report_common::html_escape(&entry.path));
+            s.push_str("</code></td><td><code>");
+            s.push_str(&report_common::html_escape(&entry.sha256_hex));
+            s.push_str("</code></td><td><code>");
+            s.push_str(&report_common::html_escape(&entry.symbols.join(", ")));
+            s.push_str("</code></td></tr>");
+        }
+        s.push_str("</tbody></table>");
+    }
 
     if !certificate.diagnostics.is_empty() {
         s.push_str("<h2>Diagnostics</h2><ul>");
@@ -3346,6 +3423,74 @@ fn collect_async_proof_summary(coverage_path: &Path) -> Result<TrustCertificateA
             .and_then(Value::as_str)
             .map(str::to_string),
     })
+}
+
+fn collect_recursive_proof_summary(
+    coverage_path: &Path,
+) -> Result<TrustCertificateRecursiveProofSummary> {
+    if !coverage_path.is_file() {
+        return Ok(TrustCertificateRecursiveProofSummary {
+            recursive_defn: 0,
+            proven_recursive_defn: 0,
+            imported_summary_defn: 0,
+            termination_proven_defn: 0,
+            unsupported_recursive_defn: 0,
+        });
+    }
+
+    let doc = report_common::read_json_file(coverage_path)?;
+    Ok(TrustCertificateRecursiveProofSummary {
+        recursive_defn: doc
+            .pointer("/summary/recursive_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        proven_recursive_defn: doc
+            .pointer("/summary/proven_recursive_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        imported_summary_defn: doc
+            .pointer("/summary/imported_summary_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        termination_proven_defn: doc
+            .pointer("/summary/termination_proven_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        unsupported_recursive_defn: doc
+            .pointer("/summary/unsupported_recursive_defn")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+    })
+}
+
+fn collect_imported_summary_inventory(doc: &Value) -> Vec<TrustCertificateImportedSummary> {
+    let mut out = doc
+        .get("imported_summaries")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.get("path").and_then(Value::as_str)?.to_string();
+            let sha256_hex = entry.get("sha256_hex").and_then(Value::as_str)?.to_string();
+            let mut symbols = entry
+                .get("symbols")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            symbols.sort();
+            symbols.dedup();
+            Some(TrustCertificateImportedSummary {
+                path,
+                sha256_hex,
+                symbols,
+            })
+        })
+        .collect::<Vec<_>>();
+    out.sort_by(|a, b| (a.path.as_str(), a.sha256_hex.as_str()).cmp(&(b.path.as_str(), b.sha256_hex.as_str())));
+    out
 }
 
 fn collect_capsule_artifacts(
@@ -3828,7 +3973,7 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
             .any(|world| world == WorldId::RunOs.as_str())
         {
             diags.push(trust_diag(
-                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "X07TP_BACKEND_NOT_CERTIFIABLE",
                 "networked sandboxed trusted-program profiles must not allow run-os",
             ));
         }
@@ -3864,7 +4009,7 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
         }
         if !profile.evidence_requirements.require_network_capsules {
             diags.push(trust_diag(
-                "X07TP_CAPSULE_ATTEST_REQUIRED",
+                "X07TP_NETWORK_PROFILE_REQUIRED",
                 "networked sandboxed trusted-program profiles must require network capsule evidence",
             ));
         }
@@ -3879,25 +4024,25 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
         }
         if profile.sandbox_requirements.sandbox_backend != "vm" {
             diags.push(trust_diag(
-                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "X07TP_BACKEND_NOT_CERTIFIABLE",
                 "networked sandboxed trusted-program profiles must require sandbox_backend=vm",
             ));
         }
         if !profile.sandbox_requirements.forbid_weaker_isolation {
             diags.push(trust_diag(
-                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "X07TP_BACKEND_NOT_CERTIFIABLE",
                 "networked sandboxed trusted-program profiles must forbid weaker isolation",
             ));
         }
         if profile.sandbox_requirements.network_mode != "allowlist" {
             diags.push(trust_diag(
-                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "X07TP_NETWORK_PROFILE_REQUIRED",
                 "networked sandboxed trusted-program profiles must require network_mode=allowlist",
             ));
         }
         if profile.sandbox_requirements.network_enforcement != "vm_boundary_allowlist" {
             diags.push(trust_diag(
-                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "X07TP_NETWORK_PROFILE_REQUIRED",
                 "networked sandboxed trusted-program profiles must require network_enforcement=vm_boundary_allowlist",
             ));
         }
@@ -4036,8 +4181,16 @@ fn validate_profile_against_context(
     if profile.sandbox_requirements.sandbox_backend == "vm" && ctx.world != WorldId::RunOsSandboxed
     {
         diags.push(trust_diag(
-            "X07TP_SANDBOX_BACKEND_REQUIRED",
-            "sandboxed trusted-program profiles require run-os-sandboxed project worlds",
+            if profile.id == "trusted_program_sandboxed_net_v1" {
+                "X07TP_BACKEND_NOT_CERTIFIABLE"
+            } else {
+                "X07TP_SANDBOX_BACKEND_REQUIRED"
+            },
+            if profile.id == "trusted_program_sandboxed_net_v1" {
+                "networked sandboxed trusted-program profiles require run-os-sandboxed project worlds"
+            } else {
+                "sandboxed trusted-program profiles require run-os-sandboxed project worlds"
+            },
         ));
     }
     if profile.sandbox_requirements.network_mode == "none"
@@ -4063,13 +4216,13 @@ fn validate_profile_against_context(
             != Some(true)
         {
             diags.push(trust_diag(
-                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "X07TP_NETWORK_PROFILE_REQUIRED",
                 "networked sandboxed trusted-program profiles require policy.net.enabled=true",
             ));
         }
         if allow_hosts.is_empty() {
             diags.push(trust_diag(
-                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "X07TP_NETWORK_PROFILE_REQUIRED",
                 "networked sandboxed trusted-program profiles require a non-empty policy.net.allow_hosts allowlist",
             ));
         }
@@ -4250,7 +4403,9 @@ fn add_coverage_diagnostics(coverage_doc: &Value, diagnostics: &mut Vec<diagnost
             function.get("status").and_then(Value::as_str),
             Some(
                 "proven"
+                    | "proven_recursive"
                     | "proven_async"
+                    | "imported_summary"
                     | "trusted_primitive"
                     | "trusted_scheduler_model"
                     | "capsule_boundary"
@@ -4361,6 +4516,8 @@ fn prove_issue_code(report_doc: &Value) -> &'static str {
 
 fn add_review_diff_diagnostics(review_doc: &Value, diagnostics: &mut Vec<diagnostics::Diagnostic>) {
     let proof_changes = review_highlight_count(review_doc, "/highlights/proof_changes");
+    let recursive_proof_changes =
+        review_highlight_count(review_doc, "/highlights/recursive_proof_changes");
     let boundary_changes = review_highlight_count(review_doc, "/highlights/boundary_changes");
     let subset_changes = review_highlight_count(review_doc, "/highlights/subset_changes");
     let summary_changes = review_highlight_count(review_doc, "/highlights/summary_changes");
@@ -4372,11 +4529,15 @@ fn add_review_diff_diagnostics(review_doc: &Value, diagnostics: &mut Vec<diagnos
     let dependency_closure_changes =
         review_highlight_count(review_doc, "/highlights/dependency_closure_changes");
 
-    if proof_changes > 0 || subset_changes > 0 || summary_changes > 0 {
+    if proof_changes > 0
+        || recursive_proof_changes > 0
+        || subset_changes > 0
+        || summary_changes > 0
+    {
         diagnostics.push(trust_diag(
             "X07TC_EDIFF_POSTURE",
             format!(
-                "review diff detected forbidden trust posture changes (proof_changes={proof_changes}, subset_changes={subset_changes}, summary_changes={summary_changes})"
+                "review diff detected forbidden trust posture changes (proof_changes={proof_changes}, recursive_proof_changes={recursive_proof_changes}, subset_changes={subset_changes}, summary_changes={summary_changes})"
             ),
         ));
     }
@@ -4390,7 +4551,7 @@ fn add_review_diff_diagnostics(review_doc: &Value, diagnostics: &mut Vec<diagnos
     }
     if network_policy_changes > 0 {
         diagnostics.push(trust_diag(
-            "X07TC_ERUNTIME_NETWORK_EVIDENCE",
+            "X07TC_ENET_POLICY",
             format!(
                 "review diff detected {network_policy_changes} network-policy change(s) relative to the baseline"
             ),
@@ -4548,7 +4709,13 @@ fn build_coverage_evidence(
     entry: &str,
     out_dir: &Path,
     diagnostics: &mut Vec<diagnostics::Diagnostic>,
-) -> Result<(EvidenceRef, Value, Vec<String>)> {
+) -> Result<(
+    EvidenceRef,
+    Value,
+    Vec<String>,
+    Option<EvidenceRef>,
+    Vec<TrustCertificateImportedSummary>,
+)> {
     let verify_report_path = out_dir.join("verify.coverage.report.json");
     let coverage_path = out_dir.join("verify.coverage.json");
     let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
@@ -4593,11 +4760,38 @@ fn build_coverage_evidence(
         ));
     }
 
+    let mut summary_ref = None;
+    let mut imported_summary_inventory = Vec::new();
+    if let Some(raw_summary_path) = report_doc
+        .pointer("/artifacts/verify_summary_path")
+        .and_then(Value::as_str)
+    {
+        let summary_src_path = resolve_report_artifact_path(&verify_report_path, cwd, raw_summary_path);
+        if summary_src_path.is_file() {
+            let summary_doc = report_common::read_json_file(&summary_src_path)?;
+            let summary_path = out_dir.join("verify.summary.json");
+            write_json_artifact(&summary_path, &summary_doc)?;
+            summary_ref = Some(evidence_ref_for_path(&summary_path)?);
+            imported_summary_inventory = collect_imported_summary_inventory(&summary_doc);
+        } else {
+            diagnostics.push(trust_diag(
+                "X07TC_EPROOF_COVERAGE",
+                format!(
+                    "verify coverage report referenced missing verify.summary artifact: {}",
+                    summary_src_path.display()
+                ),
+            ));
+        }
+    }
+
     let mut prove_targets = Vec::new();
     if let Some(functions) = coverage_doc.get("functions").and_then(Value::as_array) {
         for function in functions {
             if function.get("kind").and_then(Value::as_str) == Some("defn")
-                && function.get("status").and_then(Value::as_str) == Some("proven")
+                && matches!(
+                    function.get("status").and_then(Value::as_str),
+                    Some("proven" | "proven_recursive")
+                )
             {
                 if let Some(symbol) = function.get("symbol").and_then(Value::as_str) {
                     prove_targets.push(symbol.to_string());
@@ -4610,6 +4804,8 @@ fn build_coverage_evidence(
         evidence_ref_for_path(&coverage_path)?,
         coverage_doc,
         prove_targets,
+        summary_ref,
+        imported_summary_inventory,
     ))
 }
 
@@ -5744,6 +5940,14 @@ mod tests {
                 covered: 0,
                 model: None,
             },
+            recursive_proof_summary: TrustCertificateRecursiveProofSummary {
+                recursive_defn: 0,
+                proven_recursive_defn: 0,
+                imported_summary_defn: 0,
+                termination_proven_defn: 0,
+                unsupported_recursive_defn: 0,
+            },
+            imported_summary_inventory: Vec::new(),
             capsules: TrustCertificateCapsules {
                 count: 0,
                 ids: Vec::new(),
@@ -5771,6 +5975,7 @@ mod tests {
                     path: "verify.coverage.json".to_string(),
                     sha256_hex: "1".repeat(64),
                 },
+                verify_summary_report: None,
                 schema_derive_reports: Vec::new(),
                 prove_reports: Vec::new(),
                 tests_report: EvidenceRef {
@@ -6075,7 +6280,7 @@ mod tests {
             .any(|diag| diag.code == "X07TC_EBOUNDARY_RELAXED"));
         assert!(diagnostics
             .iter()
-            .any(|diag| diag.code == "X07TC_ERUNTIME_NETWORK_EVIDENCE"));
+            .any(|diag| diag.code == "X07TC_ENET_POLICY"));
         assert!(diagnostics
             .iter()
             .any(|diag| diag.code == "X07TC_EPEER_POLICY"));

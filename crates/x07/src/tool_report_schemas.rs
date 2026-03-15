@@ -149,6 +149,9 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("pkg.add") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-add.report.schema.json"
         )),
+        Some("pkg.attest-closure") => Some(include_bytes!(
+            "../../../spec/x07-tool-pkg-attest-closure.report.schema.json"
+        )),
         Some("pkg.lock") => Some(include_bytes!(
             "../../../spec/x07-tool-pkg-lock.report.schema.json"
         )),
@@ -214,6 +217,15 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         )),
         Some("trust.certify") => Some(include_bytes!(
             "../../../spec/x07-tool-trust-certify.report.schema.json"
+        )),
+        Some("trust.capsule") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-capsule.report.schema.json"
+        )),
+        Some("trust.capsule.attest") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-capsule-attest.report.schema.json"
+        )),
+        Some("trust.capsule.check") => Some(include_bytes!(
+            "../../../spec/x07-tool-trust-capsule-check.report.schema.json"
         )),
         Some("trust.profile") => Some(include_bytes!(
             "../../../spec/x07-tool-trust-profile.report.schema.json"

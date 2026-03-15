@@ -34,6 +34,7 @@ pub struct CompileOptions {
     pub enable_rr: bool,
     pub enable_kv: bool,
     pub module_roots: Vec<std::path::PathBuf>,
+    pub prefer_module_roots_first: bool,
     pub arch_root: Option<std::path::PathBuf>,
     pub emit_main: bool,
     pub freestanding: bool,
@@ -41,6 +42,7 @@ pub struct CompileOptions {
     pub contract_mode: ContractMode,
     pub allow_unsafe: Option<bool>,
     pub allow_ffi: Option<bool>,
+    pub allow_internal_only_heads_in_entry: bool,
 }
 
 impl Default for CompileOptions {
@@ -51,6 +53,7 @@ impl Default for CompileOptions {
             enable_rr: false,
             enable_kv: false,
             module_roots: Vec::new(),
+            prefer_module_roots_first: false,
             arch_root: None,
             emit_main: true,
             freestanding: false,
@@ -58,6 +61,7 @@ impl Default for CompileOptions {
             contract_mode: ContractMode::default(),
             allow_unsafe: None,
             allow_ffi: None,
+            allow_internal_only_heads_in_entry: false,
         }
     }
 }
@@ -196,7 +200,7 @@ pub fn compile_program_to_program_with_meta(
     }
 
     validate_program_visibility(&parsed_program, &module_infos)?;
-    forbid_internal_only_heads_in_non_builtin_code(&parsed_program, &module_infos)?;
+    forbid_internal_only_heads_in_non_builtin_code(&parsed_program, &module_infos, options)?;
 
     let contract_nodes = |clauses: &[crate::x07ast::ContractClauseAst]| -> usize {
         clauses
@@ -365,7 +369,9 @@ fn compile_frontend(
     enforce_contract_typecheck("main", &file)?;
     fuel_used = fuel_used.saturating_add(x07ast_node_count(&file));
     let main = parse_main_file_x07ast(file)?;
-    forbid_internal_only_heads_in_entry("main", &main)?;
+    if !options.allow_internal_only_heads_in_entry {
+        forbid_internal_only_heads_in_entry("main", &main)?;
+    }
     let mut modules = BTreeMap::new();
     let mut module_infos = BTreeMap::new();
     module_infos.insert(
@@ -831,12 +837,15 @@ fn forbid_internal_only_heads_in_module(
 fn forbid_internal_only_heads_in_non_builtin_code(
     program: &Program,
     module_infos: &BTreeMap<String, ModuleInfo>,
+    options: &CompileOptions,
 ) -> Result<(), CompilerError> {
-    if let Some(head) = find_internal_only_head(&program.solve) {
-        return Err(CompilerError::new(
-            CompileErrorKind::Unsupported,
-            format!("main: internal-only builtin is not allowed here: {head}"),
-        ));
+    if !options.allow_internal_only_heads_in_entry {
+        if let Some(head) = find_internal_only_head(&program.solve) {
+            return Err(CompilerError::new(
+                CompileErrorKind::Unsupported,
+                format!("main: internal-only builtin is not allowed here: {head}"),
+            ));
+        }
     }
 
     for f in &program.functions {
@@ -859,6 +868,9 @@ fn forbid_internal_only_heads_in_non_builtin_code(
             )
         })?;
         if info.is_builtin {
+            continue;
+        }
+        if options.allow_internal_only_heads_in_entry && module_id == "main" {
             continue;
         }
         if f.name.contains(".__std_stream_pipe_v1_") {
@@ -922,6 +934,9 @@ fn forbid_internal_only_heads_in_non_builtin_code(
             )
         })?;
         if info.is_builtin {
+            continue;
+        }
+        if options.allow_internal_only_heads_in_entry && module_id == "main" {
             continue;
         }
         if f.name.contains(".__std_stream_pipe_v1_") {
@@ -1087,8 +1102,12 @@ fn load_module_recursive(
         ));
     }
 
-    let source =
-        module_source::load_module_source(module_id, options.world, &options.module_roots)?;
+    let source = module_source::load_module_source_with_preference(
+        module_id,
+        options.world,
+        &options.module_roots,
+        options.prefer_module_roots_first,
+    )?;
     let src = source.src;
     let is_builtin = source.is_builtin;
 

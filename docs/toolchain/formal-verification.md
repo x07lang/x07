@@ -35,8 +35,15 @@ flowchart LR
 
 - prove reports (`x07.verify.report@0.4.0`)
 - reachable coverage (`x07.verify.coverage@0.3.0`)
+- standalone imported-summary artifacts (`x07.verify.summary@0.1.0`)
 
 For pure recursive certification, self-recursive `defn` targets are accepted when they declare `decreases[]`. Prove reports expose a `proof_summary` block, and coverage reports expose both recursive summary counters and per-function proof summaries so imported or unsupported graph nodes are visible to reviewers.
+
+Direct prove inputs currently accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` and `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
+
+That means schema-derived record and tagged-union documents can now sit directly on the proof boundary as `bytes_view@brand`: the generated verify driver runs the validator first and only then materializes the branded view seen by the proof target. Direct `vec_u8` params/results are now admitted in the same certifiable subset. Owned branded `bytes` and nested result carriers remain outside the current direct prove-input subset.
+
+When a reviewed callee sits outside the currently loaded graph, emit `verify.summary.json` from its coverage run and pass it back with `x07 verify --summary <path>`. That keeps the imported proof posture explicit in both the coverage artifact and the final certificate/review flow.
 
 For async certification, coverage distinguishes:
 

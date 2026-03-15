@@ -39,6 +39,7 @@ pub const X07_BUNDLE_REPORT_SCHEMA_VERSION: &str = "x07.bundle.report@0.4.0";
 pub const X07_DOC_REPORT_SCHEMA_VERSION: &str = "x07.doc.report@0.1.0";
 pub const X07_VERIFY_REPORT_SCHEMA_VERSION: &str = "x07.verify.report@0.4.0";
 pub const X07_VERIFY_COVERAGE_SCHEMA_VERSION: &str = "x07.verify.coverage@0.3.0";
+pub const X07_VERIFY_SUMMARY_SCHEMA_VERSION: &str = "x07.verify.summary@0.1.0";
 pub const X07_VERIFY_PRIMITIVES_SCHEMA_VERSION: &str = "x07.verify.primitives@0.1.0";
 pub const X07_VERIFY_CEX_SCHEMA_VERSION: &str = "x07.verify.cex@0.2.0";
 pub const X07_BENCH_SUITE_SCHEMA_VERSION: &str = "x07.bench.suite@0.1.0";

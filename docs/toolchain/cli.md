@@ -181,7 +181,7 @@ See: [Architecture check](arch-check.md).
 - `x07 review diff --from <path> --to <path> --html-out <path>`
 - `x07 review diff --from <path> --to <path> --html-out <path> --json-out <path>`
   - Produces an intent-level semantic diff for x07AST/project/arch/policy changes.
-  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|async-proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion|capsule-contract-relaxation|capsule-set-change|sandbox-policy-widen|runtime-attestation-regression|weaker-isolation-enabled|network-allowlist-widen|peer-policy-relaxation|capsule-network-surface-widen|package-set-change|lockfile-hash-change|advisory-allowance-enabled`.
+  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|recursion-proof-coverage-decrease|async-proof-coverage-decrease|summary-downgrade|boundary-relaxation|trusted-subset-expansion|capsule-contract-relaxation|capsule-set-change|sandbox-policy-widen|runtime-attestation-regression|weaker-isolation-enabled|network-allowlist-widen|peer-policy-relaxation|capsule-network-surface-widen|package-set-change|lockfile-hash-change|advisory-allowance-enabled`.
   - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.4.0"`).
 
 See: [Review & trust artifacts](review-trust.md).
@@ -281,15 +281,20 @@ See: [Property-based testing](pbt.md).
   - `--project <path>` (or one/more `--module-root <dir>`)
   - `--unwind <n>` (CBMC loop unwinding bound)
   - `--max-bytes-len <n>` (bound for `bytes` / `bytes_view` params)
+  - `--summary <path>` (import reviewed `verify.summary.json` artifacts)
 
 Notes:
 
 - `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets. Pure self-recursive `defn` targets are supported when they declare `decreases[]`; mutual recursion, recursive `defasync`, and `for` loops with non-literal bounds remain unsupported.
-- v0.1 supports params: `i32`, `u32`, `bytes`, `bytes_view` (use a wrapper if you need other types).
+- Direct `--prove` inputs currently support `i32`, `u32`, raw `bytes`, raw `bytes_view`, raw `vec_u8`, `option_i32`, `option_bytes`, `option_bytes_view`, `result_i32`, `result_bytes`, and `result_bytes_view`.
+- Direct prove inputs accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` / `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
+- That means schema-derived record and tagged-union documents can be proved directly as `bytes_view@brand` inputs, with the generated verify driver running the validator before it constructs the branded view seen by the proof target.
+- Owned branded `bytes` and nested result carriers are still rejected explicitly.
 - `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant`) on the target function.
 - `--prove` is the certifiable mode for accepted trust certificates; unsupported targets return `result.kind = "unsupported"`.
 - `--prove` reports include `proof_summary` for the solver engine, recursion kind, `decreases` usage, unwind-bounded recursion, and the reachable dependency symbol set.
 - `--coverage` emits a reachable-closure coverage artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including recursive proof counters plus per-function `proof_summary`, alongside `proven_async`, `trusted_scheduler_model`, and `capsule_boundary` statuses when they apply.
+- `--coverage` and `--prove` emit reusable `verify.summary.json` artifacts (`x07.verify.summary@0.1.0`); pass them back with `--summary <path>` when a reviewed reachable dependency sits outside the currently loaded module roots.
 - Async `--prove` failures emit `x07.verify.cex@0.2.0`, including `await_invariant`, `scope_invariant`, and `cancellation_ensures` counterexamples when those checks fail.
 - Artifacts are written under `.x07/artifacts/verify/<mode>/<entry>/` (driver module, emitted C, CBMC output, counterexample/SMT artifacts when present).
 - Async proof coverage is lowered through the trusted scheduler model catalog at `catalog/verify_scheduler_model.json`.

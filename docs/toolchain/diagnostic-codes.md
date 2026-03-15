@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 389
-- quickfix support (`sometimes` or `always`): 353
-- quickfix coverage: 90.75%
+- total codes: 400
+- quickfix support (`sometimes` or `always`): 358
+- quickfix coverage: 89.50%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -197,6 +197,9 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-CONTRACT-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0003`. |
 | `X07-CONTRACT-0004` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0004`. |
 | `X07-CONTRACT-0005` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-CONTRACT-0005`. |
+| `X07-CONTRACT-0009` | x07c / lint / error | sometimes | Recursive decreases clause is invalid. |
+| `X07-CONTRACT-0010` | x07c / lint / error | sometimes | Recursive decreases metadata is attached to a non-certifiable target. |
+| `X07-CONTRACT-0011` | x07c / lint / error | sometimes | Recursive self-call is missing decreases evidence. |
 | `X07-FIX-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FIX-0003`. |
 | `X07-FMT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-FMT-0001`. |
 | `X07-GENERICS-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-GENERICS-0001`. |
@@ -272,6 +275,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07INIT_PKG_LOCK` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_PKG_LOCK`. |
 | `X07INIT_SRC` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_SRC`. |
 | `X07INIT_TESTS` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_TESTS`. |
+| `X07INIT_TRUST` | x07 / lint / error | sometimes | Project/package scaffold diagnostic `X07INIT_TRUST`. |
 | `X07PKG_ADVISED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_ADVISED_DEP`. |
 | `X07PKG_API_URL` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_API_URL`. |
 | `X07PKG_DEP_EXISTS` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_DEP_EXISTS`. |
@@ -302,8 +306,10 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07RD_NETWORK_ALLOWLIST_WIDEN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_NETWORK_ALLOWLIST_WIDEN`. |
 | `X07RD_PACKAGE_SET_CHANGE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_PACKAGE_SET_CHANGE`. |
 | `X07RD_PEER_POLICY_RELAXATION` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_PEER_POLICY_RELAXATION`. |
+| `X07RD_RECURSION_PROOF_COVERAGE_DECREASE` | x07 / lint / error | never | Review diff gate rejected a recursive proof coverage regression. |
 | `X07RD_RUNTIME_ATTEST_REGRESSION` | x07 / run / error | never | Review diff gate rejected a runtime attestation regression. |
 | `X07RD_SANDBOX_POLICY_WIDEN` | x07 / lint / error | never | Review diff gate rejected a sandbox policy widening. |
+| `X07RD_SUMMARY_DOWNGRADE` | x07 / lint / error | never | Review diff gate rejected a proof-summary downgrade. |
 | `X07RR_ENTRY_EXISTS` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_ENTRY_EXISTS`. |
 | `X07RR_HTTP` | x07 / run / error | never | Diagnostic code `X07RR_HTTP`. |
 | `X07RR_KEY_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_KEY_EMPTY`. |
@@ -321,6 +327,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07TC_EDEP_CLOSURE` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EDEP_CLOSURE`. |
 | `X07TC_EDIFF_POSTURE` | x07 / run / error | never | Baseline review or trust-posture diff gate failed certification. |
 | `X07TC_EEFFECT_LOG` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EEFFECT_LOG`. |
+| `X07TC_ENET_POLICY` | x07 / run / error | never | Network policy posture changed relative to the reviewed baseline. |
 | `X07TC_ENONDET` | x07 / run / error | never | Trust report detected nondeterminism in the certified closure. |
 | `X07TC_EPBT` | x07 / run / error | sometimes | Boundary-required property tests are missing, malformed, or failing. |
 | `X07TC_EPEER_POLICY` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EPEER_POLICY`. |
@@ -338,6 +345,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07TEST_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | sometimes | A test that requires runtime attestation did not produce it. |
 | `X07TP_ARCH` | x07 / run / error | sometimes | Project architecture posture is weaker than the trust profile requires. |
 | `X07TP_ASYNC_PROOF_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing async proof coverage. |
+| `X07TP_BACKEND_NOT_CERTIFIABLE` | x07 / run / error | never | Networked trusted-program profile allows a backend posture that is not certifiable. |
 | `X07TP_BOUNDARY` | x07 / run / error | sometimes | Project boundary index wiring is missing or incomplete for certification. |
 | `X07TP_CAPSULES` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_CAPSULES`. |
 | `X07TP_CAPSULE_ATTEST_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing capsule attestation requirements. |
@@ -347,6 +355,7 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07TP_INVALID` | x07 / run / error | sometimes | Trust profile JSON is missing or invalid. |
 | `X07TP_LANGUAGE` | x07 / run / error | never | Project uses language or policy features forbidden by the trust profile. |
 | `X07TP_NETWORK_MODE_FORBIDDEN` | x07 / run / error | never | Sandboxed local trusted-program profile allows networking where it should not. |
+| `X07TP_NETWORK_PROFILE_REQUIRED` | x07 / run / error | never | Networked trusted-program profile is missing required network certification posture. |
 | `X07TP_NOT_CERTIFIABLE` | x07 / run / error | never | Trust profile is weaker than the Milestone A certification floor. |
 | `X07TP_PEER_POLICY_REQUIRED` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_PEER_POLICY_REQUIRED`. |
 | `X07TP_PROJECT_MISMATCH` | x07 / run / error | sometimes | Project manifest could not be resolved for trust profile validation. |
@@ -375,6 +384,8 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07V_SCOPE_INVARIANT_FAILED` | x07 / lint / error | never | An async scope invariant failed under proof. |
 | `X07V_SMT_SAT` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_SAT`. |
 | `X07V_SMT_UNKNOWN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_UNKNOWN`. |
+| `X07V_SUMMARY_MISMATCH` | x07 / lint / error | never | An imported proof summary does not match the current declaration. |
+| `X07V_SUMMARY_MISSING` | x07 / lint / error | sometimes | A reachable proof summary dependency is missing. |
 | `X07V_UNWIND_INCOMPLETE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNWIND_INCOMPLETE`. |
 | `X7I0001` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0001`. |
 | `X7I0100` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0100`. |
@@ -4181,6 +4192,68 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07-CONTRACT-0009`
+
+Summary: Recursive decreases clause is invalid.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A `decreases[]` clause must stay contract-pure, typecheck to `i32`, and keep its witness payload within the supported contract witness subset.
+
+Agent strategy:
+
+- Keep `decreases[].expr` in the contract-pure subset.
+- Make each `decreases[].expr` typecheck to `i32`.
+- Keep `decreases[].witness[]` values in the supported contract witness subset.
+- Re-run `x07 lint` or `x07 check`.
+
+
+## `X07-CONTRACT-0010`
+
+Summary: Recursive decreases metadata is attached to a non-certifiable target.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The enclosing `defn` declares `decreases[]`, but the function is not a directly self-recursive proof target or it lacks the surrounding contract clauses needed for certification.
+
+Agent strategy:
+
+- Keep `decreases[]` only on directly self-recursive `defn` targets.
+- Add at least one `requires`, `ensures`, or `invariant` clause when the function is meant to be proved.
+- Remove `decreases[]` from non-recursive helpers.
+- Re-run `x07 lint` or `x07 check`.
+
+
+## `X07-CONTRACT-0011`
+
+Summary: Recursive self-call is missing decreases evidence.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The function body makes a direct self-recursive call, but the enclosing `defn` does not declare `decreases[]` to justify the termination rank.
+
+Agent strategy:
+
+- Add `decreases[]` to the enclosing `defn`.
+- Keep the recursive target inside the certifiable pure subset.
+- Re-run `x07 lint` or `x07 check`.
+
+
 ## `X07-FIX-0003`
 
 Summary: Core lint/schema diagnostic `X07-FIX-0003`.
@@ -5689,6 +5762,26 @@ Agent strategy:
 - Re-run `x07 init` command variant.
 
 
+## `X07INIT_TRUST`
+
+Summary: Project/package scaffold diagnostic `X07INIT_TRUST`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Initialization constraints (existing files/layout/arguments) can usually be resolved by deterministic filesystem and argument changes.
+
+Agent strategy:
+
+- Adjust init target path and flags.
+- Ensure required directories/files are in expected state.
+- Re-run `x07 init` command variant.
+
+
 ## `X07PKG_ADVISED_DEP`
 
 Summary: Package workflow diagnostic `X07PKG_ADVISED_DEP`.
@@ -6296,6 +6389,27 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07RD_RECURSION_PROOF_COVERAGE_DECREASE`
+
+Summary: Review diff gate rejected a recursive proof coverage regression.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a review decision or recursive proof-surface repair.
+
+Details:
+
+The candidate reduced proved recursive coverage or introduced newly unsupported recursive proof surface relative to the reviewed baseline.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `recursive_proof_changes` highlight set.
+- Restore the lost recursive proof coverage or intentionally reset the review baseline.
+- Re-run `x07 review diff --fail-on recursion-proof-coverage-decrease`.
+
+
 ## `X07RD_RUNTIME_ATTEST_REGRESSION`
 
 Summary: Review diff gate rejected a runtime attestation regression.
@@ -6336,6 +6450,27 @@ Agent strategy:
 - Inspect the `sandbox_policy_changes` highlights in the review report.
 - Restore the stricter sandbox policy or intentionally update the review baseline.
 - Re-run the requested `x07 review diff --fail-on ...` gate.
+
+
+## `X07RD_SUMMARY_DOWNGRADE`
+
+Summary: Review diff gate rejected a proof-summary downgrade.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a review decision or a stronger summary posture.
+
+Details:
+
+The candidate weakened reachable proof-summary posture relative to the baseline, such as dropping prove-supported status or degrading a reviewed proof status.
+
+Agent strategy:
+
+- Inspect the `summary_changes` highlights in the review report.
+- Restore the stronger proof-summary posture or intentionally reset the review baseline.
+- Re-run `x07 review diff --fail-on summary-downgrade`.
 
 
 ## `X07RR_ENTRY_EXISTS`
@@ -6683,6 +6818,27 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07TC_ENET_POLICY`
+
+Summary: Network policy posture changed relative to the reviewed baseline.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or a semantic policy change.
+
+Details:
+
+Certification rejected the candidate because the review diff reported a network allowlist or policy-surface change that must be re-reviewed before shipping.
+
+Agent strategy:
+
+- Run `x07 review diff --fail-on network-allowlist-widen` and inspect the highlighted policy delta.
+- Tighten the candidate policy or intentionally refresh the reviewed baseline.
+- Re-run `x07 trust certify` with the corrected baseline.
 
 
 ## `X07TC_ENONDET`
@@ -7036,6 +7192,27 @@ Agent strategy:
 - Re-run `x07 trust profile check`.
 
 
+## `X07TP_BACKEND_NOT_CERTIFIABLE`
+
+Summary: Networked trusted-program profile allows a backend posture that is not certifiable.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires editing the published certification contract or selecting a certifiable runtime posture.
+
+Details:
+
+Milestone C networked certification requires VM-backed sandboxing, forbids weaker isolation, and rejects project worlds outside the certifiable sandbox line.
+
+Agent strategy:
+
+- Keep `worlds_allowed` free of `run-os`.
+- Set `sandbox_requirements.sandbox_backend="vm"` and `sandbox_requirements.forbid_weaker_isolation=true`.
+- Re-run `x07 trust profile check`.
+
+
 ## `X07TP_BOUNDARY`
 
 Summary: Project boundary index wiring is missing or incomplete for certification.
@@ -7219,6 +7396,27 @@ Agent strategy:
 
 - Keep `sandbox_requirements.network_mode="none"`.
 - Ensure the selected sandbox policy sets `net.enabled=false`.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_NETWORK_PROFILE_REQUIRED`
+
+Summary: Networked trusted-program profile is missing required network certification posture.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires editing the published certification contract.
+
+Details:
+
+The Milestone C networked trust profile must require the allowlist-backed network posture, attested network capsules, and matching runtime network evidence semantics.
+
+Agent strategy:
+
+- Keep `sandbox_requirements.network_mode="allowlist"` and `sandbox_requirements.network_enforcement="vm_boundary_allowlist"`.
+- Set `evidence_requirements.require_network_capsules=true`.
 - Re-run `x07 trust profile check`.
 
 
@@ -7787,6 +7985,47 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07V_SUMMARY_MISMATCH`
+
+Summary: An imported proof summary does not match the current declaration.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires aligning reviewed summary artifacts with the current declaration graph.
+
+Details:
+
+The supplied `x07.verify.summary@0.1.0` artifact names a reachable symbol, but its declaration digest does not match the currently loaded source graph.
+
+Agent strategy:
+
+- Regenerate the imported summary from the exact reviewed declaration set.
+- Keep summary artifacts and source graph revisions aligned.
+- Re-run `x07 verify --summary <path>`.
+
+
+## `X07V_SUMMARY_MISSING`
+
+Summary: A reachable proof summary dependency is missing.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The requested verify run reached a symbol outside the locally loaded graph and no imported `x07.verify.summary@0.1.0` artifact was supplied for that symbol.
+
+Agent strategy:
+
+- Re-run `x07 verify --coverage --entry <sym>` for the reviewed callee to emit `verify.summary.json`.
+- Pass the emitted artifact back via `x07 verify --summary <path>`.
+- Re-run the original verify command.
 
 
 ## `X07V_UNWIND_INCOMPLETE`

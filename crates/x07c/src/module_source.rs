@@ -17,6 +17,15 @@ pub fn load_module_source(
     world: x07_worlds::WorldId,
     module_roots: &[PathBuf],
 ) -> Result<ModuleSource, CompilerError> {
+    load_module_source_with_preference(module_id, world, module_roots, false)
+}
+
+pub fn load_module_source_with_preference(
+    module_id: &str,
+    world: x07_worlds::WorldId,
+    module_roots: &[PathBuf],
+    prefer_module_roots_first: bool,
+) -> Result<ModuleSource, CompilerError> {
     if world.is_standalone_only() && module_id.starts_with("std.world.") {
         let (path, src) = read_module_from_roots(module_id, module_roots)?;
         return Ok(ModuleSource {
@@ -24,6 +33,24 @@ pub fn load_module_source(
             src,
             path: Some(path),
             is_builtin: false,
+        });
+    }
+
+    if prefer_module_roots_first {
+        if let Some((path, src)) = read_module_from_roots_if_present(module_id, module_roots)? {
+            return Ok(ModuleSource {
+                module_id: module_id.to_string(),
+                src,
+                path: Some(path),
+                is_builtin: false,
+            });
+        }
+    } else if let Some(src) = builtin_modules::builtin_module_source(module_id) {
+        return Ok(ModuleSource {
+            module_id: module_id.to_string(),
+            src: src.to_string(),
+            path: None,
+            is_builtin: true,
         });
     }
 
@@ -49,11 +76,38 @@ pub fn read_module_from_roots(
     module_id: &str,
     module_roots: &[PathBuf],
 ) -> Result<(PathBuf, String), CompilerError> {
+    if let Some(found) = read_module_from_roots_if_present(module_id, module_roots)? {
+        return Ok(found);
+    }
     if module_roots.is_empty() {
         return Err(CompilerError::new(
             CompileErrorKind::Parse,
             format!("unknown module: {module_id:?}"),
         ));
+    }
+    validate::validate_module_id(module_id)
+        .map_err(|message| CompilerError::new(CompileErrorKind::Parse, message))?;
+
+    let mut rel_path_base = PathBuf::new();
+    for seg in module_id.split('.') {
+        rel_path_base.push(seg);
+    }
+
+    let mut json_rel = rel_path_base.clone();
+    json_rel.set_extension("x07.json");
+    let json_rel_display = json_rel.display().to_string();
+    Err(CompilerError::new(
+        CompileErrorKind::Parse,
+        format!("unknown module: {module_id:?} (searched: {json_rel_display})"),
+    ))
+}
+
+fn read_module_from_roots_if_present(
+    module_id: &str,
+    module_roots: &[PathBuf],
+) -> Result<Option<(PathBuf, String)>, CompilerError> {
+    if module_roots.is_empty() {
+        return Ok(None);
     }
 
     validate::validate_module_id(module_id)
@@ -66,8 +120,6 @@ pub fn read_module_from_roots(
 
     let mut json_rel = rel_path_base.clone();
     json_rel.set_extension("x07.json");
-    let json_rel_display = json_rel.display().to_string();
-
     let mut json_hits: Vec<PathBuf> = Vec::new();
     for root in module_roots {
         let path = root.join(&json_rel);
@@ -85,7 +137,7 @@ pub fn read_module_from_roots(
                         format!("read module {module_id:?} at {}: {e}", path.display()),
                     )
                 })?;
-                Ok((path.clone(), src))
+                Ok(Some((path.clone(), src)))
             }
             _ => Err(CompilerError::new(
                 CompileErrorKind::Parse,
@@ -93,8 +145,5 @@ pub fn read_module_from_roots(
             )),
         };
     }
-    Err(CompilerError::new(
-        CompileErrorKind::Parse,
-        format!("unknown module: {module_id:?} (searched: {json_rel_display})"),
-    ))
+    Ok(None)
 }

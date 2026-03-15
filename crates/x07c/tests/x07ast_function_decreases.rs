@@ -183,8 +183,78 @@ fn typecheck_checks_defn_decreases_expr_type() {
         report
             .diagnostics
             .iter()
-            .any(|diag| diag.code == "X07-CONTRACT-0001"),
-        "expected X07-CONTRACT-0001, got: {:?}",
+            .any(|diag| diag.code == "X07-CONTRACT-0009"),
+        "expected X07-CONTRACT-0009, got: {:?}",
+        report.diagnostics
+    );
+}
+
+#[test]
+fn typecheck_rejects_decreases_on_non_recursive_target() {
+    let doc = json!({
+        "schema_version": X07AST_SCHEMA_VERSION_V0_8_0,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.f",
+                "params": [{"name": "n", "ty": "i32"}],
+                "result": "i32",
+                "requires": [{"id": "r0", "expr": [">=", "n", 0]}],
+                "decreases": [{"id": "d0", "expr": "n"}],
+                "body": ["+", "n", 1]
+            }
+        ],
+        "solve": ["bytes.alloc", 0],
+    });
+
+    let file = typecheck_testutil::file_from_json(&doc);
+    let report = typecheck_file_local(&file, &TypecheckOptions::default());
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07-CONTRACT-0010"),
+        "expected X07-CONTRACT-0010, got: {:?}",
+        report.diagnostics
+    );
+}
+
+#[test]
+fn typecheck_rejects_recursive_defn_without_decreases() {
+    let doc = json!({
+        "schema_version": X07AST_SCHEMA_VERSION_V0_8_0,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defn",
+                "name": "main.fact",
+                "params": [{"name": "n", "ty": "i32"}],
+                "result": "i32",
+                "requires": [{"id": "r0", "expr": [">=", "n", 0]}],
+                "body": [
+                    "if",
+                    ["<=", "n", 0],
+                    0,
+                    ["main.fact", ["-", "n", 1]]
+                ]
+            }
+        ],
+        "solve": ["bytes.alloc", 0],
+    });
+
+    let file = typecheck_testutil::file_from_json(&doc);
+    let report = typecheck_file_local(&file, &TypecheckOptions::default());
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07-CONTRACT-0011"),
+        "expected X07-CONTRACT-0011, got: {:?}",
         report.diagnostics
     );
 }

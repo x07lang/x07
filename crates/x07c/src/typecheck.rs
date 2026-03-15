@@ -77,6 +77,7 @@ enum ConstraintOrigin {
         name: String,
     },
     ContractExpr,
+    DecreasesExpr,
     AsyncAwaitInvariant,
     AsyncScopeInvariant,
     AsyncCancellationEnsure,
@@ -92,6 +93,7 @@ impl ConstraintOrigin {
             ConstraintOrigin::IfBranch => "if_branch",
             ConstraintOrigin::SetAssign { .. } => "set_assign",
             ConstraintOrigin::ContractExpr => "contract_expr",
+            ConstraintOrigin::DecreasesExpr => "decreases_expr",
             ConstraintOrigin::AsyncAwaitInvariant => "async_await_invariant",
             ConstraintOrigin::AsyncScopeInvariant => "async_scope_invariant",
             ConstraintOrigin::AsyncCancellationEnsure => "async_cancellation_ensure",
@@ -1147,6 +1149,23 @@ fn diag_for_unify_error(c: &Constraint, err: &UnifyError) -> Diagnostic {
                 quickfix: None,
             }
         }
+        ConstraintOrigin::DecreasesExpr => {
+            data.insert("expected".to_string(), ty_term_to_value_like(&err.rhs));
+            data.insert("got".to_string(), ty_term_to_value_like(&err.lhs));
+            Diagnostic {
+                code: "X07-CONTRACT-0009".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Type,
+                message: "decreases clause must typecheck to i32".to_string(),
+                loc: Some(Location::X07Ast {
+                    ptr: c.blame_ptr.clone(),
+                }),
+                notes: Vec::new(),
+                related: Vec::new(),
+                data,
+                quickfix: None,
+            }
+        }
         ConstraintOrigin::AsyncAwaitInvariant => {
             data.insert("expected".to_string(), ty_term_to_value_like(&err.rhs));
             data.insert("got".to_string(), ty_term_to_value_like(&err.lhs));
@@ -1663,6 +1682,24 @@ fn async_protocol_has_clauses(protocol: Option<&crate::x07ast::AsyncProtocolAst>
     })
 }
 
+fn collect_direct_call_ptrs(expr: &Expr, symbol: &str, out: &mut Vec<String>) {
+    match expr {
+        Expr::List { items, .. } => {
+            if items
+                .first()
+                .and_then(Expr::as_ident)
+                .is_some_and(|head| head == symbol)
+            {
+                out.push(expr.ptr().to_string());
+            }
+            for item in items {
+                collect_direct_call_ptrs(item, symbol, out);
+            }
+        }
+        Expr::Int { .. } | Expr::Ident { .. } => {}
+    }
+}
+
 fn contract_collect_ident_ptrs(expr: &Expr, needle: &str, out: &mut Vec<String>) {
     match expr {
         Expr::Ident { name, .. } if name == needle => out.push(expr.ptr().to_string()),
@@ -1988,6 +2025,9 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
         let decreases = defn_decreases(file, &f.name)
             .expect("internal decreases should decode")
             .unwrap_or_default();
+        let has_contracts = contract_has_clauses(&f.requires, &f.ensures, &f.invariant);
+        let mut direct_recursive_calls = Vec::new();
+        collect_direct_call_ptrs(&f.body, &f.name, &mut direct_recursive_calls);
         for p in &f.params {
             infer.bind(
                 p.name.clone(),
@@ -2000,7 +2040,39 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
         }
         let mut witness_types: Vec<(String, TyTerm)> = Vec::new();
 
-        if contract_has_clauses(&f.requires, &f.ensures, &f.invariant) || !decreases.is_empty() {
+        if !decreases.is_empty() {
+            let mut reasons = Vec::new();
+            if direct_recursive_calls.is_empty() {
+                reasons.push(
+                    "decreases[] is only supported on directly self-recursive defn targets"
+                        .to_string(),
+                );
+            }
+            if !has_contracts {
+                reasons.push(
+                    "decreases[] requires at least one requires/ensures/invariant clause"
+                        .to_string(),
+                );
+            }
+            if !reasons.is_empty() {
+                infer.diagnostics.push(diag_contract_err(
+                    "X07-CONTRACT-0010",
+                    format!("/decls/{decl_idx}/decreases"),
+                    reasons.join("; "),
+                ));
+            }
+        }
+        if decreases.is_empty() {
+            for ptr in &direct_recursive_calls {
+                infer.diagnostics.push(diag_contract_err(
+                    "X07-CONTRACT-0011",
+                    ptr.clone(),
+                    "recursive self-call requires decreases[] on the enclosing defn".to_string(),
+                ));
+            }
+        }
+
+        if has_contracts || !decreases.is_empty() {
             for (pidx, p) in f.params.iter().enumerate() {
                 if p.name == "__result" {
                     let ptr = format!("/decls/{decl_idx}/params/{pidx}/name");
@@ -2141,8 +2213,8 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
                 &mut infer,
                 &decreases,
                 &want_bool,
-                ConstraintOrigin::ContractExpr,
-                "X07-CONTRACT-0002",
+                ConstraintOrigin::DecreasesExpr,
+                "X07-CONTRACT-0009",
                 false,
                 &mut witness_types,
             );
@@ -2160,7 +2232,15 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
                 );
                 infer
                     .diagnostics
-                    .push(diag_contract_err("X07-CONTRACT-0005", ptr, msg));
+                    .push(diag_contract_err(
+                        if ptr.contains("/decreases/") {
+                            "X07-CONTRACT-0009"
+                        } else {
+                            "X07-CONTRACT-0005"
+                        },
+                        ptr,
+                        msg,
+                    ));
             }
         }
         drain_pending_tapp(

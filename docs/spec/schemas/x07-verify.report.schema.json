@@ -75,7 +75,8 @@
         "cbmc_json_path": { "type": "string" },
         "cex_path": { "type": "string" },
         "smt2_path": { "type": "string" },
-        "z3_out_path": { "type": "string" }
+        "z3_out_path": { "type": "string" },
+        "verify_summary_path": { "type": "string" }
       }
     },
     "proof_summary": {

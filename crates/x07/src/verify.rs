@@ -9,10 +9,16 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use x07_contracts::{
+    X07AST_SCHEMA_VERSION,
     X07_VERIFY_CEX_SCHEMA_VERSION, X07_VERIFY_COVERAGE_SCHEMA_VERSION,
     X07_VERIFY_PRIMITIVES_SCHEMA_VERSION, X07_VERIFY_REPORT_SCHEMA_VERSION,
+    X07_VERIFY_SUMMARY_SCHEMA_VERSION,
 };
 use x07_worlds::WorldId;
+use x07c::ast::Expr;
+use x07c::x07ast::{
+    self, AsyncProtocolAst, ContractClauseAst, LoopContractAst, TypeRef, X07AstFile,
+};
 
 use crate::report_common;
 use crate::repro::ToolInfo;
@@ -26,6 +32,8 @@ const X07_VERIFY_CEX_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07.verify.cex@0.2.0.schema.json");
 const X07_VERIFY_PRIMITIVES_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-verify.primitives.schema.json");
+const X07_VERIFY_SUMMARY_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-verify.summary.schema.json");
 const X07_VERIFY_PRIMITIVES_CATALOG_BYTES: &[u8] =
     include_bytes!("../../../catalog/verify_primitives.json");
 const X07_VERIFY_SCHEDULER_MODEL_BYTES: &[u8] =
@@ -38,6 +46,348 @@ const Z3_TIMEOUT_SECONDS: u64 = 10;
 const Z3_ASYNC_PROVE_TIMEOUT_SECONDS: u64 = 30;
 const PROCESS_SUMMARY_MAX_CHARS: usize = 1024;
 const CBMC_OBJECT_BITS_RETRY_VALUES: [u32; 2] = [12, 16];
+const VERIFY_VEC_SUPPORT_MODULE_ID: &str = "x07.verify.vec_support_v1";
+
+fn expr_ident(name: impl Into<String>) -> Expr {
+    Expr::Ident {
+        name: name.into(),
+        ptr: String::new(),
+    }
+}
+
+fn expr_int(value: i32) -> Expr {
+    Expr::Int {
+        value,
+        ptr: String::new(),
+    }
+}
+
+fn expr_list(items: Vec<Expr>) -> Expr {
+    Expr::List {
+        items,
+        ptr: String::new(),
+    }
+}
+
+fn expr_call(head: impl Into<String>, args: Vec<Expr>) -> Expr {
+    let mut items = Vec::with_capacity(args.len() + 1);
+    items.push(expr_ident(head));
+    items.extend(args);
+    expr_list(items)
+}
+
+fn rewrite_verify_overlay_type_ref(ty: &mut TypeRef) -> bool {
+    match ty {
+        TypeRef::Named(name) => {
+            if name == "vec_u8" {
+                *name = "bytes".to_string();
+                true
+            } else {
+                false
+            }
+        }
+        TypeRef::Var(_) => false,
+        TypeRef::App { args, .. } => args
+            .iter_mut()
+            .fold(false, |changed, arg| rewrite_verify_overlay_type_ref(arg) || changed),
+    }
+}
+
+fn rewrite_verify_overlay_contracts(clauses: &mut [ContractClauseAst]) -> bool {
+    let mut changed = false;
+    for clause in clauses {
+        changed |= rewrite_verify_overlay_expr(&mut clause.expr);
+        for witness in &mut clause.witness {
+            changed |= rewrite_verify_overlay_expr(witness);
+        }
+    }
+    changed
+}
+
+fn rewrite_verify_overlay_loop_contracts(loop_contracts: &mut [LoopContractAst]) -> bool {
+    let mut changed = false;
+    for loop_contract in loop_contracts {
+        changed |= rewrite_verify_overlay_contracts(&mut loop_contract.invariant);
+        changed |= rewrite_verify_overlay_contracts(&mut loop_contract.decreases);
+    }
+    changed
+}
+
+fn rewrite_verify_overlay_async_protocol(protocol: Option<&mut AsyncProtocolAst>) -> bool {
+    let Some(protocol) = protocol else {
+        return false;
+    };
+    rewrite_verify_overlay_contracts(&mut protocol.await_invariant)
+        | rewrite_verify_overlay_contracts(&mut protocol.scope_invariant)
+        | rewrite_verify_overlay_contracts(&mut protocol.cancellation_ensures)
+}
+
+fn rewrite_verify_overlay_expr(expr: &mut Expr) -> bool {
+    let Expr::List { items, .. } = expr else {
+        return false;
+    };
+    let mut changed = false;
+    for item in items.iter_mut() {
+        changed |= rewrite_verify_overlay_expr(item);
+    }
+    let Some(head) = items.first().and_then(Expr::as_ident) else {
+        return changed;
+    };
+    let args = items[1..].to_vec();
+    let replacement = match head {
+        "vec_u8.with_capacity" | "std.vec.with_capacity" if args.len() == 1 => {
+            Some(expr_call("bytes.alloc", vec![expr_int(0)]))
+        }
+        "vec_u8.into_bytes" | "std.vec.as_bytes" if args.len() == 1 => Some(args[0].clone()),
+        "vec_u8.clear" if args.len() == 1 => Some(expr_call("bytes.alloc", vec![expr_int(0)])),
+        "vec_u8.reserve_exact" | "std.vec.reserve_exact" if args.len() == 2 => Some(args[0].clone()),
+        "vec_u8.len" | "std.vec.len" if args.len() == 1 => Some(expr_call(
+            format!("{VERIFY_VEC_SUPPORT_MODULE_ID}.len_v1"),
+            vec![args[0].clone()],
+        )),
+        "vec_u8.get" | "std.vec.get" if args.len() == 2 => Some(expr_call(
+            format!("{VERIFY_VEC_SUPPORT_MODULE_ID}.get_v1"),
+            vec![args[0].clone(), args[1].clone()],
+        )),
+        "vec_u8.as_view" if args.len() == 1 => Some(expr_call("bytes.view", vec![args[0].clone()])),
+        "vec_u8.push" | "std.vec.push" if args.len() == 2 => Some(expr_call(
+            format!("{VERIFY_VEC_SUPPORT_MODULE_ID}.push_v1"),
+            vec![args[0].clone(), args[1].clone()],
+        )),
+        "vec_u8.set" if args.len() == 3 => Some(expr_call(
+            format!("{VERIFY_VEC_SUPPORT_MODULE_ID}.set_v1"),
+            vec![args[0].clone(), args[1].clone(), args[2].clone()],
+        )),
+        "vec_u8.extend_bytes" | "std.vec.extend_bytes" if args.len() == 2 => Some(expr_call(
+            format!("{VERIFY_VEC_SUPPORT_MODULE_ID}.extend_bytes_v1"),
+            vec![args[0].clone(), args[1].clone()],
+        )),
+        "vec_u8.extend_bytes_range" if args.len() == 4 => Some(expr_call(
+            format!("{VERIFY_VEC_SUPPORT_MODULE_ID}.extend_bytes_range_v1"),
+            vec![
+                args[0].clone(),
+                args[1].clone(),
+                args[2].clone(),
+                args[3].clone(),
+            ],
+        )),
+        _ => None,
+    };
+    if let Some(replacement) = replacement {
+        *expr = replacement;
+        true
+    } else {
+        changed
+    }
+}
+
+fn rewrite_verify_overlay_file(file: &mut X07AstFile) {
+    let mut needs_vec_support = false;
+    for function in &mut file.functions {
+        for param in &mut function.params {
+            needs_vec_support |= rewrite_verify_overlay_type_ref(&mut param.ty);
+        }
+        needs_vec_support |= rewrite_verify_overlay_type_ref(&mut function.result);
+        needs_vec_support |= rewrite_verify_overlay_contracts(&mut function.requires);
+        needs_vec_support |= rewrite_verify_overlay_contracts(&mut function.ensures);
+        needs_vec_support |= rewrite_verify_overlay_contracts(&mut function.invariant);
+        needs_vec_support |= rewrite_verify_overlay_loop_contracts(&mut function.loop_contracts);
+        needs_vec_support |= rewrite_verify_overlay_expr(&mut function.body);
+    }
+    for function in &mut file.async_functions {
+        for param in &mut function.params {
+            needs_vec_support |= rewrite_verify_overlay_type_ref(&mut param.ty);
+        }
+        needs_vec_support |= rewrite_verify_overlay_type_ref(&mut function.result);
+        needs_vec_support |= rewrite_verify_overlay_contracts(&mut function.requires);
+        needs_vec_support |= rewrite_verify_overlay_contracts(&mut function.ensures);
+        needs_vec_support |= rewrite_verify_overlay_contracts(&mut function.invariant);
+        needs_vec_support |= rewrite_verify_overlay_async_protocol(function.protocol.as_mut());
+        needs_vec_support |= rewrite_verify_overlay_loop_contracts(&mut function.loop_contracts);
+        needs_vec_support |= rewrite_verify_overlay_expr(&mut function.body);
+    }
+    for function in &mut file.extern_functions {
+        for param in &mut function.params {
+            needs_vec_support |= rewrite_verify_overlay_type_ref(&mut param.ty);
+        }
+        if let Some(result) = function.result.as_mut() {
+            needs_vec_support |= rewrite_verify_overlay_type_ref(result);
+        }
+    }
+    if let Some(solve) = file.solve.as_mut() {
+        needs_vec_support |= rewrite_verify_overlay_expr(solve);
+    }
+    if needs_vec_support {
+        file.imports.insert(VERIFY_VEC_SUPPORT_MODULE_ID.to_string());
+    }
+    x07ast::canonicalize_x07ast_file(file);
+}
+
+fn verify_overlay_module_path(root: &Path, module_id: &str) -> PathBuf {
+    let mut path = root.to_path_buf();
+    for seg in module_id.split('.') {
+        path.push(seg);
+    }
+    path.set_extension("x07.json");
+    path
+}
+
+fn build_verify_vec_support_module() -> Value {
+    serde_json::json!({
+        "schema_version": X07AST_SCHEMA_VERSION,
+        "kind": "module",
+        "module_id": VERIFY_VEC_SUPPORT_MODULE_ID,
+        "imports": [],
+        "decls": [
+            {
+                "kind": "export",
+                "names": [
+                    "x07.verify.vec_support_v1.extend_bytes_range_v1",
+                    "x07.verify.vec_support_v1.extend_bytes_v1",
+                    "x07.verify.vec_support_v1.get_v1",
+                    "x07.verify.vec_support_v1.len_v1",
+                    "x07.verify.vec_support_v1.push_v1",
+                    "x07.verify.vec_support_v1.set_v1"
+                ]
+            },
+            {
+                "kind": "defn",
+                "name": "x07.verify.vec_support_v1.len_v1",
+                "params": [{"name": "v", "ty": "bytes"}],
+                "result": "i32",
+                "body": ["view.len", ["bytes.view", "v"]]
+            },
+            {
+                "kind": "defn",
+                "name": "x07.verify.vec_support_v1.get_v1",
+                "params": [{"name": "v", "ty": "bytes"}, {"name": "idx", "ty": "i32"}],
+                "result": "i32",
+                "body": ["view.get_u8", ["bytes.view", "v"], "idx"]
+            },
+            {
+                "kind": "defn",
+                "name": "x07.verify.vec_support_v1.extend_bytes_v1",
+                "params": [{"name": "v", "ty": "bytes"}, {"name": "chunk", "ty": "bytes_view"}],
+                "result": "bytes",
+                "body": ["bytes.concat", "v", ["view.to_bytes", "chunk"]]
+            },
+            {
+                "kind": "defn",
+                "name": "x07.verify.vec_support_v1.extend_bytes_range_v1",
+                "params": [
+                    {"name": "v", "ty": "bytes"},
+                    {"name": "chunk", "ty": "bytes_view"},
+                    {"name": "start", "ty": "i32"},
+                    {"name": "len", "ty": "i32"}
+                ],
+                "result": "bytes",
+                "body": [
+                    "bytes.concat",
+                    "v",
+                    ["view.to_bytes", ["view.slice", "chunk", "start", "len"]]
+                ]
+            },
+            {
+                "kind": "defn",
+                "name": "x07.verify.vec_support_v1.push_v1",
+                "params": [{"name": "v", "ty": "bytes"}, {"name": "x", "ty": "i32"}],
+                "result": "bytes",
+                "body": [
+                    "begin",
+                    ["let", "word", ["codec.write_u32_le", "x"]],
+                    ["let", "word_v", ["bytes.view", "word"]],
+                    ["let", "one", ["view.to_bytes", ["view.slice", "word_v", 0, 1]]],
+                    ["bytes.concat", "v", "one"]
+                ]
+            },
+            {
+                "kind": "defn",
+                "name": "x07.verify.vec_support_v1.set_v1",
+                "params": [
+                    {"name": "v", "ty": "bytes"},
+                    {"name": "idx", "ty": "i32"},
+                    {"name": "x", "ty": "i32"}
+                ],
+                "result": "bytes",
+                "body": [
+                    "begin",
+                    ["let", "base_v", ["bytes.view", "v"]],
+                    ["let", "n", ["view.len", "base_v"]],
+                    [
+                        "if",
+                        ["<u", "idx", "n"],
+                        [
+                            "begin",
+                            ["let", "prefix", ["view.to_bytes", ["view.slice", "base_v", 0, "idx"]]],
+                            ["let", "word", ["codec.write_u32_le", "x"]],
+                            ["let", "word_v", ["bytes.view", "word"]],
+                            ["let", "one", ["view.to_bytes", ["view.slice", "word_v", 0, 1]]],
+                            ["let", "next_idx", ["+", "idx", 1]],
+                            ["let", "suffix", ["view.to_bytes", ["view.slice", "base_v", "next_idx", ["-", "n", "next_idx"]]]],
+                            ["bytes.concat", ["bytes.concat", "prefix", "one"], "suffix"]
+                        ],
+                        ["begin", ["view.get_u8", "base_v", "idx"], ["bytes.alloc", 0]]
+                    ]
+                ]
+            }
+        ]
+    })
+}
+
+fn build_verify_compile_module_roots(
+    module_roots: &[PathBuf],
+    entry: &str,
+    work_dir: &Path,
+) -> Result<Vec<PathBuf>> {
+    let overlay_root = work_dir.join("module_overlay");
+    std::fs::create_dir_all(&overlay_root)
+        .with_context(|| format!("create verify overlay dir: {}", overlay_root.display()))?;
+
+    let support_path = verify_overlay_module_path(&overlay_root, VERIFY_VEC_SUPPORT_MODULE_ID);
+    if let Some(parent) = support_path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create verify overlay module dir: {}", parent.display()))?;
+    }
+    let mut support_bytes =
+        serde_json::to_vec_pretty(&build_verify_vec_support_module()).context("encode vec support module JSON")?;
+    support_bytes.push(b'\n');
+    util::write_atomic(&support_path, &support_bytes)
+        .with_context(|| format!("write verify support module: {}", support_path.display()))?;
+
+    let (entry_module, _) = entry.rsplit_once('.').context("--entry must contain '.'")?;
+    let mut queue = VecDeque::from([entry_module.to_string()]);
+    let mut visited = BTreeSet::new();
+    while let Some(module_id) = queue.pop_front() {
+        if module_id == VERIFY_VEC_SUPPORT_MODULE_ID || !visited.insert(module_id.clone()) {
+            continue;
+        }
+        let source =
+            x07c::module_source::load_module_source(&module_id, WorldId::SolvePure, module_roots)
+                .map_err(|err| anyhow::anyhow!("{:?}: {}", err.kind, err.message))?;
+        let mut file = x07c::x07ast::parse_x07ast_json(source.src.as_bytes())
+            .map_err(|err| anyhow::anyhow!("parse overlay module {module_id:?}: {err}"))?;
+        rewrite_verify_overlay_file(&mut file);
+        let imports = file.imports.iter().cloned().collect::<Vec<_>>();
+        let mut bytes = serde_json::to_vec_pretty(&x07c::x07ast::x07ast_file_to_value(&file))
+            .with_context(|| format!("encode overlay module JSON for {module_id:?}"))?;
+        bytes.push(b'\n');
+        let out_path = verify_overlay_module_path(&overlay_root, &module_id);
+        if let Some(parent) = out_path.parent() {
+            std::fs::create_dir_all(parent).with_context(|| {
+                format!("create verify overlay module dir: {}", parent.display())
+            })?;
+        }
+        util::write_atomic(&out_path, &bytes)
+            .with_context(|| format!("write verify overlay module: {}", out_path.display()))?;
+        for import in imports {
+            if import != VERIFY_VEC_SUPPORT_MODULE_ID {
+                queue.push_back(import);
+            }
+        }
+    }
+
+    Ok(vec![overlay_root])
+}
 
 #[derive(Debug, Clone, Args)]
 pub struct VerifyArgs {
@@ -85,6 +435,10 @@ pub struct VerifyArgs {
     /// Defaults to `<project_root>/.x07/artifacts` or `<cwd>/.x07/artifacts`.
     #[arg(long, value_name = "DIR")]
     pub artifact_dir: Option<PathBuf>,
+
+    /// Import one or more proof-summary artifacts produced by `x07 verify`.
+    #[arg(long = "summary", value_name = "PATH")]
+    pub summary: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,7 +486,7 @@ struct VerifyResult {
     details: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 struct Artifacts {
     #[serde(skip_serializing_if = "Option::is_none")]
     driver_path: Option<String>,
@@ -146,9 +500,11 @@ struct Artifacts {
     smt2_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     z3_out_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    verify_summary_path: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct VerifyCoverage {
     schema_version: &'static str,
     entry: String,
@@ -157,12 +513,14 @@ struct VerifyCoverage {
     functions: Vec<VerifyCoverageFunction>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct VerifyCoverageSummary {
     reachable_defn: u64,
     proven_defn: u64,
     recursive_defn: u64,
     proven_recursive_defn: u64,
+    imported_summary_defn: u64,
+    termination_proven_defn: u64,
     unsupported_recursive_defn: u64,
     reachable_async: u64,
     proven_async: u64,
@@ -175,25 +533,82 @@ struct VerifyCoverageSummary {
     async_model: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct VerifyCoverageFunction {
     symbol: String,
     kind: String,
     status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    signature: Option<VerifyFunctionSignature>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     proof_summary: Option<VerifyFunctionProofSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    decl_sha256_hex: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     source_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     details: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct VerifyFunctionProofSummary {
     recursion_kind: String,
     has_decreases: bool,
     decreases_count: u64,
     prove_supported: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct VerifyFunctionSignature {
+    params: Vec<VerifySignatureParam>,
+    result: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    result_brand: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct VerifySignatureParam {
+    ty: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    brand: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct VerifySummary {
+    schema_version: String,
+    entry: String,
+    worlds: Vec<String>,
+    summary: VerifyCoverageSummary,
+    functions: Vec<VerifyCoverageFunction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    imported_summaries: Vec<VerifyImportedSummaryRef>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct VerifyImportedSummaryRef {
+    path: String,
+    sha256_hex: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    symbols: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct ImportedSummaryFunction {
+    function: VerifyCoverageFunction,
+    source: VerifyImportedSummaryRef,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ImportedSummaryIndex {
+    by_symbol: BTreeMap<String, ImportedSummaryFunction>,
+    inventory: Vec<VerifyImportedSummaryRef>,
+}
+
+#[derive(Debug, Clone)]
+struct CoverageAnalysis {
+    coverage: VerifyCoverage,
+    diagnostics: Vec<x07c::diagnostics::Diagnostic>,
+    imported_summaries: Vec<VerifyImportedSummaryRef>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -215,7 +630,7 @@ struct VerifyPrimitiveEntry {
 #[derive(Debug, Clone)]
 struct TrustedPrimitiveStub {
     symbol: String,
-    params: Vec<String>,
+    params: Vec<VerifySignatureParam>,
     result: String,
 }
 
@@ -228,13 +643,23 @@ struct CoverageModule {
 #[derive(Debug, Clone)]
 struct CoverageDecl {
     kind: String,
-    params: Vec<String>,
+    param_names: Vec<String>,
+    params: Vec<VerifySignatureParam>,
     result: String,
+    result_brand: Option<String>,
+    decl_sha256_hex: String,
     has_contracts: bool,
     decreases_count: usize,
+    decreases: Vec<Value>,
     body: Option<Value>,
     contract_exprs: Vec<Value>,
     source_path: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+struct VerifyBrandModule {
+    imports: Vec<String>,
+    validators: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -394,13 +819,41 @@ fn cmd_verify_inner(
         }
     };
 
+    let imported_summary_index = match load_imported_summary_index(&cwd, &args.summary) {
+        Ok(v) => v,
+        Err(err) => {
+            let d = diag_verify("X07V_SUMMARY_MISMATCH", format!("{err:#}"));
+            return write_report_and_exit(
+                machine,
+                VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
+            );
+        }
+    };
+
+    let artifact_base =
+        resolve_artifact_base_dir(&cwd, project_root.as_deref(), args.artifact_dir.as_deref());
+
     if mode == Mode::Coverage {
-        return cmd_verify_coverage(machine, &args, project_path.as_deref(), &target);
+        return cmd_verify_coverage(
+            machine,
+            &args,
+            project_path.as_deref(),
+            &module_roots,
+            &target,
+            &imported_summary_index,
+            &artifact_base,
+        );
     }
 
     if mode == Mode::Prove {
         if let Some((code, msg)) =
-            prove_unsupported_reason(&target, &args.entry, args.max_bytes_len, &recursion)
+            prove_unsupported_reason(
+                &module_roots,
+                &target,
+                &args.entry,
+                args.max_bytes_len,
+                &recursion,
+            )
         {
             return write_report_and_exit(
                 machine,
@@ -422,8 +875,13 @@ fn cmd_verify_inner(
                 );
             }
         }
-    } else if let Some(d) =
-        verify_precheck_diag(&target, &args.entry, args.max_bytes_len, &recursion)
+    } else if let Some(d) = verify_precheck_diag(
+        &module_roots,
+        &target,
+        &args.entry,
+        args.max_bytes_len,
+        &recursion,
+    )
     {
         return write_report_and_exit(
             machine,
@@ -442,9 +900,6 @@ fn cmd_verify_inner(
         max_bytes_len: args.max_bytes_len,
         input_len_bytes,
     };
-
-    let artifact_base =
-        resolve_artifact_base_dir(&cwd, project_root.as_deref(), args.artifact_dir.as_deref());
 
     let mut artifacts = Artifacts::default();
 
@@ -466,8 +921,15 @@ fn cmd_verify_inner(
     std::fs::create_dir_all(&work_dir)
         .with_context(|| format!("create artifact dir: {}", work_dir.display()))?;
 
-    let driver_src = match build_verify_driver_x07ast_json(&args.entry, &target, args.max_bytes_len)
-    {
+    let use_direct_prove_harness = mode == Mode::Prove && direct_prove_harness_supported(&target);
+    let normalize_for_overlay = mode == Mode::Prove && !use_direct_prove_harness;
+    let driver_src = match build_verify_driver_x07ast_json(
+        &module_roots,
+        &args.entry,
+        &target,
+        args.max_bytes_len,
+        normalize_for_overlay,
+    ) {
         Ok(src) => src,
         Err(err) if mode == Mode::Prove && target.is_async => {
             return write_report_and_exit(
@@ -495,13 +957,45 @@ fn cmd_verify_inner(
             &args,
             project_path.as_deref(),
             &target,
+            &imported_summary_index,
         )?)
     } else {
         None
     };
     let proof_summary = prove_coverage
         .as_ref()
-        .map(|coverage| report_proof_summary(coverage, &target, &recursion));
+        .map(|analysis| report_proof_summary(&analysis.coverage, &target, &recursion));
+
+    if mode == Mode::Prove
+        && prove_coverage
+            .as_ref()
+            .is_some_and(|analysis| !analysis.diagnostics.is_empty())
+    {
+        let diag = prove_coverage
+            .as_ref()
+            .and_then(|analysis| analysis.diagnostics.first())
+            .cloned()
+            .unwrap_or_else(|| {
+                diag_verify(
+                    "X07V_SUMMARY_MISSING",
+                    "imported proof-summary reuse failed for a reachable symbol",
+                )
+            });
+        return write_report_and_exit(
+            machine,
+            VerifyReport::error(mode, &args.entry, bounds, diag, 2).with_artifacts(artifacts),
+        );
+    }
+
+    if let Some(analysis) = &prove_coverage {
+        let verify_summary_path = work_dir.join("verify.summary.json");
+        write_verify_summary_artifact(
+            &verify_summary_path,
+            &analysis.coverage,
+            &analysis.imported_summaries,
+        )?;
+        artifacts.verify_summary_path = Some(verify_summary_path.display().to_string());
+    }
 
     let trusted_primitive_stubs = if mode == Mode::Prove {
         trusted_primitive_stubs_for_prove(
@@ -509,13 +1003,19 @@ fn cmd_verify_inner(
             project_path.as_deref(),
             &target,
             &module_roots,
-            prove_coverage.as_ref(),
+            prove_coverage.as_ref().map(|analysis| &analysis.coverage),
         )?
     } else {
         Vec::new()
     };
-
-    let c_src = match compile_driver_to_c(&driver_src, &module_roots) {
+    let compile_module_roots = if use_direct_prove_harness {
+        module_roots.clone()
+    } else if mode == Mode::Prove {
+        build_verify_compile_module_roots(&module_roots, &args.entry, &work_dir)?
+    } else {
+        module_roots.clone()
+    };
+    let c_src = match compile_driver_to_c(&driver_src, &compile_module_roots) {
         Ok(v) => v,
         Err(err) if mode == Mode::Prove && target.is_async => {
             return write_report_and_exit(
@@ -552,7 +1052,12 @@ fn cmd_verify_inner(
     } else {
         c_src
     };
-    let c_with_harness = format!("{c_src}\n\n{}\n", build_c_harness(bounds.input_len_bytes));
+    let harness_src = if use_direct_prove_harness {
+        build_direct_prove_c_harness(&args.entry, &target, args.max_bytes_len)?
+    } else {
+        build_c_harness(bounds.input_len_bytes)
+    };
+    let c_with_harness = format!("{c_src}\n\n{harness_src}\n");
     let c_path = work_dir.join("verify.c");
     util::write_atomic(&c_path, c_with_harness.as_bytes())
         .with_context(|| format!("write verify C: {}", c_path.display()))?;
@@ -852,6 +1357,16 @@ fn cmd_verify_smt(
     artifacts.z3_out_path = Some(z3_out_path.display().to_string());
 
     let status = z3_stdout.lines().next().unwrap_or("").trim();
+    if status.is_empty() && !smt2_has_solver_query(&smt2_path)? {
+        return write_report_and_exit(
+            machine,
+            attach_summary(if mode == Mode::Prove {
+                VerifyReport::proven(&args.entry, bounds, artifacts)
+            } else {
+                VerifyReport::verified(mode, &args.entry, bounds, artifacts)
+            }),
+        );
+    }
     match status {
         "unsat" => write_report_and_exit(
             machine,
@@ -1057,6 +1572,14 @@ fn normalize_smt2_logic_for_z3(path: &Path) -> Result<()> {
         .with_context(|| format!("rewrite smt2 logic: {}", path.display()))
 }
 
+fn smt2_has_solver_query(path: &Path) -> Result<bool> {
+    let text =
+        std::fs::read_to_string(path).with_context(|| format!("read smt2: {}", path.display()))?;
+    Ok(text
+        .lines()
+        .any(|line| line.trim_start().starts_with("(check-sat")))
+}
+
 fn resolve_project_manifest(cwd: &Path, explicit: Option<&Path>) -> Result<Option<PathBuf>> {
     if let Some(p) = explicit {
         let p = util::resolve_existing_path_upwards(p);
@@ -1148,11 +1671,15 @@ fn resolve_artifact_base_dir(
 
 #[derive(Debug, Clone)]
 struct TargetSig {
-    params: Vec<String>,
+    param_names: Vec<String>,
+    params: Vec<VerifySignatureParam>,
     result: String,
+    result_brand: Option<String>,
+    decl_sha256_hex: String,
     is_async: bool,
     has_contracts: bool,
     decreases_count: usize,
+    decreases: Vec<Value>,
     body: Value,
     source_path: PathBuf,
 }
@@ -1205,30 +1732,53 @@ fn load_target_info(module_roots: &[PathBuf], entry: &str) -> Result<TargetSig> 
             .get("params")
             .and_then(Value::as_array)
             .context("defn missing params[]")?;
+        let mut param_names = Vec::with_capacity(params.len());
         let mut out = Vec::with_capacity(params.len());
         for p in params {
+            param_names.push(
+                p.get("name")
+                    .and_then(Value::as_str)
+                    .context("param missing name")?
+                    .to_string(),
+            );
             let ty = p
                 .get("ty")
                 .and_then(Value::as_str)
                 .context("param missing ty")?;
-            out.push(ty.to_string());
+            out.push(VerifySignatureParam {
+                ty: ty.to_string(),
+                brand: p.get("brand").and_then(Value::as_str).map(str::to_string),
+            });
         }
         let has_contracts = has_any_contracts(d);
         let body = d.get("body").cloned().context("defn missing body")?;
+        let decreases = d
+            .get("decreases")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.get("expr").cloned())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         return Ok(TargetSig {
+            param_names,
             params: out,
             result: d
                 .get("result")
                 .and_then(Value::as_str)
                 .context("defn missing result")?
                 .to_string(),
+            result_brand: d
+                .get("result_brand")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            decl_sha256_hex: decl_sha256_hex_for_value(d)?,
             is_async: kind == "defasync",
             has_contracts,
-            decreases_count: d
-                .get("decreases")
-                .and_then(Value::as_array)
-                .map(Vec::len)
-                .unwrap_or(0),
+            decreases_count: decreases.len(),
+            decreases,
             body,
             source_path: source
                 .path
@@ -1238,6 +1788,235 @@ fn load_target_info(module_roots: &[PathBuf], entry: &str) -> Result<TargetSig> 
     }
 
     anyhow::bail!("could not find function {entry:?} in resolved module {module_id:?}")
+}
+
+fn load_verify_brand_module<'a>(
+    module_roots: &[PathBuf],
+    module_id: &str,
+    cache: &'a mut BTreeMap<String, VerifyBrandModule>,
+) -> Result<&'a VerifyBrandModule> {
+    if !cache.contains_key(module_id) {
+        let source = x07c::module_source::load_module_source(module_id, WorldId::SolvePure, module_roots)
+            .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
+        let doc: Value = serde_json::from_str(&source.src)
+            .with_context(|| format!("parse module JSON for {module_id:?}"))?;
+        let imports = doc
+            .get("imports")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let meta = doc
+            .get("meta")
+            .and_then(Value::as_object)
+            .map(|obj| {
+                obj.iter()
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect::<BTreeMap<_, _>>()
+            })
+            .unwrap_or_default();
+        let validators = x07c::stream_pipe::brand_registry_from_meta_v1(&meta)
+            .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
+        cache.insert(
+            module_id.to_string(),
+            VerifyBrandModule {
+                imports,
+                validators,
+            },
+        );
+    }
+    Ok(cache
+        .get(module_id)
+        .expect("verify brand module inserted into cache"))
+}
+
+fn resolve_verify_brand_validator(
+    module_roots: &[PathBuf],
+    entry: &str,
+    brand_id: &str,
+) -> Result<String> {
+    let (module_id, _) = entry.rsplit_once('.').context("--entry must contain '.'")?;
+    let mut cache = BTreeMap::new();
+    let mut queue = VecDeque::from([module_id.to_string()]);
+    let mut visited = BTreeSet::new();
+    let mut matches = BTreeSet::new();
+
+    while let Some(current) = queue.pop_front() {
+        if !visited.insert(current.clone()) {
+            continue;
+        }
+        let module = load_verify_brand_module(module_roots, &current, &mut cache)?;
+        if let Some(validator) = module.validators.get(brand_id) {
+            matches.insert(validator.clone());
+        }
+        for import in &module.imports {
+            queue.push_back(import.clone());
+        }
+    }
+
+    match matches.len() {
+        1 => Ok(matches.into_iter().next().expect("single validator match")),
+        0 => anyhow::bail!(
+            "brand {:?} is missing meta.brands_v1.validate in the reachable module graph for {:?}",
+            brand_id,
+            entry
+        ),
+        _ => anyhow::bail!(
+            "brand {:?} resolves to multiple validators in the reachable module graph for {:?}: {:?}",
+            brand_id,
+            entry,
+            matches.into_iter().collect::<Vec<_>>()
+        ),
+    }
+}
+
+fn decl_sha256_hex_for_value(value: &Value) -> Result<String> {
+    let bytes = report_common::canonical_pretty_json_bytes(value)?;
+    Ok(util::sha256_hex(&bytes))
+}
+
+fn load_imported_summary_index(cwd: &Path, paths: &[PathBuf]) -> Result<ImportedSummaryIndex> {
+    let mut index = ImportedSummaryIndex::default();
+    for raw_path in paths {
+        let path = if raw_path.is_absolute() {
+            raw_path.clone()
+        } else {
+            cwd.join(raw_path)
+        };
+        let bytes =
+            std::fs::read(&path).with_context(|| format!("read verify summary: {}", path.display()))?;
+        let value: Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parse verify summary JSON: {}", path.display()))?;
+        let diags = validate_verify_summary_schema(&value)?;
+        if !diags.is_empty() {
+            anyhow::bail!(
+                "verify summary schema invalid for {}: {}",
+                path.display(),
+                diags[0].message
+            );
+        }
+        let summary: VerifySummary = serde_json::from_value(value)
+            .with_context(|| format!("decode verify summary JSON: {}", path.display()))?;
+        if summary.schema_version != X07_VERIFY_SUMMARY_SCHEMA_VERSION {
+            anyhow::bail!(
+                "verify summary schema_version mismatch for {}: expected {:?} got {:?}",
+                path.display(),
+                X07_VERIFY_SUMMARY_SCHEMA_VERSION,
+                summary.schema_version
+            );
+        }
+        let mut symbols = summary
+            .functions
+            .iter()
+            .map(|function| function.symbol.clone())
+            .filter(|symbol| !symbol.trim().is_empty())
+            .collect::<Vec<_>>();
+        symbols.sort();
+        symbols.dedup();
+        let source = VerifyImportedSummaryRef {
+            path: path.display().to_string(),
+            sha256_hex: util::sha256_hex(&bytes),
+            symbols,
+        };
+        for function in summary.functions {
+            let symbol = function.symbol.clone();
+            if symbol.trim().is_empty() {
+                continue;
+            }
+            if index.by_symbol.contains_key(&symbol) {
+                anyhow::bail!(
+                    "duplicate imported verify summary for symbol {:?} via {}",
+                    symbol,
+                    path.display()
+                );
+            }
+            index.by_symbol.insert(
+                symbol,
+                ImportedSummaryFunction {
+                    function,
+                    source: source.clone(),
+                },
+            );
+        }
+        index.inventory.push(source);
+    }
+    index
+        .inventory
+        .sort_by(|a, b| (a.path.as_str(), a.sha256_hex.as_str()).cmp(&(b.path.as_str(), b.sha256_hex.as_str())));
+    Ok(index)
+}
+
+fn add_used_imported_summary(
+    used_imported_summaries: &mut BTreeMap<String, VerifyImportedSummaryRef>,
+    source: &VerifyImportedSummaryRef,
+    symbol: &str,
+) {
+    let entry = used_imported_summaries
+        .entry(source.path.clone())
+        .or_insert_with(|| VerifyImportedSummaryRef {
+            path: source.path.clone(),
+            sha256_hex: source.sha256_hex.clone(),
+            symbols: Vec::new(),
+        });
+    if !entry.symbols.iter().any(|existing| existing == symbol) {
+        entry.symbols.push(symbol.to_string());
+        entry.symbols.sort();
+    }
+}
+
+fn coverage_function_from_imported_summary(
+    symbol: &str,
+    imported: &ImportedSummaryFunction,
+    signature: Option<VerifyFunctionSignature>,
+    decl_sha256_hex: Option<String>,
+    source_path: Option<String>,
+) -> VerifyCoverageFunction {
+    let mut function = imported.function.clone();
+    function.symbol = symbol.to_string();
+    function.signature = signature.or(function.signature.clone());
+    function.decl_sha256_hex = decl_sha256_hex.or(function.decl_sha256_hex.clone());
+    function.source_path = source_path.or(function.source_path.clone());
+    function.details = Some(match imported.function.status.as_str() {
+        "termination_proven" => {
+            format!("termination summary imported from {}", imported.source.path)
+        }
+        _ => format!("proof summary imported from {}", imported.source.path),
+    });
+    function.status = if imported.function.status == "termination_proven" {
+        "termination_proven".to_string()
+    } else {
+        "imported_summary".to_string()
+    };
+    function
+}
+
+fn summary_mismatch_function_for_decl(
+    symbol: &str,
+    decl: &CoverageDecl,
+    imported: &ImportedSummaryFunction,
+) -> VerifyCoverageFunction {
+    VerifyCoverageFunction {
+        symbol: symbol.to_string(),
+        kind: decl.kind.clone(),
+        status: "unsupported".to_string(),
+        signature: Some(verify_function_signature(
+            &decl.params,
+            &decl.result,
+            decl.result_brand.as_deref(),
+        )),
+        proof_summary: imported.function.proof_summary.clone(),
+        decl_sha256_hex: Some(decl.decl_sha256_hex.clone()),
+        source_path: Some(decl.source_path.display().to_string()),
+        details: Some(format!(
+            "imported proof summary from {} does not match the current declaration",
+            imported.source.path
+        )),
+    }
 }
 
 fn load_coverage_module<'a>(
@@ -1292,8 +2071,34 @@ fn load_coverage_module<'a>(
                 .map(|params| {
                     params
                         .iter()
-                        .filter_map(|p| p.get("ty").and_then(Value::as_str))
-                        .map(str::to_string)
+                        .map(|p| {
+                            Some((
+                                p.get("name").and_then(Value::as_str)?.to_string(),
+                                VerifySignatureParam {
+                                    ty: p.get("ty").and_then(Value::as_str)?.to_string(),
+                                    brand: p
+                                        .get("brand")
+                                        .and_then(Value::as_str)
+                                        .map(str::to_string),
+                                },
+                            ))
+                        })
+                        .collect::<Option<Vec<_>>>()
+                })
+                .flatten()
+                .unwrap_or_default();
+            let param_names = params
+                .iter()
+                .map(|(name, _)| name.clone())
+                .collect::<Vec<_>>();
+            let params = params.into_iter().map(|(_, param)| param).collect::<Vec<_>>();
+            let decreases = decl
+                .get("decreases")
+                .and_then(Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.get("expr").cloned())
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
@@ -1301,18 +2106,21 @@ fn load_coverage_module<'a>(
                 name.to_string(),
                 CoverageDecl {
                     kind: kind.to_string(),
+                    param_names,
                     params,
                     result: decl
                         .get("result")
                         .and_then(Value::as_str)
                         .unwrap_or("i32")
                         .to_string(),
+                    result_brand: decl
+                        .get("result_brand")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    decl_sha256_hex: decl_sha256_hex_for_value(&decl)?,
                     has_contracts: has_any_contracts(&decl),
-                    decreases_count: decl
-                        .get("decreases")
-                        .and_then(Value::as_array)
-                        .map(Vec::len)
-                        .unwrap_or(0),
+                    decreases_count: decreases.len(),
+                    decreases,
                     body: decl.get("body").cloned(),
                     contract_exprs: collect_contract_exprs(&decl),
                     source_path: source
@@ -1666,16 +2474,176 @@ fn recursion_summary_for_symbol(
     })
 }
 
+fn supported_verify_param_type(ty: &str) -> bool {
+    matches!(
+        ty,
+        "i32"
+            | "u32"
+            | "bytes"
+            | "bytes_view"
+            | "vec_u8"
+            | "option_i32"
+            | "option_bytes"
+            | "option_bytes_view"
+            | "result_i32"
+            | "result_bytes"
+            | "result_bytes_view"
+    )
+}
+
+fn supported_verify_result_type(ty: &str) -> bool {
+    supported_verify_param_type(ty)
+}
+
+fn encoded_verify_param_bytes(param: &VerifySignatureParam, max_bytes_len: u32) -> Result<u64> {
+    match param.ty.as_str() {
+        "i32" | "u32" => Ok(4),
+        "bytes" | "bytes_view" | "vec_u8" => Ok(4u64 + max_bytes_len as u64),
+        "option_i32" | "result_i32" => Ok(5),
+        "option_bytes" | "option_bytes_view" | "result_bytes" | "result_bytes_view" => {
+            Ok(1u64 + 4u64 + max_bytes_len as u64)
+        }
+        other => anyhow::bail!("unsupported verify type {other:?}"),
+    }
+}
+
+fn verify_brand_supported_carrier(ty: &str) -> bool {
+    matches!(
+        ty,
+        "bytes_view" | "option_bytes_view" | "result_bytes_view"
+    )
+}
+
+fn verify_driver_raw_param(param: &VerifySignatureParam) -> Result<VerifySignatureParam> {
+    let ty = match param.ty.as_str() {
+        "i32" | "u32" | "bytes_view" | "option_i32" | "result_i32" => param.ty.as_str(),
+        "bytes" | "vec_u8" => "bytes_view",
+        "option_bytes" | "option_bytes_view" => "option_bytes_view",
+        "result_bytes" | "result_bytes_view" => "result_bytes_view",
+        other => anyhow::bail!("unsupported verify param type {other:?}"),
+    };
+    Ok(VerifySignatureParam {
+        ty: ty.to_string(),
+        brand: None,
+    })
+}
+
+fn verify_compile_param(
+    param: &VerifySignatureParam,
+    normalize_for_overlay: bool,
+) -> VerifySignatureParam {
+    if normalize_for_overlay && param.ty == "vec_u8" {
+        VerifySignatureParam {
+            ty: "bytes".to_string(),
+            brand: param.brand.clone(),
+        }
+    } else {
+        param.clone()
+    }
+}
+
+fn find_signature_rich_type_unsupported(
+    module_roots: &[PathBuf],
+    entry: &str,
+    target: &TargetSig,
+) -> Option<String> {
+    for (idx, param) in target.params.iter().enumerate() {
+        if target.is_async && (param.brand.is_some() || param.ty == "vec_u8") {
+            let param_name = target
+                .param_names
+                .get(idx)
+                .map(String::as_str)
+                .unwrap_or("__arg");
+            return Some(format!(
+                "x07 verify defasync proof inputs keep the async line on unbranded byte carriers; param {:?} uses {:?}",
+                param_name, param.ty
+            ));
+        }
+        if param.brand.is_some() {
+            if !verify_brand_supported_carrier(&param.ty) {
+                return Some(format!(
+                    "x07 verify currently supports proof-input brands on bytes_view and its option/result view carriers, got {:?}",
+                    param.ty
+                ));
+            }
+            if let Err(err) = resolve_verify_brand_validator(
+                module_roots,
+                entry,
+                param.brand.as_deref().expect("brand checked"),
+            ) {
+                return Some(err.to_string());
+            }
+        }
+        if !supported_verify_param_type(&param.ty) {
+            return Some(format!(
+                "x07 verify does not support param type {:?} in the certifiable richer-data subset",
+                param.ty
+            ));
+        }
+        if let Err(err) = verify_driver_raw_param(param) {
+            return Some(err.to_string());
+        }
+    }
+    if !supported_verify_result_type(&target.result) {
+        return Some(format!(
+            "x07 verify does not support result type {:?} in the certifiable richer-data subset",
+            target.result
+        ));
+    }
+    None
+}
+
+fn find_unsupported_heap_effect(body: &Value) -> Option<String> {
+    match body {
+        Value::Array(items) => {
+            if let Some(head) = items.first().and_then(Value::as_str) {
+                if matches!(
+                    head,
+                    "unsafe"
+                        | "addr_of"
+                        | "addr_of_mut"
+                        | "bytes.set_u8"
+                        | "bytes.as_ptr"
+                        | "bytes.as_mut_ptr"
+                        | "view.as_ptr"
+                        | "vec_u8.as_ptr"
+                        | "vec_u8.as_mut_ptr"
+                        | "ptr.null"
+                        | "ptr.as_const"
+                        | "ptr.cast"
+                        | "ptr.add"
+                        | "ptr.sub"
+                        | "ptr.offset"
+                        | "ptr.read_u8"
+                        | "ptr.write_u8"
+                        | "ptr.read_i32"
+                        | "ptr.write_i32"
+                        | "memcpy"
+                        | "memmove"
+                        | "memset"
+                ) {
+                    return Some(format!(
+                        "x07 verify does not support heap/pointer effect {:?} in the certifiable pure subset",
+                        head
+                    ));
+                }
+            }
+            for item in items {
+                if let Some(msg) = find_unsupported_heap_effect(item) {
+                    return Some(msg);
+                }
+            }
+            None
+        }
+        Value::Object(obj) => obj.values().find_map(find_unsupported_heap_effect),
+        _ => None,
+    }
+}
+
 fn compute_input_len_bytes(sig: &TargetSig, max_bytes_len: u32) -> Result<u32> {
     let mut total: u64 = 0;
-    for ty in &sig.params {
-        match ty.as_str() {
-            "i32" | "u32" => total = total.saturating_add(4),
-            "bytes" | "bytes_view" => total = total.saturating_add(4 + max_bytes_len as u64),
-            other => anyhow::bail!(
-                "unsupported verify param type {other:?} (supported: i32,u32,bytes,bytes_view)"
-            ),
-        }
+    for param in &sig.params {
+        total = total.saturating_add(encoded_verify_param_bytes(param, max_bytes_len)?);
     }
     if total > u32::MAX as u64 {
         anyhow::bail!("verify input encoding too large: {total} bytes");
@@ -1684,6 +2652,7 @@ fn compute_input_len_bytes(sig: &TargetSig, max_bytes_len: u32) -> Result<u32> {
 }
 
 fn prove_unsupported_reason(
+    module_roots: &[PathBuf],
     target: &TargetSig,
     entry: &str,
     max_bytes_len: u32,
@@ -1710,6 +2679,9 @@ fn prove_unsupported_reason(
                     "self-recursive targets must declare decreases[] to use x07 verify".to_string(),
                 ));
             }
+            if let Some(msg) = find_recursive_termination_failure(target, entry) {
+                return Some(("X07V_RECURSION_TERMINATION_FAILED", msg));
+            }
         }
         RecursionKind::Mutual => {
             return Some((
@@ -1724,8 +2696,14 @@ fn prove_unsupported_reason(
     if let Some(msg) = find_for_with_non_literal_bounds(&target.body) {
         return Some(("X07V_UNSUPPORTED_FOR_BOUNDS", msg));
     }
+    if let Some(msg) = find_signature_rich_type_unsupported(module_roots, entry, target) {
+        return Some(("X07V_UNSUPPORTED_RICH_TYPE", msg));
+    }
+    if let Some(msg) = find_unsupported_heap_effect(&target.body) {
+        return Some(("X07V_UNSUPPORTED_HEAP_EFFECT", msg));
+    }
     if let Err(err) = compute_input_len_bytes(target, max_bytes_len) {
-        return Some(("X07V_UNSUPPORTED_PARAM", err.to_string()));
+        return Some(("X07V_UNSUPPORTED_RICH_TYPE", err.to_string()));
     }
     if target.is_async && target.result != "bytes" && target.result != "result_bytes" {
         return Some((
@@ -1740,12 +2718,14 @@ fn prove_unsupported_reason(
 }
 
 fn verify_precheck_diag(
+    module_roots: &[PathBuf],
     target: &TargetSig,
     entry: &str,
     max_bytes_len: u32,
     recursion: &RecursionSummary,
 ) -> Option<x07c::diagnostics::Diagnostic> {
-    let (code, msg) = prove_unsupported_reason(target, entry, max_bytes_len, recursion)?;
+    let (code, msg) =
+        prove_unsupported_reason(module_roots, target, entry, max_bytes_len, recursion)?;
     Some(diag_verify(code, msg))
 }
 
@@ -1759,6 +2739,18 @@ fn function_proof_summary(
         has_decreases: target.decreases_count != 0,
         decreases_count: target.decreases_count as u64,
         prove_supported,
+    }
+}
+
+fn verify_function_signature(
+    params: &[VerifySignatureParam],
+    result: &str,
+    result_brand: Option<&str>,
+) -> VerifyFunctionSignature {
+    VerifyFunctionSignature {
+        params: params.to_vec(),
+        result: result.to_string(),
+        result_brand: result_brand.map(str::to_string),
     }
 }
 
@@ -1794,11 +2786,16 @@ fn cmd_verify_coverage(
     machine: &crate::reporting::MachineArgs,
     args: &VerifyArgs,
     project_path: Option<&Path>,
+    module_roots: &[PathBuf],
     target: &TargetSig,
+    imported_summary_index: &ImportedSummaryIndex,
+    artifact_base: &Path,
 ) -> Result<std::process::ExitCode> {
-    let coverage = match coverage_report_for_entry(args, project_path, target) {
-        Ok(coverage) => coverage,
+    let analysis = match coverage_report_for_entry(args, project_path, target, imported_summary_index)
+    {
+        Ok(analysis) => analysis,
         Err(err) => coverage_report_fallback(
+            module_roots,
             &args.entry,
             project_path,
             target,
@@ -1806,9 +2803,26 @@ fn cmd_verify_coverage(
             Some(format!("could not materialize reachable closure: {err:#}")),
         ),
     };
+    let work_dir = artifact_base
+        .join("verify")
+        .join("coverage")
+        .join(util::safe_artifact_dir_name(&args.entry));
+    std::fs::create_dir_all(&work_dir)
+        .with_context(|| format!("create artifact dir: {}", work_dir.display()))?;
+    let verify_summary_path = work_dir.join("verify.summary.json");
+    write_verify_summary_artifact(
+        &verify_summary_path,
+        &analysis.coverage,
+        &analysis.imported_summaries,
+    )?;
     write_report_and_exit(
         machine,
-        VerifyReport::coverage_report(&args.entry, Bounds::for_args(args), coverage),
+        VerifyReport::coverage_report(&args.entry, Bounds::for_args(args), analysis.coverage)
+            .with_artifacts(Artifacts {
+                verify_summary_path: Some(verify_summary_path.display().to_string()),
+                ..Artifacts::default()
+            })
+            .with_diagnostics(analysis.diagnostics),
     )
 }
 
@@ -1830,6 +2844,7 @@ fn coverage_world(project_path: Option<&Path>) -> WorldId {
 }
 
 fn coverage_function_for_target(
+    module_roots: &[PathBuf],
     entry: &str,
     target: &TargetSig,
     max_bytes_len: u32,
@@ -1846,7 +2861,7 @@ fn coverage_function_for_target(
                 ),
             )
         } else if let Some((_, msg)) =
-            prove_unsupported_reason(target, entry, max_bytes_len, recursion)
+            prove_unsupported_reason(module_roots, target, entry, max_bytes_len, recursion)
         {
             ("defasync".to_string(), "unsupported".to_string(), Some(msg))
         } else {
@@ -1858,13 +2873,27 @@ fn coverage_function_for_target(
             "uncovered".to_string(),
             Some("target function has no requires/ensures/invariant clauses".to_string()),
         )
-    } else if let Some((_, msg)) = prove_unsupported_reason(target, entry, max_bytes_len, recursion)
+    } else if let Some((code, msg)) =
+        prove_unsupported_reason(module_roots, target, entry, max_bytes_len, recursion)
     {
-        ("defn".to_string(), "unsupported".to_string(), Some(msg))
+        if recursion.kind == RecursionKind::SelfRecursive
+            && target.decreases_count != 0
+            && matches!(code, "X07V_UNSUPPORTED_RICH_TYPE" | "X07V_UNSUPPORTED_HEAP_EFFECT")
+        {
+            (
+                "defn".to_string(),
+                "termination_proven".to_string(),
+                Some(format!(
+                    "recursive termination posture remains covered by decreases[], but full proof is unsupported: {msg}"
+                )),
+            )
+        } else {
+            ("defn".to_string(), "unsupported".to_string(), Some(msg))
+        }
     } else if recursion.kind == RecursionKind::SelfRecursive {
         (
             "defn".to_string(),
-            "proven".to_string(),
+            "proven_recursive".to_string(),
             Some(format!(
                 "self-recursive target with {} decreases clause(s)",
                 target.decreases_count
@@ -1873,13 +2902,22 @@ fn coverage_function_for_target(
     } else {
         ("defn".to_string(), "proven".to_string(), None)
     };
-    let prove_supported = status == "proven" || status == "proven_async";
+    let prove_supported = matches!(
+        status.as_str(),
+        "proven" | "proven_recursive" | "proven_async"
+    );
 
     VerifyCoverageFunction {
         symbol: entry.to_string(),
         kind,
         status,
+        signature: Some(verify_function_signature(
+            &target.params,
+            &target.result,
+            target.result_brand.as_deref(),
+        )),
         proof_summary: Some(function_proof_summary(target, recursion, prove_supported)),
+        decl_sha256_hex: Some(target.decl_sha256_hex.clone()),
         source_path: Some(target.source_path.display().to_string()),
         details,
     }
@@ -1889,7 +2927,8 @@ fn coverage_report_for_entry(
     args: &VerifyArgs,
     project_path: Option<&Path>,
     _target: &TargetSig,
-) -> Result<VerifyCoverage> {
+    imported_summary_index: &ImportedSummaryIndex,
+) -> Result<CoverageAnalysis> {
     let cwd = std::env::current_dir().context("get cwd")?;
     let module_roots = resolve_module_roots(&cwd, project_path, &args.module_root)?;
     let world = coverage_world(project_path);
@@ -1899,6 +2938,8 @@ fn coverage_report_for_entry(
     let mut queue = VecDeque::from([args.entry.clone()]);
     let mut visited = BTreeSet::new();
     let mut functions = BTreeMap::new();
+    let mut diagnostics = Vec::new();
+    let mut used_imported_summaries = BTreeMap::new();
     let mut saw_async = false;
 
     while let Some(symbol) = queue.pop_front() {
@@ -1913,7 +2954,9 @@ fn coverage_report_for_entry(
                     symbol,
                     kind: kind.clone(),
                     status: "trusted_primitive".to_string(),
+                    signature: None,
                     proof_summary: None,
+                    decl_sha256_hex: None,
                     source_path: None,
                     details: None,
                 },
@@ -1921,16 +2964,83 @@ fn coverage_report_for_entry(
             continue;
         }
 
+        if symbol != args.entry {
+            if let Some(imported) = imported_summary_index.by_symbol.get(&symbol) {
+                let current_decl = symbol
+                    .rsplit_once('.')
+                    .and_then(|(module_id, _)| {
+                        load_coverage_module(&module_roots, world, module_id, &mut module_cache)
+                            .ok()
+                    })
+                    .and_then(|module| module.decls.get(&symbol));
+                if let Some(decl) = current_decl {
+                    let summary_decl_sha = imported.function.decl_sha256_hex.as_deref();
+                    if summary_decl_sha != Some(decl.decl_sha256_hex.as_str()) {
+                        diagnostics.push(diag_verify(
+                            "X07V_SUMMARY_MISMATCH",
+                            format!(
+                                "imported proof summary for {:?} does not match the current declaration",
+                                symbol
+                            ),
+                        ));
+                        functions.insert(
+                            symbol.clone(),
+                            summary_mismatch_function_for_decl(&symbol, decl, imported),
+                        );
+                        continue;
+                    }
+                    add_used_imported_summary(
+                        &mut used_imported_summaries,
+                        &imported.source,
+                        &symbol,
+                    );
+                    functions.insert(
+                        symbol.clone(),
+                        coverage_function_from_imported_summary(
+                            &symbol,
+                            imported,
+                            Some(verify_function_signature(
+                                &decl.params,
+                                &decl.result,
+                                decl.result_brand.as_deref(),
+                            )),
+                            Some(decl.decl_sha256_hex.clone()),
+                            Some(decl.source_path.display().to_string()),
+                        ),
+                    );
+                    continue;
+                }
+                add_used_imported_summary(&mut used_imported_summaries, &imported.source, &symbol);
+                functions.insert(
+                    symbol.clone(),
+                    coverage_function_from_imported_summary(&symbol, imported, None, None, None),
+                );
+                continue;
+            }
+        }
+
         let Some((module_id, _)) = symbol.rsplit_once('.') else {
+            diagnostics.push(diag_verify(
+                "X07V_SUMMARY_MISSING",
+                format!(
+                    "reachable symbol {:?} could not be resolved and no imported summary was supplied",
+                    symbol
+                ),
+            ));
             functions.insert(
                 symbol.clone(),
                 VerifyCoverageFunction {
                     symbol,
                     kind: "imported".to_string(),
                     status: "unsupported".to_string(),
+                    signature: None,
                     proof_summary: None,
+                    decl_sha256_hex: None,
                     source_path: None,
-                    details: Some("symbol is not fully qualified".to_string()),
+                    details: Some(
+                        "symbol is not fully qualified and no imported summary was supplied"
+                            .to_string(),
+                    ),
                 },
             );
             continue;
@@ -1946,7 +3056,9 @@ fn coverage_report_for_entry(
                         symbol,
                         kind: "builtin".to_string(),
                         status: "trusted_primitive".to_string(),
+                        signature: None,
                         proof_summary: None,
+                        decl_sha256_hex: None,
                         source_path: None,
                         details: None,
                     },
@@ -1954,15 +3066,26 @@ fn coverage_report_for_entry(
                 continue;
             }
             Err(err) => {
+                diagnostics.push(diag_verify(
+                    "X07V_SUMMARY_MISSING",
+                    format!(
+                        "reachable symbol {:?} could not be resolved and no imported summary was supplied: {err}",
+                        symbol
+                    ),
+                ));
                 functions.insert(
                     symbol.clone(),
                     VerifyCoverageFunction {
                         symbol,
                         kind: "imported".to_string(),
                         status: "unsupported".to_string(),
+                        signature: None,
                         proof_summary: None,
+                        decl_sha256_hex: None,
                         source_path: None,
-                        details: Some(err.to_string()),
+                        details: Some(format!(
+                            "{err}; no imported summary was supplied for this reachable symbol"
+                        )),
                     },
                 );
                 continue;
@@ -1976,23 +3099,34 @@ fn coverage_report_for_entry(
                         symbol,
                         kind: "builtin".to_string(),
                         status: "trusted_primitive".to_string(),
+                        signature: None,
                         proof_summary: None,
+                        decl_sha256_hex: None,
                         source_path: None,
                         details: None,
                     },
                 );
                 continue;
             }
+            diagnostics.push(diag_verify(
+                "X07V_SUMMARY_MISSING",
+                format!(
+                    "reachable symbol {:?} was not present in the loaded module graph and no imported summary was supplied",
+                    symbol
+                ),
+            ));
             functions.insert(
                 symbol.clone(),
                 VerifyCoverageFunction {
                     symbol,
                     kind: "imported".to_string(),
                     status: "unsupported".to_string(),
+                    signature: None,
                     proof_summary: None,
+                    decl_sha256_hex: None,
                     source_path: None,
                     details: Some(
-                        "referenced symbol could not be resolved in the loaded module graph"
+                        "referenced symbol could not be resolved in the loaded module graph and no imported summary was supplied"
                             .to_string(),
                     ),
                 },
@@ -2011,7 +3145,13 @@ fn coverage_report_for_entry(
                     symbol,
                     kind: decl.kind.clone(),
                     status: "capsule_boundary".to_string(),
+                    signature: Some(verify_function_signature(
+                        &decl.params,
+                        &decl.result,
+                        decl.result_brand.as_deref(),
+                    )),
                     proof_summary: None,
+                    decl_sha256_hex: Some(decl.decl_sha256_hex.clone()),
                     source_path: Some(decl.source_path.display().to_string()),
                     details: Some(format!(
                         "reachable closure terminates at certified capsule node {:?}",
@@ -2035,7 +3175,9 @@ fn coverage_report_for_entry(
             symbol: format!("x07.verify.scheduler_model.{}", model.id),
             kind: "builtin".to_string(),
             status: "trusted_scheduler_model".to_string(),
+            signature: None,
             proof_summary: None,
+            decl_sha256_hex: None,
             source_path: None,
             details: Some(model.guarantees.join("; ")),
         });
@@ -2045,22 +3187,29 @@ fn coverage_report_for_entry(
     };
     let mut summary = summarize_coverage_functions(&functions);
     summary.async_model = async_model;
-    Ok(VerifyCoverage {
-        schema_version: X07_VERIFY_COVERAGE_SCHEMA_VERSION,
-        entry: args.entry.clone(),
-        worlds: coverage_worlds(project_path),
-        summary,
-        functions,
+    let mut imported_summaries = used_imported_summaries.into_values().collect::<Vec<_>>();
+    imported_summaries.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(CoverageAnalysis {
+        coverage: VerifyCoverage {
+            schema_version: X07_VERIFY_COVERAGE_SCHEMA_VERSION,
+            entry: args.entry.clone(),
+            worlds: coverage_worlds(project_path),
+            summary,
+            functions,
+        },
+        diagnostics,
+        imported_summaries,
     })
 }
 
 fn coverage_report_fallback(
+    module_roots: &[PathBuf],
     entry: &str,
     project_path: Option<&Path>,
     target: &TargetSig,
     max_bytes_len: u32,
     extra_details: Option<String>,
-) -> VerifyCoverage {
+) -> CoverageAnalysis {
     let recursion = RecursionSummary {
         kind: if target.decreases_count > 0 && contains_direct_recursion(&target.body, entry) {
             RecursionKind::SelfRecursive
@@ -2069,9 +3218,15 @@ fn coverage_report_fallback(
         },
         cycle_symbol: None,
     };
-    let mut function = coverage_function_for_target(entry, target, max_bytes_len, &recursion);
+    let mut function =
+        coverage_function_for_target(module_roots, entry, target, max_bytes_len, &recursion);
     match extra_details {
-        Some(details) if function.status == "proven" || function.status == "proven_async" => {
+        Some(details)
+            if matches!(
+                function.status.as_str(),
+                "proven" | "proven_recursive" | "proven_async"
+            ) =>
+        {
             function.status = "unsupported".to_string();
             function.details = Some(details);
         }
@@ -2081,12 +3236,16 @@ fn coverage_report_fallback(
         _ => {}
     }
     let functions = vec![function];
-    VerifyCoverage {
-        schema_version: X07_VERIFY_COVERAGE_SCHEMA_VERSION,
-        entry: entry.to_string(),
-        worlds: coverage_worlds(project_path),
-        summary: summarize_coverage_functions(&functions),
-        functions,
+    CoverageAnalysis {
+        coverage: VerifyCoverage {
+            schema_version: X07_VERIFY_COVERAGE_SCHEMA_VERSION,
+            entry: entry.to_string(),
+            worlds: coverage_worlds(project_path),
+            summary: summarize_coverage_functions(&functions),
+            functions,
+        },
+        diagnostics: Vec::new(),
+        imported_summaries: Vec::new(),
     }
 }
 
@@ -2103,7 +3262,13 @@ fn coverage_function_for_decl(
             symbol: symbol.to_string(),
             kind: "extern".to_string(),
             status: "unsupported".to_string(),
+            signature: Some(verify_function_signature(
+                &decl.params,
+                &decl.result,
+                decl.result_brand.as_deref(),
+            )),
             proof_summary: None,
+            decl_sha256_hex: Some(decl.decl_sha256_hex.clone()),
             source_path,
             details: Some(
                 "extern declarations are outside the certifiable pure subset".to_string(),
@@ -2112,11 +3277,15 @@ fn coverage_function_for_decl(
         _ => {
             let body = decl.body.clone().unwrap_or(Value::Null);
             let target = TargetSig {
+                param_names: decl.param_names.clone(),
                 params: decl.params.clone(),
                 result: decl.result.clone(),
+                result_brand: decl.result_brand.clone(),
+                decl_sha256_hex: decl.decl_sha256_hex.clone(),
                 is_async: decl.kind == "defasync",
                 has_contracts: decl.has_contracts,
                 decreases_count: decl.decreases_count,
+                decreases: decl.decreases.clone(),
                 body,
                 source_path: decl.source_path.clone(),
             };
@@ -2126,7 +3295,7 @@ fn coverage_function_for_decl(
                     cycle_symbol: None,
                 },
             );
-            coverage_function_for_target(symbol, &target, max_bytes_len, &recursion)
+            coverage_function_for_target(module_roots, symbol, &target, max_bytes_len, &recursion)
         }
     }
 }
@@ -2136,7 +3305,13 @@ fn summarize_coverage_functions(functions: &[VerifyCoverageFunction]) -> VerifyC
         reachable_defn: functions.iter().filter(|f| f.kind == "defn").count() as u64,
         proven_defn: functions
             .iter()
-            .filter(|f| f.kind == "defn" && f.status == "proven")
+            .filter(|f| {
+                f.kind == "defn"
+                    && matches!(
+                        f.status.as_str(),
+                        "proven" | "proven_recursive" | "imported_summary"
+                    )
+            })
             .count() as u64,
         recursive_defn: functions
             .iter()
@@ -2151,11 +3326,19 @@ fn summarize_coverage_functions(functions: &[VerifyCoverageFunction]) -> VerifyC
             .iter()
             .filter(|f| {
                 f.kind == "defn"
-                    && f.status == "proven"
+                    && matches!(f.status.as_str(), "proven_recursive" | "imported_summary")
                     && f.proof_summary
                         .as_ref()
                         .is_some_and(|summary| summary.recursion_kind == "self_recursive")
             })
+            .count() as u64,
+        imported_summary_defn: functions
+            .iter()
+            .filter(|f| f.kind == "defn" && f.status == "imported_summary")
+            .count() as u64,
+        termination_proven_defn: functions
+            .iter()
+            .filter(|f| f.kind == "defn" && f.status == "termination_proven")
             .count() as u64,
         unsupported_recursive_defn: functions
             .iter()
@@ -2203,9 +3386,11 @@ fn is_builtin_like_symbol(symbol: &str) -> bool {
 }
 
 fn build_verify_driver_x07ast_json(
+    module_roots: &[PathBuf],
     entry: &str,
     sig: &TargetSig,
     max_bytes_len: u32,
+    normalize_for_overlay: bool,
 ) -> Result<Vec<u8>> {
     let (module_id, _) = entry.rsplit_once('.').context("--entry must contain '.'")?;
 
@@ -2216,59 +3401,45 @@ fn build_verify_driver_x07ast_json(
 
     let mut stmts: Vec<Value> = Vec::new();
     let mut call_args: Vec<Value> = Vec::new();
+    let mut helper_decls = Vec::new();
+    let mut imports = BTreeSet::from([module_id.to_string(), "std.codec".to_string()]);
+    let decode_params = if sig.is_async {
+        sig.params.clone()
+    } else {
+        sig.params
+            .iter()
+            .map(verify_driver_raw_param)
+            .collect::<Result<Vec<_>>>()?
+    };
 
     stmts.push(serde_json::json!(["let", "off", 0]));
 
-    for (idx, ty) in sig.params.iter().enumerate() {
-        let off = Value::String("off".to_string());
-        match ty.as_str() {
-            "i32" | "u32" => {
-                let name = format!("p{idx}");
-                stmts.push(serde_json::json!([
-                    "let",
-                    name,
-                    ["std.codec.read_u32_le", "input", off]
-                ]));
-                stmts.push(serde_json::json!(["set", "off", ["+", "off", 4]]));
-                call_args.push(Value::String(format!("p{idx}")));
-            }
-            "bytes" | "bytes_view" => {
-                let n_raw = format!("p{idx}_len_raw");
-                let n = format!("p{idx}_len");
-                let data_off = serde_json::json!(["+", "off", 4]);
-                let raw_len = serde_json::json!(["std.codec.read_u32_le", "input", off]);
-                stmts.push(serde_json::json!(["let", n_raw, raw_len]));
-                stmts.push(serde_json::json!([
-                    "let",
-                    n,
-                    [
-                        "if",
-                        ["<u", n_raw, max_plus_1 as i64],
-                        n_raw,
-                        max_bytes_len as i64
-                    ]
-                ]));
-
-                let slice = serde_json::json!(["view.slice", "input", data_off, n.clone()]);
-                if ty == "bytes" {
-                    let bname = format!("p{idx}_bytes");
-                    stmts.push(serde_json::json!(["let", bname, ["view.to_bytes", slice]]));
-                    call_args.push(Value::String(bname));
-                } else {
-                    let vname = format!("p{idx}_view");
-                    stmts.push(serde_json::json!(["let", vname, slice]));
-                    call_args.push(Value::String(vname));
-                }
-
-                let step = 4u64 + max_bytes_len as u64;
-                stmts.push(serde_json::json!(["set", "off", ["+", "off", step as i64]]));
-            }
-            other => anyhow::bail!("unsupported verify param type {other:?}"),
-        }
+    for (idx, param) in decode_params.iter().enumerate() {
+        let step = append_verify_param_setup(
+            &mut stmts,
+            &mut call_args,
+            idx,
+            param,
+            max_bytes_len,
+            max_plus_1,
+        )?;
+        stmts.push(serde_json::json!(["set", "off", ["+", "off", step as i64]]));
     }
 
     let mut call_items = Vec::with_capacity(1 + call_args.len());
-    call_items.push(Value::String(entry.to_string()));
+    if sig.is_async {
+        call_items.push(Value::String(entry.to_string()));
+    } else {
+        let helper_name = build_verify_sync_helper_decl(
+            &mut helper_decls,
+            &mut imports,
+            module_roots,
+            entry,
+            sig,
+            normalize_for_overlay,
+        )?;
+        call_items.push(Value::String(helper_name));
+    }
     call_items.extend(call_args);
 
     if sig.is_async {
@@ -2320,16 +3491,12 @@ fn build_verify_driver_x07ast_json(
     solve_items.extend(stmts);
     let solve = Value::Array(solve_items);
 
-    let mut imports = vec![module_id.to_string(), "std.codec".to_string()];
-    imports.sort();
-    imports.dedup();
-
     let file = serde_json::json!({
         "schema_version": x07_contracts::X07AST_SCHEMA_VERSION,
         "kind": "entry",
         "module_id": "main",
-        "imports": imports,
-        "decls": [],
+        "imports": imports.into_iter().collect::<Vec<_>>(),
+        "decls": helper_decls,
         "solve": solve,
     });
 
@@ -2338,15 +3505,653 @@ fn build_verify_driver_x07ast_json(
     Ok(out)
 }
 
+fn build_verify_sync_helper_decl(
+    helper_decls: &mut Vec<Value>,
+    imports: &mut BTreeSet<String>,
+    module_roots: &[PathBuf],
+    entry: &str,
+    sig: &TargetSig,
+    normalize_for_overlay: bool,
+) -> Result<String> {
+    let helper_name = "main.__verify_call_v1".to_string();
+    let compile_params = sig
+        .params
+        .iter()
+        .map(|param| verify_compile_param(param, normalize_for_overlay))
+        .collect::<Vec<_>>();
+    let raw_params = sig
+        .params
+        .iter()
+        .enumerate()
+        .map(|(idx, param)| {
+            let mut raw = serde_json::Map::new();
+            raw.insert(
+                "name".to_string(),
+                Value::String(format!("p{idx}_raw")),
+            );
+            raw.insert(
+                "ty".to_string(),
+                Value::String(verify_driver_raw_param(param)?.ty),
+            );
+            Ok(Value::Object(raw))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let mut call_items = Vec::with_capacity(1 + sig.params.len());
+    call_items.push(Value::String(entry.to_string()));
+    for (idx, (param, compile_param)) in sig.params.iter().zip(compile_params.iter()).enumerate() {
+        if let Some(brand_id) = param.brand.as_deref() {
+            let validator = resolve_verify_brand_validator(module_roots, entry, brand_id)?;
+            if let Some((validator_module, _)) = validator.rsplit_once('.') {
+                imports.insert(validator_module.to_string());
+            }
+        }
+        call_items.push(build_verify_sync_helper_arg_expr(
+            &format!("p{idx}_raw"),
+            param,
+            compile_param,
+            module_roots,
+            entry,
+        )?);
+    }
+
+    let body = serde_json::json!([
+        "begin",
+        ["let", "empty_bytes", ["bytes.empty"]],
+        ["let", "empty_view", ["bytes.view", "empty_bytes"]],
+        ["let", "_", Value::Array(call_items)],
+        ["result_i32.ok", 0]
+    ]);
+
+    helper_decls.push(serde_json::json!({
+        "kind": "defn",
+        "name": helper_name,
+        "params": raw_params,
+        "result": "result_i32",
+        "body": body,
+    }));
+    Ok("main.__verify_call_v1".to_string())
+}
+
+fn build_verify_sync_helper_arg_expr(
+    raw_name: &str,
+    param: &VerifySignatureParam,
+    compile_param: &VerifySignatureParam,
+    module_roots: &[PathBuf],
+    entry: &str,
+) -> Result<Value> {
+    let raw = Value::String(raw_name.to_string());
+    let empty_view = Value::String("empty_view".to_string());
+    let brand_cast = |target_ty: &str, value: Value| -> Result<Value> {
+        let brand_id = param
+            .brand
+            .as_deref()
+            .context("verify helper missing brand id")?;
+        let validator = resolve_verify_brand_validator(module_roots, entry, brand_id)?;
+        let check_name = format!("{raw_name}_brand_check");
+        let view_name = format!("{raw_name}_brand_view");
+        let validate_value = value.clone();
+        Ok(if target_ty == "bytes" {
+            serde_json::json!([
+                "begin",
+                ["let", check_name, ["try", [validator, validate_value]]],
+                ["let", view_name, ["__internal.brand.assume_view_v1", brand_id, value]],
+                ["__internal.brand.view_to_bytes_preserve_brand_v1", view_name]
+            ])
+        } else {
+            serde_json::json!([
+                "begin",
+                ["let", check_name, ["try", [validator, validate_value]]],
+                ["__internal.brand.assume_view_v1", brand_id, value]
+            ])
+        })
+    };
+
+    match compile_param.ty.as_str() {
+        "i32" | "u32" | "option_i32" | "result_i32" => Ok(raw),
+        "vec_u8" => Ok(serde_json::json!([
+            "vec_u8.extend_bytes",
+            ["vec_u8.with_capacity", ["view.len", raw]],
+            raw
+        ])),
+        "bytes_view" => {
+            if param.brand.is_some() {
+                brand_cast("bytes_view", raw)
+            } else {
+                Ok(raw)
+            }
+        }
+        "bytes" => {
+            if param.brand.is_some() {
+                brand_cast("bytes", raw)
+            } else {
+                Ok(serde_json::json!(["view.to_bytes", raw]))
+            }
+        }
+        "option_bytes_view" => {
+            let payload = serde_json::json!(["option_bytes_view.unwrap_or", raw, empty_view]);
+            let some_payload = if param.brand.is_some() {
+                brand_cast("bytes_view", payload)?
+            } else {
+                payload
+            };
+            Ok(serde_json::json!([
+                "if",
+                ["!=", ["option_bytes_view.is_some", raw], 0],
+                ["option_bytes_view.some", some_payload],
+                ["option_bytes_view.none"]
+            ]))
+        }
+        "option_bytes" => {
+            let payload = serde_json::json!(["option_bytes_view.unwrap_or", raw, empty_view]);
+            let some_payload = if param.brand.is_some() {
+                brand_cast("bytes", payload)?
+            } else {
+                serde_json::json!(["view.to_bytes", payload])
+            };
+            Ok(serde_json::json!([
+                "if",
+                ["!=", ["option_bytes_view.is_some", raw], 0],
+                ["option_bytes.some", some_payload],
+                ["option_bytes.none"]
+            ]))
+        }
+        "result_bytes_view" => {
+            let payload = serde_json::json!(["result_bytes_view.unwrap_or", raw, empty_view]);
+            let ok_payload = if param.brand.is_some() {
+                brand_cast("bytes_view", payload)?
+            } else {
+                payload
+            };
+            Ok(serde_json::json!([
+                "if",
+                ["!=", ["result_bytes_view.is_ok", raw], 0],
+                ["result_bytes_view.ok", ok_payload],
+                ["result_bytes_view.err", ["result_bytes_view.err_code", raw]]
+            ]))
+        }
+        "result_bytes" => {
+            let payload = serde_json::json!(["result_bytes_view.unwrap_or", raw, empty_view]);
+            let ok_payload = if param.brand.is_some() {
+                brand_cast("bytes", payload)?
+            } else {
+                serde_json::json!(["view.to_bytes", payload])
+            };
+            Ok(serde_json::json!([
+                "if",
+                ["!=", ["result_bytes_view.is_ok", raw], 0],
+                ["result_bytes.ok", ok_payload],
+                ["result_bytes.err", ["result_bytes_view.err_code", raw]]
+            ]))
+        }
+        other => anyhow::bail!("unsupported verify sync helper param type {other:?}"),
+    }
+}
+
+fn append_verify_param_setup(
+    stmts: &mut Vec<Value>,
+    call_args: &mut Vec<Value>,
+    idx: usize,
+    param: &VerifySignatureParam,
+    max_bytes_len: u32,
+    max_plus_1: u64,
+) -> Result<u64> {
+    let off = Value::String("off".to_string());
+    match param.ty.as_str() {
+        "i32" | "u32" => {
+            let name = format!("p{idx}");
+            stmts.push(serde_json::json!([
+                "let",
+                name,
+                ["std.codec.read_u32_le", "input", off]
+            ]));
+            call_args.push(Value::String(format!("p{idx}")));
+            Ok(4)
+        }
+        "bytes" | "bytes_view" | "vec_u8" => {
+            append_verify_bytes_like_param(
+                stmts,
+                call_args,
+                idx,
+                if param.ty == "vec_u8" {
+                    "bytes_view"
+                } else {
+                    &param.ty
+                },
+                off,
+                max_bytes_len,
+                max_plus_1,
+            )?;
+            Ok(4u64 + max_bytes_len as u64)
+        }
+        "option_i32" => {
+            let tag = format!("p{idx}_tag");
+            let value = format!("p{idx}_value");
+            let arg = format!("p{idx}_arg");
+            stmts.push(serde_json::json!(["let", tag, ["view.get_u8", "input", off]]));
+            stmts.push(serde_json::json!([
+                "let",
+                value,
+                ["std.codec.read_u32_le", "input", ["+", "off", 1]]
+            ]));
+            stmts.push(serde_json::json!([
+                "let",
+                arg,
+                [
+                    "if",
+                    ["!=", tag, 0],
+                    ["option_i32.some", value],
+                    ["option_i32.none"]
+                ]
+            ]));
+            call_args.push(Value::String(arg));
+            Ok(5)
+        }
+        "option_bytes" | "option_bytes_view" => {
+            let tag = format!("p{idx}_tag");
+            stmts.push(serde_json::json!(["let", tag, ["view.get_u8", "input", off]]));
+            let payload_name = append_verify_bytes_payload(
+                stmts,
+                idx,
+                "payload",
+                if param.ty == "option_bytes" {
+                    "bytes"
+                } else {
+                    "bytes_view"
+                },
+                serde_json::json!(["+", "off", 1]),
+                max_bytes_len,
+                max_plus_1,
+            )?;
+            let arg = format!("p{idx}_arg");
+            let ctor = if param.ty == "option_bytes" {
+                "option_bytes.some"
+            } else {
+                "option_bytes_view.some"
+            };
+            let none_ctor = if param.ty == "option_bytes" {
+                "option_bytes.none"
+            } else {
+                "option_bytes_view.none"
+            };
+            stmts.push(serde_json::json!([
+                "let",
+                arg,
+                [
+                    "if",
+                    ["!=", tag, 0],
+                    [ctor, payload_name],
+                    [none_ctor]
+                ]
+            ]));
+            call_args.push(Value::String(arg));
+            Ok(1u64 + 4u64 + max_bytes_len as u64)
+        }
+        "result_i32" => {
+            let tag = format!("p{idx}_tag");
+            let value = format!("p{idx}_value");
+            let arg = format!("p{idx}_arg");
+            stmts.push(serde_json::json!(["let", tag, ["view.get_u8", "input", off]]));
+            stmts.push(serde_json::json!([
+                "let",
+                value,
+                ["std.codec.read_u32_le", "input", ["+", "off", 1]]
+            ]));
+            stmts.push(serde_json::json!([
+                "let",
+                arg,
+                [
+                    "if",
+                    ["!=", tag, 0],
+                    ["result_i32.ok", value],
+                    ["result_i32.err", value]
+                ]
+            ]));
+            call_args.push(Value::String(arg));
+            Ok(5)
+        }
+        "result_bytes" | "result_bytes_view" => {
+            let tag = format!("p{idx}_tag");
+            let err_code = format!("p{idx}_err_code");
+            let arg = format!("p{idx}_arg");
+            stmts.push(serde_json::json!(["let", tag, ["view.get_u8", "input", off]]));
+            stmts.push(serde_json::json!([
+                "let",
+                err_code,
+                ["std.codec.read_u32_le", "input", ["+", "off", 1]]
+            ]));
+            let payload_name = append_verify_bytes_payload(
+                stmts,
+                idx,
+                "payload",
+                if param.ty == "result_bytes" {
+                    "bytes"
+                } else {
+                    "bytes_view"
+                },
+                serde_json::json!(["+", "off", 1]),
+                max_bytes_len,
+                max_plus_1,
+            )?;
+            let ok_ctor = if param.ty == "result_bytes" {
+                "result_bytes.ok"
+            } else {
+                "result_bytes_view.ok"
+            };
+            let err_ctor = if param.ty == "result_bytes" {
+                "result_bytes.err"
+            } else {
+                "result_bytes_view.err"
+            };
+            stmts.push(serde_json::json!([
+                "let",
+                arg,
+                [
+                    "if",
+                    ["!=", tag, 0],
+                    [ok_ctor, payload_name],
+                    [err_ctor, err_code]
+                ]
+            ]));
+            call_args.push(Value::String(arg));
+            Ok(1u64 + 4u64 + max_bytes_len as u64)
+        }
+        other => anyhow::bail!("unsupported verify param type {other:?}"),
+    }
+}
+
+fn append_verify_bytes_like_param(
+    stmts: &mut Vec<Value>,
+    call_args: &mut Vec<Value>,
+    idx: usize,
+    ty: &str,
+    off: Value,
+    max_bytes_len: u32,
+    max_plus_1: u64,
+) -> Result<()> {
+    let value_name =
+        append_verify_bytes_payload(stmts, idx, "arg", ty, off, max_bytes_len, max_plus_1)?;
+    call_args.push(Value::String(value_name));
+    Ok(())
+}
+
+fn append_verify_bytes_payload(
+    stmts: &mut Vec<Value>,
+    idx: usize,
+    suffix: &str,
+    ty: &str,
+    off: Value,
+    max_bytes_len: u32,
+    max_plus_1: u64,
+) -> Result<String> {
+    let n_raw = format!("p{idx}_{suffix}_len_raw");
+    let n = format!("p{idx}_{suffix}_len");
+    let slice_name = format!("p{idx}_{suffix}_slice");
+    let data_off = serde_json::json!(["+", off, 4]);
+    let raw_len = serde_json::json!(["std.codec.read_u32_le", "input", off]);
+    stmts.push(serde_json::json!(["let", n_raw, raw_len]));
+    stmts.push(serde_json::json!([
+        "let",
+        n,
+        [
+            "if",
+            ["<u", n_raw, max_plus_1 as i64],
+            n_raw,
+            max_bytes_len as i64
+        ]
+    ]));
+    stmts.push(serde_json::json!([
+        "let",
+        slice_name,
+        ["view.slice", "input", data_off, n.clone()]
+    ]));
+
+    match ty {
+        "bytes_view" => Ok(slice_name),
+        "bytes" => append_verify_bytes_value(stmts, idx, suffix, &slice_name),
+        other => anyhow::bail!("unsupported verify bytes payload type {other:?}"),
+    }
+}
+
+fn append_verify_bytes_value(
+    stmts: &mut Vec<Value>,
+    idx: usize,
+    suffix: &str,
+    slice_name: &str,
+) -> Result<String> {
+    let bytes_name = format!("p{idx}_{suffix}_bytes");
+    stmts.push(serde_json::json!(["let", bytes_name, ["view.to_bytes", slice_name]]));
+    Ok(bytes_name)
+}
+
 fn compile_driver_to_c(driver_src: &[u8], module_roots: &[PathBuf]) -> Result<String> {
     let mut opts =
         x07c::world_config::compile_options_for_world(WorldId::SolvePure, module_roots.to_vec());
     opts.emit_main = false;
     opts.freestanding = true;
     opts.contract_mode = x07c::compile::ContractMode::VerifyBmc;
+    opts.allow_internal_only_heads_in_entry = true;
+    opts.prefer_module_roots_first = true;
     let out = x07c::compile::compile_program_to_c_with_meta(driver_src, &opts)
         .map_err(|err| anyhow::anyhow!("{:?}: {}", err.kind, err.message))?;
     Ok(out.c_src)
+}
+
+fn direct_prove_harness_supported(target: &TargetSig) -> bool {
+    !target.is_async
+        && target.result_brand.is_none()
+        && target.params.iter().all(|param| {
+            param.brand.is_none()
+                && matches!(
+                    param.ty.as_str(),
+                    "i32"
+                        | "u32"
+                        | "bytes"
+                        | "bytes_view"
+                        | "vec_u8"
+                        | "option_i32"
+                        | "option_bytes"
+                        | "option_bytes_view"
+                        | "result_i32"
+                        | "result_bytes"
+                        | "result_bytes_view"
+                )
+        })
+        && matches!(
+            target.result.as_str(),
+            "i32"
+                | "u32"
+                | "bytes"
+                | "bytes_view"
+                | "vec_u8"
+                | "option_i32"
+                | "option_bytes"
+                | "option_bytes_view"
+                | "result_i32"
+                | "result_bytes"
+                | "result_bytes_view"
+        )
+}
+
+fn c_verify_ty_name(ty: &str) -> Result<&'static str> {
+    Ok(match ty {
+        "i32" | "u32" => "uint32_t",
+        "bytes" => "bytes_t",
+        "bytes_view" => "bytes_view_t",
+        "vec_u8" => "vec_u8_t",
+        "option_i32" => "option_i32_t",
+        "option_bytes" => "option_bytes_t",
+        "option_bytes_view" => "option_bytes_view_t",
+        "result_i32" => "result_i32_t",
+        "result_bytes" => "result_bytes_t",
+        "result_bytes_view" => "result_bytes_view_t",
+        other => anyhow::bail!("unsupported direct prove C type {other:?}"),
+    })
+}
+
+fn append_direct_harness_bytes_param(
+    out: &mut String,
+    name: &str,
+    ty: &str,
+    max_bytes_len: u32,
+) -> Result<String> {
+    let buf_name = format!("{name}_buf");
+    let len_name = format!("{name}_len");
+    let buf_cap = std::cmp::max(1u32, max_bytes_len);
+    out.push_str(&format!("  uint8_t {buf_name}[{buf_cap}];\n"));
+    for i in 0..buf_cap {
+        out.push_str(&format!("  {buf_name}[{i}] = x07_nondet_u8();\n"));
+    }
+    out.push_str(&format!("  uint32_t {len_name} = x07_nondet_u32();\n"));
+    out.push_str(&format!(
+        "  __CPROVER_assume({len_name} <= UINT32_C({max_bytes_len}));\n"
+    ));
+    match ty {
+        "bytes" => {
+            out.push_str(&format!(
+                "  bytes_t {name} = (bytes_t){{ .ptr = {buf_name}, .len = {len_name} }};\n"
+            ));
+        }
+        "bytes_view" => {
+            out.push_str(&format!(
+                "  bytes_view_t {name} = (bytes_view_t){{ .ptr = {buf_name}, .len = {len_name} }};\n"
+            ));
+        }
+        "vec_u8" => {
+            out.push_str(&format!(
+                "  vec_u8_t {name} = (vec_u8_t){{ .data = {buf_name}, .len = {len_name}, .cap = UINT32_C({max_bytes_len}) }};\n"
+            ));
+        }
+        other => anyhow::bail!("unsupported direct prove bytes-like type {other:?}"),
+    }
+    Ok(name.to_string())
+}
+
+fn append_direct_harness_param(
+    out: &mut String,
+    idx: usize,
+    param: &VerifySignatureParam,
+    max_bytes_len: u32,
+) -> Result<String> {
+    let name = format!("p{idx}");
+    match param.ty.as_str() {
+        "i32" | "u32" => {
+            out.push_str(&format!("  uint32_t {name} = x07_nondet_u32();\n"));
+        }
+        "bytes" | "bytes_view" | "vec_u8" => {
+            return append_direct_harness_bytes_param(out, &name, &param.ty, max_bytes_len);
+        }
+        "option_i32" => {
+            out.push_str(&format!("  uint32_t {name}_tag = x07_nondet_u32();\n"));
+            out.push_str(&format!("  __CPROVER_assume({name}_tag <= UINT32_C(1));\n"));
+            out.push_str(&format!("  uint32_t {name}_payload = x07_nondet_u32();\n"));
+            out.push_str(&format!(
+                "  option_i32_t {name} = (option_i32_t){{ .tag = {name}_tag, .payload = {name}_payload }};\n"
+            ));
+        }
+        "option_bytes" | "option_bytes_view" => {
+            let payload = append_direct_harness_bytes_param(
+                out,
+                &format!("{name}_payload"),
+                if param.ty == "option_bytes" {
+                    "bytes"
+                } else {
+                    "bytes_view"
+                },
+                max_bytes_len,
+            )?;
+            out.push_str(&format!("  uint32_t {name}_tag = x07_nondet_u32();\n"));
+            out.push_str(&format!("  __CPROVER_assume({name}_tag <= UINT32_C(1));\n"));
+            out.push_str(&format!(
+                "  {} {name};\n",
+                c_verify_ty_name(&param.ty)?
+            ));
+            out.push_str(&format!("  {name}.tag = {name}_tag;\n"));
+            out.push_str(&format!("  {name}.payload = {payload};\n"));
+        }
+        "result_i32" => {
+            out.push_str(&format!("  uint32_t {name}_tag = x07_nondet_u32();\n"));
+            out.push_str(&format!("  __CPROVER_assume({name}_tag <= UINT32_C(1));\n"));
+            out.push_str(&format!("  uint32_t {name}_payload = x07_nondet_u32();\n"));
+            out.push_str(&format!(
+                "  result_i32_t {name} = (result_i32_t){{ .tag = {name}_tag, .payload.ok = {name}_payload }};\n"
+            ));
+        }
+        "result_bytes" | "result_bytes_view" => {
+            let ok = append_direct_harness_bytes_param(
+                out,
+                &format!("{name}_ok"),
+                if param.ty == "result_bytes" {
+                    "bytes"
+                } else {
+                    "bytes_view"
+                },
+                max_bytes_len,
+            )?;
+            out.push_str(&format!("  uint32_t {name}_tag = x07_nondet_u32();\n"));
+            out.push_str(&format!("  __CPROVER_assume({name}_tag <= UINT32_C(1));\n"));
+            out.push_str(&format!("  uint32_t {name}_err = x07_nondet_u32();\n"));
+            out.push_str(&format!(
+                "  {} {name};\n",
+                c_verify_ty_name(&param.ty)?
+            ));
+            out.push_str(&format!("  {name}.tag = {name}_tag;\n"));
+            out.push_str(&format!("  if ({name}_tag != 0) {{ {name}.payload.ok = {ok}; }} else {{ {name}.payload.err = {name}_err; }}\n"));
+        }
+        other => anyhow::bail!("unsupported direct prove param type {other:?}"),
+    }
+    Ok(name)
+}
+
+fn build_direct_prove_c_harness(
+    entry: &str,
+    target: &TargetSig,
+    max_bytes_len: u32,
+) -> Result<String> {
+    let mut out = String::new();
+    out.push_str("static unsigned char x07_nondet_u8(void) {\n");
+    out.push_str("  unsigned char value;\n");
+    out.push_str("  return value;\n");
+    out.push_str("}\n");
+    out.push_str("static uint32_t x07_nondet_u32(void) {\n");
+    out.push_str("  uint32_t value;\n");
+    out.push_str("  return value;\n");
+    out.push_str("}\n");
+    out.push_str(&format!("static void {VERIFY_HARNESS_FN}(void) {{\n"));
+    out.push_str("  uint8_t arena_mem[65536];\n");
+    out.push_str("  ctx_t ctx;\n");
+    out.push_str("  memset(&ctx, 0, sizeof(ctx));\n");
+    out.push_str("  ctx.fuel_init = (uint64_t)(X07_FUEL_INIT);\n");
+    out.push_str("  ctx.fuel = ctx.fuel_init;\n");
+    out.push_str("  ctx.heap.mem = arena_mem;\n");
+    out.push_str("  ctx.heap.cap = (uint32_t)sizeof(arena_mem);\n");
+    out.push_str("  rt_heap_init(&ctx);\n");
+    out.push_str("  rt_allocator_init(&ctx);\n");
+    out.push_str("  rt_ext_ctx = &ctx;\n");
+    out.push_str("  rt_kv_init(&ctx);\n");
+    out.push_str("  bytes_view_t input = rt_view_empty(&ctx);\n");
+    let mut arg_names = Vec::with_capacity(target.params.len());
+    for (idx, param) in target.params.iter().enumerate() {
+        arg_names.push(append_direct_harness_param(
+            &mut out,
+            idx,
+            param,
+            max_bytes_len,
+        )?);
+    }
+    let result_ty = c_verify_ty_name(&target.result)?;
+    out.push_str(&format!(
+        "  {result_ty} out = {}(&ctx, input",
+        c_user_fn_name(entry)
+    ));
+    for arg in &arg_names {
+        out.push_str(&format!(", {arg}"));
+    }
+    out.push_str(");\n");
+    out.push_str("  (void)out;\n");
+    out.push_str("  rt_ext_ctx = NULL;\n");
+    out.push_str("}\n");
+    Ok(out)
 }
 
 fn trusted_primitive_stubs_for_prove(
@@ -2356,12 +4161,13 @@ fn trusted_primitive_stubs_for_prove(
     module_roots: &[PathBuf],
     coverage: Option<&VerifyCoverage>,
 ) -> Result<Vec<TrustedPrimitiveStub>> {
-    let owned_coverage;
+    let owned_analysis;
     let coverage = if let Some(coverage) = coverage {
         coverage
     } else {
-        owned_coverage = coverage_report_for_entry(args, project_path, target)?;
-        &owned_coverage
+        owned_analysis =
+            coverage_report_for_entry(args, project_path, target, &ImportedSummaryIndex::default())?;
+        &owned_analysis.coverage
     };
     let mut out = Vec::new();
     for function in &coverage.functions {
@@ -2402,6 +4208,11 @@ fn trusted_primitive_stub_body(stub: &TrustedPrimitiveStub) -> Result<String> {
         "i32" | "u32" => {
             lines.push("  return UINT32_C(0);".to_string());
         }
+        "vec_u8" => {
+            lines.push("  vec_u8_t out;".to_string());
+            lines.push("  memset(&out, 0, sizeof(out));".to_string());
+            lines.push("  return out;".to_string());
+        }
         "bytes" => {
             lines.push("  return (bytes_t){ .ptr = NULL, .len = UINT32_C(0) };".to_string());
         }
@@ -2435,6 +4246,11 @@ fn trusted_primitive_stub_body(stub: &TrustedPrimitiveStub) -> Result<String> {
         }
         "result_bytes_view" => {
             lines.push("  result_bytes_view_t out;".to_string());
+            lines.push("  memset(&out, 0, sizeof(out));".to_string());
+            lines.push("  return out;".to_string());
+        }
+        "result_result_bytes" => {
+            lines.push("  result_result_bytes_t out;".to_string());
             lines.push("  memset(&out, 0, sizeof(out));".to_string());
             lines.push("  return out;".to_string());
         }
@@ -2503,22 +4319,19 @@ fn find_c_function_definition(text: &str, c_name: &str) -> Result<Option<(usize,
     Ok(None)
 }
 
-fn apply_trusted_primitive_stubs(c_src: &str, stubs: &[TrustedPrimitiveStub]) -> Result<String> {
-    if stubs.is_empty() {
-        return Ok(c_src.to_string());
-    }
-
+fn apply_c_function_body_replacements(
+    c_src: &str,
+    bodies: &[(String, String)],
+) -> Result<String> {
     let mut replacements: Vec<(usize, usize, String)> = Vec::new();
-    for stub in stubs {
-        let c_name = c_user_fn_name(&stub.symbol);
+    for (c_name, body) in bodies {
         let Some((open_brace_idx, close_brace_idx)) = find_c_function_definition(c_src, &c_name)?
         else {
             anyhow::bail!(
-                "could not locate generated C body for trusted primitive {:?}",
-                stub.symbol
+                "could not locate generated C body for {:?}",
+                c_name
             );
         };
-        let body = trusted_primitive_stub_body(stub)?;
         replacements.push((open_brace_idx, close_brace_idx, format!("{{\n{body}\n}}")));
     }
 
@@ -2528,6 +4341,17 @@ fn apply_trusted_primitive_stubs(c_src: &str, stubs: &[TrustedPrimitiveStub]) ->
         out.replace_range(start..=end, &replacement);
     }
     Ok(out)
+}
+
+fn apply_trusted_primitive_stubs(c_src: &str, stubs: &[TrustedPrimitiveStub]) -> Result<String> {
+    if stubs.is_empty() {
+        return Ok(c_src.to_string());
+    }
+    let replacements = stubs
+        .iter()
+        .map(|stub| Ok((c_user_fn_name(&stub.symbol), trusted_primitive_stub_body(stub)?)))
+        .collect::<Result<Vec<_>>>()?;
+    apply_c_function_body_replacements(c_src, &replacements)
 }
 
 fn build_c_harness(input_len: u32) -> String {
@@ -2665,6 +4489,67 @@ fn contains_direct_recursion(expr: &Value, entry: &str) -> bool {
     }
 }
 
+fn recursive_arg_is_obviously_non_decreasing(arg: &Value, decreases_ident: &str) -> bool {
+    match arg {
+        Value::String(ident) => ident == decreases_ident,
+        Value::Array(items) => match items.first().and_then(Value::as_str) {
+            Some("+") if items.len() == 3 => {
+                let lhs_is_rank =
+                    matches!(items.get(1), Some(Value::String(ident)) if ident == decreases_ident);
+                let rhs_is_rank =
+                    matches!(items.get(2), Some(Value::String(ident)) if ident == decreases_ident);
+                (lhs_is_rank && items.get(2).and_then(Value::as_i64).is_some_and(|n| n >= 0))
+                    || (rhs_is_rank
+                        && items.get(1).and_then(Value::as_i64).is_some_and(|n| n >= 0))
+            }
+            Some("-") if items.len() == 3 => {
+                matches!(items.get(1), Some(Value::String(ident)) if ident == decreases_ident)
+                    && items.get(2).and_then(Value::as_i64).is_some_and(|n| n <= 0)
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn find_recursive_termination_failure(target: &TargetSig, entry: &str) -> Option<String> {
+    let decreases_ident = target.decreases.first()?.as_str()?;
+    let decreases_param_idx = target
+        .param_names
+        .iter()
+        .position(|name| name == decreases_ident)?;
+
+    fn walk(
+        expr: &Value,
+        entry: &str,
+        decreases_ident: &str,
+        decreases_param_idx: usize,
+    ) -> Option<String> {
+        match expr {
+            Value::Array(items) => {
+                if matches!(items.first(), Some(Value::String(head)) if head == entry) {
+                    let arg = items.get(decreases_param_idx + 1)?;
+                    if recursive_arg_is_obviously_non_decreasing(arg, decreases_ident) {
+                        return Some(format!(
+                            "recursive self-call does not obviously decrease {:?}",
+                            decreases_ident
+                        ));
+                    }
+                }
+                items
+                    .iter()
+                    .find_map(|item| walk(item, entry, decreases_ident, decreases_param_idx))
+            }
+            Value::Object(map) => map
+                .values()
+                .find_map(|value| walk(value, entry, decreases_ident, decreases_param_idx)),
+            _ => None,
+        }
+    }
+
+    walk(&target.body, entry, decreases_ident, decreases_param_idx)
+}
+
 fn find_for_with_non_literal_bounds(expr: &Value) -> Option<String> {
     match expr {
         Value::Array(items) => {
@@ -2791,6 +4676,36 @@ fn verify_cex_to_pretty_canon_bytes(cex: &VerifyCex) -> Result<Vec<u8>> {
         );
     }
     report_common::canonical_pretty_json_bytes(&v).context("canon verify cex JSON")
+}
+
+fn verify_summary_to_pretty_canon_bytes(summary: &VerifySummary) -> Result<Vec<u8>> {
+    let v = serde_json::to_value(summary).context("serialize verify summary JSON")?;
+    let diags = validate_verify_summary_schema(&v)?;
+    if !diags.is_empty() {
+        anyhow::bail!(
+            "internal error: verify summary JSON is not schema-valid: {}",
+            diags[0].message
+        );
+    }
+    report_common::canonical_pretty_json_bytes(&v).context("canon verify summary JSON")
+}
+
+fn write_verify_summary_artifact(
+    path: &Path,
+    coverage: &VerifyCoverage,
+    imported_summaries: &[VerifyImportedSummaryRef],
+) -> Result<()> {
+    let summary = VerifySummary {
+        schema_version: X07_VERIFY_SUMMARY_SCHEMA_VERSION.to_string(),
+        entry: coverage.entry.clone(),
+        worlds: coverage.worlds.clone(),
+        summary: coverage.summary.clone(),
+        functions: coverage.functions.clone(),
+        imported_summaries: imported_summaries.to_vec(),
+    };
+    let bytes = verify_summary_to_pretty_canon_bytes(&summary)?;
+    util::write_atomic(path, &bytes)
+        .with_context(|| format!("write verify summary: {}", path.display()))
 }
 
 impl VerifyReport {
@@ -3006,6 +4921,12 @@ impl VerifyReport {
         self.proof_summary = Some(proof_summary);
         self
     }
+
+    fn with_diagnostics(mut self, diagnostics: Vec<x07c::diagnostics::Diagnostic>) -> Self {
+        self.diagnostics_count = diagnostics.len() as u64;
+        self.diagnostics = diagnostics;
+        self
+    }
 }
 
 fn write_report_and_exit(
@@ -3210,6 +5131,15 @@ fn validate_verify_report_schema(value: &Value) -> Result<Vec<x07c::diagnostics:
     Ok(out)
 }
 
+fn validate_verify_summary_schema(value: &Value) -> Result<Vec<x07c::diagnostics::Diagnostic>> {
+    let diags = report_common::validate_schema(
+        X07_VERIFY_SUMMARY_SCHEMA_BYTES,
+        "spec/x07-verify.summary.schema.json",
+        value,
+    )?;
+    Ok(diags)
+}
+
 fn mode_count(args: &VerifyArgs) -> usize {
     [args.bmc, args.smt, args.prove, args.coverage]
         .into_iter()
@@ -3344,11 +5274,15 @@ exit 0
     #[test]
     fn z3_timeout_seconds_uses_longer_budget_for_async_prove() {
         let async_target = TargetSig {
+            param_names: Vec::new(),
             params: Vec::new(),
             result: "bytes".to_string(),
+            result_brand: None,
+            decl_sha256_hex: "00".repeat(32),
             is_async: true,
             has_contracts: true,
             decreases_count: 0,
+            decreases: Vec::new(),
             body: json!(0),
             source_path: PathBuf::from("async_fixture.x07.json"),
         };
@@ -3423,16 +5357,29 @@ exit 1
     #[test]
     fn verify_driver_imports_std_codec_and_uses_std_codec_read() {
         let sig = TargetSig {
-            params: vec!["i32".to_string()],
+            param_names: vec!["x".to_string()],
+            params: vec![VerifySignatureParam {
+                ty: "i32".to_string(),
+                brand: None,
+            }],
             result: "bytes".to_string(),
+            result_brand: None,
+            decl_sha256_hex: "11".repeat(32),
             is_async: false,
             has_contracts: true,
             decreases_count: 0,
+            decreases: Vec::new(),
             body: json!(0),
             source_path: PathBuf::from("verify_fixture.x07.json"),
         };
-        let bytes =
-            build_verify_driver_x07ast_json("verify_fixture.f", &sig, 16).expect("build driver");
+        let bytes = build_verify_driver_x07ast_json(
+            &[],
+            "verify_fixture.f",
+            &sig,
+            16,
+            false,
+        )
+        .expect("build driver");
         let text = String::from_utf8_lossy(&bytes);
         assert!(
             text.contains("std.codec.read_u32_le"),
@@ -3490,6 +5437,54 @@ exit 1
         assert!(
             !contains_direct_recursion(&json!("verify_fixture.f"), "verify_fixture.f"),
             "strings are not call heads"
+        );
+    }
+
+    #[test]
+    fn find_recursive_termination_failure_flags_non_decreasing_self_call() {
+        let target = TargetSig {
+            param_names: vec!["n".to_string()],
+            params: vec![VerifySignatureParam {
+                ty: "i32".to_string(),
+                brand: None,
+            }],
+            result: "i32".to_string(),
+            result_brand: None,
+            decl_sha256_hex: "22".repeat(32),
+            is_async: false,
+            has_contracts: true,
+            decreases_count: 1,
+            decreases: vec![json!("n")],
+            body: json!(["if", ["=", "n", 0], 0, ["verify_fixture.f", "n"]]),
+            source_path: PathBuf::from("verify_fixture.x07.json"),
+        };
+        assert_eq!(
+            find_recursive_termination_failure(&target, "verify_fixture.f"),
+            Some("recursive self-call does not obviously decrease \"n\"".to_string())
+        );
+    }
+
+    #[test]
+    fn find_recursive_termination_failure_accepts_subtracting_literal_step() {
+        let target = TargetSig {
+            param_names: vec!["n".to_string()],
+            params: vec![VerifySignatureParam {
+                ty: "i32".to_string(),
+                brand: None,
+            }],
+            result: "i32".to_string(),
+            result_brand: None,
+            decl_sha256_hex: "33".repeat(32),
+            is_async: false,
+            has_contracts: true,
+            decreases_count: 1,
+            decreases: vec![json!("n")],
+            body: json!(["if", ["=", "n", 0], 0, ["verify_fixture.f", ["-", "n", 1]]]),
+            source_path: PathBuf::from("verify_fixture.x07.json"),
+        };
+        assert_eq!(
+            find_recursive_termination_failure(&target, "verify_fixture.f"),
+            None
         );
     }
 
@@ -3570,6 +5565,22 @@ exit 1
         assert!(text.contains("(check-sat)\n"));
         assert!(!text.contains("(get-value (x))"));
         assert!(text.contains("(exit)\n"));
+        std::fs::remove_dir_all(&dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn smt2_has_solver_query_detects_missing_check_sat() {
+        let dir =
+            std::env::temp_dir().join(format!("x07_verify_smt2_query_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("verify.smt2");
+        std::fs::write(&path, "(set-logic QF_AUFBV)\n(assert true)\n").expect("write smt2");
+
+        assert!(!smt2_has_solver_query(&path).expect("check missing query"));
+
+        std::fs::write(&path, "(set-logic QF_AUFBV)\n(check-sat)\n").expect("write smt2");
+        assert!(smt2_has_solver_query(&path).expect("check present query"));
         std::fs::remove_dir_all(&dir).expect("cleanup temp dir");
     }
 }
