@@ -1,5 +1,5 @@
 {
-  "schema_version": "x07.trust.profile@0.2.0",
+  "schema_version": "x07.trust.profile@0.3.0",
   "id": "verified_core_pure_v1",
   "claims": ["human_can_review_certificate_not_source"],
   "entrypoints": ["app.main"],
@@ -33,6 +33,9 @@
     "require_capsule_attestations": false,
     "require_runtime_attestation": false,
     "require_effect_log_digests": false,
+    "require_peer_policies": false,
+    "require_network_capsules": false,
+    "require_dependency_closure_attestation": false,
     "require_compile_attestation": true,
     "require_trust_report_clean": true,
     "require_sbom": true
@@ -40,6 +43,7 @@
   "sandbox_requirements": {
     "sandbox_backend": "any",
     "forbid_weaker_isolation": false,
-    "network_mode": "any"
+    "network_mode": "any",
+    "network_enforcement": "any"
   }
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-runtime.attest.schema.json",
-  "title": "x07.runtime.attest@0.1.0",
+  "title": "x07.runtime.attest@0.2.0",
   "description": "Runtime attestation emitted for `run-os-sandboxed` executions.",
   "type": "object",
   "additionalProperties": false,
@@ -14,6 +14,13 @@
     "input_len_bytes",
     "guest_image_digest",
     "effective_policy_digest",
+    "network_mode",
+    "network_enforcement",
+    "allow_dns",
+    "allow_tcp",
+    "allow_udp",
+    "effective_allow_hosts",
+    "effective_deny_hosts",
     "bundled_binary_digest",
     "compile_attestation_digest",
     "capsule_attestation_digests",
@@ -21,7 +28,7 @@
     "outcome"
   ],
   "properties": {
-    "schema_version": { "const": "x07.runtime.attest@0.1.0" },
+    "schema_version": { "const": "x07.runtime.attest@0.2.0" },
     "world": {
       "type": "string",
       "const": "run-os-sandboxed"
@@ -57,6 +64,27 @@
         { "type": "null" }
       ]
     },
+    "network_mode": {
+      "type": "string",
+      "enum": ["disabled", "none", "allowlist"]
+    },
+    "network_enforcement": {
+      "type": "string",
+      "enum": ["none", "vm_boundary_allowlist", "guest_allowlist", "unsupported"]
+    },
+    "allow_dns": { "type": "boolean" },
+    "allow_tcp": { "type": "boolean" },
+    "allow_udp": { "type": "boolean" },
+    "effective_allow_hosts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/net_host" },
+      "default": []
+    },
+    "effective_deny_hosts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 255 },
+      "default": []
+    },
     "bundled_binary_digest": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
@@ -87,6 +115,23 @@
             { "type": "string", "maxLength": 65536 },
             { "type": "null" }
           ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "net_host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "ports"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "ports": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "uniqueItems": true
         }
       }
     }

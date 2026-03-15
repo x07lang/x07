@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-review.diff.schema.json",
-  "title": "x07.review.diff@0.3.0",
+  "title": "x07.review.diff@0.4.0",
   "description": "Machine-readable semantic diff model emitted by `x07 review diff` (JSON backing model for the HTML intent-level diff viewer).",
   "type": "object",
   "additionalProperties": false,
@@ -16,7 +16,7 @@
     "diags"
   ],
   "properties": {
-    "schema_version": { "const": "x07.review.diff@0.3.0" },
+    "schema_version": { "const": "x07.review.diff@0.4.0" },
 
     "mode": {
       "type": "string",
@@ -116,13 +116,18 @@
       "required": [
         "world_changes",
         "budget_changes",
+        "summary_changes",
         "policy_changes",
+        "network_policy_changes",
         "capability_changes",
         "proof_changes",
         "boundary_changes",
         "subset_changes",
         "async_proof_changes",
         "capsule_changes",
+        "peer_policy_changes",
+        "capsule_network_changes",
+        "dependency_closure_changes",
         "runtime_attestation_changes",
         "sandbox_policy_changes"
       ],
@@ -137,9 +142,19 @@
           "items": { "$ref": "#/$defs/budget_change" },
           "default": []
         },
+        "summary_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/generic_change" },
+          "default": []
+        },
         "policy_changes": {
           "type": "array",
           "items": { "$ref": "#/$defs/policy_change" },
+          "default": []
+        },
+        "network_policy_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/generic_change" },
           "default": []
         },
         "capability_changes": {
@@ -172,6 +187,21 @@
           "items": { "$ref": "#/$defs/capsule_change" },
           "default": []
         },
+        "peer_policy_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/generic_change" },
+          "default": []
+        },
+        "capsule_network_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/generic_change" },
+          "default": []
+        },
+        "dependency_closure_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/generic_change" },
+          "default": []
+        },
         "runtime_attestation_changes": {
           "type": "array",
           "items": { "$ref": "#/$defs/runtime_attestation_change" },
@@ -190,6 +220,19 @@
       "required": ["kind", "severity", "subject", "path", "before", "after"],
       "properties": {
         "kind": { "type": "string", "enum": ["async_proof"] },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "before": { "$ref": "#/$defs/json_value" },
+        "after": { "$ref": "#/$defs/json_value" }
+      }
+    },
+    "generic_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "subject", "path", "before", "after"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1, "maxLength": 128 },
         "severity": { "$ref": "#/$defs/review_severity" },
         "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
         "path": { "type": ["string", "null"], "maxLength": 4096 },

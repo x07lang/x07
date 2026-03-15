@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-trust.certificate.schema.json",
-  "title": "x07.trust.certificate@0.2.0",
+  "title": "x07.trust.certificate@0.3.0",
   "description": "Source-free trust certificate emitted by `x07 trust certify`.",
   "type": "object",
   "additionalProperties": false,
@@ -12,11 +12,16 @@
     "entry",
     "out_dir",
     "claims",
+    "capsules",
+    "network_capsules",
+    "runtime",
+    "package_set_digest",
+    "dependency_closure",
     "tcb",
     "evidence"
   ],
   "properties": {
-    "schema_version": { "const": "x07.trust.certificate@0.2.0" },
+    "schema_version": { "const": "x07.trust.certificate@0.3.0" },
     "verdict": {
       "type": "string",
       "enum": ["accepted", "rejected"]
@@ -68,13 +73,35 @@
         }
       }
     },
+    "network_capsules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "ids"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "default": []
+        }
+      }
+    },
     "runtime": {
       "anyOf": [
         { "type": "null" },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["backend", "network_mode", "weaker_isolation", "attestation"],
+          "required": [
+            "backend",
+            "network_mode",
+            "network_enforcement",
+            "weaker_isolation",
+            "effective_allow_hosts",
+            "policy_digest_bound",
+            "guest_image_digest_bound",
+            "attestation"
+          ],
           "properties": {
             "backend": {
               "type": "string",
@@ -84,7 +111,62 @@
               "type": "string",
               "enum": ["none", "allowlist", "disabled"]
             },
+            "network_enforcement": {
+              "type": "string",
+              "enum": ["none", "vm_boundary_allowlist", "guest_allowlist", "unsupported"]
+            },
             "weaker_isolation": { "type": "boolean" },
+            "effective_allow_hosts": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/net_host" },
+              "default": []
+            },
+            "policy_digest_bound": { "type": "boolean" },
+            "guest_image_digest_bound": { "type": "boolean" },
+            "attestation": {
+              "anyOf": [
+                { "$ref": "#/$defs/evidence_ref" },
+                { "type": "null" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "package_set_digest": {
+      "anyOf": [
+        { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "dependency_closure": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "manifest_digest",
+            "lockfile_digest",
+            "packages",
+            "advisory_check_ok",
+            "attestation"
+          ],
+          "properties": {
+            "manifest_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "lockfile_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "packages": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+              "default": []
+            },
+            "advisory_check_ok": { "type": "boolean" },
             "attestation": {
               "anyOf": [
                 { "$ref": "#/$defs/evidence_ref" },
@@ -150,6 +232,11 @@
             { "type": "null" }
           ]
         },
+        "peer_policy_files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_ref" },
+          "default": []
+        },
         "capsule_attestations": {
           "type": "array",
           "items": { "$ref": "#/$defs/evidence_ref" },
@@ -161,6 +248,12 @@
           "default": []
         },
         "review_diff": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "dependency_closure_attestation": {
           "anyOf": [
             { "$ref": "#/$defs/evidence_ref" },
             { "type": "null" }
@@ -181,6 +274,21 @@
     }
   },
   "$defs": {
+    "net_host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "ports"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "ports": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "uniqueItems": true
+        }
+      }
+    },
     "evidence_ref": {
       "type": "object",
       "additionalProperties": false,

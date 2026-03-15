@@ -9,7 +9,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use x07_contracts::{
     PROJECT_LOCKFILE_SCHEMA_VERSION, PROJECT_LOCKFILE_SCHEMA_VERSIONS_SUPPORTED,
-    X07DIAG_SCHEMA_VERSION, X07_TRUST_CERTIFICATE_SCHEMA_VERSION, X07_TRUST_PROFILE_SCHEMA_VERSION,
+    X07DIAG_SCHEMA_VERSION, X07_CAPSULE_ATTEST_SCHEMA_VERSION, X07_CAPSULE_CONTRACT_SCHEMA_VERSION,
+    X07_DEP_CLOSURE_ATTEST_SCHEMA_VERSION, X07_EFFECT_LOG_SCHEMA_VERSION,
+    X07_PEER_POLICY_SCHEMA_VERSION, X07_RUNTIME_ATTEST_SCHEMA_VERSION,
+    X07_TRUST_CERTIFICATE_SCHEMA_VERSION, X07_TRUST_PROFILE_SCHEMA_VERSION,
     X07_TRUST_REPORT_SCHEMA_VERSION,
 };
 use x07_worlds::WorldId;
@@ -34,6 +37,12 @@ const X07_CAPSULE_CONTRACT_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-capsule.contract.schema.json");
 const X07_CAPSULE_ATTEST_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-capsule.attest.schema.json");
+const X07_RUNTIME_ATTEST_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-runtime.attest.schema.json");
+const X07_PEER_POLICY_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-peer.policy.schema.json");
+const X07_DEP_CLOSURE_ATTEST_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-dep.closure.attest.schema.json");
 const X07_VERIFY_PRIMITIVES_CATALOG_BYTES: &[u8] =
     include_bytes!("../../../catalog/verify_primitives.json");
 const X07_DEPS_CAPABILITY_POLICY_SCHEMA_BYTES: &[u8] =
@@ -301,6 +310,9 @@ struct TrustEvidenceRequirements {
     require_capsule_attestations: bool,
     require_runtime_attestation: bool,
     require_effect_log_digests: bool,
+    require_peer_policies: bool,
+    require_network_capsules: bool,
+    require_dependency_closure_attestation: bool,
     require_compile_attestation: bool,
     require_trust_report_clean: bool,
     require_sbom: bool,
@@ -312,6 +324,7 @@ struct TrustSandboxRequirements {
     sandbox_backend: String,
     forbid_weaker_isolation: bool,
     network_mode: String,
+    network_enforcement: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -337,7 +350,10 @@ struct TrustCertificate {
     claims: Vec<String>,
     async_proof: TrustCertificateAsyncProof,
     capsules: TrustCertificateCapsules,
+    network_capsules: TrustCertificateNetworkCapsules,
     runtime: Option<TrustCertificateRuntime>,
+    package_set_digest: Option<String>,
+    dependency_closure: Option<TrustCertificateDependencyClosure>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     effect_logs: Vec<EvidenceRef>,
     tcb: TrustCertificateTcb,
@@ -362,10 +378,36 @@ struct TrustCertificateCapsules {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct TrustCertificateNetworkCapsules {
+    count: u64,
+    ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct TrustCertificateRuntime {
     backend: String,
     network_mode: String,
+    network_enforcement: String,
     weaker_isolation: bool,
+    #[serde(default)]
+    effective_allow_hosts: Vec<TrustCertificateNetHost>,
+    policy_digest_bound: bool,
+    guest_image_digest_bound: bool,
+    attestation: Option<EvidenceRef>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct TrustCertificateNetHost {
+    host: String,
+    ports: Vec<u16>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificateDependencyClosure {
+    manifest_digest: String,
+    lockfile_digest: String,
+    packages: Vec<String>,
+    advisory_check_ok: bool,
     attestation: Option<EvidenceRef>,
 }
 
@@ -390,11 +432,15 @@ struct TrustCertificateEvidence {
     #[serde(skip_serializing_if = "Option::is_none")]
     runtime_attestation: Option<EvidenceRef>,
     #[serde(default)]
+    peer_policy_files: Vec<EvidenceRef>,
+    #[serde(default)]
     capsule_attestations: Vec<EvidenceRef>,
     #[serde(default)]
     effect_logs: Vec<EvidenceRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
     review_diff: Option<EvidenceRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dependency_closure_attestation: Option<EvidenceRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
     bundle_path: Option<String>,
 }
@@ -409,6 +455,15 @@ struct EvidenceRef {
 struct BoundaryEvidenceRequirements {
     schema_paths: BTreeSet<String>,
     required_tests: BTreeMap<String, BoundaryTestRequirement>,
+}
+
+#[derive(Debug, Clone)]
+struct CapsuleArtifacts {
+    capsules: TrustCertificateCapsules,
+    network_capsules: TrustCertificateNetworkCapsules,
+    capsule_attestations: Vec<EvidenceRef>,
+    effect_logs: Vec<EvidenceRef>,
+    peer_policies: Vec<EvidenceRef>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -463,6 +518,8 @@ struct CapsuleContract {
     effect_log: CapsuleEffectLog,
     replay: CapsuleReplay,
     conformance: CapsuleConformance,
+    #[serde(default)]
+    network: Option<CapsuleNetworkContract>,
 }
 
 #[allow(dead_code)]
@@ -499,6 +556,19 @@ struct CapsuleConformance {
     report_path: Option<String>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapsuleNetworkContract {
+    peer_policy_paths: Vec<String>,
+    #[serde(default)]
+    request_contract_path: Option<String>,
+    #[serde(default)]
+    response_contract_path: Option<String>,
+    #[serde(default)]
+    conformance_tests: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct CapsuleAttestationDoc {
     schema_version: &'static str,
@@ -507,6 +577,90 @@ struct CapsuleAttestationDoc {
     module_digests: Vec<CapsuleModuleDigest>,
     lockfile_digest: String,
     conformance_report_digest: String,
+    peer_policy_digests: Vec<CapsuleModuleDigest>,
+    request_contract_digest: Option<String>,
+    response_contract_digest: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PeerPolicyDoc {
+    schema_version: String,
+    policy_id: String,
+    tls_mode: String,
+    #[serde(default)]
+    ca_paths: Vec<String>,
+    #[serde(default)]
+    spki_sha256: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RuntimeAttestationDoc {
+    schema_version: String,
+    sandbox_backend: String,
+    weaker_isolation: bool,
+    #[serde(default)]
+    guest_image_digest: Option<String>,
+    #[serde(default)]
+    effective_policy_digest: Option<String>,
+    network_mode: String,
+    network_enforcement: String,
+    #[serde(default)]
+    effective_allow_hosts: Vec<TrustCertificateNetHost>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct DepClosureAttestationDoc {
+    schema_version: String,
+    project_path: String,
+    manifest_digest: String,
+    lockfile_digest: String,
+    package_set_digest: String,
+    #[serde(default)]
+    dependencies: Vec<DepClosureDependencyDoc>,
+    advisory_check: DepClosureAdvisoryCheckDoc,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct DepClosureDependencyDoc {
+    name: String,
+    version: String,
+    path: String,
+    package_manifest_digest: String,
+    module_root: String,
+    module_root_digest: String,
+    #[serde(default)]
+    modules: Vec<DepClosureModuleDigestDoc>,
+    yanked: bool,
+    #[serde(default)]
+    advisories: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct DepClosureModuleDigestDoc {
+    module_id: String,
+    digest: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+struct DepClosureAdvisoryCheckDoc {
+    mode: String,
+    ok: bool,
+    allow_yanked: bool,
+    allow_advisories: bool,
+    #[serde(default)]
+    yanked: Vec<String>,
+    #[serde(default)]
+    advisories: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -827,6 +981,47 @@ fn cmd_trust_capsule_check(
                     &contract_path,
                 ));
             }
+            if let Some(network) = &contract.network {
+                if network.peer_policy_paths.is_empty() {
+                    diagnostics.push(trust_diag_with_path(
+                        "X07CAP_PEER_POLICY_REQUIRED",
+                        "network capsule contracts must declare at least one peer policy",
+                        &contract_path,
+                    ));
+                }
+                if network.conformance_tests.is_empty() {
+                    diagnostics.push(trust_diag_with_path(
+                        "X07CAP_CONFORMANCE_MISSING",
+                        "network capsule contracts must declare conformance_tests",
+                        &contract_path,
+                    ));
+                }
+                for peer_policy_path in &network.peer_policy_paths {
+                    let peer_policy_abs = index_root.join(peer_policy_path);
+                    match load_peer_policy(&peer_policy_abs) {
+                        Ok(policy) => {
+                            if policy.tls_mode != "none"
+                                && policy.ca_paths.is_empty()
+                                && policy.spki_sha256.is_empty()
+                            {
+                                diagnostics.push(trust_diag_with_path(
+                                    "X07CAP_TLS_POLICY_INCOMPLETE",
+                                    format!(
+                                        "peer policy {:?} enables TLS but does not declare trust roots or SPKI pins",
+                                        policy.policy_id
+                                    ),
+                                    &peer_policy_abs,
+                                ));
+                            }
+                        }
+                        Err(err) => diagnostics.push(trust_diag_with_path(
+                            "X07CAP_PEER_POLICY_REQUIRED",
+                            format!("{err:#}"),
+                            &peer_policy_abs,
+                        )),
+                    }
+                }
+            }
             let attest_path = index_root.join(&capsule.attestation_path);
             match report_common::read_json_file(&attest_path) {
                 Ok(doc) => {
@@ -856,6 +1051,44 @@ fn cmd_trust_capsule_check(
                                 ),
                                 &attest_path,
                             ));
+                        }
+                        if let Some(network) = &contract.network {
+                            let mut expected_peer_policy_digests = network
+                                .peer_policy_paths
+                                .iter()
+                                .filter_map(|path| {
+                                    let abs = index_root.join(path);
+                                    if !abs.is_file() {
+                                        return None;
+                                    }
+                                    Some(json!({
+                                        "path": abs.display().to_string(),
+                                        "digest": format!("sha256:{}", sha256_hex_for_path(&abs).ok()?)
+                                    }))
+                                })
+                                .collect::<Vec<_>>();
+                            expected_peer_policy_digests.sort_by(|a, b| {
+                                a.get("path")
+                                    .and_then(Value::as_str)
+                                    .cmp(&b.get("path").and_then(Value::as_str))
+                            });
+                            let mut got_peer_policy_digests = doc
+                                .get("peer_policy_digests")
+                                .and_then(Value::as_array)
+                                .cloned()
+                                .unwrap_or_default();
+                            got_peer_policy_digests.sort_by(|a, b| {
+                                a.get("path")
+                                    .and_then(Value::as_str)
+                                    .cmp(&b.get("path").and_then(Value::as_str))
+                            });
+                            if expected_peer_policy_digests != got_peer_policy_digests {
+                                diagnostics.push(trust_diag_with_path(
+                                    "X07CAP_PEER_POLICY_REQUIRED",
+                                    "capsule attestation peer-policy digests do not match the contract peer-policy set",
+                                    &attest_path,
+                                ));
+                            }
                         }
                     }
                 }
@@ -894,6 +1127,7 @@ fn cmd_trust_capsule_attest(
 ) -> Result<std::process::ExitCode> {
     let contract_path = util::resolve_existing_path_upwards(&args.contract);
     let contract = load_capsule_contract(&contract_path)?;
+    let contract_root = contract_path.parent().unwrap_or_else(|| Path::new("."));
     let mut module_digests = Vec::new();
     for module in &args.module {
         let path = util::resolve_existing_path_upwards(module);
@@ -903,9 +1137,36 @@ fn cmd_trust_capsule_attest(
         });
     }
     module_digests.sort_by(|a, b| a.path.cmp(&b.path));
+    let mut peer_policy_digests = Vec::new();
+    let (request_contract_digest, response_contract_digest) =
+        if let Some(network) = &contract.network {
+            for peer_policy_path in &network.peer_policy_paths {
+                let path = contract_root.join(peer_policy_path);
+                peer_policy_digests.push(CapsuleModuleDigest {
+                    path: path.display().to_string(),
+                    digest: format!("sha256:{}", sha256_hex_for_path(&path)?),
+                });
+            }
+            peer_policy_digests.sort_by(|a, b| a.path.cmp(&b.path));
+            let request_digest = network
+                .request_contract_path
+                .as_deref()
+                .map(|path| contract_root.join(path))
+                .map(|path| sha256_hex_for_path(&path).map(|digest| format!("sha256:{digest}")))
+                .transpose()?;
+            let response_digest = network
+                .response_contract_path
+                .as_deref()
+                .map(|path| contract_root.join(path))
+                .map(|path| sha256_hex_for_path(&path).map(|digest| format!("sha256:{digest}")))
+                .transpose()?;
+            (request_digest, response_digest)
+        } else {
+            (None, None)
+        };
 
     let doc = CapsuleAttestationDoc {
-        schema_version: "x07.capsule.attest@0.1.0",
+        schema_version: X07_CAPSULE_ATTEST_SCHEMA_VERSION,
         capsule_id: contract.id,
         contract_digest: format!("sha256:{}", sha256_hex_for_path(&contract_path)?),
         module_digests,
@@ -919,6 +1180,9 @@ fn cmd_trust_capsule_attest(
                 &args.conformance_report
             ))?
         ),
+        peer_policy_digests,
+        request_contract_digest,
+        response_contract_digest,
     };
     let value = serde_json::to_value(&doc).context("serialize capsule attestation")?;
     let schema_diags = report_common::validate_schema(
@@ -2353,6 +2617,9 @@ fn cmd_trust_certify(
         trust_report_ref,
         compile_attestation_ref,
         review_diff_ref,
+        dependency_closure,
+        dependency_closure_ref,
+        package_set_digest,
         bundle_path,
     ) = if let Some(project_path) = project_path.as_deref() {
         let (boundaries_ref, boundaries_doc) =
@@ -2443,6 +2710,13 @@ fn cmd_trust_certify(
             &out_dir,
             &mut diagnostics,
         )?;
+        let (dependency_closure, dependency_closure_ref, package_set_digest) =
+            build_dependency_closure_evidence(
+                project_path,
+                profile.as_ref(),
+                &out_dir,
+                &mut diagnostics,
+            )?;
 
         if let Some(profile) = &profile {
             if profile.evidence_requirements.require_compile_attestation
@@ -2464,6 +2738,9 @@ fn cmd_trust_certify(
             trust_report_ref,
             compile_attestation_ref,
             review_diff_ref,
+            dependency_closure,
+            dependency_closure_ref,
+            package_set_digest,
             bundle_path,
         )
     } else {
@@ -2505,6 +2782,9 @@ fn cmd_trust_certify(
                 None
             },
             None,
+            None,
+            None,
+            None,
         )
     };
 
@@ -2522,8 +2802,7 @@ fn cmd_trust_certify(
             ),
         ));
     }
-    let (capsules, capsule_attestations, effect_logs) =
-        collect_capsule_artifacts(&project_root, profile.as_ref(), &mut diagnostics)?;
+    let capsules = collect_capsule_artifacts(&project_root, profile.as_ref(), &mut diagnostics)?;
     let (runtime, runtime_attestation) = collect_runtime_attestation(
         Path::new(&tests_ref.path),
         &project_root,
@@ -2550,9 +2829,12 @@ fn cmd_trust_certify(
             .map(|p| p.claims.clone())
             .unwrap_or_default(),
         async_proof,
-        capsules,
+        capsules: capsules.capsules,
+        network_capsules: capsules.network_capsules,
         runtime,
-        effect_logs: effect_logs.clone(),
+        package_set_digest,
+        dependency_closure,
+        effect_logs: capsules.effect_logs.clone(),
         tcb: build_certificate_tcb(),
         evidence: TrustCertificateEvidence {
             boundaries_report: boundaries_ref,
@@ -2563,9 +2845,11 @@ fn cmd_trust_certify(
             trust_report: trust_report_ref,
             compile_attestation: compile_attestation_ref,
             runtime_attestation,
-            capsule_attestations,
-            effect_logs,
+            peer_policy_files: capsules.peer_policies,
+            capsule_attestations: capsules.capsule_attestations,
+            effect_logs: capsules.effect_logs,
             review_diff: review_diff_ref,
+            dependency_closure_attestation: dependency_closure_ref,
             bundle_path: bundle_path.map(|path| path.display().to_string()),
         },
         diagnostics,
@@ -2695,11 +2979,35 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
         certificate.capsules.ids.join(", ")
     )));
     s.push_str("</code></td></tr>");
+    s.push_str("<tr><td>network capsules</td><td><code>");
+    s.push_str(&report_common::html_escape(&format!(
+        "{} [{}]",
+        certificate.network_capsules.count,
+        certificate.network_capsules.ids.join(", ")
+    )));
+    s.push_str("</code></td></tr>");
     if let Some(runtime) = &certificate.runtime {
         s.push_str("<tr><td>runtime</td><td><code>");
         s.push_str(&report_common::html_escape(&format!(
-            "backend={} network_mode={} weaker_isolation={}",
-            runtime.backend, runtime.network_mode, runtime.weaker_isolation
+            "backend={} network_mode={} network_enforcement={} weaker_isolation={}",
+            runtime.backend,
+            runtime.network_mode,
+            runtime.network_enforcement,
+            runtime.weaker_isolation
+        )));
+        s.push_str("</code></td></tr>");
+    }
+    if let Some(package_set_digest) = &certificate.package_set_digest {
+        s.push_str("<tr><td>package set digest</td><td><code>");
+        s.push_str(&report_common::html_escape(package_set_digest));
+        s.push_str("</code></td></tr>");
+    }
+    if let Some(dependency_closure) = &certificate.dependency_closure {
+        s.push_str("<tr><td>dependency closure</td><td><code>");
+        s.push_str(&report_common::html_escape(&format!(
+            "packages={} advisory_check_ok={}",
+            dependency_closure.packages.join(", "),
+            dependency_closure.advisory_check_ok
         )));
         s.push_str("</code></td></tr>");
     }
@@ -2752,6 +3060,13 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
         s.push_str(&report_common::html_escape(&runtime_attestation.sha256_hex));
         s.push_str("</code></td></tr>");
     }
+    for evidence in &certificate.evidence.peer_policy_files {
+        s.push_str("<tr><td>peer policy</td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
     for evidence in &certificate.evidence.capsule_attestations {
         s.push_str("<tr><td>capsule attestation</td><td><code>");
         s.push_str(&report_common::html_escape(&evidence.path));
@@ -2761,6 +3076,13 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
     }
     for evidence in &certificate.evidence.effect_logs {
         s.push_str("<tr><td>effect log</td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
+    if let Some(evidence) = &certificate.evidence.dependency_closure_attestation {
+        s.push_str("<tr><td>dependency closure</td><td><code>");
         s.push_str(&report_common::html_escape(&evidence.path));
         s.push_str("</code></td><td><code>");
         s.push_str(&report_common::html_escape(&evidence.sha256_hex));
@@ -2843,14 +3165,86 @@ fn load_capsule_contract(path: &Path) -> Result<CapsuleContract> {
     }
     let contract: CapsuleContract =
         serde_json::from_value(doc).with_context(|| format!("parse {}", path.display()))?;
-    if contract.schema_version.trim() != "x07.capsule.contract@0.1.0" {
+    if contract.schema_version.trim() != X07_CAPSULE_CONTRACT_SCHEMA_VERSION {
         anyhow::bail!(
             "capsule contract schema_version mismatch: expected {:?} got {:?}",
-            "x07.capsule.contract@0.1.0",
+            X07_CAPSULE_CONTRACT_SCHEMA_VERSION,
             contract.schema_version
         );
     }
     Ok(contract)
+}
+
+fn load_peer_policy(path: &Path) -> Result<PeerPolicyDoc> {
+    let doc = report_common::read_json_file(path)?;
+    let schema_diags = report_common::validate_schema(
+        X07_PEER_POLICY_SCHEMA_BYTES,
+        "spec/x07-peer.policy.schema.json",
+        &doc,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!("peer policy schema invalid: {}", schema_diags[0].message);
+    }
+    let policy: PeerPolicyDoc =
+        serde_json::from_value(doc).with_context(|| format!("parse {}", path.display()))?;
+    if policy.schema_version.trim() != X07_PEER_POLICY_SCHEMA_VERSION {
+        anyhow::bail!(
+            "peer policy schema_version mismatch: expected {:?} got {:?}",
+            X07_PEER_POLICY_SCHEMA_VERSION,
+            policy.schema_version
+        );
+    }
+    Ok(policy)
+}
+
+fn load_dep_closure_attestation(path: &Path) -> Result<DepClosureAttestationDoc> {
+    let doc = report_common::read_json_file(path)?;
+    let schema_diags = report_common::validate_schema(
+        X07_DEP_CLOSURE_ATTEST_SCHEMA_BYTES,
+        "spec/x07-dep.closure.attest.schema.json",
+        &doc,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "dependency closure attestation schema invalid: {}",
+            schema_diags[0].message
+        );
+    }
+    let attestation: DepClosureAttestationDoc =
+        serde_json::from_value(doc).with_context(|| format!("parse {}", path.display()))?;
+    if attestation.schema_version.trim() != X07_DEP_CLOSURE_ATTEST_SCHEMA_VERSION {
+        anyhow::bail!(
+            "dependency closure schema_version mismatch: expected {:?} got {:?}",
+            X07_DEP_CLOSURE_ATTEST_SCHEMA_VERSION,
+            attestation.schema_version
+        );
+    }
+    Ok(attestation)
+}
+
+fn load_runtime_attestation_doc(path: &Path) -> Result<RuntimeAttestationDoc> {
+    let doc = report_common::read_json_file(path)?;
+    let schema_diags = report_common::validate_schema(
+        X07_RUNTIME_ATTEST_SCHEMA_BYTES,
+        "spec/x07-runtime.attest.schema.json",
+        &doc,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "runtime attestation schema invalid: {}",
+            schema_diags[0].message
+        );
+    }
+    let attestation: RuntimeAttestationDoc =
+        serde_json::from_value(doc).with_context(|| format!("parse {}", path.display()))?;
+    if attestation.schema_version.trim() != X07_RUNTIME_ATTEST_SCHEMA_VERSION {
+        anyhow::bail!(
+            "runtime attestation schema_version mismatch: expected {:?} got {:?}",
+            X07_RUNTIME_ATTEST_SCHEMA_VERSION,
+            attestation.schema_version
+        );
+    }
+    Ok(attestation)
 }
 
 fn default_capsule_index_path(project_root: &Path) -> PathBuf {
@@ -2868,6 +3262,40 @@ fn resolve_report_artifact_path(report_path: &Path, project_root: &Path, raw: &s
         return report_relative;
     }
     project_root.join(candidate)
+}
+
+fn policy_allow_hosts_from_doc(doc: Option<&Value>) -> Vec<TrustCertificateNetHost> {
+    let Some(hosts) = doc
+        .and_then(|doc| doc.pointer("/net/allow_hosts"))
+        .and_then(Value::as_array)
+    else {
+        return Vec::new();
+    };
+    let mut out = hosts
+        .iter()
+        .filter_map(|host| {
+            let host_name = host.get("host").and_then(Value::as_str)?.to_string();
+            let ports = host
+                .get("ports")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_u64)
+                .filter_map(|port| u16::try_from(port).ok())
+                .collect::<Vec<_>>();
+            if host_name.is_empty() || ports.is_empty() {
+                return None;
+            }
+            Some(TrustCertificateNetHost {
+                host: host_name,
+                ports,
+            })
+        })
+        .collect::<Vec<_>>();
+    out.sort_by(|a, b| {
+        (a.host.as_str(), a.ports.as_slice()).cmp(&(b.host.as_str(), b.ports.as_slice()))
+    });
+    out
 }
 
 fn collect_async_proof_summary(coverage_path: &Path) -> Result<TrustCertificateAsyncProof> {
@@ -2908,7 +3336,21 @@ fn collect_capsule_artifacts(
     project_root: &Path,
     profile: Option<&TrustProfile>,
     diagnostics: &mut Vec<diagnostics::Diagnostic>,
-) -> Result<(TrustCertificateCapsules, Vec<EvidenceRef>, Vec<EvidenceRef>)> {
+) -> Result<CapsuleArtifacts> {
+    let empty = || CapsuleArtifacts {
+        capsules: TrustCertificateCapsules {
+            count: 0,
+            ids: Vec::new(),
+            attestations: Vec::new(),
+        },
+        network_capsules: TrustCertificateNetworkCapsules {
+            count: 0,
+            ids: Vec::new(),
+        },
+        capsule_attestations: Vec::new(),
+        effect_logs: Vec::new(),
+        peer_policies: Vec::new(),
+    };
     let index_path = default_capsule_index_path(project_root);
     if !index_path.is_file() {
         if profile.is_some_and(|p| p.evidence_requirements.require_capsule_attestations) {
@@ -2925,15 +3367,21 @@ fn collect_capsule_artifacts(
                 &index_path,
             ));
         }
-        return Ok((
-            TrustCertificateCapsules {
-                count: 0,
-                ids: Vec::new(),
-                attestations: Vec::new(),
-            },
-            Vec::new(),
-            Vec::new(),
-        ));
+        if profile.is_some_and(|p| p.evidence_requirements.require_network_capsules) {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_ECAPSULE_NETWORK_ATTEST",
+                "trust profile requires network capsule evidence, but no capsule index is present",
+                &index_path,
+            ));
+        }
+        if profile.is_some_and(|p| p.evidence_requirements.require_peer_policies) {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_EPEER_POLICY",
+                "trust profile requires peer-policy evidence, but no capsule index is present",
+                &index_path,
+            ));
+        }
+        return Ok(empty());
     }
 
     let index = match load_capsule_index(&index_path) {
@@ -2944,22 +3392,16 @@ fn collect_capsule_artifacts(
                 format!("{err:#}"),
                 &index_path,
             ));
-            return Ok((
-                TrustCertificateCapsules {
-                    count: 0,
-                    ids: Vec::new(),
-                    attestations: Vec::new(),
-                },
-                Vec::new(),
-                Vec::new(),
-            ));
+            return Ok(empty());
         }
     };
 
     let index_root = index_path.parent().unwrap_or_else(|| Path::new("."));
     let mut capsule_ids = Vec::new();
+    let mut network_capsule_ids = Vec::new();
     let mut capsule_attestations = Vec::new();
     let mut effect_logs = Vec::new();
+    let mut peer_policies = Vec::new();
 
     for capsule in &index.capsules {
         capsule_ids.push(capsule.id.clone());
@@ -2978,7 +3420,60 @@ fn collect_capsule_artifacts(
                         &effect_log_schema,
                     ));
                 } else {
+                    let effect_log_doc = report_common::read_json_file(&effect_log_schema)?;
+                    if effect_log_doc
+                        .get("schema_version")
+                        .and_then(Value::as_str)
+                        .is_some_and(|version| version != X07_EFFECT_LOG_SCHEMA_VERSION)
+                    {
+                        diagnostics.push(trust_diag_with_path(
+                            "X07TC_EEFFECT_LOG",
+                            format!(
+                                "capsule {:?} effect-log schema must use {}",
+                                capsule.id, X07_EFFECT_LOG_SCHEMA_VERSION
+                            ),
+                            &effect_log_schema,
+                        ));
+                    }
                     effect_logs.push(evidence_ref_for_path(&effect_log_schema)?);
+                }
+                if let Some(network) = &contract.network {
+                    network_capsule_ids.push(capsule.id.clone());
+                    if network.conformance_tests.is_empty() {
+                        diagnostics.push(trust_diag_with_path(
+                            "X07TC_ECAPSULE_NETWORK_ATTEST",
+                            format!(
+                                "network capsule {:?} must declare conformance_tests",
+                                capsule.id
+                            ),
+                            &contract_path,
+                        ));
+                    }
+                    for peer_policy_path in &network.peer_policy_paths {
+                        let peer_policy_abs = index_root.join(peer_policy_path);
+                        if !peer_policy_abs.is_file() {
+                            diagnostics.push(trust_diag_with_path(
+                                "X07TC_EPEER_POLICY",
+                                format!(
+                                    "network capsule {:?} references missing peer policy {:?}",
+                                    capsule.id, peer_policy_path
+                                ),
+                                &peer_policy_abs,
+                            ));
+                            continue;
+                        }
+                        let _policy = load_peer_policy(&peer_policy_abs).map_err(|err| {
+                            diagnostics.push(trust_diag_with_path(
+                                "X07TC_EPEER_POLICY",
+                                format!("{err:#}"),
+                                &peer_policy_abs,
+                            ));
+                            err
+                        });
+                        if peer_policy_abs.is_file() {
+                            peer_policies.push(evidence_ref_for_path(&peer_policy_abs)?);
+                        }
+                    }
                 }
             }
             Err(err) => diagnostics.push(trust_diag_with_path(
@@ -3004,8 +3499,11 @@ fn collect_capsule_artifacts(
     }
 
     capsule_ids.sort();
+    network_capsule_ids.sort();
     capsule_attestations.sort_by(|a, b| a.path.cmp(&b.path));
     effect_logs.sort_by(|a, b| a.path.cmp(&b.path));
+    peer_policies.sort_by(|a, b| a.path.cmp(&b.path));
+    peer_policies.dedup_by(|a, b| a.path == b.path);
 
     if profile.is_some_and(|p| p.evidence_requirements.require_capsule_attestations)
         && capsule_attestations.len() < capsule_ids.len()
@@ -3023,13 +3521,37 @@ fn collect_capsule_artifacts(
             "trust profile requires effect-log digests, but none were collected",
         ));
     }
+    if profile.is_some_and(|p| p.evidence_requirements.require_network_capsules)
+        && network_capsule_ids.is_empty()
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_ECAPSULE_NETWORK_ATTEST",
+            "trust profile requires network capsule evidence, but no network capsule contracts were collected",
+        ));
+    }
+    if profile.is_some_and(|p| p.evidence_requirements.require_peer_policies)
+        && peer_policies.is_empty()
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_EPEER_POLICY",
+            "trust profile requires peer-policy evidence, but none were collected",
+        ));
+    }
 
-    let capsules = TrustCertificateCapsules {
-        count: capsule_ids.len() as u64,
-        ids: capsule_ids,
-        attestations: capsule_attestations.clone(),
-    };
-    Ok((capsules, capsule_attestations, effect_logs))
+    Ok(CapsuleArtifacts {
+        capsules: TrustCertificateCapsules {
+            count: capsule_ids.len() as u64,
+            ids: capsule_ids,
+            attestations: capsule_attestations.clone(),
+        },
+        network_capsules: TrustCertificateNetworkCapsules {
+            count: network_capsule_ids.len() as u64,
+            ids: network_capsule_ids,
+        },
+        capsule_attestations,
+        effect_logs,
+        peer_policies,
+    })
 }
 
 fn collect_runtime_attestation(
@@ -3042,6 +3564,31 @@ fn collect_runtime_attestation(
     let mut backend = None;
     let mut weaker_isolation = false;
     let mut runtime_attestation = None;
+    let mut network_mode = match ctx
+        .and_then(|project| project.policy_doc.as_ref())
+        .and_then(|doc| doc.pointer("/net/enabled"))
+        .and_then(Value::as_bool)
+    {
+        Some(true)
+            if !policy_allow_hosts_from_doc(
+                ctx.and_then(|project| project.policy_doc.as_ref()),
+            )
+            .is_empty() =>
+        {
+            "allowlist".to_string()
+        }
+        Some(false) => "none".to_string(),
+        _ => "disabled".to_string(),
+    };
+    let mut network_enforcement = if network_mode == "allowlist" {
+        "unsupported".to_string()
+    } else {
+        "none".to_string()
+    };
+    let mut effective_allow_hosts =
+        policy_allow_hosts_from_doc(ctx.and_then(|project| project.policy_doc.as_ref()));
+    let mut policy_digest_bound = false;
+    let mut guest_image_digest_bound = false;
 
     if tests_report_path.is_file() {
         let report_doc = report_common::read_json_file(tests_report_path)?;
@@ -3073,7 +3620,23 @@ fn collect_runtime_attestation(
                     let resolved =
                         resolve_report_artifact_path(tests_report_path, project_root, raw_path);
                     if resolved.is_file() {
-                        runtime_attestation = Some(evidence_ref_for_path(&resolved)?);
+                        match load_runtime_attestation_doc(&resolved) {
+                            Ok(doc) => {
+                                backend = Some(doc.sandbox_backend.clone());
+                                weaker_isolation = doc.weaker_isolation;
+                                network_mode = doc.network_mode;
+                                network_enforcement = doc.network_enforcement;
+                                effective_allow_hosts = doc.effective_allow_hosts;
+                                policy_digest_bound = doc.effective_policy_digest.is_some();
+                                guest_image_digest_bound = doc.guest_image_digest.is_some();
+                                runtime_attestation = Some(evidence_ref_for_path(&resolved)?);
+                            }
+                            Err(err) => diagnostics.push(trust_diag_with_path(
+                                "X07TC_ERUNTIME_ATTEST",
+                                format!("{err:#}"),
+                                &resolved,
+                            )),
+                        }
                     } else {
                         diagnostics.push(trust_diag_with_path(
                             "X07TC_ERUNTIME_ATTEST",
@@ -3115,38 +3678,73 @@ fn collect_runtime_attestation(
         ));
     }
 
-    let network_mode = match ctx
-        .and_then(|project| project.policy_doc.as_ref())
-        .and_then(|doc| doc.pointer("/net/enabled"))
-        .and_then(Value::as_bool)
-    {
-        Some(true) => "allowlist",
-        Some(false) => "none",
-        None => "disabled",
-    };
     let runtime = if ctx.is_some_and(|project| project.world == WorldId::RunOsSandboxed)
         || runtime_attestation.is_some()
         || backend.is_some()
     {
         Some(TrustCertificateRuntime {
             backend: backend.unwrap_or_else(|| "none".to_string()),
-            network_mode: network_mode.to_string(),
+            network_mode: network_mode.clone(),
+            network_enforcement: network_enforcement.clone(),
             weaker_isolation,
+            effective_allow_hosts: effective_allow_hosts.clone(),
+            policy_digest_bound,
+            guest_image_digest_bound,
             attestation: runtime_attestation.clone(),
         })
     } else {
         None
     };
 
-    if profile.is_some_and(|p| p.sandbox_requirements.network_mode == "none")
-        && network_mode != "none"
-    {
-        diagnostics.push(trust_diag(
-            "X07TC_ESANDBOX_PROFILE",
-            format!(
-                "runtime policy reports network_mode={network_mode:?}, but the trust profile requires none"
-            ),
-        ));
+    if let Some(profile) = profile {
+        if profile.sandbox_requirements.network_mode == "none" && network_mode != "none" {
+            diagnostics.push(trust_diag(
+                "X07TC_ESANDBOX_PROFILE",
+                format!(
+                    "runtime policy reports network_mode={network_mode:?}, but the trust profile requires none"
+                ),
+            ));
+        }
+        if profile.sandbox_requirements.network_mode == "allowlist" {
+            if network_mode != "allowlist" {
+                diagnostics.push(trust_diag(
+                    "X07TC_ERUNTIME_NETWORK_EVIDENCE",
+                    format!(
+                        "runtime attestation must report network_mode=\"allowlist\", got {:?}",
+                        network_mode
+                    ),
+                ));
+            }
+            if effective_allow_hosts.is_empty() {
+                diagnostics.push(trust_diag(
+                    "X07TC_ERUNTIME_NETWORK_EVIDENCE",
+                    "runtime attestation must bind a non-empty effective allowlist for the networked sandbox profile",
+                ));
+            }
+            if !policy_digest_bound {
+                diagnostics.push(trust_diag(
+                    "X07TC_ERUNTIME_NETWORK_EVIDENCE",
+                    "runtime attestation is missing the effective policy digest required for the networked sandbox profile",
+                ));
+            }
+            if profile.sandbox_requirements.sandbox_backend == "vm" && !guest_image_digest_bound {
+                diagnostics.push(trust_diag(
+                    "X07TC_ERUNTIME_NETWORK_EVIDENCE",
+                    "runtime attestation is missing the VM guest image digest required for the networked sandbox profile",
+                ));
+            }
+            if profile.sandbox_requirements.network_enforcement != "any"
+                && network_enforcement != profile.sandbox_requirements.network_enforcement
+            {
+                diagnostics.push(trust_diag(
+                    "X07TC_ERUNTIME_NETWORK_EVIDENCE",
+                    format!(
+                        "runtime attestation reports network_enforcement={:?}, but the trust profile requires {:?}",
+                        network_enforcement, profile.sandbox_requirements.network_enforcement
+                    ),
+                ));
+            }
+        }
     }
 
     Ok((runtime, runtime_attestation))
@@ -3201,6 +3799,92 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
                 "sandboxed local trusted-program profiles must keep network_mode=none",
             ));
         }
+        if profile.sandbox_requirements.network_enforcement != "none" {
+            diags.push(trust_diag(
+                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "sandboxed local trusted-program profiles must keep network_enforcement=none",
+            ));
+        }
+    } else if profile.id == "trusted_program_sandboxed_net_v1" {
+        if profile
+            .worlds_allowed
+            .iter()
+            .any(|world| world == WorldId::RunOs.as_str())
+        {
+            diags.push(trust_diag(
+                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "networked sandboxed trusted-program profiles must not allow run-os",
+            ));
+        }
+        if !profile.evidence_requirements.require_async_proof_coverage {
+            diags.push(trust_diag(
+                "X07TP_ASYNC_PROOF_REQUIRED",
+                "networked sandboxed trusted-program profiles must require async proof coverage",
+            ));
+        }
+        if !profile.evidence_requirements.require_capsule_attestations {
+            diags.push(trust_diag(
+                "X07TP_CAPSULE_ATTEST_REQUIRED",
+                "networked sandboxed trusted-program profiles must require capsule attestations",
+            ));
+        }
+        if !profile.evidence_requirements.require_runtime_attestation {
+            diags.push(trust_diag(
+                "X07TP_RUNTIME_ATTEST_REQUIRED",
+                "networked sandboxed trusted-program profiles must require runtime attestation",
+            ));
+        }
+        if !profile.evidence_requirements.require_effect_log_digests {
+            diags.push(trust_diag(
+                "X07TP_EFFECT_LOG_REQUIRED",
+                "networked sandboxed trusted-program profiles must require effect-log digests",
+            ));
+        }
+        if !profile.evidence_requirements.require_peer_policies {
+            diags.push(trust_diag(
+                "X07TP_PEER_POLICY_REQUIRED",
+                "networked sandboxed trusted-program profiles must require peer-policy evidence",
+            ));
+        }
+        if !profile.evidence_requirements.require_network_capsules {
+            diags.push(trust_diag(
+                "X07TP_CAPSULE_ATTEST_REQUIRED",
+                "networked sandboxed trusted-program profiles must require network capsule evidence",
+            ));
+        }
+        if !profile
+            .evidence_requirements
+            .require_dependency_closure_attestation
+        {
+            diags.push(trust_diag(
+                "X07TP_DEP_CLOSURE_REQUIRED",
+                "networked sandboxed trusted-program profiles must require dependency-closure attestations",
+            ));
+        }
+        if profile.sandbox_requirements.sandbox_backend != "vm" {
+            diags.push(trust_diag(
+                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "networked sandboxed trusted-program profiles must require sandbox_backend=vm",
+            ));
+        }
+        if !profile.sandbox_requirements.forbid_weaker_isolation {
+            diags.push(trust_diag(
+                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "networked sandboxed trusted-program profiles must forbid weaker isolation",
+            ));
+        }
+        if profile.sandbox_requirements.network_mode != "allowlist" {
+            diags.push(trust_diag(
+                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "networked sandboxed trusted-program profiles must require network_mode=allowlist",
+            ));
+        }
+        if profile.sandbox_requirements.network_enforcement != "vm_boundary_allowlist" {
+            diags.push(trust_diag(
+                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "networked sandboxed trusted-program profiles must require network_enforcement=vm_boundary_allowlist",
+            ));
+        }
     } else if profile.id == "certified_capsule_v1" {
         if profile
             .worlds_allowed
@@ -3242,6 +3926,12 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
                 "certified capsule profiles must keep network_mode=none",
             ));
         }
+        if profile.sandbox_requirements.network_enforcement != "none" {
+            diags.push(trust_diag(
+                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "certified capsule profiles must keep network_enforcement=none",
+            ));
+        }
     } else if profile.language_subset.allow_defasync
         || profile.language_subset.allow_recursion
         || profile.language_subset.allow_extern
@@ -3269,9 +3959,15 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
         || profile.evidence_requirements.require_capsule_attestations
         || profile.evidence_requirements.require_runtime_attestation
         || profile.evidence_requirements.require_effect_log_digests
+        || profile.evidence_requirements.require_peer_policies
+        || profile.evidence_requirements.require_network_capsules
+        || profile
+            .evidence_requirements
+            .require_dependency_closure_attestation
         || profile.sandbox_requirements.sandbox_backend != "any"
         || profile.sandbox_requirements.forbid_weaker_isolation
         || profile.sandbox_requirements.network_mode != "any"
+        || profile.sandbox_requirements.network_enforcement != "any"
         || !profile.evidence_requirements.require_compile_attestation
         || !profile.evidence_requirements.require_trust_report_clean
         || !profile.evidence_requirements.require_sbom
@@ -3340,6 +4036,27 @@ fn validate_profile_against_context(
             "X07TP_NETWORK_MODE_FORBIDDEN",
             "sandboxed local trusted-program profiles require policy.net.enabled=false",
         ));
+    }
+    if profile.sandbox_requirements.network_mode == "allowlist" {
+        let allow_hosts = policy_allow_hosts_from_doc(ctx.policy_doc.as_ref());
+        if ctx
+            .policy_doc
+            .as_ref()
+            .and_then(|doc| doc.pointer("/net/enabled"))
+            .and_then(Value::as_bool)
+            != Some(true)
+        {
+            diags.push(trust_diag(
+                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "networked sandboxed trusted-program profiles require policy.net.enabled=true",
+            ));
+        }
+        if allow_hosts.is_empty() {
+            diags.push(trust_diag(
+                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "networked sandboxed trusted-program profiles require a non-empty policy.net.allow_hosts allowlist",
+            ));
+        }
     }
 
     let features = scan_language_features(&ctx.module_roots);
@@ -3630,12 +4347,20 @@ fn add_review_diff_diagnostics(review_doc: &Value, diagnostics: &mut Vec<diagnos
     let proof_changes = review_highlight_count(review_doc, "/highlights/proof_changes");
     let boundary_changes = review_highlight_count(review_doc, "/highlights/boundary_changes");
     let subset_changes = review_highlight_count(review_doc, "/highlights/subset_changes");
+    let summary_changes = review_highlight_count(review_doc, "/highlights/summary_changes");
+    let network_policy_changes =
+        review_highlight_count(review_doc, "/highlights/network_policy_changes");
+    let peer_policy_changes = review_highlight_count(review_doc, "/highlights/peer_policy_changes");
+    let capsule_network_changes =
+        review_highlight_count(review_doc, "/highlights/capsule_network_changes");
+    let dependency_closure_changes =
+        review_highlight_count(review_doc, "/highlights/dependency_closure_changes");
 
-    if proof_changes > 0 || subset_changes > 0 {
+    if proof_changes > 0 || subset_changes > 0 || summary_changes > 0 {
         diagnostics.push(trust_diag(
             "X07TC_EDIFF_POSTURE",
             format!(
-                "review diff detected forbidden trust posture changes (proof_changes={proof_changes}, subset_changes={subset_changes})"
+                "review diff detected forbidden trust posture changes (proof_changes={proof_changes}, subset_changes={subset_changes}, summary_changes={summary_changes})"
             ),
         ));
     }
@@ -3644,6 +4369,38 @@ fn add_review_diff_diagnostics(review_doc: &Value, diagnostics: &mut Vec<diagnos
             "X07TC_EBOUNDARY_RELAXED",
             format!(
                 "review diff detected {boundary_changes} boundary contract relaxation(s) relative to the baseline"
+            ),
+        ));
+    }
+    if network_policy_changes > 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_ERUNTIME_NETWORK_EVIDENCE",
+            format!(
+                "review diff detected {network_policy_changes} network-policy change(s) relative to the baseline"
+            ),
+        ));
+    }
+    if peer_policy_changes > 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_EPEER_POLICY",
+            format!(
+                "review diff detected {peer_policy_changes} peer-policy change(s) relative to the baseline"
+            ),
+        ));
+    }
+    if capsule_network_changes > 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_ECAPSULE_NETWORK_ATTEST",
+            format!(
+                "review diff detected {capsule_network_changes} network capsule contract change(s) relative to the baseline"
+            ),
+        ));
+    }
+    if dependency_closure_changes > 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_EDEP_CLOSURE",
+            format!(
+                "review diff detected {dependency_closure_changes} dependency-closure change(s) relative to the baseline"
             ),
         ));
     }
@@ -4138,6 +4895,92 @@ fn build_bundle_evidence(
     };
 
     Ok((attestation_ref, bundle_path))
+}
+
+fn build_dependency_closure_evidence(
+    project_path: &Path,
+    profile: Option<&TrustProfile>,
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(
+    Option<TrustCertificateDependencyClosure>,
+    Option<EvidenceRef>,
+    Option<String>,
+)> {
+    let attestation_path = out_dir.join("dep.closure.attest.json");
+    let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let args = vec![
+        "pkg".to_string(),
+        "attest-closure".to_string(),
+        "--project".to_string(),
+        project_path.display().to_string(),
+        "--out".to_string(),
+        attestation_path.display().to_string(),
+    ];
+    let run = run_self_command(cwd, &args)?;
+
+    if !attestation_path.is_file() {
+        if profile.is_some_and(|p| {
+            p.evidence_requirements
+                .require_dependency_closure_attestation
+        }) {
+            diagnostics.push(trust_diag(
+                "X07TC_EDEP_CLOSURE",
+                format!(
+                    "x07 pkg attest-closure did not emit an attestation: {}",
+                    stderr_summary(&run.stderr)
+                ),
+            ));
+        }
+        return Ok((None, None, None));
+    }
+
+    let doc = match load_dep_closure_attestation(&attestation_path) {
+        Ok(doc) => doc,
+        Err(err) => {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_EDEP_CLOSURE",
+                format!("{err:#}"),
+                &attestation_path,
+            ));
+            return Ok((None, None, None));
+        }
+    };
+    let attestation_ref = evidence_ref_for_path(&attestation_path)?;
+    let mut packages = doc
+        .dependencies
+        .iter()
+        .map(|dep| format!("{}@{}", dep.name, dep.version))
+        .collect::<Vec<_>>();
+    packages.sort();
+
+    if !doc.advisory_check.ok {
+        diagnostics.push(trust_diag(
+            "X07TC_EDEP_CLOSURE",
+            "dependency closure attestation reports disallowed yanked dependencies or active advisories",
+        ));
+    } else if run.exit_code != 0 {
+        diagnostics.push(trust_diag(
+            "X07TC_EDEP_CLOSURE",
+            format!(
+                "x07 pkg attest-closure exited with {}: {}",
+                run.exit_code,
+                stderr_summary(&run.stderr)
+            ),
+        ));
+    }
+
+    Ok((
+        Some(TrustCertificateDependencyClosure {
+            manifest_digest: doc.manifest_digest.clone(),
+            lockfile_digest: doc.lockfile_digest.clone(),
+            packages,
+            advisory_check_ok: doc.advisory_check.ok,
+            attestation: Some(attestation_ref.clone()),
+        }),
+        Some(attestation_ref),
+        Some(doc.package_set_digest),
+    ))
 }
 
 fn build_review_evidence(
@@ -4890,7 +5733,13 @@ mod tests {
                 ids: Vec::new(),
                 attestations: Vec::new(),
             },
+            network_capsules: TrustCertificateNetworkCapsules {
+                count: 0,
+                ids: Vec::new(),
+            },
             runtime: None,
+            package_set_digest: None,
+            dependency_closure: None,
             effect_logs: Vec::new(),
             tcb: TrustCertificateTcb {
                 x07_version: "0.1.78".to_string(),
@@ -4921,9 +5770,11 @@ mod tests {
                     sha256_hex: "4".repeat(64),
                 },
                 runtime_attestation: None,
+                peer_policy_files: Vec::new(),
                 capsule_attestations: Vec::new(),
                 effect_logs: Vec::new(),
                 review_diff: None,
+                dependency_closure_attestation: None,
                 bundle_path: None,
             },
             diagnostics: Vec::new(),
@@ -4963,7 +5814,11 @@ mod tests {
         let runtime = TrustCertificateRuntime {
             backend: "vm".to_string(),
             network_mode: "none".to_string(),
+            network_enforcement: "none".to_string(),
             weaker_isolation: false,
+            effective_allow_hosts: Vec::new(),
+            policy_digest_bound: false,
+            guest_image_digest_bound: false,
             attestation: None,
         };
         let value = serde_json::to_value(runtime).expect("serialize runtime");
@@ -5185,7 +6040,12 @@ mod tests {
                 "highlights": {
                     "proof_changes": [{"subject": "proof coverage summary"}],
                     "boundary_changes": [{"subject": "example.api.sum_v1"}],
-                    "subset_changes": [{"subject": "trust profile relaxation"}]
+                    "subset_changes": [{"subject": "trust profile relaxation"}],
+                    "summary_changes": [{"subject": "trust summary regression"}],
+                    "network_policy_changes": [{"subject": "policy/run-os.json"}],
+                    "peer_policy_changes": [{"subject": "arch/capsules/upstream.peer_policy.json"}],
+                    "capsule_network_changes": [{"subject": "capsule.echo_v1"}],
+                    "dependency_closure_changes": [{"subject": "x07.lock.json"}]
                 }
             }),
             &mut diagnostics,
@@ -5197,6 +6057,18 @@ mod tests {
         assert!(diagnostics
             .iter()
             .any(|diag| diag.code == "X07TC_EBOUNDARY_RELAXED"));
+        assert!(diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07TC_ERUNTIME_NETWORK_EVIDENCE"));
+        assert!(diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07TC_EPEER_POLICY"));
+        assert!(diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07TC_ECAPSULE_NETWORK_ATTEST"));
+        assert!(diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07TC_EDEP_CLOSURE"));
     }
 
     #[test]
@@ -5256,7 +6128,7 @@ mod tests {
         .expect("write tests report");
 
         let profile = TrustProfile {
-            schema_version: "x07.trust.profile@0.2.0".to_string(),
+            schema_version: "x07.trust.profile@0.3.0".to_string(),
             id: "trusted_program_sandboxed_local_v1".to_string(),
             claims: Vec::new(),
             entrypoints: Vec::new(),
@@ -5290,6 +6162,9 @@ mod tests {
                 require_capsule_attestations: true,
                 require_runtime_attestation: false,
                 require_effect_log_digests: true,
+                require_peer_policies: false,
+                require_network_capsules: false,
+                require_dependency_closure_attestation: false,
                 require_compile_attestation: true,
                 require_trust_report_clean: true,
                 require_sbom: true,
@@ -5298,6 +6173,7 @@ mod tests {
                 sandbox_backend: "vm".to_string(),
                 forbid_weaker_isolation: true,
                 network_mode: "none".to_string(),
+                network_enforcement: "none".to_string(),
             },
         };
 

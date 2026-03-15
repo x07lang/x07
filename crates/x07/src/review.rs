@@ -61,6 +61,12 @@ pub enum ReviewFailOn {
     RuntimeAttestationRegression,
     WeakerIsolationEnabled,
     TrustedSubsetExpansion,
+    NetworkAllowlistWiden,
+    PeerPolicyRelaxation,
+    CapsuleNetworkSurfaceWiden,
+    PackageSetChange,
+    LockfileHashChange,
+    AdvisoryAllowanceEnabled,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -156,13 +162,18 @@ impl Summary {
 struct Highlights {
     world_changes: Vec<Value>,
     budget_changes: Vec<Value>,
+    summary_changes: Vec<Value>,
     policy_changes: Vec<Value>,
+    network_policy_changes: Vec<Value>,
     capability_changes: Vec<Value>,
     proof_changes: Vec<Value>,
     boundary_changes: Vec<Value>,
     subset_changes: Vec<Value>,
     async_proof_changes: Vec<Value>,
     capsule_changes: Vec<Value>,
+    peer_policy_changes: Vec<Value>,
+    capsule_network_changes: Vec<Value>,
+    dependency_closure_changes: Vec<Value>,
     runtime_attestation_changes: Vec<Value>,
     sandbox_policy_changes: Vec<Value>,
 }
@@ -172,13 +183,18 @@ impl Highlights {
         Self {
             world_changes: Vec::new(),
             budget_changes: Vec::new(),
+            summary_changes: Vec::new(),
             policy_changes: Vec::new(),
+            network_policy_changes: Vec::new(),
             capability_changes: Vec::new(),
             proof_changes: Vec::new(),
             boundary_changes: Vec::new(),
             subset_changes: Vec::new(),
             async_proof_changes: Vec::new(),
             capsule_changes: Vec::new(),
+            peer_policy_changes: Vec::new(),
+            capsule_network_changes: Vec::new(),
+            dependency_closure_changes: Vec::new(),
             runtime_attestation_changes: Vec::new(),
             sandbox_policy_changes: Vec::new(),
         }
@@ -457,6 +473,30 @@ fn cmd_review_diff(args: ReviewDiffArgs) -> Result<std::process::ExitCode> {
                     &mut ctx,
                     &mut report.highlights,
                 ),
+                "lockfile" => diff_lockfile(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
+                "peer_policy" => diff_peer_policy(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
+                "dependency_closure" => diff_dependency_closure(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
                 "policy" => diff_policy(
                     &rel_str,
                     before_json.as_ref(),
@@ -639,6 +679,55 @@ fn fail_on_triggered(report: &ReviewDiffReport, fail_on: &[ReviewFailOn]) -> boo
                     return true;
                 }
             }
+            ReviewFailOn::NetworkAllowlistWiden => {
+                if !report.highlights.network_policy_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::PeerPolicyRelaxation => {
+                if !report.highlights.peer_policy_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::CapsuleNetworkSurfaceWiden => {
+                if !report.highlights.capsule_network_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::PackageSetChange => {
+                if report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .any(|change| change.get("kind").and_then(Value::as_str) == Some("package_set"))
+                {
+                    return true;
+                }
+            }
+            ReviewFailOn::LockfileHashChange => {
+                if report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .any(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("lockfile_hash")
+                    })
+                {
+                    return true;
+                }
+            }
+            ReviewFailOn::AdvisoryAllowanceEnabled => {
+                if report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .any(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("advisory_allowance")
+                    })
+                {
+                    return true;
+                }
+            }
         }
     }
     false
@@ -734,6 +823,89 @@ fn posture_gate_diags(
                     ));
                 }
             }
+            ReviewFailOn::NetworkAllowlistWiden => {
+                if !report.highlights.network_policy_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_NETWORK_ALLOWLIST_WIDEN",
+                        format!(
+                            "network allowlist widened across {} reviewed change(s)",
+                            report.highlights.network_policy_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::PeerPolicyRelaxation => {
+                if !report.highlights.peer_policy_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_PEER_POLICY_RELAXATION",
+                        format!(
+                            "peer policy relaxed across {} reviewed file(s)",
+                            report.highlights.peer_policy_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::CapsuleNetworkSurfaceWiden => {
+                if !report.highlights.capsule_network_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_CAPSULE_NETWORK_SURFACE_WIDEN",
+                        format!(
+                            "network capsule surface widened across {} reviewed file(s)",
+                            report.highlights.capsule_network_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::PackageSetChange => {
+                let count = report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("package_set")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_PACKAGE_SET_CHANGE",
+                        format!("dependency package set changed in {count} reviewed file(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::LockfileHashChange => {
+                let count = report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("lockfile_hash")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_LOCKFILE_HASH_CHANGE",
+                        format!("lockfile digest changed in {count} reviewed file(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::AdvisoryAllowanceEnabled => {
+                let count = report
+                    .highlights
+                    .dependency_closure_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("advisory_allowance")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_ADVISORY_ALLOWANCE_ENABLED",
+                        format!(
+                            "disallowed advisory or yanked dependency state appeared in {count} reviewed file(s)"
+                        ),
+                    ));
+                }
+            }
             _ => {}
         }
     }
@@ -801,8 +973,23 @@ fn push_simple_file_change(
 
 fn classify_file(rel: &str, before: Option<&Value>, after: Option<&Value>) -> &'static str {
     let lower = rel.to_ascii_lowercase();
+    let schema_version = before
+        .and_then(|doc| doc.get("schema_version"))
+        .or_else(|| after.and_then(|doc| doc.get("schema_version")))
+        .and_then(Value::as_str);
     if lower.ends_with("verify.coverage.json") {
         return "proof";
+    }
+    if schema_version == Some("x07.peer.policy@0.1.0") {
+        return "peer_policy";
+    }
+    if schema_version == Some("x07.dep.closure.attest@0.1.0")
+        || lower.ends_with("dep.closure.attest.json")
+    {
+        return "dependency_closure";
+    }
+    if lower == "x07.lock.json" {
+        return "lockfile";
     }
     if lower.ends_with(".x07.json") {
         return "x07ast";
@@ -832,6 +1019,7 @@ fn build_globsets(args: &ReviewDiffArgs) -> Result<(GlobSet, GlobSet)> {
         ReviewMode::Project => &[
             "**/*.x07.json",
             "x07.json",
+            "x07.lock.json",
             "**/*.x07project.json",
             "arch/**",
             "runtime-attest/**",
@@ -1950,6 +2138,21 @@ fn diff_capsule(
         "after": after.cloned().unwrap_or(Value::Null),
     });
     ctx.push(&mut highlights.capsule_changes, change);
+    let before_network = before.and_then(|doc| doc.get("network")).cloned();
+    let after_network = after.and_then(|doc| doc.get("network")).cloned();
+    if before_network != after_network {
+        ctx.push(
+            &mut highlights.capsule_network_changes,
+            json!({
+                "kind": "capsule_network",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before_network.unwrap_or(Value::Null),
+                "after": after_network.unwrap_or(Value::Null),
+            }),
+        );
+    }
     push_simple_file_change(file_diff, ctx, "capsule_changed", "high", title);
 }
 
@@ -2012,6 +2215,175 @@ fn diff_runtime_attestation(
         "runtime_attestation_changed",
         severity,
         "runtime attestation changed",
+    );
+}
+
+fn diff_lockfile(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+
+    let before_packages = lockfile_packages(before);
+    let after_packages = lockfile_packages(after);
+    if before_packages != after_packages {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "package_set",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before_packages,
+                "after": after_packages,
+            }),
+        );
+    }
+    ctx.push(
+        &mut highlights.dependency_closure_changes,
+        json!({
+            "kind": "lockfile_hash",
+            "severity": "high",
+            "subject": path,
+            "path": path,
+            "before": before.cloned().unwrap_or(Value::Null),
+            "after": after.cloned().unwrap_or(Value::Null),
+        }),
+    );
+    if lockfile_has_advisory_allowance(after) && !lockfile_has_advisory_allowance(before) {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "advisory_allowance",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before.cloned().unwrap_or(Value::Null),
+                "after": after.cloned().unwrap_or(Value::Null),
+            }),
+        );
+    }
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "lockfile_changed",
+        "high",
+        "lockfile changed",
+    );
+}
+
+fn diff_peer_policy(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+    let severity = if peer_policy_relaxed(before, after) {
+        "high"
+    } else {
+        "warn"
+    };
+    ctx.push(
+        &mut highlights.peer_policy_changes,
+        json!({
+            "kind": "peer_policy",
+            "severity": severity,
+            "subject": path,
+            "path": path,
+            "before": before.cloned().unwrap_or(Value::Null),
+            "after": after.cloned().unwrap_or(Value::Null),
+        }),
+    );
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "peer_policy_changed",
+        severity,
+        "peer policy changed",
+    );
+}
+
+fn diff_dependency_closure(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+    let before_digest = before
+        .and_then(|doc| doc.get("package_set_digest"))
+        .cloned();
+    let after_digest = after.and_then(|doc| doc.get("package_set_digest")).cloned();
+    if before_digest != after_digest {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "package_set",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before_digest.unwrap_or(Value::Null),
+                "after": after_digest.unwrap_or(Value::Null),
+            }),
+        );
+    }
+    if before.and_then(|doc| doc.get("lockfile_digest")).cloned()
+        != after.and_then(|doc| doc.get("lockfile_digest")).cloned()
+    {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "lockfile_hash",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before.and_then(|doc| doc.get("lockfile_digest")).cloned().unwrap_or(Value::Null),
+                "after": after.and_then(|doc| doc.get("lockfile_digest")).cloned().unwrap_or(Value::Null),
+            }),
+        );
+    }
+    let before_ok = before
+        .and_then(|doc| doc.pointer("/advisory_check/ok"))
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+    let after_ok = after
+        .and_then(|doc| doc.pointer("/advisory_check/ok"))
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+    if before_ok && !after_ok {
+        ctx.push(
+            &mut highlights.dependency_closure_changes,
+            json!({
+                "kind": "advisory_allowance",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before.cloned().unwrap_or(Value::Null),
+                "after": after.cloned().unwrap_or(Value::Null),
+            }),
+        );
+    }
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "dependency_closure_changed",
+        "high",
+        "dependency closure changed",
     );
 }
 
@@ -2203,6 +2575,18 @@ fn trust_profile_subset(v: Option<&Value>) -> Value {
             .and_then(|doc| doc.get("require_effect_log_digests"))
             .cloned()
             .unwrap_or(Value::Bool(false)),
+        "require_peer_policies": evidence
+            .and_then(|doc| doc.get("require_peer_policies"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_network_capsules": evidence
+            .and_then(|doc| doc.get("require_network_capsules"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_dependency_closure_attestation": evidence
+            .and_then(|doc| doc.get("require_dependency_closure_attestation"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
         "require_proof_mode": evidence
             .and_then(|doc| doc.get("require_proof_mode"))
             .cloned()
@@ -2254,6 +2638,11 @@ fn trust_profile_subset(v: Option<&Value>) -> Value {
             .and_then(|doc| doc.get("network_mode"))
             .cloned()
             .unwrap_or(Value::Null),
+        "network_enforcement": v
+            .and_then(|doc| doc.get("sandbox_requirements"))
+            .and_then(|doc| doc.get("network_enforcement"))
+            .cloned()
+            .unwrap_or(Value::Null),
         "require_allowlist_mode": arch
             .and_then(|doc| doc.get("require_allowlist_mode"))
             .cloned()
@@ -2295,6 +2684,9 @@ fn trust_subset_expanded(before: &Value, after: &Value) -> bool {
         "require_capsule_attestations",
         "require_runtime_attestation",
         "require_effect_log_digests",
+        "require_peer_policies",
+        "require_network_capsules",
+        "require_dependency_closure_attestation",
         "require_compile_attestation",
         "require_boundary_index",
         "require_schema_derive_check",
@@ -2329,6 +2721,13 @@ fn trust_subset_expanded(before: &Value, after: &Value) -> bool {
     }
     if before.get("network_mode") == Some(&Value::String("none".to_string()))
         && after.get("network_mode") != Some(&Value::String("none".to_string()))
+    {
+        return true;
+    }
+    if before.get("network_enforcement")
+        == Some(&Value::String("vm_boundary_allowlist".to_string()))
+        && after.get("network_enforcement")
+            != Some(&Value::String("vm_boundary_allowlist".to_string()))
     {
         return true;
     }
@@ -2759,6 +3158,17 @@ fn compare_policy_allowlist(
         .push(&mut sinks.highlights.policy_changes, value.clone());
     if widened && subject == "policy.net.allow_hosts" {
         sinks.ctx.push(
+            &mut sinks.highlights.network_policy_changes,
+            json!({
+                "kind": "network_allowlist",
+                "severity": "high",
+                "subject": subject,
+                "path": path,
+                "before": b,
+                "after": a,
+            }),
+        );
+        sinks.ctx.push(
             &mut sinks.highlights.sandbox_policy_changes,
             json!({
                 "kind": "sandbox_policy",
@@ -2799,6 +3209,40 @@ fn allowlist_delta(before: &Value, after: &Value) -> (Vec<String>, Vec<String>) 
     (added, removed)
 }
 
+fn lockfile_packages(v: Option<&Value>) -> Value {
+    let deps = v
+        .and_then(|doc| doc.get("dependencies"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut packages = deps
+        .iter()
+        .filter_map(|dep| {
+            let name = dep.get("name").and_then(Value::as_str)?;
+            let version = dep.get("version").and_then(Value::as_str)?;
+            Some(format!("{name}@{version}"))
+        })
+        .collect::<Vec<_>>();
+    packages.sort();
+    json!(packages)
+}
+
+fn lockfile_has_advisory_allowance(v: Option<&Value>) -> bool {
+    let Some(deps) = v
+        .and_then(|doc| doc.get("dependencies"))
+        .and_then(Value::as_array)
+    else {
+        return false;
+    };
+    deps.iter().any(|dep| {
+        dep.get("yanked").and_then(Value::as_bool) == Some(true)
+            || dep
+                .get("advisories")
+                .and_then(Value::as_array)
+                .is_some_and(|advisories| !advisories.is_empty())
+    })
+}
+
 fn allowlist_entries(v: &Value) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     let Some(items) = v.as_array() else {
@@ -2814,6 +3258,57 @@ fn canonical_json_compact(v: &Value) -> String {
     let mut clone = v.clone();
     x07c::x07ast::canon_value_jcs(&mut clone);
     serde_json::to_string(&clone).unwrap_or_else(|_| "null".to_string())
+}
+
+fn peer_policy_relaxed(before: Option<&Value>, after: Option<&Value>) -> bool {
+    let Some(after) = after else {
+        return before.is_some();
+    };
+    let Some(before) = before else {
+        return true;
+    };
+    if before.get("host") != after.get("host") {
+        return true;
+    }
+    let before_ports = allowlist_entries(before.get("ports").unwrap_or(&Value::Array(Vec::new())));
+    let after_ports = allowlist_entries(after.get("ports").unwrap_or(&Value::Array(Vec::new())));
+    if !after_ports.is_subset(&before_ports) {
+        return true;
+    }
+    if before.get("transport") != after.get("transport") {
+        return true;
+    }
+    if tls_mode_rank(after.get("tls_mode")) < tls_mode_rank(before.get("tls_mode")) {
+        return true;
+    }
+    let before_roots =
+        allowlist_entries(before.get("ca_paths").unwrap_or(&Value::Array(Vec::new())));
+    let after_roots = allowlist_entries(after.get("ca_paths").unwrap_or(&Value::Array(Vec::new())));
+    if !before_roots.is_subset(&after_roots) {
+        return true;
+    }
+    let before_pins = allowlist_entries(
+        before
+            .get("spki_sha256")
+            .unwrap_or(&Value::Array(Vec::new())),
+    );
+    let after_pins = allowlist_entries(
+        after
+            .get("spki_sha256")
+            .unwrap_or(&Value::Array(Vec::new())),
+    );
+    if !before_pins.is_subset(&after_pins) {
+        return true;
+    }
+    false
+}
+
+fn tls_mode_rank(v: Option<&Value>) -> u8 {
+    match v.and_then(Value::as_str).unwrap_or("none") {
+        "mtls" => 3,
+        "tls" => 2,
+        _ => 1,
+    }
 }
 
 fn compare_policy_bool(
@@ -2858,6 +3353,19 @@ fn compare_policy_bool(
     sinks
         .ctx
         .push(&mut sinks.highlights.policy_changes, value.clone());
+    if subject.starts_with("policy.net.") {
+        sinks.ctx.push(
+            &mut sinks.highlights.network_policy_changes,
+            json!({
+                "kind": "network_policy",
+                "severity": severity,
+                "subject": subject,
+                "path": path,
+                "before": b,
+                "after": a,
+            }),
+        );
+    }
     if subject == "policy.net.enabled" && a == Some(true) {
         sinks.ctx.push(
             &mut sinks.highlights.sandbox_policy_changes,
@@ -2977,7 +3485,17 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
     s.push_str("<h2>High-Signal Deltas</h2>");
     render_change_list(&mut s, "World Changes", &report.highlights.world_changes);
     render_change_list(&mut s, "Budget Changes", &report.highlights.budget_changes);
+    render_change_list(
+        &mut s,
+        "Summary Changes",
+        &report.highlights.summary_changes,
+    );
     render_change_list(&mut s, "Policy Changes", &report.highlights.policy_changes);
+    render_change_list(
+        &mut s,
+        "Network Policy Changes",
+        &report.highlights.network_policy_changes,
+    );
     render_change_list(
         &mut s,
         "Capability Changes",
@@ -2998,6 +3516,21 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
         &mut s,
         "Capsule Changes",
         &report.highlights.capsule_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Peer Policy Changes",
+        &report.highlights.peer_policy_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Capsule Network Changes",
+        &report.highlights.capsule_network_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Dependency Closure Changes",
+        &report.highlights.dependency_closure_changes,
     );
     render_change_list(
         &mut s,
@@ -3090,6 +3623,12 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
                 ReviewFailOn::RuntimeAttestationRegression => "runtime-attestation-regression",
                 ReviewFailOn::WeakerIsolationEnabled => "weaker-isolation-enabled",
                 ReviewFailOn::TrustedSubsetExpansion => "trusted-subset-expansion",
+                ReviewFailOn::NetworkAllowlistWiden => "network-allowlist-widen",
+                ReviewFailOn::PeerPolicyRelaxation => "peer-policy-relaxation",
+                ReviewFailOn::CapsuleNetworkSurfaceWiden => "capsule-network-surface-widen",
+                ReviewFailOn::PackageSetChange => "package-set-change",
+                ReviewFailOn::LockfileHashChange => "lockfile-hash-change",
+                ReviewFailOn::AdvisoryAllowanceEnabled => "advisory-allowance-enabled",
             })
             .collect::<Vec<&str>>()
     });
@@ -3131,12 +3670,17 @@ fn review_risk(report: &ReviewDiffReport) -> (&'static str, &'static str, &'stat
         .world_changes
         .iter()
         .chain(report.highlights.budget_changes.iter())
+        .chain(report.highlights.summary_changes.iter())
         .chain(report.highlights.policy_changes.iter())
+        .chain(report.highlights.network_policy_changes.iter())
         .chain(report.highlights.capability_changes.iter())
         .chain(report.highlights.proof_changes.iter())
         .chain(report.highlights.async_proof_changes.iter())
         .chain(report.highlights.boundary_changes.iter())
         .chain(report.highlights.capsule_changes.iter())
+        .chain(report.highlights.peer_policy_changes.iter())
+        .chain(report.highlights.capsule_network_changes.iter())
+        .chain(report.highlights.dependency_closure_changes.iter())
         .chain(report.highlights.runtime_attestation_changes.iter())
         .chain(report.highlights.sandbox_policy_changes.iter())
         .chain(report.highlights.subset_changes.iter())

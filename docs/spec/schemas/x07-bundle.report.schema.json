@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-bundle.report.schema.json",
-  "title": "X07 x07 bundle report v0.3.0",
+  "title": "X07 x07 bundle report v0.4.0",
   "description": "Wrapper report emitted by `x07 bundle`. Includes target resolution + bundling metadata + the underlying runner report used to produce the native artifact.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "runner", "world", "target", "bundle", "report"],
   "properties": {
-    "schema_version": { "const": "x07.bundle.report@0.3.0" },
+    "schema_version": { "const": "x07.bundle.report@0.4.0" },
 
     "runner": { "enum": ["host", "os"] },
 

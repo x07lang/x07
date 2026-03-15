@@ -3229,7 +3229,7 @@ fn scaffold_trust_profile_fixture(dir: &Path) {
     write_json(
         &dir.join("arch/trust/profiles/verified_core_pure_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.2.0",
+            "schema_version": "x07.trust.profile@0.3.0",
             "id": "verified_core_pure_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -3263,6 +3263,9 @@ fn scaffold_trust_profile_fixture(dir: &Path) {
                 "require_capsule_attestations": false,
                 "require_runtime_attestation": false,
                 "require_effect_log_digests": false,
+                "require_peer_policies": false,
+                "require_network_capsules": false,
+                "require_dependency_closure_attestation": false,
                 "require_compile_attestation": true,
                 "require_trust_report_clean": true,
                 "require_sbom": true
@@ -3270,7 +3273,8 @@ fn scaffold_trust_profile_fixture(dir: &Path) {
             "sandbox_requirements": {
                 "sandbox_backend": "any",
                 "forbid_weaker_isolation": false,
-                "network_mode": "any"
+                "network_mode": "any",
+                "network_enforcement": "any"
             }
         }),
     );
@@ -3413,7 +3417,7 @@ fn scaffold_sandbox_trust_profile_fixture(dir: &Path, world: &str, net_enabled: 
     write_json(
         &dir.join("arch/capsules/capsule.echo.contract.json"),
         &serde_json::json!({
-            "schema_version": "x07.capsule.contract@0.1.0",
+            "schema_version": "x07.capsule.contract@0.2.0",
             "id": "capsule.echo_v1",
             "worlds_allowed": [world],
             "capabilities": ["net"],
@@ -3443,24 +3447,28 @@ fn scaffold_sandbox_trust_profile_fixture(dir: &Path, world: &str, net_enabled: 
             "conformance": {
                 "tests": ["smoke_main"],
                 "report_path": null
-            }
+            },
+            "network": null
         }),
     );
     write_json(
         &dir.join("arch/capsules/capsule.echo.attest.json"),
         &serde_json::json!({
-            "schema_version": "x07.capsule.attest@0.1.0",
+            "schema_version": "x07.capsule.attest@0.2.0",
             "capsule_id": "capsule.echo_v1",
             "contract_digest": format!("sha256:{}", "0".repeat(64)),
             "module_digests": [],
             "lockfile_digest": format!("sha256:{}", "1".repeat(64)),
-            "conformance_report_digest": format!("sha256:{}", "2".repeat(64))
+            "conformance_report_digest": format!("sha256:{}", "2".repeat(64)),
+            "peer_policy_digests": [],
+            "request_contract_digest": null,
+            "response_contract_digest": null
         }),
     );
     write_json(
         &dir.join("arch/capsules/capsule.echo.effect_log.json"),
         &serde_json::json!({
-            "schema_version": "x07.effect.log@0.1.0",
+            "schema_version": "x07.effect.log@0.2.0",
             "capsule_id": "capsule.echo_v1",
             "events": []
         }),
@@ -3580,7 +3588,7 @@ fn x07_trust_profile_check_accepts_sandboxed_local_profile() {
     write_json(
         &dir.join("arch/trust/profiles/trusted_program_sandboxed_local_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.2.0",
+            "schema_version": "x07.trust.profile@0.3.0",
             "id": "trusted_program_sandboxed_local_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -3614,6 +3622,9 @@ fn x07_trust_profile_check_accepts_sandboxed_local_profile() {
                 "require_capsule_attestations": true,
                 "require_runtime_attestation": true,
                 "require_effect_log_digests": true,
+                "require_peer_policies": false,
+                "require_network_capsules": false,
+                "require_dependency_closure_attestation": false,
                 "require_compile_attestation": true,
                 "require_trust_report_clean": true,
                 "require_sbom": true
@@ -3621,7 +3632,8 @@ fn x07_trust_profile_check_accepts_sandboxed_local_profile() {
             "sandbox_requirements": {
                 "sandbox_backend": "vm",
                 "forbid_weaker_isolation": true,
-                "network_mode": "none"
+                "network_mode": "none",
+                "network_enforcement": "none"
             }
         }),
     );
@@ -3663,7 +3675,7 @@ fn x07_trust_profile_check_rejects_run_os_for_sandboxed_local_profile() {
     write_json(
         &dir.join("arch/trust/profiles/trusted_program_sandboxed_local_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.2.0",
+            "schema_version": "x07.trust.profile@0.3.0",
             "id": "trusted_program_sandboxed_local_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -3697,6 +3709,9 @@ fn x07_trust_profile_check_rejects_run_os_for_sandboxed_local_profile() {
                 "require_capsule_attestations": true,
                 "require_runtime_attestation": true,
                 "require_effect_log_digests": true,
+                "require_peer_policies": false,
+                "require_network_capsules": false,
+                "require_dependency_closure_attestation": false,
                 "require_compile_attestation": true,
                 "require_trust_report_clean": true,
                 "require_sbom": true
@@ -3704,7 +3719,8 @@ fn x07_trust_profile_check_rejects_run_os_for_sandboxed_local_profile() {
             "sandbox_requirements": {
                 "sandbox_backend": "vm",
                 "forbid_weaker_isolation": true,
-                "network_mode": "none"
+                "network_mode": "none",
+                "network_enforcement": "none"
             }
         }),
     );
@@ -3743,7 +3759,7 @@ fn x07_trust_profile_check_rejects_network_enabled_local_sandbox_policy() {
     write_json(
         &dir.join("arch/trust/profiles/trusted_program_sandboxed_local_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.2.0",
+            "schema_version": "x07.trust.profile@0.3.0",
             "id": "trusted_program_sandboxed_local_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -3777,6 +3793,9 @@ fn x07_trust_profile_check_rejects_network_enabled_local_sandbox_policy() {
                 "require_capsule_attestations": true,
                 "require_runtime_attestation": true,
                 "require_effect_log_digests": true,
+                "require_peer_policies": false,
+                "require_network_capsules": false,
+                "require_dependency_closure_attestation": false,
                 "require_compile_attestation": true,
                 "require_trust_report_clean": true,
                 "require_sbom": true
@@ -3784,7 +3803,8 @@ fn x07_trust_profile_check_rejects_network_enabled_local_sandbox_policy() {
             "sandbox_requirements": {
                 "sandbox_backend": "vm",
                 "forbid_weaker_isolation": true,
-                "network_mode": "none"
+                "network_mode": "none",
+                "network_enforcement": "none"
             }
         }),
     );
@@ -3822,7 +3842,7 @@ fn x07_trust_profile_check_rejects_weakened_sandbox_profile_contract() {
     write_json(
         &dir.join("bad_profile.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.2.0",
+            "schema_version": "x07.trust.profile@0.3.0",
             "id": "trusted_program_sandboxed_local_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -3856,6 +3876,9 @@ fn x07_trust_profile_check_rejects_weakened_sandbox_profile_contract() {
                 "require_capsule_attestations": false,
                 "require_runtime_attestation": false,
                 "require_effect_log_digests": false,
+                "require_peer_policies": false,
+                "require_network_capsules": false,
+                "require_dependency_closure_attestation": false,
                 "require_compile_attestation": true,
                 "require_trust_report_clean": true,
                 "require_sbom": true
@@ -3863,7 +3886,8 @@ fn x07_trust_profile_check_rejects_weakened_sandbox_profile_contract() {
             "sandbox_requirements": {
                 "sandbox_backend": "os",
                 "forbid_weaker_isolation": false,
-                "network_mode": "allowlist"
+                "network_mode": "allowlist",
+                "network_enforcement": "unsupported"
             }
         }),
     );
@@ -9717,7 +9741,7 @@ fn x07_review_diff_fail_on_capsule_runtime_and_sandbox_posture_returns_20() {
     write_json(
         &before_copy.join("arch/capsules/capsule.echo.contract.json"),
         &serde_json::json!({
-            "schema_version": "x07.capsule.contract@0.1.0",
+            "schema_version": "x07.capsule.contract@0.2.0",
             "id": "capsule.echo_v1",
             "worlds_allowed": ["run-os-sandboxed"],
             "capabilities": ["net"],
@@ -9737,7 +9761,8 @@ fn x07_review_diff_fail_on_capsule_runtime_and_sandbox_posture_returns_20() {
             "conformance": {
                 "tests": ["capsule_echo_smoke"],
                 "report_path": null
-            }
+            },
+            "network": null
         }),
     );
     write_json(
@@ -9765,7 +9790,7 @@ fn x07_review_diff_fail_on_capsule_runtime_and_sandbox_posture_returns_20() {
     write_json(
         &after_copy.join("arch/capsules/capsule.echo.contract.json"),
         &serde_json::json!({
-            "schema_version": "x07.capsule.contract@0.1.0",
+            "schema_version": "x07.capsule.contract@0.2.0",
             "id": "capsule.echo_v1",
             "worlds_allowed": ["run-os-sandboxed"],
             "capabilities": ["net", "process"],
@@ -9785,13 +9810,14 @@ fn x07_review_diff_fail_on_capsule_runtime_and_sandbox_posture_returns_20() {
             "conformance": {
                 "tests": ["capsule_echo_smoke"],
                 "report_path": null
-            }
+            },
+            "network": null
         }),
     );
     write_json(
         &before_copy.join("runtime.attest.json"),
         &serde_json::json!({
-            "schema_version": "x07.runtime.attest@0.1.0",
+            "schema_version": "x07.runtime.attest@0.2.0",
             "world": "run-os-sandboxed",
             "sandbox_backend": "vm",
             "artifact_path": "solver",
@@ -9799,6 +9825,13 @@ fn x07_review_diff_fail_on_capsule_runtime_and_sandbox_posture_returns_20() {
             "input_len_bytes": 0,
             "guest_image_digest": format!("sha256:{}", "0".repeat(64)),
             "effective_policy_digest": format!("sha256:{}", "1".repeat(64)),
+            "network_mode": "allowlist",
+            "network_enforcement": "vm_boundary_allowlist",
+            "allow_dns": true,
+            "allow_tcp": true,
+            "allow_udp": false,
+            "effective_allow_hosts": [{"host": "api.example.com", "ports": [443]}],
+            "effective_deny_hosts": [],
             "bundled_binary_digest": format!("sha256:{}", "2".repeat(64)),
             "compile_attestation_digest": format!("sha256:{}", "3".repeat(64)),
             "capsule_attestation_digests": [],
@@ -9810,7 +9843,7 @@ fn x07_review_diff_fail_on_capsule_runtime_and_sandbox_posture_returns_20() {
     write_json(
         &after_copy.join("runtime.attest.json"),
         &serde_json::json!({
-            "schema_version": "x07.runtime.attest@0.1.0",
+            "schema_version": "x07.runtime.attest@0.2.0",
             "world": "run-os-sandboxed",
             "sandbox_backend": "os",
             "artifact_path": "solver",
@@ -9818,6 +9851,13 @@ fn x07_review_diff_fail_on_capsule_runtime_and_sandbox_posture_returns_20() {
             "input_len_bytes": 0,
             "guest_image_digest": format!("sha256:{}", "4".repeat(64)),
             "effective_policy_digest": format!("sha256:{}", "5".repeat(64)),
+            "network_mode": "allowlist",
+            "network_enforcement": "unsupported",
+            "allow_dns": true,
+            "allow_tcp": true,
+            "allow_udp": false,
+            "effective_allow_hosts": [{"host": "api.example.com", "ports": [443]}],
+            "effective_deny_hosts": [],
             "bundled_binary_digest": format!("sha256:{}", "6".repeat(64)),
             "compile_attestation_digest": format!("sha256:{}", "7".repeat(64)),
             "capsule_attestation_digests": [],
@@ -10184,7 +10224,8 @@ fn x07_trust_capsule_attest_overwrites_fixture_and_check_passes() {
         String::from_utf8_lossy(&out.stderr)
     );
     let attest_stdout = parse_json_stdout(&out);
-    assert_eq!(attest_stdout["schema_version"], "x07.capsule.attest@0.1.0");
+    assert_eq!(attest_stdout["schema_version"], "x07.capsule.attest@0.2.0");
+    assert_eq!(attest_stdout["peer_policy_digests"], serde_json::json!([]));
     assert_eq!(attest_stdout["capsule_id"], "capsule.echo_v1");
     assert!(dir.join("arch/capsules/capsule.echo.attest.json").is_file());
 
@@ -10317,7 +10358,7 @@ fn x07_trust_profile_check_accepts_strict_pure_project() {
     write_json(
         &dir.join("arch/trust/profiles/verified_core_pure_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.2.0",
+            "schema_version": "x07.trust.profile@0.3.0",
             "id": "verified_core_pure_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["app.main"],
@@ -10351,6 +10392,9 @@ fn x07_trust_profile_check_accepts_strict_pure_project() {
                 "require_capsule_attestations": false,
                 "require_runtime_attestation": false,
                 "require_effect_log_digests": false,
+                "require_peer_policies": false,
+                "require_network_capsules": false,
+                "require_dependency_closure_attestation": false,
                 "require_compile_attestation": true,
                 "require_trust_report_clean": true,
                 "require_sbom": true
@@ -10358,7 +10402,8 @@ fn x07_trust_profile_check_accepts_strict_pure_project() {
             "sandbox_requirements": {
                 "sandbox_backend": "any",
                 "forbid_weaker_isolation": false,
-                "network_mode": "any"
+                "network_mode": "any",
+                "network_enforcement": "any"
             }
         }),
     );

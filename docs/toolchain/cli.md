@@ -177,8 +177,8 @@ See: [Architecture check](arch-check.md).
 - `x07 review diff --from <path> --to <path> --html-out <path>`
 - `x07 review diff --from <path> --to <path> --html-out <path> --json-out <path>`
   - Produces an intent-level semantic diff for x07AST/project/arch/policy changes.
-  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|async-proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion|capsule-contract-relaxation|capsule-set-change|sandbox-policy-widen|runtime-attestation-regression|weaker-isolation-enabled`.
-  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.3.0"`).
+  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|async-proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion|capsule-contract-relaxation|capsule-set-change|sandbox-policy-widen|runtime-attestation-regression|weaker-isolation-enabled|network-allowlist-widen|peer-policy-relaxation|capsule-network-surface-widen|package-set-change|lockfile-hash-change|advisory-allowance-enabled`.
+  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.4.0"`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -194,13 +194,13 @@ See: [Review & trust artifacts](review-trust.md).
   - JSON schema: `spec/x07-trust.report.schema.json` (`schema_version: "x07.trust.report@0.1.0"`).
 - `x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry <sym>`
   - Validates a certification profile against the current project posture.
-  - Built-in profile line: `verified_core_pure_v1`, `trusted_program_sandboxed_local_v1`, and `certified_capsule_v1` (`x07.trust.profile@0.2.0`).
+  - Built-in profile line: `verified_core_pure_v1`, `trusted_program_sandboxed_local_v1`, `trusted_program_sandboxed_net_v1`, and `certified_capsule_v1` (`x07.trust.profile@0.3.0`).
 - `x07 trust capsule check --index arch/capsules/index.x07capsule.json --project x07.json`
   - Validates a capsule index plus referenced contracts/attestations.
 - `x07 trust capsule attest --contract <path> --module <path>... --lockfile x07.lock.json --conformance-report <path> --out <path>`
-  - Emits a deterministic `x07.capsule.attest@0.1.0` artifact for a certified capsule.
+  - Emits a deterministic `x07.capsule.attest@0.2.0` artifact for a certified capsule.
 - `x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry <sym> --out-dir target/cert`
-  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, trust report, tests report, compile attestation evidence, and any observed capsule/runtime evidence references (`x07.trust.certificate@0.2.0`).
+  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, trust report, tests report, compile attestation evidence, dependency-closure evidence, and any observed capsule/runtime/peer-policy evidence references (`x07.trust.certificate@0.3.0`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -350,6 +350,7 @@ See: [State machines](state-machines.md).
 - `x07 pkg versions <name>`
 - `x07 pkg versions <name> --refresh`
 - `x07 pkg lock --project x07.json`
+- `x07 pkg attest-closure --project x07.json --out <path>`
 - `x07 pkg provides <module-id>`
 - `x07 pkg pack --package <dir> --out <path>`
 - `x07 pkg login --index <registry_url>`
@@ -360,6 +361,7 @@ Notes:
 - `x07 pkg add <name>@<version>` edits `x07.json` only (no network) unless you pass `--sync`.
 - `x07 pkg add <name>` consults the index to resolve a version (network unless you use a file-based index).
 - `x07 pkg lock` uses the official registry index by default when fetching is required; override with `--index` or use `--offline`.
+- `x07 pkg attest-closure` emits `x07.dep.closure.attest@0.1.0` and exits with code `20` when the closure is materialized but yanked/advisory policy fails.
 - Use `x07 pkg lock --project x07.json --check` in CI to fail if `x07.lock.json` is out of date.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
 - Sparse index reads (including `x07 pkg versions`) may be cached; use `x07 pkg versions --refresh <name>` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
@@ -398,7 +400,7 @@ See: [Embedding in C](embedding-in-c.md).
   - Bundles a VM-backed sandbox bundle by default (requires a base policy via profile or `--policy`).
   - To emit a legacy policy-only bundle (weaker isolation), add: `--sandbox-backend os --i-accept-weaker-isolation`.
 
-Bundle report schema: `spec/x07-bundle.report.schema.json` (`schema_version: "x07.bundle.report@0.3.0"`).
+Bundle report schema: `spec/x07-bundle.report.schema.json` (`schema_version: "x07.bundle.report@0.4.0"`).
 
 ### Running programs (canonical)
 
@@ -414,7 +416,7 @@ Use `x07 run` as the canonical entry point for execution. Prefer intent-driven p
 - `x07 run --repair=memory`
 - `x07 run --repair=write` (default)
 
-For `run-os-sandboxed`, `x07 run --attest-runtime <path>` writes `x07.runtime.attest@0.1.0` and records the reference in the runner and wrapped reports.
+For `run-os-sandboxed`, `x07 run --attest-runtime <path>` writes `x07.runtime.attest@0.2.0` and records the reference in the runner and wrapped reports.
 
 For the complete guide (targets, worlds, input, policies, reports), see [Running programs](running-programs.md).
 

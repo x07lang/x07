@@ -76,9 +76,11 @@ X07 exposes formal verification as a public toolchain surface, not an internal e
 
 - `x07 verify` proves contract properties and emits machine-readable proof/coverage artifacts.
 - `x07 trust capsule` attests effectful capsule boundaries.
-- `x07 trust certify` binds proofs, tests, boundaries, capsules, and runtime evidence into a certificate bundle that reviewers can consume directly.
+- `x07 pkg attest-closure` freezes the reviewed dependency closure into a deterministic attestation.
+- `x07 trust certify` binds proofs, tests, boundaries, capsules, dependency closure, peer policies, and runtime evidence into a certificate bundle that reviewers can consume directly.
 
 The current certifiable proof subset includes pure self-recursive `defn` targets when they declare `decreases[]`; proof and coverage artifacts expose that recursion posture explicitly instead of hiding it behind a pass/fail bit.
+The networked sandbox certification line is `trusted_program_sandboxed_net_v1`: it requires attested network capsules, pinned peer-policy files, a non-empty runtime allowlist, dependency-closure attestation, and VM-boundary network enforcement in the runtime attestation.
 
 ```mermaid
 flowchart LR

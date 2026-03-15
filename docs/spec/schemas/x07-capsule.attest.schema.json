@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-capsule.attest.schema.json",
-  "title": "x07.capsule.attest@0.1.0",
+  "title": "x07.capsule.attest@0.2.0",
   "description": "Digest-bound attestation for a certified capsule.",
   "type": "object",
   "additionalProperties": false,
@@ -11,10 +11,13 @@
     "contract_digest",
     "module_digests",
     "lockfile_digest",
-    "conformance_report_digest"
+    "conformance_report_digest",
+    "peer_policy_digests",
+    "request_contract_digest",
+    "response_contract_digest"
   ],
   "properties": {
-    "schema_version": { "const": "x07.capsule.attest@0.1.0" },
+    "schema_version": { "const": "x07.capsule.attest@0.2.0" },
     "capsule_id": {
       "type": "string",
       "minLength": 1,
@@ -28,7 +31,24 @@
       "default": []
     },
     "lockfile_digest": { "$ref": "#/$defs/sha256_digest" },
-    "conformance_report_digest": { "$ref": "#/$defs/sha256_digest" }
+    "conformance_report_digest": { "$ref": "#/$defs/sha256_digest" },
+    "peer_policy_digests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/module_digest" },
+      "default": []
+    },
+    "request_contract_digest": {
+      "anyOf": [
+        { "$ref": "#/$defs/sha256_digest" },
+        { "type": "null" }
+      ]
+    },
+    "response_contract_digest": {
+      "anyOf": [
+        { "$ref": "#/$defs/sha256_digest" },
+        { "type": "null" }
+      ]
+    }
   },
   "$defs": {
     "sha256_digest": {

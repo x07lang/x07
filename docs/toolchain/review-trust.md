@@ -44,11 +44,17 @@ Notes:
   - `sandbox-policy-widen`
   - `runtime-attestation-regression`
   - `weaker-isolation-enabled`
+  - `network-allowlist-widen`
+  - `peer-policy-relaxation`
+  - `capsule-network-surface-widen`
+  - `package-set-change`
+  - `lockfile-hash-change`
+  - `advisory-allowance-enabled`
 
 JSON schema:
 
 - `spec/x07-review.diff.schema.json`
-- `schema_version: "x07.review.diff@0.3.0"`
+- `schema_version: "x07.review.diff@0.4.0"`
 
 ## Trust report (`x07 trust report`)
 
@@ -152,6 +158,7 @@ Current built-in profiles include:
 
 - `arch/trust/profiles/verified_core_pure_v1.json`
 - `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`
+- `arch/trust/profiles/trusted_program_sandboxed_net_v1.json`
 - `arch/trust/profiles/certified_capsule_v1.json`
 
 ## Capsule contracts (`x07 trust capsule`)
@@ -171,7 +178,15 @@ x07 trust capsule attest \
   --out target/capsules/capsule.echo.attest.json
 ```
 
-Use these commands to validate the capsule index plus referenced contracts/attestations, and to emit deterministic `x07.capsule.attest@0.1.0` artifacts that `x07 trust certify` can bind into a certificate bundle.
+Use these commands to validate the capsule index plus referenced contracts/attestations, and to emit deterministic `x07.capsule.attest@0.2.0` artifacts that `x07 trust certify` can bind into a certificate bundle. Network capsules can now declare peer-policy files plus request/response contract digests, so the attestation covers the reviewed network surface instead of only the local module set.
+
+For package-backed certification, generate dependency-closure evidence before certification:
+
+```bash
+x07 pkg attest-closure \
+  --project x07.json \
+  --out target/cert/dep-closure.attest.json
+```
 
 ## Trust certify (`x07 trust certify`)
 
@@ -195,13 +210,14 @@ The certificate bundle includes:
 - `trust.report.json`
 - `compile.attest.json`
 - capsule attestation references, runtime-attestation references, and effect-log digests when they are present in the observed evidence
+- peer-policy references, network capsule inventory, package-set digest, and dependency-closure evidence when the selected profile requires them
 
 `x07 trust certify` rejects if proof coverage regresses, required boundary metadata is missing, boundary-declared smoke/PBT tests do not resolve and pass, schema-derived outputs drift, trust report cleanliness fails, or compile attestation cannot bind the emitted native artifact.
 
 Certificate schema:
 
 - `spec/x07-trust.certificate.schema.json`
-- `schema_version: "x07.trust.certificate@0.2.0"`
+- `schema_version: "x07.trust.certificate@0.3.0"`
 
 For `verified_core_pure_v1`, boundary-referenced schemas are rechecked with `x07 schema derive --check --out-dir .`, so certified projects should derive those schema outputs into the project root.
 
@@ -228,6 +244,15 @@ For sandboxed or capsule-backed projects, add the Milestone B posture gates as n
 - `sandbox-policy-widen`
 - `runtime-attestation-regression`
 - `weaker-isolation-enabled`
+
+For the networked sandbox profile, add the Milestone C posture gates:
+
+- `network-allowlist-widen`
+- `peer-policy-relaxation`
+- `capsule-network-surface-widen`
+- `package-set-change`
+- `lockfile-hash-change`
+- `advisory-allowance-enabled`
 
 The canonical example projects at `docs/examples/verified_core_pure_v1/`, `docs/examples/trusted_sandbox_program_v1/`, and `docs/examples/certified_capsule_v1/` are structured to exercise those certificate flows end to end.
 The checked-in `.github/workflows/certify.yml` files in those examples show the minimal CI surface for running the same flows in GitHub Actions, and `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` plus `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/` serve as the first-party package-backed dogfood examples in this train.

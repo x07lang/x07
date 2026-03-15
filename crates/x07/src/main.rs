@@ -429,6 +429,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Versions(_)) => vec!["pkg", "versions"],
                 Some(pkg::PkgCommand::Pack(_)) => vec!["pkg", "pack"],
                 Some(pkg::PkgCommand::Lock(_)) => vec!["pkg", "lock"],
+                Some(pkg::PkgCommand::AttestClosure(_)) => vec!["pkg", "attest-closure"],
                 Some(pkg::PkgCommand::Provides(_)) => vec!["pkg", "provides"],
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
                 Some(pkg::PkgCommand::Publish(_)) => vec!["pkg", "publish"],
@@ -1796,6 +1797,10 @@ struct RuntimeAttestationRef {
     path: String,
     sandbox_backend: String,
     weaker_isolation: bool,
+    #[serde(default)]
+    network_mode: String,
+    #[serde(default)]
+    network_enforcement: String,
 }
 
 #[derive(Debug, serde::Deserialize)]

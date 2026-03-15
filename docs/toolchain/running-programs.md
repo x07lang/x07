@@ -152,10 +152,10 @@ Other `X07_OS_*` environment variables embedded into the wrapper are treated as 
 
 Report modes:
 
-- `--report runner` (default): pass through the runner JSON (`spec/x07-os-runner.report.schema.json`, `schema_version: "x07-os-runner.report@0.4.0"`)
-- `--report wrapped`: wrap the runner JSON in `spec/x07-run.report.schema.json` (`schema_version: "x07.run.report@0.2.0"`)
+- `--report runner` (default): pass through the runner JSON (`spec/x07-os-runner.report.schema.json`, `schema_version: "x07-os-runner.report@0.5.0"`)
+- `--report wrapped`: wrap the runner JSON in `spec/x07-run.report.schema.json` (`schema_version: "x07.run.report@0.3.0"`)
 
-For `run-os-sandboxed`, `x07 run --attest-runtime <path>` writes a deterministic runtime attestation (`spec/x07-runtime.attest.schema.json`, `schema_version: "x07.runtime.attest@0.1.0"`). The attestation binds the effective policy digest, bundled binary digest, compile attestation digest, capsule attestation digests, and effect-log digests. The runner report then records `sandbox_backend` and a `runtime_attestation` reference so trust/certification tooling can bind the observed execution.
+For `run-os-sandboxed`, `x07 run --attest-runtime <path>` writes a deterministic runtime attestation (`spec/x07-runtime.attest.schema.json`, `schema_version: "x07.runtime.attest@0.2.0"`). The attestation binds the effective policy digest, network mode, network enforcement posture, effective allow/deny host sets, bundled binary digest, compile attestation digest, capsule attestation digests, and effect-log digests. The runner report then records `sandbox_backend`, `network_mode`, and a `runtime_attestation` reference so trust/certification tooling can bind the observed execution.
 
 ### Runtime traps (AST pointers)
 

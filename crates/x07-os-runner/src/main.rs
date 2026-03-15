@@ -1461,6 +1461,15 @@ struct RuntimeAttestation {
     guest_image_digest: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     effective_policy_digest: Option<String>,
+    network_mode: &'static str,
+    network_enforcement: &'static str,
+    allow_dns: bool,
+    allow_tcp: bool,
+    allow_udp: bool,
+    #[serde(default)]
+    effective_allow_hosts: Vec<RuntimeNetHost>,
+    #[serde(default)]
+    effective_deny_hosts: Vec<String>,
     bundled_binary_digest: String,
     compile_attestation_digest: Option<String>,
     #[serde(default)]
@@ -1479,15 +1488,30 @@ struct RuntimeAttestationOutcome {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct RuntimeNetHost {
+    host: String,
+    ports: Vec<u16>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct RuntimeAttestationRef {
     path: String,
     sandbox_backend: &'static str,
     weaker_isolation: bool,
+    network_mode: &'static str,
+    network_enforcement: &'static str,
 }
 
 #[derive(Debug, Clone)]
 struct RuntimeAttestationBindings {
     effective_policy_digest: Option<String>,
+    network_mode: &'static str,
+    network_enforcement: &'static str,
+    allow_dns: bool,
+    allow_tcp: bool,
+    allow_udp: bool,
+    effective_allow_hosts: Vec<RuntimeNetHost>,
+    effective_deny_hosts: Vec<String>,
     bundled_binary_digest: String,
     compile_attestation_digest: Option<String>,
     capsule_attestation_digests: Vec<String>,
@@ -1542,7 +1566,7 @@ fn sha256_prefixed_for_path(path: &Path) -> Result<String> {
     Ok(sha256_prefixed(&bytes))
 }
 
-fn load_runtime_policy_digest(policy_path: Option<&Path>) -> Result<(Option<String>, bool)> {
+fn load_runtime_policy_bindings(policy_path: Option<&Path>) -> Result<RuntimeAttestationBindings> {
     let Some(path) = policy_path else {
         anyhow::bail!(
             "X07RA_EPOLICY_DIGEST: runtime attestation requires an effective policy path"
@@ -1560,7 +1584,36 @@ fn load_runtime_policy_digest(policy_path: Option<&Path>) -> Result<(Option<Stri
             path.display()
         )
     })?;
-    Ok((Some(sha256_prefixed(&bytes)), policy.net.enabled))
+    let effective_allow_hosts = policy
+        .net
+        .allow_hosts
+        .iter()
+        .map(|host| RuntimeNetHost {
+            host: host.host.clone(),
+            ports: host.ports.clone(),
+        })
+        .collect::<Vec<_>>();
+    let network_mode = if !policy.net.enabled {
+        "none"
+    } else if effective_allow_hosts.is_empty() {
+        "disabled"
+    } else {
+        "allowlist"
+    };
+    Ok(RuntimeAttestationBindings {
+        effective_policy_digest: Some(sha256_prefixed(&bytes)),
+        network_mode,
+        network_enforcement: "unsupported",
+        allow_dns: policy.net.allow_dns,
+        allow_tcp: policy.net.allow_tcp,
+        allow_udp: policy.net.allow_udp,
+        effective_allow_hosts,
+        effective_deny_hosts: Vec::new(),
+        bundled_binary_digest: String::new(),
+        compile_attestation_digest: None,
+        capsule_attestation_digests: Vec::new(),
+        effect_log_digests: Vec::new(),
+    })
 }
 
 fn build_runtime_attestation_bindings(
@@ -1570,36 +1623,28 @@ fn build_runtime_attestation_bindings(
     policy_path: Option<&Path>,
     guest_image_digest: Option<&str>,
 ) -> Result<RuntimeAttestationBindings> {
-    if sandbox_backend != "vm" || weaker_isolation {
-        anyhow::bail!(
-            "X07RA_EWEAKER_ISOLATION: runtime attestation requires sandbox_backend=vm without weaker isolation"
-        );
-    }
-    if guest_image_digest.is_none() {
+    if sandbox_backend == "vm" && guest_image_digest.is_none() {
         anyhow::bail!("X07RA_EGUEST_DIGEST: runtime attestation requires a VM guest image digest");
     }
 
-    let (effective_policy_digest, network_enabled) = load_runtime_policy_digest(policy_path)?;
-    if network_enabled {
-        anyhow::bail!(
-            "X07RA_ENET_FORBIDDEN_IN_LOCAL_PROFILE: runtime attestation requires policy.net.enabled=false for the local sandbox profile"
-        );
-    }
+    let mut bindings = load_runtime_policy_bindings(policy_path)?;
+    bindings.network_enforcement = match bindings.network_mode {
+        "none" => "none",
+        "allowlist" if sandbox_backend == "vm" && !weaker_isolation => "vm_boundary_allowlist",
+        "allowlist" if weaker_isolation => "guest_allowlist",
+        "allowlist" => "unsupported",
+        _ => "none",
+    };
 
-    let bundled_binary_digest = sha256_prefixed_for_path(artifact_path).with_context(|| {
-        format!(
-            "X07RA_EWRITE: compute bundled binary digest for {}",
-            artifact_path.display()
-        )
-    })?;
+    bindings.bundled_binary_digest =
+        sha256_prefixed_for_path(artifact_path).with_context(|| {
+            format!(
+                "X07RA_EWRITE: compute bundled binary digest for {}",
+                artifact_path.display()
+            )
+        })?;
 
-    Ok(RuntimeAttestationBindings {
-        effective_policy_digest,
-        bundled_binary_digest,
-        compile_attestation_digest: None,
-        capsule_attestation_digests: Vec::new(),
-        effect_log_digests: Vec::new(),
-    })
+    Ok(bindings)
 }
 
 fn write_runtime_attestation(
@@ -1642,6 +1687,13 @@ fn write_runtime_attestation(
         run_dir: run_dir.map(|p| p.display().to_string()),
         guest_image_digest: guest_image_digest.map(|digest| digest.to_string()),
         effective_policy_digest: bindings.effective_policy_digest,
+        network_mode: bindings.network_mode,
+        network_enforcement: bindings.network_enforcement,
+        allow_dns: bindings.allow_dns,
+        allow_tcp: bindings.allow_tcp,
+        allow_udp: bindings.allow_udp,
+        effective_allow_hosts: bindings.effective_allow_hosts.clone(),
+        effective_deny_hosts: bindings.effective_deny_hosts.clone(),
         bundled_binary_digest: bindings.bundled_binary_digest,
         compile_attestation_digest: bindings.compile_attestation_digest,
         capsule_attestation_digests: bindings.capsule_attestation_digests,
@@ -1667,6 +1719,8 @@ fn write_runtime_attestation(
         path: path.display().to_string(),
         sandbox_backend,
         weaker_isolation,
+        network_mode: bindings.network_mode,
+        network_enforcement: bindings.network_enforcement,
     })
 }
 
@@ -2357,6 +2411,13 @@ mod tests {
             doc["effective_policy_digest"],
             sha256_prefixed(&std::fs::read(&policy_path).expect("read policy bytes"))
         );
+        assert_eq!(doc["network_mode"], "none");
+        assert_eq!(doc["network_enforcement"], "none");
+        assert_eq!(doc["allow_dns"], false);
+        assert_eq!(doc["allow_tcp"], false);
+        assert_eq!(doc["allow_udp"], false);
+        assert_eq!(doc["effective_allow_hosts"], serde_json::json!([]));
+        assert_eq!(doc["effective_deny_hosts"], serde_json::json!([]));
         assert_eq!(
             doc["bundled_binary_digest"],
             sha256_prefixed(&std::fs::read(&artifact_path).expect("read artifact bytes"))
@@ -2370,6 +2431,8 @@ mod tests {
         assert_eq!(attestation_ref.path, path.display().to_string());
         assert_eq!(attestation_ref.sandbox_backend, "vm");
         assert!(!attestation_ref.weaker_isolation);
+        assert_eq!(attestation_ref.network_mode, "none");
+        assert_eq!(attestation_ref.network_enforcement, "none");
 
         std::fs::remove_dir_all(&dir).expect("remove runtime attestation test dir");
     }
@@ -2423,7 +2486,7 @@ mod tests {
     }
 
     #[test]
-    fn write_runtime_attestation_rejects_weaker_isolation() {
+    fn write_runtime_attestation_records_weaker_isolation() {
         let dir = workspace_root()
             .join("target")
             .join("runtime-attest-tests")
@@ -2452,7 +2515,7 @@ mod tests {
         )
         .expect("write policy");
 
-        let err = write_runtime_attestation(
+        let attestation_ref = write_runtime_attestation(
             &path,
             "vm",
             true,
@@ -2465,13 +2528,20 @@ mod tests {
             0,
             None,
         )
-        .expect_err("weaker isolation must fail");
-        assert!(format!("{err:#}").contains("X07RA_EWEAKER_ISOLATION"));
+        .expect("weaker isolation should still be recorded");
+        let doc: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(&path).expect("read weaker-isolation attestation"),
+        )
+        .expect("parse weaker-isolation attestation");
+        assert_eq!(doc["weaker_isolation"], true);
+        assert_eq!(doc["network_mode"], "none");
+        assert_eq!(doc["network_enforcement"], "none");
+        assert!(attestation_ref.weaker_isolation);
         std::fs::remove_dir_all(&dir).expect("remove temp dir");
     }
 
     #[test]
-    fn write_runtime_attestation_rejects_network_enabled_policy() {
+    fn write_runtime_attestation_records_network_allowlist_policy() {
         let dir = workspace_root()
             .join("target")
             .join("runtime-attest-tests")
@@ -2488,7 +2558,15 @@ mod tests {
                 "policy_id": "sandbox.local",
                 "limits": { "cpu_ms": 1000, "wall_ms": 1000, "mem_bytes": 1048576, "fds": 16, "procs": 4 },
                 "fs": { "enabled": false, "read_roots": [], "write_roots": [], "deny_hidden": true },
-                "net": { "enabled": true, "allow_dns": true, "allow_tcp": true, "allow_udp": false, "allow_hosts": [] },
+                "net": {
+                    "enabled": true,
+                    "allow_dns": true,
+                    "allow_tcp": true,
+                    "allow_udp": false,
+                    "allow_hosts": [
+                        { "host": "registry.x07.io", "ports": [443] }
+                    ]
+                },
                 "db": { "enabled": false },
                 "env": { "enabled": false, "allow_keys": [], "deny_keys": [] },
                 "time": { "enabled": false, "allow_monotonic": false, "allow_wall_clock": false, "allow_sleep": false, "max_sleep_ms": 0, "allow_local_tzid": false },
@@ -2500,7 +2578,7 @@ mod tests {
         )
         .expect("write policy");
 
-        let err = write_runtime_attestation(
+        let attestation_ref = write_runtime_attestation(
             &path,
             "vm",
             false,
@@ -2513,8 +2591,21 @@ mod tests {
             0,
             None,
         )
-        .expect_err("network-enabled policy must fail");
-        assert!(format!("{err:#}").contains("X07RA_ENET_FORBIDDEN_IN_LOCAL_PROFILE"));
+        .expect("network allowlist policy should be recorded");
+        let doc: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).expect("read network attestation"))
+                .expect("parse network attestation");
+        assert_eq!(doc["network_mode"], "allowlist");
+        assert_eq!(doc["network_enforcement"], "vm_boundary_allowlist");
+        assert_eq!(doc["allow_dns"], true);
+        assert_eq!(doc["allow_tcp"], true);
+        assert_eq!(doc["allow_udp"], false);
+        assert_eq!(
+            doc["effective_allow_hosts"],
+            serde_json::json!([{ "host": "registry.x07.io", "ports": [443] }])
+        );
+        assert_eq!(attestation_ref.network_mode, "allowlist");
+        assert_eq!(attestation_ref.network_enforcement, "vm_boundary_allowlist");
         std::fs::remove_dir_all(&dir).expect("remove temp dir");
     }
 

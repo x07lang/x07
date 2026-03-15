@@ -12,6 +12,16 @@
   "claims": [
     "human_can_review_certificate_not_source"
   ],
+  "dependency_closure": {
+    "advisory_check_ok": true,
+    "attestation": {
+      "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/dep.closure.attest.json",
+      "sha256_hex": "66c095bcadfe8904a1ea7d430399b972adbc9a5fb49f24e5f4082ecc4d61ef5e"
+    },
+    "lockfile_digest": "sha256:3381e3077b949a91303e2553042cb35ed7bd76fcbc613b9ae039f1bc93b4da24",
+    "manifest_digest": "sha256:644838e66836a2a45e6d182f9be52ff1705a5d1192364e59d49ce0580414da91",
+    "packages": []
+  },
   "entry": "example.main",
   "evidence": {
     "boundaries_report": {
@@ -22,33 +32,43 @@
     "capsule_attestations": [],
     "compile_attestation": {
       "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/compile.attest.json",
-      "sha256_hex": "3a6acc077982c32ede846f1eba62567e0d34a7af31f19359a4e520aa89f318a0"
+      "sha256_hex": "60b0ea6f0106854143ea1beb00328da96617a031f78055a1c1571bdbb552f19a"
     },
     "coverage_report": {
       "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/verify.coverage.json",
-      "sha256_hex": "61a9707fc845d4ab788356b873061c41a5add313b0f0867b545c3a869982b59b"
+      "sha256_hex": "285997b98bffca5174926aa3fb4411f78d011b21bb28889a2c9afbed6866cc0c"
+    },
+    "dependency_closure_attestation": {
+      "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/dep.closure.attest.json",
+      "sha256_hex": "66c095bcadfe8904a1ea7d430399b972adbc9a5fb49f24e5f4082ecc4d61ef5e"
     },
     "effect_logs": [],
+    "peer_policy_files": [],
     "prove_reports": [
       {
         "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/prove/id_31728496d40a1c141362c603207c6be17129fb3df21f0c9c8549f0ea8b93a23a.json",
-        "sha256_hex": "997c190a6144ea5db13f5a0e1ea1ef12ae812981112bf106830ddb0279115580"
+        "sha256_hex": "95eede51739fd740e89a88e5d4ad415d99cb60ed16a04e641ef2ea231f29a8f8"
       }
     ],
     "schema_derive_reports": [],
     "tests_report": {
       "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/tests.report.json",
-      "sha256_hex": "5c707b9863e8cbc3d45d61bc67cefcef3b25119f124e23d3683563f615f57931"
+      "sha256_hex": "92a50537e8e7a37b103bb40e576efaa38c670fcd0600f820ab29d5715005d3ea"
     },
     "trust_report": {
       "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/trust.report.json",
-      "sha256_hex": "30ea8bcadc4d54bcd49d72498cc6a251804629c8bc700bfa0322bc802477df22"
+      "sha256_hex": "107447d35bcbd4bb97ebd867649f3f20a696f773f40b7b0912dcb0d4cebd8d47"
     }
   },
+  "network_capsules": {
+    "count": 0,
+    "ids": []
+  },
   "out_dir": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert",
+  "package_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
   "profile": "verified_core_pure_v1",
   "runtime": null,
-  "schema_version": "x07.trust.certificate@0.2.0",
+  "schema_version": "x07.trust.certificate@0.3.0",
   "tcb": {
     "host_compiler": "cc (Apple clang version 17.0.0 (clang-1700.6.4.2))",
     "trusted_primitive_manifest_digest": "sha256:ba1d8275a1fe7f3ab13c9289ecc1229794e46a051bba9851769e6a3cd57fd189",

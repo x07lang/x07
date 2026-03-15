@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-run.report.schema.json",
-  "title": "X07 x07 run report v0.2.0",
+  "title": "X07 x07 run report v0.3.0",
   "description": "Optional wrapper report emitted by `x07 run --report wrapped`.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "runner", "world", "target", "report"],
   "properties": {
-    "schema_version": { "const": "x07.run.report@0.2.0" },
+    "schema_version": { "const": "x07.run.report@0.3.0" },
     "runner": { "enum": ["host", "os"] },
     "world": {
       "enum": [

@@ -57,8 +57,10 @@ It checks:
 - smoke/PBT resolution
 - schema-derive drift
 - trust report cleanliness
+- dependency-closure attestation when the profile requires it
 - compile attestation
 - capsule attestations when the profile requires them
+- peer-policy evidence and network capsule posture when the profile requires them
 - runtime attestation when the profile requires it
 
 If a project keeps extra local helper checks that do not satisfy the
@@ -71,9 +73,12 @@ test manifest and point `x07 trust certify` at the certification manifest with
 For sandboxed certification, the claim is not just about source code. It also binds the observed execution:
 
 - effective policy digest
+- network mode and backend enforcement posture
+- effective host allowlist / denylist
 - bundled binary digest
 - compile attestation digest
 - capsule attestation digests
+- peer-policy digests
 - effect-log digests
 
 That is why sandboxed certification requires a supported `run-os-sandboxed` VM backend.
@@ -86,6 +91,7 @@ The current public profiles are:
 | --- | --- | --- |
 | `verified_core_pure_v1` | pure verified-core entry can be reviewed from the certificate | full reachable proof coverage, no OS effects |
 | `trusted_program_sandboxed_local_v1` | sandboxed async entry can be reviewed from the certificate | async proof coverage, capsule attestations, runtime attestation, VM backend, no network |
+| `trusted_program_sandboxed_net_v1` | sandboxed networked async entry can be reviewed from the certificate | async proof coverage, attested network capsules, pinned peer policies, dependency-closure attestation, VM-boundary allowlist enforcement |
 | `certified_capsule_v1` | effectful capsule is attested and reviewable as a pinned boundary | capsule contract, conformance report, attestation |
 
 ## Design decisions
@@ -111,7 +117,11 @@ That lets the verified or trusted entry stay small while making the effect bound
 
 ### Runtime attestation for sandboxed trust
 
-A sandboxed certificate without runtime evidence is incomplete. The certificate therefore binds the policy, binary, compile attestation, and capsule/effect-log evidence to the observed sandbox run.
+A sandboxed certificate without runtime evidence is incomplete. The certificate therefore binds the policy, network enforcement posture, binary, compile attestation, and capsule/effect-log evidence to the observed sandbox run.
+
+### Dependency closure is part of the trust claim
+
+Networked certification is also a package-set claim. `x07 pkg attest-closure` records the exact locked dependency set, per-module digests, and advisory/yank posture so `x07 trust certify` can expose the reviewed closure in the certificate instead of treating `x07.lock.json` as an untracked side input.
 
 ### Certificate-first review
 

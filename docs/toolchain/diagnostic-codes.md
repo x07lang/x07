@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 344
-- quickfix support (`sometimes` or `always`): 326
-- quickfix coverage: 94.77%
+- total codes: 389
+- quickfix support (`sometimes` or `always`): 353
+- quickfix coverage: 90.75%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -184,6 +184,9 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-ARITY-RETURN-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-RETURN-0001`. |
 | `X07-ARITY-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ARITY-UNSAFE-0001`. |
 | `X07-AST-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-AST-0001`. |
+| `X07-ASYNC-CONTRACT-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0001`. |
+| `X07-ASYNC-CONTRACT-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0002`. |
+| `X07-ASYNC-CONTRACT-0003` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0003`. |
 | `X07-BOOL-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-BOOL-0001`. |
 | `X07-BORROW-0001` | x07c / lint / error | sometimes | Borrowing view/subview from a temporary expression is invalid. |
 | `X07-BORROW-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-BORROW-0002`. |
@@ -242,6 +245,14 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07-WORLD-UNSAFE-0001` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0001`. |
 | `X07-WORLD-UNSAFE-0002` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07-WORLD-UNSAFE-0002`. |
 | `X07-X07AST-PARSE-0001` | x07 / parse / error<br/>x07c / parse / error | sometimes | Core lint/schema diagnostic `X07-X07AST-PARSE-0001`. |
+| `X07CAP_ATTEST_DIGEST_MISMATCH` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_ATTEST_DIGEST_MISMATCH`. |
+| `X07CAP_CONFORMANCE_MISSING` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_CONFORMANCE_MISSING`. |
+| `X07CAP_CONFORMANCE_REQUIRED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_CONFORMANCE_REQUIRED`. |
+| `X07CAP_CONTRACT_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_CONTRACT_INVALID`. |
+| `X07CAP_EFFECT_LOG_REQUIRED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_EFFECT_LOG_REQUIRED`. |
+| `X07CAP_INDEX_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_INDEX_INVALID`. |
+| `X07CAP_PEER_POLICY_REQUIRED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_PEER_POLICY_REQUIRED`. |
+| `X07CAP_TLS_POLICY_INCOMPLETE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07CAP_TLS_POLICY_INCOMPLETE`. |
 | `X07C_WASM_BACKEND_FEATURE_REQUIRED` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`. |
 | `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_BUILTIN`. |
 | `X07C_WASM_BACKEND_UNSUPPORTED_FORM` | x07c / lint / error | sometimes | Core lint/schema diagnostic `X07C_WASM_BACKEND_UNSUPPORTED_FORM`. |
@@ -282,6 +293,17 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_SPEC_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_SPEC_INVALID`. |
 | `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
 | `X07PKG_YANKED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_YANKED_DEP`. |
+| `X07RD_ADVISORY_ALLOWANCE_ENABLED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_ADVISORY_ALLOWANCE_ENABLED`. |
+| `X07RD_ASYNC_PROOF_COVERAGE_DECREASE` | x07 / lint / error | never | Review diff gate rejected an async proof coverage regression. |
+| `X07RD_CAPSULE_CONTRACT_RELAXATION` | x07 / lint / error | never | Review diff gate rejected a capsule contract relaxation. |
+| `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN`. |
+| `X07RD_CAPSULE_SET_CHANGE` | x07 / lint / error | never | Review diff gate rejected a capsule inventory change. |
+| `X07RD_LOCKFILE_HASH_CHANGE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_LOCKFILE_HASH_CHANGE`. |
+| `X07RD_NETWORK_ALLOWLIST_WIDEN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_NETWORK_ALLOWLIST_WIDEN`. |
+| `X07RD_PACKAGE_SET_CHANGE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_PACKAGE_SET_CHANGE`. |
+| `X07RD_PEER_POLICY_RELAXATION` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_PEER_POLICY_RELAXATION`. |
+| `X07RD_RUNTIME_ATTEST_REGRESSION` | x07 / run / error | never | Review diff gate rejected a runtime attestation regression. |
+| `X07RD_SANDBOX_POLICY_WIDEN` | x07 / lint / error | never | Review diff gate rejected a sandbox policy widening. |
 | `X07RR_ENTRY_EXISTS` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_ENTRY_EXISTS`. |
 | `X07RR_HTTP` | x07 / run / error | never | Diagnostic code `X07RR_HTTP`. |
 | `X07RR_KEY_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_KEY_EMPTY`. |
@@ -290,30 +312,53 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07RR_OP_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_OP_EMPTY`. |
 | `X07RR_URL_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_URL_EMPTY`. |
 | `X07TC_EARCH_STRICT` | x07 / run / error | sometimes | Strict architecture evidence failed certification. |
+| `X07TC_EASYNC_PROOF` | x07 / run / error | never | Async proof coverage or async proof obligations failed certification. |
 | `X07TC_EBOUNDARY_MISSING` | x07 / run / error | sometimes | Boundary declarations are missing or incomplete for certification. |
 | `X07TC_EBOUNDARY_RELAXED` | x07 / run / error | never | The candidate relaxes a certified boundary contract relative to the baseline. |
+| `X07TC_ECAPSULE_ATTEST` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ECAPSULE_ATTEST`. |
+| `X07TC_ECAPSULE_NETWORK_ATTEST` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ECAPSULE_NETWORK_ATTEST`. |
 | `X07TC_ECOMPILE_ATTEST` | x07 / run / error | never | Compile attestation failed or could not bind the emitted binary. |
+| `X07TC_EDEP_CLOSURE` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EDEP_CLOSURE`. |
 | `X07TC_EDIFF_POSTURE` | x07 / run / error | never | Baseline review or trust-posture diff gate failed certification. |
+| `X07TC_EEFFECT_LOG` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EEFFECT_LOG`. |
 | `X07TC_ENONDET` | x07 / run / error | never | Trust report detected nondeterminism in the certified closure. |
 | `X07TC_EPBT` | x07 / run / error | sometimes | Boundary-required property tests are missing, malformed, or failing. |
+| `X07TC_EPEER_POLICY` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EPEER_POLICY`. |
 | `X07TC_EPROFILE` | x07 / run / error | sometimes | Certification trust profile is missing or invalid. |
 | `X07TC_EPROJECT` | x07 / run / error | sometimes | Certification could not resolve the project manifest or source closure. |
 | `X07TC_EPROOF_COVERAGE` | x07 / run / error | never | Reachable proof coverage is incomplete for certification. |
+| `X07TC_ERUNTIME_ATTEST` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ERUNTIME_ATTEST`. |
+| `X07TC_ERUNTIME_NETWORK_EVIDENCE` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ERUNTIME_NETWORK_EVIDENCE`. |
+| `X07TC_ESANDBOX_PROFILE` | x07 / run / error | never | Sandbox runtime evidence violates the certification profile. |
 | `X07TC_ESCHEMA_DRIFT` | x07 / run / error | sometimes | Boundary-referenced schema outputs drifted or are missing. |
 | `X07TC_ETESTS` | x07 / run / error | sometimes | Deterministic certification tests are missing or failing. |
 | `X07TC_ETRUST_REPORT` | x07 / run / error | never | Trust report evidence failed certification. |
+| `X07TEST_ASYNC_ENTRY_UNSUPPORTED` | x07 / lint / error | never | x07 test could not build or run the selected async entrypoint. |
+| `X07TEST_CAPSULE_EVIDENCE_MISSING` | x07 / lint / error | never | A test that requires capsule evidence did not provide it. |
+| `X07TEST_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | sometimes | A test that requires runtime attestation did not produce it. |
 | `X07TP_ARCH` | x07 / run / error | sometimes | Project architecture posture is weaker than the trust profile requires. |
+| `X07TP_ASYNC_PROOF_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing async proof coverage. |
 | `X07TP_BOUNDARY` | x07 / run / error | sometimes | Project boundary index wiring is missing or incomplete for certification. |
+| `X07TP_CAPSULES` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_CAPSULES`. |
+| `X07TP_CAPSULE_ATTEST_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing capsule attestation requirements. |
+| `X07TP_DEP_CLOSURE_REQUIRED` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_DEP_CLOSURE_REQUIRED`. |
+| `X07TP_EFFECT_LOG_REQUIRED` | x07 / run / error | never | Trust profile is missing required effect-log evidence semantics. |
 | `X07TP_ENTRY_FORBIDDEN` | x07 / run / error | never | Requested entrypoint is not allowed by the trust profile. |
 | `X07TP_INVALID` | x07 / run / error | sometimes | Trust profile JSON is missing or invalid. |
 | `X07TP_LANGUAGE` | x07 / run / error | never | Project uses language or policy features forbidden by the trust profile. |
+| `X07TP_NETWORK_MODE_FORBIDDEN` | x07 / run / error | never | Sandboxed local trusted-program profile allows networking where it should not. |
 | `X07TP_NOT_CERTIFIABLE` | x07 / run / error | never | Trust profile is weaker than the Milestone A certification floor. |
+| `X07TP_PEER_POLICY_REQUIRED` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_PEER_POLICY_REQUIRED`. |
 | `X07TP_PROJECT_MISMATCH` | x07 / run / error | sometimes | Project manifest could not be resolved for trust profile validation. |
+| `X07TP_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing runtime attestation requirements. |
+| `X07TP_SANDBOX_BACKEND_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing the VM-only isolation requirement. |
 | `X07TP_WORLD` | x07 / run / error | never | Project world is outside the trust profile allowlist. |
 | `X07T_EPBT_MANIFEST_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_MANIFEST_INVALID`. |
 | `X07T_EPBT_PARAM_EMPTY` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`. |
 | `X07T_EPBT_UNKNOWN_GEN_KIND` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNKNOWN_GEN_KIND`. |
 | `X07T_EPBT_UNSUPPORTED_WORLD` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNSUPPORTED_WORLD`. |
+| `X07V_ASYNC_COUNTEREXAMPLE` | x07 / lint / error | never | The async proof found a counterexample. |
+| `X07V_CANCELLATION_ENSURE_FAILED` | x07 / lint / error | never | The async cancellation postcondition failed under proof. |
 | `X07V_EARGS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EARGS`. |
 | `X07V_ECBMC_ERROR` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_ERROR`. |
 | `X07V_ECBMC_FAILURE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_FAILURE`. |
@@ -327,9 +372,9 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07V_EZ3_MISSING` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EZ3_MISSING`. |
 | `X07V_EZ3_RUN` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07V_EZ3_RUN`. |
 | `X07V_INTERNAL` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_INTERNAL`. |
+| `X07V_SCOPE_INVARIANT_FAILED` | x07 / lint / error | never | An async scope invariant failed under proof. |
 | `X07V_SMT_SAT` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_SAT`. |
 | `X07V_SMT_UNKNOWN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_UNKNOWN`. |
-| `X07V_UNSUPPORTED_ASYNC` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNSUPPORTED_ASYNC`. |
 | `X07V_UNWIND_INCOMPLETE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNWIND_INCOMPLETE`. |
 | `X7I0001` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0001`. |
 | `X7I0100` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0100`. |
@@ -3875,6 +3920,66 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07-ASYNC-CONTRACT-0001`
+
+Summary: Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0001`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-ASYNC-CONTRACT-0002`
+
+Summary: Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0002`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07-ASYNC-CONTRACT-0003`
+
+Summary: Core lint/schema diagnostic `X07-ASYNC-CONTRACT-0003`.
+
+Origins:
+- x07c (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
 ## `X07-BOOL-0001`
 
 Summary: Core lint/schema diagnostic `X07-BOOL-0001`.
@@ -5043,6 +5148,166 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07CAP_ATTEST_DIGEST_MISMATCH`
+
+Summary: Core lint/schema diagnostic `X07CAP_ATTEST_DIGEST_MISMATCH`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_CONFORMANCE_MISSING`
+
+Summary: Core lint/schema diagnostic `X07CAP_CONFORMANCE_MISSING`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_CONFORMANCE_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07CAP_CONFORMANCE_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_CONTRACT_INVALID`
+
+Summary: Core lint/schema diagnostic `X07CAP_CONTRACT_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_EFFECT_LOG_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07CAP_EFFECT_LOG_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_INDEX_INVALID`
+
+Summary: Core lint/schema diagnostic `X07CAP_INDEX_INVALID`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_PEER_POLICY_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07CAP_PEER_POLICY_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07CAP_TLS_POLICY_INCOMPLETE`
+
+Summary: Core lint/schema diagnostic `X07CAP_TLS_POLICY_INCOMPLETE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
 ## `X07C_WASM_BACKEND_FEATURE_REQUIRED`
 
 Summary: Core lint/schema diagnostic `X07C_WASM_BACKEND_FEATURE_REQUIRED`.
@@ -5848,6 +6113,231 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07RD_ADVISORY_ALLOWANCE_ENABLED`
+
+Summary: Core lint/schema diagnostic `X07RD_ADVISORY_ALLOWANCE_ENABLED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_ASYNC_PROOF_COVERAGE_DECREASE`
+
+Summary: Review diff gate rejected an async proof coverage regression.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a review decision or proof-surface repair.
+
+Details:
+
+The candidate change reduced proven async coverage or introduced newly uncovered/unsupported async proof surface relative to the baseline.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `async_proof_changes` highlight set.
+- Restore the lost async proof coverage or intentionally reset the baseline after review.
+- Re-run `x07 review diff --fail-on async-proof-coverage-decrease`.
+
+
+## `X07RD_CAPSULE_CONTRACT_RELAXATION`
+
+Summary: Review diff gate rejected a capsule contract relaxation.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or a semantic capsule-contract change.
+
+Details:
+
+The candidate weakened a certified capsule contract relative to the reviewed baseline.
+
+Agent strategy:
+
+- Inspect the `capsule_changes` highlights in the review report.
+- Restore the stricter capsule contract or intentionally update the review baseline.
+- Re-run `x07 review diff --fail-on capsule-contract-relaxation`.
+
+
+## `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN`
+
+Summary: Core lint/schema diagnostic `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_CAPSULE_SET_CHANGE`
+
+Summary: Review diff gate rejected a capsule inventory change.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or capsule inventory change.
+
+Details:
+
+The candidate added, removed, or reordered certified capsule membership relative to the baseline review set.
+
+Agent strategy:
+
+- Inspect the capsule index diff and confirm whether the inventory change is intentional.
+- Restore the baseline capsule set or intentionally update the review baseline.
+- Re-run `x07 review diff --fail-on capsule-set-change`.
+
+
+## `X07RD_LOCKFILE_HASH_CHANGE`
+
+Summary: Core lint/schema diagnostic `X07RD_LOCKFILE_HASH_CHANGE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_NETWORK_ALLOWLIST_WIDEN`
+
+Summary: Core lint/schema diagnostic `X07RD_NETWORK_ALLOWLIST_WIDEN`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_PACKAGE_SET_CHANGE`
+
+Summary: Core lint/schema diagnostic `X07RD_PACKAGE_SET_CHANGE`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_PEER_POLICY_RELAXATION`
+
+Summary: Core lint/schema diagnostic `X07RD_PEER_POLICY_RELAXATION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07RD_RUNTIME_ATTEST_REGRESSION`
+
+Summary: Review diff gate rejected a runtime attestation regression.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or runtime-evidence repair.
+
+Details:
+
+The candidate changed runtime attestation posture relative to the baseline in a way the requested review gate forbids.
+
+Agent strategy:
+
+- Inspect the `runtime_attestation_changes` highlights in the review report.
+- Restore the baseline attestation posture or intentionally update the review baseline.
+- Re-run `x07 review diff --fail-on runtime-attestation-regression`.
+
+
+## `X07RD_SANDBOX_POLICY_WIDEN`
+
+Summary: Review diff gate rejected a sandbox policy widening.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a baseline review decision or runtime-policy tightening.
+
+Details:
+
+The candidate widened the sandbox runtime posture, including enabling weaker isolation or otherwise relaxing the reviewed sandbox policy.
+
+Agent strategy:
+
+- Inspect the `sandbox_policy_changes` highlights in the review report.
+- Restore the stricter sandbox policy or intentionally update the review baseline.
+- Re-run the requested `x07 review diff --fail-on ...` gate.
+
+
 ## `X07RR_ENTRY_EXISTS`
 
 Summary: Record/replay fixture diagnostic `X07RR_ENTRY_EXISTS`.
@@ -6010,6 +6500,27 @@ Agent strategy:
 - Re-run `x07 trust certify`.
 
 
+## `X07TC_EASYNC_PROOF`
+
+Summary: Async proof coverage or async proof obligations failed certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-focused contract work or semantic refactoring rather than a deterministic quickfix.
+
+Details:
+
+At least one reachable `defasync` symbol is uncovered, hit an async counterexample, failed a protocol clause, or could not be proven with the trusted scheduler model.
+
+Agent strategy:
+
+- Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect the async summary.
+- Re-run `x07 verify --prove --entry <defasync>` for the failing symbol and fix `await_invariant`, `scope_invariant`, or `cancellation_ensures` as needed.
+- Re-run `x07 trust certify`.
+
+
 ## `X07TC_EBOUNDARY_MISSING`
 
 Summary: Boundary declarations are missing or incomplete for certification.
@@ -6052,6 +6563,46 @@ Agent strategy:
 - Re-run `x07 trust certify` with the corrected baseline.
 
 
+## `X07TC_ECAPSULE_ATTEST`
+
+Summary: Core lint/schema diagnostic `X07TC_ECAPSULE_ATTEST`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_ECAPSULE_NETWORK_ATTEST`
+
+Summary: Core lint/schema diagnostic `X07TC_ECAPSULE_NETWORK_ATTEST`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
 ## `X07TC_ECOMPILE_ATTEST`
 
 Summary: Compile attestation failed or could not bind the emitted binary.
@@ -6073,6 +6624,26 @@ Agent strategy:
 - Fix reproducibility or toolchain drift before certifying again.
 
 
+## `X07TC_EDEP_CLOSURE`
+
+Summary: Core lint/schema diagnostic `X07TC_EDEP_CLOSURE`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
 ## `X07TC_EDIFF_POSTURE`
 
 Summary: Baseline review or trust-posture diff gate failed certification.
@@ -6092,6 +6663,26 @@ Agent strategy:
 - Run `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion`.
 - Tighten the candidate change or intentionally update the baseline.
 - Re-run `x07 trust certify` with the corrected baseline.
+
+
+## `X07TC_EEFFECT_LOG`
+
+Summary: Core lint/schema diagnostic `X07TC_EEFFECT_LOG`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07TC_ENONDET`
@@ -6134,6 +6725,26 @@ Agent strategy:
 - Add the missing test id under `tests/tests.json` with the required `pbt` stanza using the deterministic JSON Patch scaffolding.
 - Keep the test world inside the profile/boundary allowlist.
 - Re-run `x07 test --all` and then `x07 trust certify`.
+
+
+## `X07TC_EPEER_POLICY`
+
+Summary: Core lint/schema diagnostic `X07TC_EPEER_POLICY`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
 
 
 ## `X07TC_EPROFILE`
@@ -6195,6 +6806,67 @@ Agent strategy:
 - Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect `target/cert/verify.coverage.json`.
 - Move unsupported logic behind certified boundaries or refactor it into the certifiable subset.
 - Re-run `x07 verify --prove` for uncovered symbols before certifying again.
+
+
+## `X07TC_ERUNTIME_ATTEST`
+
+Summary: Core lint/schema diagnostic `X07TC_ERUNTIME_ATTEST`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_ERUNTIME_NETWORK_EVIDENCE`
+
+Summary: Core lint/schema diagnostic `X07TC_ERUNTIME_NETWORK_EVIDENCE`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TC_ESANDBOX_PROFILE`
+
+Summary: Sandbox runtime evidence violates the certification profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires changing runtime policy or execution posture, not a deterministic AST patch.
+
+Details:
+
+The runtime evidence used for certification reports a sandbox backend, weaker-isolation posture, or network posture that is weaker than the selected trusted-program profile allows.
+
+Agent strategy:
+
+- Keep the project on `run-os-sandboxed` with `sandbox_backend=vm`.
+- Disable weaker-isolation opt-ins and keep `policy.net.enabled=false` for the local sandboxed trust profile.
+- Re-run the sandbox smoke tests and `x07 trust certify`.
 
 
 ## `X07TC_ESCHEMA_DRIFT`
@@ -6260,6 +6932,68 @@ Agent strategy:
 - Re-run `x07 trust certify`.
 
 
+## `X07TEST_ASYNC_ENTRY_UNSUPPORTED`
+
+Summary: x07 test could not build or run the selected async entrypoint.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires fixing the selected entrypoint or its supported test return shape.
+
+Details:
+
+The manifest selected an async entry, but the test harness could not lower it into a supported async driver or return-shape combination.
+
+Agent strategy:
+
+- Keep async test entries on the supported `bytes_status_v1` or `result_i32` driver forms.
+- Re-run `x07 test --manifest tests/tests.json` after fixing the entry declaration.
+- If the entry is not meant to be async, point the manifest at a `defn` wrapper.
+
+
+## `X07TEST_CAPSULE_EVIDENCE_MISSING`
+
+Summary: A test that requires capsule evidence did not provide it.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires fixing emitted sandbox evidence or the declared capsule inventory.
+
+Details:
+
+The manifest declared required capsules, but the emitted test evidence did not include matching capsule ids or effect-log digests.
+
+Agent strategy:
+
+- Keep the test manifest `required_capsules[]` aligned with the sandboxed boundary surface.
+- Ensure the sandbox execution emits capsule/effect-log evidence into the test report.
+- Re-run `x07 test`.
+
+
+## `X07TEST_RUNTIME_ATTEST_REQUIRED`
+
+Summary: A test that requires runtime attestation did not produce it.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The manifest marked the test as requiring runtime attestation, but the run report did not include a runtime attestation reference or the referenced file was missing.
+
+Agent strategy:
+
+- Keep the test on `run-os-sandboxed`.
+- Ensure the harness passes `--attest-runtime` through to `x07-os-runner`.
+- Re-run `x07 test` and inspect the emitted runtime-attest artifact path.
+
+
 ## `X07TP_ARCH`
 
 Summary: Project architecture posture is weaker than the trust profile requires.
@@ -6278,6 +7012,27 @@ Agent strategy:
 
 - Start from the `verified_core_pure_v1` manifest posture.
 - Apply the deterministic manifest JSON Patch scaffolding to enable allowlist mode, cycle/orphan/visibility/world-cap checks, and trust-zone boundary contracts.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_ASYNC_PROOF_REQUIRED`
+
+Summary: Sandboxed trusted-program profile is missing async proof coverage.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires editing the published certification contract.
+
+Details:
+
+The sandboxed local trusted-program contract requires async proof coverage for the reviewed closure.
+
+Agent strategy:
+
+- Set `evidence_requirements.require_async_proof_coverage=true`.
+- Keep the sandboxed profile aligned with `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`.
 - Re-run `x07 trust profile check`.
 
 
@@ -6300,6 +7055,88 @@ Agent strategy:
 - Add `contracts_v1.boundaries.index_path` to `arch/manifest.x07arch.json` with the deterministic manifest JSON Patch.
 - Create `arch/boundaries/index.x07boundary.json` and keep public boundaries there.
 - Use `x07 schema derive --emit-boundary-stub` when you need deterministic boundary scaffolding.
+
+
+## `X07TP_CAPSULES`
+
+Summary: Core lint/schema diagnostic `X07TP_CAPSULES`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TP_CAPSULE_ATTEST_REQUIRED`
+
+Summary: Sandboxed trusted-program profile is missing capsule attestation requirements.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires editing the published certification contract.
+
+Details:
+
+The sandboxed local trusted-program contract must require capsule attestations for effect boundaries.
+
+Agent strategy:
+
+- Set `evidence_requirements.require_capsule_attestations=true`.
+- Keep the sandboxed profile aligned with `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_DEP_CLOSURE_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07TP_DEP_CLOSURE_REQUIRED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07TP_EFFECT_LOG_REQUIRED`
+
+Summary: Trust profile is missing required effect-log evidence semantics.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires editing the published certification contract.
+
+Details:
+
+The selected trust profile must require effect-log digests for certified capsule or sandboxed trusted-program evidence, but the profile leaves that requirement disabled.
+
+Agent strategy:
+
+- Set `evidence_requirements.require_effect_log_digests=true`.
+- Keep the published trust profile aligned with the certified capsule or sandboxed trusted-program contract.
+- Re-run `x07 trust profile check`.
 
 
 ## `X07TP_ENTRY_FORBIDDEN`
@@ -6364,6 +7201,27 @@ Agent strategy:
 - Re-run `x07 trust profile check`.
 
 
+## `X07TP_NETWORK_MODE_FORBIDDEN`
+
+Summary: Sandboxed local trusted-program profile allows networking where it should not.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires editing the published certification contract or sandbox policy.
+
+Details:
+
+The Milestone B local sandbox profile keeps networking disabled until VM-boundary allowlist enforcement is fully supported across backends.
+
+Agent strategy:
+
+- Keep `sandbox_requirements.network_mode="none"`.
+- Ensure the selected sandbox policy sets `net.enabled=false`.
+- Re-run `x07 trust profile check`.
+
+
 ## `X07TP_NOT_CERTIFIABLE`
 
 Summary: Trust profile is weaker than the Milestone A certification floor.
@@ -6385,6 +7243,26 @@ Agent strategy:
 - Re-run `x07 trust profile check`.
 
 
+## `X07TP_PEER_POLICY_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07TP_PEER_POLICY_REQUIRED`.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
 ## `X07TP_PROJECT_MISMATCH`
 
 Summary: Project manifest could not be resolved for trust profile validation.
@@ -6402,6 +7280,48 @@ Agent strategy:
 
 - Pass `--project x07.json` (or a directory containing it).
 - Ensure `x07.json` exists and resolves cleanly.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_RUNTIME_ATTEST_REQUIRED`
+
+Summary: Sandboxed trusted-program profile is missing runtime attestation requirements.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires editing the published certification contract.
+
+Details:
+
+The sandboxed local trusted-program contract must require runtime attestation for certified executions.
+
+Agent strategy:
+
+- Set `evidence_requirements.require_runtime_attestation=true`.
+- Keep the sandboxed profile aligned with `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`.
+- Re-run `x07 trust profile check`.
+
+
+## `X07TP_SANDBOX_BACKEND_REQUIRED`
+
+Summary: Sandboxed trusted-program profile is missing the VM-only isolation requirement.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires editing the published certification contract.
+
+Details:
+
+The sandboxed local trusted-program contract must require `run-os-sandboxed` with `sandbox_backend=vm` and must forbid weaker isolation.
+
+Agent strategy:
+
+- Keep `worlds_allowed` free of `run-os`.
+- Set `sandbox_requirements.sandbox_backend="vm"` and `sandbox_requirements.forbid_weaker_isolation=true`.
 - Re-run `x07 trust profile check`.
 
 
@@ -6504,6 +7424,48 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07V_ASYNC_COUNTEREXAMPLE`
+
+Summary: The async proof found a counterexample.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires understanding and fixing the async proof failure, not applying a deterministic quickfix.
+
+Details:
+
+CBMC produced a concrete async execution trace that violates one of the stated async proof obligations.
+
+Agent strategy:
+
+- Inspect the emitted counterexample JSON and trace.
+- Tighten the async protocol clauses or repair the state machine logic.
+- Re-run `x07 verify --prove`.
+
+
+## `X07V_CANCELLATION_ENSURE_FAILED`
+
+Summary: The async cancellation postcondition failed under proof.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires cancellation-path proof work rather than a deterministic quickfix.
+
+Details:
+
+The `cancellation_ensures` clause does not hold on the cancellation path of the proved async function.
+
+Agent strategy:
+
+- Model the cancellation result and cleanup effects explicitly in `cancellation_ensures`.
+- Repair any cancellation-path state updates or resource cleanup.
+- Re-run `x07 verify --prove`.
 
 
 ## `X07V_EARGS`
@@ -6766,6 +7728,27 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07V_SCOPE_INVARIANT_FAILED`
+
+Summary: An async scope invariant failed under proof.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires contract correction or state-machine changes.
+
+Details:
+
+The `scope_invariant` clause does not hold across the proved async execution.
+
+Agent strategy:
+
+- Re-check the scope state carried across awaits and cancellation.
+- Strengthen or correct `scope_invariant` so it matches the actual state machine.
+- Re-run `x07 verify --prove`.
+
+
 ## `X07V_SMT_SAT`
 
 Summary: Core lint/schema diagnostic `X07V_SMT_SAT`.
@@ -6789,26 +7772,6 @@ Agent strategy:
 ## `X07V_SMT_UNKNOWN`
 
 Summary: Core lint/schema diagnostic `X07V_SMT_UNKNOWN`.
-
-Origins:
-- x07 (stage: lint, severity: error)
-
-Quickfix support: `sometimes`
-
-Details:
-
-The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
-
-Agent strategy:
-
-- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
-- Apply deterministic AST/config edits.
-- Re-run compile/test.
-
-
-## `X07V_UNSUPPORTED_ASYNC`
-
-Summary: Core lint/schema diagnostic `X07V_UNSUPPORTED_ASYNC`.
 
 Origins:
 - x07 (stage: lint, severity: error)

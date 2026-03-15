@@ -79,12 +79,12 @@
       "type": "object",
       "additionalProperties": false,
       "default": {
-        "stdout_schema_version": "x07-os-runner.report@0.4.0",
+        "stdout_schema_version": "x07-os-runner.report@0.5.0",
         "stdout_is_single_json_object": true
       },
       "properties": {
         "stdout_schema_version": {
-          "const": "x07-os-runner.report@0.4.0"
+          "const": "x07-os-runner.report@0.5.0"
         },
         "stdout_is_single_json_object": {
           "const": true

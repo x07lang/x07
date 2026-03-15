@@ -1,5 +1,5 @@
 {
-  "schema_version": "x07.capsule.contract@0.1.0",
+  "schema_version": "x07.capsule.contract@0.2.0",
   "id": "capsule.main_v1",
   "worlds_allowed": ["run-os-sandboxed"],
   "capabilities": [],
@@ -29,5 +29,6 @@
   "conformance": {
     "tests": ["smoke/capsule_echo"],
     "report_path": "capsule.main.conformance.json"
-  }
+  },
+  "network": null
 }

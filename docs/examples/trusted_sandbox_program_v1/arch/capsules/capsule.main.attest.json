@@ -9,5 +9,8 @@
       "path": "/Users/webik/projects/x07lang/x07/docs/examples/trusted_sandbox_program_v1/src/capsule.x07.json"
     }
   ],
-  "schema_version": "x07.capsule.attest@0.1.0"
+  "peer_policy_digests": [],
+  "request_contract_digest": null,
+  "response_contract_digest": null,
+  "schema_version": "x07.capsule.attest@0.2.0"
 }

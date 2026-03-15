@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-capsule.contract.schema.json",
-  "title": "x07.capsule.contract@0.1.0",
+  "title": "x07.capsule.contract@0.2.0",
   "description": "Pinned contract for a certified capsule that mediates effectful boundaries.",
   "type": "object",
   "additionalProperties": false,
@@ -19,7 +19,7 @@
     "conformance"
   ],
   "properties": {
-    "schema_version": { "const": "x07.capsule.contract@0.1.0" },
+    "schema_version": { "const": "x07.capsule.contract@0.2.0" },
     "id": {
       "type": "string",
       "minLength": 1,
@@ -87,6 +87,46 @@
           ]
         }
       }
+    },
+    "network": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "peer_policy_paths",
+            "request_contract_path",
+            "response_contract_path",
+            "conformance_tests"
+          ],
+          "properties": {
+            "peer_policy_paths": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/rel_path" },
+              "uniqueItems": true
+            },
+            "request_contract_path": {
+              "anyOf": [
+                { "$ref": "#/$defs/rel_path" },
+                { "type": "null" }
+              ]
+            },
+            "response_contract_path": {
+              "anyOf": [
+                { "$ref": "#/$defs/rel_path" },
+                { "type": "null" }
+              ]
+            },
+            "conformance_tests": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+              "default": []
+            }
+          }
+        }
+      ]
     }
   },
   "$defs": {
