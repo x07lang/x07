@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-arch.manifest.schema.json",
-  "title": "x07.arch.manifest@0.2.0",
+  "title": "x07.arch.manifest@0.3.0",
   "description": "Pinned architecture manifest consumed by `x07 arch check`.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "repo", "externals", "nodes", "rules", "checks", "tool_budgets"],
   "properties": {
-    "schema_version": { "const": "x07.arch.manifest@0.2.0" },
+    "schema_version": { "const": "x07.arch.manifest@0.3.0" },
     "repo": {
       "type": "object",
       "additionalProperties": false,
@@ -81,7 +81,7 @@
     },
     "trust_zone": {
       "type": "string",
-      "enum": ["verified_core", "test_only", "untrusted"]
+      "enum": ["verified_core", "certified_capsule", "test_only", "untrusted"]
     },
     "node_match": {
       "type": "object",

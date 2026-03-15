@@ -8,30 +8,32 @@ pub const X07AST_SCHEMA_VERSION_V0_3_0: &str = "x07.x07ast@0.3.0";
 pub const X07AST_SCHEMA_VERSION_V0_4_0: &str = "x07.x07ast@0.4.0";
 pub const X07AST_SCHEMA_VERSION_V0_5_0: &str = "x07.x07ast@0.5.0";
 pub const X07AST_SCHEMA_VERSION_V0_6_0: &str = "x07.x07ast@0.6.0";
+pub const X07AST_SCHEMA_VERSION_V0_7_0: &str = "x07.x07ast@0.7.0";
 
 /// The default x07AST schema version emitted by current tooling.
-pub const X07AST_SCHEMA_VERSION: &str = X07AST_SCHEMA_VERSION_V0_6_0;
+pub const X07AST_SCHEMA_VERSION: &str = X07AST_SCHEMA_VERSION_V0_7_0;
 
 pub const X07AST_SCHEMA_VERSIONS_SUPPORTED: &[&str] = &[
     X07AST_SCHEMA_VERSION_V0_3_0,
     X07AST_SCHEMA_VERSION_V0_4_0,
     X07AST_SCHEMA_VERSION_V0_5_0,
     X07AST_SCHEMA_VERSION_V0_6_0,
+    X07AST_SCHEMA_VERSION_V0_7_0,
 ];
 pub const X07_MONO_MAP_SCHEMA_VERSION: &str = "x07.mono.map@0.1.0";
 pub const X07_PBT_REPRO_SCHEMA_VERSION: &str = "x07.pbt.repro@0.1.0";
 pub const X07_CONTRACT_REPRO_SCHEMA_VERSION: &str = "x07.contract.repro@0.1.0";
 pub const X07DIAG_SCHEMA_VERSION: &str = "x07.x07diag@0.1.0";
 pub const X07_AGENT_CONTEXT_SCHEMA_VERSION: &str = "x07.agent.context@0.1.0";
-pub const X07TEST_SCHEMA_VERSION: &str = "x07.x07test@0.3.0";
+pub const X07TEST_SCHEMA_VERSION: &str = "x07.x07test@0.4.0";
 pub const X07_DIAG_CATALOG_SCHEMA_VERSION: &str = "x07.diag.catalog@0.1.0";
 pub const X07_DIAG_COVERAGE_SCHEMA_VERSION: &str = "x07.diag.coverage@0.1.0";
 
 pub const X07C_REPORT_SCHEMA_VERSION: &str = "x07c.report@0.1.0";
 pub const X07_HOST_RUNNER_REPORT_SCHEMA_VERSION: &str = "x07-host-runner.report@0.3.0";
-pub const X07_OS_RUNNER_REPORT_SCHEMA_VERSION: &str = "x07-os-runner.report@0.3.0";
-pub const X07_RUN_REPORT_SCHEMA_VERSION: &str = "x07.run.report@0.1.0";
-pub const X07_BUNDLE_REPORT_SCHEMA_VERSION: &str = "x07.bundle.report@0.2.0";
+pub const X07_OS_RUNNER_REPORT_SCHEMA_VERSION: &str = "x07-os-runner.report@0.4.0";
+pub const X07_RUN_REPORT_SCHEMA_VERSION: &str = "x07.run.report@0.2.0";
+pub const X07_BUNDLE_REPORT_SCHEMA_VERSION: &str = "x07.bundle.report@0.3.0";
 pub const X07_DOC_REPORT_SCHEMA_VERSION: &str = "x07.doc.report@0.1.0";
 pub const X07_VERIFY_REPORT_SCHEMA_VERSION: &str = "x07.verify.report@0.2.0";
 pub const X07_VERIFY_COVERAGE_SCHEMA_VERSION: &str = "x07.verify.coverage@0.1.0";
@@ -40,11 +42,12 @@ pub const X07_VERIFY_CEX_SCHEMA_VERSION: &str = "x07.verify.cex@0.1.0";
 pub const X07_BENCH_SUITE_SCHEMA_VERSION: &str = "x07.bench.suite@0.1.0";
 pub const X07_BENCH_INSTANCE_SCHEMA_VERSION: &str = "x07.bench.instance@0.1.0";
 pub const X07_BENCH_REPORT_SCHEMA_VERSION: &str = "x07.bench.report@0.1.0";
-pub const X07_REVIEW_DIFF_SCHEMA_VERSION: &str = "x07.review.diff@0.2.0";
+pub const X07_REVIEW_DIFF_SCHEMA_VERSION: &str = "x07.review.diff@0.3.0";
 pub const X07_TRUST_REPORT_SCHEMA_VERSION: &str = "x07.trust.report@0.1.0";
-pub const X07_TRUST_PROFILE_SCHEMA_VERSION: &str = "x07.trust.profile@0.1.0";
-pub const X07_TRUST_CERTIFICATE_SCHEMA_VERSION: &str = "x07.trust.certificate@0.1.0";
+pub const X07_TRUST_PROFILE_SCHEMA_VERSION: &str = "x07.trust.profile@0.2.0";
+pub const X07_TRUST_CERTIFICATE_SCHEMA_VERSION: &str = "x07.trust.certificate@0.2.0";
 pub const X07_COMPILE_ATTEST_SCHEMA_VERSION: &str = "x07.compile.attest@0.1.0";
+pub const X07_RUNTIME_ATTEST_SCHEMA_VERSION: &str = "x07.runtime.attest@0.1.0";
 pub const X07_DEPS_CAPABILITY_POLICY_SCHEMA_VERSION: &str = "x07.deps.capability_policy@0.1.0";
 pub const X07_TOOL_REPORT_SCHEMA_VERSION: &str = "x07.tool.report@0.1.0";
 
@@ -56,10 +59,12 @@ pub const NATIVE_REQUIRES_SCHEMA_VERSION: &str = "x07.native-requires@0.1.0";
 
 pub const X07_ARCH_MANIFEST_SCHEMA_VERSION_V0_1_0: &str = "x07.arch.manifest@0.1.0";
 pub const X07_ARCH_MANIFEST_SCHEMA_VERSION_V0_2_0: &str = "x07.arch.manifest@0.2.0";
-pub const X07_ARCH_MANIFEST_SCHEMA_VERSION: &str = X07_ARCH_MANIFEST_SCHEMA_VERSION_V0_2_0;
+pub const X07_ARCH_MANIFEST_SCHEMA_VERSION_V0_3_0: &str = "x07.arch.manifest@0.3.0";
+pub const X07_ARCH_MANIFEST_SCHEMA_VERSION: &str = X07_ARCH_MANIFEST_SCHEMA_VERSION_V0_3_0;
 pub const X07_ARCH_MANIFEST_SCHEMA_VERSIONS_SUPPORTED: &[&str] = &[
     X07_ARCH_MANIFEST_SCHEMA_VERSION_V0_1_0,
     X07_ARCH_MANIFEST_SCHEMA_VERSION_V0_2_0,
+    X07_ARCH_MANIFEST_SCHEMA_VERSION_V0_3_0,
 ];
 pub const X07_ARCH_MANIFEST_LOCK_SCHEMA_VERSION: &str = "x07.arch.manifest.lock@0.1.0";
 pub const X07_ARCH_REPORT_SCHEMA_VERSION: &str = "x07.arch.report@0.1.0";

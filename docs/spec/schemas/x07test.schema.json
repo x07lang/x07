@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07test.schema.json",
-  "title": "X07 x07Test v0.3.0",
+  "title": "X07 x07Test v0.4.0",
   "description": "Deterministic test report format for the built-in X07 test harness (manifest-driven; stable ordering; JSON-first).",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "tool", "invocation", "summary", "tests"],
   "properties": {
-    "schema_version": { "const": "x07.x07test@0.3.0" },
+    "schema_version": { "const": "x07.x07test@0.4.0" },
     "tool": { "$ref": "#/$defs/tool_info" },
     "invocation": { "$ref": "#/$defs/invocation" },
     "summary": { "$ref": "#/$defs/summary" },
@@ -78,6 +78,10 @@
         "run-os",
         "run-os-sandboxed"
       ]
+    },
+    "sandbox_backend": {
+      "type": "string",
+      "enum": ["os", "vm"]
     },
     "test_status": {
       "type": "string",
@@ -199,7 +203,19 @@
         "solve_output_b64": { "type": "string" },
         "stdout_b64": { "type": "string" },
         "stderr_b64": { "type": "string" },
-        "failure_code_u32": { "type": "integer", "minimum": 0 }
+        "failure_code_u32": { "type": "integer", "minimum": 0 },
+        "sandbox_backend": { "$ref": "#/$defs/sandbox_backend" },
+        "runtime_attestation": { "$ref": "#/$defs/runtime_attestation_ref" }
+      }
+    },
+    "runtime_attestation_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sandbox_backend", "weaker_isolation"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sandbox_backend": { "$ref": "#/$defs/sandbox_backend" },
+        "weaker_isolation": { "type": "boolean" }
       }
     },
     "test_case_result": {

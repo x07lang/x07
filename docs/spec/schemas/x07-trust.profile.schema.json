@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-trust.profile.schema.json",
-  "title": "x07.trust.profile@0.1.0",
+  "title": "x07.trust.profile@0.2.0",
   "description": "Certification profile consumed by `x07 trust profile check` and `x07 trust certify`.",
   "type": "object",
   "additionalProperties": false,
@@ -13,10 +13,11 @@
     "worlds_allowed",
     "language_subset",
     "arch_requirements",
-    "evidence_requirements"
+    "evidence_requirements",
+    "sandbox_requirements"
   ],
   "properties": {
-    "schema_version": { "const": "x07.trust.profile@0.1.0" },
+    "schema_version": { "const": "x07.trust.profile@0.2.0" },
     "id": {
       "type": "string",
       "minLength": 1,
@@ -92,7 +93,7 @@
       "properties": {
         "manifest_min_version": {
           "type": "string",
-          "enum": ["x07.arch.manifest@0.2.0"]
+          "enum": ["x07.arch.manifest@0.2.0", "x07.arch.manifest@0.3.0"]
         },
         "require_allowlist_mode": { "type": "boolean" },
         "require_deny_cycles": { "type": "boolean" },
@@ -113,6 +114,10 @@
         "require_pbt",
         "require_proof_mode",
         "require_proof_coverage",
+        "require_async_proof_coverage",
+        "require_capsule_attestations",
+        "require_runtime_attestation",
+        "require_effect_log_digests",
         "require_compile_attestation",
         "require_trust_report_clean",
         "require_sbom"
@@ -131,10 +136,39 @@
           "type": "string",
           "enum": ["all_reachable_defn", "all_reachable_user_defn"]
         },
+        "require_async_proof_coverage": { "type": "boolean" },
+        "require_capsule_attestations": { "type": "boolean" },
+        "require_runtime_attestation": { "type": "boolean" },
+        "require_effect_log_digests": { "type": "boolean" },
         "require_compile_attestation": { "type": "boolean" },
         "require_trust_report_clean": { "type": "boolean" },
         "require_sbom": { "type": "boolean" }
       }
+    },
+    "sandbox_requirements": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sandbox_backend",
+            "forbid_weaker_isolation",
+            "network_mode"
+          ],
+          "properties": {
+            "sandbox_backend": {
+              "type": "string",
+              "enum": ["any", "vm", "os", "none"]
+            },
+            "forbid_weaker_isolation": { "type": "boolean" },
+            "network_mode": {
+              "type": "string",
+              "enum": ["any", "none", "allowlist"]
+            }
+          }
+        }
+      ]
     }
   }
 }

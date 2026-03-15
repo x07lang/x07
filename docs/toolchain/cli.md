@@ -173,8 +173,8 @@ See: [Architecture check](arch-check.md).
 - `x07 review diff --from <path> --to <path> --html-out <path>`
 - `x07 review diff --from <path> --to <path> --html-out <path> --json-out <path>`
   - Produces an intent-level semantic diff for x07AST/project/arch/policy changes.
-  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion`.
-  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.2.0"`).
+  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|async-proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion|capsule-contract-relaxation|capsule-set-change|sandbox-policy-widen|runtime-attestation-regression|weaker-isolation-enabled`.
+  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.3.0"`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -190,8 +190,13 @@ See: [Review & trust artifacts](review-trust.md).
   - JSON schema: `spec/x07-trust.report.schema.json` (`schema_version: "x07.trust.report@0.1.0"`).
 - `x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry <sym>`
   - Validates a certification profile against the current project posture.
+  - Built-in profile line: `verified_core_pure_v1`, `trusted_program_sandboxed_local_v1`, and `certified_capsule_v1` (`x07.trust.profile@0.2.0`).
+- `x07 trust capsule check --index arch/capsules/index.x07capsule.json --project x07.json`
+  - Validates a capsule index plus referenced contracts/attestations.
+- `x07 trust capsule attest --contract <path> --module <path>... --lockfile x07.lock.json --conformance-report <path> --out <path>`
+  - Emits a deterministic `x07.capsule.attest@0.1.0` artifact for a certified capsule.
 - `x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry <sym> --out-dir target/cert`
-  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, trust report, tests report, and compile attestation evidence.
+  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, trust report, tests report, compile attestation evidence, and any observed capsule/runtime evidence references (`x07.trust.certificate@0.2.0`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -386,7 +391,7 @@ See: [Embedding in C](embedding-in-c.md).
   - Bundles a VM-backed sandbox bundle by default (requires a base policy via profile or `--policy`).
   - To emit a legacy policy-only bundle (weaker isolation), add: `--sandbox-backend os --i-accept-weaker-isolation`.
 
-Bundle report schema: `spec/x07-bundle.report.schema.json` (`schema_version: "x07.bundle.report@0.2.0"`).
+Bundle report schema: `spec/x07-bundle.report.schema.json` (`schema_version: "x07.bundle.report@0.3.0"`).
 
 ### Running programs (canonical)
 
@@ -401,6 +406,8 @@ Use `x07 run` as the canonical entry point for execution. Prefer intent-driven p
 - `x07 run --repair=off`
 - `x07 run --repair=memory`
 - `x07 run --repair=write` (default)
+
+For `run-os-sandboxed`, `x07 run --attest-runtime <path>` writes `x07.runtime.attest@0.1.0` and records the reference in the runner and wrapped reports.
 
 For the complete guide (targets, worlds, input, policies, reports), see [Running programs](running-programs.md).
 

@@ -134,6 +134,10 @@ pub struct RunArgs {
     #[arg(long)]
     pub i_accept_weaker_isolation: bool,
 
+    /// Write a runtime attestation artifact for run-os-sandboxed executions.
+    #[arg(long, value_name = "PATH")]
+    pub attest_runtime: Option<PathBuf>,
+
     /// Append network destinations to the sandbox policy allowlist (repeatable).
     #[arg(long, value_name = "HOST:PORT[,PORT...]")]
     pub allow_host: Vec<String>,
@@ -316,6 +320,9 @@ pub fn cmd_run(
         anyhow::bail!(
             "--sandbox-backend/--i-accept-weaker-isolation are only supported for OS worlds"
         );
+    }
+    if args.attest_runtime.is_some() && world != WorldId::RunOsSandboxed {
+        anyhow::bail!("--attest-runtime is only supported for --world run-os-sandboxed");
     }
 
     let cc_profile = resolve_cc_profile(&args, selected_profile.as_ref());
@@ -561,6 +568,10 @@ pub fn cmd_run(
             }
             if args.i_accept_weaker_isolation {
                 argv.push("--i-accept-weaker-isolation".to_string());
+            }
+            if let Some(path) = args.attest_runtime.as_ref() {
+                argv.push("--attest-runtime".to_string());
+                argv.push(path.display().to_string());
             }
 
             if resolve_auto_ffi(&args, selected_profile.as_ref()) {

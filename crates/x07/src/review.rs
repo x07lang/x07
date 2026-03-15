@@ -52,7 +52,13 @@ pub enum ReviewFailOn {
     AllowUnsafe,
     AllowFfi,
     ProofCoverageDecrease,
+    AsyncProofCoverageDecrease,
     BoundaryRelaxation,
+    CapsuleContractRelaxation,
+    CapsuleSetChange,
+    SandboxPolicyWiden,
+    RuntimeAttestationRegression,
+    WeakerIsolationEnabled,
     TrustedSubsetExpansion,
 }
 
@@ -154,6 +160,10 @@ struct Highlights {
     proof_changes: Vec<Value>,
     boundary_changes: Vec<Value>,
     subset_changes: Vec<Value>,
+    async_proof_changes: Vec<Value>,
+    capsule_changes: Vec<Value>,
+    runtime_attestation_changes: Vec<Value>,
+    sandbox_policy_changes: Vec<Value>,
 }
 
 impl Highlights {
@@ -166,6 +176,10 @@ impl Highlights {
             proof_changes: Vec::new(),
             boundary_changes: Vec::new(),
             subset_changes: Vec::new(),
+            async_proof_changes: Vec::new(),
+            capsule_changes: Vec::new(),
+            runtime_attestation_changes: Vec::new(),
+            sandbox_policy_changes: Vec::new(),
         }
     }
 }
@@ -450,13 +464,28 @@ fn cmd_review_diff(args: ReviewDiffArgs) -> Result<std::process::ExitCode> {
                     &mut ctx,
                     &mut report.highlights,
                 ),
-                "json" => push_simple_file_change(
-                    &mut file_diff,
-                    &mut ctx,
-                    "json_changed",
-                    "info",
-                    "JSON file changed",
-                ),
+                "json" => {
+                    if rel_str.contains("runtime-attest/")
+                        || rel_str.ends_with("runtime.attest.json")
+                    {
+                        diff_runtime_attestation(
+                            &rel_str,
+                            before_json.as_ref(),
+                            after_json.as_ref(),
+                            &mut file_diff,
+                            &mut ctx,
+                            &mut report.highlights,
+                        );
+                    } else {
+                        push_simple_file_change(
+                            &mut file_diff,
+                            &mut ctx,
+                            "json_changed",
+                            "info",
+                            "JSON file changed",
+                        );
+                    }
+                }
                 _ => push_simple_file_change(
                     &mut file_diff,
                     &mut ctx,
@@ -549,8 +578,52 @@ fn fail_on_triggered(report: &ReviewDiffReport, fail_on: &[ReviewFailOn]) -> boo
                     return true;
                 }
             }
+            ReviewFailOn::AsyncProofCoverageDecrease => {
+                if !report.highlights.async_proof_changes.is_empty() {
+                    return true;
+                }
+            }
             ReviewFailOn::BoundaryRelaxation => {
                 if !report.highlights.boundary_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::CapsuleContractRelaxation => {
+                if report.highlights.capsule_changes.iter().any(|change| {
+                    change.get("kind").and_then(Value::as_str) == Some("capsule_contract")
+                }) {
+                    return true;
+                }
+            }
+            ReviewFailOn::CapsuleSetChange => {
+                if report
+                    .highlights
+                    .capsule_changes
+                    .iter()
+                    .any(|change| change.get("kind").and_then(Value::as_str) == Some("capsule_set"))
+                {
+                    return true;
+                }
+            }
+            ReviewFailOn::SandboxPolicyWiden => {
+                if !report.highlights.sandbox_policy_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::RuntimeAttestationRegression => {
+                if !report.highlights.runtime_attestation_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::WeakerIsolationEnabled => {
+                if report
+                    .highlights
+                    .sandbox_policy_changes
+                    .iter()
+                    .any(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("weaker_isolation")
+                    })
+                {
                     return true;
                 }
             }
@@ -654,6 +727,9 @@ fn build_globsets(args: &ReviewDiffArgs) -> Result<(GlobSet, GlobSet)> {
             "x07.json",
             "**/*.x07project.json",
             "arch/**",
+            "runtime-attest/**",
+            "runtime.attest.json",
+            "**/runtime.attest.json",
             ".x07/policies/**",
             "**/*.policy.json",
         ],
@@ -1327,6 +1403,11 @@ fn diff_arch(
         return;
     }
 
+    if path.contains("/capsules/") || path.starts_with("arch/capsules/") {
+        diff_capsule(path, before, after, file_diff, ctx, highlights);
+        return;
+    }
+
     if path.contains("/trust/profiles/") || path.starts_with("arch/trust/profiles/") {
         diff_trust_profile(path, before, after, file_diff, ctx, highlights);
         return;
@@ -1388,11 +1469,26 @@ fn diff_arch(
             if b == a {
                 continue;
             }
-            if a.as_deref() == Some("verified_core") && b.as_deref() != Some("verified_core") {
+            if trust_zone_rank_str(a.as_deref()) > trust_zone_rank_str(b.as_deref()) {
                 ctx.push(
                     &mut highlights.subset_changes,
                     json!({
                         "kind": "trusted_subset",
+                        "severity": "high",
+                        "subject": format!("arch trust zone {}", node),
+                        "path": path,
+                        "before": b,
+                        "after": a,
+                    }),
+                );
+            }
+            if a.as_deref() == Some("certified_capsule")
+                || b.as_deref() == Some("certified_capsule")
+            {
+                ctx.push(
+                    &mut highlights.capsule_changes,
+                    json!({
+                        "kind": "capsule_set",
                         "severity": "high",
                         "subject": format!("arch trust zone {}", node),
                         "path": path,
@@ -1567,11 +1663,55 @@ fn diff_proof(
         );
     }
 
+    let before_async = proof_async_summary(before);
+    let after_async = proof_async_summary(after);
+    let async_regressed = after_async
+        .get("proven_async")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        < before_async
+            .get("proven_async")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+        || after_async
+            .get("runtime_only_async")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_async
+                .get("runtime_only_async")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+        || after_async
+            .get("uncovered_async")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > before_async
+                .get("uncovered_async")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+    if before_async != after_async && async_regressed {
+        ctx.push(
+            &mut highlights.async_proof_changes,
+            json!({
+                "kind": "async_proof",
+                "severity": "high",
+                "subject": "async proof coverage summary",
+                "path": path,
+                "before": before_async,
+                "after": after_async,
+            }),
+        );
+    }
+
     push_simple_file_change(
         file_diff,
         ctx,
         "proof_changed",
-        if decreased { "high" } else { "info" },
+        if decreased || async_regressed {
+            "high"
+        } else {
+            "info"
+        },
         "proof coverage changed",
     );
 }
@@ -1586,6 +1726,38 @@ fn proof_summary(v: Option<&Value>) -> Value {
         "proven_defn": summary.get("proven_defn").cloned().unwrap_or(Value::from(0)),
         "uncovered_defn": summary.get("uncovered_defn").cloned().unwrap_or(Value::from(0)),
         "unsupported_defn": summary.get("unsupported_defn").cloned().unwrap_or(Value::from(0)),
+    })
+}
+
+fn proof_async_summary(v: Option<&Value>) -> Value {
+    let mut reachable_async = 0u64;
+    let mut proven_async = 0u64;
+    let mut runtime_only_async = 0u64;
+    let mut uncovered_async = 0u64;
+
+    if let Some(functions) = v
+        .and_then(|doc| doc.get("functions"))
+        .and_then(Value::as_array)
+    {
+        for function in functions {
+            if function.get("kind").and_then(Value::as_str) != Some("defasync") {
+                continue;
+            }
+            reachable_async += 1;
+            match function.get("status").and_then(Value::as_str).unwrap_or("") {
+                "proven" | "proven_async" => proven_async += 1,
+                "runtime_only" => runtime_only_async += 1,
+                "uncovered" => uncovered_async += 1,
+                _ => {}
+            }
+        }
+    }
+
+    json!({
+        "reachable_async": reachable_async,
+        "proven_async": proven_async,
+        "runtime_only_async": runtime_only_async,
+        "uncovered_async": uncovered_async,
     })
 }
 
@@ -1634,6 +1806,102 @@ fn diff_boundary_index(
             "high"
         },
         "boundary catalog changed",
+    );
+}
+
+fn diff_capsule(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+
+    let kind = if path.ends_with("index.x07capsule.json") {
+        "capsule_set"
+    } else {
+        "capsule_contract"
+    };
+    let title = if kind == "capsule_set" {
+        "capsule index changed"
+    } else {
+        "capsule contract changed"
+    };
+    let change = json!({
+        "kind": kind,
+        "severity": "high",
+        "subject": path,
+        "path": path,
+        "before": before.cloned().unwrap_or(Value::Null),
+        "after": after.cloned().unwrap_or(Value::Null),
+    });
+    ctx.push(&mut highlights.capsule_changes, change);
+    push_simple_file_change(file_diff, ctx, "capsule_changed", "high", title);
+}
+
+fn diff_runtime_attestation(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+
+    let after_backend = after.and_then(|doc| doc.get("sandbox_backend")).cloned();
+    let before_weaker = before
+        .and_then(|doc| doc.get("weaker_isolation"))
+        .cloned()
+        .unwrap_or(Value::Bool(false));
+    let after_weaker = after
+        .and_then(|doc| doc.get("weaker_isolation"))
+        .cloned()
+        .unwrap_or(Value::Bool(false));
+    let severity = if before_weaker != after_weaker
+        || after_backend != Some(Value::String("vm".to_string()))
+    {
+        "high"
+    } else {
+        "warn"
+    };
+
+    ctx.push(
+        &mut highlights.runtime_attestation_changes,
+        json!({
+            "kind": "runtime_attestation",
+            "severity": severity,
+            "subject": path,
+            "path": path,
+            "before": before.cloned().unwrap_or(Value::Null),
+            "after": after.cloned().unwrap_or(Value::Null),
+        }),
+    );
+    if before_weaker != after_weaker && after_weaker == Value::Bool(true) {
+        ctx.push(
+            &mut highlights.sandbox_policy_changes,
+            json!({
+                "kind": "weaker_isolation",
+                "severity": "high",
+                "subject": path,
+                "path": path,
+                "before": before_weaker,
+                "after": after_weaker,
+            }),
+        );
+    }
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "runtime_attestation_changed",
+        severity,
+        "runtime attestation changed",
     );
 }
 
@@ -1809,6 +2077,22 @@ fn trust_profile_subset(v: Option<&Value>) -> Value {
             .and_then(|doc| doc.get("require_proof_coverage"))
             .cloned()
             .unwrap_or(Value::Null),
+        "require_async_proof_coverage": evidence
+            .and_then(|doc| doc.get("require_async_proof_coverage"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_capsule_attestations": evidence
+            .and_then(|doc| doc.get("require_capsule_attestations"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_runtime_attestation": evidence
+            .and_then(|doc| doc.get("require_runtime_attestation"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_effect_log_digests": evidence
+            .and_then(|doc| doc.get("require_effect_log_digests"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
         "require_proof_mode": evidence
             .and_then(|doc| doc.get("require_proof_mode"))
             .cloned()
@@ -1845,6 +2129,21 @@ fn trust_profile_subset(v: Option<&Value>) -> Value {
             .and_then(|doc| doc.get("require_sbom"))
             .cloned()
             .unwrap_or(Value::Bool(false)),
+        "sandbox_backend": v
+            .and_then(|doc| doc.get("sandbox_requirements"))
+            .and_then(|doc| doc.get("sandbox_backend"))
+            .cloned()
+            .unwrap_or(Value::Null),
+        "forbid_weaker_isolation": v
+            .and_then(|doc| doc.get("sandbox_requirements"))
+            .and_then(|doc| doc.get("forbid_weaker_isolation"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "network_mode": v
+            .and_then(|doc| doc.get("sandbox_requirements"))
+            .and_then(|doc| doc.get("network_mode"))
+            .cloned()
+            .unwrap_or(Value::Null),
         "require_allowlist_mode": arch
             .and_then(|doc| doc.get("require_allowlist_mode"))
             .cloned()
@@ -1882,6 +2181,10 @@ fn trust_subset_expanded(before: &Value, after: &Value) -> bool {
         "require_visibility",
         "require_world_caps",
         "require_brand_boundaries",
+        "require_async_proof_coverage",
+        "require_capsule_attestations",
+        "require_runtime_attestation",
+        "require_effect_log_digests",
         "require_compile_attestation",
         "require_boundary_index",
         "require_schema_derive_check",
@@ -1896,6 +2199,28 @@ fn trust_subset_expanded(before: &Value, after: &Value) -> bool {
         {
             return true;
         }
+    }
+
+    if before.get("sandbox_backend") == Some(&Value::String("vm".to_string()))
+        && after.get("sandbox_backend") != Some(&Value::String("vm".to_string()))
+    {
+        return true;
+    }
+    if before
+        .get("forbid_weaker_isolation")
+        .and_then(Value::as_bool)
+        == Some(true)
+        && after
+            .get("forbid_weaker_isolation")
+            .and_then(Value::as_bool)
+            == Some(false)
+    {
+        return true;
+    }
+    if before.get("network_mode") == Some(&Value::String("none".to_string()))
+        && after.get("network_mode") != Some(&Value::String("none".to_string()))
+    {
+        return true;
     }
 
     if pbt_requirement_rank(after.get("require_pbt"))
@@ -1974,7 +2299,17 @@ fn verify_mode_rank(v: Option<&Value>) -> u8 {
 
 fn trust_zone_rank(v: Option<&Value>) -> u8 {
     match v.and_then(Value::as_str).unwrap_or("untrusted") {
-        "verified_core" => 2,
+        "verified_core" => 3,
+        "certified_capsule" => 2,
+        "test_only" => 1,
+        _ => 0,
+    }
+}
+
+fn trust_zone_rank_str(v: Option<&str>) -> u8 {
+    match v.unwrap_or("untrusted") {
+        "verified_core" => 3,
+        "certified_capsule" => 2,
         "test_only" => 1,
         _ => 0,
     }
@@ -2312,6 +2647,19 @@ fn compare_policy_allowlist(
     sinks
         .ctx
         .push(&mut sinks.highlights.policy_changes, value.clone());
+    if widened && subject == "policy.net.allow_hosts" {
+        sinks.ctx.push(
+            &mut sinks.highlights.sandbox_policy_changes,
+            json!({
+                "kind": "sandbox_policy",
+                "severity": "high",
+                "subject": subject,
+                "path": path,
+                "before": b,
+                "after": a,
+            }),
+        );
+    }
 
     sinks.ctx.push(
         &mut sinks.file_diff.changes,
@@ -2400,6 +2748,19 @@ fn compare_policy_bool(
     sinks
         .ctx
         .push(&mut sinks.highlights.policy_changes, value.clone());
+    if subject == "policy.net.enabled" && a == Some(true) {
+        sinks.ctx.push(
+            &mut sinks.highlights.sandbox_policy_changes,
+            json!({
+                "kind": "sandbox_policy",
+                "severity": "high",
+                "subject": subject,
+                "path": path,
+                "before": b,
+                "after": a,
+            }),
+        );
+    }
 
     sinks.ctx.push(
         &mut sinks.file_diff.changes,
@@ -2515,8 +2876,28 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
     render_change_list(&mut s, "Proof Changes", &report.highlights.proof_changes);
     render_change_list(
         &mut s,
+        "Async Proof Changes",
+        &report.highlights.async_proof_changes,
+    );
+    render_change_list(
+        &mut s,
         "Boundary Changes",
         &report.highlights.boundary_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Capsule Changes",
+        &report.highlights.capsule_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Runtime Attestation Changes",
+        &report.highlights.runtime_attestation_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Sandbox Policy Changes",
+        &report.highlights.sandbox_policy_changes,
     );
     render_change_list(
         &mut s,
@@ -2591,7 +2972,13 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
                 ReviewFailOn::AllowUnsafe => "allow-unsafe",
                 ReviewFailOn::AllowFfi => "allow-ffi",
                 ReviewFailOn::ProofCoverageDecrease => "proof-coverage-decrease",
+                ReviewFailOn::AsyncProofCoverageDecrease => "async-proof-coverage-decrease",
                 ReviewFailOn::BoundaryRelaxation => "boundary-relaxation",
+                ReviewFailOn::CapsuleContractRelaxation => "capsule-contract-relaxation",
+                ReviewFailOn::CapsuleSetChange => "capsule-set-change",
+                ReviewFailOn::SandboxPolicyWiden => "sandbox-policy-widen",
+                ReviewFailOn::RuntimeAttestationRegression => "runtime-attestation-regression",
+                ReviewFailOn::WeakerIsolationEnabled => "weaker-isolation-enabled",
                 ReviewFailOn::TrustedSubsetExpansion => "trusted-subset-expansion",
             })
             .collect::<Vec<&str>>()
@@ -2637,7 +3024,11 @@ fn review_risk(report: &ReviewDiffReport) -> (&'static str, &'static str, &'stat
         .chain(report.highlights.policy_changes.iter())
         .chain(report.highlights.capability_changes.iter())
         .chain(report.highlights.proof_changes.iter())
+        .chain(report.highlights.async_proof_changes.iter())
         .chain(report.highlights.boundary_changes.iter())
+        .chain(report.highlights.capsule_changes.iter())
+        .chain(report.highlights.runtime_attestation_changes.iter())
+        .chain(report.highlights.sandbox_policy_changes.iter())
         .chain(report.highlights.subset_changes.iter())
         .any(|v| {
             v.get("severity")

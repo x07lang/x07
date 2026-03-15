@@ -1,5 +1,6 @@
 use serde_json::json;
 
+use x07_contracts::X07AST_SCHEMA_VERSION_V0_7_0;
 use x07c::typecheck::{typecheck_file_local, TypecheckOptions};
 
 mod typecheck_testutil;
@@ -218,6 +219,142 @@ fn witness_type_is_restricted() {
                     "expr": 1,
                     "witness": [["vec_u8.with_capacity", 0]]
                 }],
+                "body": 0
+            }
+        ],
+        "solve": ["bytes.alloc", 0],
+    });
+
+    let file = typecheck_testutil::file_from_json(&doc);
+    let report = typecheck_file_local(&file, &TypecheckOptions::default());
+
+    assert!(
+        has_code(&report.diagnostics, "X07-CONTRACT-0005"),
+        "expected X07-CONTRACT-0005, got: {:?}",
+        report.diagnostics
+    );
+}
+
+#[test]
+fn await_invariant_must_typecheck_to_i32() {
+    let doc = json!({
+        "schema_version": X07AST_SCHEMA_VERSION_V0_7_0,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defasync",
+                "name": "main.f",
+                "params": [],
+                "result": "i32",
+                "protocol": {
+                    "await_invariant": [{"expr": ["bytes.lit", "x"]}]
+                },
+                "body": 0
+            }
+        ],
+        "solve": ["bytes.alloc", 0],
+    });
+
+    let file = typecheck_testutil::file_from_json(&doc);
+    let report = typecheck_file_local(&file, &TypecheckOptions::default());
+
+    assert!(
+        has_code(&report.diagnostics, "X07-ASYNC-CONTRACT-0001"),
+        "expected X07-ASYNC-CONTRACT-0001, got: {:?}",
+        report.diagnostics
+    );
+}
+
+#[test]
+fn async_protocol_clause_must_be_pure() {
+    let doc = json!({
+        "schema_version": X07AST_SCHEMA_VERSION_V0_7_0,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defasync",
+                "name": "main.f",
+                "params": [{"name":"p","ty":"bytes_view"}],
+                "result": "i32",
+                "protocol": {
+                    "scope_invariant": [{"expr": ["std.world.fs.read_file", "p"]}]
+                },
+                "body": 0
+            }
+        ],
+        "solve": ["bytes.alloc", 0],
+    });
+
+    let file = typecheck_testutil::file_from_json(&doc);
+    let report = typecheck_file_local(&file, &TypecheckOptions::default());
+
+    let d = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "X07-ASYNC-CONTRACT-0004")
+        .expect("expected X07-ASYNC-CONTRACT-0004");
+    assert!(
+        d.notes.iter().any(|n| n.contains("Allowed contract-pure")),
+        "expected allowlist note, got: {:?}",
+        d.notes
+    );
+}
+
+#[test]
+fn cancellation_ensures_binds_result() {
+    let doc = json!({
+        "schema_version": X07AST_SCHEMA_VERSION_V0_7_0,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defasync",
+                "name": "main.f",
+                "params": [],
+                "result": "i32",
+                "protocol": {
+                    "cancellation_ensures": [{"expr": ["=", "__result", 0]}]
+                },
+                "body": 0
+            }
+        ],
+        "solve": ["bytes.alloc", 0],
+    });
+
+    let file = typecheck_testutil::file_from_json(&doc);
+    let report = typecheck_file_local(&file, &TypecheckOptions::default());
+
+    assert!(
+        report.diagnostics.is_empty(),
+        "expected no diagnostics, got: {:?}",
+        report.diagnostics
+    );
+}
+
+#[test]
+fn async_protocol_witness_type_is_restricted() {
+    let doc = json!({
+        "schema_version": X07AST_SCHEMA_VERSION_V0_7_0,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defasync",
+                "name": "main.f",
+                "params": [],
+                "result": "i32",
+                "protocol": {
+                    "await_invariant": [{
+                        "expr": 1,
+                        "witness": [["vec_u8.with_capacity", 0]]
+                    }]
+                },
                 "body": 0
             }
         ],

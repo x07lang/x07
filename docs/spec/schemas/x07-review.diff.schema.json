@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-review.diff.schema.json",
-  "title": "x07.review.diff@0.2.0",
+  "title": "x07.review.diff@0.3.0",
   "description": "Machine-readable semantic diff model emitted by `x07 review diff` (JSON backing model for the HTML intent-level diff viewer).",
   "type": "object",
   "additionalProperties": false,
@@ -16,7 +16,7 @@
     "diags"
   ],
   "properties": {
-    "schema_version": { "const": "x07.review.diff@0.2.0" },
+    "schema_version": { "const": "x07.review.diff@0.3.0" },
 
     "mode": {
       "type": "string",
@@ -120,7 +120,11 @@
         "capability_changes",
         "proof_changes",
         "boundary_changes",
-        "subset_changes"
+        "subset_changes",
+        "async_proof_changes",
+        "capsule_changes",
+        "runtime_attestation_changes",
+        "sandbox_policy_changes"
       ],
       "properties": {
         "world_changes": {
@@ -157,7 +161,40 @@
           "type": "array",
           "items": { "$ref": "#/$defs/subset_change" },
           "default": []
+        },
+        "async_proof_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/async_proof_change" },
+          "default": []
+        },
+        "capsule_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capsule_change" },
+          "default": []
+        },
+        "runtime_attestation_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/runtime_attestation_change" },
+          "default": []
+        },
+        "sandbox_policy_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sandbox_policy_change" },
+          "default": []
         }
+      }
+    },
+    "async_proof_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "subject", "path", "before", "after"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["async_proof"] },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "before": { "$ref": "#/$defs/json_value" },
+        "after": { "$ref": "#/$defs/json_value" }
       }
     },
     "proof_change": {
@@ -192,6 +229,51 @@
       "required": ["kind", "severity", "subject", "path", "before", "after"],
       "properties": {
         "kind": { "type": "string", "enum": ["trusted_subset"] },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "before": { "$ref": "#/$defs/json_value" },
+        "after": { "$ref": "#/$defs/json_value" }
+      }
+    },
+    "capsule_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "subject", "path", "before", "after"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["capsule_contract", "capsule_set"]
+        },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "before": { "$ref": "#/$defs/json_value" },
+        "after": { "$ref": "#/$defs/json_value" }
+      }
+    },
+    "runtime_attestation_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "subject", "path", "before", "after"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["runtime_attestation"] },
+        "severity": { "$ref": "#/$defs/review_severity" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 4096 },
+        "before": { "$ref": "#/$defs/json_value" },
+        "after": { "$ref": "#/$defs/json_value" }
+      }
+    },
+    "sandbox_policy_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "subject", "path", "before", "after"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["sandbox_policy", "weaker_isolation"]
+        },
         "severity": { "$ref": "#/$defs/review_severity" },
         "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
         "path": { "type": ["string", "null"], "maxLength": 4096 },

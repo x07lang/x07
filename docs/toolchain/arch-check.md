@@ -8,7 +8,7 @@ It is deterministic and emits machine-readable diagnostics (`x07diag`) plus opti
 
 Supported schema versions:
 
-- Manifest: `arch/manifest.x07arch.json` (`schema_version: "x07.arch.manifest@0.2.0"`)
+- Manifest: `arch/manifest.x07arch.json` (`schema_version: "x07.arch.manifest@0.3.0"`)
 - Lock: `arch/manifest.lock.json` (`schema_version: "x07.arch.manifest.lock@0.1.0"`)
 
 Contracts-by-example (copy/paste):
@@ -62,6 +62,7 @@ Scan configuration comes from:
 Each node now also declares a `trust_zone`:
 
 - `verified_core`
+- `certified_capsule`
 - `test_only`
 - `untrusted`
 
@@ -134,7 +135,9 @@ Violations: `E_ARCH_WORLD_EDGE_FORBIDDEN`.
 
 ### Trust zones
 
-`verified_core` nodes may only depend on other `verified_core` nodes.
+`verified_core` nodes may only depend on `verified_core` or `certified_capsule` nodes.
+
+Use `certified_capsule` for explicitly effectful adapters that are validated and attested separately from the pure verified core.
 
 Violations: `E_ARCH_TRUST_ZONE_EDGE`.
 
@@ -213,10 +216,10 @@ If `manifest.contracts_v1` is present, `x07 arch check` can also validate repo-l
   - enforces canonical JSON at contract file boundaries (for example, JCS / RFC 8785)
 - `contracts_v1.boundaries` (public boundary contracts)
   - validates `arch/boundaries/index.x07boundary.json`
-  - requires every public export in a `verified_core` node to be pinned in the boundary index
+  - requires every public export in a `verified_core` or `certified_capsule` node to be pinned in the boundary index
   - emits `boundaries_report` inside the arch report for certification flows
 
-When you are preparing a certifiable pure project, start from the `docs/examples/verified_core_pure_v1/arch/` layout and keep the boundary index, smoke entries, and trust zones in the same repo-local `arch/` tree.
+When you are preparing a certifiable project, start from the `docs/examples/verified_core_pure_v1/arch/` layout and keep the boundary index, smoke entries, trust zones, and any capsule declarations in the same repo-local `arch/` tree.
 
 ### Cross-contract dependencies
 

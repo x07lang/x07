@@ -425,6 +425,15 @@ fn try_main() -> Result<std::process::ExitCode> {
                         vec!["trust", "profile", "check"]
                     }
                 },
+                Some(trust::TrustCommand::Capsule(args)) => match &args.cmd {
+                    None => vec!["trust", "capsule"],
+                    Some(trust::TrustCapsuleCommand::Check(_)) => {
+                        vec!["trust", "capsule", "check"]
+                    }
+                    Some(trust::TrustCapsuleCommand::Attest(_)) => {
+                        vec!["trust", "capsule", "attest"]
+                    }
+                },
                 Some(trust::TrustCommand::Certify(_)) => vec!["trust", "certify"],
             },
             Some(Command::Patch(args)) => match &args.cmd {
@@ -1442,6 +1451,10 @@ struct OsRunnerReportRaw {
     compile: OsRunnerCompileRaw,
     #[serde(default)]
     solve: Option<OsRunnerSolveRaw>,
+    #[serde(default)]
+    sandbox_backend: Option<String>,
+    #[serde(default)]
+    runtime_attestation: Option<RuntimeAttestationRef>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1468,6 +1481,13 @@ struct OsRunnerSolveRaw {
     sched_stats: Option<x07_host_runner::SchedStats>,
     #[serde(default)]
     trap: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+struct RuntimeAttestationRef {
+    path: String,
+    sandbox_backend: String,
+    weaker_isolation: bool,
 }
 
 static X07TEST_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1542,6 +1562,19 @@ fn run_one_test_os(
         .with_context(|| format!("write driver: {}", driver_path.display()))?;
 
     let exe_out_path = out_dir.join("solver");
+    let runtime_attestation_path = if test.world == WorldId::RunOsSandboxed {
+        let path = args
+            .artifact_dir
+            .join("runtime-attest")
+            .join(format!("{}.json", util::safe_artifact_dir_name(&test.id)));
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("create runtime attestation dir: {}", parent.display()))?;
+        }
+        Some(path)
+    } else {
+        None
+    };
 
     let mut cmd = std::process::Command::new(crate::util::resolve_sibling_or_path("x07-os-runner"));
     let manifest_dir = args.manifest.parent().map(Path::to_path_buf);
@@ -1610,6 +1643,9 @@ fn run_one_test_os(
             .as_deref()
             .context("internal error: missing resolved policy path")?;
         cmd.arg("--policy").arg(policy_path);
+        if let Some(path) = runtime_attestation_path.as_ref() {
+            cmd.arg("--attest-runtime").arg(path);
+        }
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     for root in module_roots {
@@ -1672,17 +1708,23 @@ fn run_one_test_os(
             return Ok(result);
         }
     };
+    let OsRunnerReportRaw {
+        compile,
+        solve,
+        sandbox_backend,
+        runtime_attestation,
+    } = report;
 
     result.compile = Some(CompileSection {
-        ok: report.compile.ok,
-        exit_code: Some(report.compile.exit_status),
+        ok: compile.ok,
+        exit_code: Some(compile.exit_status),
         compiler_diags: Vec::new(),
         artifact_path: Some(display_path(&exe_out_path)),
-        c_bytes: Some(report.compile.c_source_size),
+        c_bytes: Some(compile.c_source_size),
     });
 
-    if !report.compile.ok {
-        if let Some(msg) = report.compile.compile_error {
+    if !compile.ok {
+        if let Some(msg) = compile.compile_error {
             result.diags.push(Diag::new("ETEST_COMPILE", msg));
         } else {
             result
@@ -1696,7 +1738,7 @@ fn run_one_test_os(
         return Ok(result);
     }
 
-    let Some(solve) = report.solve else {
+    let Some(solve) = solve else {
         result.diags.push(Diag::new(
             "ETEST_RUN",
             "missing solve section in x07-os-runner report",
@@ -1718,6 +1760,8 @@ fn run_one_test_os(
         stdout_b64: Some(solve.stdout_b64),
         stderr_b64: Some(solve.stderr_b64),
         failure_code_u32: None,
+        sandbox_backend,
+        runtime_attestation,
     });
 
     if !solve.ok || solve.exit_status != 0 {
@@ -2988,6 +3032,10 @@ struct RunSection {
     stderr_b64: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     failure_code_u32: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sandbox_backend: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    runtime_attestation: Option<RuntimeAttestationRef>,
 }
 
 impl RunSection {
@@ -3003,6 +3051,8 @@ impl RunSection {
             stdout_b64: Some(b64.encode(&r.stdout)),
             stderr_b64: Some(b64.encode(&r.stderr)),
             failure_code_u32: None,
+            sandbox_backend: None,
+            runtime_attestation: None,
         }
     }
 }

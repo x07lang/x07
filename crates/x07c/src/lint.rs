@@ -11,6 +11,7 @@ use crate::mem_provenance::{
 use crate::x07ast::{self, X07AstFile, X07AstKind};
 use x07_contracts::{
     X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+    X07AST_SCHEMA_VERSION_V0_7_0,
 };
 
 fn expr_ident(name: impl Into<String>) -> Expr {
@@ -226,6 +227,13 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
             &ctx,
             &mut diagnostics,
         );
+        lint_async_protocol(
+            f.protocol.as_ref(),
+            &format!("/decls/{decl_idx}/protocol"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
         lint_loop_contracts(
             &f.loop_contracts,
             &format!("/decls/{decl_idx}/loop_contracts"),
@@ -241,7 +249,8 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
     if run_typecheck
         && (file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0
-            || file.schema_version == X07AST_SCHEMA_VERSION_V0_6_0)
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_6_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_7_0)
     {
         let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
         diagnostics.extend(tc.diagnostics);
@@ -275,6 +284,39 @@ fn lint_contract_clauses(
             );
         }
     }
+}
+
+fn lint_async_protocol(
+    protocol: Option<&x07ast::AsyncProtocolAst>,
+    base_ptr: &str,
+    options: LintOptions,
+    ctx: &LintCtx,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(protocol) = protocol else {
+        return;
+    };
+    lint_contract_clauses(
+        &protocol.await_invariant,
+        &format!("{base_ptr}/await_invariant"),
+        options,
+        ctx,
+        diagnostics,
+    );
+    lint_contract_clauses(
+        &protocol.scope_invariant,
+        &format!("{base_ptr}/scope_invariant"),
+        options,
+        ctx,
+        diagnostics,
+    );
+    lint_contract_clauses(
+        &protocol.cancellation_ensures,
+        &format!("{base_ptr}/cancellation_ensures"),
+        options,
+        ctx,
+        diagnostics,
+    );
 }
 
 fn lint_loop_contracts(
@@ -338,6 +380,9 @@ fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
                 requires: &f.requires,
                 ensures: &f.ensures,
                 invariant: &f.invariant,
+                await_invariant: &[],
+                scope_invariant: &[],
+                cancellation_ensures: &[],
                 body: Some(&f.body),
             },
             diagnostics,
@@ -356,6 +401,21 @@ fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
                 requires: &f.requires,
                 ensures: &f.ensures,
                 invariant: &f.invariant,
+                await_invariant: f
+                    .protocol
+                    .as_ref()
+                    .map(|p| p.await_invariant.as_slice())
+                    .unwrap_or(&[]),
+                scope_invariant: f
+                    .protocol
+                    .as_ref()
+                    .map(|p| p.scope_invariant.as_slice())
+                    .unwrap_or(&[]),
+                cancellation_ensures: f
+                    .protocol
+                    .as_ref()
+                    .map(|p| p.cancellation_ensures.as_slice())
+                    .unwrap_or(&[]),
                 body: Some(&f.body),
             },
             diagnostics,
@@ -372,6 +432,9 @@ struct FnDeclRefs<'a> {
     requires: &'a [x07ast::ContractClauseAst],
     ensures: &'a [x07ast::ContractClauseAst],
     invariant: &'a [x07ast::ContractClauseAst],
+    await_invariant: &'a [x07ast::ContractClauseAst],
+    scope_invariant: &'a [x07ast::ContractClauseAst],
+    cancellation_ensures: &'a [x07ast::ContractClauseAst],
     body: Option<&'a Expr>,
 }
 
@@ -425,6 +488,27 @@ fn lint_type_params_usage(
     );
     collect_type_vars_from_contract_clauses(
         decl.invariant,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.await_invariant,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.scope_invariant,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.cancellation_ensures,
         &declared,
         &mut used,
         &mut quickfix_ctx,

@@ -7,9 +7,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::Parser;
+use serde::Serialize;
 #[cfg(test)]
 use x07_contracts::RUN_OS_POLICY_SCHEMA_VERSION;
-use x07_contracts::X07_OS_RUNNER_REPORT_SCHEMA_VERSION;
+use x07_contracts::{X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_RUNTIME_ATTEST_SCHEMA_VERSION};
 use x07_host_runner::{
     apply_cc_profile, compile_program_with_options, CcProfile, CompilerResult, RunnerConfig,
     RunnerResult,
@@ -104,6 +105,9 @@ struct Cli {
 
     #[arg(long)]
     auto_ffi: bool,
+
+    #[arg(long, value_name = "PATH")]
+    attest_runtime: Option<PathBuf>,
 }
 
 fn main() -> std::process::ExitCode {
@@ -178,9 +182,13 @@ fn try_main() -> Result<std::process::ExitCode> {
             world.as_str()
         );
     }
+    if cli.attest_runtime.is_some() && world != WorldId::RunOsSandboxed {
+        anyhow::bail!("--attest-runtime is only supported for --world run-os-sandboxed");
+    }
 
     let sandbox_backend =
         resolve_sandbox_backend(world, cli.sandbox_backend, cli.i_accept_weaker_isolation)?;
+    let sandbox_backend_name = sandbox_backend_label(world, sandbox_backend);
 
     let policy = load_policy(world, cli.policy.as_ref())?;
     if let Some(ref pol) = policy {
@@ -261,6 +269,22 @@ fn try_main() -> Result<std::process::ExitCode> {
                 run_dir: None,
             };
             let solve = run_os_artifact(&inv)?;
+            let runtime_attestation = match (cli.attest_runtime.as_deref(), sandbox_backend_name) {
+                (Some(path), Some(sandbox_backend)) => Some(write_runtime_attestation(
+                    path,
+                    sandbox_backend,
+                    cli.i_accept_weaker_isolation,
+                    artifact,
+                    cli.policy.as_deref(),
+                    input.len(),
+                    inv.run_dir,
+                    None,
+                    solve.ok,
+                    solve.exit_status,
+                    solve.trap.as_deref(),
+                )?),
+                _ => None,
+            };
 
             let exit_code: u8 = if solve.ok && solve.exit_status == 0 {
                 0
@@ -268,7 +292,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 1
             };
             let b64 = base64::engine::general_purpose::STANDARD;
-            let json = serde_json::json!({
+            let mut json = serde_json::json!({
                 "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
                 "mode": "run-os",
                 "world": world.as_str(),
@@ -295,6 +319,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "debug_stats": solve.debug_stats,
                 "trap": solve.trap,
             });
+            attach_runtime_fields(
+                &mut json,
+                sandbox_backend_name,
+                runtime_attestation.as_ref(),
+            );
             println!("{}", serde_json::to_string_pretty(&json)?);
 
             Ok(std::process::ExitCode::from(exit_code))
@@ -340,7 +369,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             if !compile.ok {
                 let b64 = base64::engine::general_purpose::STANDARD;
                 let exit_code: u8 = 1;
-                let json = serde_json::json!({
+                let mut json = serde_json::json!({
                     "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
                     "mode": "compile-run",
                     "world": world.as_str(),
@@ -348,6 +377,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     "compile": compiler_json(&compile, &b64),
                     "solve": serde_json::Value::Null,
                 });
+                attach_runtime_fields(&mut json, sandbox_backend_name, None);
                 println!("{}", serde_json::to_string_pretty(&json)?);
                 return Ok(std::process::ExitCode::from(exit_code));
             }
@@ -355,7 +385,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             if cli.compile_only {
                 let b64 = base64::engine::general_purpose::STANDARD;
                 let exit_code: u8 = 0;
-                let json = serde_json::json!({
+                let mut json = serde_json::json!({
                     "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
                     "mode": "compile-run",
                     "world": world.as_str(),
@@ -363,6 +393,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     "compile": compiler_json(&compile, &b64),
                     "solve": serde_json::Value::Null,
                 });
+                attach_runtime_fields(&mut json, sandbox_backend_name, None);
                 println!("{}", serde_json::to_string_pretty(&json)?);
                 return Ok(std::process::ExitCode::from(exit_code));
             }
@@ -370,7 +401,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             if cli.compile_only {
                 let b64 = base64::engine::general_purpose::STANDARD;
                 let exit_code: u8 = 0;
-                let json = serde_json::json!({
+                let mut json = serde_json::json!({
                     "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
                     "mode": "project-compile-run",
                     "world": world.as_str(),
@@ -378,6 +409,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     "compile": compiler_json(&compile, &b64),
                     "solve": serde_json::Value::Null,
                 });
+                attach_runtime_fields(&mut json, sandbox_backend_name, None);
                 println!("{}", serde_json::to_string_pretty(&json)?);
                 return Ok(std::process::ExitCode::from(exit_code));
             }
@@ -398,6 +430,22 @@ fn try_main() -> Result<std::process::ExitCode> {
                 run_dir: None,
             };
             let solve = run_os_artifact(&inv)?;
+            let runtime_attestation = match (cli.attest_runtime.as_deref(), sandbox_backend_name) {
+                (Some(path), Some(sandbox_backend)) => Some(write_runtime_attestation(
+                    path,
+                    sandbox_backend,
+                    cli.i_accept_weaker_isolation,
+                    exe.as_path(),
+                    cli.policy.as_deref(),
+                    input.len(),
+                    inv.run_dir,
+                    None,
+                    solve.ok,
+                    solve.exit_status,
+                    solve.trap.as_deref(),
+                )?),
+                _ => None,
+            };
 
             let exit_code: u8 = if compile.ok && solve.ok && solve.exit_status == 0 {
                 0
@@ -405,7 +453,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 1
             };
             let b64 = base64::engine::general_purpose::STANDARD;
-            let json = serde_json::json!({
+            let mut json = serde_json::json!({
                 "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
                 "mode": "compile-run",
                 "world": world.as_str(),
@@ -413,6 +461,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "compile": compiler_json(&compile, &b64),
                 "solve": runner_json(&solve, &b64),
             });
+            attach_runtime_fields(
+                &mut json,
+                sandbox_backend_name,
+                runtime_attestation.as_ref(),
+            );
             println!("{}", serde_json::to_string_pretty(&json)?);
 
             Ok(std::process::ExitCode::from(exit_code))
@@ -481,7 +534,7 @@ fn try_main() -> Result<std::process::ExitCode> {
             if !compile.ok {
                 let b64 = base64::engine::general_purpose::STANDARD;
                 let exit_code: u8 = 1;
-                let json = serde_json::json!({
+                let mut json = serde_json::json!({
                     "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
                     "mode": "project-compile-run",
                     "world": world.as_str(),
@@ -489,6 +542,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                     "compile": compiler_json(&compile, &b64),
                     "solve": serde_json::Value::Null,
                 });
+                attach_runtime_fields(&mut json, sandbox_backend_name, None);
                 println!("{}", serde_json::to_string_pretty(&json)?);
                 return Ok(std::process::ExitCode::from(exit_code));
             }
@@ -509,6 +563,22 @@ fn try_main() -> Result<std::process::ExitCode> {
                 run_dir: Some(base),
             };
             let solve = run_os_artifact(&inv)?;
+            let runtime_attestation = match (cli.attest_runtime.as_deref(), sandbox_backend_name) {
+                (Some(path), Some(sandbox_backend)) => Some(write_runtime_attestation(
+                    path,
+                    sandbox_backend,
+                    cli.i_accept_weaker_isolation,
+                    exe.as_path(),
+                    cli.policy.as_deref(),
+                    input.len(),
+                    inv.run_dir,
+                    None,
+                    solve.ok,
+                    solve.exit_status,
+                    solve.trap.as_deref(),
+                )?),
+                _ => None,
+            };
 
             let exit_code: u8 = if compile.ok && solve.ok && solve.exit_status == 0 {
                 0
@@ -516,7 +586,7 @@ fn try_main() -> Result<std::process::ExitCode> {
                 1
             };
             let b64 = base64::engine::general_purpose::STANDARD;
-            let json = serde_json::json!({
+            let mut json = serde_json::json!({
                 "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
                 "mode": "project-compile-run",
                 "world": world.as_str(),
@@ -524,6 +594,11 @@ fn try_main() -> Result<std::process::ExitCode> {
                 "compile": compiler_json(&compile, &b64),
                 "solve": runner_json(&solve, &b64),
             });
+            attach_runtime_fields(
+                &mut json,
+                sandbox_backend_name,
+                runtime_attestation.as_ref(),
+            );
             println!("{}", serde_json::to_string_pretty(&json)?);
 
             Ok(std::process::ExitCode::from(exit_code))
@@ -1234,6 +1309,34 @@ fn run_vm(
         .get("exit_status")
         .and_then(|v| v.as_i64())
         .unwrap_or(1);
+    let solve_exit_status_i32 = solve
+        .get("exit_status")
+        .and_then(|v| v.as_i64())
+        .and_then(|v| i32::try_from(v).ok())
+        .unwrap_or(1);
+    let runtime_policy_path = run_job_in.join("policy.json");
+    let runtime_attestation = match (cli.attest_runtime.as_deref(), solve.get("ok")) {
+        (Some(path), Some(_)) => {
+            let attestation_artifact = cli
+                .compiled_out
+                .as_deref()
+                .unwrap_or(compiled_artifact.as_path());
+            Some(write_runtime_attestation(
+                path,
+                "vm",
+                accept_weaker_isolation,
+                attestation_artifact,
+                Some(runtime_policy_path.as_path()),
+                input.len(),
+                Some(base_host.as_path()),
+                run_spec.image_digest.as_deref(),
+                solve_ok,
+                solve_exit_status_i32,
+                solve.get("trap").and_then(|value| value.as_str()),
+            )?)
+        }
+        _ => None,
+    };
 
     let exit_code: u8 = if compile_ok && solve_ok && solve_exit_status == 0 {
         0
@@ -1241,7 +1344,7 @@ fn run_vm(
         1
     };
 
-    let combined = serde_json::json!({
+    let mut combined = serde_json::json!({
         "schema_version": X07_OS_RUNNER_REPORT_SCHEMA_VERSION,
         "mode": mode,
         "world": world.as_str(),
@@ -1249,6 +1352,7 @@ fn run_vm(
         "compile": compile,
         "solve": solve,
     });
+    attach_runtime_fields(&mut combined, Some("vm"), runtime_attestation.as_ref());
     println!("{}", serde_json::to_string_pretty(&combined)?);
     Ok(std::process::ExitCode::from(exit_code))
 }
@@ -1337,6 +1441,122 @@ fn runner_json(
         "mem_stats": solve.mem_stats,
         "debug_stats": solve.debug_stats,
         "trap": solve.trap,
+    })
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct RuntimeAttestation {
+    schema_version: &'static str,
+    world: &'static str,
+    sandbox_backend: &'static str,
+    weaker_isolation: bool,
+    artifact_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    policy_path: Option<String>,
+    input_len_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    run_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    guest_image_digest: Option<String>,
+    outcome: RuntimeAttestationOutcome,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct RuntimeAttestationOutcome {
+    ok: bool,
+    exit_status: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trap: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct RuntimeAttestationRef {
+    path: String,
+    sandbox_backend: &'static str,
+    weaker_isolation: bool,
+}
+
+fn sandbox_backend_label(
+    world: WorldId,
+    sandbox_backend: EffectiveSandboxBackend,
+) -> Option<&'static str> {
+    if world != WorldId::RunOsSandboxed {
+        return None;
+    }
+    Some(match sandbox_backend {
+        EffectiveSandboxBackend::Os => "os",
+        EffectiveSandboxBackend::Vm => "vm",
+        EffectiveSandboxBackend::None => "none",
+    })
+}
+
+fn attach_runtime_fields(
+    doc: &mut serde_json::Value,
+    sandbox_backend: Option<&'static str>,
+    runtime_attestation: Option<&RuntimeAttestationRef>,
+) {
+    let Some(obj) = doc.as_object_mut() else {
+        return;
+    };
+    if let Some(sandbox_backend) = sandbox_backend {
+        obj.insert(
+            "sandbox_backend".to_string(),
+            serde_json::Value::String(sandbox_backend.to_string()),
+        );
+    }
+    if let Some(runtime_attestation) = runtime_attestation {
+        obj.insert(
+            "runtime_attestation".to_string(),
+            serde_json::to_value(runtime_attestation).unwrap_or_else(|_| serde_json::Value::Null),
+        );
+    }
+}
+
+fn write_runtime_attestation(
+    path: &Path,
+    sandbox_backend: &'static str,
+    weaker_isolation: bool,
+    artifact_path: &Path,
+    policy_path: Option<&Path>,
+    input_len_bytes: usize,
+    run_dir: Option<&Path>,
+    guest_image_digest: Option<&str>,
+    solve_ok: bool,
+    solve_exit_status: i32,
+    solve_trap: Option<&str>,
+) -> Result<RuntimeAttestationRef> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create runtime attestation dir: {}", parent.display()))?;
+    }
+
+    let attestation = RuntimeAttestation {
+        schema_version: X07_RUNTIME_ATTEST_SCHEMA_VERSION,
+        world: WorldId::RunOsSandboxed.as_str(),
+        sandbox_backend,
+        weaker_isolation,
+        artifact_path: artifact_path.display().to_string(),
+        policy_path: policy_path.map(|p| p.display().to_string()),
+        input_len_bytes: input_len_bytes as u64,
+        run_dir: run_dir.map(|p| p.display().to_string()),
+        guest_image_digest: guest_image_digest.map(|digest| digest.to_string()),
+        outcome: RuntimeAttestationOutcome {
+            ok: solve_ok,
+            exit_status: solve_exit_status,
+            trap: solve_trap.map(|trap| trap.to_string()),
+        },
+    };
+
+    let mut bytes =
+        serde_json::to_vec_pretty(&attestation).context("serialize runtime attestation JSON")?;
+    bytes.push(b'\n');
+    std::fs::write(path, bytes)
+        .with_context(|| format!("write runtime attestation: {}", path.display()))?;
+
+    Ok(RuntimeAttestationRef {
+        path: path.display().to_string(),
+        sandbox_backend,
+        weaker_isolation,
     })
 }
 
@@ -1914,6 +2134,62 @@ mod tests {
             let code = read_u32_le(doc, 1);
             panic!("expected ok doc, got err code={code} bytes={doc:?}");
         }
+    }
+
+    #[test]
+    fn write_runtime_attestation_emits_expected_json() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("unix time")
+            .as_nanos();
+        let dir = workspace_root()
+            .join("target")
+            .join("runtime-attest-tests")
+            .join(format!("{}-{stamp}", std::process::id()));
+        let path = dir.join("runtime-attest.json");
+        let artifact_path = dir.join("solver");
+        let policy_path = dir.join("policy.json");
+        let run_dir = dir.join("run");
+
+        let attestation_ref = write_runtime_attestation(
+            &path,
+            "vm",
+            true,
+            &artifact_path,
+            Some(&policy_path),
+            3,
+            Some(&run_dir),
+            Some("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            false,
+            17,
+            Some("runtime trap"),
+        )
+        .expect("write runtime attestation");
+
+        let doc_bytes = std::fs::read(&path).expect("read runtime attestation");
+        let doc: serde_json::Value =
+            serde_json::from_slice(&doc_bytes).expect("parse runtime attestation JSON");
+        assert_eq!(doc["schema_version"], X07_RUNTIME_ATTEST_SCHEMA_VERSION);
+        assert_eq!(doc["world"], WorldId::RunOsSandboxed.as_str());
+        assert_eq!(doc["sandbox_backend"], "vm");
+        assert_eq!(doc["weaker_isolation"], true);
+        assert_eq!(doc["artifact_path"], artifact_path.display().to_string());
+        assert_eq!(doc["policy_path"], policy_path.display().to_string());
+        assert_eq!(doc["input_len_bytes"], 3);
+        assert_eq!(doc["run_dir"], run_dir.display().to_string());
+        assert_eq!(
+            doc["guest_image_digest"],
+            "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        );
+        assert_eq!(doc["outcome"]["ok"], false);
+        assert_eq!(doc["outcome"]["exit_status"], 17);
+        assert_eq!(doc["outcome"]["trap"], "runtime trap");
+
+        assert_eq!(attestation_ref.path, path.display().to_string());
+        assert_eq!(attestation_ref.sandbox_backend, "vm");
+        assert!(attestation_ref.weaker_isolation);
+
+        std::fs::remove_dir_all(&dir).expect("remove runtime attestation test dir");
     }
 
     fn base_runner_config(max_output_bytes: usize) -> RunnerConfig {

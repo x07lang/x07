@@ -31,13 +31,19 @@ Notes:
   - `allow-unsafe`
   - `allow-ffi`
   - `proof-coverage-decrease`
+  - `async-proof-coverage-decrease`
   - `boundary-relaxation`
   - `trusted-subset-expansion`
+  - `capsule-contract-relaxation`
+  - `capsule-set-change`
+  - `sandbox-policy-widen`
+  - `runtime-attestation-regression`
+  - `weaker-isolation-enabled`
 
 JSON schema:
 
 - `spec/x07-review.diff.schema.json`
-- `schema_version: "x07.review.diff@0.2.0"`
+- `schema_version: "x07.review.diff@0.3.0"`
 
 ## Trust report (`x07 trust report`)
 
@@ -134,7 +140,33 @@ This validates:
 - allowed worlds,
 - language subset restrictions (`defasync`, `extern`, `allow_unsafe`, `allow_ffi`),
 - arch manifest posture (`allowlist_mode`, cycles/orphans/visibility/world-caps),
-- boundary index wiring for the certifiable trust surface.
+- boundary index wiring for the certifiable trust surface,
+- capsule requirements, runtime-attestation requirements, effect-log requirements, and sandbox backend/network posture when the selected profile asks for them.
+
+Current built-in profiles include:
+
+- `arch/trust/profiles/verified_core_pure_v1.json`
+- `arch/trust/profiles/trusted_program_sandboxed_local_v1.json`
+- `arch/trust/profiles/certified_capsule_v1.json`
+
+## Capsule contracts (`x07 trust capsule`)
+
+```bash
+x07 trust capsule check \
+  --index arch/capsules/index.x07capsule.json \
+  --project x07.json
+```
+
+```bash
+x07 trust capsule attest \
+  --contract arch/capsules/capsule.echo.contract.json \
+  --module src/echo.x07.json \
+  --lockfile x07.lock.json \
+  --conformance-report target/capsules/echo.conformance.json \
+  --out target/capsules/capsule.echo.attest.json
+```
+
+Use these commands to validate the capsule index plus referenced contracts/attestations, and to emit deterministic `x07.capsule.attest@0.1.0` artifacts that `x07 trust certify` can bind into a certificate bundle.
 
 ## Trust certify (`x07 trust certify`)
 
@@ -157,12 +189,22 @@ The certificate bundle includes:
 - `tests.report.json`
 - `trust.report.json`
 - `compile.attest.json`
+- capsule attestation references, runtime-attestation references, and effect-log digests when they are present in the observed evidence
 
 `x07 trust certify` rejects if proof coverage regresses, required boundary metadata is missing, boundary-declared smoke/PBT tests do not resolve and pass, schema-derived outputs drift, trust report cleanliness fails, or compile attestation cannot bind the emitted native artifact.
+
+Certificate schema:
+
+- `spec/x07-trust.certificate.schema.json`
+- `schema_version: "x07.trust.certificate@0.2.0"`
 
 For `verified_core_pure_v1`, boundary-referenced schemas are rechecked with `x07 schema derive --check --out-dir .`, so certified projects should derive those schema outputs into the project root.
 
 When a certified entry depends on reviewed imported helpers, `x07 verify --prove` uses the trusted primitive catalog in `catalog/verify_primitives.json` to model those calls in the proof harness. The coverage report still lists each trusted primitive explicitly so the certificate makes that trust boundary visible.
+
+Current limitation:
+
+- `trusted_program_sandboxed_local_v1` and other async/capsule-backed profiles can already validate profile posture and bundle runtime/capsule evidence, but accepted async certification is still blocked until `x07 verify` gains certifiable `defasync` proof and coverage support.
 
 ## Certificate-first review flow
 
@@ -172,6 +214,15 @@ For `verified_core_pure_v1`, the reviewer flow is:
 2. Read `target/cert/summary.html` for the human overview.
 3. Inspect `target/cert/certificate.json` for the machine-readable evidence bundle.
 4. Use `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion` when comparing a baseline certificate posture to a candidate change.
+
+For sandboxed or capsule-backed projects, add the Milestone B posture gates as needed:
+
+- `async-proof-coverage-decrease`
+- `capsule-contract-relaxation`
+- `capsule-set-change`
+- `sandbox-policy-widen`
+- `runtime-attestation-regression`
+- `weaker-isolation-enabled`
 
 The canonical example project at `docs/examples/verified_core_pure_v1/` is structured to exercise that flow end to end.
 The checked-in `.github/workflows/certify.yml` file in that example shows the minimal CI surface for running the same certificate flow in GitHub Actions, and `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` serves as the second certifiable example project in this train.

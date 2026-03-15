@@ -41,7 +41,7 @@
     },
     "trust_zone": {
       "type": "string",
-      "enum": ["verified_core", "test_only", "untrusted"]
+      "enum": ["verified_core", "certified_capsule", "test_only", "untrusted"]
     },
     "brand_or_schema": {
       "type": "object",

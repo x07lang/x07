@@ -4,6 +4,7 @@ use std::fmt::Display;
 use serde_json::Value;
 use x07_contracts::{
     X07AST_SCHEMA_VERSIONS_SUPPORTED, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
+    X07AST_SCHEMA_VERSION_V0_7_0,
 };
 
 use crate::ast::Expr;
@@ -139,6 +140,13 @@ pub struct LoopContractAst {
 }
 
 #[derive(Debug, Clone)]
+pub struct AsyncProtocolAst {
+    pub await_invariant: Vec<ContractClauseAst>,
+    pub scope_invariant: Vec<ContractClauseAst>,
+    pub cancellation_ensures: Vec<ContractClauseAst>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AstFunctionDef {
     pub name: String,
     pub type_params: Vec<TypeParam>,
@@ -159,6 +167,7 @@ pub struct AstAsyncFunctionDef {
     pub requires: Vec<ContractClauseAst>,
     pub ensures: Vec<ContractClauseAst>,
     pub invariant: Vec<ContractClauseAst>,
+    pub protocol: Option<AsyncProtocolAst>,
     pub loop_contracts: Vec<LoopContractAst>,
     pub params: Vec<AstFunctionParam>,
     pub result: TypeRef,
@@ -237,8 +246,11 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
         });
     }
     let allow_contracts = schema_version == X07AST_SCHEMA_VERSION_V0_5_0
-        || schema_version == X07AST_SCHEMA_VERSION_V0_6_0;
-    let allow_loop_contracts = schema_version == X07AST_SCHEMA_VERSION_V0_6_0;
+        || schema_version == X07AST_SCHEMA_VERSION_V0_6_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_7_0;
+    let allow_loop_contracts = schema_version == X07AST_SCHEMA_VERSION_V0_6_0
+        || schema_version == X07AST_SCHEMA_VERSION_V0_7_0;
+    let allow_async_protocol = schema_version == X07AST_SCHEMA_VERSION_V0_7_0;
 
     let kind = get_required_string(root_obj, "/kind", "kind")?;
     let kind = match kind.trim() {
@@ -326,6 +338,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                     false,
                     allow_contracts,
                     allow_loop_contracts,
+                    allow_async_protocol,
                 )?;
                 if !function_names.insert(parsed.name.clone()) {
                     return Err(X07AstError {
@@ -354,6 +367,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                     true,
                     allow_contracts,
                     allow_loop_contracts,
+                    allow_async_protocol,
                 )?;
                 if !function_names.insert(parsed.name.clone()) {
                     return Err(X07AstError {
@@ -367,6 +381,7 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                     requires: parsed.requires,
                     ensures: parsed.ensures,
                     invariant: parsed.invariant,
+                    protocol: parsed.protocol,
                     loop_contracts: parsed.loop_contracts,
                     params: parsed.params,
                     result: parsed.result,
@@ -429,6 +444,7 @@ struct ParsedDefLike {
     requires: Vec<ContractClauseAst>,
     ensures: Vec<ContractClauseAst>,
     invariant: Vec<ContractClauseAst>,
+    protocol: Option<AsyncProtocolAst>,
     loop_contracts: Vec<LoopContractAst>,
     params: Vec<AstFunctionParam>,
     result: TypeRef,
@@ -443,6 +459,7 @@ fn parse_def_like(
     is_async: bool,
     allow_contracts: bool,
     allow_loop_contracts: bool,
+    allow_async_protocol: bool,
 ) -> Result<ParsedDefLike, X07AstError> {
     let kind_label = if is_async { "defasync" } else { "defn" };
 
@@ -462,11 +479,17 @@ fn parse_def_like(
     let type_params = parse_type_params(dobj, ptr)?;
 
     if !allow_contracts {
-        for field in ["requires", "ensures", "invariant", "loop_contracts"] {
+        for field in [
+            "requires",
+            "ensures",
+            "invariant",
+            "loop_contracts",
+            "protocol",
+        ] {
             if dobj.contains_key(field) {
                 return Err(X07AstError {
                     message: format!(
-                        "{field} is only supported in {X07AST_SCHEMA_VERSION_V0_5_0} or {X07AST_SCHEMA_VERSION_V0_6_0}"
+                        "{field} is only supported in {X07AST_SCHEMA_VERSION_V0_5_0}, {X07AST_SCHEMA_VERSION_V0_6_0}, or {X07AST_SCHEMA_VERSION_V0_7_0}"
                     ),
                     ptr: format!("{ptr}/{field}"),
                 });
@@ -474,9 +497,17 @@ fn parse_def_like(
         }
     }
 
+    if !is_async && dobj.contains_key("protocol") {
+        return Err(X07AstError {
+            message: "protocol is only supported on defasync declarations".to_string(),
+            ptr: format!("{ptr}/protocol"),
+        });
+    }
+
     let requires = parse_contract_clauses(dobj, ptr, "requires")?;
     let ensures = parse_contract_clauses(dobj, ptr, "ensures")?;
     let invariant = parse_contract_clauses(dobj, ptr, "invariant")?;
+    let protocol = parse_async_protocol(dobj, ptr, is_async, allow_async_protocol)?;
     let loop_contracts = parse_loop_contracts(dobj, ptr, allow_loop_contracts)?;
 
     let params = parse_params(dobj, ptr, kind_label)?;
@@ -522,12 +553,57 @@ fn parse_def_like(
         requires,
         ensures,
         invariant,
+        protocol,
         loop_contracts,
         params,
         result,
         result_brand,
         body,
     })
+}
+
+fn parse_async_protocol(
+    dobj: &serde_json::Map<String, Value>,
+    ptr: &str,
+    is_async: bool,
+    allow_async_protocol: bool,
+) -> Result<Option<AsyncProtocolAst>, X07AstError> {
+    let Some(v) = dobj.get("protocol") else {
+        return Ok(None);
+    };
+    if !is_async {
+        return Err(X07AstError {
+            message: "protocol is only supported on defasync declarations".to_string(),
+            ptr: format!("{ptr}/protocol"),
+        });
+    }
+    if !allow_async_protocol {
+        return Err(X07AstError {
+            message: format!("protocol is only supported in {X07AST_SCHEMA_VERSION_V0_7_0}"),
+            ptr: format!("{ptr}/protocol"),
+        });
+    }
+    let obj = v.as_object().ok_or_else(|| X07AstError {
+        message: "protocol must be an object".to_string(),
+        ptr: format!("{ptr}/protocol"),
+    })?;
+    Ok(Some(AsyncProtocolAst {
+        await_invariant: parse_contract_clauses(
+            obj,
+            &format!("{ptr}/protocol"),
+            "await_invariant",
+        )?,
+        scope_invariant: parse_contract_clauses(
+            obj,
+            &format!("{ptr}/protocol"),
+            "scope_invariant",
+        )?,
+        cancellation_ensures: parse_contract_clauses(
+            obj,
+            &format!("{ptr}/protocol"),
+            "cancellation_ensures",
+        )?,
+    }))
 }
 
 fn parse_loop_contracts(
@@ -540,7 +616,9 @@ fn parse_loop_contracts(
     };
     if !allow_loop_contracts {
         return Err(X07AstError {
-            message: format!("loop_contracts is only supported in {X07AST_SCHEMA_VERSION_V0_6_0}"),
+            message: format!(
+                "loop_contracts is only supported in {X07AST_SCHEMA_VERSION_V0_6_0} or {X07AST_SCHEMA_VERSION_V0_7_0}"
+            ),
             ptr: format!("{ptr}/loop_contracts"),
         });
     }
@@ -1143,6 +1221,7 @@ fn reptr_x07ast_file(file: &mut X07AstFile) {
         reptr_contract_clauses(&mut f.requires, &format!("/decls/{decl_idx}/requires"));
         reptr_contract_clauses(&mut f.ensures, &format!("/decls/{decl_idx}/ensures"));
         reptr_contract_clauses(&mut f.invariant, &format!("/decls/{decl_idx}/invariant"));
+        reptr_async_protocol(f.protocol.as_mut(), &format!("/decls/{decl_idx}/protocol"));
         reptr_loop_contracts(
             &mut f.loop_contracts,
             &format!("/decls/{decl_idx}/loop_contracts"),
@@ -1158,6 +1237,24 @@ fn reptr_contract_clauses(clauses: &mut [ContractClauseAst], base_ptr: &str) {
             reptr_expr(w, &format!("{base_ptr}/{cidx}/witness/{widx}"));
         }
     }
+}
+
+fn reptr_async_protocol(protocol: Option<&mut AsyncProtocolAst>, base_ptr: &str) {
+    let Some(protocol) = protocol else {
+        return;
+    };
+    reptr_contract_clauses(
+        &mut protocol.await_invariant,
+        &format!("{base_ptr}/await_invariant"),
+    );
+    reptr_contract_clauses(
+        &mut protocol.scope_invariant,
+        &format!("{base_ptr}/scope_invariant"),
+    );
+    reptr_contract_clauses(
+        &mut protocol.cancellation_ensures,
+        &format!("{base_ptr}/cancellation_ensures"),
+    );
 }
 
 fn reptr_loop_contracts(loop_contracts: &mut [LoopContractAst], base_ptr: &str) {
@@ -1207,6 +1304,7 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
             &f.requires,
             &f.ensures,
             &f.invariant,
+            None,
             &f.loop_contracts,
             &f.params,
             &f.result,
@@ -1222,6 +1320,7 @@ fn x07ast_decls_to_values(file: &X07AstFile) -> Vec<Value> {
             &f.requires,
             &f.ensures,
             &f.invariant,
+            f.protocol.as_ref(),
             &f.loop_contracts,
             &f.params,
             &f.result,
@@ -1312,6 +1411,7 @@ fn def_decl_value(
     requires: &[ContractClauseAst],
     ensures: &[ContractClauseAst],
     invariant: &[ContractClauseAst],
+    protocol: Option<&AsyncProtocolAst>,
     loop_contracts: &[LoopContractAst],
     params: &[AstFunctionParam],
     result: &TypeRef,
@@ -1346,6 +1446,9 @@ fn def_decl_value(
             "invariant".to_string(),
             Value::Array(invariant.iter().map(contract_clause_to_value).collect()),
         );
+    }
+    if let Some(protocol) = protocol {
+        m.insert("protocol".to_string(), async_protocol_to_value(protocol));
     }
     if !loop_contracts.is_empty() {
         m.insert(
@@ -1389,6 +1492,47 @@ fn contract_clause_to_value(c: &ContractClauseAst) -> Value {
         m.insert(
             "witness".to_string(),
             Value::Array(c.witness.iter().map(expr_to_value).collect()),
+        );
+    }
+    Value::Object(m)
+}
+
+fn async_protocol_to_value(protocol: &AsyncProtocolAst) -> Value {
+    let mut m = serde_json::Map::new();
+    if !protocol.await_invariant.is_empty() {
+        m.insert(
+            "await_invariant".to_string(),
+            Value::Array(
+                protocol
+                    .await_invariant
+                    .iter()
+                    .map(contract_clause_to_value)
+                    .collect(),
+            ),
+        );
+    }
+    if !protocol.scope_invariant.is_empty() {
+        m.insert(
+            "scope_invariant".to_string(),
+            Value::Array(
+                protocol
+                    .scope_invariant
+                    .iter()
+                    .map(contract_clause_to_value)
+                    .collect(),
+            ),
+        );
+    }
+    if !protocol.cancellation_ensures.is_empty() {
+        m.insert(
+            "cancellation_ensures".to_string(),
+            Value::Array(
+                protocol
+                    .cancellation_ensures
+                    .iter()
+                    .map(contract_clause_to_value)
+                    .collect(),
+            ),
         );
     }
     Value::Object(m)

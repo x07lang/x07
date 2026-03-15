@@ -1,5 +1,5 @@
 {
-  "schema_version": "x07.arch.manifest@0.2.0",
+  "schema_version": "x07.arch.manifest@0.3.0",
   "repo": { "id": "verified_core_pure_v1", "root": "." },
   "externals": {
     "allowed_import_prefixes": ["std."],

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-capsule.index.schema.json",
+  "title": "x07.capsule.index@0.1.0",
+  "description": "Pinned capsule catalog consumed by trust certification and review tooling.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "capsules"],
+  "properties": {
+    "schema_version": { "const": "x07.capsule.index@0.1.0" },
+    "capsules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capsule_ref" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "capsule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "capsule_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "worlds_allowed",
+        "capabilities",
+        "contract_path",
+        "attestation_path"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/capsule_id" },
+        "worlds_allowed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/world_id" },
+          "default": []
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "default": []
+        },
+        "contract_path": { "$ref": "#/$defs/rel_path" },
+        "attestation_path": { "$ref": "#/$defs/rel_path" }
+      }
+    }
+  }
+}

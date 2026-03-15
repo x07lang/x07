@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-effect.log.schema.json",
+  "title": "x07.effect.log@0.1.0",
+  "description": "Structured effect-log envelope referenced by capsule contracts and runtime attestations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "capsule_id", "events"],
+  "properties": {
+    "schema_version": { "const": "x07.effect.log@0.1.0" },
+    "capsule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "digest"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "meta": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    }
+  }
+}

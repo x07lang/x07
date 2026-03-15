@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://x07.io/spec/x07ast.schema.json",
+  "$id": "https://x07.io/spec/x07ast.v0.7.0.schema.json",
   "title": "X07 x07AST v0.7.0",
   "description": "Canonical, JSON-based AST carrier for LLM-first X07 program generation and repair. Expressions are encoded as JSON S-expressions (json-sexpr).",
   "type": "object",

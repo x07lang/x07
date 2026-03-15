@@ -44,10 +44,11 @@ The root JSON object must include `schema_version`.
 
 Current schema version:
 
-- `x07.x07ast@0.6.0`
+- `x07.x07ast@0.7.0`
 
 The toolchain also accepts legacy schema versions:
 
+- `x07.x07ast@0.6.0` (programs with loop contracts but without async protocol contracts)
 - `x07.x07ast@0.5.0` (programs with function contracts but without loop contracts)
 - `x07.x07ast@0.4.0` (programs without contracts)
 - `x07.x07ast@0.3.0` (concrete-only programs)
@@ -119,6 +120,18 @@ Minimal shape:
 ```
 
 Use `x07 verify --prove` with `loop_contracts` when the certified surface needs loops but still fits the current pure, non-recursive proof subset.
+
+## Async protocol contracts (v0.7)
+
+x07AST v0.7 adds `protocol` on `defasync` declarations so async code can declare proof obligations across suspension points and task scopes.
+
+`protocol` may include:
+
+- `await_invariant[]`
+- `scope_invariant[]`
+- `cancellation_ensures[]`
+
+These clauses use the same contract-clause object shape as `requires` / `ensures` / `invariant`, and they must remain contract-pure.
 
 ## Branded bytes annotations
 

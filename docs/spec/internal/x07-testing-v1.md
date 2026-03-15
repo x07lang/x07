@@ -117,7 +117,7 @@ Exit codes:
 
 `x07 test` emits a JSON report with stable ordering by `id`.
 
-Schema: `spec/x07test.schema.json` (`schema_version = x07.x07test@0.3.0`).
+Schema: `spec/x07test.schema.json` (`schema_version = x07.x07test@0.4.0`).
 
 Contract violations:
 

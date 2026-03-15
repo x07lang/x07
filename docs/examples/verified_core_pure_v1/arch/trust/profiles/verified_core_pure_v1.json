@@ -1,5 +1,5 @@
 {
-  "schema_version": "x07.trust.profile@0.1.0",
+  "schema_version": "x07.trust.profile@0.2.0",
   "id": "verified_core_pure_v1",
   "claims": [
     "human_can_review_certificate_not_source"
@@ -19,7 +19,7 @@
     "allow_dynamic_dispatch": false
   },
   "arch_requirements": {
-    "manifest_min_version": "x07.arch.manifest@0.2.0",
+    "manifest_min_version": "x07.arch.manifest@0.3.0",
     "require_allowlist_mode": true,
     "require_deny_cycles": true,
     "require_deny_orphans": true,
@@ -35,8 +35,17 @@
     "require_pbt": "public_boundaries_only",
     "require_proof_mode": "prove",
     "require_proof_coverage": "all_reachable_defn",
+    "require_async_proof_coverage": false,
+    "require_capsule_attestations": false,
+    "require_runtime_attestation": false,
+    "require_effect_log_digests": false,
     "require_compile_attestation": true,
     "require_trust_report_clean": true,
     "require_sbom": true
+  },
+  "sandbox_requirements": {
+    "sandbox_backend": "any",
+    "forbid_weaker_isolation": false,
+    "network_mode": "any"
   }
 }

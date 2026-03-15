@@ -559,7 +559,7 @@ fn arch_check_suggests_and_applies_patches_for_rr_sorting_and_sanitizer_defaults
     std::fs::create_dir_all(&root).expect("create root");
 
     let manifest = r#"{
-  "schema_version": "x07.arch.manifest@0.2.0",
+  "schema_version": "x07.arch.manifest@0.3.0",
   "repo": { "id": "tmp_arch_check", "root": "." },
   "externals": { "allowed_import_prefixes": ["std.", "ext."], "allowed_exact": [] },
   "nodes": [],
@@ -720,7 +720,7 @@ fn arch_check_rr_sanitizer_schema_version_diag_includes_expected_and_got() {
     std::fs::create_dir_all(&root).expect("create root");
 
     let manifest = r#"{
-  "schema_version": "x07.arch.manifest@0.2.0",
+  "schema_version": "x07.arch.manifest@0.3.0",
   "repo": { "id": "tmp_arch_check", "root": "." },
   "externals": { "allowed_import_prefixes": ["std.", "ext."], "allowed_exact": [] },
   "nodes": [],
@@ -2526,7 +2526,7 @@ fn scaffold_trust_profile_fixture(dir: &Path) {
     write_json(
         &dir.join("arch/manifest.x07arch.json"),
         &serde_json::json!({
-            "schema_version": "x07.arch.manifest@0.2.0",
+            "schema_version": "x07.arch.manifest@0.3.0",
             "repo": {"id": "cli-fixture", "root": "."},
             "externals": {"allowed_import_prefixes": ["std."], "allowed_exact": []},
             "nodes": [
@@ -2590,7 +2590,7 @@ fn scaffold_trust_profile_fixture(dir: &Path) {
     write_json(
         &dir.join("arch/trust/profiles/verified_core_pure_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.1.0",
+            "schema_version": "x07.trust.profile@0.2.0",
             "id": "verified_core_pure_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -2604,7 +2604,7 @@ fn scaffold_trust_profile_fixture(dir: &Path) {
                 "allow_dynamic_dispatch": false
             },
             "arch_requirements": {
-                "manifest_min_version": "x07.arch.manifest@0.2.0",
+                "manifest_min_version": "x07.arch.manifest@0.3.0",
                 "require_allowlist_mode": true,
                 "require_deny_cycles": true,
                 "require_deny_orphans": true,
@@ -2620,12 +2620,270 @@ fn scaffold_trust_profile_fixture(dir: &Path) {
                 "require_pbt": "public_boundaries_only",
                 "require_proof_mode": "prove",
                 "require_proof_coverage": "all_reachable_defn",
+                "require_async_proof_coverage": false,
+                "require_capsule_attestations": false,
+                "require_runtime_attestation": false,
+                "require_effect_log_digests": false,
                 "require_compile_attestation": true,
                 "require_trust_report_clean": true,
                 "require_sbom": true
+            },
+            "sandbox_requirements": {
+                "sandbox_backend": "any",
+                "forbid_weaker_isolation": false,
+                "network_mode": "any"
             }
         }),
     );
+}
+
+fn scaffold_sandbox_trust_profile_fixture(dir: &Path, world: &str, net_enabled: bool) {
+    std::fs::create_dir_all(dir.join("src")).expect("create src");
+    std::fs::create_dir_all(dir.join("arch/boundaries")).expect("create boundaries");
+    std::fs::create_dir_all(dir.join("arch/capsules")).expect("create capsules");
+    std::fs::create_dir_all(dir.join("arch/trust/profiles")).expect("create trust profiles");
+    std::fs::create_dir_all(dir.join("policy")).expect("create policy");
+
+    let mut project = serde_json::json!({
+        "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+        "world": world,
+        "entry": "src/main.x07.json",
+        "module_roots": ["src"],
+        "dependencies": [],
+        "lockfile": "x07.lock.json"
+    });
+    if world == "run-os-sandboxed" {
+        project["default_profile"] = Value::String("sandbox".to_string());
+        project["profiles"] = serde_json::json!({
+            "sandbox": {
+                "world": "run-os-sandboxed",
+                "policy": "policy/run-os.json"
+            }
+        });
+    }
+    write_json(&dir.join("x07.json"), &project);
+    write_json(
+        &dir.join("x07.lock.json"),
+        &serde_json::json!({
+            "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
+            "dependencies": []
+        }),
+    );
+    write_json(
+        &dir.join("src/main.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["main.id_v1"]},
+                {
+                    "kind":"defn",
+                    "name":"main.id_v1",
+                    "params":[{"name":"x","ty":"i32"}],
+                    "result":"i32",
+                    "requires":[{"id":"r0","expr":["=","x","x"]}],
+                    "body":"x"
+                }
+            ],
+            "solve":["main.id_v1", 7]
+        }),
+    );
+    write_json(
+        &dir.join("arch/manifest.x07arch.json"),
+        &serde_json::json!({
+            "schema_version": "x07.arch.manifest@0.3.0",
+            "repo": {"id": "cli-sandbox-fixture", "root": "."},
+            "externals": {"allowed_import_prefixes": ["std."], "allowed_exact": []},
+            "nodes": [
+                {
+                    "id": "app_core",
+                    "match": {"module_prefixes": ["main"]},
+                    "world": world,
+                    "trust_zone": "verified_core",
+                    "visibility": {"mode": "public", "visible_to": []},
+                    "imports": {
+                        "deny_prefixes": ["std.os."],
+                        "allow_prefixes": ["main", "std."]
+                    },
+                    "contracts": {"smoke_entry": "main.id_v1"}
+                }
+            ],
+            "rules": [
+                {"kind": "deny_cycles_v1", "id": "deny_cycles.nodes_v1", "scope": "nodes"}
+            ],
+            "checks": {
+                "deny_cycles": true,
+                "deny_orphans": true,
+                "enforce_visibility": true,
+                "enforce_world_caps": true,
+                "allowlist_mode": {
+                    "enabled": true,
+                    "default_allow_external": false,
+                    "default_allow_internal": false
+                },
+                "brand_boundary_v1": {"enabled": true},
+                "world_of_imported_v1": {"enabled": true}
+            },
+            "contracts_v1": {
+                "boundaries": {
+                    "index_path": "arch/boundaries/index.x07boundary.json",
+                    "enforce": "error"
+                }
+            }
+        }),
+    );
+    write_json(
+        &dir.join("arch/boundaries/index.x07boundary.json"),
+        &serde_json::json!({
+            "schema_version": "x07.arch.boundaries.index@0.1.0",
+            "boundaries": [
+                {
+                    "id": "main.id_v1",
+                    "symbol": "main.id_v1",
+                    "node_id": "app_core",
+                    "kind": "public_function",
+                    "from_zone": "verified_core",
+                    "to_zone": "verified_core",
+                    "worlds_allowed": [world],
+                    "input": {"params": [{"name": "x", "ty": "i32"}]},
+                    "output": {"ty": "i32"},
+                    "smoke": {"entry": "main.id_v1", "tests": ["smoke_main"]},
+                    "pbt": {"required": false, "tests": []},
+                    "verify": {"required": true, "mode": "prove"}
+                }
+            ]
+        }),
+    );
+    write_json(
+        &dir.join("arch/capsules/index.x07capsule.json"),
+        &serde_json::json!({
+            "schema_version": "x07.capsule.index@0.1.0",
+            "capsules": [
+                {
+                    "id": "capsule.echo_v1",
+                    "worlds_allowed": [world],
+                    "capabilities": ["net"],
+                    "contract_path": "capsule.echo.contract.json",
+                    "attestation_path": "capsule.echo.attest.json"
+                }
+            ]
+        }),
+    );
+    write_json(
+        &dir.join("arch/capsules/capsule.echo.contract.json"),
+        &serde_json::json!({
+            "schema_version": "x07.capsule.contract@0.1.0",
+            "id": "capsule.echo_v1",
+            "worlds_allowed": [world],
+            "capabilities": ["net"],
+            "language": {
+                "allow_unsafe": false,
+                "allow_ffi": false
+            },
+            "input": {
+                "shape": {
+                    "brand": "capsule.echo.in_v1"
+                }
+            },
+            "output": {
+                "shape": {
+                    "brand": "capsule.echo.out_v1"
+                }
+            },
+            "error_spaces": ["capsule.echo.error_v1"],
+            "effect_log": {
+                "schema_path": "capsule.echo.effect_log.json",
+                "redaction": "metadata_only",
+                "replay_safe": true
+            },
+            "replay": {
+                "mode": "deterministic"
+            },
+            "conformance": {
+                "tests": ["smoke_main"],
+                "report_path": null
+            }
+        }),
+    );
+    write_json(
+        &dir.join("arch/capsules/capsule.echo.attest.json"),
+        &serde_json::json!({
+            "schema_version": "x07.capsule.attest@0.1.0",
+            "capsule_id": "capsule.echo_v1",
+            "contract_digest": format!("sha256:{}", "0".repeat(64)),
+            "module_digests": [],
+            "lockfile_digest": format!("sha256:{}", "1".repeat(64)),
+            "conformance_report_digest": format!("sha256:{}", "2".repeat(64))
+        }),
+    );
+    write_json(
+        &dir.join("arch/capsules/capsule.echo.effect_log.json"),
+        &serde_json::json!({
+            "schema_version": "x07.effect.log@0.1.0",
+            "capsule_id": "capsule.echo_v1",
+            "events": []
+        }),
+    );
+    if world == "run-os-sandboxed" {
+        write_json(
+            &dir.join("policy/run-os.json"),
+            &serde_json::json!({
+                "schema_version": "x07.run-os-policy@0.1.0",
+                "policy_id": "sandbox_fixture",
+                "limits": {
+                    "cpu_ms": 5000,
+                    "wall_ms": 6000,
+                    "mem_bytes": 33554432,
+                    "fds": 16,
+                    "procs": 8
+                },
+                "fs": {
+                    "enabled": false,
+                    "read_roots": [],
+                    "write_roots": [],
+                    "deny_hidden": true
+                },
+                "net": {
+                    "enabled": net_enabled,
+                    "allow_dns": net_enabled,
+                    "allow_tcp": net_enabled,
+                    "allow_udp": false,
+                    "allow_hosts": if net_enabled {
+                        serde_json::json!([{"host": "127.0.0.1", "ports": [4317]}])
+                    } else {
+                        serde_json::json!([])
+                    }
+                },
+                "env": {
+                    "enabled": false,
+                    "allow_keys": [],
+                    "deny_keys": []
+                },
+                "time": {
+                    "enabled": false,
+                    "allow_monotonic": false,
+                    "allow_wall_clock": false,
+                    "allow_sleep": false,
+                    "max_sleep_ms": 0,
+                    "allow_local_tzid": false
+                },
+                "language": {
+                    "allow_unsafe": false,
+                    "allow_ffi": false
+                },
+                "process": {
+                    "enabled": false,
+                    "allow_spawn": false,
+                    "max_live": 0,
+                    "max_spawns": 0,
+                    "allow_exec": false,
+                    "allow_exit": false
+                }
+            }),
+        );
+    }
 }
 
 #[test]
@@ -2669,6 +2927,330 @@ fn x07_trust_profile_check_accepts_matching_profile() {
     assert_eq!(v["ok"], true);
     assert_eq!(v["profile"], "verified_core_pure_v1");
     assert_eq!(v["entry"], "main.id_v1");
+}
+
+#[test]
+fn x07_trust_profile_check_accepts_sandboxed_local_profile() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_profile_check_sandbox_ok");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    scaffold_sandbox_trust_profile_fixture(&dir, "run-os-sandboxed", false);
+    write_json(
+        &dir.join("arch/trust/profiles/trusted_program_sandboxed_local_v1.json"),
+        &serde_json::json!({
+            "schema_version": "x07.trust.profile@0.2.0",
+            "id": "trusted_program_sandboxed_local_v1",
+            "claims": ["human_can_review_certificate_not_source"],
+            "entrypoints": ["main.id_v1"],
+            "worlds_allowed": ["run-os-sandboxed"],
+            "language_subset": {
+                "allow_defasync": true,
+                "allow_recursion": false,
+                "allow_extern": false,
+                "allow_unsafe": false,
+                "allow_ffi": false,
+                "allow_dynamic_dispatch": false
+            },
+            "arch_requirements": {
+                "manifest_min_version": "x07.arch.manifest@0.3.0",
+                "require_allowlist_mode": true,
+                "require_deny_cycles": true,
+                "require_deny_orphans": true,
+                "require_visibility": true,
+                "require_world_caps": true,
+                "require_brand_boundaries": true
+            },
+            "evidence_requirements": {
+                "require_boundary_index": true,
+                "require_schema_derive_check": true,
+                "require_smoke_harnesses": true,
+                "require_unit_tests": true,
+                "require_pbt": "public_boundaries_only",
+                "require_proof_mode": "prove",
+                "require_proof_coverage": "all_reachable_defn",
+                "require_async_proof_coverage": true,
+                "require_capsule_attestations": true,
+                "require_runtime_attestation": true,
+                "require_effect_log_digests": true,
+                "require_compile_attestation": true,
+                "require_trust_report_clean": true,
+                "require_sbom": true
+            },
+            "sandbox_requirements": {
+                "sandbox_backend": "vm",
+                "forbid_weaker_isolation": true,
+                "network_mode": "none"
+            }
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "profile",
+            "check",
+            "--profile",
+            "arch/trust/profiles/trusted_program_sandboxed_local_v1.json",
+            "--project",
+            "x07.json",
+            "--entry",
+            "main.id_v1",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse trust profile report");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["profile"], "trusted_program_sandboxed_local_v1");
+}
+
+#[test]
+fn x07_trust_profile_check_rejects_run_os_for_sandboxed_local_profile() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_profile_check_sandbox_run_os");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    scaffold_sandbox_trust_profile_fixture(&dir, "run-os", false);
+    write_json(
+        &dir.join("arch/trust/profiles/trusted_program_sandboxed_local_v1.json"),
+        &serde_json::json!({
+            "schema_version": "x07.trust.profile@0.2.0",
+            "id": "trusted_program_sandboxed_local_v1",
+            "claims": ["human_can_review_certificate_not_source"],
+            "entrypoints": ["main.id_v1"],
+            "worlds_allowed": ["run-os-sandboxed"],
+            "language_subset": {
+                "allow_defasync": true,
+                "allow_recursion": false,
+                "allow_extern": false,
+                "allow_unsafe": false,
+                "allow_ffi": false,
+                "allow_dynamic_dispatch": false
+            },
+            "arch_requirements": {
+                "manifest_min_version": "x07.arch.manifest@0.3.0",
+                "require_allowlist_mode": true,
+                "require_deny_cycles": true,
+                "require_deny_orphans": true,
+                "require_visibility": true,
+                "require_world_caps": true,
+                "require_brand_boundaries": true
+            },
+            "evidence_requirements": {
+                "require_boundary_index": true,
+                "require_schema_derive_check": true,
+                "require_smoke_harnesses": true,
+                "require_unit_tests": true,
+                "require_pbt": "public_boundaries_only",
+                "require_proof_mode": "prove",
+                "require_proof_coverage": "all_reachable_defn",
+                "require_async_proof_coverage": true,
+                "require_capsule_attestations": true,
+                "require_runtime_attestation": true,
+                "require_effect_log_digests": true,
+                "require_compile_attestation": true,
+                "require_trust_report_clean": true,
+                "require_sbom": true
+            },
+            "sandbox_requirements": {
+                "sandbox_backend": "vm",
+                "forbid_weaker_isolation": true,
+                "network_mode": "none"
+            }
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "profile",
+            "check",
+            "--profile",
+            "arch/trust/profiles/trusted_program_sandboxed_local_v1.json",
+            "--project",
+            "x07.json",
+            "--entry",
+            "main.id_v1",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse trust profile report");
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_SANDBOX_BACKEND_REQUIRED"));
+}
+
+#[test]
+fn x07_trust_profile_check_rejects_network_enabled_local_sandbox_policy() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_profile_check_sandbox_net");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    scaffold_sandbox_trust_profile_fixture(&dir, "run-os-sandboxed", true);
+    write_json(
+        &dir.join("arch/trust/profiles/trusted_program_sandboxed_local_v1.json"),
+        &serde_json::json!({
+            "schema_version": "x07.trust.profile@0.2.0",
+            "id": "trusted_program_sandboxed_local_v1",
+            "claims": ["human_can_review_certificate_not_source"],
+            "entrypoints": ["main.id_v1"],
+            "worlds_allowed": ["run-os-sandboxed"],
+            "language_subset": {
+                "allow_defasync": true,
+                "allow_recursion": false,
+                "allow_extern": false,
+                "allow_unsafe": false,
+                "allow_ffi": false,
+                "allow_dynamic_dispatch": false
+            },
+            "arch_requirements": {
+                "manifest_min_version": "x07.arch.manifest@0.3.0",
+                "require_allowlist_mode": true,
+                "require_deny_cycles": true,
+                "require_deny_orphans": true,
+                "require_visibility": true,
+                "require_world_caps": true,
+                "require_brand_boundaries": true
+            },
+            "evidence_requirements": {
+                "require_boundary_index": true,
+                "require_schema_derive_check": true,
+                "require_smoke_harnesses": true,
+                "require_unit_tests": true,
+                "require_pbt": "public_boundaries_only",
+                "require_proof_mode": "prove",
+                "require_proof_coverage": "all_reachable_defn",
+                "require_async_proof_coverage": true,
+                "require_capsule_attestations": true,
+                "require_runtime_attestation": true,
+                "require_effect_log_digests": true,
+                "require_compile_attestation": true,
+                "require_trust_report_clean": true,
+                "require_sbom": true
+            },
+            "sandbox_requirements": {
+                "sandbox_backend": "vm",
+                "forbid_weaker_isolation": true,
+                "network_mode": "none"
+            }
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "profile",
+            "check",
+            "--profile",
+            "arch/trust/profiles/trusted_program_sandboxed_local_v1.json",
+            "--project",
+            "x07.json",
+            "--entry",
+            "main.id_v1",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse trust profile report");
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_NETWORK_MODE_FORBIDDEN"));
+}
+
+#[test]
+fn x07_trust_profile_check_rejects_weakened_sandbox_profile_contract() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_profile_check_sandbox_contract");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    write_json(
+        &dir.join("bad_profile.json"),
+        &serde_json::json!({
+            "schema_version": "x07.trust.profile@0.2.0",
+            "id": "trusted_program_sandboxed_local_v1",
+            "claims": ["human_can_review_certificate_not_source"],
+            "entrypoints": ["main.id_v1"],
+            "worlds_allowed": ["run-os", "run-os-sandboxed"],
+            "language_subset": {
+                "allow_defasync": true,
+                "allow_recursion": false,
+                "allow_extern": false,
+                "allow_unsafe": false,
+                "allow_ffi": false,
+                "allow_dynamic_dispatch": false
+            },
+            "arch_requirements": {
+                "manifest_min_version": "x07.arch.manifest@0.3.0",
+                "require_allowlist_mode": true,
+                "require_deny_cycles": true,
+                "require_deny_orphans": true,
+                "require_visibility": true,
+                "require_world_caps": true,
+                "require_brand_boundaries": true
+            },
+            "evidence_requirements": {
+                "require_boundary_index": true,
+                "require_schema_derive_check": true,
+                "require_smoke_harnesses": true,
+                "require_unit_tests": true,
+                "require_pbt": "public_boundaries_only",
+                "require_proof_mode": "prove",
+                "require_proof_coverage": "all_reachable_defn",
+                "require_async_proof_coverage": false,
+                "require_capsule_attestations": false,
+                "require_runtime_attestation": false,
+                "require_effect_log_digests": false,
+                "require_compile_attestation": true,
+                "require_trust_report_clean": true,
+                "require_sbom": true
+            },
+            "sandbox_requirements": {
+                "sandbox_backend": "os",
+                "forbid_weaker_isolation": false,
+                "network_mode": "allowlist"
+            }
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &["trust", "profile", "check", "--profile", "bad_profile.json"],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse trust profile report");
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_ASYNC_PROOF_REQUIRED"));
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_CAPSULE_ATTEST_REQUIRED"));
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_RUNTIME_ATTEST_REQUIRED"));
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_SANDBOX_BACKEND_REQUIRED"));
+    assert!(diags
+        .iter()
+        .any(|diag| diag["code"] == "X07TP_NETWORK_MODE_FORBIDDEN"));
 }
 
 #[test]
@@ -3025,7 +3607,7 @@ fn arch_manifest_doc(
     externals: Value,
 ) -> Value {
     serde_json::json!({
-      "schema_version": "x07.arch.manifest@0.2.0",
+      "schema_version": "x07.arch.manifest@0.3.0",
       "repo": {"id":"test-repo","root":"."},
       "externals": externals,
       "nodes": nodes,
@@ -8158,6 +8740,210 @@ fn x07_review_diff_fail_on_formal_verification_posture_returns_20() {
 }
 
 #[test]
+fn x07_review_diff_fail_on_capsule_runtime_and_sandbox_posture_returns_20() {
+    let root = repo_root();
+    let fixtures = fixtures_root().join("review");
+    let before = fixtures.join("before");
+    let after = fixtures.join("after");
+
+    let work = fresh_tmp_dir(&root, "tmp_x07_review_diff_capsule_runtime");
+    let before_copy = work.join("before");
+    let after_copy = work.join("after");
+    copy_dir_recursive(&before, &before_copy);
+    copy_dir_recursive(&after, &after_copy);
+
+    write_json(
+        &before_copy.join("arch/capsules/index.x07capsule.json"),
+        &serde_json::json!({
+            "schema_version": "x07.capsule.index@0.1.0",
+            "capsules": [
+                {
+                    "id": "capsule.echo_v1",
+                    "worlds_allowed": ["run-os-sandboxed"],
+                    "capabilities": ["net"],
+                    "contract_path": "capsule.echo.contract.json",
+                    "attestation_path": "capsule.echo.attest.json"
+                }
+            ]
+        }),
+    );
+    write_json(
+        &before_copy.join("arch/capsules/capsule.echo.contract.json"),
+        &serde_json::json!({
+            "schema_version": "x07.capsule.contract@0.1.0",
+            "id": "capsule.echo_v1",
+            "worlds_allowed": ["run-os-sandboxed"],
+            "capabilities": ["net"],
+            "language": {
+                "allow_unsafe": false,
+                "allow_ffi": false
+            },
+            "input": { "shape": { "brand": "capsule.echo.in_v1" } },
+            "output": { "shape": { "brand": "capsule.echo.out_v1" } },
+            "error_spaces": ["capsule.echo.error_v1"],
+            "effect_log": {
+                "schema_path": "capsule.echo.effect_log.json",
+                "redaction": "metadata_only",
+                "replay_safe": true
+            },
+            "replay": { "mode": "deterministic" },
+            "conformance": {
+                "tests": ["capsule_echo_smoke"],
+                "report_path": null
+            }
+        }),
+    );
+    write_json(
+        &after_copy.join("arch/capsules/index.x07capsule.json"),
+        &serde_json::json!({
+            "schema_version": "x07.capsule.index@0.1.0",
+            "capsules": [
+                {
+                    "id": "capsule.echo_v1",
+                    "worlds_allowed": ["run-os-sandboxed"],
+                    "capabilities": ["net"],
+                    "contract_path": "capsule.echo.contract.json",
+                    "attestation_path": "capsule.echo.attest.json"
+                },
+                {
+                    "id": "capsule.fs_v1",
+                    "worlds_allowed": ["run-os-sandboxed"],
+                    "capabilities": ["fs"],
+                    "contract_path": "capsule.fs.contract.json",
+                    "attestation_path": "capsule.fs.attest.json"
+                }
+            ]
+        }),
+    );
+    write_json(
+        &after_copy.join("arch/capsules/capsule.echo.contract.json"),
+        &serde_json::json!({
+            "schema_version": "x07.capsule.contract@0.1.0",
+            "id": "capsule.echo_v1",
+            "worlds_allowed": ["run-os-sandboxed"],
+            "capabilities": ["net", "process"],
+            "language": {
+                "allow_unsafe": true,
+                "allow_ffi": true
+            },
+            "input": { "shape": { "brand": "capsule.echo.in_v1" } },
+            "output": { "shape": { "brand": "capsule.echo.out_v1" } },
+            "error_spaces": ["capsule.echo.error_v1"],
+            "effect_log": {
+                "schema_path": "capsule.echo.effect_log.json",
+                "redaction": "none",
+                "replay_safe": false
+            },
+            "replay": { "mode": "deterministic" },
+            "conformance": {
+                "tests": ["capsule_echo_smoke"],
+                "report_path": null
+            }
+        }),
+    );
+    write_json(
+        &before_copy.join("runtime.attest.json"),
+        &serde_json::json!({
+            "schema_version": "x07.runtime.attest@0.1.0",
+            "world": "run-os-sandboxed",
+            "sandbox_backend": "vm",
+            "guest_digest": format!("sha256:{}", "0".repeat(64)),
+            "policy_digest": format!("sha256:{}", "1".repeat(64)),
+            "binary_digest": format!("sha256:{}", "2".repeat(64)),
+            "compile_attestation_digest": format!("sha256:{}", "3".repeat(64)),
+            "capsule_attestation_digests": [],
+            "effect_log_digests": [],
+            "weaker_isolation": false,
+            "exit": { "kind": "code", "code": 0 }
+        }),
+    );
+    write_json(
+        &after_copy.join("runtime.attest.json"),
+        &serde_json::json!({
+            "schema_version": "x07.runtime.attest@0.1.0",
+            "world": "run-os-sandboxed",
+            "sandbox_backend": "os",
+            "guest_digest": format!("sha256:{}", "4".repeat(64)),
+            "policy_digest": format!("sha256:{}", "5".repeat(64)),
+            "binary_digest": format!("sha256:{}", "6".repeat(64)),
+            "compile_attestation_digest": format!("sha256:{}", "7".repeat(64)),
+            "capsule_attestation_digests": [],
+            "effect_log_digests": [],
+            "weaker_isolation": true,
+            "exit": { "kind": "code", "code": 0 }
+        }),
+    );
+
+    let json_out = work.join("review_capsule_runtime.json");
+    let html_out = work.join("review_capsule_runtime.html");
+    let out = run_x07(&[
+        "review",
+        "diff",
+        "--from",
+        before_copy.to_str().unwrap(),
+        "--to",
+        after_copy.to_str().unwrap(),
+        "--mode",
+        "project",
+        "--json-out",
+        json_out.to_str().unwrap(),
+        "--html-out",
+        html_out.to_str().unwrap(),
+        "--fail-on",
+        "capsule-contract-relaxation",
+        "--fail-on",
+        "capsule-set-change",
+        "--fail-on",
+        "sandbox-policy-widen",
+        "--fail-on",
+        "runtime-attestation-regression",
+        "--fail-on",
+        "weaker-isolation-enabled",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(20),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let report: Value =
+        serde_json::from_slice(&std::fs::read(&json_out).expect("read review json"))
+            .expect("parse review json");
+    assert!(
+        report["highlights"]["capsule_changes"]
+            .as_array()
+            .expect("capsule_changes[]")
+            .iter()
+            .any(|c| c["kind"] == "capsule_contract"),
+        "expected capsule contract changes"
+    );
+    assert!(
+        report["highlights"]["capsule_changes"]
+            .as_array()
+            .expect("capsule_changes[]")
+            .iter()
+            .any(|c| c["kind"] == "capsule_set"),
+        "expected capsule set changes"
+    );
+    assert!(
+        !report["highlights"]["runtime_attestation_changes"]
+            .as_array()
+            .expect("runtime_attestation_changes[]")
+            .is_empty(),
+        "expected runtime attestation changes"
+    );
+    assert!(
+        report["highlights"]["sandbox_policy_changes"]
+            .as_array()
+            .expect("sandbox_policy_changes[]")
+            .iter()
+            .any(|c| c["kind"] == "weaker_isolation"),
+        "expected weaker isolation change"
+    );
+}
+
+#[test]
 fn x07_trust_report_outputs_expected_schema_and_flags() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_trust_report");
@@ -8392,6 +9178,77 @@ fn x07_trust_report_outputs_expected_schema_and_flags() {
 }
 
 #[test]
+fn x07_trust_capsule_attest_overwrites_fixture_and_check_passes() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_trust_capsule");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+    scaffold_sandbox_trust_profile_fixture(&dir, "run-os-sandboxed", false);
+
+    write_json(
+        &dir.join("target/capsules/echo.conformance.json"),
+        &serde_json::json!({
+            "schema_version": "x07.conformance.report@0.1.0",
+            "ok": true,
+            "tests": ["smoke_main"]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "capsule",
+            "attest",
+            "--contract",
+            "arch/capsules/capsule.echo.contract.json",
+            "--module",
+            "src/main.x07.json",
+            "--lockfile",
+            "x07.lock.json",
+            "--conformance-report",
+            "target/capsules/echo.conformance.json",
+            "--out",
+            "arch/capsules/capsule.echo.attest.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let attest_stdout = parse_json_stdout(&out);
+    assert_eq!(attest_stdout["schema_version"], "x07.capsule.attest@0.1.0");
+    assert_eq!(attest_stdout["capsule_id"], "capsule.echo_v1");
+    assert!(dir.join("arch/capsules/capsule.echo.attest.json").is_file());
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "trust",
+            "capsule",
+            "check",
+            "--project",
+            "x07.json",
+            "--index",
+            "arch/capsules/index.x07capsule.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let check_stdout = parse_json_stdout(&out);
+    assert_eq!(check_stdout["ok"], true);
+    assert_eq!(check_stdout["checked_capsules"], 1);
+}
+
+#[test]
 fn x07_trust_profile_check_accepts_strict_pure_project() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_trust_profile_check");
@@ -8452,7 +9309,7 @@ fn x07_trust_profile_check_accepts_strict_pure_project() {
     write_json(
         &dir.join("arch/manifest.x07arch.json"),
         &serde_json::json!({
-            "schema_version": "x07.arch.manifest@0.2.0",
+            "schema_version": "x07.arch.manifest@0.3.0",
             "repo": { "id": "fixture", "root": "." },
             "externals": { "allowed_import_prefixes": ["std."], "allowed_exact": [] },
             "nodes": [
@@ -8497,7 +9354,7 @@ fn x07_trust_profile_check_accepts_strict_pure_project() {
     write_json(
         &dir.join("arch/trust/profiles/verified_core_pure_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.1.0",
+            "schema_version": "x07.trust.profile@0.2.0",
             "id": "verified_core_pure_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["app.main"],
@@ -8511,7 +9368,7 @@ fn x07_trust_profile_check_accepts_strict_pure_project() {
                 "allow_dynamic_dispatch": false
             },
             "arch_requirements": {
-                "manifest_min_version": "x07.arch.manifest@0.2.0",
+                "manifest_min_version": "x07.arch.manifest@0.3.0",
                 "require_allowlist_mode": true,
                 "require_deny_cycles": true,
                 "require_deny_orphans": true,
@@ -8527,9 +9384,18 @@ fn x07_trust_profile_check_accepts_strict_pure_project() {
                 "require_pbt": "public_boundaries_only",
                 "require_proof_mode": "prove",
                 "require_proof_coverage": "all_reachable_defn",
+                "require_async_proof_coverage": false,
+                "require_capsule_attestations": false,
+                "require_runtime_attestation": false,
+                "require_effect_log_digests": false,
                 "require_compile_attestation": true,
                 "require_trust_report_clean": true,
                 "require_sbom": true
+            },
+            "sandbox_requirements": {
+                "sandbox_backend": "any",
+                "forbid_weaker_isolation": false,
+                "network_mode": "any"
             }
         }),
     );

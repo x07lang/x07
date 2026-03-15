@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-runtime.attest.schema.json",
+  "title": "x07.runtime.attest@0.1.0",
+  "description": "Runtime attestation emitted for `run-os-sandboxed` executions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "world",
+    "sandbox_backend",
+    "weaker_isolation",
+    "artifact_path",
+    "input_len_bytes",
+    "outcome"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.runtime.attest@0.1.0" },
+    "world": {
+      "type": "string",
+      "const": "run-os-sandboxed"
+    },
+    "sandbox_backend": {
+      "type": "string",
+      "enum": ["os", "vm"]
+    },
+    "weaker_isolation": { "type": "boolean" },
+    "artifact_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "policy_path": {
+      "anyOf": [
+        { "type": "string", "minLength": 1, "maxLength": 4096 },
+        { "type": "null" }
+      ]
+    },
+    "input_len_bytes": { "type": "integer", "minimum": 0 },
+    "run_dir": {
+      "anyOf": [
+        { "type": "string", "minLength": 1, "maxLength": 4096 },
+        { "type": "null" }
+      ]
+    },
+    "guest_image_digest": {
+      "anyOf": [
+        { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "exit_status"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "exit_status": { "type": "integer" },
+        "trap": {
+          "anyOf": [
+            { "type": "string", "maxLength": 65536 },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

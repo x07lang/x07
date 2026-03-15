@@ -1,7 +1,7 @@
 root ::= entry-doc | module-doc
 
-entry-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"entry\"" ws entry-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.5.0\"" ws "," ws "\"solve\"" ws ":" ws sexpr ws "}"
-module-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"module\"" ws module-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.5.0\"" ws "}"
+entry-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"entry\"" ws entry-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.7.0\"" ws "," ws "\"solve\"" ws ":" ws sexpr ws "}"
+module-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"module\"" ws module-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.7.0\"" ws "}"
 
 entry-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
 module-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
@@ -32,10 +32,14 @@ decl-defn-tail ::= "" | decl-defn-tail-type-params | decl-defn-tail-result-brand
 decl-defn-tail-type-params ::= ws "," ws "\"type_params\"" ws ":" ws type-param-array
 decl-defn-tail-result-brand ::= ws "," ws "\"result_brand\"" ws ":" ws symbol
 decl-defn-tail-both ::= ws "," ws "\"result_brand\"" ws ":" ws symbol ws "," ws "\"type_params\"" ws ":" ws type-param-array
-decl-defasync-tail ::= "" | decl-defasync-tail-type-params | decl-defasync-tail-result-brand | decl-defasync-tail-both
+decl-defasync-tail ::= "" | decl-defasync-tail-type-params | decl-defasync-tail-result-brand | decl-defasync-tail-both | decl-defasync-tail-protocol | decl-defasync-tail-protocol-type-params | decl-defasync-tail-protocol-result-brand | decl-defasync-tail-protocol-both
 decl-defasync-tail-type-params ::= ws "," ws "\"type_params\"" ws ":" ws type-param-array
 decl-defasync-tail-result-brand ::= ws "," ws "\"result_brand\"" ws ":" ws symbol
 decl-defasync-tail-both ::= ws "," ws "\"result_brand\"" ws ":" ws symbol ws "," ws "\"type_params\"" ws ":" ws type-param-array
+decl-defasync-tail-protocol ::= ws "," ws "\"protocol\"" ws ":" ws async-protocol
+decl-defasync-tail-protocol-type-params ::= ws "," ws "\"protocol\"" ws ":" ws async-protocol ws "," ws "\"type_params\"" ws ":" ws type-param-array
+decl-defasync-tail-protocol-result-brand ::= ws "," ws "\"protocol\"" ws ":" ws async-protocol ws "," ws "\"result_brand\"" ws ":" ws symbol
+decl-defasync-tail-protocol-both ::= ws "," ws "\"protocol\"" ws ":" ws async-protocol ws "," ws "\"result_brand\"" ws ":" ws symbol ws "," ws "\"type_params\"" ws ":" ws type-param-array
 
 decl-export ::= "{" ws "\"kind\"" ws ":" ws "\"export\"" ws "," ws "\"names\"" ws ":" ws symbol-array-non-empty ws "}"
 
@@ -61,6 +65,7 @@ contract-clause-expr-id-witness ::= "{" ws "\"expr\"" ws ":" ws sexpr ws "," ws 
 contract-witness-array ::= "[" ws contract-witness-list-opt ws "]"
 contract-witness-list-opt ::= "" | sexpr contract-witness-list-tail
 contract-witness-list-tail ::= "" | ws "," ws sexpr contract-witness-list-tail
+async-protocol ::= json-object
 
 type-param-array ::= "[" ws type-param-list-opt ws "]"
 type-param-list-opt ::= "" | type-param type-param-list-tail

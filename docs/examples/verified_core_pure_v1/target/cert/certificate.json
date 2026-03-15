@@ -1,4 +1,14 @@
 {
+  "async_proof": {
+    "covered": 0,
+    "model": null,
+    "reachable": 0
+  },
+  "capsules": {
+    "attestations": [],
+    "count": 0,
+    "ids": []
+  },
   "claims": [
     "human_can_review_certificate_not_source"
   ],
@@ -9,14 +19,16 @@
       "sha256_hex": "8ef02ae6bfcff60b1ed522763f306751471faefbe102807804f57bac308b984b"
     },
     "bundle_path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/bundle/id_31728496d40a1c141362c603207c6be17129fb3df21f0c9c8549f0ea8b93a23a",
+    "capsule_attestations": [],
     "compile_attestation": {
       "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/compile.attest.json",
-      "sha256_hex": "5a7b9c112fa4e6c600663a1750d49345263b4608d70d97c7b5239435afe6753a"
+      "sha256_hex": "3a6acc077982c32ede846f1eba62567e0d34a7af31f19359a4e520aa89f318a0"
     },
     "coverage_report": {
       "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/verify.coverage.json",
       "sha256_hex": "61a9707fc845d4ab788356b873061c41a5add313b0f0867b545c3a869982b59b"
     },
+    "effect_logs": [],
     "prove_reports": [
       {
         "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/prove/id_31728496d40a1c141362c603207c6be17129fb3df21f0c9c8549f0ea8b93a23a.json",
@@ -26,16 +38,17 @@
     "schema_derive_reports": [],
     "tests_report": {
       "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/tests.report.json",
-      "sha256_hex": "a019f9372c48ad3fdb6c23e1733dad6dfd599d7ae6d9cdd4d4880f0ac3088bf5"
+      "sha256_hex": "5c707b9863e8cbc3d45d61bc67cefcef3b25119f124e23d3683563f615f57931"
     },
     "trust_report": {
       "path": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert/trust.report.json",
-      "sha256_hex": "515afb4317f3591f2d15aade09fc88adb12c0ad9262143eeb9453d7e5b04a52c"
+      "sha256_hex": "30ea8bcadc4d54bcd49d72498cc6a251804629c8bc700bfa0322bc802477df22"
     }
   },
   "out_dir": "/Users/webik/projects/x07lang/x07/docs/examples/verified_core_pure_v1/target/cert",
   "profile": "verified_core_pure_v1",
-  "schema_version": "x07.trust.certificate@0.1.0",
+  "runtime": null,
+  "schema_version": "x07.trust.certificate@0.2.0",
   "tcb": {
     "host_compiler": "cc (Apple clang version 17.0.0 (clang-1700.6.4.2))",
     "trusted_primitive_manifest_digest": "sha256:ba1d8275a1fe7f3ab13c9289ecc1229794e46a051bba9851769e6a3cd57fd189",

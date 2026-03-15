@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-capsule.contract.schema.json",
+  "title": "x07.capsule.contract@0.1.0",
+  "description": "Pinned contract for a certified capsule that mediates effectful boundaries.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "worlds_allowed",
+    "capabilities",
+    "language",
+    "input",
+    "output",
+    "error_spaces",
+    "effect_log",
+    "replay",
+    "conformance"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.capsule.contract@0.1.0" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "worlds_allowed": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/world_id" },
+      "default": []
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "default": []
+    },
+    "language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allow_unsafe", "allow_ffi"],
+      "properties": {
+        "allow_unsafe": { "type": "boolean" },
+        "allow_ffi": { "type": "boolean" }
+      }
+    },
+    "input": { "$ref": "#/$defs/io_contract" },
+    "output": { "$ref": "#/$defs/io_contract" },
+    "error_spaces": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+      "default": []
+    },
+    "effect_log": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_path", "redaction", "replay_safe"],
+      "properties": {
+        "schema_path": { "$ref": "#/$defs/rel_path" },
+        "redaction": { "type": "string", "enum": ["none", "metadata_only", "strip_payload"] },
+        "replay_safe": { "type": "boolean" }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["deterministic", "redacted", "forbidden"] }
+      }
+    },
+    "conformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tests"],
+      "properties": {
+        "tests": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "default": []
+        },
+        "report_path": {
+          "anyOf": [
+            { "$ref": "#/$defs/rel_path" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "brand_or_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "brand": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "schema": { "$ref": "#/$defs/rel_path" }
+      },
+      "anyOf": [
+        { "required": ["brand"] },
+        { "required": ["schema"] }
+      ]
+    },
+    "io_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape"],
+      "properties": {
+        "shape": { "$ref": "#/$defs/brand_or_schema" },
+        "encoding_doc": {
+          "anyOf": [
+            { "$ref": "#/$defs/rel_path" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

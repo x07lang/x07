@@ -77,6 +77,9 @@ enum ConstraintOrigin {
         name: String,
     },
     ContractExpr,
+    AsyncAwaitInvariant,
+    AsyncScopeInvariant,
+    AsyncCancellationEnsure,
     ExprCheck,
 }
 
@@ -89,6 +92,9 @@ impl ConstraintOrigin {
             ConstraintOrigin::IfBranch => "if_branch",
             ConstraintOrigin::SetAssign { .. } => "set_assign",
             ConstraintOrigin::ContractExpr => "contract_expr",
+            ConstraintOrigin::AsyncAwaitInvariant => "async_await_invariant",
+            ConstraintOrigin::AsyncScopeInvariant => "async_scope_invariant",
+            ConstraintOrigin::AsyncCancellationEnsure => "async_cancellation_ensure",
             ConstraintOrigin::ExprCheck => "expr_check",
         }
     }
@@ -200,16 +206,20 @@ impl<'a> InferState<'a> {
     }
 
     fn check_contract_expr(&mut self, expr: &Expr, want: &TyTerm) {
+        self.check_contract_expr_with_origin(expr, want, ConstraintOrigin::ContractExpr);
+    }
+
+    fn check_contract_expr_with_origin(
+        &mut self,
+        expr: &Expr,
+        want: &TyTerm,
+        origin: ConstraintOrigin,
+    ) {
         let got = self.infer_expr(expr, None);
         if matches!(got.ty, TyTerm::Never) {
             return;
         }
-        self.add_constraint(
-            got.ty,
-            want.clone(),
-            expr.ptr().to_string(),
-            ConstraintOrigin::ContractExpr,
-        );
+        self.add_constraint(got.ty, want.clone(), expr.ptr().to_string(), origin);
     }
 
     fn infer_expr(&mut self, expr: &Expr, want: Option<&TyTerm>) -> TyInfoTerm {
@@ -1137,6 +1147,57 @@ fn diag_for_unify_error(c: &Constraint, err: &UnifyError) -> Diagnostic {
                 quickfix: None,
             }
         }
+        ConstraintOrigin::AsyncAwaitInvariant => {
+            data.insert("expected".to_string(), ty_term_to_value_like(&err.rhs));
+            data.insert("got".to_string(), ty_term_to_value_like(&err.lhs));
+            Diagnostic {
+                code: "X07-ASYNC-CONTRACT-0001".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Type,
+                message: "await invariant must typecheck to i32".to_string(),
+                loc: Some(Location::X07Ast {
+                    ptr: c.blame_ptr.clone(),
+                }),
+                notes: Vec::new(),
+                related: Vec::new(),
+                data,
+                quickfix: None,
+            }
+        }
+        ConstraintOrigin::AsyncScopeInvariant => {
+            data.insert("expected".to_string(), ty_term_to_value_like(&err.rhs));
+            data.insert("got".to_string(), ty_term_to_value_like(&err.lhs));
+            Diagnostic {
+                code: "X07-ASYNC-CONTRACT-0002".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Type,
+                message: "scope invariant must typecheck to i32".to_string(),
+                loc: Some(Location::X07Ast {
+                    ptr: c.blame_ptr.clone(),
+                }),
+                notes: Vec::new(),
+                related: Vec::new(),
+                data,
+                quickfix: None,
+            }
+        }
+        ConstraintOrigin::AsyncCancellationEnsure => {
+            data.insert("expected".to_string(), ty_term_to_value_like(&err.rhs));
+            data.insert("got".to_string(), ty_term_to_value_like(&err.lhs));
+            Diagnostic {
+                code: "X07-ASYNC-CONTRACT-0003".to_string(),
+                severity: Severity::Error,
+                stage: Stage::Type,
+                message: "cancellation ensure must typecheck to i32".to_string(),
+                loc: Some(Location::X07Ast {
+                    ptr: c.blame_ptr.clone(),
+                }),
+                notes: Vec::new(),
+                related: Vec::new(),
+                data,
+                quickfix: None,
+            }
+        }
     }
 }
 
@@ -1590,6 +1651,14 @@ fn contract_has_clauses(
     !(requires.is_empty() && ensures.is_empty() && invariant.is_empty())
 }
 
+fn async_protocol_has_clauses(protocol: Option<&crate::x07ast::AsyncProtocolAst>) -> bool {
+    protocol.is_some_and(|protocol| {
+        !protocol.await_invariant.is_empty()
+            || !protocol.scope_invariant.is_empty()
+            || !protocol.cancellation_ensures.is_empty()
+    })
+}
+
 fn contract_collect_ident_ptrs(expr: &Expr, needle: &str, out: &mut Vec<String>) {
     match expr {
         Expr::Ident { name, .. } if name == needle => out.push(expr.ptr().to_string()),
@@ -1648,9 +1717,83 @@ fn contract_collect_binding_ptrs(expr: &Expr, out: &mut Vec<(String, String)>) {
     }
 }
 
+fn contract_collect_binding_ptrs_clauses(
+    clauses: &[ContractClauseAst],
+    out: &mut Vec<(String, String)>,
+) {
+    for clause in clauses {
+        contract_collect_binding_ptrs(&clause.expr, out);
+        for witness in &clause.witness {
+            contract_collect_binding_ptrs(witness, out);
+        }
+    }
+}
+
+fn contract_collect_ident_ptrs_clauses(
+    clauses: &[ContractClauseAst],
+    needle: &str,
+    out: &mut Vec<String>,
+) {
+    for clause in clauses {
+        contract_collect_ident_ptrs(&clause.expr, needle, out);
+        for witness in &clause.witness {
+            contract_collect_ident_ptrs(witness, needle, out);
+        }
+    }
+}
+
+fn contract_collect_impurity_clauses(
+    clauses: &[ContractClauseAst],
+    out: &mut Vec<(String, String)>,
+) {
+    for clause in clauses {
+        contract_collect_impurity(&clause.expr, out);
+        for witness in &clause.witness {
+            contract_collect_impurity(witness, out);
+        }
+    }
+}
+
+fn check_contract_clause_set(
+    infer: &mut InferState,
+    clauses: &[ContractClauseAst],
+    want_bool: &TyTerm,
+    origin: ConstraintOrigin,
+    impure_code: &str,
+    allow_result: bool,
+    witness_types: &mut Vec<(String, TyTerm)>,
+) {
+    let mut impure = Vec::new();
+    contract_collect_impurity_clauses(clauses, &mut impure);
+    for (ptr, msg) in impure {
+        infer
+            .diagnostics
+            .push(diag_contract_err(impure_code, ptr, msg));
+    }
+
+    if !allow_result {
+        let mut ptrs = Vec::new();
+        contract_collect_ident_ptrs_clauses(clauses, "__result", &mut ptrs);
+        for ptr in ptrs {
+            let msg = "\"__result\" is only available in ensures clauses".to_string();
+            infer
+                .diagnostics
+                .push(diag_contract_err("X07-CONTRACT-0003", ptr, msg));
+        }
+    }
+
+    for clause in clauses {
+        infer.check_contract_expr_with_origin(&clause.expr, want_bool, origin.clone());
+        for witness in &clause.witness {
+            let ty = infer.infer_expr(witness, None).ty;
+            witness_types.push((witness.ptr().to_string(), ty));
+        }
+    }
+}
+
 fn diag_contract_err(code: &str, ptr: String, message: String) -> Diagnostic {
     let mut notes = Vec::new();
-    if code == "X07-CONTRACT-0002" {
+    if code == "X07-CONTRACT-0002" || code == "X07-ASYNC-CONTRACT-0004" {
         notes.push(format!(
             "Allowed contract-pure heads/operators: {}; plus any `option_*` and `result_*`. Module calls are disallowed (only builtins/operators).",
             CONTRACT_PURE_CALL_HEAD_ALLOWLIST.join(", ")
@@ -1881,7 +2024,6 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
                     contract_collect_binding_ptrs(w, &mut bindings);
                 }
             }
-
             for (name, ptr) in bindings {
                 if name == "__result" {
                     let msg = "reserved name is not allowed here: \"__result\"".to_string();
@@ -2024,7 +2166,9 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
         }
         let mut witness_types: Vec<(String, TyTerm)> = Vec::new();
 
-        if contract_has_clauses(&f.requires, &f.ensures, &f.invariant) {
+        if contract_has_clauses(&f.requires, &f.ensures, &f.invariant)
+            || async_protocol_has_clauses(f.protocol.as_ref())
+        {
             for (pidx, p) in f.params.iter().enumerate() {
                 if p.name == "__result" {
                     let ptr = format!("/decls/{decl_idx}/params/{pidx}/name");
@@ -2054,6 +2198,14 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
                 for w in &c.witness {
                     contract_collect_binding_ptrs(w, &mut bindings);
                 }
+            }
+            if let Some(protocol) = &f.protocol {
+                contract_collect_binding_ptrs_clauses(&protocol.await_invariant, &mut bindings);
+                contract_collect_binding_ptrs_clauses(&protocol.scope_invariant, &mut bindings);
+                contract_collect_binding_ptrs_clauses(
+                    &protocol.cancellation_ensures,
+                    &mut bindings,
+                );
             }
 
             for (name, ptr) in bindings {
@@ -2155,6 +2307,45 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
                     let ty = infer.infer_expr(w, None).ty;
                     witness_types.push((w.ptr().to_string(), ty));
                 }
+            }
+            if let Some(protocol) = &f.protocol {
+                check_contract_clause_set(
+                    &mut infer,
+                    &protocol.await_invariant,
+                    &want_bool,
+                    ConstraintOrigin::AsyncAwaitInvariant,
+                    "X07-ASYNC-CONTRACT-0004",
+                    false,
+                    &mut witness_types,
+                );
+                check_contract_clause_set(
+                    &mut infer,
+                    &protocol.scope_invariant,
+                    &want_bool,
+                    ConstraintOrigin::AsyncScopeInvariant,
+                    "X07-ASYNC-CONTRACT-0004",
+                    false,
+                    &mut witness_types,
+                );
+                infer.push_scope();
+                infer.bind(
+                    "__result".to_string(),
+                    TyInfoTerm {
+                        ty: type_ref_to_term(&f.result),
+                        brand: f.result_brand.clone(),
+                        view_full: false,
+                    },
+                );
+                check_contract_clause_set(
+                    &mut infer,
+                    &protocol.cancellation_ensures,
+                    &want_bool,
+                    ConstraintOrigin::AsyncCancellationEnsure,
+                    "X07-ASYNC-CONTRACT-0004",
+                    true,
+                    &mut witness_types,
+                );
+                infer.pop_scope();
             }
         }
 

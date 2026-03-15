@@ -28,6 +28,12 @@ const X07_TRUST_PROFILE_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-trust.profile.schema.json");
 const X07_TRUST_CERTIFICATE_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-trust.certificate.schema.json");
+const X07_CAPSULE_INDEX_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-capsule.index.schema.json");
+const X07_CAPSULE_CONTRACT_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-capsule.contract.schema.json");
+const X07_CAPSULE_ATTEST_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-capsule.attest.schema.json");
 const X07_VERIFY_PRIMITIVES_CATALOG_BYTES: &[u8] =
     include_bytes!("../../../catalog/verify_primitives.json");
 const X07_DEPS_CAPABILITY_POLICY_SCHEMA_BYTES: &[u8] =
@@ -49,6 +55,8 @@ pub enum TrustCommand {
     Report(TrustReportArgs),
     /// Validate trust profiles and project compatibility.
     Profile(TrustProfileArgs),
+    /// Validate or attest certified capsules.
+    Capsule(TrustCapsuleArgs),
     /// Emit a certificate bundle for a certifiable entrypoint.
     Certify(TrustCertifyArgs),
 }
@@ -64,6 +72,21 @@ pub struct TrustProfileArgs {
 pub enum TrustProfileCommand {
     /// Validate a trust profile and optional project compatibility.
     Check(TrustProfileCheckArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+#[command(subcommand_required = false)]
+pub struct TrustCapsuleArgs {
+    #[command(subcommand)]
+    pub cmd: Option<TrustCapsuleCommand>,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum TrustCapsuleCommand {
+    /// Validate a capsule index plus referenced contracts and attestations.
+    Check(TrustCapsuleCheckArgs),
+    /// Emit a capsule attestation from a contract + digest inputs.
+    Attest(TrustCapsuleAttestArgs),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -151,6 +174,44 @@ pub struct TrustProfileCheckArgs {
 }
 
 #[derive(Debug, Clone, Args)]
+pub struct TrustCapsuleCheckArgs {
+    /// Capsule index JSON path.
+    #[arg(
+        long,
+        value_name = "PATH",
+        default_value = "arch/capsules/index.x07capsule.json"
+    )]
+    pub index: PathBuf,
+
+    /// Optional project manifest path (`x07.json`) or directory containing it.
+    #[arg(long, value_name = "PATH")]
+    pub project: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TrustCapsuleAttestArgs {
+    /// Capsule contract JSON path.
+    #[arg(long, value_name = "PATH")]
+    pub contract: PathBuf,
+
+    /// Module or package files to hash into the attestation.
+    #[arg(long, value_name = "PATH")]
+    pub module: Vec<PathBuf>,
+
+    /// Lockfile to hash into the attestation.
+    #[arg(long, value_name = "PATH")]
+    pub lockfile: PathBuf,
+
+    /// Conformance report to hash into the attestation.
+    #[arg(long, value_name = "PATH")]
+    pub conformance_report: PathBuf,
+
+    /// Output path for the capsule attestation.
+    #[arg(long, value_name = "PATH")]
+    pub out: PathBuf,
+}
+
+#[derive(Debug, Clone, Args)]
 pub struct TrustCertifyArgs {
     /// Project manifest path (`x07.json`) or directory containing it.
     #[arg(long, value_name = "PATH")]
@@ -200,6 +261,7 @@ struct TrustProfile {
     language_subset: TrustLanguageSubset,
     arch_requirements: TrustArchRequirements,
     evidence_requirements: TrustEvidenceRequirements,
+    sandbox_requirements: TrustSandboxRequirements,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -235,9 +297,21 @@ struct TrustEvidenceRequirements {
     require_pbt: String,
     require_proof_mode: String,
     require_proof_coverage: String,
+    require_async_proof_coverage: bool,
+    require_capsule_attestations: bool,
+    require_runtime_attestation: bool,
+    require_effect_log_digests: bool,
     require_compile_attestation: bool,
     require_trust_report_clean: bool,
     require_sbom: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustSandboxRequirements {
+    sandbox_backend: String,
+    forbid_weaker_isolation: bool,
+    network_mode: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -261,10 +335,38 @@ struct TrustCertificate {
     entry: String,
     out_dir: String,
     claims: Vec<String>,
+    async_proof: TrustCertificateAsyncProof,
+    capsules: TrustCertificateCapsules,
+    runtime: Option<TrustCertificateRuntime>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    effect_logs: Vec<EvidenceRef>,
     tcb: TrustCertificateTcb,
     evidence: TrustCertificateEvidence,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     diagnostics: Vec<diagnostics::Diagnostic>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificateAsyncProof {
+    reachable: u64,
+    covered: u64,
+    model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificateCapsules {
+    count: u64,
+    ids: Vec<String>,
+    #[serde(default)]
+    attestations: Vec<EvidenceRef>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificateRuntime {
+    backend: String,
+    network_mode: String,
+    weaker_isolation: bool,
+    attestation: Option<EvidenceRef>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -285,6 +387,12 @@ struct TrustCertificateEvidence {
     tests_report: EvidenceRef,
     trust_report: EvidenceRef,
     compile_attestation: EvidenceRef,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    runtime_attestation: Option<EvidenceRef>,
+    #[serde(default)]
+    capsule_attestations: Vec<EvidenceRef>,
+    #[serde(default)]
+    effect_logs: Vec<EvidenceRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
     review_diff: Option<EvidenceRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -314,6 +422,97 @@ struct BoundaryTestRequirement {
 struct ManifestTestRequirement {
     world: String,
     has_pbt: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapsuleIndex {
+    schema_version: String,
+    #[serde(default)]
+    capsules: Vec<CapsuleRef>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapsuleRef {
+    id: String,
+    #[serde(default)]
+    worlds_allowed: Vec<String>,
+    #[serde(default)]
+    capabilities: Vec<String>,
+    contract_path: String,
+    attestation_path: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapsuleContract {
+    schema_version: String,
+    id: String,
+    #[serde(default)]
+    worlds_allowed: Vec<String>,
+    #[serde(default)]
+    capabilities: Vec<String>,
+    language: CapsuleLanguage,
+    input: Value,
+    output: Value,
+    #[serde(default)]
+    error_spaces: Vec<String>,
+    effect_log: CapsuleEffectLog,
+    replay: CapsuleReplay,
+    conformance: CapsuleConformance,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapsuleLanguage {
+    allow_unsafe: bool,
+    allow_ffi: bool,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapsuleEffectLog {
+    schema_path: String,
+    redaction: String,
+    replay_safe: bool,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapsuleReplay {
+    mode: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapsuleConformance {
+    #[serde(default)]
+    tests: Vec<String>,
+    #[serde(default)]
+    report_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CapsuleAttestationDoc {
+    schema_version: &'static str,
+    capsule_id: String,
+    contract_digest: String,
+    module_digests: Vec<CapsuleModuleDigest>,
+    lockfile_digest: String,
+    conformance_report_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CapsuleModuleDigest {
+    path: String,
+    digest: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -526,6 +725,7 @@ pub fn cmd_trust(
     match cmd {
         TrustCommand::Report(args) => cmd_trust_report(machine, args),
         TrustCommand::Profile(args) => cmd_trust_profile(machine, args),
+        TrustCommand::Capsule(args) => cmd_trust_capsule(machine, args),
         TrustCommand::Certify(args) => cmd_trust_certify(machine, args),
     }
 }
@@ -540,6 +740,202 @@ fn cmd_trust_profile(
     match cmd {
         TrustProfileCommand::Check(args) => cmd_trust_profile_check(machine, args),
     }
+}
+
+fn cmd_trust_capsule(
+    machine: &crate::reporting::MachineArgs,
+    args: TrustCapsuleArgs,
+) -> Result<std::process::ExitCode> {
+    let Some(cmd) = args.cmd else {
+        anyhow::bail!("missing trust capsule subcommand (try --help)");
+    };
+    match cmd {
+        TrustCapsuleCommand::Check(args) => cmd_trust_capsule_check(machine, args),
+        TrustCapsuleCommand::Attest(args) => cmd_trust_capsule_attest(machine, args),
+    }
+}
+
+fn cmd_trust_capsule_check(
+    machine: &crate::reporting::MachineArgs,
+    args: TrustCapsuleCheckArgs,
+) -> Result<std::process::ExitCode> {
+    let project_path = match args.project.as_deref() {
+        Some(path) => Some(resolve_project_manifest_arg(path)?),
+        None => None,
+    };
+    let base_dir = project_path
+        .as_deref()
+        .and_then(Path::parent)
+        .unwrap_or_else(|| Path::new("."));
+    let index_path = if args.index.is_absolute() {
+        args.index.clone()
+    } else {
+        base_dir.join(&args.index)
+    };
+
+    let mut diagnostics = Vec::new();
+    let mut checked = 0u64;
+    let index = match load_capsule_index(&index_path) {
+        Ok(index) => Some(index),
+        Err(err) => {
+            diagnostics.push(trust_diag_with_path(
+                "X07CAP_INDEX_INVALID",
+                format!("{err:#}"),
+                &index_path,
+            ));
+            None
+        }
+    };
+
+    if let Some(index) = &index {
+        let index_root = index_path.parent().unwrap_or_else(|| Path::new("."));
+        for capsule in &index.capsules {
+            checked += 1;
+            let contract_path = index_root.join(&capsule.contract_path);
+            let contract = match load_capsule_contract(&contract_path) {
+                Ok(contract) => contract,
+                Err(err) => {
+                    diagnostics.push(trust_diag_with_path(
+                        "X07CAP_CONTRACT_INVALID",
+                        format!("{err:#}"),
+                        &contract_path,
+                    ));
+                    continue;
+                }
+            };
+            if contract.id != capsule.id {
+                diagnostics.push(trust_diag_with_path(
+                    "X07CAP_CONTRACT_INVALID",
+                    format!(
+                        "capsule id mismatch: index has {:?}, contract has {:?}",
+                        capsule.id, contract.id
+                    ),
+                    &contract_path,
+                ));
+            }
+            if contract.effect_log.schema_path.trim().is_empty() {
+                diagnostics.push(trust_diag_with_path(
+                    "X07CAP_EFFECT_LOG_REQUIRED",
+                    "capsule contract is missing effect_log.schema_path",
+                    &contract_path,
+                ));
+            }
+            if contract.conformance.tests.is_empty() {
+                diagnostics.push(trust_diag_with_path(
+                    "X07CAP_CONFORMANCE_REQUIRED",
+                    "capsule contract must declare at least one conformance test id",
+                    &contract_path,
+                ));
+            }
+            let attest_path = index_root.join(&capsule.attestation_path);
+            match report_common::read_json_file(&attest_path) {
+                Ok(doc) => {
+                    let schema_diags = report_common::validate_schema(
+                        X07_CAPSULE_ATTEST_SCHEMA_BYTES,
+                        "spec/x07-capsule.attest.schema.json",
+                        &doc,
+                    )?;
+                    if !schema_diags.is_empty() {
+                        diagnostics.push(trust_diag_with_path(
+                            "X07CAP_ATTEST_DIGEST_MISMATCH",
+                            format!("attestation schema invalid: {}", schema_diags[0].message),
+                            &attest_path,
+                        ));
+                    } else {
+                        let actual = format!("sha256:{}", sha256_hex_for_path(&contract_path)?);
+                        let got = doc
+                            .get("contract_digest")
+                            .and_then(Value::as_str)
+                            .unwrap_or("");
+                        if got != actual {
+                            diagnostics.push(trust_diag_with_path(
+                                "X07CAP_ATTEST_DIGEST_MISMATCH",
+                                format!(
+                                    "contract digest mismatch: expected {:?} got {:?}",
+                                    actual, got
+                                ),
+                                &attest_path,
+                            ));
+                        }
+                    }
+                }
+                Err(err) => diagnostics.push(trust_diag_with_path(
+                    "X07CAP_ATTEST_DIGEST_MISMATCH",
+                    format!("{err:#}"),
+                    &attest_path,
+                )),
+            }
+        }
+    }
+
+    let exit_code = if diagnostics.is_empty() { 0 } else { 20 };
+    let value = json!({
+        "kind": "x07.trust.capsule.check",
+        "ok": diagnostics.is_empty(),
+        "index": index_path.display().to_string(),
+        "checked_capsules": checked,
+        "diagnostics": diagnostics,
+        "exit_code": exit_code
+    });
+    write_machine_json(
+        machine,
+        &value,
+        exit_code,
+        &format!(
+            "trust capsule check: ok={} checked={checked}",
+            diagnostics.is_empty()
+        ),
+    )
+}
+
+fn cmd_trust_capsule_attest(
+    machine: &crate::reporting::MachineArgs,
+    args: TrustCapsuleAttestArgs,
+) -> Result<std::process::ExitCode> {
+    let contract_path = util::resolve_existing_path_upwards(&args.contract);
+    let contract = load_capsule_contract(&contract_path)?;
+    let mut module_digests = Vec::new();
+    for module in &args.module {
+        let path = util::resolve_existing_path_upwards(module);
+        module_digests.push(CapsuleModuleDigest {
+            path: path.display().to_string(),
+            digest: format!("sha256:{}", sha256_hex_for_path(&path)?),
+        });
+    }
+    module_digests.sort_by(|a, b| a.path.cmp(&b.path));
+
+    let doc = CapsuleAttestationDoc {
+        schema_version: "x07.capsule.attest@0.1.0",
+        capsule_id: contract.id,
+        contract_digest: format!("sha256:{}", sha256_hex_for_path(&contract_path)?),
+        module_digests,
+        lockfile_digest: format!(
+            "sha256:{}",
+            sha256_hex_for_path(&util::resolve_existing_path_upwards(&args.lockfile))?
+        ),
+        conformance_report_digest: format!(
+            "sha256:{}",
+            sha256_hex_for_path(&util::resolve_existing_path_upwards(
+                &args.conformance_report
+            ))?
+        ),
+    };
+    let value = serde_json::to_value(&doc).context("serialize capsule attestation")?;
+    let schema_diags = report_common::validate_schema(
+        X07_CAPSULE_ATTEST_SCHEMA_BYTES,
+        "spec/x07-capsule.attest.schema.json",
+        &value,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "internal error: capsule attestation is not schema-valid: {}",
+            schema_diags[0].message
+        );
+    }
+    let bytes = report_common::canonical_pretty_json_bytes(&value)?;
+    util::write_atomic(&args.out, &bytes)
+        .with_context(|| format!("write capsule attestation: {}", args.out.display()))?;
+    write_machine_json(machine, &value, 0, "trust capsule attest: ok")
 }
 
 fn cmd_trust_report(
@@ -2112,6 +2508,30 @@ fn cmd_trust_certify(
         )
     };
 
+    let async_proof = collect_async_proof_summary(Path::new(&coverage_ref.path))?;
+    if profile
+        .as_ref()
+        .is_some_and(|p| p.evidence_requirements.require_async_proof_coverage)
+        && async_proof.covered < async_proof.reachable
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_EASYNC_PROOF",
+            format!(
+                "async proof coverage is incomplete: covered {} of {} reachable defasync symbol(s)",
+                async_proof.covered, async_proof.reachable
+            ),
+        ));
+    }
+    let (capsules, capsule_attestations, effect_logs) =
+        collect_capsule_artifacts(&project_root, profile.as_ref(), &mut diagnostics)?;
+    let (runtime, runtime_attestation) = collect_runtime_attestation(
+        Path::new(&tests_ref.path),
+        &project_root,
+        ctx.as_ref(),
+        profile.as_ref(),
+        &mut diagnostics,
+    )?;
+
     let certificate = TrustCertificate {
         schema_version: X07_TRUST_CERTIFICATE_SCHEMA_VERSION,
         verdict: if diagnostics.is_empty() {
@@ -2129,6 +2549,10 @@ fn cmd_trust_certify(
             .as_ref()
             .map(|p| p.claims.clone())
             .unwrap_or_default(),
+        async_proof,
+        capsules,
+        runtime,
+        effect_logs: effect_logs.clone(),
         tcb: build_certificate_tcb(),
         evidence: TrustCertificateEvidence {
             boundaries_report: boundaries_ref,
@@ -2138,6 +2562,9 @@ fn cmd_trust_certify(
             tests_report: tests_ref,
             trust_report: trust_report_ref,
             compile_attestation: compile_attestation_ref,
+            runtime_attestation,
+            capsule_attestations,
+            effect_logs,
             review_diff: review_diff_ref,
             bundle_path: bundle_path.map(|path| path.display().to_string()),
         },
@@ -2252,6 +2679,32 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
     }
     s.push_str("</tbody></table>");
 
+    s.push_str(
+        "<h2>Assurance</h2><table><thead><tr><th>Area</th><th>Value</th></tr></thead><tbody>",
+    );
+    s.push_str("<tr><td>async proof</td><td><code>");
+    s.push_str(&report_common::html_escape(&format!(
+        "{}/{} reachable",
+        certificate.async_proof.covered, certificate.async_proof.reachable
+    )));
+    s.push_str("</code></td></tr>");
+    s.push_str("<tr><td>capsules</td><td><code>");
+    s.push_str(&report_common::html_escape(&format!(
+        "{} [{}]",
+        certificate.capsules.count,
+        certificate.capsules.ids.join(", ")
+    )));
+    s.push_str("</code></td></tr>");
+    if let Some(runtime) = &certificate.runtime {
+        s.push_str("<tr><td>runtime</td><td><code>");
+        s.push_str(&report_common::html_escape(&format!(
+            "backend={} network_mode={} weaker_isolation={}",
+            runtime.backend, runtime.network_mode, runtime.weaker_isolation
+        )));
+        s.push_str("</code></td></tr>");
+    }
+    s.push_str("</tbody></table>");
+
     s.push_str("<h2>Evidence</h2><table><thead><tr><th>Artifact</th><th>Path</th><th>sha256</th></tr></thead><tbody>");
     for (label, evidence) in [
         ("boundaries", &certificate.evidence.boundaries_report),
@@ -2290,6 +2743,27 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
         s.push_str(&report_common::html_escape(&review.path));
         s.push_str("</code></td><td><code>");
         s.push_str(&report_common::html_escape(&review.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
+    if let Some(runtime_attestation) = &certificate.evidence.runtime_attestation {
+        s.push_str("<tr><td>runtime attestation</td><td><code>");
+        s.push_str(&report_common::html_escape(&runtime_attestation.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&runtime_attestation.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
+    for evidence in &certificate.evidence.capsule_attestations {
+        s.push_str("<tr><td>capsule attestation</td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.sha256_hex));
+        s.push_str("</code></td></tr>");
+    }
+    for evidence in &certificate.evidence.effect_logs {
+        s.push_str("<tr><td>effect log</td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.path));
+        s.push_str("</code></td><td><code>");
+        s.push_str(&report_common::html_escape(&evidence.sha256_hex));
         s.push_str("</code></td></tr>");
     }
     s.push_str("</tbody></table>");
@@ -2332,15 +2806,424 @@ fn load_trust_profile(path: &Path) -> Result<TrustProfile> {
     Ok(profile)
 }
 
+fn load_capsule_index(path: &Path) -> Result<CapsuleIndex> {
+    let doc = report_common::read_json_file(path)?;
+    let schema_diags = report_common::validate_schema(
+        X07_CAPSULE_INDEX_SCHEMA_BYTES,
+        "spec/x07-capsule.index.schema.json",
+        &doc,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!("capsule index schema invalid: {}", schema_diags[0].message);
+    }
+    let index: CapsuleIndex =
+        serde_json::from_value(doc).with_context(|| format!("parse {}", path.display()))?;
+    if index.schema_version.trim() != "x07.capsule.index@0.1.0" {
+        anyhow::bail!(
+            "capsule index schema_version mismatch: expected {:?} got {:?}",
+            "x07.capsule.index@0.1.0",
+            index.schema_version
+        );
+    }
+    Ok(index)
+}
+
+fn load_capsule_contract(path: &Path) -> Result<CapsuleContract> {
+    let doc = report_common::read_json_file(path)?;
+    let schema_diags = report_common::validate_schema(
+        X07_CAPSULE_CONTRACT_SCHEMA_BYTES,
+        "spec/x07-capsule.contract.schema.json",
+        &doc,
+    )?;
+    if !schema_diags.is_empty() {
+        anyhow::bail!(
+            "capsule contract schema invalid: {}",
+            schema_diags[0].message
+        );
+    }
+    let contract: CapsuleContract =
+        serde_json::from_value(doc).with_context(|| format!("parse {}", path.display()))?;
+    if contract.schema_version.trim() != "x07.capsule.contract@0.1.0" {
+        anyhow::bail!(
+            "capsule contract schema_version mismatch: expected {:?} got {:?}",
+            "x07.capsule.contract@0.1.0",
+            contract.schema_version
+        );
+    }
+    Ok(contract)
+}
+
+fn default_capsule_index_path(project_root: &Path) -> PathBuf {
+    project_root.join("arch/capsules/index.x07capsule.json")
+}
+
+fn resolve_report_artifact_path(report_path: &Path, project_root: &Path, raw: &str) -> PathBuf {
+    let candidate = PathBuf::from(raw);
+    if candidate.is_absolute() {
+        return candidate;
+    }
+    let report_dir = report_path.parent().unwrap_or_else(|| Path::new("."));
+    let report_relative = report_dir.join(&candidate);
+    if report_relative.exists() {
+        return report_relative;
+    }
+    project_root.join(candidate)
+}
+
+fn collect_async_proof_summary(coverage_path: &Path) -> Result<TrustCertificateAsyncProof> {
+    if !coverage_path.is_file() {
+        return Ok(TrustCertificateAsyncProof {
+            reachable: 0,
+            covered: 0,
+            model: None,
+        });
+    }
+
+    let doc = report_common::read_json_file(coverage_path)?;
+    let mut reachable = 0u64;
+    let mut covered = 0u64;
+    if let Some(functions) = doc.get("functions").and_then(Value::as_array) {
+        for function in functions {
+            if function.get("kind").and_then(Value::as_str) != Some("defasync") {
+                continue;
+            }
+            reachable += 1;
+            if function.get("status").and_then(Value::as_str) == Some("proven") {
+                covered += 1;
+            }
+        }
+    }
+
+    Ok(TrustCertificateAsyncProof {
+        reachable,
+        covered,
+        model: doc
+            .pointer("/summary/async_model")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    })
+}
+
+fn collect_capsule_artifacts(
+    project_root: &Path,
+    profile: Option<&TrustProfile>,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(TrustCertificateCapsules, Vec<EvidenceRef>, Vec<EvidenceRef>)> {
+    let index_path = default_capsule_index_path(project_root);
+    if !index_path.is_file() {
+        if profile.is_some_and(|p| p.evidence_requirements.require_capsule_attestations) {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_ECAPSULE_ATTEST",
+                "trust profile requires arch/capsules/index.x07capsule.json",
+                &index_path,
+            ));
+        }
+        if profile.is_some_and(|p| p.evidence_requirements.require_effect_log_digests) {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_EEFFECT_LOG",
+                "trust profile requires effect-log evidence, but no capsule index is present",
+                &index_path,
+            ));
+        }
+        return Ok((
+            TrustCertificateCapsules {
+                count: 0,
+                ids: Vec::new(),
+                attestations: Vec::new(),
+            },
+            Vec::new(),
+            Vec::new(),
+        ));
+    }
+
+    let index = match load_capsule_index(&index_path) {
+        Ok(index) => index,
+        Err(err) => {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_ECAPSULE_ATTEST",
+                format!("{err:#}"),
+                &index_path,
+            ));
+            return Ok((
+                TrustCertificateCapsules {
+                    count: 0,
+                    ids: Vec::new(),
+                    attestations: Vec::new(),
+                },
+                Vec::new(),
+                Vec::new(),
+            ));
+        }
+    };
+
+    let index_root = index_path.parent().unwrap_or_else(|| Path::new("."));
+    let mut capsule_ids = Vec::new();
+    let mut capsule_attestations = Vec::new();
+    let effect_logs = Vec::new();
+
+    for capsule in &index.capsules {
+        capsule_ids.push(capsule.id.clone());
+
+        let contract_path = index_root.join(&capsule.contract_path);
+        match load_capsule_contract(&contract_path) {
+            Ok(contract) => {
+                let effect_log_schema = index_root.join(&contract.effect_log.schema_path);
+                if !effect_log_schema.is_file() {
+                    diagnostics.push(trust_diag_with_path(
+                        "X07TC_EEFFECT_LOG",
+                        format!(
+                            "capsule {:?} references missing effect-log schema {:?}",
+                            capsule.id, contract.effect_log.schema_path
+                        ),
+                        &effect_log_schema,
+                    ));
+                }
+            }
+            Err(err) => diagnostics.push(trust_diag_with_path(
+                "X07TC_ECAPSULE_ATTEST",
+                format!("{err:#}"),
+                &contract_path,
+            )),
+        }
+
+        let attestation_path = index_root.join(&capsule.attestation_path);
+        if attestation_path.is_file() {
+            capsule_attestations.push(evidence_ref_for_path(&attestation_path)?);
+        } else {
+            diagnostics.push(trust_diag_with_path(
+                "X07TC_ECAPSULE_ATTEST",
+                format!(
+                    "capsule {:?} is missing attestation {:?}",
+                    capsule.id, capsule.attestation_path
+                ),
+                &attestation_path,
+            ));
+        }
+    }
+
+    capsule_ids.sort();
+    capsule_attestations.sort_by(|a, b| a.path.cmp(&b.path));
+
+    if profile.is_some_and(|p| p.evidence_requirements.require_capsule_attestations)
+        && capsule_attestations.len() < capsule_ids.len()
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_ECAPSULE_ATTEST",
+            "trust profile requires attested capsules, but one or more attestations are missing",
+        ));
+    }
+    if profile.is_some_and(|p| p.evidence_requirements.require_effect_log_digests)
+        && effect_logs.is_empty()
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_EEFFECT_LOG",
+            "trust profile requires effect-log digests, but none were collected",
+        ));
+    }
+
+    let capsules = TrustCertificateCapsules {
+        count: capsule_ids.len() as u64,
+        ids: capsule_ids,
+        attestations: capsule_attestations.clone(),
+    };
+    Ok((capsules, capsule_attestations, effect_logs))
+}
+
+fn collect_runtime_attestation(
+    tests_report_path: &Path,
+    project_root: &Path,
+    ctx: Option<&ProjectContext>,
+    profile: Option<&TrustProfile>,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<(Option<TrustCertificateRuntime>, Option<EvidenceRef>)> {
+    let mut backend = None;
+    let mut weaker_isolation = false;
+    let mut runtime_attestation = None;
+
+    if tests_report_path.is_file() {
+        let report_doc = report_common::read_json_file(tests_report_path)?;
+        if let Some(tests) = report_doc.get("tests").and_then(Value::as_array) {
+            for test in tests {
+                let Some(run) = test.get("run") else {
+                    continue;
+                };
+                if backend.is_none() {
+                    backend = run
+                        .get("sandbox_backend")
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                }
+                let Some(attestation_ref) = run.get("runtime_attestation") else {
+                    continue;
+                };
+                if backend.is_none() {
+                    backend = attestation_ref
+                        .get("sandbox_backend")
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                }
+                weaker_isolation = attestation_ref
+                    .get("weaker_isolation")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                if let Some(raw_path) = attestation_ref.get("path").and_then(Value::as_str) {
+                    let resolved =
+                        resolve_report_artifact_path(tests_report_path, project_root, raw_path);
+                    if resolved.is_file() {
+                        runtime_attestation = Some(evidence_ref_for_path(&resolved)?);
+                    } else {
+                        diagnostics.push(trust_diag_with_path(
+                            "X07TC_ERUNTIME_ATTEST",
+                            format!(
+                                "runtime attestation referenced by x07 test is missing: {raw_path}"
+                            ),
+                            &resolved,
+                        ));
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    if profile.is_some_and(|p| p.evidence_requirements.require_runtime_attestation)
+        && runtime_attestation.is_none()
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_ERUNTIME_ATTEST",
+            "trust profile requires runtime attestation, but x07 test did not produce one",
+        ));
+    }
+    if profile.is_some_and(|p| p.sandbox_requirements.forbid_weaker_isolation) && weaker_isolation {
+        diagnostics.push(trust_diag(
+            "X07TC_ERUNTIME_ATTEST",
+            "runtime attestation reports weaker isolation, which the trust profile forbids",
+        ));
+    }
+
+    let network_mode = match ctx
+        .and_then(|project| project.policy_doc.as_ref())
+        .and_then(|doc| doc.pointer("/net/enabled"))
+        .and_then(Value::as_bool)
+    {
+        Some(true) => "allowlist",
+        Some(false) => "none",
+        None => "disabled",
+    };
+    let runtime = if ctx.is_some_and(|project| project.world == WorldId::RunOsSandboxed)
+        || runtime_attestation.is_some()
+        || backend.is_some()
+    {
+        Some(TrustCertificateRuntime {
+            backend: backend.unwrap_or_else(|| "none".to_string()),
+            network_mode: network_mode.to_string(),
+            weaker_isolation,
+            attestation: runtime_attestation.clone(),
+        })
+    } else {
+        None
+    };
+
+    Ok((runtime, runtime_attestation))
+}
+
 fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::Diagnostic> {
     let mut diags = Vec::new();
-    if profile.language_subset.allow_defasync
+    if profile.id == "trusted_program_sandboxed_local_v1" {
+        if profile
+            .worlds_allowed
+            .iter()
+            .any(|world| world == WorldId::RunOs.as_str())
+        {
+            diags.push(trust_diag(
+                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "sandboxed trusted-program profiles must not allow run-os",
+            ));
+        }
+        if !profile.evidence_requirements.require_async_proof_coverage {
+            diags.push(trust_diag(
+                "X07TP_ASYNC_PROOF_REQUIRED",
+                "sandboxed trusted-program profiles must require async proof coverage",
+            ));
+        }
+        if !profile.evidence_requirements.require_capsule_attestations {
+            diags.push(trust_diag(
+                "X07TP_CAPSULE_ATTEST_REQUIRED",
+                "sandboxed trusted-program profiles must require capsule attestations",
+            ));
+        }
+        if !profile.evidence_requirements.require_runtime_attestation {
+            diags.push(trust_diag(
+                "X07TP_RUNTIME_ATTEST_REQUIRED",
+                "sandboxed trusted-program profiles must require runtime attestation",
+            ));
+        }
+        if profile.sandbox_requirements.sandbox_backend != "vm" {
+            diags.push(trust_diag(
+                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "sandboxed trusted-program profiles must require sandbox_backend=vm",
+            ));
+        }
+        if !profile.sandbox_requirements.forbid_weaker_isolation {
+            diags.push(trust_diag(
+                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "sandboxed trusted-program profiles must forbid weaker isolation",
+            ));
+        }
+        if profile.sandbox_requirements.network_mode != "none" {
+            diags.push(trust_diag(
+                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "sandboxed local trusted-program profiles must keep network_mode=none",
+            ));
+        }
+    } else if profile.id == "certified_capsule_v1" {
+        if profile
+            .worlds_allowed
+            .iter()
+            .any(|world| world == WorldId::RunOs.as_str())
+        {
+            diags.push(trust_diag(
+                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "certified capsule profiles must not allow run-os",
+            ));
+        }
+        if !profile.evidence_requirements.require_capsule_attestations {
+            diags.push(trust_diag(
+                "X07TP_CAPSULE_ATTEST_REQUIRED",
+                "certified capsule profiles must require capsule attestations",
+            ));
+        }
+        if !profile.evidence_requirements.require_effect_log_digests {
+            diags.push(trust_diag(
+                "X07TP_EFFECT_LOG_REQUIRED",
+                "certified capsule profiles must require effect-log digests",
+            ));
+        }
+        if profile.sandbox_requirements.sandbox_backend != "vm" {
+            diags.push(trust_diag(
+                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "certified capsule profiles must require sandbox_backend=vm",
+            ));
+        }
+        if !profile.sandbox_requirements.forbid_weaker_isolation {
+            diags.push(trust_diag(
+                "X07TP_SANDBOX_BACKEND_REQUIRED",
+                "certified capsule profiles must forbid weaker isolation",
+            ));
+        }
+        if profile.sandbox_requirements.network_mode != "none" {
+            diags.push(trust_diag(
+                "X07TP_NETWORK_MODE_FORBIDDEN",
+                "certified capsule profiles must keep network_mode=none",
+            ));
+        }
+    } else if profile.language_subset.allow_defasync
         || profile.language_subset.allow_recursion
         || profile.language_subset.allow_extern
         || profile.language_subset.allow_unsafe
         || profile.language_subset.allow_ffi
         || profile.language_subset.allow_dynamic_dispatch
-        || profile.arch_requirements.manifest_min_version != "x07.arch.manifest@0.2.0"
+        || profile.arch_requirements.manifest_min_version != "x07.arch.manifest@0.3.0"
         || !profile.arch_requirements.require_allowlist_mode
         || !profile.arch_requirements.require_deny_cycles
         || !profile.arch_requirements.require_deny_orphans
@@ -2357,6 +3240,13 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
             .evidence_requirements
             .require_proof_coverage
             .starts_with("all_reachable_")
+        || profile.evidence_requirements.require_async_proof_coverage
+        || profile.evidence_requirements.require_capsule_attestations
+        || profile.evidence_requirements.require_runtime_attestation
+        || profile.evidence_requirements.require_effect_log_digests
+        || profile.sandbox_requirements.sandbox_backend != "any"
+        || profile.sandbox_requirements.forbid_weaker_isolation
+        || profile.sandbox_requirements.network_mode != "any"
         || !profile.evidence_requirements.require_compile_attestation
         || !profile.evidence_requirements.require_trust_report_clean
         || !profile.evidence_requirements.require_sbom
@@ -2404,6 +3294,26 @@ fn validate_profile_against_context(
                 ctx.world.as_str(),
                 profile.id
             ),
+        ));
+    }
+    if profile.sandbox_requirements.sandbox_backend == "vm" && ctx.world != WorldId::RunOsSandboxed
+    {
+        diags.push(trust_diag(
+            "X07TP_SANDBOX_BACKEND_REQUIRED",
+            "sandboxed trusted-program profiles require run-os-sandboxed project worlds",
+        ));
+    }
+    if profile.sandbox_requirements.network_mode == "none"
+        && ctx
+            .policy_doc
+            .as_ref()
+            .and_then(|doc| doc.pointer("/net/enabled"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diags.push(trust_diag(
+            "X07TP_NETWORK_MODE_FORBIDDEN",
+            "sandboxed local trusted-program profiles require policy.net.enabled=false",
         ));
     }
 
@@ -2557,6 +3467,16 @@ fn validate_profile_against_context(
             "contracts_v1.boundaries.index_path is required by this trust profile",
             arch_manifest_path,
         ));
+    }
+    if profile.evidence_requirements.require_capsule_attestations {
+        let capsule_index_path = default_capsule_index_path(&ctx.root);
+        if !capsule_index_path.is_file() {
+            diags.push(trust_diag_with_path(
+                "X07TP_CAPSULES",
+                "arch/capsules/index.x07capsule.json is required by this trust profile",
+                &capsule_index_path,
+            ));
+        }
     }
 
     Ok(diags)
@@ -3541,6 +4461,12 @@ fn evidence_ref_for_path(path: &Path) -> Result<EvidenceRef> {
     })
 }
 
+fn sha256_hex_for_path(path: &Path) -> Result<String> {
+    let bytes =
+        std::fs::read(path).with_context(|| format!("read artifact: {}", path.display()))?;
+    Ok(util::sha256_hex(&bytes))
+}
+
 fn stderr_summary(stderr: &[u8]) -> String {
     let text = String::from_utf8_lossy(stderr).trim().to_string();
     if text.is_empty() {
@@ -3886,6 +4812,18 @@ mod tests {
             entry: "app.main".to_string(),
             out_dir: "target/cert".to_string(),
             claims: vec!["human_can_review_certificate_not_source".to_string()],
+            async_proof: TrustCertificateAsyncProof {
+                reachable: 0,
+                covered: 0,
+                model: None,
+            },
+            capsules: TrustCertificateCapsules {
+                count: 0,
+                ids: Vec::new(),
+                attestations: Vec::new(),
+            },
+            runtime: None,
+            effect_logs: Vec::new(),
             tcb: TrustCertificateTcb {
                 x07_version: "0.1.78".to_string(),
                 host_compiler: "cc (clang 18.1.0)".to_string(),
@@ -3914,6 +4852,9 @@ mod tests {
                     path: "compile.attest.json".to_string(),
                     sha256_hex: "4".repeat(64),
                 },
+                runtime_attestation: None,
+                capsule_attestations: Vec::new(),
+                effect_logs: Vec::new(),
                 review_diff: None,
                 bundle_path: None,
             },
@@ -3926,12 +4867,40 @@ mod tests {
             .and_then(Value::as_array)
             .expect("prove_reports array");
         assert!(prove_reports.is_empty());
+        assert!(value
+            .get("async_proof")
+            .and_then(|v| v.get("model"))
+            .is_some());
+        assert!(value
+            .pointer("/async_proof/model")
+            .is_some_and(Value::is_null));
         assert_eq!(
             value
                 .pointer("/tcb/trusted_primitive_manifest_digest")
                 .and_then(Value::as_str),
             Some(format!("sha256:{}", "f".repeat(64)).as_str())
         );
+
+        let schema_diags = report_common::validate_schema(
+            X07_TRUST_CERTIFICATE_SCHEMA_BYTES,
+            "spec/x07-trust.certificate.schema.json",
+            &value,
+        )
+        .expect("validate certificate schema");
+        assert!(schema_diags.is_empty(), "schema diags: {schema_diags:?}");
+    }
+
+    #[test]
+    fn trust_certificate_runtime_serialization_keeps_null_attestation() {
+        let runtime = TrustCertificateRuntime {
+            backend: "vm".to_string(),
+            network_mode: "none".to_string(),
+            weaker_isolation: false,
+            attestation: None,
+        };
+        let value = serde_json::to_value(runtime).expect("serialize runtime");
+        assert!(value.get("attestation").is_some());
+        assert!(value.get("attestation").is_some_and(Value::is_null));
     }
 
     #[test]
@@ -3941,7 +4910,7 @@ mod tests {
         std::fs::write(
             dir.join("arch/manifest.x07arch.json"),
             serde_json::to_vec_pretty(&json!({
-                "schema_version": "x07.arch.manifest@0.2.0",
+                "schema_version": "x07.arch.manifest@0.3.0",
                 "repo": {"id": "fixture", "root": "."},
                 "nodes": [],
                 "rules": [],

@@ -250,6 +250,7 @@ struct ArchNode {
 #[serde(rename_all = "snake_case")]
 enum ArchTrustZone {
     VerifiedCore,
+    CertifiedCapsule,
     TestOnly,
     Untrusted,
 }
@@ -3018,6 +3019,7 @@ fn arch_check_once(
         };
         if from_node.trust_zone == ArchTrustZone::VerifiedCore
             && to_node.trust_zone != ArchTrustZone::VerifiedCore
+            && to_node.trust_zone != ArchTrustZone::CertifiedCapsule
         {
             let mut data = BTreeMap::new();
             data.insert("node_from".to_string(), Value::String(from.clone()));
@@ -3040,7 +3042,7 @@ fn arch_check_once(
             }
             diags.push(diag_lint_error(
                 "E_ARCH_TRUST_ZONE_EDGE",
-                "verified_core nodes may only depend on verified_core nodes",
+                "verified_core nodes may only depend on verified_core or certified_capsule nodes",
                 None,
                 data,
             ));
@@ -3665,7 +3667,8 @@ fn check_contracts_v1(
                                 continue;
                             };
                             if node.visibility.mode.trim() != "public"
-                                || node.trust_zone != ArchTrustZone::VerifiedCore
+                                || (node.trust_zone != ArchTrustZone::VerifiedCore
+                                    && node.trust_zone != ArchTrustZone::CertifiedCapsule)
                             {
                                 continue;
                             }
@@ -3691,7 +3694,7 @@ fn check_contracts_v1(
                                     );
                                     let diag = diag_lint_error(
                                         "E_ARCH_BOUNDARY_MISSING",
-                                        "public verified_core export is missing from boundaries index",
+                                        "public verified_core/certified_capsule export is missing from boundaries index",
                                         Some(&module.rel_path),
                                         data,
                                     );
@@ -3721,7 +3724,7 @@ fn check_contracts_v1(
                                     );
                                     let diag = diag_lint_error(
                                         "E_ARCH_BOUNDARY_MISSING",
-                                        "public verified_core export is missing from boundaries index",
+                                        "public verified_core/certified_capsule export is missing from boundaries index",
                                         Some(&module.rel_path),
                                         data,
                                     );

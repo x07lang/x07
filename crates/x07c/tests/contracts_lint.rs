@@ -1,5 +1,6 @@
 use serde_json::json;
 
+use x07_contracts::X07AST_SCHEMA_VERSION_V0_7_0;
 use x07c::diagnostics::Location;
 use x07c::lint;
 
@@ -98,4 +99,44 @@ fn lint_checks_contracts_in_defasync() {
         panic!("expected X07Ast location for X07-BORROW-0001: {d:?}");
     };
     assert_eq!(ptr, "/decls/0/requires/0/witness/0/1");
+}
+
+#[test]
+fn lint_checks_async_protocol_in_defasync() {
+    let doc = json!({
+        "schema_version": X07AST_SCHEMA_VERSION_V0_7_0,
+        "kind": "entry",
+        "module_id": "main",
+        "imports": [],
+        "decls": [
+            {
+                "kind": "defasync",
+                "name": "main.f",
+                "params": [],
+                "result": "i32",
+                "protocol": {
+                    "await_invariant": [{
+                        "expr": 1,
+                        "witness": [["bytes.view", ["bytes.lit", "hi"]]]
+                    }]
+                },
+                "body": 0
+            }
+        ],
+        "solve": 0,
+    });
+
+    let file = typecheck_testutil::file_from_json(&doc);
+    let report = lint::lint_file(&file, lint::LintOptions::default());
+    assert!(!report.ok, "expected lint errors");
+
+    let d = report
+        .diagnostics
+        .iter()
+        .find(|d| d.code == "X07-BORROW-0001")
+        .expect("expected X07-BORROW-0001 diagnostic");
+    let Some(Location::X07Ast { ptr }) = d.loc.as_ref() else {
+        panic!("expected X07Ast location for X07-BORROW-0001: {d:?}");
+    };
+    assert_eq!(ptr, "/decls/0/protocol/await_invariant/0/witness/0/1");
 }
