@@ -1,0 +1,24 @@
+{
+  "schema_version": "x07.tests_manifest@0.1.0",
+  "tests": [
+    {
+      "id": "std.obs/openmetrics_render_v1",
+      "world": "solve-pure",
+      "entry": "std.obs.tests.test_openmetrics_render_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.obs/otlp_encode_v1",
+      "world": "solve-pure",
+      "entry": "std.obs.tests.test_otlp_encode_v1",
+      "expect": "pass"
+    },
+    {
+      "id": "std.obs/otlp_http_export_rejects_invalid_snapshot_v1",
+      "world": "run-os-sandboxed",
+      "entry": "std.obs.tests.test_otlp_http_export_rejects_invalid_snapshot_v1",
+      "expect": "pass",
+      "policy_json": "policies/obs_tests_v1.policy.json"
+    }
+  ]
+}

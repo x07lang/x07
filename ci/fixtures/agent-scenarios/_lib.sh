@@ -66,7 +66,7 @@ from pathlib import Path
 
 wrapped = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 sv = wrapped.get("schema_version")
-if sv != "x07.run.report@0.1.0":
+if sv != "x07.run.report@0.3.0":
     raise SystemExit(f"wrapped schema_version mismatch: {sv!r}")
 report = wrapped.get("report")
 if not isinstance(report, dict):

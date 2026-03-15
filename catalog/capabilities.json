@@ -207,7 +207,7 @@
       "summary": "Crawling helpers: robots/sitemaps/url normalization/scheduling + RR fetch helpers.",
       "canonical": {
         "name": "ext-web-crawl",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "status": "experimental"
     },
@@ -442,7 +442,7 @@
       "summary": "Metrics snapshot + OpenMetrics rendering + OTLP encoding/export.",
       "canonical": {
         "name": "ext-obs",
-        "version": "0.1.4"
+        "version": "0.1.5"
       },
       "worlds": [
         "run-os",

@@ -68,7 +68,7 @@ import base64, json, struct, sys
 
 def payload_from_run_report(path: str) -> bytes:
     r = json.load(open(path, "r", encoding="utf-8"))
-    assert r.get("schema_version") == "x07.run.report@0.1.0", r.get("schema_version")
+    assert r.get("schema_version") == "x07.run.report@0.3.0", r.get("schema_version")
     assert r.get("runner") == "host", r.get("runner")
     rep = r.get("report") or {}
     assert rep.get("schema_version") == "x07-host-runner.report@0.3.0", rep.get("schema_version")
@@ -106,4 +106,3 @@ print("ok: stream plugin smoke")
 PY
 
 echo "ok: check_stream_plugins_smoke"
-

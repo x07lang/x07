@@ -234,7 +234,7 @@ x07 run --profile os --input input.bin --report wrapped --report-out .x07/run.os
 "$python_bin" - ".x07/run.os.json" <<'PY'
 import json, sys
 doc = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-if doc.get("schema_version") != "x07.run.report@0.1.0":
+if doc.get("schema_version") != "x07.run.report@0.3.0":
     raise SystemExit("ERROR: wrapped report schema_version mismatch")
 if doc.get("runner") != "os":
     raise SystemExit("ERROR: expected runner=os")

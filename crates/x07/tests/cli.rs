@@ -2833,7 +2833,10 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
         &std::fs::read(helper_summary_path).expect("read helper verify summary"),
     )
     .expect("parse helper verify summary");
-    assert_eq!(helper_summary["schema_version"], X07_VERIFY_SUMMARY_SCHEMA_VERSION);
+    assert_eq!(
+        helper_summary["schema_version"],
+        X07_VERIFY_SUMMARY_SCHEMA_VERSION
+    );
 
     let main_out = run_x07_in_dir(
         &dir,
@@ -2856,8 +2859,14 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
     );
     let main_report: Value =
         serde_json::from_slice(&main_out.stdout).expect("parse main coverage JSON");
-    assert_eq!(main_report["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
-    assert_eq!(main_report["coverage"]["summary"]["imported_summary_defn"], 1);
+    assert_eq!(
+        main_report["schema_version"],
+        X07_VERIFY_REPORT_SCHEMA_VERSION
+    );
+    assert_eq!(
+        main_report["coverage"]["summary"]["imported_summary_defn"],
+        1
+    );
     let functions = main_report["coverage"]["functions"]
         .as_array()
         .expect("functions[]");
@@ -2876,7 +2885,10 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
         &std::fs::read(main_summary_path).expect("read main verify summary"),
     )
     .expect("parse main verify summary");
-    assert_eq!(main_summary["schema_version"], X07_VERIFY_SUMMARY_SCHEMA_VERSION);
+    assert_eq!(
+        main_summary["schema_version"],
+        X07_VERIFY_SUMMARY_SCHEMA_VERSION
+    );
     assert!(
         main_summary["imported_summaries"]
             .as_array()
@@ -3130,12 +3142,10 @@ fn x07_verify_prove_rejects_nested_result_param_with_explicit_diag() {
     assert_eq!(v["mode"], "prove");
     assert_eq!(v["ok"], false);
     assert_eq!(v["result"]["kind"], "unsupported");
-    assert!(
-        v["result"]["details"]
-            .as_str()
-            .expect("details string")
-            .contains("param type \"result_result_bytes\"")
-    );
+    assert!(v["result"]["details"]
+        .as_str()
+        .expect("details string")
+        .contains("param type \"result_result_bytes\""));
     let diags = v["diagnostics"].as_array().expect("diagnostics[]");
     assert_eq!(diags[0]["code"], "X07V_UNSUPPORTED_RICH_TYPE");
 }

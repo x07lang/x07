@@ -350,7 +350,7 @@ struct TrustCertificate {
     claims: Vec<String>,
     async_proof: TrustCertificateAsyncProof,
     recursive_proof_summary: TrustCertificateRecursiveProofSummary,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     imported_summary_inventory: Vec<TrustCertificateImportedSummary>,
     capsules: TrustCertificateCapsules,
     network_capsules: TrustCertificateNetworkCapsules,
@@ -442,7 +442,6 @@ struct TrustCertificateTcb {
 struct TrustCertificateEvidence {
     boundaries_report: EvidenceRef,
     coverage_report: EvidenceRef,
-    #[serde(skip_serializing_if = "Option::is_none")]
     verify_summary_report: Option<EvidenceRef>,
     #[serde(default)]
     schema_derive_reports: Vec<EvidenceRef>,
@@ -2707,8 +2706,7 @@ fn cmd_trust_certify(
             prove_targets,
             verify_summary_ref,
             imported_summary_inventory,
-        ) =
-            build_coverage_evidence(project_path, &args.entry, &out_dir, &mut diagnostics)?;
+        ) = build_coverage_evidence(project_path, &args.entry, &out_dir, &mut diagnostics)?;
         add_coverage_diagnostics(&coverage_doc, &mut diagnostics);
         let schema_derive_refs = if profile
             .as_ref()
@@ -3021,38 +3019,40 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
         "<h2>Assurance</h2><table><thead><tr><th>Area</th><th>Value</th></tr></thead><tbody>",
     );
     s.push_str("<tr><td>async proof</td><td><code>");
-    s.push_str(&report_common::html_escape(&format!(
+    s.push_str(&report_common::html_escape(format!(
         "{}/{} reachable",
         certificate.async_proof.covered, certificate.async_proof.reachable
     )));
     s.push_str("</code></td></tr>");
     s.push_str("<tr><td>capsules</td><td><code>");
-    s.push_str(&report_common::html_escape(&format!(
+    s.push_str(&report_common::html_escape(format!(
         "{} [{}]",
         certificate.capsules.count,
         certificate.capsules.ids.join(", ")
     )));
     s.push_str("</code></td></tr>");
     s.push_str("<tr><td>network capsules</td><td><code>");
-    s.push_str(&report_common::html_escape(&format!(
+    s.push_str(&report_common::html_escape(format!(
         "{} [{}]",
         certificate.network_capsules.count,
         certificate.network_capsules.ids.join(", ")
     )));
     s.push_str("</code></td></tr>");
     s.push_str("<tr><td>recursive proof</td><td><code>");
-    s.push_str(&report_common::html_escape(&format!(
+    s.push_str(&report_common::html_escape(format!(
         "reachable={} proven={} imported={} termination_only={} unsupported={}",
         certificate.recursive_proof_summary.recursive_defn,
         certificate.recursive_proof_summary.proven_recursive_defn,
         certificate.recursive_proof_summary.imported_summary_defn,
         certificate.recursive_proof_summary.termination_proven_defn,
-        certificate.recursive_proof_summary.unsupported_recursive_defn
+        certificate
+            .recursive_proof_summary
+            .unsupported_recursive_defn
     )));
     s.push_str("</code></td></tr>");
     if let Some(runtime) = &certificate.runtime {
         s.push_str("<tr><td>runtime</td><td><code>");
-        s.push_str(&report_common::html_escape(&format!(
+        s.push_str(&report_common::html_escape(format!(
             "backend={} network_mode={} network_enforcement={} weaker_isolation={}",
             runtime.backend,
             runtime.network_mode,
@@ -3068,7 +3068,7 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
     }
     if let Some(dependency_closure) = &certificate.dependency_closure {
         s.push_str("<tr><td>dependency closure</td><td><code>");
-        s.push_str(&report_common::html_escape(&format!(
+        s.push_str(&report_common::html_escape(format!(
             "packages={} advisory_check_ok={}",
             dependency_closure.packages.join(", "),
             dependency_closure.advisory_check_ok
@@ -3077,7 +3077,7 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
     }
     if !certificate.imported_summary_inventory.is_empty() {
         s.push_str("<tr><td>imported summaries</td><td><code>");
-        s.push_str(&report_common::html_escape(&format!(
+        s.push_str(&report_common::html_escape(format!(
             "{} artifact(s)",
             certificate.imported_summary_inventory.len()
         )));
@@ -3177,7 +3177,7 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
             s.push_str("</code></td><td><code>");
             s.push_str(&report_common::html_escape(&entry.sha256_hex));
             s.push_str("</code></td><td><code>");
-            s.push_str(&report_common::html_escape(&entry.symbols.join(", ")));
+            s.push_str(&report_common::html_escape(entry.symbols.join(", ")));
             s.push_str("</code></td></tr>");
         }
         s.push_str("</tbody></table>");
@@ -3489,7 +3489,9 @@ fn collect_imported_summary_inventory(doc: &Value) -> Vec<TrustCertificateImport
             })
         })
         .collect::<Vec<_>>();
-    out.sort_by(|a, b| (a.path.as_str(), a.sha256_hex.as_str()).cmp(&(b.path.as_str(), b.sha256_hex.as_str())));
+    out.sort_by(|a, b| {
+        (a.path.as_str(), a.sha256_hex.as_str()).cmp(&(b.path.as_str(), b.sha256_hex.as_str()))
+    });
     out
 }
 
@@ -4529,10 +4531,7 @@ fn add_review_diff_diagnostics(review_doc: &Value, diagnostics: &mut Vec<diagnos
     let dependency_closure_changes =
         review_highlight_count(review_doc, "/highlights/dependency_closure_changes");
 
-    if proof_changes > 0
-        || recursive_proof_changes > 0
-        || subset_changes > 0
-        || summary_changes > 0
+    if proof_changes > 0 || recursive_proof_changes > 0 || subset_changes > 0 || summary_changes > 0
     {
         diagnostics.push(trust_diag(
             "X07TC_EDIFF_POSTURE",
@@ -4704,18 +4703,20 @@ fn build_boundaries_evidence(
     Ok((evidence_ref_for_path(&boundaries_path)?, boundaries_doc))
 }
 
-fn build_coverage_evidence(
-    project_path: &Path,
-    entry: &str,
-    out_dir: &Path,
-    diagnostics: &mut Vec<diagnostics::Diagnostic>,
-) -> Result<(
+type CoverageEvidence = (
     EvidenceRef,
     Value,
     Vec<String>,
     Option<EvidenceRef>,
     Vec<TrustCertificateImportedSummary>,
-)> {
+);
+
+fn build_coverage_evidence(
+    project_path: &Path,
+    entry: &str,
+    out_dir: &Path,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) -> Result<CoverageEvidence> {
     let verify_report_path = out_dir.join("verify.coverage.report.json");
     let coverage_path = out_dir.join("verify.coverage.json");
     let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
@@ -4766,7 +4767,8 @@ fn build_coverage_evidence(
         .pointer("/artifacts/verify_summary_path")
         .and_then(Value::as_str)
     {
-        let summary_src_path = resolve_report_artifact_path(&verify_report_path, cwd, raw_summary_path);
+        let summary_src_path =
+            resolve_report_artifact_path(&verify_report_path, cwd, raw_summary_path);
         if summary_src_path.is_file() {
             let summary_doc = report_common::read_json_file(&summary_src_path)?;
             let summary_path = out_dir.join("verify.summary.json");

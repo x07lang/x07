@@ -271,19 +271,23 @@ fn try_main() -> Result<std::process::ExitCode> {
             };
             let solve = run_os_artifact(&inv)?;
             let runtime_attestation = match (cli.attest_runtime.as_deref(), sandbox_backend_name) {
-                (Some(path), Some(sandbox_backend)) => Some(write_runtime_attestation(
-                    path,
-                    sandbox_backend,
-                    cli.i_accept_weaker_isolation,
-                    artifact,
-                    cli.policy.as_deref(),
-                    input.len(),
-                    inv.run_dir,
-                    None,
-                    solve.ok,
-                    solve.exit_status,
-                    solve.trap.as_deref(),
-                )?),
+                (Some(path), Some(sandbox_backend)) => {
+                    Some(write_runtime_attestation(RuntimeAttestationWriteArgs {
+                        path,
+                        sandbox_backend,
+                        weaker_isolation: cli.i_accept_weaker_isolation,
+                        artifact_path: artifact,
+                        policy_path: cli.policy.as_deref(),
+                        input_len_bytes: input.len(),
+                        run_dir: inv.run_dir,
+                        guest_image_digest: None,
+                        outcome: RuntimeAttestationOutcomeArgs {
+                            ok: solve.ok,
+                            exit_status: solve.exit_status,
+                            trap: solve.trap.as_deref(),
+                        },
+                    })?)
+                }
                 _ => None,
             };
 
@@ -432,19 +436,23 @@ fn try_main() -> Result<std::process::ExitCode> {
             };
             let solve = run_os_artifact(&inv)?;
             let runtime_attestation = match (cli.attest_runtime.as_deref(), sandbox_backend_name) {
-                (Some(path), Some(sandbox_backend)) => Some(write_runtime_attestation(
-                    path,
-                    sandbox_backend,
-                    cli.i_accept_weaker_isolation,
-                    exe.as_path(),
-                    cli.policy.as_deref(),
-                    input.len(),
-                    inv.run_dir,
-                    None,
-                    solve.ok,
-                    solve.exit_status,
-                    solve.trap.as_deref(),
-                )?),
+                (Some(path), Some(sandbox_backend)) => {
+                    Some(write_runtime_attestation(RuntimeAttestationWriteArgs {
+                        path,
+                        sandbox_backend,
+                        weaker_isolation: cli.i_accept_weaker_isolation,
+                        artifact_path: exe.as_path(),
+                        policy_path: cli.policy.as_deref(),
+                        input_len_bytes: input.len(),
+                        run_dir: inv.run_dir,
+                        guest_image_digest: None,
+                        outcome: RuntimeAttestationOutcomeArgs {
+                            ok: solve.ok,
+                            exit_status: solve.exit_status,
+                            trap: solve.trap.as_deref(),
+                        },
+                    })?)
+                }
                 _ => None,
             };
 
@@ -565,19 +573,23 @@ fn try_main() -> Result<std::process::ExitCode> {
             };
             let solve = run_os_artifact(&inv)?;
             let runtime_attestation = match (cli.attest_runtime.as_deref(), sandbox_backend_name) {
-                (Some(path), Some(sandbox_backend)) => Some(write_runtime_attestation(
-                    path,
-                    sandbox_backend,
-                    cli.i_accept_weaker_isolation,
-                    exe.as_path(),
-                    cli.policy.as_deref(),
-                    input.len(),
-                    inv.run_dir,
-                    None,
-                    solve.ok,
-                    solve.exit_status,
-                    solve.trap.as_deref(),
-                )?),
+                (Some(path), Some(sandbox_backend)) => {
+                    Some(write_runtime_attestation(RuntimeAttestationWriteArgs {
+                        path,
+                        sandbox_backend,
+                        weaker_isolation: cli.i_accept_weaker_isolation,
+                        artifact_path: exe.as_path(),
+                        policy_path: cli.policy.as_deref(),
+                        input_len_bytes: input.len(),
+                        run_dir: inv.run_dir,
+                        guest_image_digest: None,
+                        outcome: RuntimeAttestationOutcomeArgs {
+                            ok: solve.ok,
+                            exit_status: solve.exit_status,
+                            trap: solve.trap.as_deref(),
+                        },
+                    })?)
+                }
                 _ => None,
             };
 
@@ -1322,19 +1334,21 @@ fn run_vm(
                 .compiled_out
                 .as_deref()
                 .unwrap_or(compiled_artifact.as_path());
-            Some(write_runtime_attestation(
+            Some(write_runtime_attestation(RuntimeAttestationWriteArgs {
                 path,
-                "vm",
-                accept_weaker_isolation,
-                attestation_artifact,
-                Some(runtime_policy_path.as_path()),
-                input.len(),
-                Some(base_host.as_path()),
-                run_spec.image_digest.as_deref(),
-                solve_ok,
-                solve_exit_status_i32,
-                solve.get("trap").and_then(|value| value.as_str()),
-            )?)
+                sandbox_backend: "vm",
+                weaker_isolation: accept_weaker_isolation,
+                artifact_path: attestation_artifact,
+                policy_path: Some(runtime_policy_path.as_path()),
+                input_len_bytes: input.len(),
+                run_dir: Some(base_host.as_path()),
+                guest_image_digest: run_spec.image_digest.as_deref(),
+                outcome: RuntimeAttestationOutcomeArgs {
+                    ok: solve_ok,
+                    exit_status: solve_exit_status_i32,
+                    trap: solve.get("trap").and_then(|value| value.as_str()),
+                },
+            })?)
         }
         _ => None,
     };
@@ -1549,7 +1563,7 @@ fn attach_runtime_fields(
     if let Some(runtime_attestation) = runtime_attestation {
         obj.insert(
             "runtime_attestation".to_string(),
-            serde_json::to_value(runtime_attestation).unwrap_or_else(|_| serde_json::Value::Null),
+            serde_json::to_value(runtime_attestation).unwrap_or(serde_json::Value::Null),
         );
     }
 }
@@ -1647,27 +1661,35 @@ fn build_runtime_attestation_bindings(
     Ok(bindings)
 }
 
-fn write_runtime_attestation(
-    path: &Path,
+struct RuntimeAttestationOutcomeArgs<'a> {
+    ok: bool,
+    exit_status: i32,
+    trap: Option<&'a str>,
+}
+
+struct RuntimeAttestationWriteArgs<'a> {
+    path: &'a Path,
     sandbox_backend: &'static str,
     weaker_isolation: bool,
-    artifact_path: &Path,
-    policy_path: Option<&Path>,
+    artifact_path: &'a Path,
+    policy_path: Option<&'a Path>,
     input_len_bytes: usize,
-    run_dir: Option<&Path>,
-    guest_image_digest: Option<&str>,
-    solve_ok: bool,
-    solve_exit_status: i32,
-    solve_trap: Option<&str>,
+    run_dir: Option<&'a Path>,
+    guest_image_digest: Option<&'a str>,
+    outcome: RuntimeAttestationOutcomeArgs<'a>,
+}
+
+fn write_runtime_attestation(
+    args: RuntimeAttestationWriteArgs<'_>,
 ) -> Result<RuntimeAttestationRef> {
     let bindings = build_runtime_attestation_bindings(
-        sandbox_backend,
-        weaker_isolation,
-        artifact_path,
-        policy_path,
-        guest_image_digest,
+        args.sandbox_backend,
+        args.weaker_isolation,
+        args.artifact_path,
+        args.policy_path,
+        args.guest_image_digest,
     )?;
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = args.path.parent() {
         std::fs::create_dir_all(parent).with_context(|| {
             format!(
                 "X07RA_EWRITE: create runtime attestation dir: {}",
@@ -1679,13 +1701,13 @@ fn write_runtime_attestation(
     let attestation = RuntimeAttestation {
         schema_version: X07_RUNTIME_ATTEST_SCHEMA_VERSION,
         world: WorldId::RunOsSandboxed.as_str(),
-        sandbox_backend,
-        weaker_isolation,
-        artifact_path: artifact_path.display().to_string(),
-        policy_path: policy_path.map(|p| p.display().to_string()),
-        input_len_bytes: input_len_bytes as u64,
-        run_dir: run_dir.map(|p| p.display().to_string()),
-        guest_image_digest: guest_image_digest.map(|digest| digest.to_string()),
+        sandbox_backend: args.sandbox_backend,
+        weaker_isolation: args.weaker_isolation,
+        artifact_path: args.artifact_path.display().to_string(),
+        policy_path: args.policy_path.map(|p| p.display().to_string()),
+        input_len_bytes: args.input_len_bytes as u64,
+        run_dir: args.run_dir.map(|p| p.display().to_string()),
+        guest_image_digest: args.guest_image_digest.map(|digest| digest.to_string()),
         effective_policy_digest: bindings.effective_policy_digest,
         network_mode: bindings.network_mode,
         network_enforcement: bindings.network_enforcement,
@@ -1699,26 +1721,26 @@ fn write_runtime_attestation(
         capsule_attestation_digests: bindings.capsule_attestation_digests,
         effect_log_digests: bindings.effect_log_digests,
         outcome: RuntimeAttestationOutcome {
-            ok: solve_ok,
-            exit_status: solve_exit_status,
-            trap: solve_trap.map(|trap| trap.to_string()),
+            ok: args.outcome.ok,
+            exit_status: args.outcome.exit_status,
+            trap: args.outcome.trap.map(|trap| trap.to_string()),
         },
     };
 
     let mut bytes = serde_json::to_vec_pretty(&attestation)
         .context("X07RA_EWRITE: serialize runtime attestation JSON")?;
     bytes.push(b'\n');
-    std::fs::write(path, bytes).with_context(|| {
+    std::fs::write(args.path, bytes).with_context(|| {
         format!(
             "X07RA_EWRITE: write runtime attestation: {}",
-            path.display()
+            args.path.display()
         )
     })?;
 
     Ok(RuntimeAttestationRef {
-        path: path.display().to_string(),
-        sandbox_backend,
-        weaker_isolation,
+        path: args.path.display().to_string(),
+        sandbox_backend: args.sandbox_backend,
+        weaker_isolation: args.weaker_isolation,
         network_mode: bindings.network_mode,
         network_enforcement: bindings.network_enforcement,
     })
@@ -2377,19 +2399,23 @@ mod tests {
         )
         .expect("write policy");
 
-        let attestation_ref = write_runtime_attestation(
-            &path,
-            "vm",
-            false,
-            &artifact_path,
-            Some(&policy_path),
-            3,
-            Some(&run_dir),
-            Some("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
-            false,
-            17,
-            Some("runtime trap"),
-        )
+        let attestation_ref = write_runtime_attestation(RuntimeAttestationWriteArgs {
+            path: &path,
+            sandbox_backend: "vm",
+            weaker_isolation: false,
+            artifact_path: &artifact_path,
+            policy_path: Some(&policy_path),
+            input_len_bytes: 3,
+            run_dir: Some(&run_dir),
+            guest_image_digest: Some(
+                "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            ),
+            outcome: RuntimeAttestationOutcomeArgs {
+                ok: false,
+                exit_status: 17,
+                trap: Some("runtime trap"),
+            },
+        })
         .expect("write runtime attestation");
 
         let doc_bytes = std::fs::read(&path).expect("read runtime attestation");
@@ -2467,19 +2493,21 @@ mod tests {
         )
         .expect("write policy");
 
-        let err = write_runtime_attestation(
-            &path,
-            "vm",
-            false,
-            &artifact_path,
-            Some(&policy_path),
-            0,
-            None,
-            None,
-            true,
-            0,
-            None,
-        )
+        let err = write_runtime_attestation(RuntimeAttestationWriteArgs {
+            path: &path,
+            sandbox_backend: "vm",
+            weaker_isolation: false,
+            artifact_path: &artifact_path,
+            policy_path: Some(&policy_path),
+            input_len_bytes: 0,
+            run_dir: None,
+            guest_image_digest: None,
+            outcome: RuntimeAttestationOutcomeArgs {
+                ok: true,
+                exit_status: 0,
+                trap: None,
+            },
+        })
         .expect_err("missing guest digest must fail");
         assert!(format!("{err:#}").contains("X07RA_EGUEST_DIGEST"));
         std::fs::remove_dir_all(&dir).expect("remove temp dir");
@@ -2515,19 +2543,23 @@ mod tests {
         )
         .expect("write policy");
 
-        let attestation_ref = write_runtime_attestation(
-            &path,
-            "vm",
-            true,
-            &artifact_path,
-            Some(&policy_path),
-            0,
-            None,
-            Some("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
-            true,
-            0,
-            None,
-        )
+        let attestation_ref = write_runtime_attestation(RuntimeAttestationWriteArgs {
+            path: &path,
+            sandbox_backend: "vm",
+            weaker_isolation: true,
+            artifact_path: &artifact_path,
+            policy_path: Some(&policy_path),
+            input_len_bytes: 0,
+            run_dir: None,
+            guest_image_digest: Some(
+                "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            ),
+            outcome: RuntimeAttestationOutcomeArgs {
+                ok: true,
+                exit_status: 0,
+                trap: None,
+            },
+        })
         .expect("weaker isolation should still be recorded");
         let doc: serde_json::Value = serde_json::from_slice(
             &std::fs::read(&path).expect("read weaker-isolation attestation"),
@@ -2578,19 +2610,23 @@ mod tests {
         )
         .expect("write policy");
 
-        let attestation_ref = write_runtime_attestation(
-            &path,
-            "vm",
-            false,
-            &artifact_path,
-            Some(&policy_path),
-            0,
-            None,
-            Some("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
-            true,
-            0,
-            None,
-        )
+        let attestation_ref = write_runtime_attestation(RuntimeAttestationWriteArgs {
+            path: &path,
+            sandbox_backend: "vm",
+            weaker_isolation: false,
+            artifact_path: &artifact_path,
+            policy_path: Some(&policy_path),
+            input_len_bytes: 0,
+            run_dir: None,
+            guest_image_digest: Some(
+                "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            ),
+            outcome: RuntimeAttestationOutcomeArgs {
+                ok: true,
+                exit_status: 0,
+                trap: None,
+            },
+        })
         .expect("network allowlist policy should be recorded");
         let doc: serde_json::Value =
             serde_json::from_slice(&std::fs::read(&path).expect("read network attestation"))
@@ -2669,6 +2705,7 @@ mod tests {
             enable_rr: false,
             enable_kv: false,
             module_roots,
+            prefer_module_roots_first: false,
             arch_root: None,
             emit_main: true,
             freestanding: false,
@@ -2676,6 +2713,7 @@ mod tests {
             contract_mode: compile::ContractMode::RuntimeTrap,
             allow_unsafe: None,
             allow_ffi: None,
+            allow_internal_only_heads_in_entry: false,
         };
 
         let cfg = base_runner_config(1024 * 1024);

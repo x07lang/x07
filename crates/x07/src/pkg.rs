@@ -2695,6 +2695,7 @@ fn deps_from_project_doc(doc: &Value, project_path: &Path) -> Result<Vec<project
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};

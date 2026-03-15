@@ -2230,17 +2230,15 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
                     "contract witness has unsupported type: {} (allowed: i32, bytes, bytes_view, result_*)",
                     contract_ty_brief(&resolved)
                 );
-                infer
-                    .diagnostics
-                    .push(diag_contract_err(
-                        if ptr.contains("/decreases/") {
-                            "X07-CONTRACT-0009"
-                        } else {
-                            "X07-CONTRACT-0005"
-                        },
-                        ptr,
-                        msg,
-                    ));
+                infer.diagnostics.push(diag_contract_err(
+                    if ptr.contains("/decreases/") {
+                        "X07-CONTRACT-0009"
+                    } else {
+                        "X07-CONTRACT-0005"
+                    },
+                    ptr,
+                    msg,
+                ));
             }
         }
         drain_pending_tapp(

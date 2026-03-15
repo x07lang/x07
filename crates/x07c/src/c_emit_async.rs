@@ -9808,7 +9808,7 @@ impl<'a> Emitter<'a> {
         let has_contracts = !(f.requires.is_empty()
             && f.ensures.is_empty()
             && f.invariant.is_empty()
-            && protocol.as_ref().map_or(true, |p| {
+            && protocol.as_ref().is_none_or(|p| {
                 p.await_invariant.is_empty()
                     && p.scope_invariant.is_empty()
                     && p.cancellation_ensures.is_empty()

@@ -294,9 +294,7 @@ fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> 
         InitTemplate::TrustedSandboxProgram
         | InitTemplate::TrustedNetworkService
         | InitTemplate::CertifiedCapsule
-        | InitTemplate::CertifiedNetworkCapsule => {
-            Ok((app_module_bytes()?, main_entry_bytes()?))
-        }
+        | InitTemplate::CertifiedNetworkCapsule => Ok((app_module_bytes()?, main_entry_bytes()?)),
         InitTemplate::McpServer
         | InitTemplate::McpServerStdio
         | InitTemplate::McpServerHttp

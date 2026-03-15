@@ -3,8 +3,8 @@
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
 - total codes: 400
-- quickfix support (`sometimes` or `always`): 358
-- quickfix coverage: 89.50%
+- quickfix support (`sometimes` or `always`): 370
+- quickfix coverage: 92.50%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -344,24 +344,24 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07TEST_CAPSULE_EVIDENCE_MISSING` | x07 / lint / error | never | A test that requires capsule evidence did not provide it. |
 | `X07TEST_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | sometimes | A test that requires runtime attestation did not produce it. |
 | `X07TP_ARCH` | x07 / run / error | sometimes | Project architecture posture is weaker than the trust profile requires. |
-| `X07TP_ASYNC_PROOF_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing async proof coverage. |
-| `X07TP_BACKEND_NOT_CERTIFIABLE` | x07 / run / error | never | Networked trusted-program profile allows a backend posture that is not certifiable. |
+| `X07TP_ASYNC_PROOF_REQUIRED` | x07 / run / error | sometimes | Sandboxed trusted-program profile is missing async proof coverage. |
+| `X07TP_BACKEND_NOT_CERTIFIABLE` | x07 / run / error | sometimes | Networked trusted-program profile allows a backend posture that is not certifiable. |
 | `X07TP_BOUNDARY` | x07 / run / error | sometimes | Project boundary index wiring is missing or incomplete for certification. |
 | `X07TP_CAPSULES` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_CAPSULES`. |
-| `X07TP_CAPSULE_ATTEST_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing capsule attestation requirements. |
+| `X07TP_CAPSULE_ATTEST_REQUIRED` | x07 / run / error | sometimes | Sandboxed trusted-program profile is missing capsule attestation requirements. |
 | `X07TP_DEP_CLOSURE_REQUIRED` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_DEP_CLOSURE_REQUIRED`. |
-| `X07TP_EFFECT_LOG_REQUIRED` | x07 / run / error | never | Trust profile is missing required effect-log evidence semantics. |
-| `X07TP_ENTRY_FORBIDDEN` | x07 / run / error | never | Requested entrypoint is not allowed by the trust profile. |
+| `X07TP_EFFECT_LOG_REQUIRED` | x07 / run / error | sometimes | Trust profile is missing required effect-log evidence semantics. |
+| `X07TP_ENTRY_FORBIDDEN` | x07 / run / error | sometimes | Requested entrypoint is not allowed by the trust profile. |
 | `X07TP_INVALID` | x07 / run / error | sometimes | Trust profile JSON is missing or invalid. |
-| `X07TP_LANGUAGE` | x07 / run / error | never | Project uses language or policy features forbidden by the trust profile. |
-| `X07TP_NETWORK_MODE_FORBIDDEN` | x07 / run / error | never | Sandboxed local trusted-program profile allows networking where it should not. |
-| `X07TP_NETWORK_PROFILE_REQUIRED` | x07 / run / error | never | Networked trusted-program profile is missing required network certification posture. |
-| `X07TP_NOT_CERTIFIABLE` | x07 / run / error | never | Trust profile is weaker than the Milestone A certification floor. |
+| `X07TP_LANGUAGE` | x07 / run / error | sometimes | Project uses language or policy features forbidden by the trust profile. |
+| `X07TP_NETWORK_MODE_FORBIDDEN` | x07 / run / error | sometimes | Sandboxed local trusted-program profile allows networking where it should not. |
+| `X07TP_NETWORK_PROFILE_REQUIRED` | x07 / run / error | sometimes | Networked trusted-program profile is missing required network certification posture. |
+| `X07TP_NOT_CERTIFIABLE` | x07 / run / error | sometimes | Trust profile is weaker than the Milestone A certification floor. |
 | `X07TP_PEER_POLICY_REQUIRED` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_PEER_POLICY_REQUIRED`. |
 | `X07TP_PROJECT_MISMATCH` | x07 / run / error | sometimes | Project manifest could not be resolved for trust profile validation. |
-| `X07TP_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing runtime attestation requirements. |
-| `X07TP_SANDBOX_BACKEND_REQUIRED` | x07 / run / error | never | Sandboxed trusted-program profile is missing the VM-only isolation requirement. |
-| `X07TP_WORLD` | x07 / run / error | never | Project world is outside the trust profile allowlist. |
+| `X07TP_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | sometimes | Sandboxed trusted-program profile is missing runtime attestation requirements. |
+| `X07TP_SANDBOX_BACKEND_REQUIRED` | x07 / run / error | sometimes | Sandboxed trusted-program profile is missing the VM-only isolation requirement. |
+| `X07TP_WORLD` | x07 / run / error | sometimes | Project world is outside the trust profile allowlist. |
 | `X07T_EPBT_MANIFEST_INVALID` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_MANIFEST_INVALID`. |
 | `X07T_EPBT_PARAM_EMPTY` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_PARAM_EMPTY`. |
 | `X07T_EPBT_UNKNOWN_GEN_KIND` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNKNOWN_GEN_KIND`. |
@@ -7178,8 +7178,7 @@ Summary: Sandboxed trusted-program profile is missing async proof coverage.
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires editing the published certification contract.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7199,8 +7198,7 @@ Summary: Networked trusted-program profile allows a backend posture that is not 
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires editing the published certification contract or selecting a certifiable runtime posture.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7261,8 +7259,7 @@ Summary: Sandboxed trusted-program profile is missing capsule attestation requir
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires editing the published certification contract.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7302,8 +7299,7 @@ Summary: Trust profile is missing required effect-log evidence semantics.
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires editing the published certification contract.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7323,8 +7319,7 @@ Summary: Requested entrypoint is not allowed by the trust profile.
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires a certification policy decision (change the entry vs widen the profile).
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7364,8 +7359,7 @@ Summary: Project uses language or policy features forbidden by the trust profile
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires semantic refactoring or an intentional policy change.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7385,8 +7379,7 @@ Summary: Sandboxed local trusted-program profile allows networking where it shou
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires editing the published certification contract or sandbox policy.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7406,8 +7399,7 @@ Summary: Networked trusted-program profile is missing required network certifica
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires editing the published certification contract.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7427,8 +7419,7 @@ Summary: Trust profile is weaker than the Milestone A certification floor.
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires an intentional policy change to the certification contract.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7488,8 +7479,7 @@ Summary: Sandboxed trusted-program profile is missing runtime attestation requir
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires editing the published certification contract.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7509,8 +7499,7 @@ Summary: Sandboxed trusted-program profile is missing the VM-only isolation requ
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires editing the published certification contract.
+Quickfix support: `sometimes`
 
 Details:
 
@@ -7530,8 +7519,7 @@ Summary: Project world is outside the trust profile allowlist.
 Origins:
 - x07 (stage: run, severity: error)
 
-Quickfix support: `never`
-No quickfix reason: Requires choosing a different project world or a different trust profile.
+Quickfix support: `sometimes`
 
 Details:
 

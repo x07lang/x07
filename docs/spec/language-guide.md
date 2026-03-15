@@ -94,12 +94,11 @@ Declaration objects:
 - `{"kind":"extern","abi":"C","name":"main.c_fn","link_name":"c_fn","params":[{"name":"x","ty":"i32"}],"result":"i32"}` (standalone-only; `result` may also be `"void"`)
 - `{"kind":"export","names":["std.foo.bar", ...]}` (module files only)
 
-Contracts (optional fields on `defn` / `defasync` in v0.5, plus `decreases` on `defn` in v0.8):
+Contracts (optional fields on `defn` / `defasync` in v0.5):
 
 - `requires`: array of preconditions
 - `ensures`: array of postconditions
 - `invariant`: array of function-level invariants
-- `decreases`: array of recursive termination clauses for pure self-recursive `defn`
 
 Each clause is an object:
 
@@ -724,4 +723,5 @@ Many tasks use `input[0..k]` as parameters and the remaining bytes as data.
 Example (k=1):
 
 - `["begin",["let","x",["std.bytes.get_u8","input",0]],["let","n",["std.bytes.len","input"]],["let","v",["std.vec.with_capacity",["-","n",1]]],["for","i",1,"n",["std.vec.push","v",["std.bytes.get_u8","input","i"]]],["std.vec.as_bytes","v"]]`
+
 

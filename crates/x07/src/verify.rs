@@ -9,8 +9,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use x07_contracts::{
-    X07AST_SCHEMA_VERSION,
-    X07_VERIFY_CEX_SCHEMA_VERSION, X07_VERIFY_COVERAGE_SCHEMA_VERSION,
+    X07AST_SCHEMA_VERSION, X07_VERIFY_CEX_SCHEMA_VERSION, X07_VERIFY_COVERAGE_SCHEMA_VERSION,
     X07_VERIFY_PRIMITIVES_SCHEMA_VERSION, X07_VERIFY_REPORT_SCHEMA_VERSION,
     X07_VERIFY_SUMMARY_SCHEMA_VERSION,
 };
@@ -87,9 +86,9 @@ fn rewrite_verify_overlay_type_ref(ty: &mut TypeRef) -> bool {
             }
         }
         TypeRef::Var(_) => false,
-        TypeRef::App { args, .. } => args
-            .iter_mut()
-            .fold(false, |changed, arg| rewrite_verify_overlay_type_ref(arg) || changed),
+        TypeRef::App { args, .. } => args.iter_mut().fold(false, |changed, arg| {
+            rewrite_verify_overlay_type_ref(arg) || changed
+        }),
     }
 }
 
@@ -140,7 +139,9 @@ fn rewrite_verify_overlay_expr(expr: &mut Expr) -> bool {
         }
         "vec_u8.into_bytes" | "std.vec.as_bytes" if args.len() == 1 => Some(args[0].clone()),
         "vec_u8.clear" if args.len() == 1 => Some(expr_call("bytes.alloc", vec![expr_int(0)])),
-        "vec_u8.reserve_exact" | "std.vec.reserve_exact" if args.len() == 2 => Some(args[0].clone()),
+        "vec_u8.reserve_exact" | "std.vec.reserve_exact" if args.len() == 2 => {
+            Some(args[0].clone())
+        }
         "vec_u8.len" | "std.vec.len" if args.len() == 1 => Some(expr_call(
             format!("{VERIFY_VEC_SUPPORT_MODULE_ID}.len_v1"),
             vec![args[0].clone()],
@@ -218,7 +219,8 @@ fn rewrite_verify_overlay_file(file: &mut X07AstFile) {
         needs_vec_support |= rewrite_verify_overlay_expr(solve);
     }
     if needs_vec_support {
-        file.imports.insert(VERIFY_VEC_SUPPORT_MODULE_ID.to_string());
+        file.imports
+            .insert(VERIFY_VEC_SUPPORT_MODULE_ID.to_string());
     }
     x07ast::canonicalize_x07ast_file(file);
 }
@@ -348,8 +350,8 @@ fn build_verify_compile_module_roots(
         std::fs::create_dir_all(parent)
             .with_context(|| format!("create verify overlay module dir: {}", parent.display()))?;
     }
-    let mut support_bytes =
-        serde_json::to_vec_pretty(&build_verify_vec_support_module()).context("encode vec support module JSON")?;
+    let mut support_bytes = serde_json::to_vec_pretty(&build_verify_vec_support_module())
+        .context("encode vec support module JSON")?;
     support_bytes.push(b'\n');
     util::write_atomic(&support_path, &support_bytes)
         .with_context(|| format!("write verify support module: {}", support_path.display()))?;
@@ -846,15 +848,13 @@ fn cmd_verify_inner(
     }
 
     if mode == Mode::Prove {
-        if let Some((code, msg)) =
-            prove_unsupported_reason(
-                &module_roots,
-                &target,
-                &args.entry,
-                args.max_bytes_len,
-                &recursion,
-            )
-        {
+        if let Some((code, msg)) = prove_unsupported_reason(
+            &module_roots,
+            &target,
+            &args.entry,
+            args.max_bytes_len,
+            &recursion,
+        ) {
             return write_report_and_exit(
                 machine,
                 VerifyReport::unsupported(mode, &args.entry, Bounds::for_args(&args), code, msg, 2),
@@ -881,8 +881,7 @@ fn cmd_verify_inner(
         &args.entry,
         args.max_bytes_len,
         &recursion,
-    )
-    {
+    ) {
         return write_report_and_exit(
             machine,
             VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
@@ -1068,13 +1067,15 @@ fn cmd_verify_inner(
         Mode::Smt | Mode::Prove => cmd_verify_smt(
             machine,
             &args,
-            &target,
             bounds,
-            &work_dir,
-            &c_path,
             artifacts,
-            mode,
-            proof_summary,
+            VerifySmtPlan {
+                target: &target,
+                work_dir: &work_dir,
+                c_path: &c_path,
+                mode,
+                proof_summary,
+            },
         ),
         Mode::Coverage => unreachable!("coverage returns before solver dispatch"),
     }
@@ -1235,20 +1236,24 @@ fn cmd_verify_bmc(
     write_report_and_exit(machine, report)
 }
 
+struct VerifySmtPlan<'a> {
+    target: &'a TargetSig,
+    work_dir: &'a Path,
+    c_path: &'a Path,
+    mode: Mode,
+    proof_summary: Option<VerifyProofSummary>,
+}
+
 fn cmd_verify_smt(
     machine: &crate::reporting::MachineArgs,
     args: &VerifyArgs,
-    target: &TargetSig,
     bounds: Bounds,
-    work_dir: &Path,
-    c_path: &Path,
     mut artifacts: Artifacts,
-    mode: Mode,
-    proof_summary: Option<VerifyProofSummary>,
+    plan: VerifySmtPlan<'_>,
 ) -> Result<std::process::ExitCode> {
     let attach_summary = |report: VerifyReport| {
-        if mode == Mode::Prove {
-            if let Some(summary) = proof_summary.clone() {
+        if plan.mode == Mode::Prove {
+            if let Some(summary) = plan.proof_summary.clone() {
                 return report.with_proof_summary(summary);
             }
         }
@@ -1257,13 +1262,13 @@ fn cmd_verify_smt(
     if !command_exists("cbmc") {
         let msg = format!(
             "cbmc is required for `x07 verify --{}` (install: `brew install cbmc` or see https://diffblue.github.io/cbmc/)",
-            mode.as_str()
+            plan.mode.as_str()
         );
         let d = diag_verify("X07V_ECBMC_MISSING", msg);
         return write_report_and_exit(
             machine,
             attach_summary(VerifyReport::tool_missing(
-                mode,
+                plan.mode,
                 &args.entry,
                 bounds,
                 d,
@@ -1273,10 +1278,10 @@ fn cmd_verify_smt(
         );
     }
 
-    let smt2_path = work_dir.join("verify.smt2");
+    let smt2_path = plan.work_dir.join("verify.smt2");
 
     let mut cbmc_args = vec![
-        c_path.display().to_string(),
+        plan.c_path.display().to_string(),
         "--function".to_string(),
         VERIFY_HARNESS_FN.to_string(),
         "--unwind".to_string(),
@@ -1297,7 +1302,7 @@ fn cmd_verify_smt(
         return write_report_and_exit(
             machine,
             attach_summary(
-                VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+                VerifyReport::error(plan.mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
             ),
         );
     }
@@ -1308,7 +1313,7 @@ fn cmd_verify_smt(
         return write_report_and_exit(
             machine,
             attach_summary(
-                VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+                VerifyReport::error(plan.mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
             ),
         );
     }
@@ -1322,7 +1327,7 @@ fn cmd_verify_smt(
         return write_report_and_exit(
             machine,
             attach_summary(VerifyReport::inconclusive(
-                mode,
+                plan.mode,
                 &args.entry,
                 bounds,
                 d,
@@ -1333,7 +1338,7 @@ fn cmd_verify_smt(
     }
 
     let z3_out = Command::new("z3")
-        .arg(format!("-T:{}", z3_timeout_seconds(mode, target)))
+        .arg(format!("-T:{}", z3_timeout_seconds(plan.mode, plan.target)))
         .arg("-smt2")
         .arg(&smt2_path)
         .output()
@@ -1345,13 +1350,13 @@ fn cmd_verify_smt(
         return write_report_and_exit(
             machine,
             attach_summary(
-                VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+                VerifyReport::error(plan.mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
             ),
         );
     }
 
     let z3_stdout = String::from_utf8_lossy(&z3_out.stdout).to_string();
-    let z3_out_path = work_dir.join("z3.out.txt");
+    let z3_out_path = plan.work_dir.join("z3.out.txt");
     util::write_atomic(&z3_out_path, z3_stdout.as_bytes())
         .with_context(|| format!("write z3 output: {}", z3_out_path.display()))?;
     artifacts.z3_out_path = Some(z3_out_path.display().to_string());
@@ -1360,26 +1365,26 @@ fn cmd_verify_smt(
     if status.is_empty() && !smt2_has_solver_query(&smt2_path)? {
         return write_report_and_exit(
             machine,
-            attach_summary(if mode == Mode::Prove {
+            attach_summary(if plan.mode == Mode::Prove {
                 VerifyReport::proven(&args.entry, bounds, artifacts)
             } else {
-                VerifyReport::verified(mode, &args.entry, bounds, artifacts)
+                VerifyReport::verified(plan.mode, &args.entry, bounds, artifacts)
             }),
         );
     }
     match status {
         "unsat" => write_report_and_exit(
             machine,
-            attach_summary(if mode == Mode::Prove {
+            attach_summary(if plan.mode == Mode::Prove {
                 VerifyReport::proven(&args.entry, bounds, artifacts)
             } else {
-                VerifyReport::verified(mode, &args.entry, bounds, artifacts)
+                VerifyReport::verified(plan.mode, &args.entry, bounds, artifacts)
             }),
         ),
         "sat" => {
-            if mode == Mode::Prove && target.is_async {
+            if plan.mode == Mode::Prove && plan.target.is_async {
                 let mut cbmc_args = vec![
-                    c_path.display().to_string(),
+                    plan.c_path.display().to_string(),
                     "--function".to_string(),
                     VERIFY_HARNESS_FN.to_string(),
                     "--unwind".to_string(),
@@ -1400,7 +1405,7 @@ fn cmd_verify_smt(
                     return write_report_and_exit(
                         machine,
                         attach_summary(
-                            VerifyReport::error(mode, &args.entry, bounds, d, 1)
+                            VerifyReport::error(plan.mode, &args.entry, bounds, d, 1)
                                 .with_artifacts(artifacts),
                         ),
                     );
@@ -1415,13 +1420,13 @@ fn cmd_verify_smt(
                         return write_report_and_exit(
                             machine,
                             attach_summary(
-                                VerifyReport::error(mode, &args.entry, bounds, d, 1)
+                                VerifyReport::error(plan.mode, &args.entry, bounds, d, 1)
                                     .with_artifacts(artifacts),
                             ),
                         );
                     }
                 };
-                let cbmc_json_path = work_dir.join("cbmc.json");
+                let cbmc_json_path = plan.work_dir.join("cbmc.json");
                 let cbmc_json_bytes = report_common::canonical_pretty_json_bytes(&cbmc_json)
                     .context("canon cbmc.json")?;
                 util::write_atomic(&cbmc_json_path, cbmc_json_bytes.as_slice())
@@ -1459,7 +1464,7 @@ fn cmd_verify_smt(
                             stdout_json_sha256: util::sha256_hex(cbmc_json_bytes.as_slice()),
                         },
                     };
-                    let cex_path = work_dir.join("cex.json");
+                    let cex_path = plan.work_dir.join("cex.json");
                     let cex_bytes = verify_cex_to_pretty_canon_bytes(&cex)?;
                     util::write_atomic(&cex_path, &cex_bytes)
                         .with_context(|| format!("write verify cex: {}", cex_path.display()))?;
@@ -1470,7 +1475,7 @@ fn cmd_verify_smt(
                         machine,
                         attach_summary(VerifyReport {
                             schema_version: X07_VERIFY_REPORT_SCHEMA_VERSION,
-                            mode: mode.as_str(),
+                            mode: plan.mode.as_str(),
                             ok: false,
                             entry: args.entry.clone(),
                             bounds,
@@ -1492,7 +1497,7 @@ fn cmd_verify_smt(
             write_report_and_exit(
                 machine,
                 attach_summary(VerifyReport::counterexample_found(
-                    mode,
+                    plan.mode,
                     &args.entry,
                     bounds,
                     diag_verify("X07V_SMT_SAT", "solver reported SAT (counterexample found)"),
@@ -1504,7 +1509,7 @@ fn cmd_verify_smt(
         other => write_report_and_exit(
             machine,
             attach_summary(VerifyReport::inconclusive(
-                mode,
+                plan.mode,
                 &args.entry,
                 bounds,
                 diag_verify("X07V_SMT_UNKNOWN", format!("solver returned {other:?}")),
@@ -1796,8 +1801,9 @@ fn load_verify_brand_module<'a>(
     cache: &'a mut BTreeMap<String, VerifyBrandModule>,
 ) -> Result<&'a VerifyBrandModule> {
     if !cache.contains_key(module_id) {
-        let source = x07c::module_source::load_module_source(module_id, WorldId::SolvePure, module_roots)
-            .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
+        let source =
+            x07c::module_source::load_module_source(module_id, WorldId::SolvePure, module_roots)
+                .map_err(|err| anyhow::anyhow!(err.message.to_string()))?;
         let doc: Value = serde_json::from_str(&source.src)
             .with_context(|| format!("parse module JSON for {module_id:?}"))?;
         let imports = doc
@@ -1888,8 +1894,8 @@ fn load_imported_summary_index(cwd: &Path, paths: &[PathBuf]) -> Result<Imported
         } else {
             cwd.join(raw_path)
         };
-        let bytes =
-            std::fs::read(&path).with_context(|| format!("read verify summary: {}", path.display()))?;
+        let bytes = std::fs::read(&path)
+            .with_context(|| format!("read verify summary: {}", path.display()))?;
         let value: Value = serde_json::from_slice(&bytes)
             .with_context(|| format!("parse verify summary JSON: {}", path.display()))?;
         let diags = validate_verify_summary_schema(&value)?;
@@ -1945,9 +1951,9 @@ fn load_imported_summary_index(cwd: &Path, paths: &[PathBuf]) -> Result<Imported
         }
         index.inventory.push(source);
     }
-    index
-        .inventory
-        .sort_by(|a, b| (a.path.as_str(), a.sha256_hex.as_str()).cmp(&(b.path.as_str(), b.sha256_hex.as_str())));
+    index.inventory.sort_by(|a, b| {
+        (a.path.as_str(), a.sha256_hex.as_str()).cmp(&(b.path.as_str(), b.sha256_hex.as_str()))
+    });
     Ok(index)
 }
 
@@ -2068,7 +2074,7 @@ fn load_coverage_module<'a>(
             let params = decl
                 .get("params")
                 .and_then(Value::as_array)
-                .map(|params| {
+                .and_then(|params| {
                     params
                         .iter()
                         .map(|p| {
@@ -2085,13 +2091,15 @@ fn load_coverage_module<'a>(
                         })
                         .collect::<Option<Vec<_>>>()
                 })
-                .flatten()
                 .unwrap_or_default();
             let param_names = params
                 .iter()
                 .map(|(name, _)| name.clone())
                 .collect::<Vec<_>>();
-            let params = params.into_iter().map(|(_, param)| param).collect::<Vec<_>>();
+            let params = params
+                .into_iter()
+                .map(|(_, param)| param)
+                .collect::<Vec<_>>();
             let decreases = decl
                 .get("decreases")
                 .and_then(Value::as_array)
@@ -2508,10 +2516,7 @@ fn encoded_verify_param_bytes(param: &VerifySignatureParam, max_bytes_len: u32) 
 }
 
 fn verify_brand_supported_carrier(ty: &str) -> bool {
-    matches!(
-        ty,
-        "bytes_view" | "option_bytes_view" | "result_bytes_view"
-    )
+    matches!(ty, "bytes_view" | "option_bytes_view" | "result_bytes_view")
 }
 
 fn verify_driver_raw_param(param: &VerifySignatureParam) -> Result<VerifySignatureParam> {
@@ -2791,18 +2796,18 @@ fn cmd_verify_coverage(
     imported_summary_index: &ImportedSummaryIndex,
     artifact_base: &Path,
 ) -> Result<std::process::ExitCode> {
-    let analysis = match coverage_report_for_entry(args, project_path, target, imported_summary_index)
-    {
-        Ok(analysis) => analysis,
-        Err(err) => coverage_report_fallback(
-            module_roots,
-            &args.entry,
-            project_path,
-            target,
-            args.max_bytes_len,
-            Some(format!("could not materialize reachable closure: {err:#}")),
-        ),
-    };
+    let analysis =
+        match coverage_report_for_entry(args, project_path, target, imported_summary_index) {
+            Ok(analysis) => analysis,
+            Err(err) => coverage_report_fallback(
+                module_roots,
+                &args.entry,
+                project_path,
+                target,
+                args.max_bytes_len,
+                Some(format!("could not materialize reachable closure: {err:#}")),
+            ),
+        };
     let work_dir = artifact_base
         .join("verify")
         .join("coverage")
@@ -2878,7 +2883,10 @@ fn coverage_function_for_target(
     {
         if recursion.kind == RecursionKind::SelfRecursive
             && target.decreases_count != 0
-            && matches!(code, "X07V_UNSUPPORTED_RICH_TYPE" | "X07V_UNSUPPORTED_HEAP_EFFECT")
+            && matches!(
+                code,
+                "X07V_UNSUPPORTED_RICH_TYPE" | "X07V_UNSUPPORTED_HEAP_EFFECT"
+            )
         {
             (
                 "defn".to_string(),
@@ -3525,10 +3533,7 @@ fn build_verify_sync_helper_decl(
         .enumerate()
         .map(|(idx, param)| {
             let mut raw = serde_json::Map::new();
-            raw.insert(
-                "name".to_string(),
-                Value::String(format!("p{idx}_raw")),
-            );
+            raw.insert("name".to_string(), Value::String(format!("p{idx}_raw")));
             raw.insert(
                 "ty".to_string(),
                 Value::String(verify_driver_raw_param(param)?.ty),
@@ -3595,8 +3600,15 @@ fn build_verify_sync_helper_arg_expr(
             serde_json::json!([
                 "begin",
                 ["let", check_name, ["try", [validator, validate_value]]],
-                ["let", view_name, ["__internal.brand.assume_view_v1", brand_id, value]],
-                ["__internal.brand.view_to_bytes_preserve_brand_v1", view_name]
+                [
+                    "let",
+                    view_name,
+                    ["__internal.brand.assume_view_v1", brand_id, value]
+                ],
+                [
+                    "__internal.brand.view_to_bytes_preserve_brand_v1",
+                    view_name
+                ]
             ])
         } else {
             serde_json::json!([
@@ -3728,7 +3740,11 @@ fn append_verify_param_setup(
             let tag = format!("p{idx}_tag");
             let value = format!("p{idx}_value");
             let arg = format!("p{idx}_arg");
-            stmts.push(serde_json::json!(["let", tag, ["view.get_u8", "input", off]]));
+            stmts.push(serde_json::json!([
+                "let",
+                tag,
+                ["view.get_u8", "input", off]
+            ]));
             stmts.push(serde_json::json!([
                 "let",
                 value,
@@ -3749,7 +3765,11 @@ fn append_verify_param_setup(
         }
         "option_bytes" | "option_bytes_view" => {
             let tag = format!("p{idx}_tag");
-            stmts.push(serde_json::json!(["let", tag, ["view.get_u8", "input", off]]));
+            stmts.push(serde_json::json!([
+                "let",
+                tag,
+                ["view.get_u8", "input", off]
+            ]));
             let payload_name = append_verify_bytes_payload(
                 stmts,
                 idx,
@@ -3777,12 +3797,7 @@ fn append_verify_param_setup(
             stmts.push(serde_json::json!([
                 "let",
                 arg,
-                [
-                    "if",
-                    ["!=", tag, 0],
-                    [ctor, payload_name],
-                    [none_ctor]
-                ]
+                ["if", ["!=", tag, 0], [ctor, payload_name], [none_ctor]]
             ]));
             call_args.push(Value::String(arg));
             Ok(1u64 + 4u64 + max_bytes_len as u64)
@@ -3791,7 +3806,11 @@ fn append_verify_param_setup(
             let tag = format!("p{idx}_tag");
             let value = format!("p{idx}_value");
             let arg = format!("p{idx}_arg");
-            stmts.push(serde_json::json!(["let", tag, ["view.get_u8", "input", off]]));
+            stmts.push(serde_json::json!([
+                "let",
+                tag,
+                ["view.get_u8", "input", off]
+            ]));
             stmts.push(serde_json::json!([
                 "let",
                 value,
@@ -3814,7 +3833,11 @@ fn append_verify_param_setup(
             let tag = format!("p{idx}_tag");
             let err_code = format!("p{idx}_err_code");
             let arg = format!("p{idx}_arg");
-            stmts.push(serde_json::json!(["let", tag, ["view.get_u8", "input", off]]));
+            stmts.push(serde_json::json!([
+                "let",
+                tag,
+                ["view.get_u8", "input", off]
+            ]));
             stmts.push(serde_json::json!([
                 "let",
                 err_code,
@@ -3920,7 +3943,11 @@ fn append_verify_bytes_value(
     slice_name: &str,
 ) -> Result<String> {
     let bytes_name = format!("p{idx}_{suffix}_bytes");
-    stmts.push(serde_json::json!(["let", bytes_name, ["view.to_bytes", slice_name]]));
+    stmts.push(serde_json::json!([
+        "let",
+        bytes_name,
+        ["view.to_bytes", slice_name]
+    ]));
     Ok(bytes_name)
 }
 
@@ -4062,10 +4089,7 @@ fn append_direct_harness_param(
             )?;
             out.push_str(&format!("  uint32_t {name}_tag = x07_nondet_u32();\n"));
             out.push_str(&format!("  __CPROVER_assume({name}_tag <= UINT32_C(1));\n"));
-            out.push_str(&format!(
-                "  {} {name};\n",
-                c_verify_ty_name(&param.ty)?
-            ));
+            out.push_str(&format!("  {} {name};\n", c_verify_ty_name(&param.ty)?));
             out.push_str(&format!("  {name}.tag = {name}_tag;\n"));
             out.push_str(&format!("  {name}.payload = {payload};\n"));
         }
@@ -4091,10 +4115,7 @@ fn append_direct_harness_param(
             out.push_str(&format!("  uint32_t {name}_tag = x07_nondet_u32();\n"));
             out.push_str(&format!("  __CPROVER_assume({name}_tag <= UINT32_C(1));\n"));
             out.push_str(&format!("  uint32_t {name}_err = x07_nondet_u32();\n"));
-            out.push_str(&format!(
-                "  {} {name};\n",
-                c_verify_ty_name(&param.ty)?
-            ));
+            out.push_str(&format!("  {} {name};\n", c_verify_ty_name(&param.ty)?));
             out.push_str(&format!("  {name}.tag = {name}_tag;\n"));
             out.push_str(&format!("  if ({name}_tag != 0) {{ {name}.payload.ok = {ok}; }} else {{ {name}.payload.err = {name}_err; }}\n"));
         }
@@ -4165,8 +4186,12 @@ fn trusted_primitive_stubs_for_prove(
     let coverage = if let Some(coverage) = coverage {
         coverage
     } else {
-        owned_analysis =
-            coverage_report_for_entry(args, project_path, target, &ImportedSummaryIndex::default())?;
+        owned_analysis = coverage_report_for_entry(
+            args,
+            project_path,
+            target,
+            &ImportedSummaryIndex::default(),
+        )?;
         &owned_analysis.coverage
     };
     let mut out = Vec::new();
@@ -4319,18 +4344,12 @@ fn find_c_function_definition(text: &str, c_name: &str) -> Result<Option<(usize,
     Ok(None)
 }
 
-fn apply_c_function_body_replacements(
-    c_src: &str,
-    bodies: &[(String, String)],
-) -> Result<String> {
+fn apply_c_function_body_replacements(c_src: &str, bodies: &[(String, String)]) -> Result<String> {
     let mut replacements: Vec<(usize, usize, String)> = Vec::new();
     for (c_name, body) in bodies {
-        let Some((open_brace_idx, close_brace_idx)) = find_c_function_definition(c_src, &c_name)?
+        let Some((open_brace_idx, close_brace_idx)) = find_c_function_definition(c_src, c_name)?
         else {
-            anyhow::bail!(
-                "could not locate generated C body for {:?}",
-                c_name
-            );
+            anyhow::bail!("could not locate generated C body for {:?}", c_name);
         };
         replacements.push((open_brace_idx, close_brace_idx, format!("{{\n{body}\n}}")));
     }
@@ -4349,7 +4368,12 @@ fn apply_trusted_primitive_stubs(c_src: &str, stubs: &[TrustedPrimitiveStub]) ->
     }
     let replacements = stubs
         .iter()
-        .map(|stub| Ok((c_user_fn_name(&stub.symbol), trusted_primitive_stub_body(stub)?)))
+        .map(|stub| {
+            Ok((
+                c_user_fn_name(&stub.symbol),
+                trusted_primitive_stub_body(stub)?,
+            ))
+        })
         .collect::<Result<Vec<_>>>()?;
     apply_c_function_body_replacements(c_src, &replacements)
 }
@@ -4499,8 +4523,7 @@ fn recursive_arg_is_obviously_non_decreasing(arg: &Value, decreases_ident: &str)
                 let rhs_is_rank =
                     matches!(items.get(2), Some(Value::String(ident)) if ident == decreases_ident);
                 (lhs_is_rank && items.get(2).and_then(Value::as_i64).is_some_and(|n| n >= 0))
-                    || (rhs_is_rank
-                        && items.get(1).and_then(Value::as_i64).is_some_and(|n| n >= 0))
+                    || (rhs_is_rank && items.get(1).and_then(Value::as_i64).is_some_and(|n| n >= 0))
             }
             Some("-") if items.len() == 3 => {
                 matches!(items.get(1), Some(Value::String(ident)) if ident == decreases_ident)
@@ -5180,11 +5203,16 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::io::Write as _;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static FAKE_COMMAND_SEQ: AtomicU64 = AtomicU64::new(0);
 
     fn write_fake_command(script_body: &str) -> PathBuf {
+        let seq = FAKE_COMMAND_SEQ.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!(
-            "x07_verify_fake_command_{}_{}",
+            "x07_verify_fake_command_{}_{}_{}",
             std::process::id(),
+            seq,
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .expect("system time")
@@ -5372,14 +5400,8 @@ exit 1
             body: json!(0),
             source_path: PathBuf::from("verify_fixture.x07.json"),
         };
-        let bytes = build_verify_driver_x07ast_json(
-            &[],
-            "verify_fixture.f",
-            &sig,
-            16,
-            false,
-        )
-        .expect("build driver");
+        let bytes = build_verify_driver_x07ast_json(&[], "verify_fixture.f", &sig, 16, false)
+            .expect("build driver");
         let text = String::from_utf8_lossy(&bytes);
         assert!(
             text.contains("std.codec.read_u32_le"),

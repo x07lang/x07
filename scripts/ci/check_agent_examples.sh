@@ -150,8 +150,8 @@ require_deps = sys.argv[6].strip().lower() == "true"
 
 doc = json.loads(wrapped_path.read_text(encoding="utf-8"))
 sv = doc.get("schema_version")
-if sv != "x07.run.report@0.1.0":
-    raise SystemExit(f"{name}: expected schema_version x07.run.report@0.1.0, got {sv!r}")
+if sv != "x07.run.report@0.3.0":
+    raise SystemExit(f"{name}: expected schema_version x07.run.report@0.3.0, got {sv!r}")
 
 if want_runner and doc.get("runner") != want_runner:
     raise SystemExit(f"{name}: expected runner {want_runner!r}, got {doc.get('runner')!r}")

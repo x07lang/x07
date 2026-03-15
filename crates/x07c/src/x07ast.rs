@@ -358,10 +358,12 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                     &dptr,
                     &module_id,
                     false,
-                    allow_contracts,
-                    allow_loop_contracts,
-                    allow_async_protocol,
-                    allow_defn_decreases,
+                    DefLikeSchemaCaps {
+                        allow_contracts,
+                        allow_loop_contracts,
+                        allow_async_protocol,
+                        allow_defn_decreases,
+                    },
                 )?;
                 if !function_names.insert(parsed.name.clone()) {
                     return Err(X07AstError {
@@ -400,10 +402,12 @@ fn parse_x07ast_value(root: &Value) -> Result<X07AstFile, X07AstError> {
                     &dptr,
                     &module_id,
                     true,
-                    allow_contracts,
-                    allow_loop_contracts,
-                    allow_async_protocol,
-                    allow_defn_decreases,
+                    DefLikeSchemaCaps {
+                        allow_contracts,
+                        allow_loop_contracts,
+                        allow_async_protocol,
+                        allow_defn_decreases,
+                    },
                 )?;
                 if !function_names.insert(parsed.name.clone()) {
                     return Err(X07AstError {
@@ -495,15 +499,20 @@ struct ParsedDefLike {
     body: Expr,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct DefLikeSchemaCaps {
+    allow_contracts: bool,
+    allow_loop_contracts: bool,
+    allow_async_protocol: bool,
+    allow_defn_decreases: bool,
+}
+
 fn parse_def_like(
     dobj: &serde_json::Map<String, Value>,
     ptr: &str,
     module_id: &str,
     is_async: bool,
-    allow_contracts: bool,
-    allow_loop_contracts: bool,
-    allow_async_protocol: bool,
-    allow_defn_decreases: bool,
+    caps: DefLikeSchemaCaps,
 ) -> Result<ParsedDefLike, X07AstError> {
     let kind_label = if is_async { "defasync" } else { "defn" };
 
@@ -522,7 +531,7 @@ fn parse_def_like(
 
     let type_params = parse_type_params(dobj, ptr)?;
 
-    if !allow_contracts {
+    if !caps.allow_contracts {
         for field in [
             "requires",
             "ensures",
@@ -548,7 +557,7 @@ fn parse_def_like(
                 ptr: format!("{ptr}/decreases"),
             });
         }
-        if !allow_defn_decreases {
+        if !caps.allow_defn_decreases {
             return Err(X07AstError {
                 message: format!("decreases is only supported in {X07AST_SCHEMA_VERSION_V0_8_0}"),
                 ptr: format!("{ptr}/decreases"),
@@ -571,8 +580,8 @@ fn parse_def_like(
     } else {
         parse_contract_clauses(dobj, ptr, "decreases")?
     };
-    let protocol = parse_async_protocol(dobj, ptr, is_async, allow_async_protocol)?;
-    let loop_contracts = parse_loop_contracts(dobj, ptr, allow_loop_contracts)?;
+    let protocol = parse_async_protocol(dobj, ptr, is_async, caps.allow_async_protocol)?;
+    let loop_contracts = parse_loop_contracts(dobj, ptr, caps.allow_loop_contracts)?;
 
     let params = parse_params(dobj, ptr, kind_label)?;
 
