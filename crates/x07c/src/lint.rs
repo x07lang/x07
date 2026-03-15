@@ -11,7 +11,7 @@ use crate::mem_provenance::{
 use crate::x07ast::{self, X07AstFile, X07AstKind};
 use x07_contracts::{
     X07AST_SCHEMA_VERSION_V0_4_0, X07AST_SCHEMA_VERSION_V0_5_0, X07AST_SCHEMA_VERSION_V0_6_0,
-    X07AST_SCHEMA_VERSION_V0_7_0,
+    X07AST_SCHEMA_VERSION_V0_7_0, X07AST_SCHEMA_VERSION_V0_8_0,
 };
 
 fn expr_ident(name: impl Into<String>) -> Expr {
@@ -193,6 +193,16 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
             &ctx,
             &mut diagnostics,
         );
+        let decreases = x07ast::defn_decreases(file, &f.name)
+            .expect("internal decreases should decode")
+            .unwrap_or_default();
+        lint_contract_clauses(
+            &decreases,
+            &format!("/decls/{decl_idx}/decreases"),
+            options,
+            &ctx,
+            &mut diagnostics,
+        );
         lint_loop_contracts(
             &f.loop_contracts,
             &format!("/decls/{decl_idx}/loop_contracts"),
@@ -250,7 +260,8 @@ fn lint_file_impl(file: &X07AstFile, options: LintOptions, run_typecheck: bool) 
         && (file.schema_version == X07AST_SCHEMA_VERSION_V0_4_0
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_5_0
             || file.schema_version == X07AST_SCHEMA_VERSION_V0_6_0
-            || file.schema_version == X07AST_SCHEMA_VERSION_V0_7_0)
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_7_0
+            || file.schema_version == X07AST_SCHEMA_VERSION_V0_8_0)
     {
         let tc = crate::typecheck::typecheck_file_local(file, &Default::default());
         diagnostics.extend(tc.diagnostics);
@@ -380,6 +391,10 @@ fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
                 requires: &f.requires,
                 ensures: &f.ensures,
                 invariant: &f.invariant,
+                decreases: x07ast::defn_decreases(file, &f.name)
+                    .expect("internal decreases should decode")
+                    .as_deref()
+                    .unwrap_or(&[]),
                 await_invariant: &[],
                 scope_invariant: &[],
                 cancellation_ensures: &[],
@@ -401,6 +416,7 @@ fn lint_generics_decls(file: &X07AstFile, diagnostics: &mut Vec<Diagnostic>) {
                 requires: &f.requires,
                 ensures: &f.ensures,
                 invariant: &f.invariant,
+                decreases: &[],
                 await_invariant: f
                     .protocol
                     .as_ref()
@@ -432,6 +448,7 @@ struct FnDeclRefs<'a> {
     requires: &'a [x07ast::ContractClauseAst],
     ensures: &'a [x07ast::ContractClauseAst],
     invariant: &'a [x07ast::ContractClauseAst],
+    decreases: &'a [x07ast::ContractClauseAst],
     await_invariant: &'a [x07ast::ContractClauseAst],
     scope_invariant: &'a [x07ast::ContractClauseAst],
     cancellation_ensures: &'a [x07ast::ContractClauseAst],
@@ -488,6 +505,13 @@ fn lint_type_params_usage(
     );
     collect_type_vars_from_contract_clauses(
         decl.invariant,
+        &declared,
+        &mut used,
+        &mut quickfix_ctx,
+        diagnostics,
+    );
+    collect_type_vars_from_contract_clauses(
+        decl.decreases,
         &declared,
         &mut used,
         &mut quickfix_ctx,

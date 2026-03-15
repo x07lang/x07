@@ -46,7 +46,7 @@ Replace `tests/smoke.x07.json` with:
 
 ```json
 {
-  "schema_version": "x07.x07ast@0.7.0",
+  "schema_version": "x07.x07ast@0.8.0",
   "kind": "module",
   "module_id": "smoke",
   "imports": ["std.test"],

@@ -2394,24 +2394,7 @@ fn x07_verify_prove_simple_contract_returns_proven() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_simple");
     std::fs::create_dir_all(&dir).expect("create temp dir");
 
-    write_json(
-        &dir.join("x07.json"),
-        &serde_json::json!({
-            "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
-            "world": "solve-pure",
-            "entry": "verify_fixture.x07.json",
-            "module_roots": ["."],
-            "dependencies": [],
-            "lockfile": "x07.lock.json"
-        }),
-    );
-    write_json(
-        &dir.join("x07.lock.json"),
-        &serde_json::json!({
-            "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
-            "dependencies": []
-        }),
-    );
+    write_verify_project_files(&dir);
     write_json(
         &dir.join("verify_fixture.x07.json"),
         &serde_json::json!({
@@ -2467,28 +2450,262 @@ fn x07_verify_prove_simple_contract_returns_proven() {
 }
 
 #[test]
+fn x07_verify_prove_self_recursive_with_decreases_returns_proven() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_recursive");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [{"name":"n","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [
+                        {"id":"r0","expr":[">=","n",0]},
+                        {"id":"r1","expr":["<=","n",3]}
+                    ],
+                    "ensures": [{"id":"e0","expr":[">=","__result",0]}],
+                    "decreases": [{"id":"d0","expr":"n"}],
+                    "body": ["if",["=","n",0],0,["verify_fixture.f",["-","n",1]]]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["schema_version"], X07_VERIFY_REPORT_SCHEMA_VERSION);
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["result"]["kind"], "proven");
+    assert_eq!(v["proof_summary"]["engine"], "cbmc_z3");
+    assert_eq!(v["proof_summary"]["recursion_kind"], "self_recursive");
+    assert_eq!(v["proof_summary"]["has_decreases"], true);
+    assert_eq!(v["proof_summary"]["decreases_count"], 1);
+    assert_eq!(v["proof_summary"]["bounded_by_unwind"], true);
+
+    let coverage = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--coverage",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        coverage.status.code(),
+        Some(0),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&coverage.stderr)
+    );
+    assert!(
+        coverage.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&coverage.stderr)
+    );
+
+    let coverage_doc: Value =
+        serde_json::from_slice(&coverage.stdout).expect("parse verify coverage JSON");
+    assert_eq!(coverage_doc["coverage"]["summary"]["recursive_defn"], 1);
+    assert_eq!(
+        coverage_doc["coverage"]["summary"]["proven_recursive_defn"],
+        1
+    );
+    assert_eq!(
+        coverage_doc["coverage"]["summary"]["unsupported_recursive_defn"],
+        0
+    );
+    let functions = coverage_doc["coverage"]["functions"]
+        .as_array()
+        .expect("functions[]");
+    assert_eq!(functions.len(), 1);
+    assert_eq!(functions[0]["status"], "proven");
+    assert_eq!(
+        functions[0]["proof_summary"]["recursion_kind"],
+        "self_recursive"
+    );
+    assert_eq!(functions[0]["proof_summary"]["decreases_count"], 1);
+    assert_eq!(functions[0]["proof_summary"]["prove_supported"], true);
+}
+
+#[test]
+fn x07_verify_prove_self_recursive_without_decreases_is_unsupported() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_recursive_missing_decreases");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [{"name":"n","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":[">=","n",0]}],
+                    "ensures": [{"id":"e0","expr":[">=","__result",0]}],
+                    "body": ["if",["=","n",0],0,["verify_fixture.f",["-","n",1]]]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"]["kind"], "unsupported");
+    assert_eq!(
+        v["result"]["details"],
+        "self-recursive targets must declare decreases[] to use x07 verify"
+    );
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert_eq!(diags[0]["code"], "X07V_RECURSIVE_DECREASES_REQUIRED");
+}
+
+#[test]
+fn x07_verify_prove_mutual_recursion_is_unsupported() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_mutual_recursion");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.f"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.f",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": ["verify_fixture.g","x"]
+                },
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.g",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r1","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e1","expr":["=","__result","x"]}],
+                    "body": ["verify_fixture.f","x"]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.f",
+            "--project",
+            "x07.json",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
+    assert_eq!(v["mode"], "prove");
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"]["kind"], "unsupported");
+    let diags = v["diagnostics"].as_array().expect("diagnostics[]");
+    assert_eq!(diags[0]["code"], "X07V_UNSUPPORTED_MUTUAL_RECURSION");
+    assert!(
+        v["result"]["details"]
+            .as_str()
+            .is_some_and(|details| details.contains("mutual recursion")),
+        "expected mutual recursion details, got:\n{}",
+        serde_json::to_string_pretty(&v).unwrap()
+    );
+}
+
+#[test]
 fn x07_verify_prove_defasync_protocol_returns_proven() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_defasync");
     std::fs::create_dir_all(&dir).expect("create temp dir");
 
-    write_json(
-        &dir.join("x07.json"),
-        &serde_json::json!({
-            "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
-            "world": "solve-pure",
-            "entry": "verify_fixture.x07.json",
-            "module_roots": ["."],
-            "dependencies": [],
-            "lockfile": "x07.lock.json"
-        }),
-    );
-    write_json(
-        &dir.join("x07.lock.json"),
-        &serde_json::json!({
-            "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
-            "dependencies": []
-        }),
-    );
+    write_verify_project_files(&dir);
     write_json(
         &dir.join("verify_fixture.x07.json"),
         &serde_json::json!({
@@ -3960,6 +4177,27 @@ fn x07_cli_specrows_includes_nested_subcommands() {
 fn write_json(path: &Path, doc: &Value) {
     let bytes = serde_json::to_vec_pretty(doc).expect("serialize JSON");
     write_bytes(path, &bytes);
+}
+
+fn write_verify_project_files(dir: &Path) {
+    write_json(
+        &dir.join("x07.json"),
+        &serde_json::json!({
+            "schema_version": PROJECT_MANIFEST_SCHEMA_VERSION,
+            "world": "solve-pure",
+            "entry": "verify_fixture.x07.json",
+            "module_roots": ["."],
+            "dependencies": [],
+            "lockfile": "x07.lock.json"
+        }),
+    );
+    write_json(
+        &dir.join("x07.lock.json"),
+        &serde_json::json!({
+            "schema_version": PROJECT_LOCKFILE_SCHEMA_VERSION,
+            "dependencies": []
+        }),
+    );
 }
 
 fn x07_module_doc(module_id: &str, imports: &[&str], decls: Vec<Value>) -> Value {

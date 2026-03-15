@@ -31,10 +31,12 @@ flowchart LR
 
 ### 1. Function and async contracts
 
-`x07 verify` consumes `requires`, `ensures`, `invariant`, and `defasync.protocol` clauses and emits:
+`x07 verify` consumes `requires`, `ensures`, `invariant`, `decreases`, and `defasync.protocol` clauses and emits:
 
-- prove reports (`x07.verify.report@0.3.0`)
-- reachable coverage (`x07.verify.coverage@0.2.0`)
+- prove reports (`x07.verify.report@0.4.0`)
+- reachable coverage (`x07.verify.coverage@0.3.0`)
+
+For pure recursive certification, self-recursive `defn` targets are accepted when they declare `decreases[]`. Prove reports expose a `proof_summary` block, and coverage reports expose both recursive summary counters and per-function proof summaries so imported or unsupported graph nodes are visible to reviewers.
 
 For async certification, coverage distinguishes:
 

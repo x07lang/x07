@@ -1831,6 +1831,9 @@ fn proof_summary(v: Option<&Value>) -> Value {
     json!({
         "reachable_defn": summary.get("reachable_defn").cloned().unwrap_or(Value::from(0)),
         "proven_defn": summary.get("proven_defn").cloned().unwrap_or(Value::from(0)),
+        "recursive_defn": summary.get("recursive_defn").cloned().unwrap_or(Value::from(0)),
+        "proven_recursive_defn": summary.get("proven_recursive_defn").cloned().unwrap_or(Value::from(0)),
+        "unsupported_recursive_defn": summary.get("unsupported_recursive_defn").cloned().unwrap_or(Value::from(0)),
         "uncovered_defn": summary.get("uncovered_defn").cloned().unwrap_or(Value::from(0)),
         "unsupported_defn": summary.get("unsupported_defn").cloned().unwrap_or(Value::from(0)),
     })

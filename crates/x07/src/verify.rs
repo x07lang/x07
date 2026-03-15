@@ -161,6 +161,9 @@ struct VerifyCoverage {
 struct VerifyCoverageSummary {
     reachable_defn: u64,
     proven_defn: u64,
+    recursive_defn: u64,
+    proven_recursive_defn: u64,
+    unsupported_recursive_defn: u64,
     reachable_async: u64,
     proven_async: u64,
     trusted_primitives: u64,
@@ -178,9 +181,19 @@ struct VerifyCoverageFunction {
     kind: String,
     status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    proof_summary: Option<VerifyFunctionProofSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     source_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     details: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct VerifyFunctionProofSummary {
+    recursion_kind: String,
+    has_decreases: bool,
+    decreases_count: u64,
+    prove_supported: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -218,6 +231,7 @@ struct CoverageDecl {
     params: Vec<String>,
     result: String,
     has_contracts: bool,
+    decreases_count: usize,
     body: Option<Value>,
     contract_exprs: Vec<Value>,
     source_path: PathBuf,
@@ -254,6 +268,8 @@ struct VerifyReport {
     bounds: Bounds,
     result: VerifyResult,
     #[serde(skip_serializing_if = "Option::is_none")]
+    proof_summary: Option<VerifyProofSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     coverage: Option<VerifyCoverage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     artifacts: Option<Artifacts>,
@@ -282,6 +298,16 @@ struct CbmcInfo {
     exit_code: i32,
     stdout_json_path: String,
     stdout_json_sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct VerifyProofSummary {
+    engine: String,
+    recursion_kind: String,
+    has_decreases: bool,
+    decreases_count: u64,
+    bounded_by_unwind: bool,
+    dependency_symbols: Vec<String>,
 }
 
 pub fn cmd_verify(
@@ -353,6 +379,20 @@ fn cmd_verify_inner(
             );
         }
     };
+    let recursion = match recursion_summary_for_symbol(
+        &module_roots,
+        coverage_world(project_path.as_deref()),
+        &args.entry,
+    ) {
+        Ok(v) => v,
+        Err(err) => {
+            let d = diag_verify("X07V_ETARGET", format!("{err:#}"));
+            return write_report_and_exit(
+                machine,
+                VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
+            );
+        }
+    };
 
     if mode == Mode::Coverage {
         return cmd_verify_coverage(machine, &args, project_path.as_deref(), &target);
@@ -360,7 +400,7 @@ fn cmd_verify_inner(
 
     if mode == Mode::Prove {
         if let Some((code, msg)) =
-            prove_unsupported_reason(&target, &args.entry, args.max_bytes_len)
+            prove_unsupported_reason(&target, &args.entry, args.max_bytes_len, &recursion)
         {
             return write_report_and_exit(
                 machine,
@@ -382,7 +422,9 @@ fn cmd_verify_inner(
                 );
             }
         }
-    } else if let Some(d) = verify_precheck_diag(&target, &args.entry, args.max_bytes_len) {
+    } else if let Some(d) =
+        verify_precheck_diag(&target, &args.entry, args.max_bytes_len, &recursion)
+    {
         return write_report_and_exit(
             machine,
             VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
@@ -448,8 +490,27 @@ fn cmd_verify_inner(
         .with_context(|| format!("write verify driver: {}", driver_path.display()))?;
     artifacts.driver_path = Some(driver_path.display().to_string());
 
+    let prove_coverage = if mode == Mode::Prove {
+        Some(coverage_report_for_entry(
+            &args,
+            project_path.as_deref(),
+            &target,
+        )?)
+    } else {
+        None
+    };
+    let proof_summary = prove_coverage
+        .as_ref()
+        .map(|coverage| report_proof_summary(coverage, &target, &recursion));
+
     let trusted_primitive_stubs = if mode == Mode::Prove {
-        trusted_primitive_stubs_for_prove(&args, project_path.as_deref(), &target, &module_roots)?
+        trusted_primitive_stubs_for_prove(
+            &args,
+            project_path.as_deref(),
+            &target,
+            &module_roots,
+            prove_coverage.as_ref(),
+        )?
     } else {
         Vec::new()
     };
@@ -500,7 +561,15 @@ fn cmd_verify_inner(
     match mode {
         Mode::Bmc => cmd_verify_bmc(machine, &args, bounds, &work_dir, &c_path, artifacts),
         Mode::Smt | Mode::Prove => cmd_verify_smt(
-            machine, &args, &target, bounds, &work_dir, &c_path, artifacts, mode,
+            machine,
+            &args,
+            &target,
+            bounds,
+            &work_dir,
+            &c_path,
+            artifacts,
+            mode,
+            proof_summary,
         ),
         Mode::Coverage => unreachable!("coverage returns before solver dispatch"),
     }
@@ -651,6 +720,7 @@ fn cmd_verify_bmc(
             contract: Some(contract_failure.payload),
             details: None,
         },
+        proof_summary: None,
         coverage: None,
         artifacts: Some(artifacts),
         diagnostics_count: 0,
@@ -669,7 +739,16 @@ fn cmd_verify_smt(
     c_path: &Path,
     mut artifacts: Artifacts,
     mode: Mode,
+    proof_summary: Option<VerifyProofSummary>,
 ) -> Result<std::process::ExitCode> {
+    let attach_summary = |report: VerifyReport| {
+        if mode == Mode::Prove {
+            if let Some(summary) = proof_summary.clone() {
+                return report.with_proof_summary(summary);
+            }
+        }
+        report
+    };
     if !command_exists("cbmc") {
         let msg = format!(
             "cbmc is required for `x07 verify --{}` (install: `brew install cbmc` or see https://diffblue.github.io/cbmc/)",
@@ -678,7 +757,14 @@ fn cmd_verify_smt(
         let d = diag_verify("X07V_ECBMC_MISSING", msg);
         return write_report_and_exit(
             machine,
-            VerifyReport::tool_missing(mode, &args.entry, bounds, d, artifacts, 1),
+            attach_summary(VerifyReport::tool_missing(
+                mode,
+                &args.entry,
+                bounds,
+                d,
+                artifacts,
+                1,
+            )),
         );
     }
 
@@ -705,7 +791,9 @@ fn cmd_verify_smt(
         let d = diag_verify("X07V_ECBMC_SMT2", diag_msg);
         return write_report_and_exit(
             machine,
-            VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+            attach_summary(
+                VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+            ),
         );
     }
 
@@ -714,7 +802,9 @@ fn cmd_verify_smt(
         let d = diag_verify("X07V_ECBMC_STDERR", format!("cbmc wrote to stderr: {msg}"));
         return write_report_and_exit(
             machine,
-            VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+            attach_summary(
+                VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+            ),
         );
     }
 
@@ -726,7 +816,14 @@ fn cmd_verify_smt(
         let d = diag_verify("X07V_EZ3_MISSING", msg);
         return write_report_and_exit(
             machine,
-            VerifyReport::inconclusive(mode, &args.entry, bounds, d, artifacts, 2),
+            attach_summary(VerifyReport::inconclusive(
+                mode,
+                &args.entry,
+                bounds,
+                d,
+                artifacts,
+                2,
+            )),
         );
     }
 
@@ -742,7 +839,9 @@ fn cmd_verify_smt(
         let d = diag_verify("X07V_EZ3_RUN", format!("z3 failed: {msg}"));
         return write_report_and_exit(
             machine,
-            VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+            attach_summary(
+                VerifyReport::error(mode, &args.entry, bounds, d, 1).with_artifacts(artifacts),
+            ),
         );
     }
 
@@ -756,11 +855,11 @@ fn cmd_verify_smt(
     match status {
         "unsat" => write_report_and_exit(
             machine,
-            if mode == Mode::Prove {
+            attach_summary(if mode == Mode::Prove {
                 VerifyReport::proven(&args.entry, bounds, artifacts)
             } else {
                 VerifyReport::verified(mode, &args.entry, bounds, artifacts)
-            },
+            }),
         ),
         "sat" => {
             if mode == Mode::Prove && target.is_async {
@@ -785,8 +884,10 @@ fn cmd_verify_smt(
                         diag_verify("X07V_ECBMC_STDERR", format!("cbmc wrote to stderr: {msg}"));
                     return write_report_and_exit(
                         machine,
-                        VerifyReport::error(mode, &args.entry, bounds, d, 1)
-                            .with_artifacts(artifacts),
+                        attach_summary(
+                            VerifyReport::error(mode, &args.entry, bounds, d, 1)
+                                .with_artifacts(artifacts),
+                        ),
                     );
                 }
                 let cbmc_json: Value = match serde_json::from_slice(&out.stdout) {
@@ -798,8 +899,10 @@ fn cmd_verify_smt(
                         );
                         return write_report_and_exit(
                             machine,
-                            VerifyReport::error(mode, &args.entry, bounds, d, 1)
-                                .with_artifacts(artifacts),
+                            attach_summary(
+                                VerifyReport::error(mode, &args.entry, bounds, d, 1)
+                                    .with_artifacts(artifacts),
+                            ),
                         );
                     }
                 };
@@ -850,7 +953,7 @@ fn cmd_verify_smt(
                     let diag = async_counterexample_diag(&contract_failure.payload);
                     return write_report_and_exit(
                         machine,
-                        VerifyReport {
+                        attach_summary(VerifyReport {
                             schema_version: X07_VERIFY_REPORT_SCHEMA_VERSION,
                             mode: mode.as_str(),
                             ok: false,
@@ -861,37 +964,38 @@ fn cmd_verify_smt(
                                 contract: Some(contract_failure.payload),
                                 details: None,
                             },
+                            proof_summary: None,
                             coverage: None,
                             artifacts: Some(artifacts),
                             diagnostics_count: 1,
                             diagnostics: vec![diag],
                             exit_code: 10,
-                        },
+                        }),
                     );
                 }
             }
             write_report_and_exit(
                 machine,
-                VerifyReport::counterexample_found(
+                attach_summary(VerifyReport::counterexample_found(
                     mode,
                     &args.entry,
                     bounds,
                     diag_verify("X07V_SMT_SAT", "solver reported SAT (counterexample found)"),
                     artifacts,
                     10,
-                ),
+                )),
             )
         }
         other => write_report_and_exit(
             machine,
-            VerifyReport::inconclusive(
+            attach_summary(VerifyReport::inconclusive(
                 mode,
                 &args.entry,
                 bounds,
                 diag_verify("X07V_SMT_UNKNOWN", format!("solver returned {other:?}")),
                 artifacts,
                 2,
-            ),
+            )),
         ),
     }
 }
@@ -1048,8 +1152,32 @@ struct TargetSig {
     result: String,
     is_async: bool,
     has_contracts: bool,
+    decreases_count: usize,
     body: Value,
     source_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecursionKind {
+    None,
+    SelfRecursive,
+    Mutual,
+}
+
+#[derive(Debug, Clone)]
+struct RecursionSummary {
+    kind: RecursionKind,
+    cycle_symbol: Option<String>,
+}
+
+impl RecursionSummary {
+    fn kind_str(&self) -> &'static str {
+        match self.kind {
+            RecursionKind::None => "none",
+            RecursionKind::SelfRecursive => "self_recursive",
+            RecursionKind::Mutual => "mutual",
+        }
+    }
 }
 
 fn load_target_info(module_roots: &[PathBuf], entry: &str) -> Result<TargetSig> {
@@ -1096,6 +1224,11 @@ fn load_target_info(module_roots: &[PathBuf], entry: &str) -> Result<TargetSig> 
                 .to_string(),
             is_async: kind == "defasync",
             has_contracts,
+            decreases_count: d
+                .get("decreases")
+                .and_then(Value::as_array)
+                .map(Vec::len)
+                .unwrap_or(0),
             body,
             source_path: source
                 .path
@@ -1175,6 +1308,11 @@ fn load_coverage_module<'a>(
                         .unwrap_or("i32")
                         .to_string(),
                     has_contracts: has_any_contracts(&decl),
+                    decreases_count: decl
+                        .get("decreases")
+                        .and_then(Value::as_array)
+                        .map(Vec::len)
+                        .unwrap_or(0),
                     body: decl.get("body").cloned(),
                     contract_exprs: collect_contract_exprs(&decl),
                     source_path: source
@@ -1370,6 +1508,12 @@ fn enqueue_decl_refs(
     }
 }
 
+fn decl_refs(module_id: &str, module: &CoverageModule, decl: &CoverageDecl) -> BTreeSet<String> {
+    let mut queue = VecDeque::new();
+    enqueue_decl_refs(module_id, module, decl, &mut queue);
+    queue.into_iter().collect()
+}
+
 fn collect_decl_refs(
     module_id: &str,
     module: &CoverageModule,
@@ -1463,6 +1607,65 @@ fn collect_contract_exprs(defn: &Value) -> Vec<Value> {
     out
 }
 
+fn recursion_summary_for_symbol(
+    module_roots: &[PathBuf],
+    world: WorldId,
+    entry: &str,
+) -> Result<RecursionSummary> {
+    let mut module_cache: BTreeMap<String, CoverageModule> = BTreeMap::new();
+    let mut queue = VecDeque::from([entry.to_string()]);
+    let mut visited = BTreeSet::new();
+    let mut saw_self_recursion = false;
+    let mut cycle_symbol = None;
+
+    while let Some(symbol) = queue.pop_front() {
+        if !visited.insert(symbol.clone()) {
+            continue;
+        }
+        let Some((module_id, _)) = symbol.rsplit_once('.') else {
+            continue;
+        };
+        let module = match load_coverage_module(module_roots, world, module_id, &mut module_cache) {
+            Ok(module) => module,
+            Err(_) => continue,
+        };
+        let Some(decl) = module.decls.get(&symbol) else {
+            continue;
+        };
+        if decl.kind == "extern" {
+            continue;
+        }
+
+        let refs = decl_refs(module_id, module, decl);
+        if symbol == entry && refs.contains(entry) {
+            saw_self_recursion = true;
+        }
+        if symbol != entry && refs.contains(entry) {
+            cycle_symbol = Some(symbol);
+        }
+        for next in refs {
+            queue.push_back(next);
+        }
+    }
+
+    Ok(if let Some(symbol) = cycle_symbol {
+        RecursionSummary {
+            kind: RecursionKind::Mutual,
+            cycle_symbol: Some(symbol),
+        }
+    } else if saw_self_recursion {
+        RecursionSummary {
+            kind: RecursionKind::SelfRecursive,
+            cycle_symbol: None,
+        }
+    } else {
+        RecursionSummary {
+            kind: RecursionKind::None,
+            cycle_symbol: None,
+        }
+    })
+}
+
 fn compute_input_len_bytes(sig: &TargetSig, max_bytes_len: u32) -> Result<u32> {
     let mut total: u64 = 0;
     for ty in &sig.params {
@@ -1484,6 +1687,7 @@ fn prove_unsupported_reason(
     target: &TargetSig,
     entry: &str,
     max_bytes_len: u32,
+    recursion: &RecursionSummary,
 ) -> Option<(&'static str, String)> {
     if !target.has_contracts {
         return Some((
@@ -1491,11 +1695,31 @@ fn prove_unsupported_reason(
             "target function has no requires/ensures/invariant clauses".to_string(),
         ));
     }
-    if contains_direct_recursion(&target.body, entry) {
-        return Some((
-            "X07V_UNSUPPORTED_RECURSION",
-            "x07 verify v0.1 does not support recursive targets".to_string(),
-        ));
+    match recursion.kind {
+        RecursionKind::None => {}
+        RecursionKind::SelfRecursive => {
+            if target.is_async {
+                return Some((
+                    "X07V_UNSUPPORTED_RECURSION",
+                    "x07 verify does not support recursive defasync targets".to_string(),
+                ));
+            }
+            if target.decreases_count == 0 {
+                return Some((
+                    "X07V_RECURSIVE_DECREASES_REQUIRED",
+                    "self-recursive targets must declare decreases[] to use x07 verify".to_string(),
+                ));
+            }
+        }
+        RecursionKind::Mutual => {
+            return Some((
+                "X07V_UNSUPPORTED_MUTUAL_RECURSION",
+                format!(
+                    "x07 verify does not support mutual recursion involving {:?}",
+                    recursion.cycle_symbol.as_deref().unwrap_or(entry)
+                ),
+            ));
+        }
     }
     if let Some(msg) = find_for_with_non_literal_bounds(&target.body) {
         return Some(("X07V_UNSUPPORTED_FOR_BOUNDS", msg));
@@ -1519,9 +1743,51 @@ fn verify_precheck_diag(
     target: &TargetSig,
     entry: &str,
     max_bytes_len: u32,
+    recursion: &RecursionSummary,
 ) -> Option<x07c::diagnostics::Diagnostic> {
-    let (code, msg) = prove_unsupported_reason(target, entry, max_bytes_len)?;
+    let (code, msg) = prove_unsupported_reason(target, entry, max_bytes_len, recursion)?;
     Some(diag_verify(code, msg))
+}
+
+fn function_proof_summary(
+    target: &TargetSig,
+    recursion: &RecursionSummary,
+    prove_supported: bool,
+) -> VerifyFunctionProofSummary {
+    VerifyFunctionProofSummary {
+        recursion_kind: recursion.kind_str().to_string(),
+        has_decreases: target.decreases_count != 0,
+        decreases_count: target.decreases_count as u64,
+        prove_supported,
+    }
+}
+
+fn report_proof_summary(
+    coverage: &VerifyCoverage,
+    target: &TargetSig,
+    recursion: &RecursionSummary,
+) -> VerifyProofSummary {
+    let mut dependency_symbols = coverage
+        .functions
+        .iter()
+        .filter_map(|function| {
+            if function.symbol == coverage.entry {
+                None
+            } else {
+                Some(function.symbol.clone())
+            }
+        })
+        .collect::<Vec<_>>();
+    dependency_symbols.sort();
+    dependency_symbols.dedup();
+    VerifyProofSummary {
+        engine: "cbmc_z3".to_string(),
+        recursion_kind: recursion.kind_str().to_string(),
+        has_decreases: target.decreases_count != 0,
+        decreases_count: target.decreases_count as u64,
+        bounded_by_unwind: recursion.kind != RecursionKind::None,
+        dependency_symbols,
+    }
 }
 
 fn cmd_verify_coverage(
@@ -1567,6 +1833,7 @@ fn coverage_function_for_target(
     entry: &str,
     target: &TargetSig,
     max_bytes_len: u32,
+    recursion: &RecursionSummary,
 ) -> VerifyCoverageFunction {
     let (kind, status, details) = if target.is_async {
         if !target.has_contracts {
@@ -1578,7 +1845,9 @@ fn coverage_function_for_target(
                         .to_string(),
                 ),
             )
-        } else if let Some((_, msg)) = prove_unsupported_reason(target, entry, max_bytes_len) {
+        } else if let Some((_, msg)) =
+            prove_unsupported_reason(target, entry, max_bytes_len, recursion)
+        {
             ("defasync".to_string(), "unsupported".to_string(), Some(msg))
         } else {
             ("defasync".to_string(), "proven_async".to_string(), None)
@@ -1589,16 +1858,28 @@ fn coverage_function_for_target(
             "uncovered".to_string(),
             Some("target function has no requires/ensures/invariant clauses".to_string()),
         )
-    } else if let Some((_, msg)) = prove_unsupported_reason(target, entry, max_bytes_len) {
+    } else if let Some((_, msg)) = prove_unsupported_reason(target, entry, max_bytes_len, recursion)
+    {
         ("defn".to_string(), "unsupported".to_string(), Some(msg))
+    } else if recursion.kind == RecursionKind::SelfRecursive {
+        (
+            "defn".to_string(),
+            "proven".to_string(),
+            Some(format!(
+                "self-recursive target with {} decreases clause(s)",
+                target.decreases_count
+            )),
+        )
     } else {
         ("defn".to_string(), "proven".to_string(), None)
     };
+    let prove_supported = status == "proven" || status == "proven_async";
 
     VerifyCoverageFunction {
         symbol: entry.to_string(),
         kind,
         status,
+        proof_summary: Some(function_proof_summary(target, recursion, prove_supported)),
         source_path: Some(target.source_path.display().to_string()),
         details,
     }
@@ -1632,6 +1913,7 @@ fn coverage_report_for_entry(
                     symbol,
                     kind: kind.clone(),
                     status: "trusted_primitive".to_string(),
+                    proof_summary: None,
                     source_path: None,
                     details: None,
                 },
@@ -1646,6 +1928,7 @@ fn coverage_report_for_entry(
                     symbol,
                     kind: "imported".to_string(),
                     status: "unsupported".to_string(),
+                    proof_summary: None,
                     source_path: None,
                     details: Some("symbol is not fully qualified".to_string()),
                 },
@@ -1663,6 +1946,7 @@ fn coverage_report_for_entry(
                         symbol,
                         kind: "builtin".to_string(),
                         status: "trusted_primitive".to_string(),
+                        proof_summary: None,
                         source_path: None,
                         details: None,
                     },
@@ -1676,6 +1960,7 @@ fn coverage_report_for_entry(
                         symbol,
                         kind: "imported".to_string(),
                         status: "unsupported".to_string(),
+                        proof_summary: None,
                         source_path: None,
                         details: Some(err.to_string()),
                     },
@@ -1691,6 +1976,7 @@ fn coverage_report_for_entry(
                         symbol,
                         kind: "builtin".to_string(),
                         status: "trusted_primitive".to_string(),
+                        proof_summary: None,
                         source_path: None,
                         details: None,
                     },
@@ -1703,6 +1989,7 @@ fn coverage_report_for_entry(
                     symbol,
                     kind: "imported".to_string(),
                     status: "unsupported".to_string(),
+                    proof_summary: None,
                     source_path: None,
                     details: Some(
                         "referenced symbol could not be resolved in the loaded module graph"
@@ -1724,6 +2011,7 @@ fn coverage_report_for_entry(
                     symbol,
                     kind: decl.kind.clone(),
                     status: "capsule_boundary".to_string(),
+                    proof_summary: None,
                     source_path: Some(decl.source_path.display().to_string()),
                     details: Some(format!(
                         "reachable closure terminates at certified capsule node {:?}",
@@ -1735,7 +2023,7 @@ fn coverage_report_for_entry(
         }
         functions.insert(
             symbol.clone(),
-            coverage_function_for_decl(&symbol, decl, args.max_bytes_len),
+            coverage_function_for_decl(&module_roots, world, &symbol, decl, args.max_bytes_len),
         );
         enqueue_decl_refs(module_id, module, decl, &mut queue);
     }
@@ -1747,6 +2035,7 @@ fn coverage_report_for_entry(
             symbol: format!("x07.verify.scheduler_model.{}", model.id),
             kind: "builtin".to_string(),
             status: "trusted_scheduler_model".to_string(),
+            proof_summary: None,
             source_path: None,
             details: Some(model.guarantees.join("; ")),
         });
@@ -1772,7 +2061,15 @@ fn coverage_report_fallback(
     max_bytes_len: u32,
     extra_details: Option<String>,
 ) -> VerifyCoverage {
-    let mut function = coverage_function_for_target(entry, target, max_bytes_len);
+    let recursion = RecursionSummary {
+        kind: if target.decreases_count > 0 && contains_direct_recursion(&target.body, entry) {
+            RecursionKind::SelfRecursive
+        } else {
+            RecursionKind::None
+        },
+        cycle_symbol: None,
+    };
+    let mut function = coverage_function_for_target(entry, target, max_bytes_len, &recursion);
     match extra_details {
         Some(details) if function.status == "proven" || function.status == "proven_async" => {
             function.status = "unsupported".to_string();
@@ -1794,6 +2091,8 @@ fn coverage_report_fallback(
 }
 
 fn coverage_function_for_decl(
+    module_roots: &[PathBuf],
+    world: WorldId,
     symbol: &str,
     decl: &CoverageDecl,
     max_bytes_len: u32,
@@ -1804,6 +2103,7 @@ fn coverage_function_for_decl(
             symbol: symbol.to_string(),
             kind: "extern".to_string(),
             status: "unsupported".to_string(),
+            proof_summary: None,
             source_path,
             details: Some(
                 "extern declarations are outside the certifiable pure subset".to_string(),
@@ -1816,10 +2116,17 @@ fn coverage_function_for_decl(
                 result: decl.result.clone(),
                 is_async: decl.kind == "defasync",
                 has_contracts: decl.has_contracts,
+                decreases_count: decl.decreases_count,
                 body,
                 source_path: decl.source_path.clone(),
             };
-            coverage_function_for_target(symbol, &target, max_bytes_len)
+            let recursion = recursion_summary_for_symbol(module_roots, world, symbol).unwrap_or(
+                RecursionSummary {
+                    kind: RecursionKind::None,
+                    cycle_symbol: None,
+                },
+            );
+            coverage_function_for_target(symbol, &target, max_bytes_len, &recursion)
         }
     }
 }
@@ -1830,6 +2137,35 @@ fn summarize_coverage_functions(functions: &[VerifyCoverageFunction]) -> VerifyC
         proven_defn: functions
             .iter()
             .filter(|f| f.kind == "defn" && f.status == "proven")
+            .count() as u64,
+        recursive_defn: functions
+            .iter()
+            .filter(|f| {
+                f.kind == "defn"
+                    && f.proof_summary
+                        .as_ref()
+                        .is_some_and(|summary| summary.recursion_kind != "none")
+            })
+            .count() as u64,
+        proven_recursive_defn: functions
+            .iter()
+            .filter(|f| {
+                f.kind == "defn"
+                    && f.status == "proven"
+                    && f.proof_summary
+                        .as_ref()
+                        .is_some_and(|summary| summary.recursion_kind == "self_recursive")
+            })
+            .count() as u64,
+        unsupported_recursive_defn: functions
+            .iter()
+            .filter(|f| {
+                f.kind == "defn"
+                    && f.status == "unsupported"
+                    && f.proof_summary
+                        .as_ref()
+                        .is_some_and(|summary| summary.recursion_kind != "none")
+            })
             .count() as u64,
         reachable_async: functions.iter().filter(|f| f.kind == "defasync").count() as u64,
         proven_async: functions
@@ -2018,16 +2354,23 @@ fn trusted_primitive_stubs_for_prove(
     project_path: Option<&Path>,
     target: &TargetSig,
     module_roots: &[PathBuf],
+    coverage: Option<&VerifyCoverage>,
 ) -> Result<Vec<TrustedPrimitiveStub>> {
-    let coverage = coverage_report_for_entry(args, project_path, target)?;
+    let owned_coverage;
+    let coverage = if let Some(coverage) = coverage {
+        coverage
+    } else {
+        owned_coverage = coverage_report_for_entry(args, project_path, target)?;
+        &owned_coverage
+    };
     let mut out = Vec::new();
-    for function in coverage.functions {
+    for function in &coverage.functions {
         if function.kind != "imported" || function.status != "trusted_primitive" {
             continue;
         }
         let sig = load_target_info(module_roots, &function.symbol)?;
         out.push(TrustedPrimitiveStub {
-            symbol: function.symbol,
+            symbol: function.symbol.clone(),
             params: sig.params,
             result: sig.result,
         });
@@ -2463,6 +2806,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            proof_summary: None,
             coverage: None,
             artifacts: Some(artifacts),
             diagnostics_count: 0,
@@ -2483,6 +2827,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            proof_summary: None,
             coverage: None,
             artifacts: Some(artifacts),
             diagnostics_count: 0,
@@ -2510,6 +2855,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            proof_summary: None,
             coverage: None,
             artifacts: Some(artifacts),
             diagnostics_count: 1,
@@ -2537,6 +2883,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            proof_summary: None,
             coverage: None,
             artifacts: Some(artifacts),
             diagnostics_count: 1,
@@ -2564,6 +2911,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            proof_summary: None,
             coverage: None,
             artifacts: Some(artifacts),
             diagnostics_count: 1,
@@ -2592,6 +2940,7 @@ impl VerifyReport {
                 contract: None,
                 details: Some(details),
             },
+            proof_summary: None,
             coverage: None,
             artifacts: None,
             diagnostics_count: 1,
@@ -2612,6 +2961,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            proof_summary: None,
             coverage: Some(coverage),
             artifacts: None,
             diagnostics_count: 0,
@@ -2638,6 +2988,7 @@ impl VerifyReport {
                 contract: None,
                 details: None,
             },
+            proof_summary: None,
             coverage: None,
             artifacts: None,
             diagnostics_count: 1,
@@ -2648,6 +2999,11 @@ impl VerifyReport {
 
     fn with_artifacts(mut self, artifacts: Artifacts) -> Self {
         self.artifacts = Some(artifacts);
+        self
+    }
+
+    fn with_proof_summary(mut self, proof_summary: VerifyProofSummary) -> Self {
+        self.proof_summary = Some(proof_summary);
         self
     }
 }
@@ -2992,6 +3348,7 @@ exit 0
             result: "bytes".to_string(),
             is_async: true,
             has_contracts: true,
+            decreases_count: 0,
             body: json!(0),
             source_path: PathBuf::from("async_fixture.x07.json"),
         };
@@ -3070,6 +3427,7 @@ exit 1
             result: "bytes".to_string(),
             is_async: false,
             has_contracts: true,
+            decreases_count: 0,
             body: json!(0),
             source_path: PathBuf::from("verify_fixture.x07.json"),
         };

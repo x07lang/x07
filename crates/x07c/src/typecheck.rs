@@ -6,8 +6,8 @@ use crate::ast::Expr;
 use crate::diagnostics::{Diagnostic, Location, PatchOp, Quickfix, QuickfixKind, Severity, Stage};
 use crate::unify::{unify, Subst, TyInfoTerm, TyTerm, UnifyError};
 use crate::x07ast::{
-    expr_to_value, ty_to_name, type_ref_from_expr, type_ref_to_value, ContractClauseAst, TypeParam,
-    TypeRef, X07AstFile,
+    defn_decreases, expr_to_value, ty_to_name, type_ref_from_expr, type_ref_to_value,
+    ContractClauseAst, TypeParam, TypeRef, X07AstFile,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -1231,6 +1231,10 @@ fn file_expr_values(file: &X07AstFile) -> BTreeMap<String, Value> {
         collect_contract_clause_expr_values(&f.requires, &mut out);
         collect_contract_clause_expr_values(&f.ensures, &mut out);
         collect_contract_clause_expr_values(&f.invariant, &mut out);
+        let decreases = defn_decreases(file, &f.name)
+            .expect("internal decreases should decode")
+            .unwrap_or_default();
+        collect_contract_clause_expr_values(&decreases, &mut out);
         collect_expr_values(&f.body, &mut out);
     }
     for f in &file.async_functions {
@@ -1981,6 +1985,9 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
     for (idx, f) in file.functions.iter().enumerate() {
         let decl_idx = defn_base + idx;
         let mut infer = InferState::new(sigs, &file.module_id, type_ref_to_term(&f.result));
+        let decreases = defn_decreases(file, &f.name)
+            .expect("internal decreases should decode")
+            .unwrap_or_default();
         for p in &f.params {
             infer.bind(
                 p.name.clone(),
@@ -1993,7 +2000,7 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
         }
         let mut witness_types: Vec<(String, TyTerm)> = Vec::new();
 
-        if contract_has_clauses(&f.requires, &f.ensures, &f.invariant) {
+        if contract_has_clauses(&f.requires, &f.ensures, &f.invariant) || !decreases.is_empty() {
             for (pidx, p) in f.params.iter().enumerate() {
                 if p.name == "__result" {
                     let ptr = format!("/decls/{decl_idx}/params/{pidx}/name");
@@ -2019,6 +2026,12 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
                 }
             }
             for c in &f.invariant {
+                contract_collect_binding_ptrs(&c.expr, &mut bindings);
+                for w in &c.witness {
+                    contract_collect_binding_ptrs(w, &mut bindings);
+                }
+            }
+            for c in &decreases {
                 contract_collect_binding_ptrs(&c.expr, &mut bindings);
                 for w in &c.witness {
                     contract_collect_binding_ptrs(w, &mut bindings);
@@ -2124,6 +2137,15 @@ fn typecheck_file_impl(file: &X07AstFile, sigs: &BTreeMap<String, FnSigAst>) -> 
                     witness_types.push((w.ptr().to_string(), ty));
                 }
             }
+            check_contract_clause_set(
+                &mut infer,
+                &decreases,
+                &want_bool,
+                ConstraintOrigin::ContractExpr,
+                "X07-CONTRACT-0002",
+                false,
+                &mut witness_types,
+            );
         }
 
         let want = infer.fn_ret.clone();

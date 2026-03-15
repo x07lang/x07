@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-verify.coverage.schema.json",
-  "title": "x07.verify.coverage@0.2.0",
+  "title": "x07.verify.coverage@0.3.0",
   "description": "Reachable proof-coverage report emitted by `x07 verify --coverage`.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "entry", "worlds", "summary", "functions"],
   "properties": {
-    "schema_version": { "const": "x07.verify.coverage@0.2.0" },
+    "schema_version": { "const": "x07.verify.coverage@0.3.0" },
     "entry": {
       "type": "string",
       "minLength": 1,
@@ -46,6 +46,9 @@
       "properties": {
         "reachable_defn": { "type": "integer", "minimum": 0 },
         "proven_defn": { "type": "integer", "minimum": 0 },
+        "recursive_defn": { "type": "integer", "minimum": 0 },
+        "proven_recursive_defn": { "type": "integer", "minimum": 0 },
+        "unsupported_recursive_defn": { "type": "integer", "minimum": 0 },
         "reachable_async": { "type": "integer", "minimum": 0 },
         "proven_async": { "type": "integer", "minimum": 0 },
         "trusted_primitives": { "type": "integer", "minimum": 0 },
@@ -85,6 +88,7 @@
               "uncovered"
             ]
           },
+          "proof_summary": { "$ref": "#/$defs/function_proof_summary" },
           "source_path": {
             "type": ["string", "null"],
             "maxLength": 4096
@@ -93,6 +97,27 @@
         }
       },
       "default": []
+    }
+  },
+  "$defs": {
+    "function_proof_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recursion_kind",
+        "has_decreases",
+        "decreases_count",
+        "prove_supported"
+      ],
+      "properties": {
+        "recursion_kind": {
+          "type": "string",
+          "enum": ["none", "self_recursive", "mutual"]
+        },
+        "has_decreases": { "type": "boolean" },
+        "decreases_count": { "type": "integer", "minimum": 0 },
+        "prove_supported": { "type": "boolean" }
+      }
     }
   }
 }

@@ -7,7 +7,7 @@ As of x07AST `schema_version` **`x07.x07ast@0.4.0`** (and later), X07 supports b
 
 ## Schema + compatibility
 
-- Use `x07.x07ast@0.7.0` for new files (including any use of: `type_params`, structured `type_ref`, `tapp`, `ty.*`).
+- Use `x07.x07ast@0.8.0` for new files (including any use of: `type_params`, structured `type_ref`, `tapp`, `ty.*`, contracts, or `decreases`).
 - The toolchain also accepts legacy `x07.x07ast@0.4.0` for generics-only programs (no contracts).
 - The toolchain still accepts legacy `x07.x07ast@0.3.0` for concrete-only programs.
 

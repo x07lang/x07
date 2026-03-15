@@ -78,6 +78,8 @@ X07 exposes formal verification as a public toolchain surface, not an internal e
 - `x07 trust capsule` attests effectful capsule boundaries.
 - `x07 trust certify` binds proofs, tests, boundaries, capsules, and runtime evidence into a certificate bundle that reviewers can consume directly.
 
+The current certifiable proof subset includes pure self-recursive `defn` targets when they declare `decreases[]`; proof and coverage artifacts expose that recursion posture explicitly instead of hiding it behind a pass/fail bit.
+
 ```mermaid
 flowchart LR
     A[x07AST + arch + policies] --> B[x07 verify]

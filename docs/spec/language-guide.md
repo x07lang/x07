@@ -4,12 +4,12 @@ IMPORTANT:
 - Output ONLY one JSON object (no preamble).
 - Do NOT wrap the JSON in Markdown code fences.
 - Do NOT output extra prose.
-- Must satisfy x07AST schema_version `x07.x07ast@0.7.0`.
+- Must satisfy x07AST schema_version `x07.x07ast@0.8.0`.
 
 Program encoding: UTF-8 JSON text.
 
 Entry program object fields:
-- `schema_version`: `x07.x07ast@0.7.0`
+- `schema_version`: `x07.x07ast@0.8.0`
 - `kind`: `entry`
 - `module_id`: `main`
 - `imports`: array of module IDs (e.g. `std.bytes`)
@@ -71,7 +71,7 @@ Move rules (critical):
 
 Echo (returns input):
 ```json
-{"schema_version":"x07.x07ast@0.7.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
+{"schema_version":"x07.x07ast@0.8.0","kind":"entry","module_id":"main","imports":[],"decls":[],"solve":["view.to_bytes","input"]}
 ```
 
 Arity reminder:
@@ -94,11 +94,12 @@ Declaration objects:
 - `{"kind":"extern","abi":"C","name":"main.c_fn","link_name":"c_fn","params":[{"name":"x","ty":"i32"}],"result":"i32"}` (standalone-only; `result` may also be `"void"`)
 - `{"kind":"export","names":["std.foo.bar", ...]}` (module files only)
 
-Contracts (optional fields on `defn` / `defasync` in v0.5):
+Contracts (optional fields on `defn` / `defasync` in v0.5, plus `decreases` on `defn` in v0.8):
 
 - `requires`: array of preconditions
 - `ensures`: array of postconditions
 - `invariant`: array of function-level invariants
+- `decreases`: array of recursive termination clauses for pure self-recursive `defn`
 
 Each clause is an object:
 
@@ -723,5 +724,4 @@ Many tasks use `input[0..k]` as parameters and the remaining bytes as data.
 Example (k=1):
 
 - `["begin",["let","x",["std.bytes.get_u8","input",0]],["let","n",["std.bytes.len","input"]],["let","v",["std.vec.with_capacity",["-","n",1]]],["for","i",1,"n",["std.vec.push","v",["std.bytes.get_u8","input","i"]]],["std.vec.as_bytes","v"]]`
-
 

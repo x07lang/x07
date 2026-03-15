@@ -1,7 +1,7 @@
 root ::= entry-doc | module-doc
 
-entry-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"entry\"" ws entry-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.7.0\"" ws "," ws "\"solve\"" ws ":" ws sexpr ws "}"
-module-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"module\"" ws module-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.7.0\"" ws "}"
+entry-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"entry\"" ws entry-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.8.0\"" ws "," ws "\"solve\"" ws ":" ws sexpr ws "}"
+module-doc ::= "{" ws "\"decls\"" ws ":" ws decl-array ws "," ws "\"imports\"" ws ":" ws imports-array ws "," ws "\"kind\"" ws ":" ws "\"module\"" ws module-meta-opt ws "," ws "\"module_id\"" ws ":" ws module-id ws "," ws "\"schema_version\"" ws ":" ws "\"x07.x07ast@0.8.0\"" ws "}"
 
 entry-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
 module-meta-opt ::= "" | ws "," ws "\"meta\"" ws ":" ws json-object
@@ -18,7 +18,10 @@ decl ::= decl-defn | decl-defasync | decl-export | decl-extern
 
 decl-defn ::= "{" ws "\"body\"" ws ":" ws sexpr decl-defn-pre-constraints ws "," ws "\"kind\"" ws ":" ws "\"defn\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array decl-defn-requires-opt ws "," ws "\"result\"" ws ":" ws type-ref decl-defn-tail ws "}"
 decl-defasync ::= "{" ws "\"body\"" ws ":" ws sexpr decl-defasync-pre-constraints ws "," ws "\"kind\"" ws ":" ws "\"defasync\"" ws "," ws "\"name\"" ws ":" ws symbol ws "," ws "\"params\"" ws ":" ws param-array decl-defasync-requires-opt ws "," ws "\"result\"" ws ":" ws type-ref decl-defasync-tail ws "}"
-decl-defn-pre-constraints ::= "" | decl-defn-pre-constraints-ensures | decl-defn-pre-constraints-invariant
+decl-defn-pre-constraints ::= "" | decl-defn-pre-constraints-decreases | decl-defn-pre-constraints-ensures | decl-defn-pre-constraints-invariant
+decl-defn-pre-constraints-decreases ::= ws "," ws "\"decreases\"" ws ":" ws contract-clause-array decl-defn-pre-constraints-decreases-tail
+decl-defn-pre-constraints-decreases-tail ::= "" | ws "," ws "\"ensures\"" ws ":" ws contract-clause-array decl-defn-pre-constraints-decreases-ensures-tail | ws "," ws "\"invariant\"" ws ":" ws contract-clause-array
+decl-defn-pre-constraints-decreases-ensures-tail ::= "" | ws "," ws "\"invariant\"" ws ":" ws contract-clause-array
 decl-defn-pre-constraints-ensures ::= ws "," ws "\"ensures\"" ws ":" ws contract-clause-array decl-defn-pre-constraints-ensures-tail
 decl-defn-pre-constraints-ensures-tail ::= "" | ws "," ws "\"invariant\"" ws ":" ws contract-clause-array
 decl-defn-pre-constraints-invariant ::= ws "," ws "\"invariant\"" ws ":" ws contract-clause-array

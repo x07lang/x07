@@ -280,16 +280,17 @@ See: [Property-based testing](pbt.md).
 
 Notes:
 
-- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets; recursion is still unsupported, and `for` loops must have literal bounds.
+- `x07 verify` supports the certifiable subset of reachable `defn` and `defasync` targets. Pure self-recursive `defn` targets are supported when they declare `decreases[]`; mutual recursion, recursive `defasync`, and `for` loops with non-literal bounds remain unsupported.
 - v0.1 supports params: `i32`, `u32`, `bytes`, `bytes_view` (use a wrapper if you need other types).
 - `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant`) on the target function.
 - `--prove` is the certifiable mode for accepted trust certificates; unsupported targets return `result.kind = "unsupported"`.
-- `--coverage` emits a reachable-closure coverage artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including `proven_async`, `trusted_scheduler_model`, and `capsule_boundary` statuses when they apply.
+- `--prove` reports include `proof_summary` for the solver engine, recursion kind, `decreases` usage, unwind-bounded recursion, and the reachable dependency symbol set.
+- `--coverage` emits a reachable-closure coverage artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including recursive proof counters plus per-function `proof_summary`, alongside `proven_async`, `trusted_scheduler_model`, and `capsule_boundary` statuses when they apply.
 - Async `--prove` failures emit `x07.verify.cex@0.2.0`, including `await_invariant`, `scope_invariant`, and `cancellation_ensures` counterexamples when those checks fail.
 - Artifacts are written under `.x07/artifacts/verify/<mode>/<entry>/` (driver module, emitted C, CBMC output, counterexample/SMT artifacts when present).
 - Async proof coverage is lowered through the trusted scheduler model catalog at `catalog/verify_scheduler_model.json`.
 
-Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.3.0"`).
+Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.4.0"`).
 
 ### Agent correctness benchmarks (`x07bench` JSON)
 

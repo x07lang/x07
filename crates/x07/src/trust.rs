@@ -3546,6 +3546,10 @@ fn coverage_issue_code(function: &Value) -> &'static str {
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_ascii_lowercase();
+    let recursion_kind = function
+        .pointer("/proof_summary/recursion_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     if kind == "defasync" && status == "unsupported" {
         return "X07TC_EUNSUPPORTED_DEFASYNC";
     }
@@ -3555,7 +3559,9 @@ fn coverage_issue_code(function: &Value) -> &'static str {
     if status == "uncovered" {
         return "X07TC_EPROOF_COVERAGE";
     }
-    if status == "unsupported" && details.contains("recursive") {
+    if status == "unsupported"
+        && (details.contains("recursive") || matches!(recursion_kind, "self_recursive" | "mutual"))
+    {
         return "X07TC_EUNSUPPORTED_RECURSION";
     }
     if status == "unsupported" {
@@ -3608,7 +3614,9 @@ fn prove_issue_code(report_doc: &Value) -> &'static str {
             | "X07V_SCOPE_INVARIANT_FAILED"
             | "X07V_CANCELLATION_ENSURE_FAILED"
             | "X07V_SCHEDULER_MODEL_UNTRUSTED" => return "X07TC_EASYNC_PROOF",
-            "X07V_UNSUPPORTED_RECURSION" => return "X07TC_EUNSUPPORTED_RECURSION",
+            "X07V_UNSUPPORTED_RECURSION"
+            | "X07V_RECURSIVE_DECREASES_REQUIRED"
+            | "X07V_UNSUPPORTED_MUTUAL_RECURSION" => return "X07TC_EUNSUPPORTED_RECURSION",
             _ => {}
         }
     }
@@ -5140,7 +5148,12 @@ mod tests {
                         "symbol": "example.recursive_main",
                         "kind": "defn",
                         "status": "unsupported",
-                        "details": "recursive targets are not certifiable"
+                        "proof_summary": {
+                            "recursion_kind": "self_recursive",
+                            "has_decreases": false,
+                            "decreases_count": 0,
+                            "prove_supported": false
+                        }
                     },
                     {
                         "symbol": "example.unsupported_param",
@@ -5203,6 +5216,22 @@ mod tests {
                 ]
             })),
             "X07TC_EUNSUPPORTED_DEFASYNC"
+        );
+        assert_eq!(
+            prove_issue_code(&json!({
+                "diagnostics": [
+                    { "code": "X07V_RECURSIVE_DECREASES_REQUIRED" }
+                ]
+            })),
+            "X07TC_EUNSUPPORTED_RECURSION"
+        );
+        assert_eq!(
+            prove_issue_code(&json!({
+                "diagnostics": [
+                    { "code": "X07V_UNSUPPORTED_MUTUAL_RECURSION" }
+                ]
+            })),
+            "X07TC_EUNSUPPORTED_RECURSION"
         );
     }
 
