@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 import sys
 import json
+import subprocess
 
 
 FIXED_MTIME = 946684800  # 2000-01-01T00:00:00Z
@@ -23,6 +24,10 @@ def sha256_file(path: Path) -> str:
 
 
 def iter_docs_files(docs_root: Path) -> list[tuple[str, Path]]:
+    tracked = iter_tracked_docs_files(docs_root)
+    if tracked is not None:
+        return tracked
+
     files: list[tuple[str, Path]] = []
     for p in docs_root.rglob("*"):
         if not p.is_file():
@@ -34,6 +39,49 @@ def iter_docs_files(docs_root: Path) -> list[tuple[str, Path]]:
             continue
         rel_posix = rel.as_posix()
         files.append((rel_posix, p))
+    files.sort(key=lambda e: e[0])
+    return files
+
+
+def iter_tracked_docs_files(docs_root: Path) -> list[tuple[str, Path]] | None:
+    root = Path(__file__).resolve().parents[1]
+    try:
+        rel_docs = docs_root.relative_to(root)
+    except ValueError:
+        return None
+
+    try:
+        res = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--", rel_docs.as_posix()],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+    raw = res.stdout
+    if not raw:
+        return None
+
+    files: list[tuple[str, Path]] = []
+    for item in raw.split(b"\0"):
+        if not item:
+            continue
+        rel_repo = Path(item.decode("utf-8"))
+        try:
+            rel = rel_repo.relative_to(rel_docs)
+        except ValueError:
+            continue
+        if rel.name == ".DS_Store":
+            continue
+        if any(part.startswith("._") for part in rel.parts):
+            continue
+        path = root / rel_repo
+        if not path.is_file():
+            continue
+        files.append((rel.as_posix(), path))
+
     files.sort(key=lambda e: e[0])
     return files
 
