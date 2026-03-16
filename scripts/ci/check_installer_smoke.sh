@@ -26,6 +26,23 @@ pick_python() {
   echo "python"
 }
 
+schema_const() {
+  local schema_path="$1"
+  "$python_bin" - "$schema_path" <<'PY'
+import json, sys
+
+doc = json.load(open(sys.argv[1], "r", encoding="utf-8"))
+schema_version = (
+    doc.get("properties", {})
+    .get("schema_version", {})
+    .get("const")
+)
+if not isinstance(schema_version, str) or not schema_version:
+    raise SystemExit(f"ERROR: schema_version const missing in {sys.argv[1]}")
+print(schema_version)
+PY
+}
+
 detect_target() {
   local os arch
   os="$(uname -s)"
@@ -69,6 +86,8 @@ need curl
 
 python_bin="$(pick_python)"
 need "$python_bin"
+run_report_schema="$(schema_const "$root/spec/x07-run.report.schema.json")"
+x07test_schema="$(schema_const "$root/spec/x07test.schema.json")"
 
 target="$(detect_target)"
 platform="$(detect_platform_label)"
@@ -231,10 +250,10 @@ test -f "$proj/.agent/skills/x07-agent-playbook/SKILL.md"
 printf "hello" > input.bin
 x07 run --profile os --input input.bin --report wrapped --report-out .x07/run.os.json >/dev/null
 
-"$python_bin" - ".x07/run.os.json" <<'PY'
+"$python_bin" - ".x07/run.os.json" "$run_report_schema" <<'PY'
 import json, sys
 doc = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-if doc.get("schema_version") != "x07.run.report@0.3.0":
+if doc.get("schema_version") != sys.argv[2]:
     raise SystemExit("ERROR: wrapped report schema_version mismatch")
 if doc.get("runner") != "os":
     raise SystemExit("ERROR: expected runner=os")
@@ -257,11 +276,11 @@ PY
 
 step "smoke: test harness baseline (stdlib.lock fallback)"
 x07 test --manifest tests/tests.json >"$tmp/x07test.report.json"
-"$python_bin" - "$tmp/x07test.report.json" <<'PY'
+"$python_bin" - "$tmp/x07test.report.json" "$x07test_schema" <<'PY'
 import json, sys
 from pathlib import Path
 doc = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-if doc.get("schema_version") != "x07.x07test@0.3.0":
+if doc.get("schema_version") != sys.argv[2]:
     raise SystemExit("ERROR: x07test schema_version mismatch")
 summary = doc.get("summary") or {}
 if summary.get("passed") != 1:
