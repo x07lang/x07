@@ -7518,20 +7518,20 @@
         {
           "module_id": "std.net.http.form_urlencoded",
           "path": "packages/ext/x07-ext-net/0.1.10/modules/std/net/http/form_urlencoded.x07.json",
-          "sha256": "600aa6c20f7b1907748eb74d7951e69074f157bd6303b7a3c0faf62fec23c618",
-          "size_bytes": 1941
+          "sha256": "db7d9091c129b46dad740a50b2a57947d2dbf6f8c0ed75d29186c235a13889e0",
+          "size_bytes": 1953
         },
         {
           "module_id": "std.net.http.server",
           "path": "packages/ext/x07-ext-net/0.1.10/modules/std/net/http/server.x07.json",
-          "sha256": "0f91d841a0fce37fa44c5798fa1b09ee3290f78da1fdf9729ba9e22db4877fa7",
-          "size_bytes": 17359
+          "sha256": "2ef3bd79e9f5aca21ebe1b474152e08939f1fc30781dfb327d30bcd0d0d47082",
+          "size_bytes": 17809
         },
         {
           "module_id": "std.net.http.spec",
           "path": "packages/ext/x07-ext-net/0.1.10/modules/std/net/http/spec.x07.json",
-          "sha256": "9aa08c6914d658d85c0c1dea29bd72047b67200a7f8f41825d2dd5036dbe13f1",
-          "size_bytes": 26348
+          "sha256": "59d321f192be616dd00fbefb7fcf019ffe1ce5290caea8a06f86ca3b5f306009",
+          "size_bytes": 26619
         },
         {
           "module_id": "std.net.http",
@@ -7548,8 +7548,8 @@
         {
           "module_id": "std.net.tcp",
           "path": "packages/ext/x07-ext-net/0.1.10/modules/std/net/tcp.x07.json",
-          "sha256": "1d649ad0f97dc50fb44815fb3d006d7dd8fcdd63f7bc22e888431e083ba40cb5",
-          "size_bytes": 11284
+          "sha256": "7c99f0fa3415c9151d9b1342c6c87261c79a1e6737b608503b4f868db7a7fb39",
+          "size_bytes": 11776
         },
         {
           "module_id": "std.net.tls",
@@ -12937,6 +12937,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "fd2c016aca2afb23858996651dca70968c19be164456dfdd010b7fcaf9e17e57",
+  "packages_hash": "1c9186535577a98598db37e9258898ca202115fdd46539738fdfbd214ba2b973",
   "packages_root": "packages/ext"
 }

@@ -12,10 +12,11 @@ For the smallest certificate-first example, see:
 - `docs/examples/certified_capsule_v1/`
 - `docs/examples/certified_network_capsule_v1/`
 
-For a second certifiable example built around published packages, see:
+For package-backed examples, see:
 
-- `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/`
-- `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/`
+- `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/` for the strong-profile sandboxed local line
+- `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` for developer/demo proof-summary workflows that depend on a developer-only imported stub path
+- `x07-mcp/docs/examples/trusted_program_sandboxed_net_http_v1/` for developer/demo network packaging and capsule flows
 
 ## Semantic diff (`x07 review diff`)
 
@@ -38,7 +39,14 @@ Notes:
   - `allow-unsafe`
   - `allow-ffi`
   - `proof-coverage-decrease`
+  - `recursion-proof-coverage-decrease`
   - `async-proof-coverage-decrease`
+  - `summary-downgrade`
+  - `assumption-surface-widen`
+  - `dev-only-assumption-introduced`
+  - `bounded-proof-introduced`
+  - `coverage-summary-imported`
+  - `operational-entry-diverges`
   - `boundary-relaxation`
   - `trusted-subset-expansion`
   - `capsule-contract-relaxation`
@@ -56,7 +64,7 @@ Notes:
 JSON schema:
 
 - `spec/x07-review.diff.schema.json`
-- `schema_version: "x07.review.diff@0.4.0"`
+- `schema_version: "x07.review.diff@0.5.0"`
 
 ## Trust report (`x07 trust report`)
 
@@ -152,8 +160,10 @@ This validates:
 - allowed entrypoints,
 - allowed worlds,
 - language subset restrictions (`defasync`, `extern`, `allow_unsafe`, `allow_ffi`),
+- strong-profile operational-entry wiring (`project.operational_entry_symbol` and optional `project.certification_entry_symbol`),
 - arch manifest posture (`allowlist_mode`, cycles/orphans/visibility/world-caps),
 - boundary index wiring for the certifiable trust surface,
+- per-symbol prove evidence requirements, coverage-import policy, and developer-only assumption posture,
 - capsule requirements, runtime-attestation requirements, effect-log requirements, and sandbox backend/network posture when the selected profile asks for them.
 
 Current built-in profiles include:
@@ -208,22 +218,39 @@ The certificate bundle includes:
 - `schema-derive/*.json` when boundary schemas are referenced
 - `verify.coverage.json`
 - per-symbol prove reports under `prove/`
+- proof summaries referenced from `proof_inventory`
+- proof objects and proof-check reports when the active profile requires them
 - `tests.report.json`
 - `trust.report.json`
 - `compile.attest.json`
 - capsule attestation references, runtime-attestation references, and effect-log digests when they are present in the observed evidence
 - peer-policy references, network capsule inventory, package-set digest, and dependency-closure evidence when the selected profile requires them
 
-`x07 trust certify` rejects if proof coverage regresses, required boundary metadata is missing, boundary-declared smoke/PBT tests do not resolve and pass, schema-derived outputs drift, trust report cleanliness fails, or compile attestation cannot bind the emitted native artifact.
+Accepted certificates also expose:
+
+- `operational_entry_symbol`
+- `proof_inventory`
+- `proof_assumptions`
+- recursive boundedness honesty (`recursive_proof_summary`)
+- explicit booleans for bounded-proof or developer-only-assumption dependence
+
+`x07 trust certify` rejects if support posture regresses, required prove artifacts are missing, required proof objects or proof-check reports are missing, required boundary metadata is missing, boundary-declared smoke/PBT tests do not resolve and pass, schema-derived outputs drift, trust report cleanliness fails, or compile attestation cannot bind the emitted native artifact.
+Strong trust profiles additionally reject:
+
+- operational-entry mismatch
+- surrogate certification entries
+- coverage-only imports
+- developer-only imported stubs
+- bounded recursion in accepted proof inventory
 
 Certificate schema:
 
 - `spec/x07-trust.certificate.schema.json`
-- `schema_version: "x07.trust.certificate@0.3.0"`
+- `schema_version: "x07.trust.certificate@0.6.0"`
 
 For `verified_core_pure_v1`, boundary-referenced schemas are rechecked with `x07 schema derive --check --out-dir .`, so certified projects should derive those schema outputs into the project root.
 
-When a certified entry depends on reviewed imported helpers, `x07 verify --prove` uses the trusted primitive catalog in `catalog/verify_primitives.json` to model those calls in the proof harness. The coverage report still lists each trusted primitive explicitly so the certificate makes that trust boundary visible.
+When a certified entry depends on reviewed imported helpers, `x07 verify --prove` uses the trusted primitive catalog in `catalog/verify_primitives.json` to model those calls in the proof harness. Developer-only imported stubs are available only behind `--allow-imported-stubs`, and accepted strong certificates reject them fail-closed.
 
 Runtime requirement:
 
@@ -236,9 +263,10 @@ For `verified_core_pure_v1`, the reviewer flow is:
 1. Run `x07 trust certify ... --out-dir target/cert`.
 2. Read `target/cert/summary.html` for the human overview.
 3. Inspect `target/cert/certificate.json` for the machine-readable evidence bundle.
-4. Use `x07 review diff --fail-on proof-coverage-decrease|boundary-relaxation|trusted-subset-expansion` when comparing a baseline certificate posture to a candidate change.
+4. Re-check proof objects with `x07 prove check --proof <path>` when independent proof verification is required.
+5. Use `x07 review diff --fail-on proof-coverage-decrease|assumption-surface-widen|bounded-proof-introduced|coverage-summary-imported|operational-entry-diverges|boundary-relaxation|trusted-subset-expansion` when comparing a baseline certificate posture to a candidate change.
 
-For sandboxed or capsule-backed projects, add the Milestone B posture gates as needed:
+For sandboxed or capsule-backed projects, add the posture gates below as needed:
 
 - `async-proof-coverage-decrease`
 - `capsule-contract-relaxation`
@@ -247,7 +275,7 @@ For sandboxed or capsule-backed projects, add the Milestone B posture gates as n
 - `runtime-attestation-regression`
 - `weaker-isolation-enabled`
 
-For the networked sandbox profile, add the Milestone C posture gates:
+For the networked sandbox profile, add the network/package posture gates:
 
 - `network-allowlist-widen`
 - `peer-policy-relaxation`

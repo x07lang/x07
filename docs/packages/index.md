@@ -10,9 +10,9 @@ X07 packages are source-only (x07AST JSON), and projects pin dependencies with a
 
 ## Manifest schema (canonical)
 
-- New and actively maintained projects should use `x07.project@0.3.0`.
-- The toolchain still accepts `x07.project@0.2.0` for legacy manifests.
-- `project.patch` (transitive dependency overrides) requires `x07.project@0.3.0`.
+- New and actively maintained projects should use `x07.project@0.4.0`.
+- The toolchain still accepts `x07.project@0.2.0` and `x07.project@0.3.0` for legacy manifests.
+- `project.patch` (transitive dependency overrides) works on the current manifest line, and certification-facing projects use the additional `x07.project@0.4.0` fields such as `project.operational_entry_symbol`.
 
 ## Module roots (important)
 
@@ -103,7 +103,7 @@ If you need to override a transitive dependency (for example to move off a yanke
 
 ```jsonc
 {
-  "schema_version": "x07.project@0.3.0",
+  "schema_version": "x07.project@0.4.0",
   "patch": {
     "some-dep": { "version": "1.2.3" }
   }

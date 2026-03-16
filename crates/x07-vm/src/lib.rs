@@ -24,7 +24,9 @@ pub use inspect_parsers::{
     is_owned_by_x07, parse_apple_container_json_owned, parse_ctr_container_info_json_owned, Labels,
     OwnedContainer, ParseError,
 };
-pub use job_runner::{run_vm_job, DefaultVmDriver, VmDriver, VmJobRunParams};
+pub use job_runner::{
+    run_vm_job, run_vm_job_passthrough, DefaultVmDriver, VmDriver, VmJobRunParams,
+};
 pub use kill_plan::{
     enforce_kill_plan, enforce_kill_plan_for_job, CommandSpec, ExecResult, KillBackend, KillPlan,
     KillResult, RetryPolicy, Signal, TargetRef,
@@ -598,6 +600,12 @@ pub struct SpawnedChild {
     pub child: std::process::Child,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CommandIoMode {
+    Capture,
+    Passthrough,
+}
+
 #[derive(Debug, Serialize)]
 struct GuestRequestJson {
     schema_version: &'static str,
@@ -696,7 +704,7 @@ pub fn vz_cleanup_scratch(state_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn spawn_vz_helper(spec: &RunSpec, state_dir: &Path) -> Result<SpawnedChild> {
+fn vz_helper_command(spec: &RunSpec, state_dir: &Path) -> Result<Command> {
     if spec.backend != VmBackend::Vz {
         anyhow::bail!("spawn_vz_helper: backend mismatch (expected vz)");
     }
@@ -793,7 +801,6 @@ pub fn spawn_vz_helper(spec: &RunSpec, state_dir: &Path) -> Result<SpawnedChild>
     write_guest_request_json(&job_in, &req)?;
 
     let helper = resolve_vz_helper_bin()?;
-
     let mut cmd = Command::new(helper);
     cmd.arg("run");
     cmd.arg("--run-id").arg(&spec.run_id);
@@ -823,9 +830,31 @@ pub fn spawn_vz_helper(spec: &RunSpec, state_dir: &Path) -> Result<SpawnedChild>
         cmd.arg(if readonly { "ro" } else { "rw" });
     }
 
-    cmd.stdin(Stdio::null());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
+    Ok(cmd)
+}
+
+fn configure_child_stdio(cmd: &mut Command, io_mode: CommandIoMode) {
+    match io_mode {
+        CommandIoMode::Capture => {
+            cmd.stdin(Stdio::null());
+            cmd.stdout(Stdio::piped());
+            cmd.stderr(Stdio::piped());
+        }
+        CommandIoMode::Passthrough => {
+            cmd.stdin(Stdio::inherit());
+            cmd.stdout(Stdio::inherit());
+            cmd.stderr(Stdio::inherit());
+        }
+    }
+}
+
+fn spawn_vz_helper_with_io(
+    spec: &RunSpec,
+    state_dir: &Path,
+    io_mode: CommandIoMode,
+) -> Result<SpawnedChild> {
+    let mut cmd = vz_helper_command(spec, state_dir)?;
+    configure_child_stdio(&mut cmd, io_mode);
 
     #[cfg(unix)]
     {
@@ -844,6 +873,14 @@ pub fn spawn_vz_helper(spec: &RunSpec, state_dir: &Path) -> Result<SpawnedChild>
     let pid = child.id();
 
     Ok(SpawnedChild { pid, child })
+}
+
+pub fn spawn_vz_helper(spec: &RunSpec, state_dir: &Path) -> Result<SpawnedChild> {
+    spawn_vz_helper_with_io(spec, state_dir, CommandIoMode::Capture)
+}
+
+pub fn spawn_vz_helper_passthrough(spec: &RunSpec, state_dir: &Path) -> Result<SpawnedChild> {
+    spawn_vz_helper_with_io(spec, state_dir, CommandIoMode::Passthrough)
 }
 
 pub fn hard_kill_pid_and_group(pid: u32) {
@@ -892,17 +929,21 @@ fn validate_mount_kv_string_safe(path: &Path, label: &str) -> Result<()> {
     Ok(())
 }
 
-fn run_docker_like(
+fn docker_like_command(
     bin: &str,
     spec: &RunSpec,
     container_id: &str,
     labels: &BTreeMap<String, String>,
     include_annotations: bool,
-) -> Result<RunOutput> {
+    interactive: bool,
+) -> Result<Command> {
     let mut cmd = Command::new(bin);
     cmd.arg("run");
     cmd.arg("--rm");
     cmd.arg("--name").arg(container_id);
+    if interactive {
+        cmd.arg("-i");
+    }
 
     for (k, v) in labels {
         cmd.arg("--label").arg(format!("{k}={v}"));
@@ -955,6 +996,17 @@ fn run_docker_like(
         cmd.arg(a);
     }
 
+    Ok(cmd)
+}
+
+fn run_docker_like(
+    bin: &str,
+    spec: &RunSpec,
+    container_id: &str,
+    labels: &BTreeMap<String, String>,
+    include_annotations: bool,
+) -> Result<RunOutput> {
+    let cmd = docker_like_command(bin, spec, container_id, labels, include_annotations, false)?;
     run_command_capped(
         cmd,
         spec.limits.wall_ms,
@@ -979,11 +1031,29 @@ pub fn run_podman(
     run_docker_like("podman", spec, container_id, labels, true)
 }
 
-pub fn run_apple_container(
+pub fn run_docker_passthrough(
     spec: &RunSpec,
     container_id: &str,
     labels: &BTreeMap<String, String>,
 ) -> Result<RunOutput> {
+    let cmd = docker_like_command("docker", spec, container_id, labels, false, true)?;
+    run_command_passthrough(cmd, spec.limits.wall_ms)
+}
+
+pub fn run_podman_passthrough(
+    spec: &RunSpec,
+    container_id: &str,
+    labels: &BTreeMap<String, String>,
+) -> Result<RunOutput> {
+    let cmd = docker_like_command("podman", spec, container_id, labels, true, true)?;
+    run_command_passthrough(cmd, spec.limits.wall_ms)
+}
+
+fn apple_container_command(
+    spec: &RunSpec,
+    container_id: &str,
+    labels: &BTreeMap<String, String>,
+) -> Result<Command> {
     let mut cmd = Command::new("container");
     cmd.arg("run");
     cmd.arg("--name").arg(container_id);
@@ -1037,12 +1107,30 @@ pub fn run_apple_container(
         cmd.arg(a);
     }
 
+    Ok(cmd)
+}
+
+pub fn run_apple_container(
+    spec: &RunSpec,
+    container_id: &str,
+    labels: &BTreeMap<String, String>,
+) -> Result<RunOutput> {
+    let cmd = apple_container_command(spec, container_id, labels)?;
     run_command_capped(
         cmd,
         spec.limits.wall_ms,
         spec.limits.max_stdout_bytes,
         spec.limits.max_stderr_bytes,
     )
+}
+
+pub fn run_apple_container_passthrough(
+    spec: &RunSpec,
+    container_id: &str,
+    labels: &BTreeMap<String, String>,
+) -> Result<RunOutput> {
+    let cmd = apple_container_command(spec, container_id, labels)?;
+    run_command_passthrough(cmd, spec.limits.wall_ms)
 }
 
 fn docker_like_soft_stop(bin: &str, container_id: &str, grace_ms: u64) -> Result<()> {
@@ -1144,12 +1232,12 @@ fn duration_to_ctr_timeout_arg(timeout: Duration) -> OsString {
     OsString::from(format!("{secs}s"))
 }
 
-pub fn run_firecracker_ctr(
+fn firecracker_ctr_command(
     spec: &RunSpec,
     cfg: &FirecrackerCtrConfig,
     container_id: &str,
     labels: &BTreeMap<String, String>,
-) -> Result<RunOutput> {
+) -> Result<Command> {
     let mut cmd = Command::new(&cfg.bin);
     cmd.args(ctr_base_args(cfg));
     cmd.arg("run");
@@ -1202,12 +1290,32 @@ pub fn run_firecracker_ctr(
         cmd.arg(a);
     }
 
+    Ok(cmd)
+}
+
+pub fn run_firecracker_ctr(
+    spec: &RunSpec,
+    cfg: &FirecrackerCtrConfig,
+    container_id: &str,
+    labels: &BTreeMap<String, String>,
+) -> Result<RunOutput> {
+    let cmd = firecracker_ctr_command(spec, cfg, container_id, labels)?;
     run_command_capped(
         cmd,
         spec.limits.wall_ms,
         spec.limits.max_stdout_bytes,
         spec.limits.max_stderr_bytes,
     )
+}
+
+pub fn run_firecracker_ctr_passthrough(
+    spec: &RunSpec,
+    cfg: &FirecrackerCtrConfig,
+    container_id: &str,
+    labels: &BTreeMap<String, String>,
+) -> Result<RunOutput> {
+    let cmd = firecracker_ctr_command(spec, cfg, container_id, labels)?;
+    run_command_passthrough(cmd, spec.limits.wall_ms)
 }
 
 pub fn firecracker_ctr_soft_stop(
@@ -1279,7 +1387,7 @@ pub fn firecracker_ctr_cleanup(cfg: &FirecrackerCtrConfig, container_id: &str) -
     Ok(())
 }
 
-fn wait_child_with_wall_timeout_ms(
+pub(crate) fn wait_child_with_wall_timeout_ms(
     child: &mut std::process::Child,
     wall_ms: u64,
 ) -> Result<(std::process::ExitStatus, bool)> {
@@ -1347,6 +1455,35 @@ pub fn wait_child_output_capped(
     })
 }
 
+pub(crate) fn wait_child_passthrough(
+    mut child: std::process::Child,
+    wall_ms: u64,
+) -> Result<RunOutput> {
+    let (status, timed_out) = wait_child_with_wall_timeout_ms(&mut child, wall_ms)?;
+
+    #[cfg(unix)]
+    let exit_signal = {
+        use std::os::unix::process::ExitStatusExt as _;
+        status.signal()
+    };
+    #[cfg(not(unix))]
+    let exit_signal: Option<i32> = None;
+
+    let exit_status = match status.code() {
+        Some(code) => code,
+        None => exit_signal.map(|s| 128 + s).unwrap_or(1),
+    };
+
+    Ok(RunOutput {
+        exit_status,
+        timed_out,
+        stdout: Vec::new(),
+        stderr: Vec::new(),
+        stdout_truncated: false,
+        stderr_truncated: false,
+    })
+}
+
 fn run_command_capped(
     mut cmd: Command,
     wall_ms: u64,
@@ -1359,6 +1496,12 @@ fn run_command_capped(
 
     let child = cmd.spawn().context("spawn command")?;
     wait_child_output_capped(child, wall_ms, stdout_cap, stderr_cap)
+}
+
+fn run_command_passthrough(mut cmd: Command, wall_ms: u64) -> Result<RunOutput> {
+    configure_child_stdio(&mut cmd, CommandIoMode::Passthrough);
+    let child = cmd.spawn().context("spawn command")?;
+    wait_child_passthrough(child, wall_ms)
 }
 
 pub fn to_os_args(args: &[String]) -> Vec<OsString> {
@@ -1548,6 +1691,46 @@ mod tests {
     #[test]
     fn mount_kv_string_validation_rejects_comma() {
         assert!(validate_mount_kv_string_safe(Path::new("/tmp/has,comma"), "host").is_err());
+    }
+
+    #[test]
+    fn docker_passthrough_command_requests_interactive_stdin() {
+        let spec = RunSpec {
+            run_id: "test-run".to_string(),
+            backend: VmBackend::Docker,
+            image: "example:latest".to_string(),
+            image_digest: None,
+            argv: vec!["/bin/cat".to_string()],
+            env: BTreeMap::new(),
+            mounts: Vec::new(),
+            workdir: None,
+            limits: LimitsSpec {
+                wall_ms: 1_000,
+                grace_ms: 100,
+                cleanup_ms: 100,
+                mem_bytes: None,
+                vcpus: None,
+                max_stdout_bytes: 1_024,
+                max_stderr_bytes: 1_024,
+                network: NetworkMode::None,
+            },
+        };
+
+        let cmd = docker_like_command(
+            "docker",
+            &spec,
+            "test-container",
+            &BTreeMap::new(),
+            false,
+            true,
+        )
+        .expect("build docker command");
+        let args = cmd
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+
+        assert!(args.iter().any(|arg| arg == "-i"));
     }
 
     #[cfg(unix)]

@@ -1,0 +1,47 @@
+{
+  "entry": "fixture.main",
+  "functions": [
+    {
+      "decl_sha256_hex": "951742697fc3cde51e571eed51628080d049021d59055b4e5377da3101d64e6b",
+      "kind": "defn",
+      "signature": {
+        "params": [
+          {
+            "ty": "i32"
+          }
+        ],
+        "result": "i32"
+      },
+      "source_path": "/Users/webik/projects/x07lang/x07/crates/x07/tests/fixtures/verified_core_fixture_v1/src/fixture.x07.json",
+      "status": "supported",
+      "support_summary": {
+        "decreases_count": 0,
+        "has_decreases": false,
+        "prove_supported": true,
+        "recursion_kind": "none"
+      },
+      "symbol": "fixture.main"
+    }
+  ],
+  "schema_version": "x07.verify.summary@0.2.0",
+  "summary": {
+    "capsule_boundaries": 0,
+    "imported_proof_summary_defn": 0,
+    "reachable_async": 0,
+    "reachable_defn": 1,
+    "recursive_defn": 0,
+    "supported_async": 0,
+    "supported_defn": 1,
+    "supported_recursive_defn": 0,
+    "termination_proven_defn": 0,
+    "trusted_primitives": 0,
+    "trusted_scheduler_models": 0,
+    "uncovered_defn": 0,
+    "unsupported_defn": 0,
+    "unsupported_recursive_defn": 0
+  },
+  "summary_kind": "coverage_support",
+  "worlds": [
+    "solve-pure"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-verify.proof-check.report.schema.json",
+  "title": "x07.verify.proof_check.report@0.1.0",
+  "description": "Independent proof-check report emitted by `x07 prove check`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ok",
+    "proof_object_digest",
+    "checker",
+    "result"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.verify.proof_check.report@0.1.0" },
+    "ok": { "type": "boolean" },
+    "proof_object_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "checker": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "result": { "type": "string", "enum": ["accepted", "rejected"] },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "https://x07.io/spec/x07diag.schema.json#/$defs/diagnostic"
+      },
+      "default": []
+    }
+  }
+}

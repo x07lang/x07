@@ -23,8 +23,8 @@ High-level primitives to learn early (the “one whole system”):
 - Budget scopes: [`budget.scope_v1`](../language/budget-scopes.md) (localize cost contracts; arch-driven budgets)
 - Contracts tooling: `x07 arch check`, `x07 schema derive`, `x07 sm gen` (pinned contracts → deterministic checks/generation)
 - Property-based testing: `x07 test --pbt` + `x07 fix --from-pbt` (counterexample → deterministic regression)
-- Function contracts + verification: `requires` / `ensures` / `invariant` + `x07 verify --bmc|--smt` (bounded proof artifacts)
-- Review + trust artifacts: `x07 review diff` + `x07 trust report` (human reviewable “intent-level” diff + trust report)
+- Function contracts + verification: `requires` / `ensures` / `invariant` + `x07 verify --prove|--coverage` (proof artifacts plus explicit support posture)
+- Certificate-first review: `x07 prove check`, `x07 trust certify`, `x07 review diff`, `x07 trust report`
 
 ## 1) Install and verify the toolchain
 
@@ -132,6 +132,7 @@ x07 init
 
 - The root `world` field is required (it’s used as a fallback when no run profile is selected).
 - For multi-profile projects, set the root `world` to the solve-* world you want for deterministic lint/repair (for example `solve-pure`), and run OS worlds via profiles (`run-os*`).
+- If the project will be certified, set `project.operational_entry_symbol` on the `x07.project@0.4.0` manifest line. Strong trust profiles certify that operational entry and reject proof-only surrogate entries.
 
 ### Contracts-by-example (copy/paste)
 
@@ -149,7 +150,7 @@ x07 init --template verified-core-pure
 
 That template wires `arch/`, smoke/PBT tests, and `verified_core_pure_v1` so you can go straight to `x07 trust profile check` and `x07 trust certify`.
 
-If you want the sandboxed Milestone B line instead, use:
+If you want the sandboxed certificate-backed line instead, use:
 
 ```bash
 x07 init --template trusted-sandbox-program
@@ -238,7 +239,7 @@ If you need a human-reviewable artifact for an agent patchset, use:
 
 - `x07 review diff` (semantic diff; HTML)
 - `x07 trust report` (budgets/worlds/nondeterminism summary)
-- `x07 trust certify` (certificate bundle for `verified_core_pure_v1` projects)
+- `x07 trust certify` (certificate bundle with proof inventory, assumptions, and runtime/boundary evidence)
 
 See: [Review & trust artifacts](../toolchain/review-trust.md).
 
@@ -276,7 +277,7 @@ x07 pkg remove NAME --sync
 Notes:
 
 - `x07 pkg add` edits `x07.json`. With `--sync`, it also updates `x07.lock.json`.
-- Canonical project manifests use `x07.project@0.3.0`. `x07.project@0.2.0` is accepted for legacy manifests, but `project.patch` requires `@0.3.0`.
+- Canonical project manifests use `x07.project@0.4.0`. `x07.project@0.2.0` and `x07.project@0.3.0` are accepted for legacy manifests, but current certification surfaces use the `0.4.0` fields such as `project.operational_entry_symbol`.
 - `x07 pkg add NAME@VERSION` is safe to re-run: if the same dep+version already exists, it succeeds as a no-op. If the dep exists at a different version, pick a version explicitly and update the project deps.
 - If a module import fails and you don’t know which package provides it, use `x07 pkg provides <module-id>`.
 - If you’ve added a package but don’t know which modules it exports, use `x07 doc <package-name>` (example: `x07 doc ext-net`).
@@ -288,7 +289,7 @@ Notes:
 - `x07 pkg lock` defaults to the official registry index when fetching is required; override with `--index` or forbid network with `--offline`.
 - In CI, run `x07 pkg lock --project x07.json --check`.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
-- If you must force a transitive dependency version, use `project.patch` in `x07.json` (requires `x07.project@0.3.0`).
+- If you must force a transitive dependency version, use `project.patch` in `x07.json` on the current `x07.project@0.4.0` manifest line.
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` can add and fetch these transitive deps, but agents should treat the capability map + templates as canonical so the dependency set is explicit.
 - Examples of transitive helpers: `ext-net` pulls `ext-curl-c`/`ext-sockets-c`/`ext-url-rs`, and `ext-db-sqlite` pulls `ext-db-core` (which pulls `ext-data-model`).
 

@@ -1,23 +1,32 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-project.schema.json",
-  "title": "x07.project@0.3.0",
+  "title": "x07.project@0.4.0",
   "description": "Project manifest (x07.json). Core fields are consumed by the compiler (x07c). Run profiles are consumed by x07 run.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "world", "entry", "module_roots"],
   "properties": {
     "schema_version": {
-      "const": "x07.project@0.3.0",
+      "const": "x07.project@0.4.0",
       "description": "Pinned schema identifier."
     },
     "world": {
-      "$ref": "#/$defs/solve_world_id",
-      "description": "Deterministic compile/lint/test world for the project (must be a solve-* world)."
+      "$ref": "#/$defs/world_id",
+      "description": "Default world for project commands. Use profiles/default_profile when you want separate run-time intent."
     },
     "entry": {
       "$ref": "#/$defs/entry_path",
       "description": "Entry module file (x07AST JSON)."
+    },
+    "operational_entry_symbol": {
+      "$ref": "#/$defs/symbol",
+      "description": "Exported symbol that represents the shipped operational entry."
+    },
+    "certification_entry_symbol": {
+      "anyOf": [{ "$ref": "#/$defs/symbol" }, { "type": "null" }],
+      "default": null,
+      "description": "Optional developer-only certification surrogate."
     },
     "module_roots": {
       "type": "array",
@@ -107,6 +116,12 @@
         }
       ]
     },
+    "symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)+$"
+    },
     "pkg_name": {
       "type": "string",
       "minLength": 1,
@@ -167,9 +182,7 @@
       "additionalProperties": false,
       "required": ["name", "version", "path"],
       "properties": {
-        "name": {
-          "$ref": "#/$defs/pkg_name"
-        },
+        "name": { "$ref": "#/$defs/pkg_name" },
         "version": {
           "$ref": "#/$defs/semver",
           "description": "Pinned package version."
@@ -203,9 +216,7 @@
           "$ref": "#/$defs/rel_path",
           "description": "Path to run-os-sandboxed policy JSON. Required iff world == run-os-sandboxed."
         },
-        "runner": {
-          "$ref": "#/$defs/runner_mode"
-        },
+        "runner": { "$ref": "#/$defs/runner_mode" },
         "input": {
           "$ref": "#/$defs/rel_path",
           "description": "Path to input bytes file. Optional; x07 run may derive input from CLI args."
@@ -222,41 +233,27 @@
         "cpu_time_limit_seconds": {
           "type": "integer",
           "minimum": 0,
-          "description": "CPU time limit in seconds (runner-enforced)."
+          "description": "Optional CPU time limit for OS runners."
         },
         "max_memory_bytes": {
           "type": "integer",
           "minimum": 0,
-          "description": "Max memory limit in bytes (runner-enforced)."
+          "description": "Optional runner memory cap."
         },
         "max_output_bytes": {
           "type": "integer",
           "minimum": 0,
-          "description": "Max captured output bytes (runner-enforced)."
+          "description": "Optional runner output cap."
         },
-        "cc_profile": {
-          "$ref": "#/$defs/cc_profile"
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": { "world": { "const": "run-os-sandboxed" } },
-            "required": ["world"]
-          },
-          "then": { "required": ["policy"] },
-          "else": { "not": { "required": ["policy"] } }
-        }
-      ]
+        "cc_profile": { "$ref": "#/$defs/cc_profile" }
+      }
     },
     "profiles_map": {
       "type": "object",
       "patternProperties": {
-        "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$": { "$ref": "#/$defs/run_profile" }
+        "^[A-Za-z0-9][A-Za-z0-9._-]*$": { "$ref": "#/$defs/run_profile" }
       },
-      "additionalProperties": false,
-      "default": {},
-      "description": "Map of profile name -> profile config."
+      "additionalProperties": false
     }
   }
 }

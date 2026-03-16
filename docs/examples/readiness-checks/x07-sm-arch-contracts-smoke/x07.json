@@ -1,5 +1,5 @@
 {
-  "schema_version": "x07.project@0.2.0",
+  "schema_version": "x07.project@0.4.0",
   "world": "solve-pure",
   "entry": "src/main.x07.json",
   "module_roots": [
@@ -9,4 +9,3 @@
   "lockfile": "x07.lock.json",
   "dependencies": []
 }
-

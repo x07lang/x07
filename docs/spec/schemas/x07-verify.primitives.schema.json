@@ -1,19 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-verify.primitives.schema.json",
-  "title": "x07.verify.primitives@0.1.0",
-  "description": "Trusted primitive manifest consumed by proof-coverage and certification flows.",
+  "title": "x07.verify.primitives@0.2.0",
+  "description": "Primitive and assumption manifest consumed by prove and certification flows.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "primitives"],
   "properties": {
-    "schema_version": { "const": "x07.verify.primitives@0.1.0" },
+    "schema_version": { "const": "x07.verify.primitives@0.2.0" },
     "primitives": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["symbol", "kind"],
+        "required": ["symbol", "kind", "assumption_class", "certification_policy"],
         "properties": {
           "symbol": {
             "type": "string",
@@ -22,7 +22,15 @@
           },
           "kind": {
             "type": "string",
-            "enum": ["builtin", "imported"]
+            "enum": ["builtin", "imported_model", "imported_stub"]
+          },
+          "assumption_class": {
+            "type": "string",
+            "enum": ["semantics_model", "proof_summary", "dev_stub"]
+          },
+          "certification_policy": {
+            "type": "string",
+            "enum": ["allowed", "dev_only", "forbidden"]
           },
           "note": {
             "type": "string",

@@ -53,6 +53,6 @@
     "gen/frame_payload/modules",
     "gen/event_line/modules"
   ],
-  "schema_version": "x07.project@0.2.0",
+  "schema_version": "x07.project@0.4.0",
   "world": "solve-pure"
 }

@@ -364,6 +364,7 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "check"
             | "cli"
             | "pkg"
+            | "prove"
             | "review"
             | "trust"
             | "doc"
@@ -417,6 +418,7 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
             "publish",
         ],
         "policy" => &["init"],
+        "prove" => &["check"],
         "review" => &["diff"],
         "trust" => &["report", "profile", "capsule", "certify"],
         "trust.profile" => &["check"],

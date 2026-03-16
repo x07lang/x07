@@ -1,0 +1,89 @@
+{
+  "decls": [
+    {
+      "body": [
+        "begin",
+        [
+          "let",
+          "empty_bytes",
+          [
+            "bytes.empty"
+          ]
+        ],
+        [
+          "let",
+          "empty_view",
+          [
+            "bytes.view",
+            "empty_bytes"
+          ]
+        ],
+        [
+          "let",
+          "_",
+          [
+            "fixture.main",
+            "p0_raw"
+          ]
+        ],
+        [
+          "result_i32.ok",
+          0
+        ]
+      ],
+      "kind": "defn",
+      "name": "main.__verify_call_v1",
+      "params": [
+        {
+          "name": "p0_raw",
+          "ty": "i32"
+        }
+      ],
+      "result": "result_i32"
+    }
+  ],
+  "imports": [
+    "fixture",
+    "std.codec"
+  ],
+  "kind": "entry",
+  "module_id": "main",
+  "schema_version": "x07.x07ast@0.8.0",
+  "solve": [
+    "begin",
+    [
+      "let",
+      "off",
+      0
+    ],
+    [
+      "let",
+      "p0",
+      [
+        "std.codec.read_u32_le",
+        "input",
+        "off"
+      ]
+    ],
+    [
+      "set",
+      "off",
+      [
+        "+",
+        "off",
+        4
+      ]
+    ],
+    [
+      "let",
+      "_",
+      [
+        "main.__verify_call_v1",
+        "p0"
+      ]
+    ],
+    [
+      "bytes.empty"
+    ]
+  ]
+}

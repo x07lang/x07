@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-project.v0.4.0.schema.json",
+  "title": "x07.project@0.4.0",
+  "description": "Project manifest (x07.json). Core fields are consumed by the compiler (x07c). Run profiles are consumed by x07 run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "world", "entry", "module_roots"],
+  "properties": {
+    "schema_version": {
+      "const": "x07.project@0.4.0",
+      "description": "Pinned schema identifier."
+    },
+    "world": {
+      "$ref": "#/$defs/world_id",
+      "description": "Default world for project commands. Use profiles/default_profile when you want separate run-time intent."
+    },
+    "entry": {
+      "$ref": "#/$defs/entry_path",
+      "description": "Entry module file (x07AST JSON)."
+    },
+    "operational_entry_symbol": {
+      "$ref": "#/$defs/symbol",
+      "description": "Exported symbol that represents the shipped operational entry."
+    },
+    "certification_entry_symbol": {
+      "anyOf": [{ "$ref": "#/$defs/symbol" }, { "type": "null" }],
+      "default": null,
+      "description": "Optional developer-only certification surrogate."
+    },
+    "module_roots": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/rel_path" },
+      "description": "Module root directories (relative to project)."
+    },
+    "link": {
+      "$ref": "#/$defs/link_config",
+      "default": {},
+      "description": "Optional native link config (used by C/native build backends)."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dependency_spec" },
+      "default": [],
+      "description": "Resolved dependency list (typically managed by x07 pkg)."
+    },
+    "patch": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_-]{0,127}$": { "$ref": "#/$defs/patch_spec" }
+      },
+      "additionalProperties": false,
+      "default": {},
+      "description": "Dependency overrides: map of package name -> pinned override."
+    },
+    "lockfile": {
+      "anyOf": [{ "$ref": "#/$defs/rel_path" }, { "type": "null" }],
+      "default": "x07.lock.json",
+      "description": "Optional lockfile path; null disables lockfile usage."
+    },
+    "default_profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "description": "Default run profile name for x07 run (must exist in profiles to be usable)."
+    },
+    "profiles": {
+      "$ref": "#/$defs/profiles_map",
+      "default": {},
+      "description": "Named run profiles consumed by x07 run."
+    }
+  },
+  "$defs": {
+    "world_id": {
+      "type": "string",
+      "enum": [
+        "solve-pure",
+        "solve-fs",
+        "solve-rr",
+        "solve-kv",
+        "solve-full",
+        "run-os",
+        "run-os-sandboxed"
+      ]
+    },
+    "solve_world_id": {
+      "type": "string",
+      "enum": ["solve-pure", "solve-fs", "solve-rr", "solve-kv", "solve-full"]
+    },
+    "semver": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+"
+    },
+    "entry_path": {
+      "allOf": [
+        { "$ref": "#/$defs/rel_path" },
+        { "type": "string", "pattern": "\\.x07\\.json$" }
+      ]
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)+$"
+    },
+    "pkg_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_-]{0,127}$"
+    },
+    "patch_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": { "$ref": "#/$defs/semver" },
+        "path": { "$ref": "#/$defs/rel_path" }
+      }
+    },
+    "link_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!-)[^\\s/\\\\]+$"
+    },
+    "link_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "libs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/link_name" },
+          "default": []
+        },
+        "search_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rel_path" },
+          "default": []
+        },
+        "frameworks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/link_name" },
+          "default": []
+        },
+        "static": { "type": "boolean", "default": false }
+      },
+      "default": {}
+    },
+    "dependency_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "path"],
+      "properties": {
+        "name": { "$ref": "#/$defs/pkg_name" },
+        "version": { "$ref": "#/$defs/semver" },
+        "path": { "$ref": "#/$defs/rel_path" }
+      }
+    },
+    "runner_mode": {
+      "type": "string",
+      "enum": ["auto", "host", "os"]
+    },
+    "cc_profile": {
+      "type": "string",
+      "enum": ["default", "size"]
+    },
+    "run_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world"],
+      "properties": {
+        "world": { "$ref": "#/$defs/world_id" },
+        "policy": { "$ref": "#/$defs/rel_path" },
+        "runner": { "$ref": "#/$defs/runner_mode" },
+        "input": { "$ref": "#/$defs/rel_path" },
+        "auto_ffi": { "type": "boolean" },
+        "solve_fuel": { "type": "integer", "minimum": 0 },
+        "cpu_time_limit_seconds": { "type": "integer", "minimum": 0 },
+        "max_memory_bytes": { "type": "integer", "minimum": 0 },
+        "max_output_bytes": { "type": "integer", "minimum": 0 },
+        "cc_profile": { "$ref": "#/$defs/cc_profile" }
+      }
+    },
+    "profiles_map": {
+      "type": "object",
+      "patternProperties": {
+        "^[A-Za-z0-9][A-Za-z0-9._-]*$": { "$ref": "#/$defs/run_profile" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

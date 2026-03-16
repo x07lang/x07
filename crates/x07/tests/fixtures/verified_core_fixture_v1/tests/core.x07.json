@@ -1,0 +1,125 @@
+{
+  "schema_version": "x07.x07ast@0.8.0",
+  "kind": "module",
+  "module_id": "tests.core",
+  "imports": [
+    "fixture",
+    "std.codec",
+    "std.test"
+  ],
+  "decls": [
+    {
+      "kind": "export",
+      "names": [
+        "tests.core.pbt_fixture_main_deterministic",
+        "tests.core.smoke_fixture_identity"
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "tests.core.smoke_fixture_identity",
+      "params": [],
+      "result": "result_i32",
+      "body": [
+        "begin",
+        [
+          "let",
+          "got",
+          [
+            "fixture.main",
+            7
+          ]
+        ],
+        [
+          "try",
+          [
+            "std.test.assert_i32_eq",
+            "got",
+            7,
+            [
+              "std.test.code_assert_i32_eq"
+            ]
+          ]
+        ],
+        [
+          "std.test.pass"
+        ]
+      ]
+    },
+    {
+      "kind": "defn",
+      "name": "tests.core.pbt_fixture_main_deterministic",
+      "params": [
+        {
+          "name": "payload",
+          "ty": "bytes"
+        }
+      ],
+      "result": "bytes",
+      "body": [
+        "begin",
+        [
+          "if",
+          [
+            "!=",
+            [
+              "bytes.len",
+              "payload"
+            ],
+            4
+          ],
+          [
+            "return",
+            [
+              "std.test.status_ok"
+            ]
+          ],
+          0
+        ],
+        [
+          "let",
+          "x",
+          [
+            "std.codec.read_u32_le",
+            [
+              "bytes.view",
+              "payload"
+            ],
+            0
+          ]
+        ],
+        [
+          "let",
+          "left",
+          [
+            "fixture.main",
+            "x"
+          ]
+        ],
+        [
+          "let",
+          "right",
+          [
+            "fixture.main",
+            "x"
+          ]
+        ],
+        [
+          "if",
+          [
+            "=",
+            "left",
+            "right"
+          ],
+          [
+            "std.test.status_ok"
+          ],
+          [
+            "std.test.status_fail",
+            201
+          ]
+        ]
+      ]
+    }
+  ]
+}

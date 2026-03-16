@@ -1,7 +1,7 @@
 # trusted_network_service_v1
 
 This example is the smallest sandboxed networked trusted-program project that
-exercises the Milestone C trust surfaces end to end:
+exercises the current sandboxed-network trust profile end to end:
 
 - async `example.main` entry under `run-os-sandboxed`
 - network capsule boundary at `capsule.main`

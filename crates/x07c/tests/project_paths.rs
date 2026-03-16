@@ -568,6 +568,8 @@ fn project_module_roots_dedup_prevents_duplicate_module_hits() {
         schema_version: PROJECT_MANIFEST_SCHEMA_VERSION.to_string(),
         world: "solve-pure".to_string(),
         entry: "src/main.x07.json".to_string(),
+        operational_entry_symbol: None,
+        certification_entry_symbol: None,
         module_roots: vec![
             "./src".to_string(),
             "./.x07/deps/dep/0.1.0/modules".to_string(),

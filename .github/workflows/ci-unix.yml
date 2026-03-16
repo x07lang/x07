@@ -75,6 +75,10 @@ jobs:
         shell: bash
         run: ./scripts/ci/check_verified_core_pure_example.sh
 
+      - name: Verified core fixture smoke
+        shell: bash
+        run: ./scripts/ci/check_verified_core_fixture.sh
+
       - name: Trusted network service static smoke
         shell: bash
         run: ./scripts/ci/check_trusted_network_service_static.sh

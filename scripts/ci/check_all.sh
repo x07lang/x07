@@ -101,6 +101,9 @@ step "generics intrinsics coherence"
 step "cargo clippy --all-targets -- -D warnings"
 cargo clippy --all-targets -- -D warnings
 
+step "verified core fixture release guard"
+./scripts/ci/check_verified_core_fixture.sh
+
 step "stream plugins smoke"
 ./scripts/ci/check_stream_plugins_smoke.sh
 

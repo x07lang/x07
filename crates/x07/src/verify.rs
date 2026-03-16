@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use x07_contracts::{
     X07AST_SCHEMA_VERSION, X07_VERIFY_CEX_SCHEMA_VERSION, X07_VERIFY_COVERAGE_SCHEMA_VERSION,
-    X07_VERIFY_PRIMITIVES_SCHEMA_VERSION, X07_VERIFY_REPORT_SCHEMA_VERSION,
-    X07_VERIFY_SUMMARY_SCHEMA_VERSION,
+    X07_VERIFY_PRIMITIVES_SCHEMA_VERSION, X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION,
+    X07_VERIFY_PROOF_OBJECT_SCHEMA_VERSION, X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION,
+    X07_VERIFY_REPORT_SCHEMA_VERSION, X07_VERIFY_SUMMARY_SCHEMA_VERSION,
 };
 use x07_worlds::WorldId;
 use x07c::ast::Expr;
@@ -33,6 +34,12 @@ const X07_VERIFY_PRIMITIVES_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-verify.primitives.schema.json");
 const X07_VERIFY_SUMMARY_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-verify.summary.schema.json");
+const X07_VERIFY_PROOF_SUMMARY_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-verify.proof-summary.schema.json");
+const X07_VERIFY_PROOF_OBJECT_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-verify.proof-object.schema.json");
+const X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../spec/x07-verify.proof-check.report.schema.json");
 const X07_VERIFY_PRIMITIVES_CATALOG_BYTES: &[u8] =
     include_bytes!("../../../catalog/verify_primitives.json");
 const X07_VERIFY_SCHEDULER_MODEL_BYTES: &[u8] =
@@ -439,8 +446,18 @@ pub struct VerifyArgs {
     pub artifact_dir: Option<PathBuf>,
 
     /// Import one or more proof-summary artifacts produced by `x07 verify`.
-    #[arg(long = "summary", value_name = "PATH")]
+    ///
+    /// Deprecated alias: `--summary`.
+    #[arg(long = "proof-summary", alias = "summary", value_name = "PATH")]
     pub summary: Vec<PathBuf>,
+
+    /// Developer-only: permit imported_stub assumptions in prove mode.
+    #[arg(long)]
+    pub allow_imported_stubs: bool,
+
+    /// Emit a proof object for independent checking.
+    #[arg(long, value_name = "PATH")]
+    pub emit_proof: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -503,7 +520,13 @@ struct Artifacts {
     #[serde(skip_serializing_if = "Option::is_none")]
     z3_out_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    verify_summary_path: Option<String>,
+    verify_coverage_summary_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    verify_proof_summary_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof_object_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof_check_report_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -518,14 +541,14 @@ struct VerifyCoverage {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct VerifyCoverageSummary {
     reachable_defn: u64,
-    proven_defn: u64,
+    supported_defn: u64,
     recursive_defn: u64,
-    proven_recursive_defn: u64,
-    imported_summary_defn: u64,
+    supported_recursive_defn: u64,
+    imported_proof_summary_defn: u64,
     termination_proven_defn: u64,
     unsupported_recursive_defn: u64,
     reachable_async: u64,
-    proven_async: u64,
+    supported_async: u64,
     trusted_primitives: u64,
     trusted_scheduler_models: u64,
     capsule_boundaries: u64,
@@ -543,7 +566,7 @@ struct VerifyCoverageFunction {
     #[serde(skip_serializing_if = "Option::is_none")]
     signature: Option<VerifyFunctionSignature>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    proof_summary: Option<VerifyFunctionProofSummary>,
+    support_summary: Option<VerifyFunctionSupportSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     decl_sha256_hex: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -553,7 +576,7 @@ struct VerifyCoverageFunction {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct VerifyFunctionProofSummary {
+struct VerifyFunctionSupportSummary {
     recursion_kind: String,
     has_decreases: bool,
     decreases_count: u64,
@@ -576,8 +599,9 @@ struct VerifySignatureParam {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct VerifySummary {
+struct VerifyCoverageSummaryArtifact {
     schema_version: String,
+    summary_kind: String,
     entry: String,
     worlds: Vec<String>,
     summary: VerifyCoverageSummary,
@@ -596,7 +620,7 @@ struct VerifyImportedSummaryRef {
 
 #[derive(Debug, Clone)]
 struct ImportedSummaryFunction {
-    function: VerifyCoverageFunction,
+    function: VerifyProofSummaryArtifact,
     source: VerifyImportedSummaryRef,
 }
 
@@ -625,6 +649,8 @@ struct VerifyPrimitiveCatalog {
 struct VerifyPrimitiveEntry {
     symbol: String,
     kind: String,
+    assumption_class: String,
+    certification_policy: String,
     #[allow(dead_code)]
     note: Option<String>,
 }
@@ -734,7 +760,58 @@ struct VerifyProofSummary {
     has_decreases: bool,
     decreases_count: u64,
     bounded_by_unwind: bool,
+    recursion_bound_kind: String,
     dependency_symbols: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct VerifyProofSummaryArtifact {
+    schema_version: String,
+    summary_kind: String,
+    symbol: String,
+    kind: String,
+    decl_sha256_hex: String,
+    result_kind: String,
+    engine: String,
+    recursion_kind: String,
+    recursion_bound_kind: String,
+    dependency_symbols: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof_object_digest: Option<String>,
+    #[serde(default)]
+    assumptions: Vec<VerifyProofAssumption>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+struct VerifyProofAssumption {
+    kind: String,
+    subject: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    digest: Option<String>,
+    certifiable: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct VerifyProofObject {
+    schema_version: String,
+    symbol: String,
+    kind: String,
+    decl_sha256_hex: String,
+    engine: String,
+    proof_summary_digest: String,
+    obligation_digest: String,
+    solver_transcript_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct VerifyProofCheckReport {
+    schema_version: String,
+    pub(crate) ok: bool,
+    proof_object_digest: String,
+    checker: String,
+    pub(crate) result: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    diagnostics: Vec<x07c::diagnostics::Diagnostic>,
 }
 
 pub fn cmd_verify(
@@ -823,11 +900,17 @@ fn cmd_verify_inner(
 
     let imported_summary_index = match load_imported_summary_index(&cwd, &args.summary) {
         Ok(v) => v,
-        Err(err) => {
-            let d = diag_verify("X07V_SUMMARY_MISMATCH", format!("{err:#}"));
+        Err(diagnostics) => {
+            let d = diagnostics.first().cloned().unwrap_or_else(|| {
+                diag_verify(
+                    "X07V_SUMMARY_MISMATCH",
+                    "imported proof-summary validation failed",
+                )
+            });
             return write_report_and_exit(
                 machine,
-                VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
+                VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1)
+                    .with_diagnostics(diagnostics),
             );
         }
     };
@@ -957,6 +1040,7 @@ fn cmd_verify_inner(
             project_path.as_deref(),
             &target,
             &imported_summary_index,
+            true,
         )?)
     } else {
         None
@@ -964,6 +1048,37 @@ fn cmd_verify_inner(
     let proof_summary = prove_coverage
         .as_ref()
         .map(|analysis| report_proof_summary(&analysis.coverage, &target, &recursion));
+    let proof_summary_artifact = if let Some(analysis) = &prove_coverage {
+        let primitive_catalog = load_verify_primitive_catalog()?;
+        let artifact = build_verify_proof_summary_artifact(
+            &analysis.coverage,
+            &analysis.imported_summaries,
+            &primitive_catalog,
+            &target,
+            &recursion,
+        );
+        if !args.allow_imported_stubs
+            && artifact
+                .assumptions
+                .iter()
+                .any(|assumption| assumption.kind == "imported_stub")
+        {
+            return write_report_and_exit(
+                machine,
+                VerifyReport::unsupported(
+                    mode,
+                    &args.entry,
+                    bounds.clone(),
+                    "X07V_IMPORTED_STUB_FORBIDDEN",
+                    "prove mode depends on imported_stub assumptions; rerun with --allow-imported-stubs for a developer-only flow".to_string(),
+                    2,
+                ),
+            );
+        }
+        Some(artifact)
+    } else {
+        None
+    };
 
     if mode == Mode::Prove
         && prove_coverage
@@ -976,7 +1091,7 @@ fn cmd_verify_inner(
             .cloned()
             .unwrap_or_else(|| {
                 diag_verify(
-                    "X07V_SUMMARY_MISSING",
+                    "X07V_PROOF_SUMMARY_REQUIRED",
                     "imported proof-summary reuse failed for a reachable symbol",
                 )
             });
@@ -993,7 +1108,7 @@ fn cmd_verify_inner(
             &analysis.coverage,
             &analysis.imported_summaries,
         )?;
-        artifacts.verify_summary_path = Some(verify_summary_path.display().to_string());
+        artifacts.verify_coverage_summary_path = Some(verify_summary_path.display().to_string());
     }
 
     let trusted_primitive_stubs = if mode == Mode::Prove {
@@ -1075,6 +1190,8 @@ fn cmd_verify_inner(
                 c_path: &c_path,
                 mode,
                 proof_summary,
+                proof_summary_artifact,
+                emit_proof_path: args.emit_proof.clone(),
             },
         ),
         Mode::Coverage => unreachable!("coverage returns before solver dispatch"),
@@ -1242,6 +1359,8 @@ struct VerifySmtPlan<'a> {
     c_path: &'a Path,
     mode: Mode,
     proof_summary: Option<VerifyProofSummary>,
+    proof_summary_artifact: Option<VerifyProofSummaryArtifact>,
+    emit_proof_path: Option<PathBuf>,
 }
 
 fn cmd_verify_smt(
@@ -1361,8 +1480,42 @@ fn cmd_verify_smt(
         .with_context(|| format!("write z3 output: {}", z3_out_path.display()))?;
     artifacts.z3_out_path = Some(z3_out_path.display().to_string());
 
+    let finalize_success_artifacts = |mut artifacts: Artifacts| -> Result<Artifacts> {
+        if plan.mode != Mode::Prove {
+            return Ok(artifacts);
+        }
+        if let Some(proof_summary_artifact) = plan.proof_summary_artifact.as_ref() {
+            let proof_summary_path = if let Some(proof_path) = plan.emit_proof_path.as_deref() {
+                let (bundle_artifacts, _updated_summary) = write_prove_bundle_artifacts(
+                    proof_path,
+                    proof_summary_artifact,
+                    &smt2_path,
+                    &z3_out_path,
+                )?;
+                let proof_summary_path = bundle_artifacts.verify_proof_summary_path.clone();
+                if let Some(path) = proof_summary_path.clone() {
+                    artifacts.verify_proof_summary_path = Some(path);
+                }
+                if let Some(path) = bundle_artifacts.proof_object_path.clone() {
+                    artifacts.proof_object_path = Some(path);
+                }
+                if let Some(path) = bundle_artifacts.proof_check_report_path.clone() {
+                    artifacts.proof_check_report_path = Some(path);
+                }
+                proof_summary_path
+            } else {
+                let proof_summary_path = plan.work_dir.join("verify.proof-summary.json");
+                write_verify_proof_summary_artifact(&proof_summary_path, proof_summary_artifact)?;
+                Some(proof_summary_path.display().to_string())
+            };
+            artifacts.verify_proof_summary_path = proof_summary_path;
+        }
+        Ok(artifacts)
+    };
+
     let status = z3_stdout.lines().next().unwrap_or("").trim();
     if status.is_empty() && !smt2_has_solver_query(&smt2_path)? {
+        let artifacts = finalize_success_artifacts(artifacts)?;
         return write_report_and_exit(
             machine,
             attach_summary(if plan.mode == Mode::Prove {
@@ -1373,14 +1526,17 @@ fn cmd_verify_smt(
         );
     }
     match status {
-        "unsat" => write_report_and_exit(
-            machine,
-            attach_summary(if plan.mode == Mode::Prove {
-                VerifyReport::proven(&args.entry, bounds, artifacts)
-            } else {
-                VerifyReport::verified(plan.mode, &args.entry, bounds, artifacts)
-            }),
-        ),
+        "unsat" => {
+            let artifacts = finalize_success_artifacts(artifacts)?;
+            write_report_and_exit(
+                machine,
+                attach_summary(if plan.mode == Mode::Prove {
+                    VerifyReport::proven(&args.entry, bounds, artifacts)
+                } else {
+                    VerifyReport::verified(plan.mode, &args.entry, bounds, artifacts)
+                }),
+            )
+        }
         "sat" => {
             if plan.mode == Mode::Prove && plan.target.is_async {
                 let mut cbmc_args = vec![
@@ -1898,7 +2054,10 @@ fn decl_sha256_hex_for_value(value: &Value) -> Result<String> {
     Ok(util::sha256_hex(&bytes))
 }
 
-fn load_imported_summary_index(cwd: &Path, paths: &[PathBuf]) -> Result<ImportedSummaryIndex> {
+fn load_imported_summary_index(
+    cwd: &Path,
+    paths: &[PathBuf],
+) -> std::result::Result<ImportedSummaryIndex, Vec<x07c::diagnostics::Diagnostic>> {
     let mut index = ImportedSummaryIndex::default();
     for raw_path in paths {
         let path = if raw_path.is_absolute() {
@@ -1906,61 +2065,114 @@ fn load_imported_summary_index(cwd: &Path, paths: &[PathBuf]) -> Result<Imported
         } else {
             cwd.join(raw_path)
         };
-        let bytes = std::fs::read(&path)
-            .with_context(|| format!("read verify summary: {}", path.display()))?;
-        let value: Value = serde_json::from_slice(&bytes)
-            .with_context(|| format!("parse verify summary JSON: {}", path.display()))?;
-        let diags = validate_verify_summary_schema(&value)?;
+        let bytes = std::fs::read(&path).map_err(|err| {
+            vec![diag_verify(
+                "X07V_SUMMARY_MISMATCH",
+                format!("read verify proof summary {}: {err:#}", path.display()),
+            )]
+        })?;
+        let value: Value = serde_json::from_slice(&bytes).map_err(|err| {
+            vec![diag_verify(
+                "X07V_SUMMARY_MISMATCH",
+                format!(
+                    "parse verify proof summary JSON {}: {err:#}",
+                    path.display()
+                ),
+            )]
+        })?;
+        let diags = validate_verify_proof_summary_schema(&value).map_err(|err| {
+            vec![diag_verify(
+                "X07V_SUMMARY_MISMATCH",
+                format!(
+                    "validate verify proof-summary schema {}: {err:#}",
+                    path.display()
+                ),
+            )]
+        })?;
         if !diags.is_empty() {
-            anyhow::bail!(
-                "verify summary schema invalid for {}: {}",
-                path.display(),
-                diags[0].message
-            );
+            let coverage_diags = validate_verify_summary_schema(&value).map_err(|err| {
+                vec![diag_verify(
+                    "X07V_SUMMARY_MISMATCH",
+                    format!(
+                        "validate verify coverage-summary schema {}: {err:#}",
+                        path.display()
+                    ),
+                )]
+            })?;
+            if coverage_diags.is_empty() {
+                return Err(vec![
+                    diag_verify_warning(
+                        "X07V_COVERAGE_NOT_PROOF",
+                        format!(
+                            "coverage/support summary {} is posture-only and does not count as proof evidence",
+                            path.display()
+                        ),
+                    ),
+                    diag_verify(
+                        "X07V_COVERAGE_SUMMARY_FORBIDDEN",
+                        format!(
+                            "coverage/support summary {} cannot be imported via --proof-summary; use a proof summary emitted by `x07 verify --prove`",
+                            path.display()
+                        ),
+                    ),
+                ]);
+            }
+            return Err(vec![diag_verify(
+                "X07V_SUMMARY_MISMATCH",
+                format!(
+                    "verify proof summary schema invalid for {}: {}",
+                    path.display(),
+                    diags[0].message
+                ),
+            )]);
         }
-        let summary: VerifySummary = serde_json::from_value(value)
-            .with_context(|| format!("decode verify summary JSON: {}", path.display()))?;
-        if summary.schema_version != X07_VERIFY_SUMMARY_SCHEMA_VERSION {
-            anyhow::bail!(
-                "verify summary schema_version mismatch for {}: expected {:?} got {:?}",
-                path.display(),
-                X07_VERIFY_SUMMARY_SCHEMA_VERSION,
-                summary.schema_version
-            );
+        let summary: VerifyProofSummaryArtifact = serde_json::from_value(value).map_err(|err| {
+            vec![diag_verify(
+                "X07V_SUMMARY_MISMATCH",
+                format!(
+                    "decode verify proof summary JSON {}: {err:#}",
+                    path.display()
+                ),
+            )]
+        })?;
+        if summary.schema_version != X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION {
+            return Err(vec![diag_verify(
+                "X07V_SUMMARY_MISMATCH",
+                format!(
+                    "verify proof summary schema_version mismatch for {}: expected {:?} got {:?}",
+                    path.display(),
+                    X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION,
+                    summary.schema_version
+                ),
+            )]);
         }
-        let mut symbols = summary
-            .functions
-            .iter()
-            .map(|function| function.symbol.clone())
-            .filter(|symbol| !symbol.trim().is_empty())
-            .collect::<Vec<_>>();
-        symbols.sort();
-        symbols.dedup();
+        let symbols = vec![summary.symbol.clone()];
         let source = VerifyImportedSummaryRef {
             path: path.display().to_string(),
             sha256_hex: util::sha256_hex(&bytes),
             symbols,
         };
-        for function in summary.functions {
-            let symbol = function.symbol.clone();
-            if symbol.trim().is_empty() {
-                continue;
-            }
-            if index.by_symbol.contains_key(&symbol) {
-                anyhow::bail!(
-                    "duplicate imported verify summary for symbol {:?} via {}",
+        let symbol = summary.symbol.clone();
+        if symbol.trim().is_empty() {
+            continue;
+        }
+        if index.by_symbol.contains_key(&symbol) {
+            return Err(vec![diag_verify(
+                "X07V_SUMMARY_MISMATCH",
+                format!(
+                    "duplicate imported verify proof summary for symbol {:?} via {}",
                     symbol,
                     path.display()
-                );
-            }
-            index.by_symbol.insert(
-                symbol,
-                ImportedSummaryFunction {
-                    function,
-                    source: source.clone(),
-                },
-            );
+                ),
+            )]);
         }
+        index.by_symbol.insert(
+            symbol,
+            ImportedSummaryFunction {
+                function: summary,
+                source: source.clone(),
+            },
+        );
         index.inventory.push(source);
     }
     index.inventory.sort_by(|a, b| {
@@ -1994,23 +2206,29 @@ fn coverage_function_from_imported_summary(
     decl_sha256_hex: Option<String>,
     source_path: Option<String>,
 ) -> VerifyCoverageFunction {
-    let mut function = imported.function.clone();
-    function.symbol = symbol.to_string();
-    function.signature = signature.or(function.signature.clone());
-    function.decl_sha256_hex = decl_sha256_hex.or(function.decl_sha256_hex.clone());
-    function.source_path = source_path.or(function.source_path.clone());
-    function.details = Some(match imported.function.status.as_str() {
-        "termination_proven" => {
-            format!("termination summary imported from {}", imported.source.path)
-        }
-        _ => format!("proof summary imported from {}", imported.source.path),
-    });
-    function.status = if imported.function.status == "termination_proven" {
-        "termination_proven".to_string()
+    let status = if imported.function.result_kind == "proven_async" {
+        "supported_async".to_string()
     } else {
-        "imported_summary".to_string()
+        "imported_proof_summary".to_string()
     };
-    function
+    VerifyCoverageFunction {
+        symbol: symbol.to_string(),
+        kind: imported.function.kind.clone(),
+        status,
+        signature,
+        support_summary: Some(VerifyFunctionSupportSummary {
+            recursion_kind: imported.function.recursion_kind.clone(),
+            has_decreases: false,
+            decreases_count: 0,
+            prove_supported: true,
+        }),
+        decl_sha256_hex,
+        source_path,
+        details: Some(format!(
+            "proof summary imported from {}",
+            imported.source.path
+        )),
+    }
 }
 
 fn summary_mismatch_function_for_decl(
@@ -2027,7 +2245,12 @@ fn summary_mismatch_function_for_decl(
             &decl.result,
             decl.result_brand.as_deref(),
         )),
-        proof_summary: imported.function.proof_summary.clone(),
+        support_summary: Some(VerifyFunctionSupportSummary {
+            recursion_kind: imported.function.recursion_kind.clone(),
+            has_decreases: false,
+            decreases_count: 0,
+            prove_supported: true,
+        }),
         decl_sha256_hex: Some(decl.decl_sha256_hex.clone()),
         source_path: Some(decl.source_path.display().to_string()),
         details: Some(format!(
@@ -2163,7 +2386,7 @@ fn load_coverage_module<'a>(
     Ok(cache.get(module_id).expect("coverage module inserted"))
 }
 
-fn load_verify_primitive_catalog() -> Result<BTreeMap<String, String>> {
+fn load_verify_primitive_catalog() -> Result<BTreeMap<String, VerifyPrimitiveEntry>> {
     let doc: Value = serde_json::from_slice(X07_VERIFY_PRIMITIVES_CATALOG_BYTES)
         .context("parse catalog/verify_primitives.json")?;
     let diags = report_common::validate_schema(
@@ -2189,7 +2412,7 @@ fn load_verify_primitive_catalog() -> Result<BTreeMap<String, String>> {
 
     let mut out = BTreeMap::new();
     for primitive in catalog.primitives {
-        out.insert(primitive.symbol, primitive.kind);
+        out.insert(primitive.symbol.clone(), primitive);
     }
     Ok(out)
 }
@@ -2746,12 +2969,12 @@ fn verify_precheck_diag(
     Some(diag_verify(code, msg))
 }
 
-fn function_proof_summary(
+fn function_support_summary(
     target: &TargetSig,
     recursion: &RecursionSummary,
     prove_supported: bool,
-) -> VerifyFunctionProofSummary {
-    VerifyFunctionProofSummary {
+) -> VerifyFunctionSupportSummary {
+    VerifyFunctionSupportSummary {
         recursion_kind: recursion.kind_str().to_string(),
         has_decreases: target.decreases_count != 0,
         decreases_count: target.decreases_count as u64,
@@ -2795,7 +3018,108 @@ fn report_proof_summary(
         has_decreases: target.decreases_count != 0,
         decreases_count: target.decreases_count as u64,
         bounded_by_unwind: recursion.kind != RecursionKind::None,
+        recursion_bound_kind: if recursion.kind == RecursionKind::None {
+            "none".to_string()
+        } else {
+            "bounded_by_unwind".to_string()
+        },
         dependency_symbols,
+    }
+}
+
+fn imported_summary_digest_for_symbol(
+    imported_summaries: &[VerifyImportedSummaryRef],
+    symbol: &str,
+) -> Option<String> {
+    imported_summaries
+        .iter()
+        .find(|entry| entry.symbols.iter().any(|candidate| candidate == symbol))
+        .map(|entry| format!("sha256:{}", entry.sha256_hex))
+}
+
+fn build_proof_assumptions(
+    coverage: &VerifyCoverage,
+    imported_summaries: &[VerifyImportedSummaryRef],
+    primitive_catalog: &BTreeMap<String, VerifyPrimitiveEntry>,
+) -> Vec<VerifyProofAssumption> {
+    let mut assumptions = BTreeSet::new();
+    for function in &coverage.functions {
+        if function.symbol == coverage.entry {
+            continue;
+        }
+        let assumption = match function.status.as_str() {
+            "trusted_primitive" => {
+                primitive_catalog
+                    .get(&function.symbol)
+                    .map(|primitive| VerifyProofAssumption {
+                        kind: if primitive.kind == "builtin" {
+                            "trusted_builtin".to_string()
+                        } else if primitive.assumption_class == "dev_stub" {
+                            "imported_stub".to_string()
+                        } else {
+                            "trusted_builtin".to_string()
+                        },
+                        subject: function.symbol.clone(),
+                        digest: None,
+                        certifiable: primitive.certification_policy == "allowed",
+                    })
+            }
+            "imported_proof_summary" => Some(VerifyProofAssumption {
+                kind: "imported_proof_summary".to_string(),
+                subject: function.symbol.clone(),
+                digest: imported_summary_digest_for_symbol(imported_summaries, &function.symbol),
+                certifiable: true,
+            }),
+            "trusted_scheduler_model" => Some(VerifyProofAssumption {
+                kind: "trusted_scheduler_model".to_string(),
+                subject: function.symbol.clone(),
+                digest: None,
+                certifiable: true,
+            }),
+            "capsule_boundary" => Some(VerifyProofAssumption {
+                kind: "capsule_boundary".to_string(),
+                subject: function.symbol.clone(),
+                digest: None,
+                certifiable: true,
+            }),
+            _ => None,
+        };
+        if let Some(assumption) = assumption {
+            assumptions.insert(assumption);
+        }
+    }
+    assumptions.into_iter().collect()
+}
+
+fn build_verify_proof_summary_artifact(
+    coverage: &VerifyCoverage,
+    imported_summaries: &[VerifyImportedSummaryRef],
+    primitive_catalog: &BTreeMap<String, VerifyPrimitiveEntry>,
+    target: &TargetSig,
+    recursion: &RecursionSummary,
+) -> VerifyProofSummaryArtifact {
+    let report_summary = report_proof_summary(coverage, target, recursion);
+    VerifyProofSummaryArtifact {
+        schema_version: X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION.to_string(),
+        summary_kind: "proof".to_string(),
+        symbol: coverage.entry.clone(),
+        kind: if target.is_async {
+            "defasync".to_string()
+        } else {
+            "defn".to_string()
+        },
+        decl_sha256_hex: target.decl_sha256_hex.clone(),
+        result_kind: if target.is_async {
+            "proven_async".to_string()
+        } else {
+            "proven".to_string()
+        },
+        engine: report_summary.engine,
+        recursion_kind: report_summary.recursion_kind,
+        recursion_bound_kind: report_summary.recursion_bound_kind,
+        dependency_symbols: report_summary.dependency_symbols,
+        proof_object_digest: None,
+        assumptions: build_proof_assumptions(coverage, imported_summaries, primitive_catalog),
     }
 }
 
@@ -2808,27 +3132,32 @@ fn cmd_verify_coverage(
     imported_summary_index: &ImportedSummaryIndex,
     artifact_base: &Path,
 ) -> Result<std::process::ExitCode> {
-    let analysis =
-        match coverage_report_for_entry(args, project_path, target, imported_summary_index) {
-            Ok(analysis) => analysis,
-            Err(err) => coverage_report_fallback(
-                module_roots,
-                &args.entry,
-                project_path,
-                target,
-                args.max_bytes_len,
-                Some(format!("could not materialize reachable closure: {err:#}")),
-            ),
-        };
+    let analysis = match coverage_report_for_entry(
+        args,
+        project_path,
+        target,
+        imported_summary_index,
+        false,
+    ) {
+        Ok(analysis) => analysis,
+        Err(err) => coverage_report_fallback(
+            module_roots,
+            &args.entry,
+            project_path,
+            target,
+            args.max_bytes_len,
+            Some(format!("could not materialize reachable closure: {err:#}")),
+        ),
+    };
     let work_dir = artifact_base
         .join("verify")
         .join("coverage")
         .join(util::safe_artifact_dir_name(&args.entry));
     std::fs::create_dir_all(&work_dir)
         .with_context(|| format!("create artifact dir: {}", work_dir.display()))?;
-    let verify_summary_path = work_dir.join("verify.summary.json");
+    let verify_coverage_summary_path = work_dir.join("verify.summary.json");
     write_verify_summary_artifact(
-        &verify_summary_path,
+        &verify_coverage_summary_path,
         &analysis.coverage,
         &analysis.imported_summaries,
     )?;
@@ -2836,11 +3165,29 @@ fn cmd_verify_coverage(
         machine,
         VerifyReport::coverage_report(&args.entry, Bounds::for_args(args), analysis.coverage)
             .with_artifacts(Artifacts {
-                verify_summary_path: Some(verify_summary_path.display().to_string()),
+                verify_coverage_summary_path: Some(
+                    verify_coverage_summary_path.display().to_string(),
+                ),
                 ..Artifacts::default()
             })
             .with_diagnostics(analysis.diagnostics),
     )
+}
+
+fn missing_summary_code(proof_summaries_required: bool) -> &'static str {
+    if proof_summaries_required {
+        "X07V_PROOF_SUMMARY_REQUIRED"
+    } else {
+        "X07V_SUMMARY_MISSING"
+    }
+}
+
+fn missing_summary_label(proof_summaries_required: bool) -> &'static str {
+    if proof_summaries_required {
+        "proof summary"
+    } else {
+        "summary"
+    }
 }
 
 fn coverage_worlds(project_path: Option<&Path>) -> Vec<String> {
@@ -2882,7 +3229,7 @@ fn coverage_function_for_target(
         {
             ("defasync".to_string(), "unsupported".to_string(), Some(msg))
         } else {
-            ("defasync".to_string(), "proven_async".to_string(), None)
+            ("defasync".to_string(), "supported_async".to_string(), None)
         }
     } else if !target.has_contracts {
         (
@@ -2913,18 +3260,18 @@ fn coverage_function_for_target(
     } else if recursion.kind == RecursionKind::SelfRecursive {
         (
             "defn".to_string(),
-            "proven_recursive".to_string(),
+            "supported_recursive".to_string(),
             Some(format!(
                 "self-recursive target with {} decreases clause(s)",
                 target.decreases_count
             )),
         )
     } else {
-        ("defn".to_string(), "proven".to_string(), None)
+        ("defn".to_string(), "supported".to_string(), None)
     };
     let prove_supported = matches!(
         status.as_str(),
-        "proven" | "proven_recursive" | "proven_async"
+        "supported" | "supported_recursive" | "supported_async"
     );
 
     VerifyCoverageFunction {
@@ -2936,7 +3283,7 @@ fn coverage_function_for_target(
             &target.result,
             target.result_brand.as_deref(),
         )),
-        proof_summary: Some(function_proof_summary(target, recursion, prove_supported)),
+        support_summary: Some(function_support_summary(target, recursion, prove_supported)),
         decl_sha256_hex: Some(target.decl_sha256_hex.clone()),
         source_path: Some(target.source_path.display().to_string()),
         details,
@@ -2948,6 +3295,7 @@ fn coverage_report_for_entry(
     project_path: Option<&Path>,
     _target: &TargetSig,
     imported_summary_index: &ImportedSummaryIndex,
+    proof_summaries_required: bool,
 ) -> Result<CoverageAnalysis> {
     let cwd = std::env::current_dir().context("get cwd")?;
     let module_roots = resolve_module_roots(&cwd, project_path, &args.module_root)?;
@@ -2967,18 +3315,22 @@ fn coverage_report_for_entry(
             continue;
         }
 
-        if let Some(kind) = primitive_catalog.get(&symbol) {
+        if let Some(primitive) = primitive_catalog.get(&symbol) {
             functions.insert(
                 symbol.clone(),
                 VerifyCoverageFunction {
                     symbol,
-                    kind: kind.clone(),
+                    kind: if primitive.kind == "builtin" {
+                        "builtin".to_string()
+                    } else {
+                        "imported".to_string()
+                    },
                     status: "trusted_primitive".to_string(),
                     signature: None,
-                    proof_summary: None,
+                    support_summary: None,
                     decl_sha256_hex: None,
                     source_path: None,
-                    details: None,
+                    details: primitive.note.clone(),
                 },
             );
             continue;
@@ -2994,7 +3346,7 @@ fn coverage_report_for_entry(
                     })
                     .and_then(|module| module.decls.get(&symbol));
                 if let Some(decl) = current_decl {
-                    let summary_decl_sha = imported.function.decl_sha256_hex.as_deref();
+                    let summary_decl_sha = Some(imported.function.decl_sha256_hex.as_str());
                     if summary_decl_sha != Some(decl.decl_sha256_hex.as_str()) {
                         diagnostics.push(diag_verify(
                             "X07V_SUMMARY_MISMATCH",
@@ -3041,10 +3393,11 @@ fn coverage_report_for_entry(
 
         let Some((module_id, _)) = symbol.rsplit_once('.') else {
             diagnostics.push(diag_verify(
-                "X07V_SUMMARY_MISSING",
+                missing_summary_code(proof_summaries_required),
                 format!(
-                    "reachable symbol {:?} could not be resolved and no imported summary was supplied",
-                    symbol
+                    "reachable symbol {:?} could not be resolved and no imported {} was supplied",
+                    symbol,
+                    missing_summary_label(proof_summaries_required)
                 ),
             ));
             functions.insert(
@@ -3054,13 +3407,13 @@ fn coverage_report_for_entry(
                     kind: "imported".to_string(),
                     status: "unsupported".to_string(),
                     signature: None,
-                    proof_summary: None,
+                    support_summary: None,
                     decl_sha256_hex: None,
                     source_path: None,
-                    details: Some(
-                        "symbol is not fully qualified and no imported summary was supplied"
-                            .to_string(),
-                    ),
+                    details: Some(format!(
+                        "symbol is not fully qualified and no imported {} was supplied",
+                        missing_summary_label(proof_summaries_required)
+                    )),
                 },
             );
             continue;
@@ -3077,7 +3430,7 @@ fn coverage_report_for_entry(
                         kind: "builtin".to_string(),
                         status: "trusted_primitive".to_string(),
                         signature: None,
-                        proof_summary: None,
+                        support_summary: None,
                         decl_sha256_hex: None,
                         source_path: None,
                         details: None,
@@ -3087,10 +3440,11 @@ fn coverage_report_for_entry(
             }
             Err(err) => {
                 diagnostics.push(diag_verify(
-                    "X07V_SUMMARY_MISSING",
+                    missing_summary_code(proof_summaries_required),
                     format!(
-                        "reachable symbol {:?} could not be resolved and no imported summary was supplied: {err}",
-                        symbol
+                        "reachable symbol {:?} could not be resolved and no imported {} was supplied: {err}",
+                        symbol,
+                        missing_summary_label(proof_summaries_required)
                     ),
                 ));
                 functions.insert(
@@ -3100,11 +3454,12 @@ fn coverage_report_for_entry(
                         kind: "imported".to_string(),
                         status: "unsupported".to_string(),
                         signature: None,
-                        proof_summary: None,
+                        support_summary: None,
                         decl_sha256_hex: None,
                         source_path: None,
                         details: Some(format!(
-                            "{err}; no imported summary was supplied for this reachable symbol"
+                            "{err}; no imported {} was supplied for this reachable symbol",
+                            missing_summary_label(proof_summaries_required)
                         )),
                     },
                 );
@@ -3120,7 +3475,7 @@ fn coverage_report_for_entry(
                         kind: "builtin".to_string(),
                         status: "trusted_primitive".to_string(),
                         signature: None,
-                        proof_summary: None,
+                        support_summary: None,
                         decl_sha256_hex: None,
                         source_path: None,
                         details: None,
@@ -3129,10 +3484,11 @@ fn coverage_report_for_entry(
                 continue;
             }
             diagnostics.push(diag_verify(
-                "X07V_SUMMARY_MISSING",
+                missing_summary_code(proof_summaries_required),
                 format!(
-                    "reachable symbol {:?} was not present in the loaded module graph and no imported summary was supplied",
-                    symbol
+                    "reachable symbol {:?} was not present in the loaded module graph and no imported {} was supplied",
+                    symbol,
+                    missing_summary_label(proof_summaries_required)
                 ),
             ));
             functions.insert(
@@ -3142,13 +3498,13 @@ fn coverage_report_for_entry(
                     kind: "imported".to_string(),
                     status: "unsupported".to_string(),
                     signature: None,
-                    proof_summary: None,
+                    support_summary: None,
                     decl_sha256_hex: None,
                     source_path: None,
-                    details: Some(
-                        "referenced symbol could not be resolved in the loaded module graph and no imported summary was supplied"
-                            .to_string(),
-                    ),
+                    details: Some(format!(
+                        "referenced symbol could not be resolved in the loaded module graph and no imported {} was supplied",
+                        missing_summary_label(proof_summaries_required)
+                    )),
                 },
             );
             continue;
@@ -3170,7 +3526,7 @@ fn coverage_report_for_entry(
                         &decl.result,
                         decl.result_brand.as_deref(),
                     )),
-                    proof_summary: None,
+                    support_summary: None,
                     decl_sha256_hex: Some(decl.decl_sha256_hex.clone()),
                     source_path: Some(decl.source_path.display().to_string()),
                     details: Some(format!(
@@ -3196,7 +3552,7 @@ fn coverage_report_for_entry(
             kind: "builtin".to_string(),
             status: "trusted_scheduler_model".to_string(),
             signature: None,
-            proof_summary: None,
+            support_summary: None,
             decl_sha256_hex: None,
             source_path: None,
             details: Some(model.guarantees.join("; ")),
@@ -3244,7 +3600,7 @@ fn coverage_report_fallback(
         Some(details)
             if matches!(
                 function.status.as_str(),
-                "proven" | "proven_recursive" | "proven_async"
+                "supported" | "supported_recursive" | "supported_async"
             ) =>
         {
             function.status = "unsupported".to_string();
@@ -3287,7 +3643,7 @@ fn coverage_function_for_decl(
                 &decl.result,
                 decl.result_brand.as_deref(),
             )),
-            proof_summary: None,
+            support_summary: None,
             decl_sha256_hex: Some(decl.decl_sha256_hex.clone()),
             source_path,
             details: Some(
@@ -3323,13 +3679,13 @@ fn coverage_function_for_decl(
 fn summarize_coverage_functions(functions: &[VerifyCoverageFunction]) -> VerifyCoverageSummary {
     VerifyCoverageSummary {
         reachable_defn: functions.iter().filter(|f| f.kind == "defn").count() as u64,
-        proven_defn: functions
+        supported_defn: functions
             .iter()
             .filter(|f| {
                 f.kind == "defn"
                     && matches!(
                         f.status.as_str(),
-                        "proven" | "proven_recursive" | "imported_summary"
+                        "supported" | "supported_recursive" | "imported_proof_summary"
                     )
             })
             .count() as u64,
@@ -3337,24 +3693,27 @@ fn summarize_coverage_functions(functions: &[VerifyCoverageFunction]) -> VerifyC
             .iter()
             .filter(|f| {
                 f.kind == "defn"
-                    && f.proof_summary
+                    && f.support_summary
                         .as_ref()
                         .is_some_and(|summary| summary.recursion_kind != "none")
             })
             .count() as u64,
-        proven_recursive_defn: functions
+        supported_recursive_defn: functions
             .iter()
             .filter(|f| {
                 f.kind == "defn"
-                    && matches!(f.status.as_str(), "proven_recursive" | "imported_summary")
-                    && f.proof_summary
+                    && matches!(
+                        f.status.as_str(),
+                        "supported_recursive" | "imported_proof_summary"
+                    )
+                    && f.support_summary
                         .as_ref()
                         .is_some_and(|summary| summary.recursion_kind == "self_recursive")
             })
             .count() as u64,
-        imported_summary_defn: functions
+        imported_proof_summary_defn: functions
             .iter()
-            .filter(|f| f.kind == "defn" && f.status == "imported_summary")
+            .filter(|f| f.kind == "defn" && f.status == "imported_proof_summary")
             .count() as u64,
         termination_proven_defn: functions
             .iter()
@@ -3365,15 +3724,15 @@ fn summarize_coverage_functions(functions: &[VerifyCoverageFunction]) -> VerifyC
             .filter(|f| {
                 f.kind == "defn"
                     && f.status == "unsupported"
-                    && f.proof_summary
+                    && f.support_summary
                         .as_ref()
                         .is_some_and(|summary| summary.recursion_kind != "none")
             })
             .count() as u64,
         reachable_async: functions.iter().filter(|f| f.kind == "defasync").count() as u64,
-        proven_async: functions
+        supported_async: functions
             .iter()
-            .filter(|f| f.kind == "defasync" && f.status == "proven_async")
+            .filter(|f| f.kind == "defasync" && f.status == "supported_async")
             .count() as u64,
         trusted_primitives: functions
             .iter()
@@ -4203,6 +4562,7 @@ fn trusted_primitive_stubs_for_prove(
             project_path,
             target,
             &ImportedSummaryIndex::default(),
+            false,
         )?;
         &owned_analysis.coverage
     };
@@ -4713,7 +5073,9 @@ fn verify_cex_to_pretty_canon_bytes(cex: &VerifyCex) -> Result<Vec<u8>> {
     report_common::canonical_pretty_json_bytes(&v).context("canon verify cex JSON")
 }
 
-fn verify_summary_to_pretty_canon_bytes(summary: &VerifySummary) -> Result<Vec<u8>> {
+fn verify_summary_to_pretty_canon_bytes(
+    summary: &VerifyCoverageSummaryArtifact,
+) -> Result<Vec<u8>> {
     let v = serde_json::to_value(summary).context("serialize verify summary JSON")?;
     let diags = validate_verify_summary_schema(&v)?;
     if !diags.is_empty() {
@@ -4730,8 +5092,9 @@ fn write_verify_summary_artifact(
     coverage: &VerifyCoverage,
     imported_summaries: &[VerifyImportedSummaryRef],
 ) -> Result<()> {
-    let summary = VerifySummary {
+    let summary = VerifyCoverageSummaryArtifact {
         schema_version: X07_VERIFY_SUMMARY_SCHEMA_VERSION.to_string(),
+        summary_kind: "coverage_support".to_string(),
         entry: coverage.entry.clone(),
         worlds: coverage.worlds.clone(),
         summary: coverage.summary.clone(),
@@ -4741,6 +5104,269 @@ fn write_verify_summary_artifact(
     let bytes = verify_summary_to_pretty_canon_bytes(&summary)?;
     util::write_atomic(path, &bytes)
         .with_context(|| format!("write verify summary: {}", path.display()))
+}
+
+fn verify_proof_summary_to_pretty_canon_bytes(
+    summary: &VerifyProofSummaryArtifact,
+) -> Result<Vec<u8>> {
+    let v = serde_json::to_value(summary).context("serialize verify proof summary JSON")?;
+    let diags = validate_verify_proof_summary_schema(&v)?;
+    if !diags.is_empty() {
+        anyhow::bail!(
+            "internal error: verify proof summary JSON is not schema-valid: {}",
+            diags[0].message
+        );
+    }
+    report_common::canonical_pretty_json_bytes(&v).context("canon verify proof summary JSON")
+}
+
+fn write_verify_proof_summary_artifact(
+    path: &Path,
+    summary: &VerifyProofSummaryArtifact,
+) -> Result<Vec<u8>> {
+    let bytes = verify_proof_summary_to_pretty_canon_bytes(summary)?;
+    util::write_atomic(path, &bytes)
+        .with_context(|| format!("write verify proof summary: {}", path.display()))?;
+    Ok(bytes)
+}
+
+fn verify_proof_object_to_pretty_canon_bytes(object: &VerifyProofObject) -> Result<Vec<u8>> {
+    let v = serde_json::to_value(object).context("serialize verify proof object JSON")?;
+    let diags = report_common::validate_schema(
+        X07_VERIFY_PROOF_OBJECT_SCHEMA_BYTES,
+        "spec/x07-verify.proof-object.schema.json",
+        &v,
+    )?;
+    if !diags.is_empty() {
+        anyhow::bail!(
+            "internal error: verify proof object JSON is not schema-valid: {}",
+            diags[0].message
+        );
+    }
+    report_common::canonical_pretty_json_bytes(&v).context("canon verify proof object JSON")
+}
+
+fn verify_proof_check_report_to_pretty_canon_bytes(
+    report: &VerifyProofCheckReport,
+) -> Result<Vec<u8>> {
+    let v = serde_json::to_value(report).context("serialize verify proof-check report JSON")?;
+    let diags = report_common::validate_schema(
+        X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_BYTES,
+        "spec/x07-verify.proof-check.report.schema.json",
+        &v,
+    )?;
+    if !diags.is_empty() {
+        anyhow::bail!(
+            "internal error: verify proof-check report JSON is not schema-valid: {}",
+            diags[0].message
+        );
+    }
+    report_common::canonical_pretty_json_bytes(&v).context("canon verify proof-check report JSON")
+}
+
+fn proof_summary_bundle_path(dir: &Path) -> PathBuf {
+    dir.join("verify.proof-summary.json")
+}
+
+fn proof_obligation_bundle_path(dir: &Path) -> PathBuf {
+    dir.join("verify.smt2")
+}
+
+fn proof_solver_transcript_bundle_path(dir: &Path) -> PathBuf {
+    dir.join("z3.out.txt")
+}
+
+fn proof_check_report_path(proof_path: &Path) -> PathBuf {
+    let stem = proof_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("proof");
+    proof_path.with_file_name(format!("{stem}.check.json"))
+}
+
+fn write_prove_bundle_artifacts(
+    proof_path: &Path,
+    proof_summary_artifact: &VerifyProofSummaryArtifact,
+    smt2_path: &Path,
+    z3_out_path: &Path,
+) -> Result<(Artifacts, VerifyProofSummaryArtifact)> {
+    let bundle_dir = proof_path.parent().unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(bundle_dir)
+        .with_context(|| format!("create proof bundle dir: {}", bundle_dir.display()))?;
+
+    let proof_summary_path = proof_summary_bundle_path(bundle_dir);
+    let proof_summary_bytes =
+        write_verify_proof_summary_artifact(&proof_summary_path, proof_summary_artifact)?;
+    let proof_summary_digest = format!("sha256:{}", util::sha256_hex(&proof_summary_bytes));
+
+    let smt2_bytes =
+        std::fs::read(smt2_path).with_context(|| format!("read smt2: {}", smt2_path.display()))?;
+    let proof_obligation_path = proof_obligation_bundle_path(bundle_dir);
+    util::write_atomic(&proof_obligation_path, &smt2_bytes).with_context(|| {
+        format!(
+            "write proof obligation: {}",
+            proof_obligation_path.display()
+        )
+    })?;
+
+    let solver_bytes = std::fs::read(z3_out_path)
+        .with_context(|| format!("read solver transcript: {}", z3_out_path.display()))?;
+    let solver_transcript_path = proof_solver_transcript_bundle_path(bundle_dir);
+    util::write_atomic(&solver_transcript_path, &solver_bytes).with_context(|| {
+        format!(
+            "write solver transcript: {}",
+            solver_transcript_path.display()
+        )
+    })?;
+
+    let object = VerifyProofObject {
+        schema_version: X07_VERIFY_PROOF_OBJECT_SCHEMA_VERSION.to_string(),
+        symbol: proof_summary_artifact.symbol.clone(),
+        kind: proof_summary_artifact.kind.clone(),
+        decl_sha256_hex: proof_summary_artifact.decl_sha256_hex.clone(),
+        engine: proof_summary_artifact.engine.clone(),
+        proof_summary_digest: proof_summary_digest.clone(),
+        obligation_digest: format!("sha256:{}", util::sha256_hex(&smt2_bytes)),
+        solver_transcript_digest: format!("sha256:{}", util::sha256_hex(&solver_bytes)),
+    };
+    let object_bytes = verify_proof_object_to_pretty_canon_bytes(&object)?;
+    util::write_atomic(proof_path, &object_bytes)
+        .with_context(|| format!("write proof object: {}", proof_path.display()))?;
+
+    let proof_object_digest = format!("sha256:{}", util::sha256_hex(&object_bytes));
+    let updated_summary = VerifyProofSummaryArtifact {
+        proof_object_digest: Some(proof_object_digest.clone()),
+        ..proof_summary_artifact.clone()
+    };
+    let updated_summary_bytes =
+        write_verify_proof_summary_artifact(&proof_summary_path, &updated_summary)?;
+    let updated_proof_summary_digest =
+        format!("sha256:{}", util::sha256_hex(&updated_summary_bytes));
+    let updated_object = VerifyProofObject {
+        proof_summary_digest: updated_proof_summary_digest,
+        ..object
+    };
+    let updated_object_bytes = verify_proof_object_to_pretty_canon_bytes(&updated_object)?;
+    util::write_atomic(proof_path, &updated_object_bytes)
+        .with_context(|| format!("rewrite proof object: {}", proof_path.display()))?;
+
+    let check_report = check_proof_object_path(proof_path)?;
+    let check_report_path = proof_check_report_path(proof_path);
+    let check_report_bytes = verify_proof_check_report_to_pretty_canon_bytes(&check_report)?;
+    util::write_atomic(&check_report_path, &check_report_bytes)
+        .with_context(|| format!("write proof-check report: {}", check_report_path.display()))?;
+
+    Ok((
+        Artifacts {
+            verify_proof_summary_path: Some(proof_summary_path.display().to_string()),
+            proof_object_path: Some(proof_path.display().to_string()),
+            proof_check_report_path: Some(check_report_path.display().to_string()),
+            ..Artifacts::default()
+        },
+        updated_summary,
+    ))
+}
+
+pub(crate) fn check_proof_object_path(proof_path: &Path) -> Result<VerifyProofCheckReport> {
+    let proof_bytes = std::fs::read(proof_path)
+        .with_context(|| format!("read proof object: {}", proof_path.display()))?;
+    let proof_digest = format!("sha256:{}", util::sha256_hex(&proof_bytes));
+    let value: Value = match serde_json::from_slice(&proof_bytes) {
+        Ok(value) => value,
+        Err(err) => {
+            return Ok(rejected_proof_check_report(
+                proof_digest,
+                "X07PROOF_EOBJECT_INVALID",
+                format!("parse proof object JSON {}: {err:#}", proof_path.display()),
+            ));
+        }
+    };
+    let diags = report_common::validate_schema(
+        X07_VERIFY_PROOF_OBJECT_SCHEMA_BYTES,
+        "spec/x07-verify.proof-object.schema.json",
+        &value,
+    )?;
+    if !diags.is_empty() {
+        return Ok(rejected_proof_check_report(
+            proof_digest,
+            "X07PROOF_EOBJECT_INVALID",
+            format!(
+                "proof object schema invalid for {}: {}",
+                proof_path.display(),
+                diags[0].message
+            ),
+        ));
+    }
+    let object: VerifyProofObject = match serde_json::from_value(value) {
+        Ok(object) => object,
+        Err(err) => {
+            return Ok(rejected_proof_check_report(
+                proof_digest,
+                "X07PROOF_EOBJECT_INVALID",
+                format!("decode proof object JSON {}: {err:#}", proof_path.display()),
+            ));
+        }
+    };
+    let bundle_dir = proof_path.parent().unwrap_or_else(|| Path::new("."));
+    let proof_summary_path = proof_summary_bundle_path(bundle_dir);
+    let smt2_path = proof_obligation_bundle_path(bundle_dir);
+    let z3_out_path = proof_solver_transcript_bundle_path(bundle_dir);
+    let summary_bytes = match std::fs::read(&proof_summary_path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            return Ok(rejected_proof_check_report(
+                proof_digest,
+                "X07PROOF_ECHECK_FAILED",
+                format!(
+                    "read proof summary {}: {err:#}",
+                    proof_summary_path.display()
+                ),
+            ));
+        }
+    };
+    let smt2_bytes = match std::fs::read(&smt2_path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            return Ok(rejected_proof_check_report(
+                proof_digest,
+                "X07PROOF_ECHECK_FAILED",
+                format!("read smt2 {}: {err:#}", smt2_path.display()),
+            ));
+        }
+    };
+    let solver_bytes = match std::fs::read(&z3_out_path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            return Ok(rejected_proof_check_report(
+                proof_digest,
+                "X07PROOF_ECHECK_FAILED",
+                format!("read solver transcript {}: {err:#}", z3_out_path.display()),
+            ));
+        }
+    };
+    let accepted = object.proof_summary_digest
+        == format!("sha256:{}", util::sha256_hex(&summary_bytes))
+        && object.obligation_digest == format!("sha256:{}", util::sha256_hex(&smt2_bytes))
+        && object.solver_transcript_digest == format!("sha256:{}", util::sha256_hex(&solver_bytes));
+    if accepted {
+        Ok(VerifyProofCheckReport {
+            schema_version: X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION.to_string(),
+            ok: true,
+            proof_object_digest: proof_digest,
+            checker: "x07.proof_bundle_checker".to_string(),
+            result: "accepted".to_string(),
+            diagnostics: Vec::new(),
+        })
+    } else {
+        Ok(rejected_proof_check_report(
+            proof_digest,
+            "X07PROOF_ECHECK_FAILED",
+            format!(
+                "independent proof check rejected {} because at least one bundle digest did not match",
+                proof_path.display()
+            ),
+        ))
+    }
 }
 
 impl VerifyReport {
@@ -5175,6 +5801,17 @@ fn validate_verify_summary_schema(value: &Value) -> Result<Vec<x07c::diagnostics
     Ok(diags)
 }
 
+fn validate_verify_proof_summary_schema(
+    value: &Value,
+) -> Result<Vec<x07c::diagnostics::Diagnostic>> {
+    let diags = report_common::validate_schema(
+        X07_VERIFY_PROOF_SUMMARY_SCHEMA_BYTES,
+        "spec/x07-verify.proof-summary.schema.json",
+        value,
+    )?;
+    Ok(diags)
+}
+
 fn mode_count(args: &VerifyArgs) -> usize {
     [args.bmc, args.smt, args.prove, args.coverage]
         .into_iter()
@@ -5196,10 +5833,14 @@ fn selected_mode(args: &VerifyArgs) -> Option<Mode> {
     }
 }
 
-fn diag_verify(code: &str, message: impl Into<String>) -> x07c::diagnostics::Diagnostic {
+fn diag_verify_with_severity(
+    code: &str,
+    severity: x07c::diagnostics::Severity,
+    message: impl Into<String>,
+) -> x07c::diagnostics::Diagnostic {
     x07c::diagnostics::Diagnostic {
         code: code.to_string(),
-        severity: x07c::diagnostics::Severity::Error,
+        severity,
         stage: x07c::diagnostics::Stage::Run,
         message: message.into(),
         loc: None,
@@ -5210,11 +5851,35 @@ fn diag_verify(code: &str, message: impl Into<String>) -> x07c::diagnostics::Dia
     }
 }
 
+fn diag_verify(code: &str, message: impl Into<String>) -> x07c::diagnostics::Diagnostic {
+    diag_verify_with_severity(code, x07c::diagnostics::Severity::Error, message)
+}
+
+fn diag_verify_warning(code: &str, message: impl Into<String>) -> x07c::diagnostics::Diagnostic {
+    diag_verify_with_severity(code, x07c::diagnostics::Severity::Warning, message)
+}
+
+fn rejected_proof_check_report(
+    proof_object_digest: String,
+    code: &str,
+    message: String,
+) -> VerifyProofCheckReport {
+    VerifyProofCheckReport {
+        schema_version: X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION.to_string(),
+        ok: false,
+        proof_object_digest,
+        checker: "x07.proof_bundle_checker".to_string(),
+        result: "rejected".to_string(),
+        diagnostics: vec![diag_verify(code, message)],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
     use std::io::Write as _;
+    use std::path::Path;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static FAKE_COMMAND_SEQ: AtomicU64 = AtomicU64::new(0);
@@ -5243,6 +5908,59 @@ mod tests {
             std::fs::set_permissions(&path, perms).expect("chmod");
         }
         path
+    }
+
+    fn temp_test_dir(label: &str) -> PathBuf {
+        let seq = FAKE_COMMAND_SEQ.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "x07_verify_tests_{}_{}_{}",
+            label,
+            std::process::id(),
+            seq
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    fn write_module(path: &Path, module_id: &str, imports: &[&str], decls: Vec<Value>) {
+        std::fs::write(
+            path,
+            serde_json::to_vec_pretty(&json!({
+                "schema_version": X07AST_SCHEMA_VERSION,
+                "kind": "module",
+                "module_id": module_id,
+                "imports": imports,
+                "decls": decls
+            }))
+            .expect("serialize module"),
+        )
+        .expect("write module");
+    }
+
+    fn write_valid_proof_bundle(dir: &Path) -> PathBuf {
+        let proof_path = dir.join("proof.json");
+        let smt2_path = dir.join("source.smt2");
+        let solver_path = dir.join("source.z3.out.txt");
+        std::fs::write(&smt2_path, "(set-logic AUFBV)\n(check-sat)\n").expect("write smt2");
+        std::fs::write(&solver_path, "sat\n").expect("write solver transcript");
+        let summary = VerifyProofSummaryArtifact {
+            schema_version: X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION.to_string(),
+            summary_kind: "proof".to_string(),
+            symbol: "example.main".to_string(),
+            kind: "defn".to_string(),
+            decl_sha256_hex: "11".repeat(32),
+            result_kind: "proven".to_string(),
+            engine: "z3".to_string(),
+            recursion_kind: "none".to_string(),
+            recursion_bound_kind: "none".to_string(),
+            dependency_symbols: Vec::new(),
+            proof_object_digest: None,
+            assumptions: Vec::new(),
+        };
+        write_prove_bundle_artifacts(&proof_path, &summary, &smt2_path, &solver_path)
+            .expect("write proof bundle");
+        proof_path
     }
 
     #[test]
@@ -5659,5 +6377,127 @@ exit 1
         std::fs::write(&path, "(set-logic QF_AUFBV)\n(check-sat)\n").expect("write smt2");
         assert!(smt2_has_solver_query(&path).expect("check present query"));
         std::fs::remove_dir_all(&dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn load_imported_summary_index_rejects_coverage_summary_as_proof() {
+        let dir = temp_test_dir("coverage_summary_forbidden");
+        let summary_path = dir.join("verify.summary.json");
+        let coverage = VerifyCoverage {
+            schema_version: X07_VERIFY_COVERAGE_SCHEMA_VERSION,
+            entry: "example.main".to_string(),
+            worlds: vec!["solve-pure".to_string()],
+            summary: VerifyCoverageSummary {
+                reachable_defn: 1,
+                supported_defn: 1,
+                recursive_defn: 0,
+                supported_recursive_defn: 0,
+                imported_proof_summary_defn: 0,
+                termination_proven_defn: 0,
+                unsupported_recursive_defn: 0,
+                reachable_async: 0,
+                supported_async: 0,
+                trusted_primitives: 0,
+                trusted_scheduler_models: 0,
+                capsule_boundaries: 0,
+                uncovered_defn: 0,
+                unsupported_defn: 0,
+                async_model: None,
+            },
+            functions: Vec::new(),
+        };
+        write_verify_summary_artifact(&summary_path, &coverage, &[]).expect("write summary");
+
+        let diagnostics =
+            load_imported_summary_index(Path::new("."), &[summary_path]).expect_err("reject");
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(diagnostics[0].code, "X07V_COVERAGE_NOT_PROOF");
+        assert_eq!(
+            diagnostics[0].severity,
+            x07c::diagnostics::Severity::Warning
+        );
+        assert_eq!(diagnostics[1].code, "X07V_COVERAGE_SUMMARY_FORBIDDEN");
+
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn coverage_report_for_entry_requires_proof_summary_in_prove_mode() {
+        let dir = temp_test_dir("proof_summary_required");
+        write_module(
+            &dir.join("app.x07.json"),
+            "app",
+            &[],
+            vec![
+                json!({"kind":"export","names":["app.main"]}),
+                json!({
+                    "kind":"defn",
+                    "name":"app.main",
+                    "params": [],
+                    "result":"i32",
+                    "body": ["vendor.dep.helper"]
+                }),
+            ],
+        );
+        let args = VerifyArgs {
+            bmc: false,
+            smt: false,
+            prove: true,
+            coverage: false,
+            entry: "app.main".to_string(),
+            project: None,
+            module_root: vec![dir.clone()],
+            unwind: 8,
+            max_bytes_len: 16,
+            artifact_dir: None,
+            summary: Vec::new(),
+            allow_imported_stubs: false,
+            emit_proof: None,
+        };
+        let target = load_target_info(std::slice::from_ref(&dir), "app.main").expect("target");
+        let analysis =
+            coverage_report_for_entry(&args, None, &target, &ImportedSummaryIndex::default(), true)
+                .expect("coverage analysis");
+
+        assert!(
+            analysis
+                .diagnostics
+                .iter()
+                .any(|diag| diag.code == "X07V_PROOF_SUMMARY_REQUIRED"),
+            "{:?}",
+            analysis.diagnostics
+        );
+
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn check_proof_object_path_reports_invalid_object_diagnostic() {
+        let dir = temp_test_dir("invalid_proof_object");
+        let proof_path = dir.join("proof.json");
+        std::fs::write(&proof_path, "{}\n").expect("write proof object");
+
+        let report = check_proof_object_path(&proof_path).expect("check proof");
+        assert!(!report.ok);
+        assert_eq!(report.result, "rejected");
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(report.diagnostics[0].code, "X07PROOF_EOBJECT_INVALID");
+
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn check_proof_object_path_reports_rejected_check_diagnostic() {
+        let dir = temp_test_dir("proof_check_failed");
+        let proof_path = write_valid_proof_bundle(&dir);
+        std::fs::write(dir.join("z3.out.txt"), "unsat\n").expect("tamper solver transcript");
+
+        let report = check_proof_object_path(&proof_path).expect("check proof");
+        assert!(!report.ok);
+        assert_eq!(report.result, "rejected");
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(report.diagnostics[0].code, "X07PROOF_ECHECK_FAILED");
+
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
     }
 }

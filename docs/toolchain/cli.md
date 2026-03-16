@@ -43,7 +43,7 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Official lifecycle control still flows through the official `io.x07/x07lang-mcp` server via capability-gated tools such as `lp.query_v1` and `lp.control_v1`; `x07` does not duplicate platform runtime actions here.
   - Forge-style clients should treat the public `lp.control.action.result@0.1.0`, `lp.deploy.query.result@0.1.0`, `lp.environment.list.result@0.1.0`, `lp.incident.query.result@0.2.0`, and `lp.regression.run.result@0.2.0` outputs as the stable lifecycle read surface.
 
-### WASM tooling (Phases 0–10)
+### WASM tooling
 
 - `x07 wasm [ARGS...]`
   - Delegates to `x07-wasm` on PATH.
@@ -92,7 +92,7 @@ For platform-facing remote deploy workflows, the supported wasm contract surface
 - `x07 wasm slo eval`
 - `x07 wasm app regress from-incident`
 
-See: [WASM (Phases 0–10)](wasm.md).
+See: [WASM](wasm.md).
 
 ### Doctor (platform prerequisites)
 
@@ -181,8 +181,8 @@ See: [Architecture check](arch-check.md).
 - `x07 review diff --from <path> --to <path> --html-out <path>`
 - `x07 review diff --from <path> --to <path> --html-out <path> --json-out <path>`
   - Produces an intent-level semantic diff for x07AST/project/arch/policy changes.
-  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|recursion-proof-coverage-decrease|async-proof-coverage-decrease|summary-downgrade|boundary-relaxation|trusted-subset-expansion|capsule-contract-relaxation|capsule-set-change|sandbox-policy-widen|runtime-attestation-regression|weaker-isolation-enabled|network-allowlist-widen|peer-policy-relaxation|capsule-network-surface-widen|package-set-change|lockfile-hash-change|advisory-allowance-enabled`.
-  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.4.0"`).
+  - Supports CI gates via `--fail-on world-capability|budget-increase|allow-unsafe|allow-ffi|proof-coverage-decrease|recursion-proof-coverage-decrease|async-proof-coverage-decrease|summary-downgrade|assumption-surface-widen|dev-only-assumption-introduced|bounded-proof-introduced|coverage-summary-imported|operational-entry-diverges|boundary-relaxation|trusted-subset-expansion|capsule-contract-relaxation|capsule-set-change|sandbox-policy-widen|runtime-attestation-regression|weaker-isolation-enabled|network-allowlist-widen|peer-policy-relaxation|capsule-network-surface-widen|package-set-change|lockfile-hash-change|advisory-allowance-enabled`.
+  - JSON schema: `spec/x07-review.diff.schema.json` (`schema_version: "x07.review.diff@0.5.0"`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -198,13 +198,19 @@ See: [Review & trust artifacts](review-trust.md).
   - JSON schema: `spec/x07-trust.report.schema.json` (`schema_version: "x07.trust.report@0.1.0"`).
 - `x07 trust profile check --profile arch/trust/profiles/verified_core_pure_v1.json --project x07.json --entry <sym>`
   - Validates a certification profile against the current project posture.
-  - Built-in profile line: `verified_core_pure_v1`, `trusted_program_sandboxed_local_v1`, `trusted_program_sandboxed_net_v1`, and `certified_capsule_v1` (`x07.trust.profile@0.3.0`).
+  - Built-in profile line: `verified_core_pure_v1`, `trusted_program_sandboxed_local_v1`, `trusted_program_sandboxed_net_v1`, and `certified_capsule_v1` (`x07.trust.profile@0.4.0`).
+  - Strong profiles validate `project.operational_entry_symbol`, optional `project.certification_entry_symbol`, per-symbol prove requirements, and coverage-import policy before certification starts.
 - `x07 trust capsule check --index arch/capsules/index.x07capsule.json --project x07.json`
   - Validates a capsule index plus referenced contracts/attestations.
 - `x07 trust capsule attest --contract <path> --module <path>... --lockfile x07.lock.json --conformance-report <path> --out <path>`
   - Emits a deterministic `x07.capsule.attest@0.2.0` artifact for a certified capsule.
 - `x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry <sym> --out-dir target/cert`
-  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, trust report, tests report, compile attestation evidence, dependency-closure evidence, and any observed capsule/runtime/peer-policy evidence references (`x07.trust.certificate@0.3.0`).
+  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, proof inventory, proof assumptions, compile attestation evidence, dependency-closure evidence, and any observed capsule/runtime/peer-policy evidence references (`x07.trust.certificate@0.6.0`).
+  - Strong profiles reject surrogate certification entries, coverage-only imports, developer-only imported stubs, and bounded recursive proof usage.
+
+- `x07 prove check --proof <path>`
+  - Independently checks a proof object emitted by `x07 verify --prove --emit-proof`.
+  - JSON schema: `spec/x07-verify.proof-check.report.schema.json` (`schema_version: "x07.verify.proof_check.report@0.1.0"`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -281,7 +287,10 @@ See: [Property-based testing](pbt.md).
   - `--project <path>` (or one/more `--module-root <dir>`)
   - `--unwind <n>` (CBMC loop unwinding bound)
   - `--max-bytes-len <n>` (bound for `bytes` / `bytes_view` params)
-  - `--summary <path>` (import reviewed `verify.summary.json` artifacts)
+  - `--proof-summary <path>` (import reviewed proof-summary artifacts from `x07 verify --prove`)
+  - `--summary <path>` (deprecated alias for `--proof-summary`)
+  - `--allow-imported-stubs` (developer-only proof mode)
+  - `--emit-proof <path>` (emit proof object and proof-check artifacts for independent checking)
 
 Notes:
 
@@ -293,13 +302,16 @@ Notes:
 - `x07 verify` requires at least one contract clause (`requires` / `ensures` / `invariant`) on the target function.
 - `--prove` is the certifiable mode for accepted trust certificates; unsupported targets return `result.kind = "unsupported"`.
 - `--prove` reports include `proof_summary` for the solver engine, recursion kind, `decreases` usage, unwind-bounded recursion, and the reachable dependency symbol set.
-- `--coverage` emits a reachable-closure coverage artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including recursive proof counters plus per-function `proof_summary`, alongside `proven_async`, `trusted_scheduler_model`, and `capsule_boundary` statuses when they apply.
-- `--coverage` and `--prove` emit reusable `verify.summary.json` artifacts (`x07.verify.summary@0.1.0`); pass them back with `--summary <path>` when a reviewed reachable dependency sits outside the currently loaded module roots.
+- `--coverage` emits a reachable-closure support artifact under `coverage` using `spec/x07-verify.coverage.schema.json`, including `supported*` counters plus per-function `support_summary`, alongside `trusted_scheduler_model` and `capsule_boundary` statuses when they apply.
+- `--coverage` and `--prove` emit reusable coverage/support summaries (`x07.verify.summary@0.2.0`, `summary_kind = "coverage_support"`). These are posture artifacts only and do not satisfy proof requirements.
+- Successful `--prove` runs emit reusable proof summaries (`x07.verify.proof_summary@0.2.0`, `summary_kind = "proof"`). Pass them back with `--proof-summary <path>` when a reviewed reachable dependency sits outside the currently loaded module roots.
+- Coverage/support summaries are rejected anywhere proof imports are required.
+- When `--emit-proof <path>` is set, `x07 verify --prove` also emits a proof object plus a proof-check report that `x07 prove check` can verify independently.
 - Async `--prove` failures emit `x07.verify.cex@0.2.0`, including `await_invariant`, `scope_invariant`, and `cancellation_ensures` counterexamples when those checks fail.
 - Artifacts are written under `.x07/artifacts/verify/<mode>/<entry>/` (driver module, emitted C, CBMC output, counterexample/SMT artifacts when present).
 - Async proof coverage is lowered through the trusted scheduler model catalog at `catalog/verify_scheduler_model.json`.
 
-Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.4.0"`).
+Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.7.0"`).
 
 ### Agent correctness benchmarks (`x07bench` JSON)
 
@@ -374,7 +386,7 @@ Notes:
 - Use `x07 pkg lock --project x07.json --check` in CI to fail if `x07.lock.json` is out of date.
 - When the index can be consulted, `x07 pkg lock --check` also fails on yanked dependencies and active advisories unless you explicitly allow them (`--allow-yanked` / `--allow-advisories`).
 - Sparse index reads (including `x07 pkg versions`) may be cached; use `x07 pkg versions --refresh <name>` after publishing to force a cache-busting fetch (HTTP/HTTPS indexes only).
-- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.3.0`; `x07.project@0.2.0` is accepted for legacy manifests but does not support `project.patch`).
+- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical manifest schema: `x07.project@0.4.0`; `x07.project@0.2.0` and `x07.project@0.3.0` are accepted for legacy manifests, but the current certification surfaces use `project.operational_entry_symbol` and related `0.4.0` fields).
 - Some packages may declare required helper packages via `meta.requires_packages`. When present, `x07 pkg lock` may add them to `x07.json` before locking; do not rely on this for correctness (prefer the capability map and templates, which list the full canonical set explicitly).
 
 ### Project check (no emit)

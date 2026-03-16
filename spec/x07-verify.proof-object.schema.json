@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x07.io/spec/x07-verify.proof-object.schema.json",
+  "title": "x07.verify.proof_object@0.1.0",
+  "description": "Independently checkable proof object emitted by `x07 verify --prove --emit-proof`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "symbol",
+    "kind",
+    "decl_sha256_hex",
+    "engine",
+    "proof_summary_digest",
+    "obligation_digest",
+    "solver_transcript_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "x07.verify.proof_object@0.1.0" },
+    "symbol": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "kind": { "type": "string", "enum": ["defn", "defasync"] },
+    "decl_sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "engine": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "proof_summary_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "obligation_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "solver_transcript_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

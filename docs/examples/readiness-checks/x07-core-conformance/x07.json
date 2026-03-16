@@ -1,8 +1,10 @@
 {
-  "schema_version": "x07.project@0.2.0",
+  "schema_version": "x07.project@0.4.0",
   "entry": "src/main.x07.json",
   "world": "solve-pure",
-  "module_roots": ["src"],
+  "module_roots": [
+    "src"
+  ],
   "lockfile": "x07.lock.json",
   "default_profile": "sandbox",
   "profiles": {

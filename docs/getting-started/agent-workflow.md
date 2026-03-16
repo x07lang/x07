@@ -49,7 +49,7 @@ When dependencies change, update and verify the lockfile in the same loop:
 - `x07 pkg lock --project x07.json`
 - `x07 pkg lock --project x07.json --check` (CI gate)
 - When the index can be consulted, `--check` also fails on yanked/advised deps unless explicitly allowed (`--allow-yanked` / `--allow-advisories`).
-- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical schema: `x07.project@0.3.0`; `x07.project@0.2.0` is legacy compatibility only).
+- For transitive dependency overrides, use `project.patch` in `x07.json` (canonical schema: `x07.project@0.4.0`; `x07.project@0.2.0` and `x07.project@0.3.0` are legacy compatibility lines).
 
 If you want a good mental model for “AI-native engineering”, see OpenAI’s Codex guide on building AI-native engineering teams.
 

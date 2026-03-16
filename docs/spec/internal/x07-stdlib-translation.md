@@ -130,7 +130,7 @@ Cons:
 
 #### Tier 2 (more power later): `rustc_driver` typed lowering
 
-The Rust compiler dev guide describes `rustc_driver` as the main entry for running compiler phases and recommends using it where possible. ([Rust Compiler Development Guide][2])
+The Rust compiler dev guide describes `rustc_driver` as the main entry for running compiler stages and recommends using it where possible. ([Rust Compiler Development Guide][2])
 Use this for:
 
 * typed MIR extraction (or HIR)

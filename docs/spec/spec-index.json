@@ -778,8 +778,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-project.schema.json",
       "schema_id": "https://x07.io/spec/x07-project.schema.json",
-      "schema_version": "x07.project@0.3.0",
-      "title": "x07.project@0.3.0"
+      "schema_version": "x07.project@0.4.0",
+      "title": "x07.project@0.4.0"
     },
     {
       "kind": "schema",
@@ -797,10 +797,17 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-project.v0.4.0.schema.json",
+      "schema_id": "https://x07.io/spec/x07-project.v0.4.0.schema.json",
+      "schema_version": "x07.project@0.4.0",
+      "title": "x07.project@0.4.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-review.diff.schema.json",
       "schema_id": "https://x07.io/spec/x07-review.diff.schema.json",
-      "schema_version": "x07.review.diff@0.4.0",
-      "title": "x07.review.diff@0.4.0"
+      "schema_version": "x07.review.diff@0.5.0",
+      "title": "x07.review.diff@0.5.0"
     },
     {
       "kind": "schema",
@@ -1238,6 +1245,20 @@
     },
     {
       "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-prove-check.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-prove-check.report.schema.json",
+      "schema_version": "x07.tool.prove.check.report@0.1.0",
+      "title": "x07.tool.prove.check.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-tool-prove.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-tool-prove.report.schema.json",
+      "schema_version": "x07.tool.prove.report@0.1.0",
+      "title": "x07.tool.prove.report@0.1.0"
+    },
+    {
+      "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-review-diff.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-review-diff.report.schema.json",
       "schema_version": "x07.tool.review.diff.report@0.1.0",
@@ -1408,15 +1429,15 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-trust.certificate.schema.json",
       "schema_id": "https://x07.io/spec/x07-trust.certificate.schema.json",
-      "schema_version": "x07.trust.certificate@0.3.0",
-      "title": "x07.trust.certificate@0.3.0"
+      "schema_version": "x07.trust.certificate@0.6.0",
+      "title": "x07.trust.certificate@0.6.0"
     },
     {
       "kind": "schema",
       "path": "docs/spec/schemas/x07-trust.profile.schema.json",
       "schema_id": "https://x07.io/spec/x07-trust.profile.schema.json",
-      "schema_version": "x07.trust.profile@0.3.0",
-      "title": "x07.trust.profile@0.3.0"
+      "schema_version": "x07.trust.profile@0.4.0",
+      "title": "x07.trust.profile@0.4.0"
     },
     {
       "kind": "schema",
@@ -1436,29 +1457,50 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-verify.coverage.schema.json",
       "schema_id": "https://x07.io/spec/x07-verify.coverage.schema.json",
-      "schema_version": "x07.verify.coverage@0.3.0",
-      "title": "x07.verify.coverage@0.3.0"
+      "schema_version": "x07.verify.coverage@0.4.0",
+      "title": "x07.verify.coverage@0.4.0"
     },
     {
       "kind": "schema",
       "path": "docs/spec/schemas/x07-verify.primitives.schema.json",
       "schema_id": "https://x07.io/spec/x07-verify.primitives.schema.json",
-      "schema_version": "x07.verify.primitives@0.1.0",
-      "title": "x07.verify.primitives@0.1.0"
+      "schema_version": "x07.verify.primitives@0.2.0",
+      "title": "x07.verify.primitives@0.2.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-verify.proof-check.report.schema.json",
+      "schema_id": "https://x07.io/spec/x07-verify.proof-check.report.schema.json",
+      "schema_version": "x07.verify.proof_check.report@0.1.0",
+      "title": "x07.verify.proof_check.report@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-verify.proof-object.schema.json",
+      "schema_id": "https://x07.io/spec/x07-verify.proof-object.schema.json",
+      "schema_version": "x07.verify.proof_object@0.1.0",
+      "title": "x07.verify.proof_object@0.1.0"
+    },
+    {
+      "kind": "schema",
+      "path": "docs/spec/schemas/x07-verify.proof-summary.schema.json",
+      "schema_id": "https://x07.io/spec/x07-verify.proof-summary.schema.json",
+      "schema_version": "x07.verify.proof_summary@0.2.0",
+      "title": "x07.verify.proof_summary@0.2.0"
     },
     {
       "kind": "schema",
       "path": "docs/spec/schemas/x07-verify.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-verify.report.schema.json",
-      "schema_version": "x07.verify.report@0.4.0",
-      "title": "X07 x07 verify report v0.4.0"
+      "schema_version": "x07.verify.report@0.7.0",
+      "title": "X07 x07 verify report v0.7.0"
     },
     {
       "kind": "schema",
       "path": "docs/spec/schemas/x07-verify.summary.schema.json",
       "schema_id": "https://x07.io/spec/x07-verify.summary.schema.json",
-      "schema_version": "x07.verify.summary@0.1.0",
-      "title": "x07.verify.summary@0.1.0"
+      "schema_version": "x07.verify.summary@0.2.0",
+      "title": "x07.verify.summary@0.2.0"
     },
     {
       "kind": "schema",

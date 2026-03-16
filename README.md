@@ -74,13 +74,18 @@ See [`x07lang/x07-perf-compare`](https://github.com/x07lang/x07-perf-compare) fo
 
 X07 exposes formal verification as a public toolchain surface, not an internal experiment.
 
-- `x07 verify` proves contract properties and emits machine-readable proof/coverage artifacts.
+- `x07 verify --coverage` emits reachable support posture for planning and review. Coverage is never proof.
+- `x07 verify --prove` emits machine-readable proof artifacts for certifiable targets.
+- `x07 verify --prove --emit-proof <path>` adds a proof object plus a proof-check report.
+- `x07 prove check` independently re-checks emitted proof objects.
 - `x07 trust capsule` attests effectful capsule boundaries.
 - `x07 pkg attest-closure` freezes the reviewed dependency closure into a deterministic attestation.
-- `x07 trust certify` binds proofs, tests, boundaries, capsules, dependency closure, peer policies, and runtime evidence into a certificate bundle that reviewers can consume directly.
+- `x07 trust certify` binds the operational entry, per-symbol prove inventory, proof assumptions, tests, boundaries, capsules, dependency closure, peer policies, and runtime evidence into a certificate bundle that reviewers can consume directly.
 
-The current certifiable proof subset includes pure self-recursive `defn` targets when they declare `decreases[]`; proof and coverage artifacts expose that recursion posture explicitly instead of hiding it behind a pass/fail bit.
-Imported proof summaries are public artifacts (`x07.verify.summary@0.1.0`): reviewers and downstream prove runs can reuse them through `x07 verify --summary <path>` instead of treating reviewed subgraphs as hidden local state.
+The current certifiable proof subset includes pure self-recursive `defn` targets when they declare `decreases[]`; proof artifacts expose recursion boundedness explicitly instead of hiding it behind a pass/fail bit.
+Imported proof summaries are public artifacts (`x07.verify.proof_summary@0.2.0`): downstream prove runs can reuse them through `x07 verify --proof-summary <path>` or the deprecated `--summary <path>` alias.
+Coverage/support summaries are separate posture artifacts (`x07.verify.summary@0.2.0`, `summary_kind = "coverage_support"`) and are rejected anywhere proof evidence is required.
+Strong trust profiles certify the operational entry named by `project.operational_entry_symbol`, require per-symbol prove artifacts, reject developer-only imported stubs and coverage-only imports, and bind proof inventory, proof assumptions, proof objects, and proof-check reports directly into the certificate.
 Direct prove inputs currently accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` and `result_*`, and schema-derived `bytes_view@brand` documents when the reachable module graph exposes `meta.brands_v1.validate`. That lets proved cores take branded record/tagged-union views directly while keeping validation explicit in the generated driver, and it now admits direct `vec_u8` boundary values without falling back to an unsupported richer-data diagnostic. Owned branded `bytes` and nested result carriers remain outside the current direct prove-input subset.
 The networked sandbox certification line is `trusted_program_sandboxed_net_v1`: it requires attested network capsules, pinned peer-policy files, a non-empty runtime allowlist, dependency-closure attestation, and VM-boundary network enforcement in the runtime attestation.
 On Linux, the prove/certify lanes are exercised against official `cbmc 6.8.0` and `z3 4.16.0`. The Ubuntu 24.04 `universe` packages (`cbmc 5.95.1`, `z3 4.8.12`) are too old for the async proof/certification line. Use `scripts/ci/install_formal_verification_tools_linux.sh` or the checked-in example workflows instead of relying on distro solver packages.
@@ -115,6 +120,11 @@ Canonical certificate-first examples live in:
 - `docs/examples/trusted_network_service_v1/`
 - `docs/examples/certified_capsule_v1/`
 - `docs/examples/certified_network_capsule_v1/`
+
+Additional first-party dogfood examples live in `x07-mcp`:
+
+- `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/` is the package-backed operational-entry example for the sandboxed local trust profile.
+- `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` is a developer/demo example only because its bearer-parser dependency currently relies on a developer-only imported stub path.
 
 ## Ecosystem Overview
 

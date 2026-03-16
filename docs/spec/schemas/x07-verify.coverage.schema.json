@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-verify.coverage.schema.json",
-  "title": "x07.verify.coverage@0.3.0",
-  "description": "Reachable proof-coverage report emitted by `x07 verify --coverage`.",
+  "title": "x07.verify.coverage@0.4.0",
+  "description": "Reachable support and coverage report emitted by `x07 verify --coverage`.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "entry", "worlds", "summary", "functions"],
   "properties": {
-    "schema_version": { "const": "x07.verify.coverage@0.3.0" },
+    "schema_version": { "const": "x07.verify.coverage@0.4.0" },
     "entry": {
       "type": "string",
       "minLength": 1,
@@ -34,10 +34,10 @@
       "additionalProperties": false,
       "required": [
         "reachable_defn",
-        "proven_defn",
+        "supported_defn",
         "reachable_async",
-        "proven_async",
-        "imported_summary_defn",
+        "supported_async",
+        "imported_proof_summary_defn",
         "termination_proven_defn",
         "trusted_primitives",
         "trusted_scheduler_models",
@@ -47,14 +47,14 @@
       ],
       "properties": {
         "reachable_defn": { "type": "integer", "minimum": 0 },
-        "proven_defn": { "type": "integer", "minimum": 0 },
+        "supported_defn": { "type": "integer", "minimum": 0 },
         "recursive_defn": { "type": "integer", "minimum": 0 },
-        "proven_recursive_defn": { "type": "integer", "minimum": 0 },
-        "imported_summary_defn": { "type": "integer", "minimum": 0 },
+        "supported_recursive_defn": { "type": "integer", "minimum": 0 },
+        "imported_proof_summary_defn": { "type": "integer", "minimum": 0 },
         "termination_proven_defn": { "type": "integer", "minimum": 0 },
         "unsupported_recursive_defn": { "type": "integer", "minimum": 0 },
         "reachable_async": { "type": "integer", "minimum": 0 },
-        "proven_async": { "type": "integer", "minimum": 0 },
+        "supported_async": { "type": "integer", "minimum": 0 },
         "trusted_primitives": { "type": "integer", "minimum": 0 },
         "trusted_scheduler_models": { "type": "integer", "minimum": 0 },
         "capsule_boundaries": { "type": "integer", "minimum": 0 },
@@ -83,10 +83,10 @@
           "status": {
             "type": "string",
             "enum": [
-              "proven",
-              "proven_recursive",
-              "proven_async",
-              "imported_summary",
+              "supported",
+              "supported_recursive",
+              "supported_async",
+              "imported_proof_summary",
               "termination_proven",
               "trusted_primitive",
               "trusted_scheduler_model",
@@ -96,7 +96,7 @@
             ]
           },
           "signature": { "$ref": "#/$defs/function_signature" },
-          "proof_summary": { "$ref": "#/$defs/function_proof_summary" },
+          "support_summary": { "$ref": "#/$defs/function_support_summary" },
           "decl_sha256_hex": {
             "type": ["string", "null"],
             "pattern": "^[0-9a-f]{64}$"
@@ -141,7 +141,7 @@
         }
       }
     },
-    "function_proof_summary": {
+    "function_support_summary": {
       "type": "object",
       "additionalProperties": false,
       "required": [

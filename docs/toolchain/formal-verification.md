@@ -1,30 +1,37 @@
 # Formal verification & certification
 
-X07 has two related but different verification surfaces:
+X07 has three related but different verification surfaces:
 
-- `x07 verify` proves contract properties for the reachable code around one symbol.
-- `x07 trust certify` turns proof coverage, boundary metadata, capsule attestations, tests, and runtime evidence into a certificate bundle that reviewers can consume without reading the whole source tree.
+- `x07 verify --coverage` classifies reachable support posture around one symbol.
+- `x07 verify --prove` emits proof evidence for certifiable reachable symbols.
+- `x07 trust certify` turns those proofs, tests, boundaries, capsule attestations, and runtime evidence into a certificate bundle that reviewers can consume without reading the whole source tree.
 
-The key point is that X07 does not treat "formal verification" as a single-function theorem in isolation. The public trust claim is always tied to a named certification profile and the evidence required by that profile.
+The key point is that X07 does not treat "formal verification" as a single-function theorem in isolation. The public trust claim is tied to a named certification profile, the operational entry that profile is certifying, and the exact evidence required by that profile.
 
 ## The model
 
 ```mermaid
 flowchart LR
-    A[x07AST modules + arch + policies] --> B[x07 verify]
-    B --> C[proof reports + coverage]
+    A[x07AST modules + arch + policies] --> B[x07 verify --coverage]
+    A --> C[x07 verify --prove]
+    C --> P[x07 prove check]
     A --> D[x07 trust capsule]
     D --> E[capsule attestations]
     A --> F[x07 test / x07 run]
     F --> G[runtime attestation + sandbox evidence]
     A --> H[x07 trust report]
     H --> I[SBOM + capability posture]
-    C --> J[x07 trust certify]
-    E --> J
-    G --> J
-    I --> J
-    J --> K[certificate.json + summary.html]
-    K --> L[reviewer reads certificate and review diff]
+    B --> J[support summary]
+    C --> K[proof summary + verify report]
+    P --> L[proof-check report]
+    E --> M[x07 trust certify]
+    G --> M
+    I --> M
+    J --> M
+    K --> M
+    L --> M
+    M --> N[certificate.json + summary.html]
+    N --> O[reviewer reads certificate and review diff]
 ```
 
 ## Tooling
@@ -42,21 +49,33 @@ The Ubuntu 24.04 `universe` packages (`cbmc 5.95.1`, `z3 4.8.12`) are too old fo
 
 `x07 verify` consumes `requires`, `ensures`, `invariant`, `decreases`, and `defasync.protocol` clauses and emits:
 
-- prove reports (`x07.verify.report@0.4.0`)
-- reachable coverage (`x07.verify.coverage@0.3.0`)
-- standalone imported-summary artifacts (`x07.verify.summary@0.1.0`)
+- verify reports (`x07.verify.report@0.7.0`)
+- reachable coverage/support posture (`x07.verify.coverage@0.4.0`)
+- standalone coverage/support summaries (`x07.verify.summary@0.2.0`, `summary_kind = "coverage_support"`)
+- standalone proof summaries (`x07.verify.proof_summary@0.2.0`, `summary_kind = "proof"`)
+- optional proof objects (`x07.verify.proof_object@0.1.0`)
+- optional proof-check reports (`x07.verify.proof_check.report@0.1.0`)
 
-For pure recursive certification, self-recursive `defn` targets are accepted when they declare `decreases[]`. Prove reports expose a `proof_summary` block, and coverage reports expose both recursive summary counters and per-function proof summaries so imported or unsupported graph nodes are visible to reviewers.
+The split matters:
+
+- coverage/support artifacts are planning and review artifacts
+- proof summaries are reusable proof evidence
+- proof objects plus `x07 prove check` reports are the independently checkable line used by strong trust profiles
+
+Coverage reports use support statuses such as `supported`, `supported_async`, and `imported_proof_summary`. They do not count as proof by themselves.
+For pure recursive certification, self-recursive `defn` targets are accepted when they declare `decreases[]`. Proof artifacts expose `recursion_kind` and `recursion_bound_kind` so bounded recursion cannot be hidden behind a generic success bit.
 
 Direct prove inputs currently accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` and `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
 
 That means schema-derived record and tagged-union documents can now sit directly on the proof boundary as `bytes_view@brand`: the generated verify driver runs the validator first and only then materializes the branded view seen by the proof target. Direct `vec_u8` params/results are now admitted in the same certifiable subset. Owned branded `bytes` and nested result carriers remain outside the current direct prove-input subset.
 
-When a reviewed callee sits outside the currently loaded graph, emit `verify.summary.json` from its coverage run and pass it back with `x07 verify --summary <path>`. That keeps the imported proof posture explicit in both the coverage artifact and the final certificate/review flow.
+When a reviewed callee sits outside the currently loaded graph, emit a proof summary from a successful `x07 verify --prove` run and pass it back with `x07 verify --proof-summary <path>`. Coverage/support summaries are rejected anywhere proof evidence is required. The deprecated `--summary <path>` alias still maps to `--proof-summary`.
+
+Imported primitive stubs are developer-only. Proof runs that depend on `imported_stub` assumptions require `--allow-imported-stubs`, and strong trust profiles reject those assumptions even if a prove run succeeded locally.
 
 For async certification, coverage distinguishes:
 
-- `proven_async`
+- `supported_async`
 - `trusted_scheduler_model`
 - `capsule_boundary`
 
@@ -68,7 +87,8 @@ Unsupported shapes are rejected with explicit diagnostics instead of being silen
 
 It checks:
 
-- reachable proof coverage for the selected entry
+- reachable support posture for the selected entry
+- per-symbol prove evidence for every symbol the active profile expects to be proved
 - boundary index completeness
 - smoke/PBT resolution
 - schema-derive drift
@@ -78,6 +98,14 @@ It checks:
 - capsule attestations when the profile requires them
 - peer-policy evidence and network capsule posture when the profile requires them
 - runtime attestation when the profile requires it
+
+For strong trust profiles it also checks:
+
+- `--entry` matches `project.operational_entry_symbol`
+- the certificate is for the operational entry, not a proof-friendly surrogate
+- accepted proof inventory items include proof summaries, proof objects, and proof-check reports
+- accepted proof assumptions are explicitly disclosed in the certificate
+- developer-only imported stubs, coverage-only imports, and bounded recursion are rejected fail-closed
 
 If a project keeps extra local helper checks that do not satisfy the
 certification profile world or evidence requirements, keep them in a separate
@@ -105,9 +133,9 @@ The current public profiles are:
 
 | Profile | Intended claim | Key extra requirements |
 | --- | --- | --- |
-| `verified_core_pure_v1` | pure verified-core entry can be reviewed from the certificate | full reachable proof coverage, no OS effects |
-| `trusted_program_sandboxed_local_v1` | sandboxed async entry can be reviewed from the certificate | async proof coverage, capsule attestations, runtime attestation, VM backend, no network |
-| `trusted_program_sandboxed_net_v1` | sandboxed networked async entry can be reviewed from the certificate | async proof coverage, attested network capsules, pinned peer policies, dependency-closure attestation, VM-boundary allowlist enforcement |
+| `verified_core_pure_v1` | pure verified-core operational entry can be reviewed from the certificate | per-symbol prove artifacts, proof objects/checks, no OS effects |
+| `trusted_program_sandboxed_local_v1` | sandboxed async operational entry can be reviewed from the certificate | async per-symbol prove artifacts, capsule attestations, runtime attestation, VM backend, no network |
+| `trusted_program_sandboxed_net_v1` | sandboxed networked async operational entry can be reviewed from the certificate | async per-symbol prove artifacts, attested network capsules, pinned peer policies, dependency-closure attestation, VM-boundary allowlist enforcement |
 | `certified_capsule_v1` | effectful capsule is attested and reviewable as a pinned boundary | capsule contract, conformance report, attestation |
 
 ## Design decisions
@@ -118,7 +146,15 @@ X07 does not make a vague promise that "all x07 programs are formally verified".
 
 ### Whole-graph coverage instead of point proofs
 
-The verifier still starts from one entry symbol, but the certification result is about the reachable closure, not a single declaration. Coverage artifacts make the trust boundary explicit instead of hiding imported helpers or capsules.
+The verifier still starts from one entry symbol, but the certification result is about the reachable closure, not a single declaration. Coverage artifacts make the trust boundary explicit instead of hiding imported helpers or capsules, while proof artifacts remain distinct and certifiable.
+
+### Operational-entry certification
+
+The strong claim is about the shipped entrypoint. Strong trust profiles therefore certify the operational entry named in `project.operational_entry_symbol`, not a separate proof-only surrogate.
+
+### Assumption inventory is part of the contract
+
+Certificates now expose proof assumptions directly. Trusted builtins, imported proof summaries, scheduler models, capsule boundaries, and runtime-backed assumptions are inventory items that reviewers can inspect and `x07 review diff` can gate.
 
 ### Capsules for effect boundaries
 
@@ -146,7 +182,8 @@ The intended reviewer workflow is:
 1. run `x07 trust certify`
 2. inspect `summary.html`
 3. inspect `certificate.json`
-4. compare changes with `x07 review diff`
+4. optionally re-check proof objects with `x07 prove check`
+5. compare changes with `x07 review diff`
 
 That is the reason X07 keeps review artifacts structured and deterministic.
 
@@ -169,8 +206,9 @@ Canonical examples:
 - `docs/examples/trusted_network_service_v1/`
 - `docs/examples/certified_capsule_v1/`
 - `docs/examples/certified_network_capsule_v1/`
-- `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/`
-- `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/`
+- `x07-mcp/docs/examples/trusted_program_sandboxed_local_stdio_v1/` for the strong-profile sandboxed local line
+- `x07-mcp/docs/examples/verified_core_pure_auth_core_v1/` for developer/demo proof-summary workflows that depend on a developer-only imported stub path
+- `x07-mcp/docs/examples/trusted_program_sandboxed_net_http_v1/` for developer/demo network packaging and capsule flows
 
 The standalone network capsule scaffold reuses `trusted_program_sandboxed_net_v1`; the network trust claim is about the profile posture and required evidence, not a separate capsule-only profile id.
 

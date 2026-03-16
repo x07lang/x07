@@ -1,7 +1,7 @@
 # trusted_sandbox_program_v1
 
 This example is the smallest sandboxed trusted-program project that carries the
-Milestone B trust surfaces end to end:
+current sandboxed-local trust profile end to end:
 
 - async `example.main` entry under `run-os-sandboxed`
 - certified capsule boundary at `capsule.main`

@@ -953,6 +953,9 @@ fn scan_source_codes(roots: &[PathBuf]) -> Result<ExtractedCodes> {
         r#"(?:diag_[A-Za-z0-9_]*|[A-Za-z0-9_]*_diag(?:_[A-Za-z0-9_]+)*|diagnostic_error|with_code|error_code|warning_code)\s*\(\s*"([A-Z][A-Z0-9_-]{0,63})""#,
     )
     .context("compile diagnostic-call regex")?;
+    let re_literal_code =
+        Regex::new(r#""((?:X07(?:TC|V|REL|PROOF)_[A-Z0-9][A-Z0-9_-]{0,63})|(?:X7I[0-9]{4}))""#)
+            .context("compile literal-code regex")?;
     let re_x7i_literal =
         Regex::new(r#""(X7I[0-9]{4})""#).context("compile x07import-code regex")?;
 
@@ -988,6 +991,12 @@ fn scan_source_codes(roots: &[PathBuf]) -> Result<ExtractedCodes> {
             entry.files.insert(rel_file.clone());
         }
         for cap in re_diag_call.captures_iter(&text) {
+            let key = (cap[1].to_string(), component.clone());
+            let entry = by_key.entry(key).or_default();
+            entry.occurrences = entry.occurrences.saturating_add(1);
+            entry.files.insert(rel_file.clone());
+        }
+        for cap in re_literal_code.captures_iter(&text) {
             let key = (cap[1].to_string(), component.clone());
             let entry = by_key.entry(key).or_default();
             entry.occurrences = entry.occurrences.saturating_add(1);
@@ -1388,17 +1397,17 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
             "Reachable `defasync` logic is outside the certifiable subset.",
             "The reachable closure contains runtime-only `defasync` symbols, which are forbidden by `verified_core_pure_v1`.",
             "- Split async logic behind a certified boundary and keep the certified entry closure `defn`-only.\n- Add a pure wrapper if needed.\n- Re-run `x07 verify --coverage` and `x07 trust certify`.",
-            QuickfixSupport::Never,
+            QuickfixSupport::Sometimes,
             &[],
-            Some("Requires semantic refactoring to move async logic out of the certified closure."),
+            None,
         )),
         "X07TC_EUNSUPPORTED_RECURSION" => Some(mk(
             "Reachable recursion is outside the certifiable subset.",
             "The reachable closure contains recursive logic, which `verified_core_pure_v1` does not certify.",
             "- Refactor recursion into a bounded iterative form and add loop contracts where needed.\n- Re-run `x07 verify --coverage` and `x07 trust certify`.",
-            QuickfixSupport::Never,
+            QuickfixSupport::Sometimes,
             &[],
-            Some("Requires semantic refactoring and proof work rather than a deterministic quickfix."),
+            None,
         )),
         "X07TC_EPROOF_COVERAGE" => Some(mk(
             "Reachable proof coverage is incomplete for certification.",
@@ -1412,17 +1421,33 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
             "A reachable symbol is outside the supported proof subset.",
             "At least one reachable symbol uses a construct the prover cannot certify yet (for example unsupported params, unsupported loop bounds, or unresolved non-certified imports).",
             "- Re-run `x07 verify --prove` for the reported symbol and inspect the verify diagnostics.\n- Add the missing contracts, loop skeleton, or wrapper function needed to stay in the supported subset.\n- Re-run `x07 trust certify`.",
-            QuickfixSupport::Never,
+            QuickfixSupport::Sometimes,
             &[],
-            Some("Requires code restructuring or proof-surface reduction rather than a deterministic quickfix."),
+            None,
         )),
         "X07TC_EPROVE" => Some(mk(
             "At least one reachable proof obligation failed.",
             "A reachable symbol failed `x07 verify --prove` or returned a non-`proven` result.",
             "- Re-run `x07 verify --prove` for the reported symbol.\n- Add missing loop contracts, strengthen `requires[]`/`ensures[]`, or simplify the function into the supported subset.\n- Re-run `x07 trust certify`.",
-            QuickfixSupport::Never,
+            QuickfixSupport::Sometimes,
             &[],
-            Some("Requires proof-focused code changes rather than a deterministic quickfix."),
+            None,
+        )),
+        "X07TC_EASYNC_PROVE_REPORT_MISSING" => Some(mk(
+            "Required async prove report is missing.",
+            "Certification expected a per-symbol async prove report artifact for a reachable `defasync` symbol, but the report file was missing or the proof run did not emit the expected artifact path.",
+            "- Re-run `x07 verify --prove` for the reported async symbol and keep the emitted prove report under the certificate out-dir.\n- Ensure the proof run emits `verify_proof_summary_path` in the prove report.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07TC_EPROVE_REPORT_MISSING" => Some(mk(
+            "Required per-symbol prove report is missing.",
+            "Certification expected a per-symbol prove report artifact for a reachable `defn` symbol, but the report file was missing or the proof run did not emit the expected artifact path.",
+            "- Re-run `x07 verify --prove` for the reported symbol and keep the emitted prove report under the certificate out-dir.\n- Ensure the proof run emits `verify_proof_summary_path` in the prove report.\n- Re-run `x07 trust certify`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
         )),
         "X07TC_ETESTS" => Some(mk(
             "Deterministic certification tests are missing or failing.",
@@ -1504,6 +1529,14 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
             &[],
             Some("Requires proof-focused contract work or semantic refactoring rather than a deterministic quickfix."),
         )),
+        "X07TC_ERECURSION_FORBIDDEN" => Some(mk(
+            "Reachable recursion is forbidden by the active trust profile.",
+            "The reachable closure still contains recursive symbols, but the active trust profile sets `language_subset.allow_recursion=false` and therefore fails closed even when recursion would otherwise be supported or imported as reviewed proof.",
+            "- Refactor recursive helpers out of the certified closure or choose a profile that explicitly allows recursion.\n- Re-run `x07 verify --coverage --entry <entry>` and inspect the recursive symbols in the closure.\n- Re-run `x07 trust certify` after the certified entry is recursion-free.",
+            QuickfixSupport::Never,
+            &[],
+            Some("Requires semantic refactoring or an intentional profile change."),
+        )),
         "X07TC_ESANDBOX_PROFILE" => Some(mk(
             "Sandbox runtime evidence violates the certification profile.",
             "The runtime evidence used for certification reports a sandbox backend, weaker-isolation posture, or network posture that is weaker than the selected trusted-program profile allows.",
@@ -1512,26 +1545,50 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
             &[],
             Some("Requires changing runtime policy or execution posture, not a deterministic AST patch."),
         )),
+        "X07V_COVERAGE_NOT_PROOF" => Some(mk(
+            "Coverage/support summary is not proof evidence.",
+            "A supplied `x07.verify.summary@0.2.0` artifact describes coverage posture only. It can help review or planning, but it cannot satisfy prove-mode or certification proof requirements.",
+            "- Replace the coverage/support artifact with `x07.verify.proof_summary@0.2.0` emitted by a successful `x07 verify --prove` run.\n- Keep `x07 verify --coverage` outputs for posture review only.\n- Re-run the prove flow with `--proof-summary <path>`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_PROOF_SUMMARY_REQUIRED" => Some(mk(
+            "A reachable proof summary dependency is required but missing.",
+            "The current prove flow reached a symbol outside the locally loaded graph, and no imported `x07.verify.proof_summary@0.2.0` artifact was supplied for that dependency.",
+            "- Re-run `x07 verify --prove --entry <sym>` for the reviewed dependency to emit `verify.proof-summary.json`.\n- Pass the emitted artifact back via `x07 verify --proof-summary <path>`.\n- Re-run the original prove command.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07V_COVERAGE_SUMMARY_FORBIDDEN" => Some(mk(
+            "Coverage/support summaries cannot be imported as proof.",
+            "The caller passed `x07.verify.summary@0.2.0` through `--proof-summary`, but prove-mode imports accept only `x07.verify.proof_summary@0.2.0` evidence emitted by successful prove runs.",
+            "- Remove the coverage/support artifact from `--proof-summary` inputs.\n- Re-run the dependency prove flow that emits `verify.proof-summary.json`.\n- Retry with the proof-summary artifact instead of the coverage/support summary.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
         "X07V_RECURSION_TERMINATION_FAILED" => Some(mk(
             "Recursive proof could not justify the declared termination rank.",
             "The target is directly self-recursive and declares `decreases[]`, but at least one recursive self-call does not obviously decrease the declared rank term in the verifier's certifiable recursive subset.",
             "- Keep the first `decreases[].expr` aligned with a recursive parameter.\n- Rewrite recursive self-calls so the rank argument decreases by a positive literal step.\n- Re-run `x07 verify --prove`.",
-            QuickfixSupport::Never,
+            QuickfixSupport::Sometimes,
             &[],
-            Some("Requires recursive proof-surface refactoring or a stronger termination argument."),
+            None,
         )),
         "X07V_SUMMARY_MISSING" => Some(mk(
             "A reachable proof summary dependency is missing.",
-            "The requested verify run reached a symbol outside the locally loaded graph and no imported `x07.verify.summary@0.1.0` artifact was supplied for that symbol.",
-            "- Re-run `x07 verify --coverage --entry <sym>` for the reviewed callee to emit `verify.summary.json`.\n- Pass the emitted artifact back via `x07 verify --summary <path>`.\n- Re-run the original verify command.",
+            "The requested verify run reached a symbol outside the locally loaded graph and no imported `x07.verify.proof_summary@0.2.0` artifact was supplied for that symbol.",
+            "- Re-run `x07 verify --prove --entry <sym>` for the reviewed callee to emit `verify.proof-summary.json`.\n- Pass the emitted artifact back via `x07 verify --proof-summary <path>` (or the deprecated `--summary <path>` alias).\n- Re-run the original verify command.",
             QuickfixSupport::Sometimes,
             &[],
             None,
         )),
         "X07V_SUMMARY_MISMATCH" => Some(mk(
             "An imported proof summary does not match the current declaration.",
-            "The supplied `x07.verify.summary@0.1.0` artifact names a reachable symbol, but its declaration digest does not match the currently loaded source graph.",
-            "- Regenerate the imported summary from the exact reviewed declaration set.\n- Keep summary artifacts and source graph revisions aligned.\n- Re-run `x07 verify --summary <path>`.",
+            "The supplied `x07.verify.proof_summary@0.2.0` artifact names a reachable symbol, but its declaration digest does not match the currently loaded source graph.",
+            "- Regenerate the imported summary from the exact reviewed declaration set.\n- Keep proof-summary artifacts and source graph revisions aligned.\n- Re-run `x07 verify --proof-summary <path>` (or the deprecated `--summary <path>` alias).",
             QuickfixSupport::Never,
             &[],
             Some("Requires aligning reviewed summary artifacts with the current declaration graph."),
@@ -1540,25 +1597,25 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
             "The target signature is outside the supported richer-data proof subset.",
             "The verifier currently supports the reviewed richer-data carriers for certification: unbranded `bytes` / `bytes_view`, `vec_u8`, first-order `option_*` / `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`. Schema-derived record and tagged-union documents can sit directly on the proof boundary through branded `bytes_view` inputs. Nested result carriers are still rejected explicitly.",
             "- Keep proof-target signatures on the supported richer-data carriers.\n- Schema-derived record and tagged-union documents can use branded `bytes_view` inputs when the validator is reachable through `meta.brands_v1.validate`.\n- Re-run `x07 verify --prove`.",
-            QuickfixSupport::Never,
+            QuickfixSupport::Sometimes,
             &[],
-            Some("Requires changing the proof-target signature to the supported certifiable subset."),
+            None,
         )),
         "X07V_UNSUPPORTED_HEAP_EFFECT" => Some(mk(
             "The proved core uses heap or pointer effects outside the supported subset.",
             "The verifier rejects direct heap mutation, raw pointer operations, and related memory intrinsics inside the certifiable pure proof subset instead of silently weakening proof posture.",
             "- Move heap or pointer effects behind a reviewed capsule boundary.\n- Keep proof-target logic on pure value transformations.\n- Re-run `x07 verify --prove`.",
-            QuickfixSupport::Never,
+            QuickfixSupport::Sometimes,
             &[],
-            Some("Requires semantic refactoring out of the certifiable pure subset."),
+            None,
         )),
         "X07V_UNSUPPORTED_DEFASYNC_FORM" => Some(mk(
             "The selected `defasync` target is outside the supported proof subset.",
             "Async proof currently requires a certifiable state-machine form with supported parameters and a `bytes` or `result_bytes` result type.",
             "- Refactor the async entry into the supported subset.\n- Keep proof-target `defasync` results in `bytes` or `result_bytes` form.\n- Re-run `x07 verify --prove`.",
-            QuickfixSupport::Never,
+            QuickfixSupport::Sometimes,
             &[],
-            Some("Requires semantic refactoring to a certifiable async subset."),
+            None,
         )),
         "X07V_ASYNC_COUNTEREXAMPLE" => Some(mk(
             "The async proof found a counterexample.",
@@ -1588,9 +1645,33 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
             "Async proof cannot proceed without the trusted scheduler model.",
             "The async verifier requires the checked-in deterministic scheduler model to justify the state-machine proof, but that model is missing or could not be loaded.",
             "- Restore `catalog/verify_scheduler_model.json` from the canonical toolchain tree.\n- Keep async proof runs on the released deterministic scheduler model only.\n- Re-run `x07 verify --prove`.",
-            QuickfixSupport::Never,
+            QuickfixSupport::Sometimes,
             &[],
-            Some("Requires restoring or trusting the scheduler model artifact."),
+            None,
+        )),
+        "X07V_IMPORTED_STUB_FORBIDDEN" => Some(mk(
+            "Imported stub assumptions are disabled in prove mode.",
+            "The requested prove run depends on developer-only `imported_stub` assumptions. Strong certification flows reject those assumptions instead of silently treating them as proof.",
+            "- Replace the imported stub with a proved or attested implementation on the reachable proof surface.\n- If you only need a developer-only exploration run, re-run `x07 verify --prove --allow-imported-stubs` and do not use that result for strong certification.\n- Re-run the prove or certification command on the strict surface.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07PROOF_EOBJECT_INVALID" => Some(mk(
+            "Proof object failed schema or structural validation.",
+            "The proof checker read a `x07.verify.proof_object@0.1.0` file that was malformed, schema-invalid, or otherwise could not be decoded as a valid proof object.",
+            "- Re-run `x07 verify --prove --emit-proof <path>` to regenerate the proof object.\n- Ensure the proof object file is the exact emitted artifact, not a coverage summary or edited JSON.\n- Re-run `x07 prove check --proof <path>`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07PROOF_ECHECK_FAILED" => Some(mk(
+            "Independent proof check rejected the proof bundle.",
+            "The proof checker found a digest mismatch or missing bundled artifact while replaying the emitted proof object against its proof-summary, SMT obligation, and solver transcript evidence.",
+            "- Keep the proof object together with its emitted `verify.proof-summary.json`, `verify.smt2`, and `z3.out.txt` bundle files.\n- Re-run `x07 verify --prove --emit-proof <path>` if any bundle artifact was edited or lost.\n- Re-run `x07 prove check --proof <path>` and confirm the report returns `result=accepted`.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
         )),
         "X07RA_EWRITE" => Some(mk(
             "Runtime attestation could not be written.",
@@ -1712,6 +1793,38 @@ fn exact_catalog_classification(code: &str) -> Option<CatalogClassification> {
             &[],
             Some("Requires a baseline review decision or runtime-evidence repair."),
         )),
+        "X07REL_EBOUNDED_PROOF" => Some(mk(
+            "Release guard rejected bounded proof usage in the strict fixture.",
+            "The strict verified-core fixture accepted a certificate that still depended on bounded proof evidence, which the release guard forbids for the strong internal baseline.",
+            "- Remove the bounded-proof dependency from the strict fixture certificate path.\n- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the accepted certificate no longer marks bounded proof.\n- Re-run the release-readiness CI gate.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07REL_ECOVERAGE_ONLY_IMPORT" => Some(mk(
+            "Release guard rejected a coverage-only imported summary in the strict fixture.",
+            "The strict verified-core fixture imported coverage-only summary evidence where the release guard requires checked proof evidence.",
+            "- Replace the imported coverage-only summary with per-symbol prove artifacts and checked proof evidence.\n- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the certificate proof inventory is strict.\n- Re-run the release-readiness CI gate.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07REL_EDEV_ONLY_ASSUMPTION" => Some(mk(
+            "Release guard rejected a developer-only proof assumption in the strict fixture.",
+            "The strict verified-core fixture accepted certificate evidence that still depended on developer-only assumptions such as imported stubs.",
+            "- Remove the developer-only assumption from the strict fixture proof surface.\n- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the accepted certificate has no developer-only assumptions.\n- Re-run the release-readiness CI gate.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
+        "X07REL_ESURROGATE_ENTRY" => Some(mk(
+            "Release guard rejected surrogate-entry certification in the strict fixture.",
+            "The strict verified-core fixture accepted certification for an entry that diverged from `project.operational_entry_symbol`, which the release guard forbids.",
+            "- Keep the certification entry aligned with `project.operational_entry_symbol`.\n- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm surrogate-entry rejection still fires.\n- Re-run the release-readiness CI gate.",
+            QuickfixSupport::Sometimes,
+            &[],
+            None,
+        )),
         _ => None,
     }
 }
@@ -1830,7 +1943,7 @@ fn classify_catalog_entry(code: &str) -> CatalogClassification {
             summary: format!("x07import subset compatibility diagnostic `{code}`."),
             details_md: "The source program uses syntax/semantics outside the supported importer subset. Repair is deterministic by rewriting the source into supported constructs."
                 .to_string(),
-            agent_strategy_md: "- Inspect importer diagnostic phase/context.\n- Rewrite unsupported Rust/C constructs into supported subset forms.\n- Re-run x07import and tests."
+            agent_strategy_md: "- Inspect importer diagnostic context.\n- Rewrite unsupported Rust/C constructs into supported subset forms.\n- Re-run x07import and tests."
                 .to_string(),
             quickfix_support: QuickfixSupport::Sometimes,
             quickfix_kind: Vec::new(),
@@ -1908,6 +2021,9 @@ fn infer_stage(code: &str, sample_file: Option<&str>) -> CatalogStage {
     if uc.starts_with("X07TC_") || uc.starts_with("X07TP_") {
         return CatalogStage::Run;
     }
+    if uc.starts_with("X07PROOF_") {
+        return CatalogStage::Run;
+    }
     if uc.contains("PARSE") || uc.contains("JSON_PARSE") {
         return CatalogStage::Parse;
     }
@@ -1953,7 +2069,9 @@ fn infer_stage(code: &str, sample_file: Option<&str>) -> CatalogStage {
 }
 
 fn infer_severity(code: &str) -> CatalogSeverity {
-    if code.starts_with("W_") || code.starts_with("W-") || code.starts_with("W_ARCH") {
+    if code == "X07V_COVERAGE_NOT_PROOF" {
+        CatalogSeverity::Warning
+    } else if code.starts_with("W_") || code.starts_with("W-") || code.starts_with("W_ARCH") {
         CatalogSeverity::Warning
     } else {
         CatalogSeverity::Error
@@ -2420,6 +2538,10 @@ mod tests {
             CatalogStage::Parse
         );
         assert_eq!(infer_stage("ETEST_COMPILE", None), CatalogStage::Run);
+        assert_eq!(
+            infer_stage("X07PROOF_ECHECK_FAILED", None),
+            CatalogStage::Run
+        );
         assert_eq!(infer_stage("X07-ARITY-0000", None), CatalogStage::Lint);
     }
 
@@ -2432,6 +2554,10 @@ mod tests {
         assert_eq!(
             infer_severity("E_ARCH_LOCK_INVALID"),
             CatalogSeverity::Error
+        );
+        assert_eq!(
+            infer_severity("X07V_COVERAGE_NOT_PROOF"),
+            CatalogSeverity::Warning
         );
     }
 
@@ -2484,6 +2610,10 @@ mod tests {
                 let d = Diagnostic { code: "X07PKG_SPEC_INVALID".to_string(), message: "m".to_string() };
                 let _x = diag_parse_error("E_ARCH_LOCK_READ", "m", None);
                 let _y = trust_diag("X07TC_EARCH_STRICT", "m");
+                let _missing = if true { "X07TC_EPROVE_REPORT_MISSING" } else { "X07TC_EASYNC_PROVE_REPORT_MISSING" };
+                let _release = "X07REL_ESURROGATE_ENTRY";
+                let _verify = "X07V_IMPORTED_STUB_FORBIDDEN";
+                let _proof = "X07PROOF_ECHECK_FAILED";
             }
             "#,
         )?;
@@ -2491,6 +2621,11 @@ mod tests {
         let codes: BTreeSet<String> = extracted.codes.iter().map(|r| r.code.clone()).collect();
         assert!(codes.contains("X07PKG_SPEC_INVALID"));
         assert!(codes.contains("X07TC_EARCH_STRICT"));
+        assert!(codes.contains("X07TC_EPROVE_REPORT_MISSING"));
+        assert!(codes.contains("X07TC_EASYNC_PROVE_REPORT_MISSING"));
+        assert!(codes.contains("X07REL_ESURROGATE_ENTRY"));
+        assert!(codes.contains("X07V_IMPORTED_STUB_FORBIDDEN"));
+        assert!(codes.contains("X07PROOF_ECHECK_FAILED"));
         std::fs::remove_dir_all(tmp)?;
         Ok(())
     }

@@ -307,6 +307,9 @@ struct TrustEvidenceRequirements {
     require_proof_mode: String,
     require_proof_coverage: String,
     require_async_proof_coverage: bool,
+    require_per_symbol_prove_reports_defn: bool,
+    require_per_symbol_prove_reports_async: bool,
+    allow_coverage_summary_imports: bool,
     require_capsule_attestations: bool,
     require_runtime_attestation: bool,
     require_effect_log_digests: bool,
@@ -346,12 +349,19 @@ struct TrustCertificate {
     verdict: String,
     profile: String,
     entry: String,
+    operational_entry_symbol: String,
     out_dir: String,
     claims: Vec<String>,
     async_proof: TrustCertificateAsyncProof,
+    #[serde(default)]
+    proof_inventory: Vec<TrustCertificateProofInventoryItem>,
+    #[serde(default)]
+    proof_assumptions: Vec<TrustCertificateProofAssumption>,
     recursive_proof_summary: TrustCertificateRecursiveProofSummary,
     #[serde(default)]
     imported_summary_inventory: Vec<TrustCertificateImportedSummary>,
+    accepted_depends_on_bounded_proof: bool,
+    accepted_depends_on_dev_only_assumption: bool,
     capsules: TrustCertificateCapsules,
     network_capsules: TrustCertificateNetworkCapsules,
     runtime: Option<TrustCertificateRuntime>,
@@ -368,17 +378,19 @@ struct TrustCertificate {
 #[derive(Debug, Clone, Serialize)]
 struct TrustCertificateAsyncProof {
     reachable: u64,
-    covered: u64,
+    proved: u64,
     model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 struct TrustCertificateRecursiveProofSummary {
-    recursive_defn: u64,
-    proven_recursive_defn: u64,
-    imported_summary_defn: u64,
-    termination_proven_defn: u64,
-    unsupported_recursive_defn: u64,
+    reachable_recursive_defn: u64,
+    accepted_recursive_defn: u64,
+    bounded_recursive_defn: u64,
+    unbounded_recursive_defn: u64,
+    imported_proof_summary_defn: u64,
+    rejected_recursive_defn: u64,
+    accepted_depends_on_bounded_proof: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -387,6 +399,28 @@ struct TrustCertificateImportedSummary {
     sha256_hex: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     symbols: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TrustCertificateProofInventoryItem {
+    symbol: String,
+    kind: String,
+    result_kind: String,
+    verify_report: EvidenceRef,
+    proof_summary: EvidenceRef,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof_object: Option<EvidenceRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof_check_report: Option<EvidenceRef>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+struct TrustCertificateProofAssumption {
+    kind: String,
+    subject: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    digest: Option<String>,
+    certifiable: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -626,12 +660,21 @@ struct PeerPolicyDoc {
     mtls_alias: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RuntimeAttestationDoc {
     schema_version: String,
+    world: String,
     sandbox_backend: String,
     weaker_isolation: bool,
+    artifact_path: String,
+    #[serde(default)]
+    policy_path: Option<String>,
+    #[serde(default)]
+    input_len_bytes: u64,
+    #[serde(default)]
+    run_dir: Option<String>,
     #[serde(default)]
     guest_image_digest: Option<String>,
     #[serde(default)]
@@ -639,7 +682,34 @@ struct RuntimeAttestationDoc {
     network_mode: String,
     network_enforcement: String,
     #[serde(default)]
+    allow_dns: bool,
+    #[serde(default)]
+    allow_tcp: bool,
+    #[serde(default)]
+    allow_udp: bool,
+    #[serde(default)]
     effective_allow_hosts: Vec<TrustCertificateNetHost>,
+    #[serde(default)]
+    effective_deny_hosts: Vec<String>,
+    #[serde(default)]
+    bundled_binary_digest: String,
+    #[serde(default)]
+    compile_attestation_digest: Option<String>,
+    #[serde(default)]
+    capsule_attestation_digests: Vec<String>,
+    #[serde(default)]
+    effect_log_digests: Vec<String>,
+    outcome: RuntimeAttestationOutcomeDoc,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RuntimeAttestationOutcomeDoc {
+    ok: bool,
+    exit_status: i32,
+    #[serde(default)]
+    trap: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2692,13 +2762,14 @@ fn cmd_trust_certify(
         }
     }
     let default_bundle_out = bundle_dir.join(util::safe_artifact_dir_name(&args.entry));
+    let mut operational_entry_symbol = args.entry.clone();
     let (
         boundaries_ref,
         coverage_ref,
         verify_summary_ref,
         imported_summary_inventory,
         schema_derive_refs,
-        prove_refs,
+        proof_inventory,
         tests_ref,
         trust_report_ref,
         compile_attestation_ref,
@@ -2708,6 +2779,40 @@ fn cmd_trust_certify(
         package_set_digest,
         bundle_path,
     ) = if let Some(project_path) = project_path.as_deref() {
+        if let Ok(manifest) = project::load_project_manifest(project_path) {
+            if let Some(symbol) = manifest.operational_entry_symbol.clone() {
+                operational_entry_symbol = symbol.clone();
+                if profile.as_ref().is_some_and(is_strong_trust_profile) && args.entry != symbol {
+                    diagnostics.push(trust_diag(
+                        "X07TC_EOP_ENTRY_MISMATCH",
+                        format!(
+                            "strong trust profiles require --entry to match project.operational_entry_symbol ({symbol:?})"
+                        ),
+                    ));
+                }
+            } else if profile.as_ref().is_some_and(is_strong_trust_profile) {
+                diagnostics.push(trust_diag(
+                    "X07TC_EOP_ENTRY_REQUIRED",
+                    "strong trust profiles require project.operational_entry_symbol",
+                ));
+            }
+            if profile.as_ref().is_some_and(is_strong_trust_profile)
+                && manifest
+                    .certification_entry_symbol
+                    .as_ref()
+                    .is_some_and(|symbol| {
+                        manifest
+                            .operational_entry_symbol
+                            .as_ref()
+                            .is_some_and(|op| symbol != op)
+                    })
+            {
+                diagnostics.push(trust_diag(
+                    "X07TC_ESURROGATE_ENTRY_FORBIDDEN",
+                    "strong trust profiles reject developer-only certification surrogate entries",
+                ));
+            }
+        }
         let (boundaries_ref, boundaries_doc) =
             build_boundaries_evidence(&project_root, &out_dir, &mut diagnostics)?;
         if let Some(profile) = &profile {
@@ -2753,8 +2858,20 @@ fn cmd_trust_certify(
             prove_targets,
             verify_summary_ref,
             imported_summary_inventory,
-        ) = build_coverage_evidence(project_path, &args.entry, &out_dir, &mut diagnostics)?;
-        add_coverage_diagnostics(&coverage_doc, &mut diagnostics);
+        ) = build_coverage_evidence(
+            project_path,
+            &args.entry,
+            &project_root,
+            profile.as_ref(),
+            &out_dir,
+            &mut diagnostics,
+        )?;
+        add_coverage_diagnostics(
+            &coverage_doc,
+            &project_root,
+            profile.as_ref(),
+            &mut diagnostics,
+        );
         let schema_derive_refs = if profile
             .as_ref()
             .is_some_and(|p| p.evidence_requirements.require_schema_derive_check)
@@ -2768,7 +2885,7 @@ fn cmd_trust_certify(
         } else {
             Vec::new()
         };
-        let prove_refs =
+        let proof_inventory =
             build_prove_evidence(project_path, &prove_targets, &out_dir, &mut diagnostics)?;
         let tests_ref = build_tests_evidence(
             &project_root,
@@ -2826,7 +2943,7 @@ fn cmd_trust_certify(
             verify_summary_ref,
             imported_summary_inventory,
             schema_derive_refs,
-            prove_refs,
+            proof_inventory,
             tests_ref,
             trust_report_ref,
             compile_attestation_ref,
@@ -2883,19 +3000,55 @@ fn cmd_trust_certify(
         )
     };
 
-    let async_proof = collect_async_proof_summary(Path::new(&coverage_ref.path))?;
-    let recursive_proof_summary = collect_recursive_proof_summary(Path::new(&coverage_ref.path))?;
+    let async_proof = collect_async_proof_summary(
+        &proof_inventory,
+        Path::new(&coverage_ref.path),
+        &project_root,
+        profile.as_ref(),
+    )?;
+    let recursive_proof_summary =
+        collect_recursive_proof_summary(&proof_inventory, Path::new(&coverage_ref.path))?;
+    let proof_assumptions = collect_proof_assumptions(&proof_inventory)?;
+    let accepted_depends_on_bounded_proof =
+        recursive_proof_summary.accepted_depends_on_bounded_proof;
+    let accepted_depends_on_dev_only_assumption = proof_assumptions
+        .iter()
+        .any(|assumption| !assumption.certifiable);
+    if profile
+        .as_ref()
+        .is_some_and(|p| !p.evidence_requirements.allow_coverage_summary_imports)
+        && !imported_summary_inventory.is_empty()
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_ECOVERAGE_ONLY",
+            "strong trust profiles reject imported summaries on the coverage-only evidence path",
+        ));
+    }
     if profile
         .as_ref()
         .is_some_and(|p| p.evidence_requirements.require_async_proof_coverage)
-        && async_proof.covered < async_proof.reachable
+        && async_proof.proved < async_proof.reachable
     {
         diagnostics.push(trust_diag(
             "X07TC_EASYNC_PROOF",
             format!(
-                "async proof coverage is incomplete: covered {} of {} reachable defasync symbol(s)",
-                async_proof.covered, async_proof.reachable
+                "async proof coverage is incomplete: proved {} of {} reachable defasync symbol(s)",
+                async_proof.proved, async_proof.reachable
             ),
+        ));
+    }
+    if profile.as_ref().is_some_and(is_strong_trust_profile) && accepted_depends_on_bounded_proof {
+        diagnostics.push(trust_diag(
+            "X07TC_EBOUNDED_PROOF_FORBIDDEN",
+            "strong trust profiles reject accepted proofs that depend on bounded recursion",
+        ));
+    }
+    if profile.as_ref().is_some_and(is_strong_trust_profile)
+        && accepted_depends_on_dev_only_assumption
+    {
+        diagnostics.push(trust_diag(
+            "X07TC_EDEV_ONLY_ASSUMPTION",
+            "strong trust profiles reject developer-only proof assumptions",
         ));
     }
     let capsules = collect_capsule_artifacts(&project_root, profile.as_ref(), &mut diagnostics)?;
@@ -2919,14 +3072,19 @@ fn cmd_trust_certify(
             .map(|p| p.id.clone())
             .unwrap_or_else(|| profile_path.display().to_string()),
         entry: args.entry,
+        operational_entry_symbol,
         out_dir: out_dir.display().to_string(),
         claims: profile
             .as_ref()
             .map(|p| p.claims.clone())
             .unwrap_or_default(),
         async_proof,
+        proof_inventory: proof_inventory.clone(),
+        proof_assumptions: proof_assumptions.clone(),
         recursive_proof_summary,
         imported_summary_inventory,
+        accepted_depends_on_bounded_proof,
+        accepted_depends_on_dev_only_assumption,
         capsules: capsules.capsules,
         network_capsules: capsules.network_capsules,
         runtime,
@@ -2939,7 +3097,10 @@ fn cmd_trust_certify(
             coverage_report: coverage_ref,
             verify_summary_report: verify_summary_ref,
             schema_derive_reports: schema_derive_refs,
-            prove_reports: prove_refs,
+            prove_reports: proof_inventory
+                .iter()
+                .map(|item| item.verify_report.clone())
+                .collect(),
             tests_report: tests_ref,
             trust_report: trust_report_ref,
             compile_attestation: compile_attestation_ref,
@@ -3068,7 +3229,7 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
     s.push_str("<tr><td>async proof</td><td><code>");
     s.push_str(&report_common::html_escape(format!(
         "{}/{} reachable",
-        certificate.async_proof.covered, certificate.async_proof.reachable
+        certificate.async_proof.proved, certificate.async_proof.reachable
     )));
     s.push_str("</code></td></tr>");
     s.push_str("<tr><td>capsules</td><td><code>");
@@ -3087,14 +3248,15 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
     s.push_str("</code></td></tr>");
     s.push_str("<tr><td>recursive proof</td><td><code>");
     s.push_str(&report_common::html_escape(format!(
-        "reachable={} proven={} imported={} termination_only={} unsupported={}",
-        certificate.recursive_proof_summary.recursive_defn,
-        certificate.recursive_proof_summary.proven_recursive_defn,
-        certificate.recursive_proof_summary.imported_summary_defn,
-        certificate.recursive_proof_summary.termination_proven_defn,
+        "reachable={} accepted={} bounded={} unbounded={} imported={} rejected={}",
+        certificate.recursive_proof_summary.reachable_recursive_defn,
+        certificate.recursive_proof_summary.accepted_recursive_defn,
+        certificate.recursive_proof_summary.bounded_recursive_defn,
+        certificate.recursive_proof_summary.unbounded_recursive_defn,
         certificate
             .recursive_proof_summary
-            .unsupported_recursive_defn
+            .imported_proof_summary_defn,
+        certificate.recursive_proof_summary.rejected_recursive_defn
     )));
     s.push_str("</code></td></tr>");
     if let Some(runtime) = &certificate.runtime {
@@ -3438,33 +3600,44 @@ fn policy_allow_hosts_from_doc(doc: Option<&Value>) -> Vec<TrustCertificateNetHo
     out
 }
 
-fn collect_async_proof_summary(coverage_path: &Path) -> Result<TrustCertificateAsyncProof> {
+fn collect_async_proof_summary(
+    proof_inventory: &[TrustCertificateProofInventoryItem],
+    coverage_path: &Path,
+    project_root: &Path,
+    profile: Option<&TrustProfile>,
+) -> Result<TrustCertificateAsyncProof> {
     if !coverage_path.is_file() {
         return Ok(TrustCertificateAsyncProof {
             reachable: 0,
-            covered: 0,
+            proved: 0,
             model: None,
         });
     }
 
     let doc = report_common::read_json_file(coverage_path)?;
     let mut reachable = 0u64;
-    let mut covered = 0u64;
+    let user_only = profile_requires_user_proof_scope(profile);
     if let Some(functions) = doc.get("functions").and_then(Value::as_array) {
         for function in functions {
             if function.get("kind").and_then(Value::as_str) != Some("defasync") {
                 continue;
             }
-            reachable += 1;
-            if function.get("status").and_then(Value::as_str) == Some("proven_async") {
-                covered += 1;
+            if function.get("status").and_then(Value::as_str) != Some("supported_async") {
+                continue;
             }
+            if !coverage_function_in_proof_scope(function, project_root, user_only) {
+                continue;
+            }
+            reachable += 1;
         }
     }
 
     Ok(TrustCertificateAsyncProof {
         reachable,
-        covered,
+        proved: proof_inventory
+            .iter()
+            .filter(|item| item.kind == "defasync" && item.result_kind == "proven_async")
+            .count() as u64,
         model: doc
             .pointer("/summary/async_model")
             .and_then(Value::as_str)
@@ -3473,41 +3646,98 @@ fn collect_async_proof_summary(coverage_path: &Path) -> Result<TrustCertificateA
 }
 
 fn collect_recursive_proof_summary(
+    proof_inventory: &[TrustCertificateProofInventoryItem],
     coverage_path: &Path,
 ) -> Result<TrustCertificateRecursiveProofSummary> {
     if !coverage_path.is_file() {
         return Ok(TrustCertificateRecursiveProofSummary {
-            recursive_defn: 0,
-            proven_recursive_defn: 0,
-            imported_summary_defn: 0,
-            termination_proven_defn: 0,
-            unsupported_recursive_defn: 0,
+            reachable_recursive_defn: 0,
+            accepted_recursive_defn: 0,
+            bounded_recursive_defn: 0,
+            unbounded_recursive_defn: 0,
+            imported_proof_summary_defn: 0,
+            rejected_recursive_defn: 0,
+            accepted_depends_on_bounded_proof: false,
         });
     }
 
     let doc = report_common::read_json_file(coverage_path)?;
+    let mut bounded_recursive_defn = 0u64;
+    let mut unbounded_recursive_defn = 0u64;
+    let mut accepted_recursive_defn = 0u64;
+    for item in proof_inventory {
+        let proof_summary_doc = report_common::read_json_file(Path::new(&item.proof_summary.path))?;
+        let recursion_kind = proof_summary_doc
+            .get("recursion_kind")
+            .and_then(Value::as_str)
+            .unwrap_or("none");
+        if recursion_kind == "none" {
+            continue;
+        }
+        accepted_recursive_defn += 1;
+        match proof_summary_doc
+            .get("recursion_bound_kind")
+            .and_then(Value::as_str)
+            .unwrap_or("none")
+        {
+            "unbounded" => unbounded_recursive_defn += 1,
+            "bounded_by_unwind" => bounded_recursive_defn += 1,
+            _ => {}
+        }
+    }
     Ok(TrustCertificateRecursiveProofSummary {
-        recursive_defn: doc
+        reachable_recursive_defn: doc
             .pointer("/summary/recursive_defn")
             .and_then(Value::as_u64)
             .unwrap_or(0),
-        proven_recursive_defn: doc
-            .pointer("/summary/proven_recursive_defn")
+        accepted_recursive_defn,
+        bounded_recursive_defn,
+        unbounded_recursive_defn,
+        imported_proof_summary_defn: doc
+            .pointer("/summary/imported_proof_summary_defn")
             .and_then(Value::as_u64)
             .unwrap_or(0),
-        imported_summary_defn: doc
-            .pointer("/summary/imported_summary_defn")
-            .and_then(Value::as_u64)
-            .unwrap_or(0),
-        termination_proven_defn: doc
-            .pointer("/summary/termination_proven_defn")
-            .and_then(Value::as_u64)
-            .unwrap_or(0),
-        unsupported_recursive_defn: doc
+        rejected_recursive_defn: doc
             .pointer("/summary/unsupported_recursive_defn")
             .and_then(Value::as_u64)
             .unwrap_or(0),
+        accepted_depends_on_bounded_proof: bounded_recursive_defn > 0,
     })
+}
+
+fn collect_proof_assumptions(
+    proof_inventory: &[TrustCertificateProofInventoryItem],
+) -> Result<Vec<TrustCertificateProofAssumption>> {
+    let mut assumptions = BTreeSet::new();
+    for item in proof_inventory {
+        let doc = report_common::read_json_file(Path::new(&item.proof_summary.path))?;
+        for assumption in doc
+            .get("assumptions")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let Some(kind) = assumption.get("kind").and_then(Value::as_str) else {
+                continue;
+            };
+            let Some(subject) = assumption.get("subject").and_then(Value::as_str) else {
+                continue;
+            };
+            assumptions.insert(TrustCertificateProofAssumption {
+                kind: kind.to_string(),
+                subject: subject.to_string(),
+                digest: assumption
+                    .get("digest")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                certifiable: assumption
+                    .get("certifiable")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            });
+        }
+    }
+    Ok(assumptions.into_iter().collect())
 }
 
 fn collect_imported_summary_inventory(doc: &Value) -> Vec<TrustCertificateImportedSummary> {
@@ -3979,6 +4209,24 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
                 "sandboxed trusted-program profiles must require async proof coverage",
             ));
         }
+        if !profile
+            .evidence_requirements
+            .require_per_symbol_prove_reports_defn
+            || !profile
+                .evidence_requirements
+                .require_per_symbol_prove_reports_async
+        {
+            diags.push(trust_diag(
+                "X07TP_ASYNC_PROOF_REQUIRED",
+                "sandboxed trusted-program profiles must require per-symbol prove reports",
+            ));
+        }
+        if profile.evidence_requirements.allow_coverage_summary_imports {
+            diags.push(trust_diag(
+                "X07TP_ASYNC_PROOF_REQUIRED",
+                "sandboxed trusted-program profiles must reject coverage-only imported summaries",
+            ));
+        }
         if !profile.evidence_requirements.require_capsule_attestations {
             diags.push(trust_diag(
                 "X07TP_CAPSULE_ATTEST_REQUIRED",
@@ -4030,6 +4278,24 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
             diags.push(trust_diag(
                 "X07TP_ASYNC_PROOF_REQUIRED",
                 "networked sandboxed trusted-program profiles must require async proof coverage",
+            ));
+        }
+        if !profile
+            .evidence_requirements
+            .require_per_symbol_prove_reports_defn
+            || !profile
+                .evidence_requirements
+                .require_per_symbol_prove_reports_async
+        {
+            diags.push(trust_diag(
+                "X07TP_ASYNC_PROOF_REQUIRED",
+                "networked sandboxed trusted-program profiles must require per-symbol prove reports",
+            ));
+        }
+        if profile.evidence_requirements.allow_coverage_summary_imports {
+            diags.push(trust_diag(
+                "X07TP_ASYNC_PROOF_REQUIRED",
+                "networked sandboxed trusted-program profiles must reject coverage-only imported summaries",
             ));
         }
         if !profile.evidence_requirements.require_capsule_attestations {
@@ -4112,6 +4378,24 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
                 "certified capsule profiles must require capsule attestations",
             ));
         }
+        if !profile
+            .evidence_requirements
+            .require_per_symbol_prove_reports_defn
+            || profile
+                .evidence_requirements
+                .require_per_symbol_prove_reports_async
+        {
+            diags.push(trust_diag(
+                "X07TP_CAPSULE_ATTEST_REQUIRED",
+                "certified capsule profiles must require per-symbol defn prove reports only",
+            ));
+        }
+        if profile.evidence_requirements.allow_coverage_summary_imports {
+            diags.push(trust_diag(
+                "X07TP_CAPSULE_ATTEST_REQUIRED",
+                "certified capsule profiles must reject coverage-only imported summaries",
+            ));
+        }
         if !profile.evidence_requirements.require_effect_log_digests {
             diags.push(trust_diag(
                 "X07TP_EFFECT_LOG_REQUIRED",
@@ -4166,6 +4450,13 @@ fn validate_trust_profile_strength(profile: &TrustProfile) -> Vec<diagnostics::D
             .require_proof_coverage
             .starts_with("all_reachable_")
         || profile.evidence_requirements.require_async_proof_coverage
+        || !profile
+            .evidence_requirements
+            .require_per_symbol_prove_reports_defn
+        || profile
+            .evidence_requirements
+            .require_per_symbol_prove_reports_async
+        || profile.evidence_requirements.allow_coverage_summary_imports
         || profile.evidence_requirements.require_capsule_attestations
         || profile.evidence_requirements.require_runtime_attestation
         || profile.evidence_requirements.require_effect_log_digests
@@ -4442,19 +4733,51 @@ fn validate_profile_against_context(
     Ok(diags)
 }
 
-fn add_coverage_diagnostics(coverage_doc: &Value, diagnostics: &mut Vec<diagnostics::Diagnostic>) {
+fn is_strong_trust_profile(profile: &TrustProfile) -> bool {
+    profile.evidence_requirements.require_proof_mode == "prove"
+        && profile
+            .evidence_requirements
+            .require_per_symbol_prove_reports_defn
+        && !profile.evidence_requirements.allow_coverage_summary_imports
+        && (!profile.language_subset.allow_defasync
+            || profile
+                .evidence_requirements
+                .require_per_symbol_prove_reports_async)
+}
+
+fn add_coverage_diagnostics(
+    coverage_doc: &Value,
+    project_root: &Path,
+    profile: Option<&TrustProfile>,
+    diagnostics: &mut Vec<diagnostics::Diagnostic>,
+) {
     let Some(functions) = coverage_doc.get("functions").and_then(Value::as_array) else {
         return;
     };
+    let user_only = profile_requires_user_proof_scope(profile);
+    let recursion_forbidden = profile.is_some_and(|p| !p.language_subset.allow_recursion);
     let mut issues: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
+    let mut forbidden_recursive_symbols = Vec::new();
     for function in functions {
+        if !coverage_function_in_proof_scope(function, project_root, user_only) {
+            continue;
+        }
+        let symbol = function
+            .get("symbol")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown_symbol")
+            .to_string();
+        if recursion_forbidden && coverage_function_is_recursive(function) {
+            forbidden_recursive_symbols.push(symbol);
+            continue;
+        }
         if matches!(
             function.get("status").and_then(Value::as_str),
             Some(
-                "proven"
-                    | "proven_recursive"
-                    | "proven_async"
-                    | "imported_summary"
+                "supported"
+                    | "supported_recursive"
+                    | "supported_async"
+                    | "imported_proof_summary"
                     | "trusted_primitive"
                     | "trusted_scheduler_model"
                     | "capsule_boundary"
@@ -4463,16 +4786,53 @@ fn add_coverage_diagnostics(coverage_doc: &Value, diagnostics: &mut Vec<diagnost
             continue;
         }
         let code = coverage_issue_code(function);
-        let symbol = function
-            .get("symbol")
-            .and_then(Value::as_str)
-            .unwrap_or("unknown_symbol")
-            .to_string();
         issues.entry(code).or_default().push(symbol);
+    }
+    if !forbidden_recursive_symbols.is_empty() {
+        diagnostics.push(trust_diag(
+            "X07TC_ERECURSION_FORBIDDEN",
+            format!(
+                "coverage report includes reachable recursive symbols under a trust profile that forbids recursion: {}",
+                summarize_symbol_list(&forbidden_recursive_symbols)
+            ),
+        ));
     }
     for (code, symbols) in issues {
         diagnostics.push(trust_diag(code, coverage_issue_message(code, &symbols)));
     }
+}
+
+fn profile_requires_user_proof_scope(profile: Option<&TrustProfile>) -> bool {
+    profile.is_some_and(|p| {
+        p.evidence_requirements.require_proof_coverage == "all_reachable_user_defn"
+    })
+}
+
+fn coverage_function_in_proof_scope(
+    function: &Value,
+    project_root: &Path,
+    user_only: bool,
+) -> bool {
+    if !user_only {
+        return true;
+    }
+
+    let Some(raw_source_path) = function.get("source_path").and_then(Value::as_str) else {
+        return false;
+    };
+    let source_path = PathBuf::from(raw_source_path);
+    let source_path = if source_path.is_absolute() {
+        source_path
+    } else {
+        project_root.join(source_path)
+    };
+    if !source_path.is_file() {
+        return false;
+    }
+    if !source_path.starts_with(project_root) {
+        return false;
+    }
+    !source_path.starts_with(project_root.join(".x07").join("deps"))
 }
 
 fn coverage_issue_code(function: &Value) -> &'static str {
@@ -4483,10 +4843,7 @@ fn coverage_issue_code(function: &Value) -> &'static str {
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_ascii_lowercase();
-    let recursion_kind = function
-        .pointer("/proof_summary/recursion_kind")
-        .and_then(Value::as_str)
-        .unwrap_or("");
+    let recursion_kind = coverage_function_recursion_kind(function);
     if kind == "defasync" && status == "unsupported" {
         return "X07TC_EUNSUPPORTED_DEFASYNC";
     }
@@ -4505,6 +4862,21 @@ fn coverage_issue_code(function: &Value) -> &'static str {
         return "X07TC_EPROVE_UNSUPPORTED";
     }
     "X07TC_EPROOF_COVERAGE"
+}
+
+fn coverage_function_recursion_kind(function: &Value) -> &str {
+    function
+        .pointer("/support_summary/recursion_kind")
+        .or_else(|| function.pointer("/proof_summary/recursion_kind"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+}
+
+fn coverage_function_is_recursive(function: &Value) -> bool {
+    matches!(
+        coverage_function_recursion_kind(function),
+        "self_recursive" | "mutual"
+    )
 }
 
 fn coverage_issue_message(code: &str, symbols: &[String]) -> String {
@@ -4753,7 +5125,7 @@ fn build_boundaries_evidence(
 type CoverageEvidence = (
     EvidenceRef,
     Value,
-    Vec<String>,
+    Vec<(String, String)>,
     Option<EvidenceRef>,
     Vec<TrustCertificateImportedSummary>,
 );
@@ -4761,6 +5133,8 @@ type CoverageEvidence = (
 fn build_coverage_evidence(
     project_path: &Path,
     entry: &str,
+    project_root: &Path,
+    profile: Option<&TrustProfile>,
     out_dir: &Path,
     diagnostics: &mut Vec<diagnostics::Diagnostic>,
 ) -> Result<CoverageEvidence> {
@@ -4811,7 +5185,7 @@ fn build_coverage_evidence(
     let mut summary_ref = None;
     let mut imported_summary_inventory = Vec::new();
     if let Some(raw_summary_path) = report_doc
-        .pointer("/artifacts/verify_summary_path")
+        .pointer("/artifacts/verify_coverage_summary_path")
         .and_then(Value::as_str)
     {
         let summary_src_path =
@@ -4834,16 +5208,23 @@ fn build_coverage_evidence(
     }
 
     let mut prove_targets = Vec::new();
+    let user_only = profile_requires_user_proof_scope(profile);
     if let Some(functions) = coverage_doc.get("functions").and_then(Value::as_array) {
         for function in functions {
-            if function.get("kind").and_then(Value::as_str) == Some("defn")
-                && matches!(
-                    function.get("status").and_then(Value::as_str),
-                    Some("proven" | "proven_recursive")
-                )
-            {
+            if !coverage_function_in_proof_scope(function, project_root, user_only) {
+                continue;
+            }
+            let Some(kind) = function.get("kind").and_then(Value::as_str) else {
+                continue;
+            };
+            let should_prove = matches!(
+                (kind, function.get("status").and_then(Value::as_str)),
+                ("defn", Some("supported" | "supported_recursive"))
+                    | ("defasync", Some("supported_async"))
+            );
+            if should_prove {
                 if let Some(symbol) = function.get("symbol").and_then(Value::as_str) {
-                    prove_targets.push(symbol.to_string());
+                    prove_targets.push((symbol.to_string(), kind.to_string()));
                 }
             }
         }
@@ -4860,18 +5241,22 @@ fn build_coverage_evidence(
 
 fn build_prove_evidence(
     project_path: &Path,
-    prove_targets: &[String],
+    prove_targets: &[(String, String)],
     out_dir: &Path,
     diagnostics: &mut Vec<diagnostics::Diagnostic>,
-) -> Result<Vec<EvidenceRef>> {
+) -> Result<Vec<TrustCertificateProofInventoryItem>> {
     let cwd = project_path.parent().unwrap_or_else(|| Path::new("."));
     let prove_dir = out_dir.join("prove");
     std::fs::create_dir_all(&prove_dir)
         .with_context(|| format!("create prove dir: {}", prove_dir.display()))?;
 
-    let mut refs = Vec::new();
-    for symbol in prove_targets {
-        let report_path = prove_dir.join(format!("{}.json", util::safe_artifact_dir_name(symbol)));
+    let mut inventory = Vec::new();
+    for (symbol, kind) in prove_targets {
+        let item_dir = prove_dir.join(util::safe_artifact_dir_name(symbol));
+        std::fs::create_dir_all(&item_dir)
+            .with_context(|| format!("create prove item dir: {}", item_dir.display()))?;
+        let report_path = item_dir.join("verify.prove.report.json");
+        let proof_path = item_dir.join("proof.json");
         let args = vec![
             "verify".to_string(),
             "--prove".to_string(),
@@ -4879,6 +5264,8 @@ fn build_prove_evidence(
             symbol.clone(),
             "--project".to_string(),
             project_path.display().to_string(),
+            "--emit-proof".to_string(),
+            proof_path.display().to_string(),
             "--report-out".to_string(),
             report_path.display().to_string(),
             "--quiet-json".to_string(),
@@ -4909,17 +5296,104 @@ fn build_prove_evidence(
                 ),
             ));
         }
-        refs.push(if report_path.is_file() {
+        let verify_report = if report_path.is_file() {
             evidence_ref_for_path(&report_path)?
         } else {
+            diagnostics.push(trust_diag(
+                if kind == "defasync" {
+                    "X07TC_EASYNC_PROVE_REPORT_MISSING"
+                } else {
+                    "X07TC_EPROVE_REPORT_MISSING"
+                },
+                format!("missing proof report for {symbol}"),
+            ));
             write_stub_artifact(
                 &report_path,
                 "prove_report",
                 &format!("missing proof report for {symbol}"),
             )?
+        };
+
+        let proof_summary_path = report_doc
+            .pointer("/artifacts/verify_proof_summary_path")
+            .and_then(Value::as_str)
+            .map(|raw| resolve_report_artifact_path(&report_path, cwd, raw))
+            .filter(|path| path.is_file());
+        if proof_summary_path.is_none() {
+            diagnostics.push(trust_diag(
+                if kind == "defasync" {
+                    "X07TC_EASYNC_PROVE_REPORT_MISSING"
+                } else {
+                    "X07TC_EPROVE_REPORT_MISSING"
+                },
+                format!("proof report for {symbol:?} is missing verify_proof_summary_path"),
+            ));
+        }
+        let proof_summary_ref = if let Some(path) = proof_summary_path.as_ref() {
+            evidence_ref_for_path(path)?
+        } else {
+            write_stub_artifact(
+                &item_dir.join("verify.proof-summary.json"),
+                "proof_summary",
+                &format!("missing proof summary for {symbol}"),
+            )?
+        };
+
+        let proof_object_ref = report_doc
+            .pointer("/artifacts/proof_object_path")
+            .and_then(Value::as_str)
+            .map(|raw| resolve_report_artifact_path(&report_path, cwd, raw))
+            .filter(|path| path.is_file())
+            .map(|path| evidence_ref_for_path(&path))
+            .transpose()?;
+        if proof_object_ref.is_none() {
+            diagnostics.push(trust_diag(
+                "X07TC_EPROOF_OBJECT_MISSING",
+                format!("proof report for {symbol:?} is missing proof_object_path"),
+            ));
+        }
+
+        let proof_check_report_ref = report_doc
+            .pointer("/artifacts/proof_check_report_path")
+            .and_then(Value::as_str)
+            .map(|raw| resolve_report_artifact_path(&report_path, cwd, raw))
+            .filter(|path| path.is_file())
+            .map(|path| evidence_ref_for_path(&path))
+            .transpose()?;
+        if proof_check_report_ref.is_none() {
+            diagnostics.push(trust_diag(
+                "X07TC_EPROOF_CHECK_MISSING",
+                format!("proof report for {symbol:?} is missing proof_check_report_path"),
+            ));
+        }
+
+        let result_kind = proof_summary_path
+            .as_ref()
+            .and_then(|path| report_common::read_json_file(path).ok())
+            .and_then(|doc| {
+                doc.get("result_kind")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
+            .unwrap_or_else(|| {
+                if kind == "defasync" {
+                    "proven_async".to_string()
+                } else {
+                    "proven".to_string()
+                }
+            });
+
+        inventory.push(TrustCertificateProofInventoryItem {
+            symbol: symbol.clone(),
+            kind: kind.clone(),
+            result_kind,
+            verify_report,
+            proof_summary: proof_summary_ref,
+            proof_object: proof_object_ref,
+            proof_check_report: proof_check_report_ref,
         });
     }
-    Ok(refs)
+    Ok(inventory)
 }
 
 fn build_tests_evidence(
@@ -5982,21 +6456,28 @@ mod tests {
             verdict: "rejected".to_string(),
             profile: "verified_core_pure_v1".to_string(),
             entry: "app.main".to_string(),
+            operational_entry_symbol: "app.main".to_string(),
             out_dir: "target/cert".to_string(),
             claims: vec!["human_can_review_certificate_not_source".to_string()],
             async_proof: TrustCertificateAsyncProof {
                 reachable: 0,
-                covered: 0,
+                proved: 0,
                 model: None,
             },
+            proof_inventory: Vec::new(),
+            proof_assumptions: Vec::new(),
             recursive_proof_summary: TrustCertificateRecursiveProofSummary {
-                recursive_defn: 0,
-                proven_recursive_defn: 0,
-                imported_summary_defn: 0,
-                termination_proven_defn: 0,
-                unsupported_recursive_defn: 0,
+                reachable_recursive_defn: 0,
+                accepted_recursive_defn: 0,
+                bounded_recursive_defn: 0,
+                unbounded_recursive_defn: 0,
+                imported_proof_summary_defn: 0,
+                rejected_recursive_defn: 0,
+                accepted_depends_on_bounded_proof: false,
             },
             imported_summary_inventory: Vec::new(),
+            accepted_depends_on_bounded_proof: false,
+            accepted_depends_on_dev_only_assumption: false,
             capsules: TrustCertificateCapsules {
                 count: 0,
                 ids: Vec::new(),
@@ -6288,6 +6769,8 @@ mod tests {
                     }
                 ]
             }),
+            Path::new("."),
+            None,
             &mut diagnostics,
         );
 
@@ -6300,6 +6783,92 @@ mod tests {
         assert!(codes.contains("X07TC_EPROOF_COVERAGE"));
         assert!(codes.contains("X07TC_EUNSUPPORTED_RECURSION"));
         assert!(codes.contains("X07TC_EPROVE_UNSUPPORTED"));
+    }
+
+    #[test]
+    fn add_coverage_diagnostics_rejects_recursive_symbols_when_profile_forbids_recursion() {
+        let profile = TrustProfile {
+            schema_version: "x07.trust.profile@0.4.0".to_string(),
+            id: "verified_core_pure_v1".to_string(),
+            claims: Vec::new(),
+            entrypoints: Vec::new(),
+            worlds_allowed: vec!["solve-pure".to_string()],
+            language_subset: TrustLanguageSubset {
+                allow_defasync: false,
+                allow_recursion: false,
+                allow_extern: false,
+                allow_unsafe: false,
+                allow_ffi: false,
+                allow_dynamic_dispatch: false,
+            },
+            arch_requirements: TrustArchRequirements {
+                manifest_min_version: "x07.arch.manifest@0.3.0".to_string(),
+                require_allowlist_mode: true,
+                require_deny_cycles: true,
+                require_deny_orphans: true,
+                require_visibility: true,
+                require_world_caps: true,
+                require_brand_boundaries: true,
+            },
+            evidence_requirements: TrustEvidenceRequirements {
+                require_boundary_index: true,
+                require_schema_derive_check: true,
+                require_smoke_harnesses: true,
+                require_unit_tests: true,
+                require_pbt: "required".to_string(),
+                require_proof_mode: "prove".to_string(),
+                require_proof_coverage: "all_reachable_symbols".to_string(),
+                require_async_proof_coverage: false,
+                require_per_symbol_prove_reports_defn: true,
+                require_per_symbol_prove_reports_async: false,
+                allow_coverage_summary_imports: false,
+                require_capsule_attestations: false,
+                require_runtime_attestation: false,
+                require_effect_log_digests: false,
+                require_peer_policies: false,
+                require_network_capsules: false,
+                require_dependency_closure_attestation: false,
+                require_compile_attestation: true,
+                require_trust_report_clean: true,
+                require_sbom: true,
+            },
+            sandbox_requirements: TrustSandboxRequirements {
+                sandbox_backend: "any".to_string(),
+                forbid_weaker_isolation: false,
+                network_mode: "any".to_string(),
+                network_enforcement: "any".to_string(),
+            },
+        };
+        let mut diagnostics = Vec::new();
+        add_coverage_diagnostics(
+            &json!({
+                "functions": [
+                    {
+                        "symbol": "example.recursive_supported",
+                        "kind": "defn",
+                        "status": "supported_recursive",
+                        "support_summary": {
+                            "recursion_kind": "self_recursive"
+                        }
+                    },
+                    {
+                        "symbol": "example.recursive_imported",
+                        "kind": "defn",
+                        "status": "imported_proof_summary",
+                        "proof_summary": {
+                            "recursion_kind": "self_recursive"
+                        }
+                    }
+                ]
+            }),
+            Path::new("."),
+            Some(&profile),
+            &mut diagnostics,
+        );
+
+        assert!(diagnostics
+            .iter()
+            .any(|diag| diag.code == "X07TC_ERECURSION_FORBIDDEN"));
     }
 
     #[test]
@@ -6398,7 +6967,7 @@ mod tests {
         .expect("write tests report");
 
         let profile = TrustProfile {
-            schema_version: "x07.trust.profile@0.3.0".to_string(),
+            schema_version: "x07.trust.profile@0.4.0".to_string(),
             id: "trusted_program_sandboxed_local_v1".to_string(),
             claims: Vec::new(),
             entrypoints: Vec::new(),
@@ -6429,6 +6998,9 @@ mod tests {
                 require_proof_mode: "prove".to_string(),
                 require_proof_coverage: "all_reachable_symbols".to_string(),
                 require_async_proof_coverage: true,
+                require_per_symbol_prove_reports_defn: true,
+                require_per_symbol_prove_reports_async: true,
+                allow_coverage_summary_imports: false,
                 require_capsule_attestations: true,
                 require_runtime_attestation: false,
                 require_effect_log_digests: true,

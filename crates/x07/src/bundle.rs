@@ -43,7 +43,10 @@ pub struct BundleArgs {
     #[arg(long, value_name = "PATH")]
     pub project: Option<PathBuf>,
 
-    /// Compile a single `*.x07.json` file (expert mode; requires --module-root).
+    /// Compile a single `*.x07.json` file.
+    ///
+    /// With `--project`, this overrides the project entry for the current bundle.
+    /// Without `--project`, this is expert mode and requires explicit `--module-root`.
     #[arg(long, value_name = "PATH")]
     pub program: Option<PathBuf>,
 
@@ -130,7 +133,7 @@ pub struct BundleArgs {
     #[arg(long, value_name = "PATH")]
     pub emit_attestation: Option<PathBuf>,
 
-    /// Module root directory for resolving module ids (required for --program).
+    /// Module root directory for resolving module ids (required for `--program` without `--project`).
     /// May be passed multiple times.
     #[arg(long, value_name = "DIR")]
     pub module_root: Vec<PathBuf>,
@@ -1345,17 +1348,6 @@ fn now_unix_ms() -> Result<u64> {
 }
 
 fn resolve_target(cwd: &Path, args: &BundleArgs) -> Result<(TargetKind, PathBuf, Option<PathBuf>)> {
-    let mut count = 0;
-    if args.project.is_some() {
-        count += 1;
-    }
-    if args.program.is_some() {
-        count += 1;
-    }
-    if count > 1 {
-        anyhow::bail!("set exactly one of --project or --program");
-    }
-
     if let Some(path) = &args.project {
         return Ok((
             TargetKind::Project,
@@ -1442,6 +1434,50 @@ fn resolve_auto_ffi(args: &BundleArgs, profile: Option<&crate::run::ResolvedProf
     true
 }
 
+fn read_bundle_program_bytes(
+    program_path: &Path,
+    world: WorldId,
+    args: &BundleArgs,
+    label: &str,
+) -> Result<Vec<u8>> {
+    if !program_path
+        .as_os_str()
+        .to_string_lossy()
+        .ends_with(".x07.json")
+    {
+        anyhow::bail!(
+            "{label} must be an x07AST JSON file (*.x07.json), got {}",
+            program_path.display()
+        );
+    }
+
+    let repair_result = crate::repair::maybe_repair_x07ast_file(program_path, world, &args.repair)
+        .with_context(|| format!("repair {label}: {}", program_path.display()))?;
+    let bytes = if let Some(r) = repair_result {
+        r.formatted.into_bytes()
+    } else {
+        std::fs::read(program_path)
+            .with_context(|| format!("read {label}: {}", program_path.display()))?
+    };
+
+    normalize_bundle_entry_module_id(bytes)
+}
+
+fn normalize_bundle_entry_module_id(bytes: Vec<u8>) -> Result<Vec<u8>> {
+    let mut doc: Value = serde_json::from_slice(&bytes).context("parse bundle program JSON")?;
+    if doc.get("kind").and_then(Value::as_str) != Some("entry") {
+        return Ok(bytes);
+    }
+    if doc.get("module_id").and_then(Value::as_str) == Some("main") {
+        return Ok(bytes);
+    }
+    let Some(obj) = doc.as_object_mut() else {
+        return Ok(bytes);
+    };
+    obj.insert("module_id".to_string(), Value::String("main".to_string()));
+    crate::util::canonical_jcs_bytes(&doc)
+}
+
 fn prepare_project_target(
     project_path: &Path,
     world: WorldId,
@@ -1479,15 +1515,16 @@ fn prepare_project_target(
     };
     project::verify_lockfile(project_path, &manifest, &lock)?;
 
-    let entry_path = base.join(&manifest.entry);
-    let repair_result = crate::repair::maybe_repair_x07ast_file(&entry_path, world, &args.repair)
-        .with_context(|| format!("repair entry: {}", entry_path.display()))?;
-    let program = if let Some(r) = repair_result {
-        r.formatted.into_bytes()
+    let entry_path = if let Some(program_override) = args.program.as_ref() {
+        if program_override.is_absolute() {
+            program_override.clone()
+        } else {
+            base.join(program_override)
+        }
     } else {
-        std::fs::read(&entry_path)
-            .with_context(|| format!("read entry: {}", entry_path.display()))?
+        base.join(&manifest.entry)
     };
+    let program = read_bundle_program_bytes(&entry_path, world, args, "entry")?;
 
     let mut module_roots = project::collect_module_roots(project_path, &manifest, &lock)?;
     if world.is_standalone_only() {
@@ -1516,24 +1553,7 @@ fn prepare_program_target(
     world: WorldId,
     args: &BundleArgs,
 ) -> Result<PreparedTarget> {
-    if !program_path
-        .as_os_str()
-        .to_string_lossy()
-        .ends_with(".x07.json")
-    {
-        anyhow::bail!(
-            "--program must be an x07AST JSON file (*.x07.json), got {}",
-            program_path.display()
-        );
-    }
-    let repair_result = crate::repair::maybe_repair_x07ast_file(program_path, world, &args.repair)
-        .with_context(|| format!("repair program: {}", program_path.display()))?;
-    let program = if let Some(r) = repair_result {
-        r.formatted.into_bytes()
-    } else {
-        std::fs::read(program_path)
-            .with_context(|| format!("read program: {}", program_path.display()))?
-    };
+    let program = read_bundle_program_bytes(program_path, world, args, "--program")?;
 
     let mut module_roots = args.module_root.clone();
     if world.is_standalone_only() {

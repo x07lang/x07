@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-trust.profile.schema.json",
-  "title": "x07.trust.profile@0.3.0",
+  "title": "x07.trust.profile@0.4.0",
   "description": "Certification profile consumed by `x07 trust profile check` and `x07 trust certify`.",
   "type": "object",
   "additionalProperties": false,
@@ -17,7 +17,7 @@
     "sandbox_requirements"
   ],
   "properties": {
-    "schema_version": { "const": "x07.trust.profile@0.3.0" },
+    "schema_version": { "const": "x07.trust.profile@0.4.0" },
     "id": {
       "type": "string",
       "minLength": 1,
@@ -115,6 +115,9 @@
         "require_proof_mode",
         "require_proof_coverage",
         "require_async_proof_coverage",
+        "require_per_symbol_prove_reports_defn",
+        "require_per_symbol_prove_reports_async",
+        "allow_coverage_summary_imports",
         "require_capsule_attestations",
         "require_runtime_attestation",
         "require_effect_log_digests",
@@ -140,6 +143,9 @@
           "enum": ["all_reachable_defn", "all_reachable_user_defn"]
         },
         "require_async_proof_coverage": { "type": "boolean" },
+        "require_per_symbol_prove_reports_defn": { "type": "boolean" },
+        "require_per_symbol_prove_reports_async": { "type": "boolean" },
+        "allow_coverage_summary_imports": { "type": "boolean" },
         "require_capsule_attestations": { "type": "boolean" },
         "require_runtime_attestation": { "type": "boolean" },
         "require_effect_log_digests": { "type": "boolean" },

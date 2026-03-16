@@ -41,6 +41,7 @@ mod pbt_fix;
 mod pkg;
 mod policy;
 mod policy_overrides;
+mod prove;
 mod repair;
 mod report_common;
 mod reporting;
@@ -116,6 +117,8 @@ enum Command {
     Cli(cli::CliArgs),
     /// Manage packages and lockfiles.
     Pkg(pkg::PkgArgs),
+    /// Proof-object tooling.
+    Prove(prove::ProveArgs),
     /// Produce human review artifacts (semantic diffs).
     Review(review::ReviewArgs),
     /// Emit CI trust artifacts (budgets/caps, capabilities, nondeterminism, SBOM artifacts).
@@ -434,6 +437,9 @@ fn try_main() -> Result<std::process::ExitCode> {
                 Some(pkg::PkgCommand::Login(_)) => vec!["pkg", "login"],
                 Some(pkg::PkgCommand::Publish(_)) => vec!["pkg", "publish"],
             },
+            Some(Command::Prove(args)) => match &args.cmd {
+                prove::ProveCommand::Check(_) => vec!["prove", "check"],
+            },
             Some(Command::Review(args)) => match &args.cmd {
                 None => vec!["review"],
                 Some(review::ReviewCommand::Diff(_)) => vec!["review", "diff"],
@@ -512,6 +518,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Check(args) => toolchain::cmd_check(&cli.machine, args),
         Command::Cli(args) => cli::cmd_cli(&cli.machine, args),
         Command::Pkg(args) => pkg::cmd_pkg(&cli.machine, args),
+        Command::Prove(args) => prove::cmd_prove(&cli.machine, args),
         Command::Review(args) => review::cmd_review(&cli.machine, args),
         Command::Trust(args) => trust::cmd_trust(&cli.machine, args),
         Command::Patch(args) => patch::cmd_patch(&cli.machine, args),
@@ -1922,10 +1929,10 @@ fn run_one_test_os(
     let cmd_cwd = if test.world == WorldId::RunOsSandboxed {
         let current_dir = std::env::current_dir().ok();
         let mut candidates: Vec<PathBuf> = Vec::new();
-        if let Some(d) = &manifest_dir {
+        if let Some(d) = &arch_root {
             candidates.push(d.clone());
         }
-        if let Some(d) = &arch_root {
+        if let Some(d) = &manifest_dir {
             if !candidates.iter().any(|c| c == d) {
                 candidates.push(d.clone());
             }

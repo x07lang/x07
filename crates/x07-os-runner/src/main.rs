@@ -670,6 +670,34 @@ fn default_vm_guest_image() -> String {
     )
 }
 
+fn resolve_requested_guest_image_digest(
+    backend: VmBackend,
+    guest_image: &str,
+    firecracker_cfg: Option<&x07_vm::FirecrackerCtrConfig>,
+    configured_digest: Option<String>,
+    accept_weaker_isolation: bool,
+    need_runtime_attestation: bool,
+) -> Result<Option<String>> {
+    if let Some(expected_digest) = configured_digest.filter(|value| !value.trim().is_empty()) {
+        if !accept_weaker_isolation {
+            x07_vm::verify_vm_guest_digest(
+                backend,
+                guest_image,
+                &expected_digest,
+                firecracker_cfg,
+            )?;
+        }
+        return Ok(Some(expected_digest));
+    }
+
+    if need_runtime_attestation {
+        let resolved = x07_vm::resolve_vm_guest_digest(backend, guest_image, firecracker_cfg)?;
+        return Ok(Some(resolved));
+    }
+
+    Ok(None)
+}
+
 fn policy_bytes_with_wall_override(policy_bytes: &[u8], wall_ms: u64) -> Result<Vec<u8>> {
     let mut v: serde_json::Value =
         serde_json::from_slice(policy_bytes).context("parse policy JSON")?;
@@ -782,22 +810,19 @@ fn run_vm(
     let accept_weaker_isolation = cli.i_accept_weaker_isolation
         || x07_vm::read_accept_weaker_isolation_env().unwrap_or(false);
 
-    let guest_image_digest = std::env::var(x07_vm::ENV_VM_GUEST_IMAGE_DIGEST).ok();
-    if let Some(expected_digest) = guest_image_digest.as_deref() {
-        if !accept_weaker_isolation {
-            let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
-                Some(firecracker_ctr_config_from_env())
-            } else {
-                None
-            };
-            x07_vm::verify_vm_guest_digest(
-                backend,
-                &guest_image,
-                expected_digest,
-                firecracker_cfg.as_ref(),
-            )?;
-        }
-    }
+    let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
+        Some(firecracker_ctr_config_from_env())
+    } else {
+        None
+    };
+    let guest_image_digest = resolve_requested_guest_image_digest(
+        backend,
+        &guest_image,
+        firecracker_cfg.as_ref(),
+        std::env::var(x07_vm::ENV_VM_GUEST_IMAGE_DIGEST).ok(),
+        accept_weaker_isolation,
+        cli.attest_runtime.is_some(),
+    )?;
 
     let overall_created_unix_ms = now_unix_ms()?;
     let run_id_base = {
@@ -1030,12 +1055,6 @@ fn run_vm(
         limits: build_limits,
     };
 
-    let firecracker_cfg = if backend == VmBackend::FirecrackerCtr {
-        Some(firecracker_ctr_config_from_env())
-    } else {
-        None
-    };
-
     let reaper_bin = resolve_sibling_or_path_vm("x07-vm-reaper");
     let build_out = x07_vm::run_vm_job(
         &build_spec,
@@ -1125,7 +1144,7 @@ fn run_vm(
     let compiled_artifact = build_job_out.join("compiled-out");
     if !compiled_artifact.is_file() {
         anyhow::bail!(
-            "vm build phase did not produce expected compiled artifact at {}",
+            "vm build step did not produce expected compiled artifact at {}",
             compiled_artifact.display()
         );
     }
@@ -2642,6 +2661,77 @@ mod tests {
         );
         assert_eq!(attestation_ref.network_mode, "allowlist");
         assert_eq!(attestation_ref.network_enforcement, "vm_boundary_allowlist");
+        std::fs::remove_dir_all(&dir).expect("remove temp dir");
+    }
+
+    fn temp_runtime_attest_dir(label: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("unix time")
+            .as_nanos();
+        let dir = workspace_root()
+            .join("target")
+            .join("runtime-attest-tests")
+            .join(format!("{label}-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    fn write_test_vz_guest_bundle(bundle_dir: &Path) {
+        std::fs::create_dir_all(bundle_dir).expect("create bundle dir");
+        std::fs::write(bundle_dir.join("kernel.bin"), b"kernel").expect("write kernel");
+        std::fs::write(bundle_dir.join("rootfs.img"), b"rootfs").expect("write rootfs");
+        std::fs::write(bundle_dir.join("cmdline.txt"), b"console=ttyS0").expect("write cmdline");
+        std::fs::write(
+            bundle_dir.join("manifest.json"),
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "schema_version": "x07.vz.guest.bundle@0.1.0",
+                "linux": {
+                    "kernel": "kernel.bin",
+                    "rootfs": "rootfs.img",
+                    "cmdline": "cmdline.txt"
+                }
+            }))
+            .expect("serialize bundle manifest"),
+        )
+        .expect("write bundle manifest");
+    }
+
+    #[test]
+    fn resolve_requested_guest_image_digest_auto_resolves_for_vz_attestation() {
+        let dir = temp_runtime_attest_dir("guest-digest-auto");
+        let bundle_dir = dir.join("bundle");
+        write_test_vz_guest_bundle(&bundle_dir);
+        let bundle = bundle_dir.display().to_string();
+        let expected =
+            x07_vm::resolve_vm_guest_digest(VmBackend::Vz, &bundle, None).expect("bundle digest");
+
+        let got =
+            resolve_requested_guest_image_digest(VmBackend::Vz, &bundle, None, None, false, true)
+                .expect("auto-resolve digest");
+
+        assert_eq!(got.as_deref(), Some(expected.as_str()));
+        std::fs::remove_dir_all(&dir).expect("remove temp dir");
+    }
+
+    #[test]
+    fn resolve_requested_guest_image_digest_rejects_mismatched_configured_digest() {
+        let dir = temp_runtime_attest_dir("guest-digest-mismatch");
+        let bundle_dir = dir.join("bundle");
+        write_test_vz_guest_bundle(&bundle_dir);
+        let bundle = bundle_dir.display().to_string();
+
+        let err = resolve_requested_guest_image_digest(
+            VmBackend::Vz,
+            &bundle,
+            None,
+            Some("sha256:deadbeef".to_string()),
+            false,
+            true,
+        )
+        .expect_err("mismatched configured digest must fail");
+
+        assert!(format!("{err:#}").contains("guest digest mismatch"));
         std::fs::remove_dir_all(&dir).expect("remove temp dir");
     }
 

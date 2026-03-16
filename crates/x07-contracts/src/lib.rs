@@ -37,18 +37,22 @@ pub const X07_OS_RUNNER_REPORT_SCHEMA_VERSION: &str = "x07-os-runner.report@0.5.
 pub const X07_RUN_REPORT_SCHEMA_VERSION: &str = "x07.run.report@0.3.0";
 pub const X07_BUNDLE_REPORT_SCHEMA_VERSION: &str = "x07.bundle.report@0.4.0";
 pub const X07_DOC_REPORT_SCHEMA_VERSION: &str = "x07.doc.report@0.1.0";
-pub const X07_VERIFY_REPORT_SCHEMA_VERSION: &str = "x07.verify.report@0.4.0";
-pub const X07_VERIFY_COVERAGE_SCHEMA_VERSION: &str = "x07.verify.coverage@0.3.0";
-pub const X07_VERIFY_SUMMARY_SCHEMA_VERSION: &str = "x07.verify.summary@0.1.0";
-pub const X07_VERIFY_PRIMITIVES_SCHEMA_VERSION: &str = "x07.verify.primitives@0.1.0";
+pub const X07_VERIFY_REPORT_SCHEMA_VERSION: &str = "x07.verify.report@0.7.0";
+pub const X07_VERIFY_COVERAGE_SCHEMA_VERSION: &str = "x07.verify.coverage@0.4.0";
+pub const X07_VERIFY_SUMMARY_SCHEMA_VERSION: &str = "x07.verify.summary@0.2.0";
+pub const X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION: &str = "x07.verify.proof_summary@0.2.0";
+pub const X07_VERIFY_PROOF_OBJECT_SCHEMA_VERSION: &str = "x07.verify.proof_object@0.1.0";
+pub const X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION: &str =
+    "x07.verify.proof_check.report@0.1.0";
+pub const X07_VERIFY_PRIMITIVES_SCHEMA_VERSION: &str = "x07.verify.primitives@0.2.0";
 pub const X07_VERIFY_CEX_SCHEMA_VERSION: &str = "x07.verify.cex@0.2.0";
 pub const X07_BENCH_SUITE_SCHEMA_VERSION: &str = "x07.bench.suite@0.1.0";
 pub const X07_BENCH_INSTANCE_SCHEMA_VERSION: &str = "x07.bench.instance@0.1.0";
 pub const X07_BENCH_REPORT_SCHEMA_VERSION: &str = "x07.bench.report@0.1.0";
-pub const X07_REVIEW_DIFF_SCHEMA_VERSION: &str = "x07.review.diff@0.4.0";
+pub const X07_REVIEW_DIFF_SCHEMA_VERSION: &str = "x07.review.diff@0.5.0";
 pub const X07_TRUST_REPORT_SCHEMA_VERSION: &str = "x07.trust.report@0.1.0";
-pub const X07_TRUST_PROFILE_SCHEMA_VERSION: &str = "x07.trust.profile@0.3.0";
-pub const X07_TRUST_CERTIFICATE_SCHEMA_VERSION: &str = "x07.trust.certificate@0.3.0";
+pub const X07_TRUST_PROFILE_SCHEMA_VERSION: &str = "x07.trust.profile@0.4.0";
+pub const X07_TRUST_CERTIFICATE_SCHEMA_VERSION: &str = "x07.trust.certificate@0.6.0";
 pub const X07_COMPILE_ATTEST_SCHEMA_VERSION: &str = "x07.compile.attest@0.1.0";
 pub const X07_RUNTIME_ATTEST_SCHEMA_VERSION: &str = "x07.runtime.attest@0.2.0";
 pub const X07_DEPS_CAPABILITY_POLICY_SCHEMA_VERSION: &str = "x07.deps.capability_policy@0.1.0";
@@ -124,12 +128,14 @@ pub const X07_ARCH_CRYPTO_JWT_PROFILES_SCHEMA_VERSION: &str = "x07.arch.crypto.j
 
 pub const PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0: &str = "x07.project@0.2.0";
 pub const PROJECT_MANIFEST_SCHEMA_VERSION_V0_3_0: &str = "x07.project@0.3.0";
+pub const PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0: &str = "x07.project@0.4.0";
 
-pub const PROJECT_MANIFEST_SCHEMA_VERSION: &str = PROJECT_MANIFEST_SCHEMA_VERSION_V0_3_0;
+pub const PROJECT_MANIFEST_SCHEMA_VERSION: &str = PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0;
 
 pub const PROJECT_MANIFEST_SCHEMA_VERSIONS_SUPPORTED: &[&str] = &[
     PROJECT_MANIFEST_SCHEMA_VERSION_V0_2_0,
     PROJECT_MANIFEST_SCHEMA_VERSION_V0_3_0,
+    PROJECT_MANIFEST_SCHEMA_VERSION_V0_4_0,
 ];
 
 pub const PACKAGE_MANIFEST_SCHEMA_VERSION: &str = "x07.package@0.1.0";

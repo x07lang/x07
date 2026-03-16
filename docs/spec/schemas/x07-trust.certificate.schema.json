@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-trust.certificate.schema.json",
-  "title": "x07.trust.certificate@0.3.0",
+  "title": "x07.trust.certificate@0.6.0",
   "description": "Source-free trust certificate emitted by `x07 trust certify`.",
   "type": "object",
   "additionalProperties": false,
@@ -10,20 +10,26 @@
     "verdict",
     "profile",
     "entry",
+    "operational_entry_symbol",
     "out_dir",
     "claims",
+    "async_proof",
+    "proof_inventory",
+    "proof_assumptions",
     "capsules",
     "network_capsules",
     "runtime",
     "recursive_proof_summary",
     "imported_summary_inventory",
+    "accepted_depends_on_bounded_proof",
+    "accepted_depends_on_dev_only_assumption",
     "package_set_digest",
     "dependency_closure",
     "tcb",
     "evidence"
   ],
   "properties": {
-    "schema_version": { "const": "x07.trust.certificate@0.3.0" },
+    "schema_version": { "const": "x07.trust.certificate@0.6.0" },
     "verdict": {
       "type": "string",
       "enum": ["accepted", "rejected"]
@@ -38,6 +44,11 @@
       "minLength": 1,
       "maxLength": 256
     },
+    "operational_entry_symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
     "out_dir": { "type": "string", "minLength": 1, "maxLength": 4096 },
     "claims": {
       "type": "array",
@@ -47,32 +58,48 @@
     "async_proof": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["reachable", "covered", "model"],
+      "required": ["reachable", "proved", "model"],
       "properties": {
         "reachable": { "type": "integer", "minimum": 0 },
-        "covered": { "type": "integer", "minimum": 0 },
+        "proved": { "type": "integer", "minimum": 0 },
         "model": {
-          "type": ["string", "null"],
-          "maxLength": 256
+          "anyOf": [
+            { "type": "string", "minLength": 1, "maxLength": 256 },
+            { "type": "null" }
+          ]
         }
       }
+    },
+    "proof_inventory": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/proof_inventory_item" },
+      "default": []
+    },
+    "proof_assumptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/proof_assumption" },
+      "default": []
     },
     "recursive_proof_summary": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "recursive_defn",
-        "proven_recursive_defn",
-        "imported_summary_defn",
-        "termination_proven_defn",
-        "unsupported_recursive_defn"
+        "reachable_recursive_defn",
+        "accepted_recursive_defn",
+        "bounded_recursive_defn",
+        "unbounded_recursive_defn",
+        "imported_proof_summary_defn",
+        "rejected_recursive_defn",
+        "accepted_depends_on_bounded_proof"
       ],
       "properties": {
-        "recursive_defn": { "type": "integer", "minimum": 0 },
-        "proven_recursive_defn": { "type": "integer", "minimum": 0 },
-        "imported_summary_defn": { "type": "integer", "minimum": 0 },
-        "termination_proven_defn": { "type": "integer", "minimum": 0 },
-        "unsupported_recursive_defn": { "type": "integer", "minimum": 0 }
+        "reachable_recursive_defn": { "type": "integer", "minimum": 0 },
+        "accepted_recursive_defn": { "type": "integer", "minimum": 0 },
+        "bounded_recursive_defn": { "type": "integer", "minimum": 0 },
+        "unbounded_recursive_defn": { "type": "integer", "minimum": 0 },
+        "imported_proof_summary_defn": { "type": "integer", "minimum": 0 },
+        "rejected_recursive_defn": { "type": "integer", "minimum": 0 },
+        "accepted_depends_on_bounded_proof": { "type": "boolean" }
       }
     },
     "imported_summary_inventory": {
@@ -80,6 +107,8 @@
       "items": { "$ref": "#/$defs/imported_summary_ref" },
       "default": []
     },
+    "accepted_depends_on_bounded_proof": { "type": "boolean" },
+    "accepted_depends_on_dev_only_assumption": { "type": "boolean" },
     "capsules": {
       "type": "object",
       "additionalProperties": false,
@@ -342,6 +371,62 @@
           "items": { "type": "string", "minLength": 1, "maxLength": 256 },
           "default": []
         }
+      }
+    },
+    "proof_inventory_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "kind",
+        "result_kind",
+        "verify_report",
+        "proof_summary"
+      ],
+      "properties": {
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "kind": { "type": "string", "enum": ["defn", "defasync"] },
+        "result_kind": { "type": "string", "enum": ["proven", "proven_async"] },
+        "verify_report": { "$ref": "#/$defs/evidence_ref" },
+        "proof_summary": { "$ref": "#/$defs/evidence_ref" },
+        "proof_object": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "proof_check_report": {
+          "anyOf": [
+            { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "proof_assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "subject", "certifiable"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "trusted_builtin",
+            "imported_proof_summary",
+            "imported_stub",
+            "trusted_scheduler_model",
+            "capsule_boundary",
+            "runtime_evidence"
+          ]
+        },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "digest": {
+          "anyOf": [
+            { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "certifiable": { "type": "boolean" }
       }
     }
   }

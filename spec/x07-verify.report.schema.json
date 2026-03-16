@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-verify.report.schema.json",
-  "title": "X07 x07 verify report v0.4.0",
+  "title": "X07 x07 verify report v0.7.0",
   "description": "Machine-readable report emitted by `x07 verify`.",
   "type": "object",
   "additionalProperties": false,
@@ -16,7 +16,7 @@
     "exit_code"
   ],
   "properties": {
-    "schema_version": { "const": "x07.verify.report@0.4.0" },
+    "schema_version": { "const": "x07.verify.report@0.7.0" },
     "mode": { "type": "string", "enum": ["bmc", "smt", "prove", "coverage"] },
     "ok": { "type": "boolean" },
     "entry": { "type": "string", "minLength": 1, "maxLength": 2048 },
@@ -76,7 +76,10 @@
         "cex_path": { "type": "string" },
         "smt2_path": { "type": "string" },
         "z3_out_path": { "type": "string" },
-        "verify_summary_path": { "type": "string" }
+        "verify_coverage_summary_path": { "type": "string" },
+        "verify_proof_summary_path": { "type": "string" },
+        "proof_object_path": { "type": "string" },
+        "proof_check_report_path": { "type": "string" }
       }
     },
     "proof_summary": {
@@ -88,6 +91,7 @@
         "has_decreases",
         "decreases_count",
         "bounded_by_unwind",
+        "recursion_bound_kind",
         "dependency_symbols"
       ],
       "properties": {
@@ -99,6 +103,10 @@
         "has_decreases": { "type": "boolean" },
         "decreases_count": { "type": "integer", "minimum": 0 },
         "bounded_by_unwind": { "type": "boolean" },
+        "recursion_bound_kind": {
+          "type": "string",
+          "enum": ["none", "bounded_by_unwind", "unbounded"]
+        },
         "dependency_symbols": {
           "type": "array",
           "items": { "type": "string", "minLength": 1, "maxLength": 2048 },

@@ -1,5 +1,5 @@
 {
-  "schema_version": "x07.trust.profile@0.3.0",
+  "schema_version": "x07.trust.profile@0.4.0",
   "id": "verified_core_pure_v1",
   "claims": [
     "human_can_review_certificate_not_source"
@@ -36,6 +36,9 @@
     "require_proof_mode": "prove",
     "require_proof_coverage": "all_reachable_defn",
     "require_async_proof_coverage": false,
+    "require_per_symbol_prove_reports_defn": true,
+    "require_per_symbol_prove_reports_async": false,
+    "allow_coverage_summary_imports": false,
     "require_capsule_attestations": false,
     "require_runtime_attestation": false,
     "require_effect_log_digests": false,

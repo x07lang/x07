@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 400
-- quickfix support (`sometimes` or `always`): 370
-- quickfix coverage: 92.50%
+- total codes: 441
+- quickfix support (`sometimes` or `always`): 400
+- quickfix coverage: 90.70%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -297,19 +297,30 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_SPEC_INVALID` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_SPEC_INVALID`. |
 | `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
 | `X07PKG_YANKED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_YANKED_DEP`. |
+| `X07PROOF_ECHECK_FAILED` | x07 / run / error | sometimes | Independent proof check rejected the proof bundle. |
+| `X07PROOF_EOBJECT_INVALID` | x07 / run / error | sometimes | Proof object failed schema or structural validation. |
 | `X07RD_ADVISORY_ALLOWANCE_ENABLED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_ADVISORY_ALLOWANCE_ENABLED`. |
+| `X07RD_ASSUMPTION_SURFACE_WIDEN` | x07 / lint / error | never | Review diff gate rejected a wider proof-assumption surface. |
 | `X07RD_ASYNC_PROOF_COVERAGE_DECREASE` | x07 / lint / error | never | Review diff gate rejected an async proof coverage regression. |
+| `X07RD_BOUNDED_PROOF_INTRODUCED` | x07 / lint / error | never | Review diff gate rejected bounded proof usage. |
 | `X07RD_CAPSULE_CONTRACT_RELAXATION` | x07 / lint / error | never | Review diff gate rejected a capsule contract relaxation. |
 | `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_CAPSULE_NETWORK_SURFACE_WIDEN`. |
 | `X07RD_CAPSULE_SET_CHANGE` | x07 / lint / error | never | Review diff gate rejected a capsule inventory change. |
+| `X07RD_COVERAGE_SUMMARY_IMPORTED` | x07 / lint / error | never | Review diff gate rejected a coverage-only import. |
+| `X07RD_DEV_ONLY_ASSUMPTION_INTRODUCED` | x07 / lint / error | never | Review diff gate rejected a developer-only proof assumption. |
 | `X07RD_LOCKFILE_HASH_CHANGE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_LOCKFILE_HASH_CHANGE`. |
 | `X07RD_NETWORK_ALLOWLIST_WIDEN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_NETWORK_ALLOWLIST_WIDEN`. |
+| `X07RD_OPERATIONAL_ENTRY_DIVERGES` | x07 / lint / error | never | Review diff gate rejected operational-entry divergence. |
 | `X07RD_PACKAGE_SET_CHANGE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_PACKAGE_SET_CHANGE`. |
 | `X07RD_PEER_POLICY_RELAXATION` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_PEER_POLICY_RELAXATION`. |
 | `X07RD_RECURSION_PROOF_COVERAGE_DECREASE` | x07 / lint / error | never | Review diff gate rejected a recursive proof coverage regression. |
 | `X07RD_RUNTIME_ATTEST_REGRESSION` | x07 / run / error | never | Review diff gate rejected a runtime attestation regression. |
 | `X07RD_SANDBOX_POLICY_WIDEN` | x07 / lint / error | never | Review diff gate rejected a sandbox policy widening. |
 | `X07RD_SUMMARY_DOWNGRADE` | x07 / lint / error | never | Review diff gate rejected a proof-summary downgrade. |
+| `X07REL_EBOUNDED_PROOF` | x07 / lint / error | sometimes | Release guard rejected bounded proof usage in the strict fixture. |
+| `X07REL_ECOVERAGE_ONLY_IMPORT` | x07 / lint / error | sometimes | Release guard rejected a coverage-only imported summary in the strict fixture. |
+| `X07REL_EDEV_ONLY_ASSUMPTION` | x07 / lint / error | sometimes | Release guard rejected a developer-only proof assumption in the strict fixture. |
+| `X07REL_ESURROGATE_ENTRY` | x07 / lint / error | sometimes | Release guard rejected surrogate-entry certification in the strict fixture. |
 | `X07RR_ENTRY_EXISTS` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_ENTRY_EXISTS`. |
 | `X07RR_HTTP` | x07 / run / error | never | Diagnostic code `X07RR_HTTP`. |
 | `X07RR_KEY_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_KEY_EMPTY`. |
@@ -319,27 +330,42 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07RR_URL_EMPTY` | x07 / run / error | sometimes | Record/replay fixture diagnostic `X07RR_URL_EMPTY`. |
 | `X07TC_EARCH_STRICT` | x07 / run / error | sometimes | Strict architecture evidence failed certification. |
 | `X07TC_EASYNC_PROOF` | x07 / run / error | never | Async proof coverage or async proof obligations failed certification. |
+| `X07TC_EASYNC_PROVE_REPORT_MISSING` | x07 / run / error | sometimes | Required async prove report is missing. |
 | `X07TC_EBOUNDARY_MISSING` | x07 / run / error | sometimes | Boundary declarations are missing or incomplete for certification. |
 | `X07TC_EBOUNDARY_RELAXED` | x07 / run / error | never | The candidate relaxes a certified boundary contract relative to the baseline. |
+| `X07TC_EBOUNDED_PROOF_FORBIDDEN` | x07 / run / error | never | Bounded recursion proof is forbidden for the active trust profile. |
 | `X07TC_ECAPSULE_ATTEST` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ECAPSULE_ATTEST`. |
 | `X07TC_ECAPSULE_NETWORK_ATTEST` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ECAPSULE_NETWORK_ATTEST`. |
 | `X07TC_ECOMPILE_ATTEST` | x07 / run / error | never | Compile attestation failed or could not bind the emitted binary. |
+| `X07TC_ECOVERAGE_ONLY` | x07 / run / error | never | Coverage/support evidence cannot satisfy certification. |
 | `X07TC_EDEP_CLOSURE` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EDEP_CLOSURE`. |
+| `X07TC_EDEV_ONLY_ASSUMPTION` | x07 / run / error | never | Developer-only proof assumptions are forbidden for the active trust profile. |
 | `X07TC_EDIFF_POSTURE` | x07 / run / error | never | Baseline review or trust-posture diff gate failed certification. |
 | `X07TC_EEFFECT_LOG` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EEFFECT_LOG`. |
 | `X07TC_ENET_POLICY` | x07 / run / error | never | Network policy posture changed relative to the reviewed baseline. |
 | `X07TC_ENONDET` | x07 / run / error | never | Trust report detected nondeterminism in the certified closure. |
+| `X07TC_EOP_ENTRY_MISMATCH` | x07 / run / error | sometimes | Certification entry does not match the operational entry. |
+| `X07TC_EOP_ENTRY_REQUIRED` | x07 / run / error | sometimes | Operational-entry metadata is required for the active trust profile. |
 | `X07TC_EPBT` | x07 / run / error | sometimes | Boundary-required property tests are missing, malformed, or failing. |
 | `X07TC_EPEER_POLICY` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EPEER_POLICY`. |
 | `X07TC_EPROFILE` | x07 / run / error | sometimes | Certification trust profile is missing or invalid. |
 | `X07TC_EPROJECT` | x07 / run / error | sometimes | Certification could not resolve the project manifest or source closure. |
+| `X07TC_EPROOF_CHECK_MISSING` | x07 / run / error | never | Required proof-check report is missing from prove evidence. |
 | `X07TC_EPROOF_COVERAGE` | x07 / run / error | never | Reachable proof coverage is incomplete for certification. |
+| `X07TC_EPROOF_OBJECT_MISSING` | x07 / run / error | never | Required proof object is missing from prove evidence. |
+| `X07TC_EPROVE` | x07 / run / error | sometimes | At least one reachable proof obligation failed. |
+| `X07TC_EPROVE_REPORT_MISSING` | x07 / run / error | sometimes | Required per-symbol prove report is missing. |
+| `X07TC_EPROVE_UNSUPPORTED` | x07 / run / error | sometimes | A reachable symbol is outside the supported proof subset. |
+| `X07TC_ERECURSION_FORBIDDEN` | x07 / run / error | never | Reachable recursion is forbidden by the active trust profile. |
 | `X07TC_ERUNTIME_ATTEST` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ERUNTIME_ATTEST`. |
 | `X07TC_ERUNTIME_NETWORK_EVIDENCE` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_ERUNTIME_NETWORK_EVIDENCE`. |
 | `X07TC_ESANDBOX_PROFILE` | x07 / run / error | never | Sandbox runtime evidence violates the certification profile. |
 | `X07TC_ESCHEMA_DRIFT` | x07 / run / error | sometimes | Boundary-referenced schema outputs drifted or are missing. |
+| `X07TC_ESURROGATE_ENTRY_FORBIDDEN` | x07 / run / error | sometimes | Surrogate certification entries are forbidden for the active trust profile. |
 | `X07TC_ETESTS` | x07 / run / error | sometimes | Deterministic certification tests are missing or failing. |
 | `X07TC_ETRUST_REPORT` | x07 / run / error | never | Trust report evidence failed certification. |
+| `X07TC_EUNSUPPORTED_DEFASYNC` | x07 / run / error | sometimes | Reachable `defasync` logic is outside the certifiable subset. |
+| `X07TC_EUNSUPPORTED_RECURSION` | x07 / run / error | sometimes | Reachable recursion is outside the certifiable subset. |
 | `X07TEST_ASYNC_ENTRY_UNSUPPORTED` | x07 / lint / error | never | x07 test could not build or run the selected async entrypoint. |
 | `X07TEST_CAPSULE_EVIDENCE_MISSING` | x07 / lint / error | never | A test that requires capsule evidence did not provide it. |
 | `X07TEST_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | sometimes | A test that requires runtime attestation did not produce it. |
@@ -354,9 +380,9 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07TP_ENTRY_FORBIDDEN` | x07 / run / error | sometimes | Requested entrypoint is not allowed by the trust profile. |
 | `X07TP_INVALID` | x07 / run / error | sometimes | Trust profile JSON is missing or invalid. |
 | `X07TP_LANGUAGE` | x07 / run / error | sometimes | Project uses language or policy features forbidden by the trust profile. |
-| `X07TP_NETWORK_MODE_FORBIDDEN` | x07 / run / error | sometimes | Sandboxed local trusted-program profile allows networking where it should not. |
-| `X07TP_NETWORK_PROFILE_REQUIRED` | x07 / run / error | sometimes | Networked trusted-program profile is missing required network certification posture. |
-| `X07TP_NOT_CERTIFIABLE` | x07 / run / error | sometimes | Trust profile is weaker than the Milestone A certification floor. |
+| `X07TP_NETWORK_MODE_FORBIDDEN` | x07 / run / error | sometimes | Sandboxed-local trust profile allows networking where it should not. |
+| `X07TP_NETWORK_PROFILE_REQUIRED` | x07 / run / error | sometimes | Networked trust profile is missing required network certification posture. |
+| `X07TP_NOT_CERTIFIABLE` | x07 / run / error | sometimes | Trust profile is weaker than the current certification floor. |
 | `X07TP_PEER_POLICY_REQUIRED` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TP_PEER_POLICY_REQUIRED`. |
 | `X07TP_PROJECT_MISMATCH` | x07 / run / error | sometimes | Project manifest could not be resolved for trust profile validation. |
 | `X07TP_RUNTIME_ATTEST_REQUIRED` | x07 / run / error | sometimes | Sandboxed trusted-program profile is missing runtime attestation requirements. |
@@ -368,6 +394,8 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07T_EPBT_UNSUPPORTED_WORLD` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07T_EPBT_UNSUPPORTED_WORLD`. |
 | `X07V_ASYNC_COUNTEREXAMPLE` | x07 / lint / error | never | The async proof found a counterexample. |
 | `X07V_CANCELLATION_ENSURE_FAILED` | x07 / lint / error | never | The async cancellation postcondition failed under proof. |
+| `X07V_COVERAGE_NOT_PROOF` | x07 / lint / warning | sometimes | Coverage/support summary is not proof evidence. |
+| `X07V_COVERAGE_SUMMARY_FORBIDDEN` | x07 / lint / error | sometimes | Coverage/support summaries cannot be imported as proof. |
 | `X07V_EARGS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EARGS`. |
 | `X07V_ECBMC_ERROR` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_ERROR`. |
 | `X07V_ECBMC_FAILURE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ECBMC_FAILURE`. |
@@ -380,12 +408,25 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07V_ETARGET` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_ETARGET`. |
 | `X07V_EZ3_MISSING` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_EZ3_MISSING`. |
 | `X07V_EZ3_RUN` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07V_EZ3_RUN`. |
+| `X07V_IMPORTED_STUB_FORBIDDEN` | x07 / lint / error | sometimes | Imported stub assumptions are disabled in prove mode. |
 | `X07V_INTERNAL` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_INTERNAL`. |
+| `X07V_NO_CONTRACTS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_NO_CONTRACTS`. |
+| `X07V_PROOF_SUMMARY_REQUIRED` | x07 / lint / error | sometimes | A reachable proof summary dependency is required but missing. |
+| `X07V_PROVE_UNSUPPORTED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_PROVE_UNSUPPORTED`. |
+| `X07V_RECURSION_TERMINATION_FAILED` | x07 / lint / error | sometimes | Recursive proof could not justify the declared termination rank. |
+| `X07V_RECURSIVE_DECREASES_REQUIRED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_RECURSIVE_DECREASES_REQUIRED`. |
+| `X07V_SCHEDULER_MODEL_UNTRUSTED` | x07 / lint / error | sometimes | Async proof cannot proceed without the trusted scheduler model. |
 | `X07V_SCOPE_INVARIANT_FAILED` | x07 / lint / error | never | An async scope invariant failed under proof. |
 | `X07V_SMT_SAT` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_SAT`. |
 | `X07V_SMT_UNKNOWN` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_SMT_UNKNOWN`. |
 | `X07V_SUMMARY_MISMATCH` | x07 / lint / error | never | An imported proof summary does not match the current declaration. |
-| `X07V_SUMMARY_MISSING` | x07 / lint / error | sometimes | A reachable proof summary dependency is missing. |
+| `X07V_SUMMARY_MISSING` | x07 / lint / error | sometimes | A reachable imported proof summary dependency is missing. |
+| `X07V_UNSUPPORTED_DEFASYNC_FORM` | x07 / lint / error | sometimes | The selected `defasync` target is outside the supported proof subset. |
+| `X07V_UNSUPPORTED_FOR_BOUNDS` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNSUPPORTED_FOR_BOUNDS`. |
+| `X07V_UNSUPPORTED_HEAP_EFFECT` | x07 / lint / error | sometimes | The proved core uses heap or pointer effects outside the supported subset. |
+| `X07V_UNSUPPORTED_MUTUAL_RECURSION` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNSUPPORTED_MUTUAL_RECURSION`. |
+| `X07V_UNSUPPORTED_RECURSION` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNSUPPORTED_RECURSION`. |
+| `X07V_UNSUPPORTED_RICH_TYPE` | x07 / type / error | sometimes | The target signature is outside the supported richer-data proof subset. |
 | `X07V_UNWIND_INCOMPLETE` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07V_UNWIND_INCOMPLETE`. |
 | `X7I0001` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0001`. |
 | `X7I0100` | x07import-core / lint / error | sometimes | x07import subset compatibility diagnostic `X7I0100`. |
@@ -6206,6 +6247,46 @@ Agent strategy:
 - Re-run the original package command.
 
 
+## `X07PROOF_ECHECK_FAILED`
+
+Summary: Independent proof check rejected the proof bundle.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker found a digest mismatch or missing bundled artifact while replaying the emitted proof object against its proof-summary, SMT obligation, and solver transcript evidence.
+
+Agent strategy:
+
+- Keep the proof object together with its emitted `verify.proof-summary.json`, `verify.smt2`, and `z3.out.txt` bundle files.
+- Re-run `x07 verify --prove --emit-proof <path>` if any bundle artifact was edited or lost.
+- Re-run `x07 prove check --proof <path>` and confirm the report returns `result=accepted`.
+
+
+## `X07PROOF_EOBJECT_INVALID`
+
+Summary: Proof object failed schema or structural validation.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker read a `x07.verify.proof_object@0.1.0` file that was malformed, schema-invalid, or otherwise could not be decoded as a valid proof object.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove --emit-proof <path>` to regenerate the proof object.
+- Ensure the proof object file is the exact emitted artifact, not a coverage summary or edited JSON.
+- Re-run `x07 prove check --proof <path>`.
+
+
 ## `X07RD_ADVISORY_ALLOWANCE_ENABLED`
 
 Summary: Core lint/schema diagnostic `X07RD_ADVISORY_ALLOWANCE_ENABLED`.
@@ -6224,6 +6305,27 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07RD_ASSUMPTION_SURFACE_WIDEN`
+
+Summary: Review diff gate rejected a wider proof-assumption surface.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires a review decision or a narrower assumption surface.
+
+Details:
+
+The candidate introduces new proof assumptions or widens the accepted assumption classes relative to the baseline certificate posture.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `assumption_changes` highlights.
+- Remove the new assumption surface or intentionally reset the review baseline after review.
+- Re-run `x07 review diff --fail-on assumption-surface-widen`.
 
 
 ## `X07RD_ASYNC_PROOF_COVERAGE_DECREASE`
@@ -6245,6 +6347,27 @@ Agent strategy:
 - Inspect `x07 review diff --json-out ...` and the `async_proof_changes` highlight set.
 - Restore the lost async proof coverage or intentionally reset the baseline after review.
 - Re-run `x07 review diff --fail-on async-proof-coverage-decrease`.
+
+
+## `X07RD_BOUNDED_PROOF_INTRODUCED`
+
+Summary: Review diff gate rejected bounded proof usage.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-surface repair or an explicit review reset.
+
+Details:
+
+The candidate begins depending on bounded recursion proof evidence in accepted certificate posture.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `boundedness_changes` highlights.
+- Remove bounded recursion from the accepted proof closure or move that code out of the strong profile.
+- Re-run `x07 review diff --fail-on bounded-proof-introduced`.
 
 
 ## `X07RD_CAPSULE_CONTRACT_RELAXATION`
@@ -6309,6 +6432,48 @@ Agent strategy:
 - Re-run `x07 review diff --fail-on capsule-set-change`.
 
 
+## `X07RD_COVERAGE_SUMMARY_IMPORTED`
+
+Summary: Review diff gate rejected a coverage-only import.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof evidence, not a coverage-only summary.
+
+Details:
+
+The candidate started importing a coverage/support summary where proof evidence is required.
+
+Agent strategy:
+
+- Inspect the `assumption_changes` and `summary_changes` highlights in the review report.
+- Replace the coverage/support import with a proof-summary import or a local prove run.
+- Re-run `x07 review diff --fail-on coverage-summary-imported`.
+
+
+## `X07RD_DEV_ONLY_ASSUMPTION_INTRODUCED`
+
+Summary: Review diff gate rejected a developer-only proof assumption.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-surface repair, not a mechanical patch.
+
+Details:
+
+The candidate begins depending on a non-certifiable proof assumption such as an imported stub in accepted certificate posture.
+
+Agent strategy:
+
+- Inspect the `assumption_changes` highlights in the review report.
+- Remove the developer-only assumption or move the flow out of the strong profile.
+- Re-run `x07 review diff --fail-on dev-only-assumption-introduced`.
+
+
 ## `X07RD_LOCKFILE_HASH_CHANGE`
 
 Summary: Core lint/schema diagnostic `X07RD_LOCKFILE_HASH_CHANGE`.
@@ -6347,6 +6512,27 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07RD_OPERATIONAL_ENTRY_DIVERGES`
+
+Summary: Review diff gate rejected operational-entry divergence.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires an explicit certification-entry decision.
+
+Details:
+
+The candidate changed the certified operational entry or caused `--entry` and `project.operational_entry_symbol` to diverge.
+
+Agent strategy:
+
+- Inspect `x07 review diff --json-out ...` and the `operational_entry_changes` highlights.
+- Realign the manifest and certification command to the shipped operational entry.
+- Re-run `x07 review diff --fail-on operational-entry-diverges`.
 
 
 ## `X07RD_PACKAGE_SET_CHANGE`
@@ -6471,6 +6657,86 @@ Agent strategy:
 - Inspect the `summary_changes` highlights in the review report.
 - Restore the stronger proof-summary posture or intentionally reset the review baseline.
 - Re-run `x07 review diff --fail-on summary-downgrade`.
+
+
+## `X07REL_EBOUNDED_PROOF`
+
+Summary: Release guard rejected bounded proof usage in the strict fixture.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The strict verified-core fixture accepted a certificate that still depended on bounded proof evidence, which the release guard forbids for the strong internal baseline.
+
+Agent strategy:
+
+- Remove the bounded-proof dependency from the strict fixture certificate path.
+- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the accepted certificate no longer marks bounded proof.
+- Re-run the release-readiness CI gate.
+
+
+## `X07REL_ECOVERAGE_ONLY_IMPORT`
+
+Summary: Release guard rejected a coverage-only imported summary in the strict fixture.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The strict verified-core fixture imported coverage-only summary evidence where the release guard requires checked proof evidence.
+
+Agent strategy:
+
+- Replace the imported coverage-only summary with per-symbol prove artifacts and checked proof evidence.
+- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the certificate proof inventory is strict.
+- Re-run the release-readiness CI gate.
+
+
+## `X07REL_EDEV_ONLY_ASSUMPTION`
+
+Summary: Release guard rejected a developer-only proof assumption in the strict fixture.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The strict verified-core fixture accepted certificate evidence that still depended on developer-only assumptions such as imported stubs.
+
+Agent strategy:
+
+- Remove the developer-only assumption from the strict fixture proof surface.
+- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm the accepted certificate has no developer-only assumptions.
+- Re-run the release-readiness CI gate.
+
+
+## `X07REL_ESURROGATE_ENTRY`
+
+Summary: Release guard rejected surrogate-entry certification in the strict fixture.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The strict verified-core fixture accepted certification for an entry that diverged from `project.operational_entry_symbol`, which the release guard forbids.
+
+Agent strategy:
+
+- Keep the certification entry aligned with `project.operational_entry_symbol`.
+- Re-run `scripts/ci/check_verified_core_fixture.sh` and confirm surrogate-entry rejection still fires.
+- Re-run the release-readiness CI gate.
 
 
 ## `X07RR_ENTRY_EXISTS`
@@ -6656,6 +6922,26 @@ Agent strategy:
 - Re-run `x07 trust certify`.
 
 
+## `X07TC_EASYNC_PROVE_REPORT_MISSING`
+
+Summary: Required async prove report is missing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Certification expected a per-symbol async prove report artifact for a reachable `defasync` symbol, but the report file was missing or the proof run did not emit the expected artifact path.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove` for the reported async symbol and keep the emitted prove report under the certificate out-dir.
+- Ensure the proof run emits `verify_proof_summary_path` in the prove report.
+- Re-run `x07 trust certify`.
+
+
 ## `X07TC_EBOUNDARY_MISSING`
 
 Summary: Boundary declarations are missing or incomplete for certification.
@@ -6696,6 +6982,27 @@ Agent strategy:
 - Run `x07 review diff --fail-on boundary-relaxation` and inspect the highlighted boundary changes.
 - Tighten the candidate boundary contract or explicitly reset the baseline after review.
 - Re-run `x07 trust certify` with the corrected baseline.
+
+
+## `X07TC_EBOUNDED_PROOF_FORBIDDEN`
+
+Summary: Bounded recursion proof is forbidden for the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-surface repair or profile scope changes.
+
+Details:
+
+Accepted strong certificates cannot depend on bounded-by-unwind recursion proof evidence.
+
+Agent strategy:
+
+- Inspect the emitted proof summaries and certificate recursive-proof fields.
+- Refactor the recursive symbol out of the strong certified closure or move it behind a non-strong flow.
+- Re-run `x07 trust certify`.
 
 
 ## `X07TC_ECAPSULE_ATTEST`
@@ -6759,6 +7066,27 @@ Agent strategy:
 - Fix reproducibility or toolchain drift before certifying again.
 
 
+## `X07TC_ECOVERAGE_ONLY`
+
+Summary: Coverage/support evidence cannot satisfy certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires prove evidence, not a mechanical patch.
+
+Details:
+
+A reachable symbol or imported dependency is covered by support posture only, without the prove artifacts required by the active trust profile.
+
+Agent strategy:
+
+- Run `x07 verify --prove` for the reachable symbol set required by the active profile.
+- Replace any imported coverage/support summary with a proof summary emitted by a successful prove run.
+- Re-run `x07 trust certify`.
+
+
 ## `X07TC_EDEP_CLOSURE`
 
 Summary: Core lint/schema diagnostic `X07TC_EDEP_CLOSURE`.
@@ -6777,6 +7105,27 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07TC_EDEV_ONLY_ASSUMPTION`
+
+Summary: Developer-only proof assumptions are forbidden for the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires proof-surface repair or dependency changes.
+
+Details:
+
+The accepted proof inventory depends on a non-certifiable assumption such as an `imported_stub` primitive.
+
+Agent strategy:
+
+- Re-run prove without `--allow-imported-stubs`.
+- Replace the stubbed dependency with certifiable code or a reviewed proof-summary path.
+- Re-run `x07 trust certify`.
 
 
 ## `X07TC_EDIFF_POSTURE`
@@ -6862,6 +7211,48 @@ Agent strategy:
 - Re-run `x07 trust certify`.
 
 
+## `X07TC_EOP_ENTRY_MISMATCH`
+
+Summary: Certification entry does not match the operational entry.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Strong trust profiles require `--entry` to match `project.operational_entry_symbol` exactly.
+
+Agent strategy:
+
+- Inspect `x07.json` and the `x07 trust certify --entry ...` argument.
+- Realign the certification command or manifest so the shipped operational entry is certified directly.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EOP_ENTRY_REQUIRED`
+
+Summary: Operational-entry metadata is required for the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+Strong trust profiles require `project.operational_entry_symbol` in `x07.project@0.4.0` manifests so the shipped entry is explicit.
+
+Agent strategy:
+
+- Add `project.operational_entry_symbol` to `x07.json`.
+- If the project still needs a helper certification symbol, keep it separate with `project.certification_entry_symbol` and certify only non-strong flows against it.
+- Re-run `x07 trust certify`.
+
+
 ## `X07TC_EPBT`
 
 Summary: Boundary-required property tests are missing, malformed, or failing.
@@ -6943,6 +7334,27 @@ Agent strategy:
 - Re-run `x07 trust certify`.
 
 
+## `X07TC_EPROOF_CHECK_MISSING`
+
+Summary: Required proof-check report is missing from prove evidence.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires regenerated proof artifacts, not a source-only patch.
+
+Details:
+
+The active trust profile requires an independent proof-check report for each accepted proof object.
+
+Agent strategy:
+
+- Run `x07 prove check --proof <path>` for the missing proof object or rerun the prove flow that emits the check report.
+- Ensure the per-symbol prove report references both the proof object and the proof-check report.
+- Re-run `x07 trust certify`.
+
+
 ## `X07TC_EPROOF_COVERAGE`
 
 Summary: Reachable proof coverage is incomplete for certification.
@@ -6962,6 +7374,108 @@ Agent strategy:
 - Run `x07 verify --coverage --entry <entry> --project x07.json` and inspect `target/cert/verify.coverage.json`.
 - Move unsupported logic behind certified boundaries or refactor it into the certifiable subset.
 - Re-run `x07 verify --prove` for uncovered symbols before certifying again.
+
+
+## `X07TC_EPROOF_OBJECT_MISSING`
+
+Summary: Required proof object is missing from prove evidence.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires regenerated proof artifacts, not a source-only patch.
+
+Details:
+
+The active trust profile requires a proof object for each accepted prove inventory item, but a referenced prove report did not bind one.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove --emit-proof <path>` for the missing symbol.
+- Run `x07 prove check --proof <path>` so the proof-check report exists alongside the proof object.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROVE`
+
+Summary: At least one reachable proof obligation failed.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A reachable symbol failed `x07 verify --prove` or returned a non-`proven` result.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove` for the reported symbol.
+- Add missing loop contracts, strengthen `requires[]`/`ensures[]`, or simplify the function into the supported subset.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROVE_REPORT_MISSING`
+
+Summary: Required per-symbol prove report is missing.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Certification expected a per-symbol prove report artifact for a reachable `defn` symbol, but the report file was missing or the proof run did not emit the expected artifact path.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove` for the reported symbol and keep the emitted prove report under the certificate out-dir.
+- Ensure the proof run emits `verify_proof_summary_path` in the prove report.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROVE_UNSUPPORTED`
+
+Summary: A reachable symbol is outside the supported proof subset.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+At least one reachable symbol uses a construct the prover cannot certify yet (for example unsupported params, unsupported loop bounds, or unresolved non-certified imports).
+
+Agent strategy:
+
+- Re-run `x07 verify --prove` for the reported symbol and inspect the verify diagnostics.
+- Add the missing contracts, loop skeleton, or wrapper function needed to stay in the supported subset.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_ERECURSION_FORBIDDEN`
+
+Summary: Reachable recursion is forbidden by the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `never`
+No quickfix reason: Requires semantic refactoring or an intentional profile change.
+
+Details:
+
+The reachable closure still contains recursive symbols, but the active trust profile sets `language_subset.allow_recursion=false` and therefore fails closed even when recursion would otherwise be supported or imported as reviewed proof.
+
+Agent strategy:
+
+- Refactor recursive helpers out of the certified closure or choose a profile that explicitly allows recursion.
+- Re-run `x07 verify --coverage --entry <entry>` and inspect the recursive symbols in the closure.
+- Re-run `x07 trust certify` after the certified entry is recursion-free.
 
 
 ## `X07TC_ERUNTIME_ATTEST`
@@ -7045,6 +7559,27 @@ Agent strategy:
 - Re-run `x07 trust certify`.
 
 
+## `X07TC_ESURROGATE_ENTRY_FORBIDDEN`
+
+Summary: Surrogate certification entries are forbidden for the active trust profile.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+Quickfix kinds: `json_patch`
+
+Details:
+
+The selected strong profile requires certifying the shipped operational entry directly, not a separate proof-friendly surrogate entry.
+
+Agent strategy:
+
+- Inspect `project.operational_entry_symbol`, optional `project.certification_entry_symbol`, and the `--entry` argument.
+- Certify the operational entry directly or move the surrogate flow to a non-strong developer check.
+- Re-run `x07 trust certify`.
+
+
 ## `X07TC_ETESTS`
 
 Summary: Deterministic certification tests are missing or failing.
@@ -7086,6 +7621,45 @@ Agent strategy:
 - Run `x07 trust report --project x07.json --out target/trust/trust.json --html-out target/trust/trust.html`.
 - Remove the disallowed capability surface or fix the missing SBOM/trust artifact.
 - Re-run `x07 trust certify`.
+
+
+## `X07TC_EUNSUPPORTED_DEFASYNC`
+
+Summary: Reachable `defasync` logic is outside the certifiable subset.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The reachable closure contains runtime-only `defasync` symbols, which are forbidden by `verified_core_pure_v1`.
+
+Agent strategy:
+
+- Split async logic behind a certified boundary and keep the certified entry closure `defn`-only.
+- Add a pure wrapper if needed.
+- Re-run `x07 verify --coverage` and `x07 trust certify`.
+
+
+## `X07TC_EUNSUPPORTED_RECURSION`
+
+Summary: Reachable recursion is outside the certifiable subset.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The reachable closure contains recursive logic, which `verified_core_pure_v1` does not certify.
+
+Agent strategy:
+
+- Refactor recursion into a bounded iterative form and add loop contracts where needed.
+- Re-run `x07 verify --coverage` and `x07 trust certify`.
 
 
 ## `X07TEST_ASYNC_ENTRY_UNSUPPORTED`
@@ -7202,12 +7776,12 @@ Quickfix support: `sometimes`
 
 Details:
 
-Milestone C networked certification requires VM-backed sandboxing, forbids weaker isolation, and rejects project worlds outside the certifiable sandbox line.
+Networked certification requires VM-backed sandboxing, forbids weaker isolation, and rejects project worlds outside the certifiable sandbox line.
 
 Agent strategy:
 
-- Keep `worlds_allowed` free of `run-os`.
-- Set `sandbox_requirements.sandbox_backend="vm"` and `sandbox_requirements.forbid_weaker_isolation=true`.
+- Inspect the selected trust profile JSON and backend requirements.
+- Restore VM-backed sandboxing and the certifiable world restrictions.
 - Re-run `x07 trust profile check`.
 
 
@@ -7374,7 +7948,7 @@ Agent strategy:
 
 ## `X07TP_NETWORK_MODE_FORBIDDEN`
 
-Summary: Sandboxed local trusted-program profile allows networking where it should not.
+Summary: Sandboxed-local trust profile allows networking where it should not.
 
 Origins:
 - x07 (stage: run, severity: error)
@@ -7383,18 +7957,18 @@ Quickfix support: `sometimes`
 
 Details:
 
-The Milestone B local sandbox profile keeps networking disabled until VM-boundary allowlist enforcement is fully supported across backends.
+The sandboxed local trust profile must keep networking disabled for the local certification line.
 
 Agent strategy:
 
-- Keep `sandbox_requirements.network_mode="none"`.
-- Ensure the selected sandbox policy sets `net.enabled=false`.
+- Inspect the selected trust profile JSON.
+- Remove network posture from the local sandbox profile or switch to the networked trust profile intentionally.
 - Re-run `x07 trust profile check`.
 
 
 ## `X07TP_NETWORK_PROFILE_REQUIRED`
 
-Summary: Networked trusted-program profile is missing required network certification posture.
+Summary: Networked trust profile is missing required network certification posture.
 
 Origins:
 - x07 (stage: run, severity: error)
@@ -7403,18 +7977,18 @@ Quickfix support: `sometimes`
 
 Details:
 
-The Milestone C networked trust profile must require the allowlist-backed network posture, attested network capsules, and matching runtime network evidence semantics.
+The networked trust profile must require allowlist-backed network posture, attested network capsules, and matching runtime network evidence semantics.
 
 Agent strategy:
 
-- Keep `sandbox_requirements.network_mode="allowlist"` and `sandbox_requirements.network_enforcement="vm_boundary_allowlist"`.
-- Set `evidence_requirements.require_network_capsules=true`.
+- Inspect the selected trust profile JSON.
+- Restore the required network evidence requirements and sandbox posture.
 - Re-run `x07 trust profile check`.
 
 
 ## `X07TP_NOT_CERTIFIABLE`
 
-Summary: Trust profile is weaker than the Milestone A certification floor.
+Summary: Trust profile is weaker than the current certification floor.
 
 Origins:
 - x07 (stage: run, severity: error)
@@ -7423,12 +7997,12 @@ Quickfix support: `sometimes`
 
 Details:
 
-The profile relaxes one or more requirements needed for `verified_core_pure_v1` certification.
+The selected trust profile omits required certification posture such as strict operational-entry binding, evidence requirements, or sandbox restrictions needed for accepted source-free review.
 
 Agent strategy:
 
-- Tighten the profile to the verified-core floor instead of weakening the certificate contract.
-- Keep the profile immutable once it is published.
+- Inspect the selected trust profile JSON.
+- Restore the missing certification requirements or switch to a non-strong developer/demo flow intentionally.
 - Re-run `x07 trust profile check`.
 
 
@@ -7652,6 +8226,46 @@ Agent strategy:
 - Model the cancellation result and cleanup effects explicitly in `cancellation_ensures`.
 - Repair any cancellation-path state updates or resource cleanup.
 - Re-run `x07 verify --prove`.
+
+
+## `X07V_COVERAGE_NOT_PROOF`
+
+Summary: Coverage/support summary is not proof evidence.
+
+Origins:
+- x07 (stage: lint, severity: warning)
+
+Quickfix support: `sometimes`
+
+Details:
+
+A supplied `x07.verify.summary@0.2.0` artifact describes coverage posture only. It can help review or planning, but it cannot satisfy prove-mode or certification proof requirements.
+
+Agent strategy:
+
+- Replace the coverage/support artifact with `x07.verify.proof_summary@0.2.0` emitted by a successful `x07 verify --prove` run.
+- Keep `x07 verify --coverage` outputs for posture review only.
+- Re-run the prove flow with `--proof-summary <path>`.
+
+
+## `X07V_COVERAGE_SUMMARY_FORBIDDEN`
+
+Summary: Coverage/support summaries cannot be imported as proof.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The caller passed `x07.verify.summary@0.2.0` through `--proof-summary`, but prove-mode imports accept only `x07.verify.proof_summary@0.2.0` evidence emitted by successful prove runs.
+
+Agent strategy:
+
+- Remove the coverage/support artifact from `--proof-summary` inputs.
+- Re-run the dependency prove flow that emits `verify.proof-summary.json`.
+- Retry with the proof-summary artifact instead of the coverage/support summary.
 
 
 ## `X07V_EARGS`
@@ -7894,6 +8508,26 @@ Agent strategy:
 - Re-run compile/test.
 
 
+## `X07V_IMPORTED_STUB_FORBIDDEN`
+
+Summary: Imported stub assumptions are disabled in prove mode.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The requested prove run depends on developer-only `imported_stub` assumptions. Strong certification flows reject those assumptions instead of silently treating them as proof.
+
+Agent strategy:
+
+- Replace the imported stub with a proved or attested implementation on the reachable proof surface.
+- If you only need a developer-only exploration run, re-run `x07 verify --prove --allow-imported-stubs` and do not use that result for strong certification.
+- Re-run the prove or certification command on the strict surface.
+
+
 ## `X07V_INTERNAL`
 
 Summary: Core lint/schema diagnostic `X07V_INTERNAL`.
@@ -7912,6 +8546,126 @@ Agent strategy:
 - Run `x07 fmt`, `x07 lint`, and `x07 fix`.
 - Apply deterministic AST/config edits.
 - Re-run compile/test.
+
+
+## `X07V_NO_CONTRACTS`
+
+Summary: Core lint/schema diagnostic `X07V_NO_CONTRACTS`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_PROOF_SUMMARY_REQUIRED`
+
+Summary: A reachable proof summary dependency is required but missing.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The current prove flow reached a symbol outside the locally loaded graph, and no imported `x07.verify.proof_summary@0.2.0` artifact was supplied for that dependency.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove --entry <sym>` for the reviewed dependency to emit `verify.proof-summary.json`.
+- Pass the emitted artifact back via `x07 verify --proof-summary <path>`.
+- Re-run the original prove command.
+
+
+## `X07V_PROVE_UNSUPPORTED`
+
+Summary: Core lint/schema diagnostic `X07V_PROVE_UNSUPPORTED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_RECURSION_TERMINATION_FAILED`
+
+Summary: Recursive proof could not justify the declared termination rank.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The target is directly self-recursive and declares `decreases[]`, but at least one recursive self-call does not obviously decrease the declared rank term in the verifier's certifiable recursive subset.
+
+Agent strategy:
+
+- Keep the first `decreases[].expr` aligned with a recursive parameter.
+- Rewrite recursive self-calls so the rank argument decreases by a positive literal step.
+- Re-run `x07 verify --prove`.
+
+
+## `X07V_RECURSIVE_DECREASES_REQUIRED`
+
+Summary: Core lint/schema diagnostic `X07V_RECURSIVE_DECREASES_REQUIRED`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_SCHEDULER_MODEL_UNTRUSTED`
+
+Summary: Async proof cannot proceed without the trusted scheduler model.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The async verifier requires the checked-in deterministic scheduler model to justify the state-machine proof, but that model is missing or could not be loaded.
+
+Agent strategy:
+
+- Restore `catalog/verify_scheduler_model.json` from the canonical toolchain tree.
+- Keep async proof runs on the released deterministic scheduler model only.
+- Re-run `x07 verify --prove`.
 
 
 ## `X07V_SCOPE_INVARIANT_FAILED`
@@ -7987,18 +8741,18 @@ No quickfix reason: Requires aligning reviewed summary artifacts with the curren
 
 Details:
 
-The supplied `x07.verify.summary@0.1.0` artifact names a reachable symbol, but its declaration digest does not match the currently loaded source graph.
+The supplied `x07.verify.proof_summary@0.2.0` artifact names a reachable symbol, but its declaration digest does not match the currently loaded source graph.
 
 Agent strategy:
 
-- Regenerate the imported summary from the exact reviewed declaration set.
-- Keep summary artifacts and source graph revisions aligned.
-- Re-run `x07 verify --summary <path>`.
+- Regenerate the imported proof summary from the exact reviewed declaration set.
+- Keep proof-summary artifacts and source graph revisions aligned.
+- Re-run `x07 verify --proof-summary <path>` (or the deprecated `--summary <path>` alias).
 
 
 ## `X07V_SUMMARY_MISSING`
 
-Summary: A reachable proof summary dependency is missing.
+Summary: A reachable imported proof summary dependency is missing.
 
 Origins:
 - x07 (stage: lint, severity: error)
@@ -8007,13 +8761,133 @@ Quickfix support: `sometimes`
 
 Details:
 
-The requested verify run reached a symbol outside the locally loaded graph and no imported `x07.verify.summary@0.1.0` artifact was supplied for that symbol.
+The requested verify run reached a symbol outside the locally loaded graph and no imported `x07.verify.proof_summary@0.2.0` artifact was supplied for that symbol.
 
 Agent strategy:
 
-- Re-run `x07 verify --coverage --entry <sym>` for the reviewed callee to emit `verify.summary.json`.
-- Pass the emitted artifact back via `x07 verify --summary <path>`.
+- Re-run `x07 verify --prove --entry <sym>` for the reviewed callee to emit a proof summary.
+- Pass the emitted artifact back via `x07 verify --proof-summary <path>` (or the deprecated `--summary <path>` alias).
 - Re-run the original verify command.
+
+
+## `X07V_UNSUPPORTED_DEFASYNC_FORM`
+
+Summary: The selected `defasync` target is outside the supported proof subset.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Async proof currently requires a certifiable state-machine form with supported parameters and a `bytes` or `result_bytes` result type.
+
+Agent strategy:
+
+- Refactor the async entry into the supported subset.
+- Keep proof-target `defasync` results in `bytes` or `result_bytes` form.
+- Re-run `x07 verify --prove`.
+
+
+## `X07V_UNSUPPORTED_FOR_BOUNDS`
+
+Summary: Core lint/schema diagnostic `X07V_UNSUPPORTED_FOR_BOUNDS`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_UNSUPPORTED_HEAP_EFFECT`
+
+Summary: The proved core uses heap or pointer effects outside the supported subset.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The verifier rejects direct heap mutation, raw pointer operations, and related memory intrinsics inside the certifiable pure proof subset instead of silently weakening proof posture.
+
+Agent strategy:
+
+- Move heap or pointer effects behind a reviewed capsule boundary.
+- Keep proof-target logic on pure value transformations.
+- Re-run `x07 verify --prove`.
+
+
+## `X07V_UNSUPPORTED_MUTUAL_RECURSION`
+
+Summary: Core lint/schema diagnostic `X07V_UNSUPPORTED_MUTUAL_RECURSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_UNSUPPORTED_RECURSION`
+
+Summary: Core lint/schema diagnostic `X07V_UNSUPPORTED_RECURSION`.
+
+Origins:
+- x07 (stage: lint, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The issue is in x07AST shape, world capability use, or policy/schema constraints and is typically repairable with deterministic AST/config edits.
+
+Agent strategy:
+
+- Run `x07 fmt`, `x07 lint`, and `x07 fix`.
+- Apply deterministic AST/config edits.
+- Re-run compile/test.
+
+
+## `X07V_UNSUPPORTED_RICH_TYPE`
+
+Summary: The target signature is outside the supported richer-data proof subset.
+
+Origins:
+- x07 (stage: type, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The verifier currently supports the reviewed richer-data carriers for certification: unbranded `bytes` / `bytes_view`, `vec_u8`, first-order `option_*` / `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`. Schema-derived record and tagged-union documents can sit directly on the proof boundary through branded `bytes_view` inputs. Nested result carriers are still rejected explicitly.
+
+Agent strategy:
+
+- Keep proof-target signatures on the supported richer-data carriers.
+- Schema-derived record and tagged-union documents can use branded `bytes_view` inputs when the validator is reachable through `meta.brands_v1.validate`.
+- Re-run `x07 verify --prove`.
 
 
 ## `X07V_UNWIND_INCOMPLETE`
@@ -8051,7 +8925,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8071,7 +8945,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8091,7 +8965,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8111,7 +8985,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8131,7 +9005,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8151,7 +9025,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8171,7 +9045,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8191,7 +9065,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8211,7 +9085,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8231,7 +9105,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8251,7 +9125,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8271,7 +9145,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8291,7 +9165,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8311,7 +9185,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8331,7 +9205,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8351,7 +9225,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8371,7 +9245,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8391,7 +9265,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8411,7 +9285,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 
@@ -8431,7 +9305,7 @@ The source program uses syntax/semantics outside the supported importer subset. 
 
 Agent strategy:
 
-- Inspect importer diagnostic phase/context.
+- Inspect importer diagnostic context.
 - Rewrite unsupported Rust/C constructs into supported subset forms.
 - Re-run x07import and tests.
 

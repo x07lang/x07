@@ -14,14 +14,15 @@ use x07_contracts::{
     X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_PATCHSET_SCHEMA_VERSION,
     X07_PKG_ADVISORY_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
     X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
-    X07_VERIFY_COVERAGE_SCHEMA_VERSION, X07_VERIFY_REPORT_SCHEMA_VERSION,
-    X07_VERIFY_SUMMARY_SCHEMA_VERSION,
+    X07_VERIFY_COVERAGE_SCHEMA_VERSION, X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION,
+    X07_VERIFY_REPORT_SCHEMA_VERSION, X07_VERIFY_SUMMARY_SCHEMA_VERSION,
 };
 use x07_runner_common::sandbox_backend::{ENV_ACCEPT_WEAKER_ISOLATION, ENV_SANDBOX_BACKEND};
 use x07c::json_patch;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static MCP_NATIVE_BACKENDS_READY: Once = Once::new();
+static RUNNER_BINARIES_READY: Once = Once::new();
 
 fn repo_root() -> PathBuf {
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -57,7 +58,26 @@ fn ensure_mcp_native_backends_staged() {
     });
 }
 
+fn ensure_runner_binaries_staged() {
+    RUNNER_BINARIES_READY.call_once(|| {
+        let root = repo_root();
+        let out = Command::new("cargo")
+            .current_dir(&root)
+            .args(["build", "-p", "x07-host-runner", "-p", "x07-os-runner"])
+            .output()
+            .expect("build runner binaries");
+        assert!(
+            out.status.success(),
+            "runner build failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            out.status,
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr),
+        );
+    });
+}
+
 fn run_x07(args: &[&str]) -> std::process::Output {
+    ensure_runner_binaries_staged();
     let exe = env!("CARGO_BIN_EXE_x07");
     Command::new(exe)
         .env(ENV_SANDBOX_BACKEND, "os")
@@ -68,6 +88,7 @@ fn run_x07(args: &[&str]) -> std::process::Output {
 }
 
 fn run_x07_in_dir(dir: &Path, args: &[&str]) -> std::process::Output {
+    ensure_runner_binaries_staged();
     let exe = env!("CARGO_BIN_EXE_x07");
     Command::new(exe)
         .current_dir(dir)
@@ -2544,7 +2565,7 @@ fn x07_verify_prove_self_recursive_with_decreases_returns_proven() {
         serde_json::from_slice(&coverage.stdout).expect("parse verify coverage JSON");
     assert_eq!(coverage_doc["coverage"]["summary"]["recursive_defn"], 1);
     assert_eq!(
-        coverage_doc["coverage"]["summary"]["proven_recursive_defn"],
+        coverage_doc["coverage"]["summary"]["supported_recursive_defn"],
         1
     );
     assert_eq!(
@@ -2555,13 +2576,13 @@ fn x07_verify_prove_self_recursive_with_decreases_returns_proven() {
         .as_array()
         .expect("functions[]");
     assert_eq!(functions.len(), 1);
-    assert_eq!(functions[0]["status"], "proven_recursive");
+    assert_eq!(functions[0]["status"], "supported_recursive");
     assert_eq!(
-        functions[0]["proof_summary"]["recursion_kind"],
+        functions[0]["support_summary"]["recursion_kind"],
         "self_recursive"
     );
-    assert_eq!(functions[0]["proof_summary"]["decreases_count"], 1);
-    assert_eq!(functions[0]["proof_summary"]["prove_supported"], true);
+    assert_eq!(functions[0]["support_summary"]["decreases_count"], 1);
+    assert_eq!(functions[0]["support_summary"]["prove_supported"], true);
 }
 
 #[test]
@@ -2807,7 +2828,7 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
         &dir,
         &[
             "verify",
-            "--coverage",
+            "--prove",
             "--entry",
             "verify_fixture.helper",
             "--project",
@@ -2821,22 +2842,22 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
         String::from_utf8_lossy(&helper_out.stderr)
     );
     let helper_report: Value =
-        serde_json::from_slice(&helper_out.stdout).expect("parse helper coverage JSON");
-    let helper_summary_path = helper_report["artifacts"]["verify_summary_path"]
+        serde_json::from_slice(&helper_out.stdout).expect("parse helper prove JSON");
+    let helper_summary_path = helper_report["artifacts"]["verify_proof_summary_path"]
         .as_str()
-        .expect("helper verify summary path");
+        .expect("helper verify proof summary path");
     assert!(
         Path::new(helper_summary_path).is_file(),
         "missing {}",
         helper_summary_path
     );
     let helper_summary: Value = serde_json::from_slice(
-        &std::fs::read(helper_summary_path).expect("read helper verify summary"),
+        &std::fs::read(helper_summary_path).expect("read helper verify proof summary"),
     )
-    .expect("parse helper verify summary");
+    .expect("parse helper verify proof summary");
     assert_eq!(
         helper_summary["schema_version"],
-        X07_VERIFY_SUMMARY_SCHEMA_VERSION
+        X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION
     );
 
     let main_out = run_x07_in_dir(
@@ -2848,7 +2869,7 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
             "verify_fixture.main",
             "--project",
             "x07.json",
-            "--summary",
+            "--proof-summary",
             helper_summary_path,
         ],
     );
@@ -2865,7 +2886,7 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
         X07_VERIFY_REPORT_SCHEMA_VERSION
     );
     assert_eq!(
-        main_report["coverage"]["summary"]["imported_summary_defn"],
+        main_report["coverage"]["summary"]["imported_proof_summary_defn"],
         1
     );
     let functions = main_report["coverage"]["functions"]
@@ -2874,12 +2895,12 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
     assert!(
         functions.iter().any(|function| {
             function["symbol"] == "verify_fixture.helper"
-                && function["status"] == "imported_summary"
+                && function["status"] == "imported_proof_summary"
         }),
         "expected imported summary status, got:\n{}",
         serde_json::to_string_pretty(&main_report).unwrap()
     );
-    let main_summary_path = main_report["artifacts"]["verify_summary_path"]
+    let main_summary_path = main_report["artifacts"]["verify_coverage_summary_path"]
         .as_str()
         .expect("main verify summary path");
     let main_summary: Value = serde_json::from_slice(
@@ -2947,7 +2968,7 @@ fn x07_verify_prove_rejects_mismatched_imported_summary() {
         &dir,
         &[
             "verify",
-            "--coverage",
+            "--prove",
             "--entry",
             "verify_fixture.helper",
             "--project",
@@ -2961,10 +2982,10 @@ fn x07_verify_prove_rejects_mismatched_imported_summary() {
         String::from_utf8_lossy(&helper_out.stderr)
     );
     let helper_report: Value =
-        serde_json::from_slice(&helper_out.stdout).expect("parse helper coverage JSON");
-    let helper_summary_path = helper_report["artifacts"]["verify_summary_path"]
+        serde_json::from_slice(&helper_out.stdout).expect("parse helper prove JSON");
+    let helper_summary_path = helper_report["artifacts"]["verify_proof_summary_path"]
         .as_str()
-        .expect("helper verify summary path")
+        .expect("helper verify proof summary path")
         .to_string();
 
     write_json(
@@ -3708,13 +3729,13 @@ fn x07_verify_coverage_defasync_reports_scheduler_model() {
     assert_eq!(v["mode"], "coverage");
     assert_eq!(v["result"]["kind"], "coverage_report");
     assert_eq!(v["coverage"]["summary"]["reachable_async"], 1);
-    assert_eq!(v["coverage"]["summary"]["proven_async"], 1);
+    assert_eq!(v["coverage"]["summary"]["supported_async"], 1);
     assert_eq!(v["coverage"]["summary"]["trusted_scheduler_models"], 1);
     let functions = v["coverage"]["functions"].as_array().expect("functions[]");
     assert!(
         functions
             .iter()
-            .any(|f| f["symbol"] == "verify_fixture.f" && f["status"] == "proven_async"),
+            .any(|f| f["symbol"] == "verify_fixture.f" && f["status"] == "supported_async"),
         "expected defasync target in coverage graph"
     );
     assert!(
@@ -3777,14 +3798,14 @@ fn x07_verify_coverage_emits_schema_shaped_report() {
     );
     assert_eq!(v["coverage"]["entry"], "verify_fixture.f");
     assert_eq!(v["coverage"]["summary"]["reachable_defn"], 1);
-    assert_eq!(v["coverage"]["summary"]["proven_defn"], 1);
+    assert_eq!(v["coverage"]["summary"]["supported_defn"], 1);
     assert_eq!(v["coverage"]["summary"]["uncovered_defn"], 0);
     assert_eq!(v["coverage"]["summary"]["unsupported_defn"], 0);
     let functions = v["coverage"]["functions"].as_array().expect("functions[]");
     assert_eq!(functions.len(), 1);
     assert_eq!(functions[0]["symbol"], "verify_fixture.f");
     assert_eq!(functions[0]["kind"], "defn");
-    assert_eq!(functions[0]["status"], "proven");
+    assert_eq!(functions[0]["status"], "supported");
     assert!(functions[0]["source_path"].as_str().is_some());
 }
 
@@ -3959,7 +3980,7 @@ fn scaffold_trust_profile_fixture(dir: &Path) {
     write_json(
         &dir.join("arch/trust/profiles/verified_core_pure_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.3.0",
+            "schema_version": "x07.trust.profile@0.4.0",
             "id": "verified_core_pure_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -3990,6 +4011,9 @@ fn scaffold_trust_profile_fixture(dir: &Path) {
                 "require_proof_mode": "prove",
                 "require_proof_coverage": "all_reachable_defn",
                 "require_async_proof_coverage": false,
+                "require_per_symbol_prove_reports_defn": true,
+                "require_per_symbol_prove_reports_async": false,
+                "allow_coverage_summary_imports": false,
                 "require_capsule_attestations": false,
                 "require_runtime_attestation": false,
                 "require_effect_log_digests": false,
@@ -4318,7 +4342,7 @@ fn x07_trust_profile_check_accepts_sandboxed_local_profile() {
     write_json(
         &dir.join("arch/trust/profiles/trusted_program_sandboxed_local_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.3.0",
+            "schema_version": "x07.trust.profile@0.4.0",
             "id": "trusted_program_sandboxed_local_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -4349,6 +4373,9 @@ fn x07_trust_profile_check_accepts_sandboxed_local_profile() {
                 "require_proof_mode": "prove",
                 "require_proof_coverage": "all_reachable_defn",
                 "require_async_proof_coverage": true,
+                "require_per_symbol_prove_reports_defn": true,
+                "require_per_symbol_prove_reports_async": true,
+                "allow_coverage_summary_imports": false,
                 "require_capsule_attestations": true,
                 "require_runtime_attestation": true,
                 "require_effect_log_digests": true,
@@ -4405,7 +4432,7 @@ fn x07_trust_profile_check_rejects_run_os_for_sandboxed_local_profile() {
     write_json(
         &dir.join("arch/trust/profiles/trusted_program_sandboxed_local_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.3.0",
+            "schema_version": "x07.trust.profile@0.4.0",
             "id": "trusted_program_sandboxed_local_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -4436,6 +4463,9 @@ fn x07_trust_profile_check_rejects_run_os_for_sandboxed_local_profile() {
                 "require_proof_mode": "prove",
                 "require_proof_coverage": "all_reachable_defn",
                 "require_async_proof_coverage": true,
+                "require_per_symbol_prove_reports_defn": true,
+                "require_per_symbol_prove_reports_async": true,
+                "allow_coverage_summary_imports": false,
                 "require_capsule_attestations": true,
                 "require_runtime_attestation": true,
                 "require_effect_log_digests": true,
@@ -4489,7 +4519,7 @@ fn x07_trust_profile_check_rejects_network_enabled_local_sandbox_policy() {
     write_json(
         &dir.join("arch/trust/profiles/trusted_program_sandboxed_local_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.3.0",
+            "schema_version": "x07.trust.profile@0.4.0",
             "id": "trusted_program_sandboxed_local_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -4520,6 +4550,9 @@ fn x07_trust_profile_check_rejects_network_enabled_local_sandbox_policy() {
                 "require_proof_mode": "prove",
                 "require_proof_coverage": "all_reachable_defn",
                 "require_async_proof_coverage": true,
+                "require_per_symbol_prove_reports_defn": true,
+                "require_per_symbol_prove_reports_async": true,
+                "allow_coverage_summary_imports": false,
                 "require_capsule_attestations": true,
                 "require_runtime_attestation": true,
                 "require_effect_log_digests": true,
@@ -4572,7 +4605,7 @@ fn x07_trust_profile_check_rejects_weakened_sandbox_profile_contract() {
     write_json(
         &dir.join("bad_profile.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.3.0",
+            "schema_version": "x07.trust.profile@0.4.0",
             "id": "trusted_program_sandboxed_local_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -4603,6 +4636,9 @@ fn x07_trust_profile_check_rejects_weakened_sandbox_profile_contract() {
                 "require_proof_mode": "prove",
                 "require_proof_coverage": "all_reachable_defn",
                 "require_async_proof_coverage": false,
+                "require_per_symbol_prove_reports_defn": true,
+                "require_per_symbol_prove_reports_async": true,
+                "allow_coverage_summary_imports": false,
                 "require_capsule_attestations": false,
                 "require_runtime_attestation": false,
                 "require_effect_log_digests": false,
@@ -4661,7 +4697,7 @@ fn x07_trust_profile_check_rejects_weakened_network_sandbox_profile_contract() {
     write_json(
         &dir.join("bad_profile.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.3.0",
+            "schema_version": "x07.trust.profile@0.4.0",
             "id": "trusted_program_sandboxed_net_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["main.id_v1"],
@@ -4692,6 +4728,9 @@ fn x07_trust_profile_check_rejects_weakened_network_sandbox_profile_contract() {
                 "require_proof_mode": "prove",
                 "require_proof_coverage": "all_reachable_defn",
                 "require_async_proof_coverage": true,
+                "require_per_symbol_prove_reports_defn": true,
+                "require_per_symbol_prove_reports_async": true,
+                "allow_coverage_summary_imports": false,
                 "require_capsule_attestations": true,
                 "require_runtime_attestation": true,
                 "require_effect_log_digests": true,
@@ -4788,20 +4827,20 @@ fn x07_verify_coverage_walks_reachable_functions_and_primitives() {
     let v: Value = serde_json::from_slice(&out.stdout).expect("parse verify report JSON");
     let summary = &v["coverage"]["summary"];
     assert_eq!(summary["reachable_defn"], 2);
-    assert_eq!(summary["proven_defn"], 2);
+    assert_eq!(summary["supported_defn"], 2);
     assert_eq!(summary["trusted_primitives"], 1);
 
     let functions = v["coverage"]["functions"].as_array().expect("functions[]");
     assert!(
         functions
             .iter()
-            .any(|f| f["symbol"] == "verify_fixture.f" && f["status"] == "proven"),
+            .any(|f| f["symbol"] == "verify_fixture.f" && f["status"] == "supported"),
         "expected verify_fixture.f in coverage graph"
     );
     assert!(
         functions
             .iter()
-            .any(|f| f["symbol"] == "verify_fixture.g" && f["status"] == "proven"),
+            .any(|f| f["symbol"] == "verify_fixture.g" && f["status"] == "supported"),
         "expected verify_fixture.g in coverage graph"
     );
     assert!(
@@ -4843,7 +4882,16 @@ fn x07_verify_prove_stubs_trusted_imported_primitives_in_generated_c() {
     .expect("serialize x07AST module");
     write_bytes(&dir.join("verify_fixture.x07.json"), &module);
 
-    let out = run_x07_in_dir(&dir, &["verify", "--prove", "--entry", "verify_fixture.f"]);
+    let out = run_x07_in_dir(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--allow-imported-stubs",
+            "--entry",
+            "verify_fixture.f",
+        ],
+    );
     assert_eq!(
         out.status.code(),
         Some(0),
@@ -10906,17 +10954,19 @@ fn x07_review_diff_fail_on_recursive_proof_and_summary_posture_returns_20() {
     write_json(
         &before_copy.join("arch/verify.coverage.json"),
         &serde_json::json!({
-            "schema_version": "x07.verify.coverage@0.3.0",
+            "schema_version": "x07.verify.coverage@0.4.0",
             "entry": "app.main",
             "worlds": ["solve-pure"],
             "summary": {
                 "reachable_defn": 1,
-                "proven_defn": 1,
+                "supported_defn": 1,
                 "recursive_defn": 1,
-                "proven_recursive_defn": 1,
+                "supported_recursive_defn": 1,
+                "imported_proof_summary_defn": 0,
+                "termination_proven_defn": 0,
                 "unsupported_recursive_defn": 0,
                 "reachable_async": 0,
-                "proven_async": 0,
+                "supported_async": 0,
                 "trusted_primitives": 0,
                 "trusted_scheduler_models": 0,
                 "capsule_boundaries": 0,
@@ -10927,8 +10977,8 @@ fn x07_review_diff_fail_on_recursive_proof_and_summary_posture_returns_20() {
                 {
                     "symbol": "app.main",
                     "kind": "defn",
-                    "status": "proven_recursive",
-                    "proof_summary": {
+                    "status": "supported_recursive",
+                    "support_summary": {
                         "recursion_kind": "self_recursive",
                         "has_decreases": true,
                         "decreases_count": 1,
@@ -10941,17 +10991,19 @@ fn x07_review_diff_fail_on_recursive_proof_and_summary_posture_returns_20() {
     write_json(
         &after_copy.join("arch/verify.coverage.json"),
         &serde_json::json!({
-            "schema_version": "x07.verify.coverage@0.3.0",
+            "schema_version": "x07.verify.coverage@0.4.0",
             "entry": "app.main",
             "worlds": ["solve-pure"],
             "summary": {
                 "reachable_defn": 1,
-                "proven_defn": 0,
+                "supported_defn": 0,
                 "recursive_defn": 1,
-                "proven_recursive_defn": 0,
+                "supported_recursive_defn": 0,
+                "imported_proof_summary_defn": 0,
+                "termination_proven_defn": 0,
                 "unsupported_recursive_defn": 1,
                 "reachable_async": 0,
-                "proven_async": 0,
+                "supported_async": 0,
                 "trusted_primitives": 0,
                 "trusted_scheduler_models": 0,
                 "capsule_boundaries": 0,
@@ -10963,7 +11015,7 @@ fn x07_review_diff_fail_on_recursive_proof_and_summary_posture_returns_20() {
                     "symbol": "app.main",
                     "kind": "defn",
                     "status": "unsupported",
-                    "proof_summary": {
+                    "support_summary": {
                         "recursion_kind": "self_recursive",
                         "has_decreases": false,
                         "decreases_count": 0,
@@ -11677,7 +11729,7 @@ fn x07_trust_profile_check_accepts_strict_pure_project() {
     write_json(
         &dir.join("arch/trust/profiles/verified_core_pure_v1.json"),
         &serde_json::json!({
-            "schema_version": "x07.trust.profile@0.3.0",
+            "schema_version": "x07.trust.profile@0.4.0",
             "id": "verified_core_pure_v1",
             "claims": ["human_can_review_certificate_not_source"],
             "entrypoints": ["app.main"],
@@ -11708,6 +11760,9 @@ fn x07_trust_profile_check_accepts_strict_pure_project() {
                 "require_proof_mode": "prove",
                 "require_proof_coverage": "all_reachable_defn",
                 "require_async_proof_coverage": false,
+                "require_per_symbol_prove_reports_defn": true,
+                "require_per_symbol_prove_reports_async": false,
+                "allow_coverage_summary_imports": false,
                 "require_capsule_attestations": false,
                 "require_runtime_attestation": false,
                 "require_effect_log_digests": false,
@@ -12270,6 +12325,89 @@ fn bundle_stdio_smoke_reads_and_writes() {
     );
     assert_eq!(run_out.stdout, b"ok\ndone");
     assert_eq!(run_out.stderr, b"log\n");
+}
+
+#[test]
+fn bundle_project_program_override_uses_override_entry() {
+    let root = repo_root();
+    let tmp = fresh_tmp_dir(&root, "bundle_project_program_override");
+    std::fs::create_dir_all(tmp.join("src")).expect("create src dir");
+
+    write_json(
+        &tmp.join("x07.json"),
+        &serde_json::json!({
+            "schema_version": "x07.project@0.4.0",
+            "world": "solve-pure",
+            "entry": "src/main.x07.json",
+            "module_roots": ["src"],
+            "dependencies": []
+        }),
+    );
+    write_json(
+        &tmp.join("src/main.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "main",
+            "imports": [],
+            "decls": [],
+            "solve": ["bytes.lit", "main"]
+        }),
+    );
+    write_json(
+        &tmp.join("src/worker_main.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "entry",
+            "module_id": "worker_main",
+            "imports": [],
+            "decls": [],
+            "solve": ["bytes.lit", "worker"]
+        }),
+    );
+
+    let out_path = tmp.join("worker_bundle");
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let out = Command::new(exe)
+        .current_dir(&tmp)
+        .args([
+            "--out",
+            out_path.to_str().expect("out_path utf-8"),
+            "bundle",
+            "--project",
+            "x07.json",
+            "--program",
+            "src/worker_main.x07.json",
+        ])
+        .output()
+        .expect("x07 bundle with project program override");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out_path.is_file(),
+        "missing bundled binary: {}",
+        out_path.display()
+    );
+
+    let run_out = Command::new(&out_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run bundled binary");
+    assert_eq!(
+        run_out.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&run_out.stdout),
+        String::from_utf8_lossy(&run_out.stderr)
+    );
+    assert_eq!(run_out.stdout, b"worker");
+    assert!(run_out.stderr.is_empty(), "expected empty stderr");
 }
 
 #[test]

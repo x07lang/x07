@@ -218,6 +218,11 @@ jobs:
         env:
           X07_REQUIRE_SOLVERS: "1"
         run: ./scripts/ci/check_verified_core_pure_example.sh
+      - name: verified_core_fixture_v1 release guard
+        shell: bash
+        env:
+          X07_REQUIRE_SOLVERS: "1"
+        run: ./scripts/ci/check_verified_core_fixture.sh
 
   network-trust-static:
     name: ci / network-trust-static / ${{ matrix.check }}

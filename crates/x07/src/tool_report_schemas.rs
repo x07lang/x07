@@ -179,6 +179,12 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("policy.init") => Some(include_bytes!(
             "../../../spec/x07-tool-policy-init.report.schema.json"
         )),
+        Some("prove") => Some(include_bytes!(
+            "../../../spec/x07-tool-prove.report.schema.json"
+        )),
+        Some("prove.check") => Some(include_bytes!(
+            "../../../spec/x07-tool-prove-check.report.schema.json"
+        )),
         Some("review") => Some(include_bytes!(
             "../../../spec/x07-tool-review.report.schema.json"
         )),

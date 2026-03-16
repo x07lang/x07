@@ -6,8 +6,8 @@ use serde::Deserialize;
 use x07_runner_common::os_policy;
 use x07_vm::{
     default_cleanup_ms, default_grace_ms, firecracker_ctr_config_from_env, resolve_sibling_or_path,
-    resolve_vm_backend, run_vm_job, LimitsSpec, MountSpec, NetworkMode, RunSpec, VmBackend,
-    VmJobRunParams, ENV_VZ_GUEST_BUNDLE,
+    resolve_vm_backend, run_vm_job_passthrough, LimitsSpec, MountSpec, NetworkMode, RunSpec,
+    VmBackend, VmJobRunParams, ENV_VZ_GUEST_BUNDLE,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -211,7 +211,7 @@ fn try_main() -> Result<std::process::ExitCode> {
 
     let reaper_bin = resolve_reaper(&exe, &sidecar);
 
-    let out = run_vm_job(
+    let out = run_vm_job_passthrough(
         &spec,
         VmJobRunParams {
             state_root: &state_root,
@@ -222,13 +222,6 @@ fn try_main() -> Result<std::process::ExitCode> {
             firecracker_cfg: firecracker_cfg.as_ref(),
         },
     )?;
-
-    if !out.stderr.is_empty() {
-        let _ = std::io::Write::write_all(&mut std::io::stderr(), &out.stderr);
-    }
-    if !out.stdout.is_empty() {
-        std::io::Write::write_all(&mut std::io::stdout(), &out.stdout).context("write stdout")?;
-    }
 
     Ok(std::process::ExitCode::from(
         out.exit_status.clamp(0, 255) as u8

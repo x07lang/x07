@@ -56,6 +56,11 @@ pub enum ReviewFailOn {
     RecursionProofCoverageDecrease,
     AsyncProofCoverageDecrease,
     SummaryDowngrade,
+    AssumptionSurfaceWiden,
+    DevOnlyAssumptionIntroduced,
+    BoundedProofIntroduced,
+    CoverageSummaryImported,
+    OperationalEntryDiverges,
     BoundaryRelaxation,
     CapsuleContractRelaxation,
     CapsuleSetChange,
@@ -169,6 +174,9 @@ struct Highlights {
     network_policy_changes: Vec<Value>,
     capability_changes: Vec<Value>,
     proof_changes: Vec<Value>,
+    assumption_changes: Vec<Value>,
+    boundedness_changes: Vec<Value>,
+    operational_entry_changes: Vec<Value>,
     recursive_proof_changes: Vec<Value>,
     boundary_changes: Vec<Value>,
     subset_changes: Vec<Value>,
@@ -191,6 +199,9 @@ impl Highlights {
             network_policy_changes: Vec::new(),
             capability_changes: Vec::new(),
             proof_changes: Vec::new(),
+            assumption_changes: Vec::new(),
+            boundedness_changes: Vec::new(),
+            operational_entry_changes: Vec::new(),
             recursive_proof_changes: Vec::new(),
             boundary_changes: Vec::new(),
             subset_changes: Vec::new(),
@@ -477,6 +488,14 @@ fn cmd_review_diff(args: ReviewDiffArgs) -> Result<std::process::ExitCode> {
                     &mut ctx,
                     &mut report.highlights,
                 ),
+                "trust_certificate" => diff_trust_certificate(
+                    &rel_str,
+                    before_json.as_ref(),
+                    after_json.as_ref(),
+                    &mut file_diff,
+                    &mut ctx,
+                    &mut report.highlights,
+                ),
                 "lockfile" => diff_lockfile(
                     &rel_str,
                     before_json.as_ref(),
@@ -649,6 +668,35 @@ fn fail_on_triggered(report: &ReviewDiffReport, fail_on: &[ReviewFailOn]) -> boo
                     return true;
                 }
             }
+            ReviewFailOn::AssumptionSurfaceWiden => {
+                if !report.highlights.assumption_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::DevOnlyAssumptionIntroduced => {
+                if report.highlights.assumption_changes.iter().any(|change| {
+                    change.get("kind").and_then(Value::as_str) == Some("dev_only_assumption")
+                }) {
+                    return true;
+                }
+            }
+            ReviewFailOn::BoundedProofIntroduced => {
+                if !report.highlights.boundedness_changes.is_empty() {
+                    return true;
+                }
+            }
+            ReviewFailOn::CoverageSummaryImported => {
+                if report.highlights.assumption_changes.iter().any(|change| {
+                    change.get("kind").and_then(Value::as_str) == Some("coverage_summary_import")
+                }) {
+                    return true;
+                }
+            }
+            ReviewFailOn::OperationalEntryDiverges => {
+                if !report.highlights.operational_entry_changes.is_empty() {
+                    return true;
+                }
+            }
             ReviewFailOn::BoundaryRelaxation => {
                 if !report.highlights.boundary_changes.is_empty() {
                     return true;
@@ -792,6 +840,72 @@ fn posture_gate_diags(
                     diags.push(review_diag(
                         "X07RD_SUMMARY_DOWNGRADE",
                         format!("proof summary posture downgraded in {count} reviewed file(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::AssumptionSurfaceWiden => {
+                if !report.highlights.assumption_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_ASSUMPTION_SURFACE_WIDEN",
+                        format!(
+                            "proof assumption surface widened across {} reviewed change(s)",
+                            report.highlights.assumption_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::DevOnlyAssumptionIntroduced => {
+                let count = report
+                    .highlights
+                    .assumption_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str) == Some("dev_only_assumption")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_DEV_ONLY_ASSUMPTION_INTRODUCED",
+                        format!("developer-only assumptions were introduced in {count} reviewed change(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::BoundedProofIntroduced => {
+                if !report.highlights.boundedness_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_BOUNDED_PROOF_INTRODUCED",
+                        format!(
+                            "bounded proof posture changed across {} reviewed change(s)",
+                            report.highlights.boundedness_changes.len()
+                        ),
+                    ));
+                }
+            }
+            ReviewFailOn::CoverageSummaryImported => {
+                let count = report
+                    .highlights
+                    .assumption_changes
+                    .iter()
+                    .filter(|change| {
+                        change.get("kind").and_then(Value::as_str)
+                            == Some("coverage_summary_import")
+                    })
+                    .count();
+                if count > 0 {
+                    diags.push(review_diag(
+                        "X07RD_COVERAGE_SUMMARY_IMPORTED",
+                        format!("coverage-summary imports were introduced in {count} reviewed change(s)"),
+                    ));
+                }
+            }
+            ReviewFailOn::OperationalEntryDiverges => {
+                if !report.highlights.operational_entry_changes.is_empty() {
+                    diags.push(review_diag(
+                        "X07RD_OPERATIONAL_ENTRY_DIVERGES",
+                        format!(
+                            "operational entry changed across {} reviewed change(s)",
+                            report.highlights.operational_entry_changes.len()
+                        ),
                     ));
                 }
             }
@@ -1021,8 +1135,19 @@ fn classify_file(rel: &str, before: Option<&Value>, after: Option<&Value>) -> &'
         .and_then(|doc| doc.get("schema_version"))
         .or_else(|| after.and_then(|doc| doc.get("schema_version")))
         .and_then(Value::as_str);
-    if lower.ends_with("verify.coverage.json") {
+    if lower.ends_with("verify.coverage.json")
+        || lower.ends_with("verify.summary.json")
+        || matches!(
+            schema_version,
+            Some("x07.verify.coverage@0.4.0") | Some("x07.verify.summary@0.2.0")
+        )
+    {
         return "proof";
+    }
+    if lower.ends_with("certificate.json")
+        || schema_version.is_some_and(|value| value.starts_with("x07.trust.certificate@"))
+    {
+        return "trust_certificate";
     }
     if schema_version == Some("x07.peer.policy@0.1.0") {
         return "peer_policy";
@@ -1960,11 +2085,11 @@ fn diff_proof(
     let before_summary = proof_summary(before);
     let after_summary = proof_summary(after);
     let decreased = after_summary
-        .get("proven_defn")
+        .get("supported_defn")
         .and_then(Value::as_u64)
         .unwrap_or(0)
         < before_summary
-            .get("proven_defn")
+            .get("supported_defn")
             .and_then(Value::as_u64)
             .unwrap_or(0)
         || after_summary
@@ -2001,11 +2126,11 @@ fn diff_proof(
     let before_recursive = recursive_proof_summary(&before_summary);
     let after_recursive = recursive_proof_summary(&after_summary);
     let recursive_regressed = after_recursive
-        .get("proven_recursive_defn")
+        .get("supported_recursive_defn")
         .and_then(Value::as_u64)
         .unwrap_or(0)
         < before_recursive
-            .get("proven_recursive_defn")
+            .get("supported_recursive_defn")
             .and_then(Value::as_u64)
             .unwrap_or(0)
         || after_recursive
@@ -2123,9 +2248,25 @@ fn proof_summary(v: Option<&Value>) -> Value {
         .unwrap_or_else(|| json!({}));
     json!({
         "reachable_defn": summary.get("reachable_defn").cloned().unwrap_or(Value::from(0)),
-        "proven_defn": summary.get("proven_defn").cloned().unwrap_or(Value::from(0)),
+        "supported_defn": summary
+            .get("supported_defn")
+            .cloned()
+            .or_else(|| summary.get("proven_defn").cloned())
+            .unwrap_or(Value::from(0)),
         "recursive_defn": summary.get("recursive_defn").cloned().unwrap_or(Value::from(0)),
-        "proven_recursive_defn": summary.get("proven_recursive_defn").cloned().unwrap_or(Value::from(0)),
+        "supported_recursive_defn": summary
+            .get("supported_recursive_defn")
+            .cloned()
+            .or_else(|| summary.get("proven_recursive_defn").cloned())
+            .unwrap_or(Value::from(0)),
+        "imported_proof_summary_defn": summary
+            .get("imported_proof_summary_defn")
+            .cloned()
+            .unwrap_or(Value::from(0)),
+        "termination_proven_defn": summary
+            .get("termination_proven_defn")
+            .cloned()
+            .unwrap_or(Value::from(0)),
         "unsupported_recursive_defn": summary.get("unsupported_recursive_defn").cloned().unwrap_or(Value::from(0)),
         "uncovered_defn": summary.get("uncovered_defn").cloned().unwrap_or(Value::from(0)),
         "unsupported_defn": summary.get("unsupported_defn").cloned().unwrap_or(Value::from(0)),
@@ -2135,7 +2276,10 @@ fn proof_summary(v: Option<&Value>) -> Value {
 fn recursive_proof_summary(summary: &Value) -> Value {
     json!({
         "recursive_defn": summary.get("recursive_defn").cloned().unwrap_or(Value::from(0)),
-        "proven_recursive_defn": summary.get("proven_recursive_defn").cloned().unwrap_or(Value::from(0)),
+        "supported_recursive_defn": summary
+            .get("supported_recursive_defn")
+            .cloned()
+            .unwrap_or(Value::from(0)),
         "unsupported_recursive_defn": summary.get("unsupported_recursive_defn").cloned().unwrap_or(Value::from(0)),
     })
 }
@@ -2156,7 +2300,7 @@ fn proof_async_summary(v: Option<&Value>) -> Value {
             }
             reachable_async += 1;
             match function.get("status").and_then(Value::as_str).unwrap_or("") {
-                "proven" | "proven_async" => proven_async += 1,
+                "supported_async" | "proven_async" => proven_async += 1,
                 "uncovered" => uncovered_async += 1,
                 "unsupported" => unsupported_async += 1,
                 _ => {}
@@ -2190,7 +2334,11 @@ fn proof_function_summaries(v: Option<&Value>) -> BTreeMap<String, Value> {
             json!({
                 "kind": function.get("kind").cloned().unwrap_or(Value::Null),
                 "status": function.get("status").cloned().unwrap_or(Value::Null),
-                "proof_summary": function.get("proof_summary").cloned().unwrap_or(Value::Null),
+                "support_summary": function
+                    .get("support_summary")
+                    .cloned()
+                    .or_else(|| function.get("proof_summary").cloned())
+                    .unwrap_or(Value::Null),
             }),
         );
     }
@@ -2219,11 +2367,13 @@ fn proof_function_summary_regressed(before: &Value, after: &Value) -> bool {
     }
 
     let before_prove_supported = before
-        .pointer("/proof_summary/prove_supported")
+        .pointer("/support_summary/prove_supported")
+        .or_else(|| before.pointer("/proof_summary/prove_supported"))
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let after_prove_supported = after
-        .pointer("/proof_summary/prove_supported")
+        .pointer("/support_summary/prove_supported")
+        .or_else(|| after.pointer("/proof_summary/prove_supported"))
         .and_then(Value::as_bool)
         .unwrap_or(false);
     if before_prove_supported && !after_prove_supported {
@@ -2231,11 +2381,13 @@ fn proof_function_summary_regressed(before: &Value, after: &Value) -> bool {
     }
 
     let before_decreases = before
-        .pointer("/proof_summary/has_decreases")
+        .pointer("/support_summary/has_decreases")
+        .or_else(|| before.pointer("/proof_summary/has_decreases"))
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let after_decreases = after
-        .pointer("/proof_summary/has_decreases")
+        .pointer("/support_summary/has_decreases")
+        .or_else(|| after.pointer("/proof_summary/has_decreases"))
         .and_then(Value::as_bool)
         .unwrap_or(false);
     if before_decreases && !after_decreases {
@@ -2243,11 +2395,13 @@ fn proof_function_summary_regressed(before: &Value, after: &Value) -> bool {
     }
 
     let before_recursive = before
-        .pointer("/proof_summary/recursion_kind")
+        .pointer("/support_summary/recursion_kind")
+        .or_else(|| before.pointer("/proof_summary/recursion_kind"))
         .and_then(Value::as_str)
         .unwrap_or("none");
     let after_recursive = after
-        .pointer("/proof_summary/recursion_kind")
+        .pointer("/support_summary/recursion_kind")
+        .or_else(|| after.pointer("/proof_summary/recursion_kind"))
         .and_then(Value::as_str)
         .unwrap_or("none");
     recursion_kind_rank(after_recursive) < recursion_kind_rank(before_recursive)
@@ -2255,9 +2409,9 @@ fn proof_function_summary_regressed(before: &Value, after: &Value) -> bool {
 
 fn proof_status_rank(status: &str) -> u8 {
     match status {
-        "proven_recursive" => 5,
-        "proven" | "proven_async" => 4,
-        "termination_proven" | "imported_summary" => 3,
+        "supported_recursive" | "proven_recursive" => 5,
+        "supported" | "supported_async" | "proven" | "proven_async" => 4,
+        "termination_proven" | "imported_proof_summary" | "imported_summary" => 3,
         "trusted_primitive" | "trusted_scheduler_model" | "capsule_boundary" => 2,
         "uncovered" => 1,
         "unsupported" => 0,
@@ -2778,6 +2932,18 @@ fn trust_profile_subset(v: Option<&Value>) -> Value {
             .and_then(|doc| doc.get("require_async_proof_coverage"))
             .cloned()
             .unwrap_or(Value::Bool(false)),
+        "require_per_symbol_prove_reports_defn": evidence
+            .and_then(|doc| doc.get("require_per_symbol_prove_reports_defn"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "require_per_symbol_prove_reports_async": evidence
+            .and_then(|doc| doc.get("require_per_symbol_prove_reports_async"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+        "allow_coverage_summary_imports": evidence
+            .and_then(|doc| doc.get("allow_coverage_summary_imports"))
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
         "require_capsule_attestations": evidence
             .and_then(|doc| doc.get("require_capsule_attestations"))
             .cloned()
@@ -2896,6 +3062,8 @@ fn trust_subset_expanded(before: &Value, after: &Value) -> bool {
         "require_world_caps",
         "require_brand_boundaries",
         "require_async_proof_coverage",
+        "require_per_symbol_prove_reports_defn",
+        "require_per_symbol_prove_reports_async",
         "require_capsule_attestations",
         "require_runtime_attestation",
         "require_effect_log_digests",
@@ -2916,6 +3084,17 @@ fn trust_subset_expanded(before: &Value, after: &Value) -> bool {
         {
             return true;
         }
+    }
+    if before
+        .get("allow_coverage_summary_imports")
+        .and_then(Value::as_bool)
+        == Some(false)
+        && after
+            .get("allow_coverage_summary_imports")
+            .and_then(Value::as_bool)
+            == Some(true)
+    {
+        return true;
     }
 
     if before.get("sandbox_backend") == Some(&Value::String("vm".to_string()))
@@ -2956,6 +3135,226 @@ fn trust_subset_expanded(before: &Value, after: &Value) -> bool {
     }
 
     false
+}
+
+fn diff_trust_certificate(
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    file_diff: &mut FileDiff,
+    ctx: &mut BuildCtx,
+    highlights: &mut Highlights,
+) {
+    if before == after {
+        return;
+    }
+
+    let mut severity = "warn";
+
+    for assumption in added_certificate_assumptions(before, after) {
+        let assumption_kind = assumption
+            .get("kind")
+            .and_then(Value::as_str)
+            .unwrap_or("proof_assumption");
+        let certifiable = assumption
+            .get("certifiable")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+        let subject = assumption
+            .get("subject")
+            .and_then(Value::as_str)
+            .unwrap_or("<unknown>");
+        let (kind, change_severity) = if !certifiable {
+            ("dev_only_assumption", "high")
+        } else {
+            (assumption_kind, "warn")
+        };
+        if change_severity == "high" {
+            severity = "high";
+        }
+        ctx.push(
+            &mut highlights.assumption_changes,
+            json!({
+                "kind": kind,
+                "severity": change_severity,
+                "subject": format!("proof assumption {subject}"),
+                "path": path,
+                "before": Value::Null,
+                "after": assumption,
+            }),
+        );
+    }
+
+    for imported_summary in added_imported_summary_inventory(before, after) {
+        severity = "high";
+        let subject = imported_summary
+            .get("path")
+            .and_then(Value::as_str)
+            .unwrap_or("<unknown>");
+        ctx.push(
+            &mut highlights.assumption_changes,
+            json!({
+                "kind": "coverage_summary_import",
+                "severity": "high",
+                "subject": format!("coverage summary import {subject}"),
+                "path": path,
+                "before": Value::Null,
+                "after": imported_summary,
+            }),
+        );
+    }
+
+    let before_bounded = certificate_bounded_acceptance(before);
+    let after_bounded = certificate_bounded_acceptance(after);
+    if !before_bounded && after_bounded {
+        severity = "high";
+        ctx.push(
+            &mut highlights.boundedness_changes,
+            json!({
+                "kind": "bounded_proof",
+                "severity": "high",
+                "subject": "certificate acceptance depends on bounded proof",
+                "path": path,
+                "before": before.and_then(|doc| doc.get("recursive_proof_summary")).cloned().unwrap_or(Value::Null),
+                "after": after.and_then(|doc| doc.get("recursive_proof_summary")).cloned().unwrap_or(Value::Null),
+            }),
+        );
+    }
+
+    let before_bounded_count = certificate_recursive_count(before, "bounded_recursive_defn");
+    let after_bounded_count = certificate_recursive_count(after, "bounded_recursive_defn");
+    if after_bounded_count > before_bounded_count {
+        severity = "high";
+        ctx.push(
+            &mut highlights.boundedness_changes,
+            json!({
+                "kind": "bounded_recursive_defn",
+                "severity": "high",
+                "subject": "accepted bounded recursive definitions",
+                "path": path,
+                "before": before_bounded_count,
+                "after": after_bounded_count,
+            }),
+        );
+    }
+
+    let before_operational = certificate_operational_entry(before);
+    let after_operational = certificate_operational_entry(after);
+    let before_certification = certificate_certification_entry(before);
+    let after_certification = certificate_certification_entry(after);
+    if before_operational != after_operational
+        || before_certification != after_certification
+        || after_operational.as_deref() != after_certification.as_deref()
+    {
+        let change_severity = if after_operational.as_deref() != after_certification.as_deref() {
+            "high"
+        } else {
+            "warn"
+        };
+        if change_severity == "high" {
+            severity = "high";
+        }
+        ctx.push(
+            &mut highlights.operational_entry_changes,
+            json!({
+                "kind": "operational_entry",
+                "severity": change_severity,
+                "subject": "certificate operational entry",
+                "path": path,
+                "before": {
+                    "entry": before_certification,
+                    "operational_entry_symbol": before_operational
+                },
+                "after": {
+                    "entry": after_certification,
+                    "operational_entry_symbol": after_operational
+                },
+            }),
+        );
+    }
+
+    push_simple_file_change(
+        file_diff,
+        ctx,
+        "trust_certificate_changed",
+        severity,
+        "trust certificate changed",
+    );
+}
+
+fn added_certificate_assumptions(before: Option<&Value>, after: Option<&Value>) -> Vec<Value> {
+    let before_map = certificate_assumption_map(before);
+    let after_map = certificate_assumption_map(after);
+    after_map
+        .into_iter()
+        .filter_map(|(key, value)| (!before_map.contains_key(&key)).then_some(value))
+        .collect()
+}
+
+fn certificate_assumption_map(v: Option<&Value>) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(items) = v
+        .and_then(|doc| doc.get("proof_assumptions"))
+        .and_then(Value::as_array)
+    else {
+        return out;
+    };
+    for item in items {
+        out.insert(canonical_json_compact(item), item.clone());
+    }
+    out
+}
+
+fn added_imported_summary_inventory(before: Option<&Value>, after: Option<&Value>) -> Vec<Value> {
+    let before_map = imported_summary_inventory_map(before);
+    let after_map = imported_summary_inventory_map(after);
+    after_map
+        .into_iter()
+        .filter_map(|(key, value)| (!before_map.contains_key(&key)).then_some(value))
+        .collect()
+}
+
+fn imported_summary_inventory_map(v: Option<&Value>) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    let Some(items) = v
+        .and_then(|doc| doc.get("imported_summary_inventory"))
+        .and_then(Value::as_array)
+    else {
+        return out;
+    };
+    for item in items {
+        out.insert(canonical_json_compact(item), item.clone());
+    }
+    out
+}
+
+fn certificate_bounded_acceptance(v: Option<&Value>) -> bool {
+    v.and_then(|doc| doc.get("accepted_depends_on_bounded_proof"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || v.and_then(|doc| {
+            doc.pointer("/recursive_proof_summary/accepted_depends_on_bounded_proof")
+        })
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn certificate_recursive_count(v: Option<&Value>, field: &str) -> u64 {
+    v.and_then(|doc| doc.pointer(&format!("/recursive_proof_summary/{field}")))
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+}
+
+fn certificate_operational_entry(v: Option<&Value>) -> Option<String> {
+    v.and_then(|doc| doc.get("operational_entry_symbol"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn certificate_certification_entry(v: Option<&Value>) -> Option<String> {
+    v.and_then(|doc| doc.get("entry"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
 }
 
 fn boundary_input_param_map(v: &Value) -> BTreeMap<String, Value> {
@@ -3719,6 +4118,21 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
     render_change_list(&mut s, "Proof Changes", &report.highlights.proof_changes);
     render_change_list(
         &mut s,
+        "Assumption Changes",
+        &report.highlights.assumption_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Boundedness Changes",
+        &report.highlights.boundedness_changes,
+    );
+    render_change_list(
+        &mut s,
+        "Operational Entry Changes",
+        &report.highlights.operational_entry_changes,
+    );
+    render_change_list(
+        &mut s,
         "Recursive Proof Changes",
         &report.highlights.recursive_proof_changes,
     );
@@ -3840,6 +4254,13 @@ fn render_html(report: &ReviewDiffReport, from: &Path, to: &Path, args: &ReviewD
                 }
                 ReviewFailOn::AsyncProofCoverageDecrease => "async-proof-coverage-decrease",
                 ReviewFailOn::SummaryDowngrade => "summary-downgrade",
+                ReviewFailOn::AssumptionSurfaceWiden => "assumption-surface-widen",
+                ReviewFailOn::DevOnlyAssumptionIntroduced => {
+                    "dev-only-assumption-introduced"
+                }
+                ReviewFailOn::BoundedProofIntroduced => "bounded-proof-introduced",
+                ReviewFailOn::CoverageSummaryImported => "coverage-summary-imported",
+                ReviewFailOn::OperationalEntryDiverges => "operational-entry-diverges",
                 ReviewFailOn::BoundaryRelaxation => "boundary-relaxation",
                 ReviewFailOn::CapsuleContractRelaxation => "capsule-contract-relaxation",
                 ReviewFailOn::CapsuleSetChange => "capsule-set-change",
@@ -3899,6 +4320,9 @@ fn review_risk(report: &ReviewDiffReport) -> (&'static str, &'static str, &'stat
         .chain(report.highlights.network_policy_changes.iter())
         .chain(report.highlights.capability_changes.iter())
         .chain(report.highlights.proof_changes.iter())
+        .chain(report.highlights.assumption_changes.iter())
+        .chain(report.highlights.boundedness_changes.iter())
+        .chain(report.highlights.operational_entry_changes.iter())
         .chain(report.highlights.recursive_proof_changes.iter())
         .chain(report.highlights.async_proof_changes.iter())
         .chain(report.highlights.boundary_changes.iter())

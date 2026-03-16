@@ -1,0 +1,43 @@
+{
+  "schema_version": "x07.arch.boundaries.index@0.1.0",
+  "boundaries": [
+    {
+      "id": "fixture.main_v1",
+      "symbol": "fixture.main",
+      "node_id": "fixture_core",
+      "kind": "public_function",
+      "from_zone": "verified_core",
+      "to_zone": "verified_core",
+      "worlds_allowed": [
+        "solve-pure"
+      ],
+      "input": {
+        "params": [
+          {
+            "name": "x",
+            "ty": "i32"
+          }
+        ]
+      },
+      "output": {
+        "ty": "i32"
+      },
+      "smoke": {
+        "entry": "tests.core.smoke_fixture_identity",
+        "tests": [
+          "smoke/fixture_identity"
+        ]
+      },
+      "pbt": {
+        "required": true,
+        "tests": [
+          "pbt/fixture_main_deterministic"
+        ]
+      },
+      "verify": {
+        "required": true,
+        "mode": "prove"
+      }
+    }
+  ]
+}

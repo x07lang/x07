@@ -21,6 +21,7 @@ Programs are stored and exchanged in a **structured AST format** (x07AST JSON). 
 ## Start here
 
 - [Why X07 (trust story + evidence pack)](why-x07.md)
+- [Formal verification & certification](toolchain/formal-verification.md)
 - [Agent initial prompt (copy/paste)](getting-started/agent-initial-prompt.md)
 - [Agent quickstart (learn X07 from scratch)](getting-started/agent-quickstart.md)
 - [Install X07](getting-started/install.md)
