@@ -5476,13 +5476,14 @@ exit 1
         let expected_path = dir.join("verify_fixture.x07.json");
         let roots =
             resolve_module_roots(&dir, None, &[dir.clone(), dir.join(".")]).expect("module roots");
-        assert_eq!(roots.len(), 1, "expected duplicate roots to collapse: {roots:?}");
-        let source = x07c::module_source::load_module_source(
-            "verify_fixture",
-            WorldId::SolvePure,
-            &roots,
-        )
-        .expect("load module from deduped roots");
+        assert_eq!(
+            roots.len(),
+            1,
+            "expected duplicate roots to collapse: {roots:?}"
+        );
+        let source =
+            x07c::module_source::load_module_source("verify_fixture", WorldId::SolvePure, &roots)
+                .expect("load module from deduped roots");
         let expected_path = std::fs::canonicalize(&expected_path).expect("canonicalize module");
         assert_eq!(source.path.as_deref(), Some(expected_path.as_path()));
 
