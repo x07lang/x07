@@ -72,6 +72,9 @@ jobs:
             zlib1g-dev \
             libsqlite3-dev \
             xz-utils
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
       - name: Run release-readiness CI
         shell: bash
         run: |
