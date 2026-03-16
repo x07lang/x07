@@ -40,16 +40,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cbmc \
             clang \
             build-essential \
+            curl \
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
             liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev \
-            z3
+            unzip
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
       - name: Stage native math backend
         shell: bash
         run: ./scripts/ci/ensure_math_backend.sh
@@ -197,16 +200,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cbmc \
             clang \
             build-essential \
+            curl \
             pkg-config \
             libssl-dev \
             libcurl4-openssl-dev \
             liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev \
-            z3
+            unzip
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
       - name: verified_core_pure_v1 certify
         shell: bash
         env:

@@ -125,15 +125,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cbmc \
+            ca-certificates \
             clang \
             build-essential \
+            curl \
             pkg-config \
             libcurl4-openssl-dev \
             liblzma-dev \
             zlib1g-dev \
             libsqlite3-dev \
-            z3
+            unzip
+
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
 
       - name: Build and import guest runner image
         shell: bash

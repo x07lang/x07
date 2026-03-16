@@ -83,6 +83,7 @@ The current certifiable proof subset includes pure self-recursive `defn` targets
 Imported proof summaries are public artifacts (`x07.verify.summary@0.1.0`): reviewers and downstream prove runs can reuse them through `x07 verify --summary <path>` instead of treating reviewed subgraphs as hidden local state.
 Direct prove inputs currently accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` and `result_*`, and schema-derived `bytes_view@brand` documents when the reachable module graph exposes `meta.brands_v1.validate`. That lets proved cores take branded record/tagged-union views directly while keeping validation explicit in the generated driver, and it now admits direct `vec_u8` boundary values without falling back to an unsupported richer-data diagnostic. Owned branded `bytes` and nested result carriers remain outside the current direct prove-input subset.
 The networked sandbox certification line is `trusted_program_sandboxed_net_v1`: it requires attested network capsules, pinned peer-policy files, a non-empty runtime allowlist, dependency-closure attestation, and VM-boundary network enforcement in the runtime attestation.
+On Linux, the prove/certify lanes are exercised against official `cbmc 6.8.0` and `z3 4.16.0`. The Ubuntu 24.04 `universe` packages (`cbmc 5.95.1`, `z3 4.8.12`) are too old for the async proof/certification line. Use `scripts/ci/install_formal_verification_tools_linux.sh` or the checked-in example workflows instead of relying on distro solver packages.
 
 ```mermaid
 flowchart LR

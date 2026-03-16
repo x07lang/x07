@@ -3476,7 +3476,8 @@ fn x07_verify_prove_defasync_protocol_returns_proven() {
     assert_eq!(
         out.status.code(),
         Some(0),
-        "stderr:\n{}",
+        "stdout:\n{}\n\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
     assert!(

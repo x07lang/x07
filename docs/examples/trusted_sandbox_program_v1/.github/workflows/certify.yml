@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  X07_TOOLCHAIN_TAG: "v0.1.78"
+  X07_TOOLCHAIN_TAG: "v0.1.79"
 
 jobs:
   certify:
@@ -28,12 +28,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cbmc \
+            ca-certificates \
             clang \
             build-essential \
+            curl \
             pkg-config \
             libcurl4-openssl-dev \
-            z3
+            unzip
+
+      - name: Install formal verification tools
+        shell: bash
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/x07lang/x07/${X07_TOOLCHAIN_TAG}/scripts/ci/install_formal_verification_tools_linux.sh" | bash
 
       - name: Install x07
         shell: bash

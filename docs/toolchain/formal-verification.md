@@ -27,6 +27,15 @@ flowchart LR
     K --> L[reviewer reads certificate and review diff]
 ```
 
+## Tooling
+
+The formal-verification surface depends on external solvers. The current Linux release/CI line is validated with:
+
+- `cbmc 6.8.0`
+- `z3 4.16.0`
+
+The Ubuntu 24.04 `universe` packages (`cbmc 5.95.1`, `z3 4.8.12`) are too old for the async prove/certify lane: old CBMC emits unsupported `snprintf` warnings during SMT export, and old Z3 times out on the scheduler-model proof even with the current harness. Use the official binaries via `scripts/ci/install_formal_verification_tools_linux.sh`, or mirror what the checked-in example workflows do.
+
 ## What X07 proves
 
 ### 1. Function and async contracts

@@ -9,8 +9,7 @@ permissions:
   contents: read
 
 env:
-  X07_TOOLCHAIN_TAG: "v0.1.78"
-  CBMC_DEB_URL: "https://github.com/diffblue/cbmc/releases/download/cbmc-6.8.0/ubuntu-24.04-cbmc-6.8.0-Linux.deb"
+  X07_TOOLCHAIN_TAG: "v0.1.79"
 
 jobs:
   certify:
@@ -27,18 +26,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            ca-certificates \
             build-essential \
             clang \
             pkg-config \
             libcurl4-openssl-dev \
-            z3 \
-            curl
+            curl \
+            unzip
 
-      - name: Install CBMC
+      - name: Install formal verification tools
         shell: bash
         run: |
-          curl -fsSL "$CBMC_DEB_URL" -o /tmp/cbmc.deb
-          sudo apt-get install -y /tmp/cbmc.deb
+          curl -fsSL "https://raw.githubusercontent.com/x07lang/x07/${X07_TOOLCHAIN_TAG}/scripts/ci/install_formal_verification_tools_linux.sh" | bash
 
       - name: Install x07
         shell: bash
