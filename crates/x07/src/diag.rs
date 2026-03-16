@@ -2069,9 +2069,11 @@ fn infer_stage(code: &str, sample_file: Option<&str>) -> CatalogStage {
 }
 
 fn infer_severity(code: &str) -> CatalogSeverity {
-    if code == "X07V_COVERAGE_NOT_PROOF" {
-        CatalogSeverity::Warning
-    } else if code.starts_with("W_") || code.starts_with("W-") || code.starts_with("W_ARCH") {
+    if code == "X07V_COVERAGE_NOT_PROOF"
+        || code.starts_with("W_")
+        || code.starts_with("W-")
+        || code.starts_with("W_ARCH")
+    {
         CatalogSeverity::Warning
     } else {
         CatalogSeverity::Error
