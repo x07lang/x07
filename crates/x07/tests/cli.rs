@@ -962,7 +962,8 @@ fn x07_test_smoke_suite() {
     assert_eq!(
         out.status.code(),
         Some(0),
-        "stderr:\n{}",
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_json_stdout(&out);

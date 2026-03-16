@@ -1614,7 +1614,7 @@ fn resolve_module_roots(
     explicit: &[PathBuf],
 ) -> Result<Vec<PathBuf>> {
     if !explicit.is_empty() {
-        return Ok(explicit.to_vec());
+        return Ok(normalize_module_roots(explicit.to_vec()));
     }
 
     if let Some(project_path) = project_path {
@@ -1645,7 +1645,7 @@ fn resolve_module_roots(
                 }
             }
         }
-        return Ok(roots);
+        return Ok(normalize_module_roots(roots));
     }
 
     let mut roots = vec![cwd.to_path_buf()];
@@ -1656,7 +1656,19 @@ fn resolve_module_roots(
             }
         }
     }
-    Ok(roots)
+    Ok(normalize_module_roots(roots))
+}
+
+fn normalize_module_roots(roots: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut out = Vec::with_capacity(roots.len());
+    let mut seen = BTreeSet::new();
+    for root in roots {
+        let normalized = std::fs::canonicalize(&root).unwrap_or(root);
+        if seen.insert(normalized.clone()) {
+            out.push(normalized);
+        }
+    }
+    out
 }
 
 fn resolve_artifact_base_dir(
@@ -5434,6 +5446,48 @@ exit 1
             "expected stdlib os module root in {:?}",
             roots
         );
+    }
+
+    #[test]
+    fn resolve_module_roots_dedupes_equivalent_paths() {
+        let seq = FAKE_COMMAND_SEQ.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "x07_verify_module_roots_{}_{}",
+            std::process::id(),
+            seq
+        ));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        std::fs::write(
+            dir.join("verify_fixture.x07.json"),
+            serde_json::to_vec_pretty(&json!({
+                "schema_version": X07AST_SCHEMA_VERSION,
+                "kind": "module",
+                "module_id": "verify_fixture",
+                "imports": [],
+                "decls": [
+                    {"kind":"export", "names":["verify_fixture.f"]},
+                    {"kind":"defn", "name":"verify_fixture.f", "params": [], "result":"i32", "body": 0}
+                ]
+            }))
+            .expect("serialize module"),
+        )
+        .expect("write module");
+
+        let expected_path = dir.join("verify_fixture.x07.json");
+        let roots =
+            resolve_module_roots(&dir, None, &[dir.clone(), dir.join(".")]).expect("module roots");
+        assert_eq!(roots.len(), 1, "expected duplicate roots to collapse: {roots:?}");
+        let source = x07c::module_source::load_module_source(
+            "verify_fixture",
+            WorldId::SolvePure,
+            &roots,
+        )
+        .expect("load module from deduped roots");
+        let expected_path = std::fs::canonicalize(&expected_path).expect("canonicalize module");
+        assert_eq!(source.path.as_deref(), Some(expected_path.as_path()));
+
+        std::fs::remove_file(&expected_path).expect("remove module");
+        std::fs::remove_dir(&dir).expect("remove temp dir");
     }
 
     #[test]
