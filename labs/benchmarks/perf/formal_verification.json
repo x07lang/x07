@@ -1,0 +1,515 @@
+{
+  "schema_version": "x07.formal_verification.perf_budget@0.1.0",
+  "host_classes": {
+    "hosted-linux": {
+      "enforce": true
+    },
+    "macos-local": {
+      "enforce": false
+    },
+    "macos-vz": {
+      "enforce": false
+    },
+    "selfhosted-kvm": {
+      "enforce": true
+    }
+  },
+  "scenarios": {
+    "trusted_sandbox_program.certify": {
+      "hosts": {
+        "macos-vz": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 300000,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 200000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 10000,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "selfhosted-kvm": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 300000,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 150000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 7000,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        }
+      }
+    },
+    "verified_core_fixture.certify": {
+      "hosts": {
+        "hosted-linux": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 245267,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 32000,
+              "max_regression_pct": 15
+            },
+            "wall_ms": {
+              "baseline": 1000,
+              "max_regression_pct": 20
+            }
+          },
+          "enabled": true,
+          "runs": 5
+        },
+        "macos-local": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 245267,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 26880,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 631,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "macos-vz": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 245267,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 36000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 1300,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "selfhosted-kvm": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 245267,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 36000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 1300,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        }
+      }
+    },
+    "verified_core_fixture.coverage": {
+      "hosts": {
+        "hosted-linux": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 1935,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 26000,
+              "max_regression_pct": 15
+            },
+            "wall_ms": {
+              "baseline": 60,
+              "max_regression_pct": 20
+            }
+          },
+          "enabled": true,
+          "runs": 5
+        },
+        "macos-local": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 1935,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 21456,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 26,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "macos-vz": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 1935,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 28000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 80,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "selfhosted-kvm": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 1935,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 28000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 80,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        }
+      }
+    },
+    "verified_core_fixture.prove": {
+      "hosts": {
+        "hosted-linux": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 523070,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 32000,
+              "max_regression_pct": 15
+            },
+            "wall_ms": {
+              "baseline": 500,
+              "max_regression_pct": 20
+            }
+          },
+          "enabled": true,
+          "runs": 5
+        },
+        "macos-local": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 523070,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 26880,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 308,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "macos-vz": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 523070,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 36000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 700,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "selfhosted-kvm": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 523070,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 36000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 700,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        }
+      }
+    },
+    "verified_core_fixture.prove_check": {
+      "hosts": {
+        "hosted-linux": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 621,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 32000,
+              "max_regression_pct": 15
+            },
+            "wall_ms": {
+              "baseline": 250,
+              "max_regression_pct": 20
+            }
+          },
+          "enabled": true,
+          "runs": 5
+        },
+        "macos-local": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 621,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 26768,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 157,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "macos-vz": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 621,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 36000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 350,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "selfhosted-kvm": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 621,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 36000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 350,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        }
+      }
+    },
+    "verified_core_pure_example.bundle_attestation": {
+      "hosts": {
+        "hosted-linux": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 36476,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 28000,
+              "max_regression_pct": 15
+            },
+            "wall_ms": {
+              "baseline": 120,
+              "max_regression_pct": 20
+            }
+          },
+          "enabled": true,
+          "runs": 5
+        },
+        "macos-local": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 36476,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 22736,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 75,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "macos-vz": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 36476,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 30000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 150,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "selfhosted-kvm": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 36476,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 30000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 150,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        }
+      }
+    },
+    "verified_core_pure_example.certify": {
+      "hosts": {
+        "hosted-linux": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 245691,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 32000,
+              "max_regression_pct": 15
+            },
+            "wall_ms": {
+              "baseline": 1000,
+              "max_regression_pct": 20
+            }
+          },
+          "enabled": true,
+          "runs": 5
+        },
+        "macos-local": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 245691,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 26800,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 628,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "macos-vz": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 245691,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 36000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 1300,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        },
+        "selfhosted-kvm": {
+          "budgets": {
+            "artifact_bytes_total": {
+              "baseline": 245691,
+              "max_regression_pct": 25
+            },
+            "peak_rss_kb": {
+              "baseline": 36000,
+              "max_regression_pct": 20
+            },
+            "wall_ms": {
+              "baseline": 1300,
+              "max_regression_pct": 25
+            }
+          },
+          "enabled": true,
+          "runs": 3
+        }
+      }
+    }
+  }
+}

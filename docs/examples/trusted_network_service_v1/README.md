@@ -48,6 +48,14 @@ x07 trust certify \
   --out-dir target/cert
 ```
 
+Re-check the emitted proof object:
+
+```bash
+x07 prove check --proof target/cert/prove/example.main/proof.json
+```
+
+Review the accepted certificate for both halves of the trust story: the operational async entry should still report `entry_body_formally_proved: true`, while the network surface remains explicit through capsule attestation, peer-policy, dependency-closure, and runtime-attestation evidence.
+
 Re-emit the tracked capsule attestation snapshot:
 
 ```bash

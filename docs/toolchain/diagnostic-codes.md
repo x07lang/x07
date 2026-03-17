@@ -2,9 +2,9 @@
 
 This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 
-- total codes: 441
-- quickfix support (`sometimes` or `always`): 400
-- quickfix coverage: 90.70%
+- total codes: 449
+- quickfix support (`sometimes` or `always`): 408
+- quickfix coverage: 90.87%
 
 | Code | Origins | Quickfix | Summary |
 | ---- | ------- | -------- | ------- |
@@ -298,7 +298,12 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07PKG_TRANSITIVE_MISSING` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_TRANSITIVE_MISSING`. |
 | `X07PKG_YANKED_DEP` | x07 / lint / error | sometimes | Package workflow diagnostic `X07PKG_YANKED_DEP`. |
 | `X07PROOF_ECHECK_FAILED` | x07 / run / error | sometimes | Independent proof check rejected the proof bundle. |
+| `X07PROOF_EIMPORTED_SUMMARY_MISMATCH` | x07 / run / error | sometimes | Semantic proof replay found imported proof-summary drift. |
 | `X07PROOF_EOBJECT_INVALID` | x07 / run / error | sometimes | Proof object failed schema or structural validation. |
+| `X07PROOF_EOBLIGATION_MISMATCH` | x07 / run / error | sometimes | Semantic proof replay regenerated a different verification obligation. |
+| `X07PROOF_ESCHEDULER_MODEL_MISMATCH` | x07 / run / error | sometimes | Semantic async proof replay found a scheduler-model mismatch. |
+| `X07PROOF_ESOLVER_REPLAY_FAILED` | x07 / run / error | sometimes | Semantic proof replay did not reproduce the expected solver verdict. |
+| `X07PROOF_ESOURCE_REPLAY_FAILED` | x07 / run / error | sometimes | Semantic proof replay could not reconstruct the proved source surface. |
 | `X07RD_ADVISORY_ALLOWANCE_ENABLED` | x07 / lint / error | sometimes | Core lint/schema diagnostic `X07RD_ADVISORY_ALLOWANCE_ENABLED`. |
 | `X07RD_ASSUMPTION_SURFACE_WIDEN` | x07 / lint / error | never | Review diff gate rejected a wider proof-assumption surface. |
 | `X07RD_ASYNC_PROOF_COVERAGE_DECREASE` | x07 / lint / error | never | Review diff gate rejected an async proof coverage regression. |
@@ -350,7 +355,10 @@ This file is generated from `catalog/diagnostics.json` using `x07 diag catalog`.
 | `X07TC_EPEER_POLICY` | x07 / run / error | sometimes | Core lint/schema diagnostic `X07TC_EPEER_POLICY`. |
 | `X07TC_EPROFILE` | x07 / run / error | sometimes | Certification trust profile is missing or invalid. |
 | `X07TC_EPROJECT` | x07 / run / error | sometimes | Certification could not resolve the project manifest or source closure. |
+| `X07TC_EPROOF_CHECK_ENGINE_MISMATCH` | x07 / run / error | sometimes | Certification found a proof-check report whose engine did not match the proved symbol metadata. |
 | `X07TC_EPROOF_CHECK_MISSING` | x07 / run / error | never | Required proof-check report is missing from prove evidence. |
+| `X07TC_EPROOF_CHECK_REJECTED` | x07 / run / error | sometimes | Certification rejected a proof whose proof-check report was not accepted. |
+| `X07TC_EPROOF_CHECK_SCHEMA_INVALID` | x07 / run / error | sometimes | Proof-check report failed schema validation during certification. |
 | `X07TC_EPROOF_COVERAGE` | x07 / run / error | never | Reachable proof coverage is incomplete for certification. |
 | `X07TC_EPROOF_OBJECT_MISSING` | x07 / run / error | never | Required proof object is missing from prove evidence. |
 | `X07TC_EPROVE` | x07 / run / error | sometimes | At least one reachable proof obligation failed. |
@@ -6267,6 +6275,26 @@ Agent strategy:
 - Re-run `x07 prove check --proof <path>` and confirm the report returns `result=accepted`.
 
 
+## `X07PROOF_EIMPORTED_SUMMARY_MISMATCH`
+
+Summary: Semantic proof replay found imported proof-summary drift.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker could not validate the bundled imported proof-summary artifacts against the digests recorded in the proof object or the replayed reachable summary surface.
+
+Agent strategy:
+
+- Keep the bundled imported proof-summary artifacts exactly as emitted by the prove flow.
+- Re-run `x07 verify --prove --proof-summary <path> --emit-proof <path>` if any imported proof summary changed.
+- Re-run `x07 prove check --proof <path>`.
+
+
 ## `X07PROOF_EOBJECT_INVALID`
 
 Summary: Proof object failed schema or structural validation.
@@ -6278,13 +6306,93 @@ Quickfix support: `sometimes`
 
 Details:
 
-The proof checker read a `x07.verify.proof_object@0.1.0` file that was malformed, schema-invalid, or otherwise could not be decoded as a valid proof object.
+The proof checker read a `x07.verify.proof_object@0.2.0` file that was malformed, schema-invalid, or otherwise could not be decoded as a valid proof object.
 
 Agent strategy:
 
 - Re-run `x07 verify --prove --emit-proof <path>` to regenerate the proof object.
 - Ensure the proof object file is the exact emitted artifact, not a coverage summary or edited JSON.
 - Re-run `x07 prove check --proof <path>`.
+
+
+## `X07PROOF_EOBLIGATION_MISMATCH`
+
+Summary: Semantic proof replay regenerated a different verification obligation.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker successfully replayed the source surface but the regenerated SMT obligation digest did not match the obligation recorded in the proof object.
+
+Agent strategy:
+
+- Treat this as source/proof drift: re-run `x07 verify --prove --emit-proof <path>` on the current source tree.
+- Keep imported proof summaries, prove bounds, and project manifest state aligned with the emitted proof bundle.
+- Re-run `x07 prove check --proof <path>` until it returns `result=accepted`.
+
+
+## `X07PROOF_ESCHEDULER_MODEL_MISMATCH`
+
+Summary: Semantic async proof replay found a scheduler-model mismatch.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker replayed an async proof but the trusted scheduler-model digest did not match the one recorded in the proof object.
+
+Agent strategy:
+
+- Use the canonical checked-in scheduler model from the same toolchain release that emitted the proof object.
+- Re-run `x07 verify --prove --emit-proof <path>` for the async symbol.
+- Re-run `x07 prove check --proof <path>`.
+
+
+## `X07PROOF_ESOLVER_REPLAY_FAILED`
+
+Summary: Semantic proof replay did not reproduce the expected solver verdict.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker regenerated the obligation but solver replay failed or returned a different result than the proof object expected.
+
+Agent strategy:
+
+- Ensure `z3` is installed and reachable in the replay environment.
+- Re-run `x07 verify --prove --emit-proof <path>` from the current source tree if the obligation or imported proof-summary inputs changed.
+- Re-run `x07 prove check --proof <path>` and confirm the report returns `result=accepted`.
+
+
+## `X07PROOF_ESOURCE_REPLAY_FAILED`
+
+Summary: Semantic proof replay could not reconstruct the proved source surface.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof checker could not replay the proof against the current project manifest, resolved declaration graph, or bundled proof-summary inputs, so it rejected the proof before obligation comparison.
+
+Agent strategy:
+
+- Run `x07 prove check --proof <path>` from the same project tree that emitted the proof object.
+- Keep the emitted proof bundle together with the matching `x07.json` state and bundled proof-summary inputs.
+- Re-run `x07 verify --prove --emit-proof <path>` if the source or manifest changed.
 
 
 ## `X07RD_ADVISORY_ALLOWANCE_ENABLED`
@@ -7334,6 +7442,26 @@ Agent strategy:
 - Re-run `x07 trust certify`.
 
 
+## `X07TC_EPROOF_CHECK_ENGINE_MISMATCH`
+
+Summary: Certification found a proof-check report whose engine did not match the proved symbol metadata.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The proof-check report replayed a different verification engine than the one recorded in the proof-summary evidence for that symbol, so the certification flow rejected it.
+
+Agent strategy:
+
+- Re-run `x07 verify --prove --emit-proof <path>` and `x07 prove check --proof <path>` from the same toolchain build.
+- Keep proof summaries, proof objects, and proof-check reports from the same prove run together.
+- Re-run `x07 trust certify`.
+
+
 ## `X07TC_EPROOF_CHECK_MISSING`
 
 Summary: Required proof-check report is missing from prove evidence.
@@ -7352,6 +7480,46 @@ Agent strategy:
 
 - Run `x07 prove check --proof <path>` for the missing proof object or rerun the prove flow that emits the check report.
 - Ensure the per-symbol prove report references both the proof object and the proof-check report.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROOF_CHECK_REJECTED`
+
+Summary: Certification rejected a proof whose proof-check report was not accepted.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+The loaded proof-check report had `ok=false` or `result!=="accepted"`, so the certification flow failed closed instead of treating the proof as independently replayed evidence.
+
+Agent strategy:
+
+- Inspect the proof-check report diagnostics and repair the source/proof inputs until `x07 prove check` returns `result=accepted`.
+- Re-run the prove flow if the source or imported proof-summary surface changed.
+- Re-run `x07 trust certify`.
+
+
+## `X07TC_EPROOF_CHECK_SCHEMA_INVALID`
+
+Summary: Proof-check report failed schema validation during certification.
+
+Origins:
+- x07 (stage: run, severity: error)
+
+Quickfix support: `sometimes`
+
+Details:
+
+Certification found a malformed, unreadable, or schema-invalid `x07.verify.proof_check.report@0.2.0` artifact where an accepted proof-check report was required.
+
+Agent strategy:
+
+- Re-run `x07 prove check --proof <path>` to regenerate the proof-check report.
+- Ensure the certificate flow is consuming the emitted report rather than an edited JSON file.
 - Re-run `x07 trust certify`.
 
 

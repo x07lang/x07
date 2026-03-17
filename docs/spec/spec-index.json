@@ -1247,15 +1247,15 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-prove-check.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-prove-check.report.schema.json",
-      "schema_version": "x07.tool.prove.check.report@0.1.0",
-      "title": "x07.tool.prove.check.report@0.1.0"
+      "schema_version": "x07.tool.prove.check.report@0.2.0",
+      "title": "x07.tool.prove.check.report@0.2.0"
     },
     {
       "kind": "schema",
       "path": "docs/spec/schemas/x07-tool-prove.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-tool-prove.report.schema.json",
-      "schema_version": "x07.tool.prove.report@0.1.0",
-      "title": "x07.tool.prove.report@0.1.0"
+      "schema_version": "x07.tool.prove.report@0.2.0",
+      "title": "x07.tool.prove.report@0.2.0"
     },
     {
       "kind": "schema",
@@ -1429,8 +1429,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-trust.certificate.schema.json",
       "schema_id": "https://x07.io/spec/x07-trust.certificate.schema.json",
-      "schema_version": "x07.trust.certificate@0.6.0",
-      "title": "x07.trust.certificate@0.6.0"
+      "schema_version": "x07.trust.certificate@0.7.0",
+      "title": "x07.trust.certificate@0.7.0"
     },
     {
       "kind": "schema",
@@ -1471,15 +1471,15 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-verify.proof-check.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-verify.proof-check.report.schema.json",
-      "schema_version": "x07.verify.proof_check.report@0.1.0",
-      "title": "x07.verify.proof_check.report@0.1.0"
+      "schema_version": "x07.verify.proof_check.report@0.2.0",
+      "title": "x07.verify.proof_check.report@0.2.0"
     },
     {
       "kind": "schema",
       "path": "docs/spec/schemas/x07-verify.proof-object.schema.json",
       "schema_id": "https://x07.io/spec/x07-verify.proof-object.schema.json",
-      "schema_version": "x07.verify.proof_object@0.1.0",
-      "title": "x07.verify.proof_object@0.1.0"
+      "schema_version": "x07.verify.proof_object@0.2.0",
+      "title": "x07.verify.proof_object@0.2.0"
     },
     {
       "kind": "schema",
@@ -1492,8 +1492,8 @@
       "kind": "schema",
       "path": "docs/spec/schemas/x07-verify.report.schema.json",
       "schema_id": "https://x07.io/spec/x07-verify.report.schema.json",
-      "schema_version": "x07.verify.report@0.7.0",
-      "title": "X07 x07 verify report v0.7.0"
+      "schema_version": "x07.verify.report@0.8.0",
+      "title": "X07 x07 verify report v0.8.0"
     },
     {
       "kind": "schema",

@@ -47,13 +47,9 @@ dist/release-manifest.json
 # Package artifacts (generated locally)
 packages/**/dist/
 
-# Tracked reference certificate snapshot for the verified-core docs example
-docs/examples/verified_core_pure_v1/.x07/
-!docs/examples/verified_core_pure_v1/target/
-docs/examples/verified_core_pure_v1/target/*
-!docs/examples/verified_core_pure_v1/target/cert/
-docs/examples/verified_core_pure_v1/target/cert/*
-!docs/examples/verified_core_pure_v1/target/cert/certificate.json
+# Generated example verification artifacts
+docs/examples/**/.x07/
+docs/examples/**/target/cert/
 
 # OS helper binaries (built by scripts/build_os_helpers.sh)
 /deps/x07/x07-proc-echo

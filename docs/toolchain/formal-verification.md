@@ -49,18 +49,20 @@ The Ubuntu 24.04 `universe` packages (`cbmc 5.95.1`, `z3 4.8.12`) are too old fo
 
 `x07 verify` consumes `requires`, `ensures`, `invariant`, `decreases`, and `defasync.protocol` clauses and emits:
 
-- verify reports (`x07.verify.report@0.7.0`)
+- verify reports (`x07.verify.report@0.8.0`)
 - reachable coverage/support posture (`x07.verify.coverage@0.4.0`)
 - standalone coverage/support summaries (`x07.verify.summary@0.2.0`, `summary_kind = "coverage_support"`)
 - standalone proof summaries (`x07.verify.proof_summary@0.2.0`, `summary_kind = "proof"`)
-- optional proof objects (`x07.verify.proof_object@0.1.0`)
-- optional proof-check reports (`x07.verify.proof_check.report@0.1.0`)
+- optional proof objects (`x07.verify.proof_object@0.2.0`)
+- optional proof-check reports (`x07.verify.proof_check.report@0.2.0`)
 
 The split matters:
 
 - coverage/support artifacts are planning and review artifacts
 - proof summaries are reusable proof evidence
 - proof objects plus `x07 prove check` reports are the independently checkable line used by strong trust profiles
+
+`x07 prove check` is a semantic replay checker, not just an artifact-integrity check. It reloads the project manifest, re-resolves the proved declaration, replays imported proof-summary inputs, re-derives the canonical SMT obligation, validates the async scheduler model when present, and requires the replayed solver result to match the proof object.
 
 Coverage reports use support statuses such as `supported`, `supported_async`, and `imported_proof_summary`. They do not count as proof by themselves.
 For pure recursive certification, self-recursive `defn` targets are accepted when they declare `decreases[]`. Proof artifacts expose `recursion_kind` and `recursion_bound_kind` so bounded recursion cannot be hidden behind a generic success bit.
@@ -103,9 +105,10 @@ For strong trust profiles it also checks:
 
 - `--entry` matches `project.operational_entry_symbol`
 - the certificate is for the operational entry, not a proof-friendly surrogate
-- accepted proof inventory items include proof summaries, proof objects, and proof-check reports
+- accepted proof inventory items include proof summaries, proof objects, proof-check reports, and proof-check acceptance metadata
 - accepted proof assumptions are explicitly disclosed in the certificate
 - developer-only imported stubs, coverage-only imports, and bounded recursion are rejected fail-closed
+- the certificate tells reviewers whether the operational entry body itself was formally proved, how many symbols were proved, and how much of the trust posture depends on capsule/runtime evidence instead
 
 If a project keeps extra local helper checks that do not satisfy the
 certification profile world or evidence requirements, keep them in a separate

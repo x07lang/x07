@@ -143,5 +143,13 @@ case "$(uname -s)" in
     ;;
 esac
 
+if [[ "${X07_SKIP_PERF_BASELINE:-0}" == "1" ]]; then
+  echo
+  echo "==> perf baseline gate (skipped; set X07_SKIP_PERF_BASELINE=0 to enable)"
+else
+  step "perf baseline gate"
+  ./labs/scripts/ci/check_perf_baseline.sh
+fi
+
 echo
 echo "ok: all checks passed"

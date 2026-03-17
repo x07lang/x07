@@ -229,10 +229,17 @@ The certificate bundle includes:
 Accepted certificates also expose:
 
 - `operational_entry_symbol`
+- `formal_verification_scope`
+- `proved_symbol_count`, `proved_defn_count`, `proved_defasync_count`
+- `entry_body_formally_proved`
+- `operational_entry_proof_inventory_refs`
+- `capsule_boundary_only_symbol_count`
+- `runtime_evidence_only_symbol_count`
 - `proof_inventory`
 - `proof_assumptions`
 - recursive boundedness honesty (`recursive_proof_summary`)
 - explicit booleans for bounded-proof or developer-only-assumption dependence
+- per-proof acceptance metadata (`proof_check_result`, `proof_check_checker`, `proof_object_digest`)
 
 `x07 trust certify` rejects if support posture regresses, required prove artifacts are missing, required proof objects or proof-check reports are missing, required boundary metadata is missing, boundary-declared smoke/PBT tests do not resolve and pass, schema-derived outputs drift, trust report cleanliness fails, or compile attestation cannot bind the emitted native artifact.
 Strong trust profiles additionally reject:
@@ -246,7 +253,7 @@ Strong trust profiles additionally reject:
 Certificate schema:
 
 - `spec/x07-trust.certificate.schema.json`
-- `schema_version: "x07.trust.certificate@0.6.0"`
+- `schema_version: "x07.trust.certificate@0.7.0"`
 
 For `verified_core_pure_v1`, boundary-referenced schemas are rechecked with `x07 schema derive --check --out-dir .`, so certified projects should derive those schema outputs into the project root.
 
@@ -262,7 +269,7 @@ For `verified_core_pure_v1`, the reviewer flow is:
 
 1. Run `x07 trust certify ... --out-dir target/cert`.
 2. Read `target/cert/summary.html` for the human overview.
-3. Inspect `target/cert/certificate.json` for the machine-readable evidence bundle.
+3. Inspect `target/cert/certificate.json` for the machine-readable evidence bundle, especially the formal-verification scope fields and per-proof proof-check results.
 4. Re-check proof objects with `x07 prove check --proof <path>` when independent proof verification is required.
 5. Use `x07 review diff --fail-on proof-coverage-decrease|assumption-surface-widen|bounded-proof-introduced|coverage-summary-imported|operational-entry-diverges|boundary-relaxation|trusted-subset-expansion` when comparing a baseline certificate posture to a candidate change.
 

@@ -794,24 +794,52 @@ struct VerifyProofAssumption {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct VerifyProofObject {
     schema_version: String,
+    project_manifest_digest: String,
+    entry_symbol: String,
     symbol: String,
     kind: String,
     decl_sha256_hex: String,
-    engine: String,
+    verify_engine: String,
+    primitive_manifest_digest: String,
+    #[serde(default)]
+    imported_proof_summary_digests: Vec<String>,
     proof_summary_digest: String,
     obligation_digest: String,
-    solver_transcript_digest: String,
+    expected_solver_result: String,
+    recursion_kind: String,
+    recursion_bound_kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scheduler_model_digest: Option<String>,
+    unwind: u32,
+    max_bytes_len: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct VerifyProofCheckReport {
     schema_version: String,
     pub(crate) ok: bool,
-    proof_object_digest: String,
-    checker: String,
+    pub(crate) proof_object_digest: String,
+    pub(crate) checker: String,
     pub(crate) result: String,
+    pub(crate) symbol: String,
+    pub(crate) entry_symbol: String,
+    pub(crate) verify_engine: String,
+    pub(crate) expected_obligation_digest: String,
+    pub(crate) replayed_obligation_digest: String,
+    pub(crate) expected_solver_result: String,
+    pub(crate) replayed_solver_result: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) validated_imported_proof_summary_digests: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) validated_scheduler_model_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     diagnostics: Vec<x07c::diagnostics::Diagnostic>,
+}
+
+#[derive(Debug, Clone)]
+struct ProveDriverBuild {
+    driver_src: Vec<u8>,
+    c_with_harness: String,
 }
 
 pub fn cmd_verify(
@@ -931,6 +959,16 @@ fn cmd_verify_inner(
     }
 
     if mode == Mode::Prove {
+        if args.emit_proof.is_some() && project_path.is_none() {
+            let d = diag_verify(
+                "X07V_EPROJECT",
+                "emit-proof requires a project manifest (`--project` or a reachable x07.json)",
+            );
+            return write_report_and_exit(
+                machine,
+                VerifyReport::error(mode, &args.entry, Bounds::for_args(&args), d, 1),
+            );
+        }
         if let Some((code, msg)) = prove_unsupported_reason(
             &module_roots,
             &target,
@@ -1003,36 +1041,22 @@ fn cmd_verify_inner(
     std::fs::create_dir_all(&work_dir)
         .with_context(|| format!("create artifact dir: {}", work_dir.display()))?;
 
-    let use_direct_prove_harness = mode == Mode::Prove && direct_prove_harness_supported(&target);
-    let normalize_for_overlay = mode == Mode::Prove && !use_direct_prove_harness;
-    let driver_src = match build_verify_driver_x07ast_json(
-        &module_roots,
-        &args.entry,
-        &target,
-        args.max_bytes_len,
-        normalize_for_overlay,
-    ) {
-        Ok(src) => src,
-        Err(err) if mode == Mode::Prove && target.is_async => {
-            return write_report_and_exit(
-                machine,
-                VerifyReport::unsupported(
-                    mode,
-                    &args.entry,
-                    bounds.clone(),
-                    "X07V_UNSUPPORTED_DEFASYNC_FORM",
-                    format!("defasync target uses an unsupported proof form: {err:#}"),
-                    2,
-                )
-                .with_artifacts(artifacts),
-            );
-        }
-        Err(err) => return Err(err),
-    };
     let driver_path = work_dir.join("driver.x07.json");
-    util::write_atomic(&driver_path, &driver_src)
-        .with_context(|| format!("write verify driver: {}", driver_path.display()))?;
-    artifacts.driver_path = Some(driver_path.display().to_string());
+    let driver_src = if mode == Mode::Prove {
+        None
+    } else {
+        let driver_src = build_verify_driver_x07ast_json(
+            &module_roots,
+            &args.entry,
+            &target,
+            args.max_bytes_len,
+            false,
+        )?;
+        util::write_atomic(&driver_path, &driver_src)
+            .with_context(|| format!("write verify driver: {}", driver_path.display()))?;
+        artifacts.driver_path = Some(driver_path.display().to_string());
+        Some(driver_src)
+    };
 
     let prove_coverage = if mode == Mode::Prove {
         Some(coverage_report_for_entry(
@@ -1111,67 +1135,65 @@ fn cmd_verify_inner(
         artifacts.verify_coverage_summary_path = Some(verify_summary_path.display().to_string());
     }
 
-    let trusted_primitive_stubs = if mode == Mode::Prove {
-        trusted_primitive_stubs_for_prove(
-            &args,
-            project_path.as_deref(),
+    let c_with_harness = if mode == Mode::Prove {
+        match build_prove_driver_build(
+            &args.entry,
             &target,
             &module_roots,
             prove_coverage.as_ref().map(|analysis| &analysis.coverage),
-        )?
-    } else {
-        Vec::new()
-    };
-    let compile_module_roots = if use_direct_prove_harness {
-        module_roots.clone()
-    } else if mode == Mode::Prove {
-        build_verify_compile_module_roots(&module_roots, &args.entry, &work_dir)?
-    } else {
-        module_roots.clone()
-    };
-    let c_src = match compile_driver_to_c(&driver_src, &compile_module_roots) {
-        Ok(v) => v,
-        Err(err) if mode == Mode::Prove && target.is_async => {
-            return write_report_and_exit(
-                machine,
-                VerifyReport::unsupported(
-                    mode,
-                    &args.entry,
-                    bounds,
-                    "X07V_UNSUPPORTED_DEFASYNC_FORM",
-                    format!("defasync target uses an unsupported proof form: {err}"),
-                    2,
-                )
-                .with_artifacts(artifacts),
-            );
+            args.max_bytes_len,
+            bounds.input_len_bytes,
+            &work_dir,
+        ) {
+            Ok(build) => {
+                util::write_atomic(&driver_path, &build.driver_src)
+                    .with_context(|| format!("write verify driver: {}", driver_path.display()))?;
+                artifacts.driver_path = Some(driver_path.display().to_string());
+                build.c_with_harness
+            }
+            Err(err) if target.is_async => {
+                return write_report_and_exit(
+                    machine,
+                    VerifyReport::unsupported(
+                        mode,
+                        &args.entry,
+                        bounds,
+                        "X07V_UNSUPPORTED_DEFASYNC_FORM",
+                        format!("defasync target uses an unsupported proof form: {err}"),
+                        2,
+                    )
+                    .with_artifacts(artifacts),
+                );
+            }
+            Err(err) => {
+                return write_report_and_exit(
+                    machine,
+                    VerifyReport::unsupported(
+                        mode,
+                        &args.entry,
+                        bounds,
+                        "X07V_PROVE_UNSUPPORTED",
+                        format!("target is outside the certifiable pure subset: {err}"),
+                        2,
+                    )
+                    .with_artifacts(artifacts),
+                );
+            }
         }
-        Err(err) if mode == Mode::Prove => {
-            return write_report_and_exit(
-                machine,
-                VerifyReport::unsupported(
-                    mode,
-                    &args.entry,
-                    bounds,
-                    "X07V_PROVE_UNSUPPORTED",
-                    format!("target is outside the certifiable pure subset: {err}"),
-                    2,
-                )
-                .with_artifacts(artifacts),
-            );
-        }
-        Err(err) => return Err(err),
-    };
-    let c_src = if mode == Mode::Prove {
-        apply_trusted_primitive_stubs(&c_src, &trusted_primitive_stubs)?
     } else {
-        c_src
+        let compile_module_roots = module_roots.clone();
+        let c_src = match compile_driver_to_c(
+            driver_src
+                .as_deref()
+                .expect("driver source for non-prove modes"),
+            &compile_module_roots,
+        ) {
+            Ok(v) => v,
+            Err(err) => return Err(err),
+        };
+        let harness_src = build_c_harness(bounds.input_len_bytes);
+        format!("{c_src}\n\n{harness_src}\n")
     };
-    let harness_src = if use_direct_prove_harness {
-        build_direct_prove_c_harness(&args.entry, &target, args.max_bytes_len)?
-    } else {
-        build_c_harness(bounds.input_len_bytes)
-    };
-    let c_with_harness = format!("{c_src}\n\n{harness_src}\n");
     let c_path = work_dir.join("verify.c");
     util::write_atomic(&c_path, c_with_harness.as_bytes())
         .with_context(|| format!("write verify C: {}", c_path.display()))?;
@@ -1189,8 +1211,13 @@ fn cmd_verify_inner(
                 work_dir: &work_dir,
                 c_path: &c_path,
                 mode,
+                project_path: project_path.clone(),
                 proof_summary,
                 proof_summary_artifact,
+                proof_imported_summaries: prove_coverage
+                    .as_ref()
+                    .map(|analysis| analysis.imported_summaries.clone())
+                    .unwrap_or_default(),
                 emit_proof_path: args.emit_proof.clone(),
             },
         ),
@@ -1358,8 +1385,10 @@ struct VerifySmtPlan<'a> {
     work_dir: &'a Path,
     c_path: &'a Path,
     mode: Mode,
+    project_path: Option<PathBuf>,
     proof_summary: Option<VerifyProofSummary>,
     proof_summary_artifact: Option<VerifyProofSummaryArtifact>,
+    proof_imported_summaries: Vec<VerifyImportedSummaryRef>,
     emit_proof_path: Option<PathBuf>,
 }
 
@@ -1486,9 +1515,16 @@ fn cmd_verify_smt(
         }
         if let Some(proof_summary_artifact) = plan.proof_summary_artifact.as_ref() {
             let proof_summary_path = if let Some(proof_path) = plan.emit_proof_path.as_deref() {
+                let project_path = plan
+                    .project_path
+                    .as_deref()
+                    .context("proof emission requires a project manifest")?;
                 let (bundle_artifacts, _updated_summary) = write_prove_bundle_artifacts(
                     proof_path,
                     proof_summary_artifact,
+                    &plan.proof_imported_summaries,
+                    project_path,
+                    &bounds,
                     &smt2_path,
                     &z3_out_path,
                 )?;
@@ -4547,25 +4583,9 @@ fn build_direct_prove_c_harness(
 }
 
 fn trusted_primitive_stubs_for_prove(
-    args: &VerifyArgs,
-    project_path: Option<&Path>,
-    target: &TargetSig,
     module_roots: &[PathBuf],
-    coverage: Option<&VerifyCoverage>,
+    coverage: &VerifyCoverage,
 ) -> Result<Vec<TrustedPrimitiveStub>> {
-    let owned_analysis;
-    let coverage = if let Some(coverage) = coverage {
-        coverage
-    } else {
-        owned_analysis = coverage_report_for_entry(
-            args,
-            project_path,
-            target,
-            &ImportedSummaryIndex::default(),
-            false,
-        )?;
-        &owned_analysis.coverage
-    };
     let mut out = Vec::new();
     for function in &coverage.functions {
         if function.kind != "imported" || function.status != "trusted_primitive" {
@@ -4579,6 +4599,45 @@ fn trusted_primitive_stubs_for_prove(
         });
     }
     Ok(out)
+}
+
+fn build_prove_driver_build(
+    entry: &str,
+    target: &TargetSig,
+    module_roots: &[PathBuf],
+    coverage: Option<&VerifyCoverage>,
+    max_bytes_len: u32,
+    input_len_bytes: u32,
+    work_dir: &Path,
+) -> Result<ProveDriverBuild> {
+    let coverage = coverage.context("prove coverage is required for prove driver build")?;
+    let use_direct_prove_harness = direct_prove_harness_supported(target);
+    let driver_src = build_verify_driver_x07ast_json(
+        module_roots,
+        entry,
+        target,
+        max_bytes_len,
+        !use_direct_prove_harness,
+    )?;
+    let compile_module_roots = if use_direct_prove_harness {
+        module_roots.to_vec()
+    } else {
+        build_verify_compile_module_roots(module_roots, entry, work_dir)?
+    };
+    let c_src = compile_driver_to_c(&driver_src, &compile_module_roots)?;
+    let c_src = apply_trusted_primitive_stubs(
+        &c_src,
+        &trusted_primitive_stubs_for_prove(module_roots, coverage)?,
+    )?;
+    let harness_src = if use_direct_prove_harness {
+        build_direct_prove_c_harness(entry, target, max_bytes_len)?
+    } else {
+        build_c_harness(input_len_bytes)
+    };
+    Ok(ProveDriverBuild {
+        driver_src,
+        c_with_harness: format!("{c_src}\n\n{harness_src}\n"),
+    })
 }
 
 fn c_user_fn_name(name: &str) -> String {
@@ -5168,6 +5227,10 @@ fn proof_summary_bundle_path(dir: &Path) -> PathBuf {
     dir.join("verify.proof-summary.json")
 }
 
+fn proof_imported_summaries_bundle_dir(dir: &Path) -> PathBuf {
+    dir.join("imported_proof_summaries")
+}
+
 fn proof_obligation_bundle_path(dir: &Path) -> PathBuf {
     dir.join("verify.smt2")
 }
@@ -5184,9 +5247,114 @@ fn proof_check_report_path(proof_path: &Path) -> PathBuf {
     proof_path.with_file_name(format!("{stem}.check.json"))
 }
 
+fn prefixed_sha256(bytes: &[u8]) -> String {
+    format!("sha256:{}", util::sha256_hex(bytes))
+}
+
+fn project_manifest_digest(path: &Path) -> Result<String> {
+    let bytes = std::fs::read(path)
+        .with_context(|| format!("read project manifest: {}", path.display()))?;
+    Ok(prefixed_sha256(&bytes))
+}
+
+fn verify_primitive_manifest_digest() -> String {
+    prefixed_sha256(X07_VERIFY_PRIMITIVES_CATALOG_BYTES)
+}
+
+fn verify_scheduler_model_digest() -> String {
+    prefixed_sha256(X07_VERIFY_SCHEDULER_MODEL_BYTES)
+}
+
+fn load_bundle_imported_summary_paths(bundle_dir: &Path) -> Result<Vec<PathBuf>> {
+    let dir = proof_imported_summaries_bundle_dir(bundle_dir);
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut paths = std::fs::read_dir(&dir)
+        .with_context(|| format!("read imported proof-summary bundle dir: {}", dir.display()))?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .collect::<Vec<_>>();
+    paths.sort();
+    Ok(paths)
+}
+
+fn write_bundle_imported_summaries(
+    bundle_dir: &Path,
+    imported_summaries: &[VerifyImportedSummaryRef],
+) -> Result<Vec<String>> {
+    let imported_dir = proof_imported_summaries_bundle_dir(bundle_dir);
+    if imported_summaries.is_empty() {
+        if imported_dir.exists() {
+            std::fs::remove_dir_all(&imported_dir).with_context(|| {
+                format!(
+                    "remove imported proof-summary bundle dir: {}",
+                    imported_dir.display()
+                )
+            })?;
+        }
+        return Ok(Vec::new());
+    }
+
+    std::fs::create_dir_all(&imported_dir).with_context(|| {
+        format!(
+            "create imported proof-summary bundle dir: {}",
+            imported_dir.display()
+        )
+    })?;
+    let mut digests = Vec::with_capacity(imported_summaries.len());
+    for imported in imported_summaries {
+        let source_path = Path::new(&imported.path);
+        let bytes = std::fs::read(source_path)
+            .with_context(|| format!("read imported proof summary: {}", source_path.display()))?;
+        let digest = prefixed_sha256(&bytes);
+        if digest != format!("sha256:{}", imported.sha256_hex) {
+            anyhow::bail!(
+                "imported proof summary digest mismatch for {}: expected sha256:{} got {}",
+                source_path.display(),
+                imported.sha256_hex,
+                digest
+            );
+        }
+        let bundle_path = imported_dir.join(format!("{}.json", imported.sha256_hex));
+        util::write_atomic(&bundle_path, &bytes).with_context(|| {
+            format!(
+                "write bundled imported proof summary: {}",
+                bundle_path.display()
+            )
+        })?;
+        digests.push(digest);
+    }
+    digests.sort();
+    digests.dedup();
+    Ok(digests)
+}
+
+fn resolve_replay_project_manifest(cwd: &Path, proof_path: &Path) -> Result<PathBuf> {
+    for start in [Some(cwd), proof_path.parent()] {
+        let mut current = start.map(Path::to_path_buf);
+        while let Some(dir) = current {
+            let candidate = dir.join("x07.json");
+            if candidate.is_file() {
+                return Ok(candidate);
+            }
+            current = dir.parent().map(Path::to_path_buf);
+        }
+    }
+    anyhow::bail!(
+        "could not resolve x07.json for proof replay from {} or {}",
+        proof_path.display(),
+        cwd.display()
+    )
+}
+
 fn write_prove_bundle_artifacts(
     proof_path: &Path,
     proof_summary_artifact: &VerifyProofSummaryArtifact,
+    imported_summaries: &[VerifyImportedSummaryRef],
+    project_path: &Path,
+    bounds: &Bounds,
     smt2_path: &Path,
     z3_out_path: &Path,
 ) -> Result<(Artifacts, VerifyProofSummaryArtifact)> {
@@ -5197,7 +5365,7 @@ fn write_prove_bundle_artifacts(
     let proof_summary_path = proof_summary_bundle_path(bundle_dir);
     let proof_summary_bytes =
         write_verify_proof_summary_artifact(&proof_summary_path, proof_summary_artifact)?;
-    let proof_summary_digest = format!("sha256:{}", util::sha256_hex(&proof_summary_bytes));
+    let proof_summary_digest = prefixed_sha256(&proof_summary_bytes);
 
     let smt2_bytes =
         std::fs::read(smt2_path).with_context(|| format!("read smt2: {}", smt2_path.display()))?;
@@ -5218,37 +5386,35 @@ fn write_prove_bundle_artifacts(
             solver_transcript_path.display()
         )
     })?;
+    let imported_proof_summary_digests =
+        write_bundle_imported_summaries(bundle_dir, imported_summaries)?;
 
     let object = VerifyProofObject {
         schema_version: X07_VERIFY_PROOF_OBJECT_SCHEMA_VERSION.to_string(),
+        project_manifest_digest: project_manifest_digest(project_path)?,
+        entry_symbol: proof_summary_artifact.symbol.clone(),
         symbol: proof_summary_artifact.symbol.clone(),
         kind: proof_summary_artifact.kind.clone(),
         decl_sha256_hex: proof_summary_artifact.decl_sha256_hex.clone(),
-        engine: proof_summary_artifact.engine.clone(),
+        verify_engine: proof_summary_artifact.engine.clone(),
+        primitive_manifest_digest: verify_primitive_manifest_digest(),
+        imported_proof_summary_digests,
         proof_summary_digest: proof_summary_digest.clone(),
-        obligation_digest: format!("sha256:{}", util::sha256_hex(&smt2_bytes)),
-        solver_transcript_digest: format!("sha256:{}", util::sha256_hex(&solver_bytes)),
+        obligation_digest: prefixed_sha256(&smt2_bytes),
+        expected_solver_result: "unsat".to_string(),
+        recursion_kind: proof_summary_artifact.recursion_kind.clone(),
+        recursion_bound_kind: proof_summary_artifact.recursion_bound_kind.clone(),
+        scheduler_model_digest: if proof_summary_artifact.kind == "defasync" {
+            Some(verify_scheduler_model_digest())
+        } else {
+            None
+        },
+        unwind: bounds.unwind,
+        max_bytes_len: bounds.max_bytes_len,
     };
     let object_bytes = verify_proof_object_to_pretty_canon_bytes(&object)?;
     util::write_atomic(proof_path, &object_bytes)
         .with_context(|| format!("write proof object: {}", proof_path.display()))?;
-
-    let proof_object_digest = format!("sha256:{}", util::sha256_hex(&object_bytes));
-    let updated_summary = VerifyProofSummaryArtifact {
-        proof_object_digest: Some(proof_object_digest.clone()),
-        ..proof_summary_artifact.clone()
-    };
-    let updated_summary_bytes =
-        write_verify_proof_summary_artifact(&proof_summary_path, &updated_summary)?;
-    let updated_proof_summary_digest =
-        format!("sha256:{}", util::sha256_hex(&updated_summary_bytes));
-    let updated_object = VerifyProofObject {
-        proof_summary_digest: updated_proof_summary_digest,
-        ..object
-    };
-    let updated_object_bytes = verify_proof_object_to_pretty_canon_bytes(&updated_object)?;
-    util::write_atomic(proof_path, &updated_object_bytes)
-        .with_context(|| format!("rewrite proof object: {}", proof_path.display()))?;
 
     let check_report = check_proof_object_path(proof_path)?;
     let check_report_path = proof_check_report_path(proof_path);
@@ -5263,110 +5429,860 @@ fn write_prove_bundle_artifacts(
             proof_check_report_path: Some(check_report_path.display().to_string()),
             ..Artifacts::default()
         },
-        updated_summary,
+        proof_summary_artifact.clone(),
     ))
 }
 
-pub(crate) fn check_proof_object_path(proof_path: &Path) -> Result<VerifyProofCheckReport> {
+struct ReplayTempDir {
+    path: PathBuf,
+}
+
+impl ReplayTempDir {
+    fn new(prefix: &str) -> Result<Self> {
+        let path = std::env::temp_dir().join(format!(
+            "{prefix}_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .context("system time before UNIX_EPOCH")?
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&path)
+            .with_context(|| format!("create replay temp dir: {}", path.display()))?;
+        Ok(Self { path })
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for ReplayTempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
+fn accepted_proof_check_report(
+    object: &VerifyProofObject,
+    proof_object_digest: String,
+    replayed_obligation_digest: String,
+    replayed_solver_result: String,
+    validated_imported_proof_summary_digests: Vec<String>,
+    validated_scheduler_model_digest: Option<String>,
+) -> VerifyProofCheckReport {
+    VerifyProofCheckReport {
+        schema_version: X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION.to_string(),
+        ok: true,
+        proof_object_digest,
+        checker: "x07.proof_replay_checker".to_string(),
+        result: "accepted".to_string(),
+        symbol: object.symbol.clone(),
+        entry_symbol: object.entry_symbol.clone(),
+        verify_engine: object.verify_engine.clone(),
+        expected_obligation_digest: object.obligation_digest.clone(),
+        replayed_obligation_digest,
+        expected_solver_result: object.expected_solver_result.clone(),
+        replayed_solver_result,
+        validated_imported_proof_summary_digests,
+        validated_scheduler_model_digest,
+        diagnostics: Vec::new(),
+    }
+}
+
+fn rejected_proof_check_report_for_object(
+    object: &VerifyProofObject,
+    proof_object_digest: String,
+    code: &str,
+    message: String,
+    replayed_obligation_digest: Option<String>,
+    replayed_solver_result: Option<String>,
+    validated_imported_proof_summary_digests: Vec<String>,
+    validated_scheduler_model_digest: Option<String>,
+) -> VerifyProofCheckReport {
+    VerifyProofCheckReport {
+        schema_version: X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION.to_string(),
+        ok: false,
+        proof_object_digest,
+        checker: "x07.proof_replay_checker".to_string(),
+        result: "rejected".to_string(),
+        symbol: object.symbol.clone(),
+        entry_symbol: object.entry_symbol.clone(),
+        verify_engine: object.verify_engine.clone(),
+        expected_obligation_digest: object.obligation_digest.clone(),
+        replayed_obligation_digest: replayed_obligation_digest
+            .unwrap_or_else(|| object.obligation_digest.clone()),
+        expected_solver_result: object.expected_solver_result.clone(),
+        replayed_solver_result: replayed_solver_result
+            .unwrap_or_else(|| object.expected_solver_result.clone()),
+        validated_imported_proof_summary_digests,
+        validated_scheduler_model_digest,
+        diagnostics: vec![diag_verify(code, message)],
+    }
+}
+
+fn load_proof_object_path(proof_path: &Path) -> Result<(String, VerifyProofObject)> {
     let proof_bytes = std::fs::read(proof_path)
         .with_context(|| format!("read proof object: {}", proof_path.display()))?;
-    let proof_digest = format!("sha256:{}", util::sha256_hex(&proof_bytes));
-    let value: Value = match serde_json::from_slice(&proof_bytes) {
-        Ok(value) => value,
-        Err(err) => {
-            return Ok(rejected_proof_check_report(
-                proof_digest,
-                "X07PROOF_EOBJECT_INVALID",
-                format!("parse proof object JSON {}: {err:#}", proof_path.display()),
-            ));
-        }
-    };
+    let proof_digest = prefixed_sha256(&proof_bytes);
+    let value: Value = serde_json::from_slice(&proof_bytes)
+        .with_context(|| format!("parse proof object JSON {}", proof_path.display()))?;
     let diags = report_common::validate_schema(
         X07_VERIFY_PROOF_OBJECT_SCHEMA_BYTES,
         "spec/x07-verify.proof-object.schema.json",
         &value,
     )?;
     if !diags.is_empty() {
-        return Ok(rejected_proof_check_report(
-            proof_digest,
-            "X07PROOF_EOBJECT_INVALID",
-            format!(
-                "proof object schema invalid for {}: {}",
-                proof_path.display(),
-                diags[0].message
-            ),
-        ));
+        anyhow::bail!("proof object schema invalid: {}", diags[0].message);
     }
-    let object: VerifyProofObject = match serde_json::from_value(value) {
-        Ok(object) => object,
+    let object: VerifyProofObject = serde_json::from_value(value)
+        .with_context(|| format!("decode proof object JSON {}", proof_path.display()))?;
+    Ok((proof_digest, object))
+}
+
+pub(crate) fn load_proof_check_report_path(
+    proof_check_path: &Path,
+) -> Result<VerifyProofCheckReport> {
+    let doc = report_common::read_json_file(proof_check_path)?;
+    let diags = report_common::validate_schema(
+        X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_BYTES,
+        "spec/x07-verify.proof-check.report.schema.json",
+        &doc,
+    )?;
+    if !diags.is_empty() {
+        anyhow::bail!("proof-check report schema invalid: {}", diags[0].message);
+    }
+    let required_str = |key: &str| -> Result<String> {
+        doc.get(key)
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .with_context(|| format!("proof-check report missing string field {:?}", key))
+    };
+    Ok(VerifyProofCheckReport {
+        schema_version: required_str("schema_version")?,
+        ok: doc
+            .get("ok")
+            .and_then(Value::as_bool)
+            .context("proof-check report missing bool field \"ok\"")?,
+        proof_object_digest: required_str("proof_object_digest")?,
+        checker: required_str("checker")?,
+        result: required_str("result")?,
+        symbol: required_str("symbol")?,
+        entry_symbol: required_str("entry_symbol")?,
+        verify_engine: required_str("verify_engine")?,
+        expected_obligation_digest: required_str("expected_obligation_digest")?,
+        replayed_obligation_digest: required_str("replayed_obligation_digest")?,
+        expected_solver_result: required_str("expected_solver_result")?,
+        replayed_solver_result: required_str("replayed_solver_result")?,
+        validated_imported_proof_summary_digests: doc
+            .get("validated_imported_proof_summary_digests")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect(),
+        validated_scheduler_model_digest: doc
+            .get("validated_scheduler_model_digest")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        diagnostics: Vec::new(),
+    })
+}
+
+pub(crate) fn check_proof_object_path(proof_path: &Path) -> Result<VerifyProofCheckReport> {
+    let (proof_digest, object) = match load_proof_object_path(proof_path) {
+        Ok(loaded) => loaded,
         Err(err) => {
+            let proof_digest = std::fs::read(proof_path)
+                .map(|bytes| prefixed_sha256(&bytes))
+                .unwrap_or_else(|_| format!("sha256:{}", "0".repeat(64)));
             return Ok(rejected_proof_check_report(
                 proof_digest,
                 "X07PROOF_EOBJECT_INVALID",
-                format!("decode proof object JSON {}: {err:#}", proof_path.display()),
+                format!("{err:#}"),
             ));
         }
     };
     let bundle_dir = proof_path.parent().unwrap_or_else(|| Path::new("."));
     let proof_summary_path = proof_summary_bundle_path(bundle_dir);
-    let smt2_path = proof_obligation_bundle_path(bundle_dir);
-    let z3_out_path = proof_solver_transcript_bundle_path(bundle_dir);
     let summary_bytes = match std::fs::read(&proof_summary_path) {
         Ok(bytes) => bytes,
         Err(err) => {
-            return Ok(rejected_proof_check_report(
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
                 proof_digest,
-                "X07PROOF_ECHECK_FAILED",
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
                 format!(
                     "read proof summary {}: {err:#}",
                     proof_summary_path.display()
                 ),
+                None,
+                None,
+                Vec::new(),
+                None,
             ));
         }
     };
-    let smt2_bytes = match std::fs::read(&smt2_path) {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            return Ok(rejected_proof_check_report(
-                proof_digest,
-                "X07PROOF_ECHECK_FAILED",
-                format!("read smt2 {}: {err:#}", smt2_path.display()),
-            ));
-        }
-    };
-    let solver_bytes = match std::fs::read(&z3_out_path) {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            return Ok(rejected_proof_check_report(
-                proof_digest,
-                "X07PROOF_ECHECK_FAILED",
-                format!("read solver transcript {}: {err:#}", z3_out_path.display()),
-            ));
-        }
-    };
-    let accepted = object.proof_summary_digest
-        == format!("sha256:{}", util::sha256_hex(&summary_bytes))
-        && object.obligation_digest == format!("sha256:{}", util::sha256_hex(&smt2_bytes))
-        && object.solver_transcript_digest == format!("sha256:{}", util::sha256_hex(&solver_bytes));
-    if accepted {
-        Ok(VerifyProofCheckReport {
-            schema_version: X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION.to_string(),
-            ok: true,
-            proof_object_digest: proof_digest,
-            checker: "x07.proof_bundle_checker".to_string(),
-            result: "accepted".to_string(),
-            diagnostics: Vec::new(),
-        })
-    } else {
-        Ok(rejected_proof_check_report(
+    let bundled_summary_digest = prefixed_sha256(&summary_bytes);
+    if bundled_summary_digest != object.proof_summary_digest {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
             proof_digest,
-            "X07PROOF_ECHECK_FAILED",
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
             format!(
-                "independent proof check rejected {} because at least one bundle digest did not match",
-                proof_path.display()
+                "bundled proof summary digest mismatch for {}: expected {} got {}",
+                proof_summary_path.display(),
+                object.proof_summary_digest,
+                bundled_summary_digest
             ),
-        ))
+            None,
+            None,
+            Vec::new(),
+            None,
+        ));
     }
+
+    let cwd = std::env::current_dir().context("get cwd for proof replay")?;
+    let project_path = match resolve_replay_project_manifest(&cwd, proof_path) {
+        Ok(path) => path,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                Vec::new(),
+                None,
+            ));
+        }
+    };
+    let current_project_manifest_digest = match project_manifest_digest(&project_path) {
+        Ok(digest) => digest,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                Vec::new(),
+                None,
+            ));
+        }
+    };
+    if current_project_manifest_digest != object.project_manifest_digest {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!(
+                "project manifest digest mismatch: expected {} got {}",
+                object.project_manifest_digest, current_project_manifest_digest
+            ),
+            None,
+            None,
+            Vec::new(),
+            None,
+        ));
+    }
+    let primitive_manifest_digest = verify_primitive_manifest_digest();
+    if primitive_manifest_digest != object.primitive_manifest_digest {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!(
+                "trusted primitive manifest digest mismatch: expected {} got {}",
+                object.primitive_manifest_digest, primitive_manifest_digest
+            ),
+            None,
+            None,
+            Vec::new(),
+            None,
+        ));
+    }
+
+    let imported_summary_paths = match load_bundle_imported_summary_paths(bundle_dir) {
+        Ok(paths) => paths,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_EIMPORTED_SUMMARY_MISMATCH",
+                format!("{err:#}"),
+                None,
+                None,
+                Vec::new(),
+                None,
+            ));
+        }
+    };
+    let mut bundled_imported_digests = Vec::new();
+    for path in &imported_summary_paths {
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                return Ok(rejected_proof_check_report_for_object(
+                    &object,
+                    proof_digest,
+                    "X07PROOF_EIMPORTED_SUMMARY_MISMATCH",
+                    format!("read imported proof summary {}: {err:#}", path.display()),
+                    None,
+                    None,
+                    bundled_imported_digests,
+                    None,
+                ));
+            }
+        };
+        bundled_imported_digests.push(prefixed_sha256(&bytes));
+    }
+    bundled_imported_digests.sort();
+    bundled_imported_digests.dedup();
+    let mut expected_imported_digests = object.imported_proof_summary_digests.clone();
+    expected_imported_digests.sort();
+    expected_imported_digests.dedup();
+    if bundled_imported_digests != expected_imported_digests {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_EIMPORTED_SUMMARY_MISMATCH",
+            format!(
+                "bundled imported proof-summary digests mismatch: expected {:?} got {:?}",
+                expected_imported_digests, bundled_imported_digests
+            ),
+            None,
+            None,
+            bundled_imported_digests,
+            None,
+        ));
+    }
+
+    let project_root = project_path.parent().unwrap_or_else(|| Path::new("."));
+    let module_roots = match resolve_module_roots(&cwd, Some(&project_path), &[]) {
+        Ok(roots) => roots,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                bundled_imported_digests,
+                None,
+            ));
+        }
+    };
+    let target = match load_target_info(&module_roots, &object.entry_symbol) {
+        Ok(target) => target,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                bundled_imported_digests,
+                None,
+            ));
+        }
+    };
+    let replay_kind = if target.is_async { "defasync" } else { "defn" };
+    if object.symbol != object.entry_symbol
+        || object.kind != replay_kind
+        || object.decl_sha256_hex != target.decl_sha256_hex
+    {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!(
+                "replayed declaration mismatch for {:?}: kind={} decl_sha256_hex={}",
+                object.entry_symbol, replay_kind, target.decl_sha256_hex
+            ),
+            None,
+            None,
+            bundled_imported_digests,
+            None,
+        ));
+    }
+    let recursion = match recursion_summary_for_symbol(
+        &module_roots,
+        coverage_world(Some(&project_path)),
+        &object.entry_symbol,
+    ) {
+        Ok(recursion) => recursion,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                bundled_imported_digests,
+                None,
+            ));
+        }
+    };
+
+    let imported_summary_index =
+        match load_imported_summary_index(project_root, &imported_summary_paths) {
+            Ok(index) => index,
+            Err(diags) => {
+                let message = diags
+                    .first()
+                    .map(|diag| diag.message.clone())
+                    .unwrap_or_else(|| "imported proof-summary replay failed".to_string());
+                return Ok(rejected_proof_check_report_for_object(
+                    &object,
+                    proof_digest,
+                    "X07PROOF_EIMPORTED_SUMMARY_MISMATCH",
+                    message,
+                    None,
+                    None,
+                    bundled_imported_digests,
+                    None,
+                ));
+            }
+        };
+    let replay_args = VerifyArgs {
+        bmc: false,
+        smt: false,
+        prove: true,
+        coverage: false,
+        entry: object.entry_symbol.clone(),
+        project: Some(project_path.clone()),
+        module_root: Vec::new(),
+        unwind: object.unwind,
+        max_bytes_len: object.max_bytes_len,
+        artifact_dir: None,
+        summary: imported_summary_paths.clone(),
+        allow_imported_stubs: true,
+        emit_proof: None,
+    };
+    let analysis = match coverage_report_for_entry(
+        &replay_args,
+        Some(&project_path),
+        &target,
+        &imported_summary_index,
+        true,
+    ) {
+        Ok(analysis) => analysis,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                bundled_imported_digests,
+                None,
+            ));
+        }
+    };
+    if !analysis.diagnostics.is_empty() {
+        let diag = &analysis.diagnostics[0];
+        let code = if diag.code == "X07V_SUMMARY_MISMATCH"
+            || diag.code == "X07V_COVERAGE_SUMMARY_FORBIDDEN"
+            || diag.code == "X07V_COVERAGE_NOT_PROOF"
+            || diag.code == "X07V_SUMMARY_MISSING"
+            || diag.code == "X07V_PROOF_SUMMARY_REQUIRED"
+        {
+            "X07PROOF_EIMPORTED_SUMMARY_MISMATCH"
+        } else {
+            "X07PROOF_ESOURCE_REPLAY_FAILED"
+        };
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            code,
+            diag.message.clone(),
+            None,
+            None,
+            bundled_imported_digests,
+            None,
+        ));
+    }
+    let primitive_catalog = match load_verify_primitive_catalog() {
+        Ok(catalog) => catalog,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                bundled_imported_digests,
+                None,
+            ));
+        }
+    };
+    let replayed_summary_artifact = build_verify_proof_summary_artifact(
+        &analysis.coverage,
+        &analysis.imported_summaries,
+        &primitive_catalog,
+        &target,
+        &recursion,
+    );
+    if replayed_summary_artifact.engine != object.verify_engine
+        || replayed_summary_artifact.recursion_kind != object.recursion_kind
+        || replayed_summary_artifact.recursion_bound_kind != object.recursion_bound_kind
+    {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!(
+                "replayed proof summary metadata mismatch: engine={} recursion_kind={} recursion_bound_kind={}",
+                replayed_summary_artifact.engine,
+                replayed_summary_artifact.recursion_kind,
+                replayed_summary_artifact.recursion_bound_kind
+            ),
+            None,
+            None,
+            bundled_imported_digests,
+            None,
+        ));
+    }
+    let replayed_summary_bytes =
+        match verify_proof_summary_to_pretty_canon_bytes(&replayed_summary_artifact) {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                return Ok(rejected_proof_check_report_for_object(
+                    &object,
+                    proof_digest,
+                    "X07PROOF_ESOURCE_REPLAY_FAILED",
+                    format!("{err:#}"),
+                    None,
+                    None,
+                    bundled_imported_digests,
+                    None,
+                ));
+            }
+        };
+    let replayed_summary_digest = prefixed_sha256(&replayed_summary_bytes);
+    if replayed_summary_digest != object.proof_summary_digest {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!(
+                "replayed proof summary digest mismatch: expected {} got {}",
+                object.proof_summary_digest, replayed_summary_digest
+            ),
+            None,
+            None,
+            bundled_imported_digests,
+            None,
+        ));
+    }
+
+    let validated_scheduler_model_digest = if object.kind == "defasync" {
+        let digest = verify_scheduler_model_digest();
+        if object.scheduler_model_digest.as_deref() != Some(digest.as_str()) {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESCHEDULER_MODEL_MISMATCH",
+                format!(
+                    "scheduler model digest mismatch: expected {:?} got {}",
+                    object.scheduler_model_digest, digest
+                ),
+                None,
+                None,
+                bundled_imported_digests,
+                Some(digest),
+            ));
+        }
+        Some(digest)
+    } else {
+        None
+    };
+
+    let input_len_bytes = match compute_input_len_bytes(&target, object.max_bytes_len) {
+        Ok(value) => value,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                bundled_imported_digests,
+                validated_scheduler_model_digest,
+            ));
+        }
+    };
+    let replay_temp_dir = match ReplayTempDir::new("x07_proof_replay") {
+        Ok(dir) => dir,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                bundled_imported_digests,
+                validated_scheduler_model_digest,
+            ));
+        }
+    };
+    let build = match build_prove_driver_build(
+        &object.entry_symbol,
+        &target,
+        &module_roots,
+        Some(&analysis.coverage),
+        object.max_bytes_len,
+        input_len_bytes,
+        replay_temp_dir.path(),
+    ) {
+        Ok(build) => build,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                bundled_imported_digests,
+                validated_scheduler_model_digest,
+            ));
+        }
+    };
+    let driver_path = replay_temp_dir.path().join("driver.x07.json");
+    if let Err(err) = util::write_atomic(&driver_path, &build.driver_src) {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!("write replay driver {}: {err:#}", driver_path.display()),
+            None,
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    let c_path = replay_temp_dir.path().join("verify.c");
+    if let Err(err) = util::write_atomic(&c_path, build.c_with_harness.as_bytes()) {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!("write replay C {}: {err:#}", c_path.display()),
+            None,
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    if !command_exists("cbmc") {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            "cbmc is not installed for semantic proof replay".to_string(),
+            None,
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    let replay_smt2_path = replay_temp_dir.path().join("verify.smt2");
+    let mut cbmc_args = vec![
+        c_path.display().to_string(),
+        "--function".to_string(),
+        VERIFY_HARNESS_FN.to_string(),
+        "--unwind".to_string(),
+        object.unwind.to_string(),
+        "--unwinding-assertions".to_string(),
+        "--smt2".to_string(),
+        "--outfile".to_string(),
+        replay_smt2_path.display().to_string(),
+    ];
+    maybe_disable_cbmc_standard_checks(&mut cbmc_args);
+    let (cbmc_out, _) = match run_cbmc_with_object_bits_retry(&cbmc_args, "run cbmc (proof replay)")
+    {
+        Ok(out) => out,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("{err:#}"),
+                None,
+                None,
+                bundled_imported_digests,
+                validated_scheduler_model_digest,
+            ));
+        }
+    };
+    if !cbmc_out.status.success() {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!(
+                "cbmc failed to emit replay SMT2: {}",
+                summarize_process_failure(
+                    &cbmc_out.stdout,
+                    &cbmc_out.stderr,
+                    PROCESS_SUMMARY_MAX_CHARS
+                )
+            ),
+            None,
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    if !cbmc_out.stderr.is_empty() && !cbmc_stderr_is_benign(&cbmc_out.stderr) {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!(
+                "cbmc wrote unexpected stderr during replay: {}",
+                summarize_process_text(&cbmc_out.stderr, PROCESS_SUMMARY_MAX_CHARS)
+            ),
+            None,
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    if let Err(err) = normalize_smt2_logic_for_z3(&replay_smt2_path) {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOURCE_REPLAY_FAILED",
+            format!("{err:#}"),
+            None,
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    let replay_smt2_bytes = match std::fs::read(&replay_smt2_path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOURCE_REPLAY_FAILED",
+                format!("read replay SMT2 {}: {err:#}", replay_smt2_path.display()),
+                None,
+                None,
+                bundled_imported_digests,
+                validated_scheduler_model_digest,
+            ));
+        }
+    };
+    let replayed_obligation_digest = prefixed_sha256(&replay_smt2_bytes);
+    if replayed_obligation_digest != object.obligation_digest {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_EOBLIGATION_MISMATCH",
+            format!(
+                "replayed SMT obligation digest mismatch: expected {} got {}",
+                object.obligation_digest, replayed_obligation_digest
+            ),
+            Some(replayed_obligation_digest),
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    if !command_exists("z3") {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOLVER_REPLAY_FAILED",
+            "z3 is not installed for semantic proof replay".to_string(),
+            Some(replayed_obligation_digest),
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    let z3_out = match Command::new("z3")
+        .arg(format!("-T:{}", z3_timeout_seconds(Mode::Prove, &target)))
+        .arg("-smt2")
+        .arg(&replay_smt2_path)
+        .output()
+    {
+        Ok(out) => out,
+        Err(err) => {
+            return Ok(rejected_proof_check_report_for_object(
+                &object,
+                proof_digest,
+                "X07PROOF_ESOLVER_REPLAY_FAILED",
+                format!("run z3: {err:#}"),
+                Some(replayed_obligation_digest),
+                None,
+                bundled_imported_digests,
+                validated_scheduler_model_digest,
+            ));
+        }
+    };
+    if !z3_out.status.success() {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOLVER_REPLAY_FAILED",
+            format!(
+                "z3 failed during replay: {}",
+                summarize_process_text(&z3_out.stderr, PROCESS_SUMMARY_MAX_CHARS)
+            ),
+            Some(replayed_obligation_digest),
+            None,
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    let replayed_solver_result = z3_out
+        .stdout
+        .split(|byte| *byte == b'\n')
+        .next()
+        .and_then(|line| std::str::from_utf8(line).ok())
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .unwrap_or("unsat")
+        .to_string();
+    if replayed_solver_result != object.expected_solver_result {
+        return Ok(rejected_proof_check_report_for_object(
+            &object,
+            proof_digest,
+            "X07PROOF_ESOLVER_REPLAY_FAILED",
+            format!(
+                "replayed solver result mismatch: expected {} got {}",
+                object.expected_solver_result, replayed_solver_result
+            ),
+            Some(replayed_obligation_digest),
+            Some(replayed_solver_result),
+            bundled_imported_digests,
+            validated_scheduler_model_digest,
+        ));
+    }
+    Ok(accepted_proof_check_report(
+        &object,
+        proof_digest,
+        replayed_obligation_digest,
+        replayed_solver_result,
+        bundled_imported_digests,
+        validated_scheduler_model_digest,
+    ))
 }
 
 impl VerifyReport {
@@ -5868,8 +6784,17 @@ fn rejected_proof_check_report(
         schema_version: X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION.to_string(),
         ok: false,
         proof_object_digest,
-        checker: "x07.proof_bundle_checker".to_string(),
+        checker: "x07.proof_replay_checker".to_string(),
         result: "rejected".to_string(),
+        symbol: "unknown".to_string(),
+        entry_symbol: "unknown".to_string(),
+        verify_engine: "unknown".to_string(),
+        expected_obligation_digest: format!("sha256:{}", "0".repeat(64)),
+        replayed_obligation_digest: format!("sha256:{}", "0".repeat(64)),
+        expected_solver_result: "unknown".to_string(),
+        replayed_solver_result: "unknown".to_string(),
+        validated_imported_proof_summary_digests: Vec::new(),
+        validated_scheduler_model_digest: None,
         diagnostics: vec![diag_verify(code, message)],
     }
 }
@@ -5942,8 +6867,21 @@ mod tests {
         let proof_path = dir.join("proof.json");
         let smt2_path = dir.join("source.smt2");
         let solver_path = dir.join("source.z3.out.txt");
+        std::fs::write(
+            dir.join("x07.json"),
+            serde_json::to_vec_pretty(&json!({
+                "schema_version": "x07.project@0.4.0",
+                "name": "proof_fixture",
+                "version": "0.1.0",
+                "language": { "edition": "2025" },
+                "module_roots": ["src"],
+                "world": "solve-pure"
+            }))
+            .expect("serialize project manifest"),
+        )
+        .expect("write project manifest");
         std::fs::write(&smt2_path, "(set-logic AUFBV)\n(check-sat)\n").expect("write smt2");
-        std::fs::write(&solver_path, "sat\n").expect("write solver transcript");
+        std::fs::write(&solver_path, "unsat\n").expect("write solver transcript");
         let summary = VerifyProofSummaryArtifact {
             schema_version: X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION.to_string(),
             summary_kind: "proof".to_string(),
@@ -5958,8 +6896,20 @@ mod tests {
             proof_object_digest: None,
             assumptions: Vec::new(),
         };
-        write_prove_bundle_artifacts(&proof_path, &summary, &smt2_path, &solver_path)
-            .expect("write proof bundle");
+        write_prove_bundle_artifacts(
+            &proof_path,
+            &summary,
+            &[],
+            &dir.join("x07.json"),
+            &Bounds {
+                unwind: 8,
+                max_bytes_len: 16,
+                input_len_bytes: 0,
+            },
+            &smt2_path,
+            &solver_path,
+        )
+        .expect("write proof bundle");
         proof_path
     }
 
@@ -6496,8 +7446,27 @@ exit 1
         assert!(!report.ok);
         assert_eq!(report.result, "rejected");
         assert_eq!(report.diagnostics.len(), 1);
-        assert_eq!(report.diagnostics[0].code, "X07PROOF_ECHECK_FAILED");
+        assert_eq!(report.diagnostics[0].code, "X07PROOF_ESOURCE_REPLAY_FAILED");
 
         std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn resolve_replay_project_manifest_prefers_cwd_before_proof_ancestors() {
+        let cwd_dir = temp_test_dir("replay_manifest_cwd");
+        let proof_root = temp_test_dir("replay_manifest_proof");
+        std::fs::write(cwd_dir.join("x07.json"), "{}\n").expect("write cwd manifest");
+        std::fs::write(proof_root.join("x07.json"), "{}\n").expect("write proof-root manifest");
+        let proof_dir = proof_root.join("bundle");
+        std::fs::create_dir_all(&proof_dir).expect("create proof dir");
+        let proof_path = proof_dir.join("proof.json");
+        std::fs::write(&proof_path, "{}\n").expect("write proof object");
+
+        let resolved =
+            resolve_replay_project_manifest(&cwd_dir, &proof_path).expect("resolve manifest");
+        assert_eq!(resolved, cwd_dir.join("x07.json"));
+
+        std::fs::remove_dir_all(cwd_dir).expect("cleanup cwd dir");
+        std::fs::remove_dir_all(proof_root).expect("cleanup proof dir");
     }
 }

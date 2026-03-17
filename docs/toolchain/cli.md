@@ -205,12 +205,12 @@ See: [Review & trust artifacts](review-trust.md).
 - `x07 trust capsule attest --contract <path> --module <path>... --lockfile x07.lock.json --conformance-report <path> --out <path>`
   - Emits a deterministic `x07.capsule.attest@0.2.0` artifact for a certified capsule.
 - `x07 trust certify --project x07.json --profile arch/trust/profiles/verified_core_pure_v1.json --entry <sym> --out-dir target/cert`
-  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, proof inventory, proof assumptions, compile attestation evidence, dependency-closure evidence, and any observed capsule/runtime/peer-policy evidence references (`x07.trust.certificate@0.6.0`).
+  - Emits a certificate bundle with boundary coverage, schema-derive drift reports, verify coverage, prove reports, proof inventory, proof assumptions, proof-check acceptance metadata, formal-verification scope fields, compile attestation evidence, dependency-closure evidence, and any observed capsule/runtime/peer-policy evidence references (`x07.trust.certificate@0.7.0`).
   - Strong profiles reject surrogate certification entries, coverage-only imports, developer-only imported stubs, and bounded recursive proof usage.
 
 - `x07 prove check --proof <path>`
   - Independently checks a proof object emitted by `x07 verify --prove --emit-proof`.
-  - JSON schema: `spec/x07-verify.proof-check.report.schema.json` (`schema_version: "x07.verify.proof_check.report@0.1.0"`).
+  - JSON schema: `spec/x07-verify.proof-check.report.schema.json` (`schema_version: "x07.verify.proof_check.report@0.2.0"`).
 
 See: [Review & trust artifacts](review-trust.md).
 
@@ -306,12 +306,12 @@ Notes:
 - `--coverage` and `--prove` emit reusable coverage/support summaries (`x07.verify.summary@0.2.0`, `summary_kind = "coverage_support"`). These are posture artifacts only and do not satisfy proof requirements.
 - Successful `--prove` runs emit reusable proof summaries (`x07.verify.proof_summary@0.2.0`, `summary_kind = "proof"`). Pass them back with `--proof-summary <path>` when a reviewed reachable dependency sits outside the currently loaded module roots.
 - Coverage/support summaries are rejected anywhere proof imports are required.
-- When `--emit-proof <path>` is set, `x07 verify --prove` also emits a proof object plus a proof-check report that `x07 prove check` can verify independently.
+- When `--emit-proof <path>` is set, `x07 verify --prove` also emits a proof object plus a proof-check report that `x07 prove check` can semantically replay independently.
 - Async `--prove` failures emit `x07.verify.cex@0.2.0`, including `await_invariant`, `scope_invariant`, and `cancellation_ensures` counterexamples when those checks fail.
 - Artifacts are written under `.x07/artifacts/verify/<mode>/<entry>/` (driver module, emitted C, CBMC output, counterexample/SMT artifacts when present).
 - Async proof coverage is lowered through the trusted scheduler model catalog at `catalog/verify_scheduler_model.json`.
 
-Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.7.0"`).
+Report schema: `spec/x07-verify.report.schema.json` (`schema_version: "x07.verify.report@0.8.0"`).
 
 ### Agent correctness benchmarks (`x07bench` JSON)
 

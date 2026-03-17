@@ -24,6 +24,7 @@ use crate::report_common;
 use crate::reporting;
 use crate::run;
 use crate::util;
+use crate::verify;
 
 const X07_TRUST_REPORT_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../spec/x07-trust.report.schema.json");
@@ -352,6 +353,15 @@ struct TrustCertificate {
     operational_entry_symbol: String,
     out_dir: String,
     claims: Vec<String>,
+    formal_verification_scope: String,
+    proved_symbol_count: u64,
+    proved_defn_count: u64,
+    proved_defasync_count: u64,
+    entry_body_formally_proved: bool,
+    #[serde(default)]
+    operational_entry_proof_inventory_refs: Vec<EvidenceRef>,
+    capsule_boundary_only_symbol_count: u64,
+    runtime_evidence_only_symbol_count: u64,
     async_proof: TrustCertificateAsyncProof,
     #[serde(default)]
     proof_inventory: Vec<TrustCertificateProofInventoryItem>,
@@ -412,6 +422,12 @@ struct TrustCertificateProofInventoryItem {
     proof_object: Option<EvidenceRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
     proof_check_report: Option<EvidenceRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof_check_result: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof_check_checker: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof_object_digest: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -463,6 +479,18 @@ struct TrustCertificateDependencyClosure {
     packages: Vec<String>,
     advisory_check_ok: bool,
     attestation: Option<EvidenceRef>,
+}
+
+#[derive(Debug, Clone)]
+struct FormalVerificationScopeSummary {
+    formal_verification_scope: String,
+    proved_symbol_count: u64,
+    proved_defn_count: u64,
+    proved_defasync_count: u64,
+    entry_body_formally_proved: bool,
+    operational_entry_proof_inventory_refs: Vec<EvidenceRef>,
+    capsule_boundary_only_symbol_count: u64,
+    runtime_evidence_only_symbol_count: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -3059,10 +3087,17 @@ fn cmd_trust_certify(
         profile.as_ref(),
         &mut diagnostics,
     )?;
+    let formal_verification_scope = collect_formal_verification_scope_summary(
+        &proof_inventory,
+        Path::new(&coverage_ref.path),
+        &operational_entry_symbol,
+        runtime.as_ref(),
+    )?;
+    let verdict_accepted = diagnostics.is_empty();
 
     let certificate = TrustCertificate {
         schema_version: X07_TRUST_CERTIFICATE_SCHEMA_VERSION,
-        verdict: if diagnostics.is_empty() {
+        verdict: if verdict_accepted {
             "accepted".to_string()
         } else {
             "rejected".to_string()
@@ -3074,10 +3109,23 @@ fn cmd_trust_certify(
         entry: args.entry,
         operational_entry_symbol,
         out_dir: out_dir.display().to_string(),
-        claims: profile
-            .as_ref()
-            .map(|p| p.claims.clone())
-            .unwrap_or_default(),
+        claims: realized_certificate_claims(
+            profile.as_ref().map(|p| p.claims.as_slice()).unwrap_or(&[]),
+            verdict_accepted,
+            formal_verification_scope.proved_symbol_count,
+            formal_verification_scope.entry_body_formally_proved,
+        ),
+        formal_verification_scope: formal_verification_scope.formal_verification_scope,
+        proved_symbol_count: formal_verification_scope.proved_symbol_count,
+        proved_defn_count: formal_verification_scope.proved_defn_count,
+        proved_defasync_count: formal_verification_scope.proved_defasync_count,
+        entry_body_formally_proved: formal_verification_scope.entry_body_formally_proved,
+        operational_entry_proof_inventory_refs: formal_verification_scope
+            .operational_entry_proof_inventory_refs,
+        capsule_boundary_only_symbol_count: formal_verification_scope
+            .capsule_boundary_only_symbol_count,
+        runtime_evidence_only_symbol_count: formal_verification_scope
+            .runtime_evidence_only_symbol_count,
         async_proof,
         proof_inventory: proof_inventory.clone(),
         proof_assumptions: proof_assumptions.clone(),
@@ -3205,6 +3253,57 @@ fn render_certificate_summary(certificate: &TrustCertificate) -> String {
     s.push_str("</code> <b>entry:</b> <code>");
     s.push_str(&report_common::html_escape(&certificate.entry));
     s.push_str("</code></p>");
+
+    s.push_str("<h2>Formal Verification Scope</h2><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>");
+    for (label, value) in [
+        (
+            "formal verification scope",
+            certificate.formal_verification_scope.as_str(),
+        ),
+        (
+            "entry body formally proved",
+            if certificate.entry_body_formally_proved {
+                "true"
+            } else {
+                "false"
+            },
+        ),
+    ] {
+        s.push_str("<tr><td>");
+        s.push_str(label);
+        s.push_str("</td><td><code>");
+        s.push_str(&report_common::html_escape(value));
+        s.push_str("</code></td></tr>");
+    }
+    s.push_str("<tr><td>proved symbols</td><td><code>");
+    s.push_str(&report_common::html_escape(format!(
+        "total={} defn={} defasync={}",
+        certificate.proved_symbol_count,
+        certificate.proved_defn_count,
+        certificate.proved_defasync_count
+    )));
+    s.push_str("</code></td></tr>");
+    s.push_str("<tr><td>capsule-boundary-only symbols</td><td><code>");
+    s.push_str(&report_common::html_escape(
+        certificate.capsule_boundary_only_symbol_count.to_string(),
+    ));
+    s.push_str("</code></td></tr>");
+    s.push_str("<tr><td>runtime-evidence-only symbols</td><td><code>");
+    s.push_str(&report_common::html_escape(
+        certificate.runtime_evidence_only_symbol_count.to_string(),
+    ));
+    s.push_str("</code></td></tr>");
+    s.push_str("<tr><td>operational entry proof refs</td><td><code>");
+    s.push_str(&report_common::html_escape(
+        certificate
+            .operational_entry_proof_inventory_refs
+            .iter()
+            .map(|evidence| evidence.path.clone())
+            .collect::<Vec<_>>()
+            .join(", "),
+    ));
+    s.push_str("</code></td></tr>");
+    s.push_str("</tbody></table>");
 
     s.push_str("<h2>TCB</h2><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>");
     for (label, value) in [
@@ -3738,6 +3837,143 @@ fn collect_proof_assumptions(
         }
     }
     Ok(assumptions.into_iter().collect())
+}
+
+fn collect_formal_verification_scope_summary(
+    proof_inventory: &[TrustCertificateProofInventoryItem],
+    coverage_path: &Path,
+    operational_entry_symbol: &str,
+    runtime: Option<&TrustCertificateRuntime>,
+) -> Result<FormalVerificationScopeSummary> {
+    let proved_symbol_count = proof_inventory.len() as u64;
+    let proved_defn_count = proof_inventory
+        .iter()
+        .filter(|item| item.kind == "defn")
+        .count() as u64;
+    let proved_defasync_count = proof_inventory
+        .iter()
+        .filter(|item| item.kind == "defasync")
+        .count() as u64;
+    let entry_body_formally_proved = proof_inventory.iter().any(|item| {
+        item.symbol == operational_entry_symbol
+            && item
+                .proof_check_result
+                .as_deref()
+                .is_some_and(|result| result == "accepted")
+    });
+    let operational_entry_proof_inventory_refs = proof_inventory
+        .iter()
+        .filter(|item| item.symbol == operational_entry_symbol)
+        .filter_map(|item| item.proof_object.clone())
+        .collect::<Vec<_>>();
+
+    if !coverage_path.is_file() {
+        return Ok(FormalVerificationScopeSummary {
+            formal_verification_scope: if entry_body_formally_proved {
+                "entry_body".to_string()
+            } else if proved_symbol_count > 0 {
+                "partial".to_string()
+            } else {
+                "none".to_string()
+            },
+            proved_symbol_count,
+            proved_defn_count,
+            proved_defasync_count,
+            entry_body_formally_proved,
+            operational_entry_proof_inventory_refs,
+            capsule_boundary_only_symbol_count: 0,
+            runtime_evidence_only_symbol_count: if !entry_body_formally_proved && runtime.is_some()
+            {
+                1
+            } else {
+                0
+            },
+        });
+    }
+
+    let doc = report_common::read_json_file(coverage_path)?;
+    let functions = doc
+        .get("functions")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let capsule_boundary_only_symbol_count = functions
+        .iter()
+        .filter(|function| {
+            function.get("status").and_then(Value::as_str) == Some("capsule_boundary")
+        })
+        .count() as u64;
+    let certifiable_graph_symbol_count = functions
+        .iter()
+        .filter(|function| {
+            matches!(
+                function.get("status").and_then(Value::as_str),
+                Some("supported") | Some("supported_recursive") | Some("supported_async")
+            )
+        })
+        .count() as u64;
+    let formal_verification_scope = if proved_symbol_count == 0 {
+        "none"
+    } else if certifiable_graph_symbol_count > 0
+        && proved_symbol_count >= certifiable_graph_symbol_count
+    {
+        "whole_certifiable_graph"
+    } else if entry_body_formally_proved {
+        "entry_body"
+    } else {
+        "partial"
+    };
+    Ok(FormalVerificationScopeSummary {
+        formal_verification_scope: formal_verification_scope.to_string(),
+        proved_symbol_count,
+        proved_defn_count,
+        proved_defasync_count,
+        entry_body_formally_proved,
+        operational_entry_proof_inventory_refs,
+        capsule_boundary_only_symbol_count,
+        runtime_evidence_only_symbol_count: if !entry_body_formally_proved && runtime.is_some() {
+            1
+        } else {
+            0
+        },
+    })
+}
+
+fn realized_certificate_claims(
+    profile_claims: &[String],
+    verdict_accepted: bool,
+    proved_symbol_count: u64,
+    entry_body_formally_proved: bool,
+) -> Vec<String> {
+    let mut claims = Vec::new();
+    for claim in profile_claims {
+        let allow = match claim.as_str() {
+            "human_can_review_certificate_not_source" => verdict_accepted,
+            "certificate_includes_formal_proof" => verdict_accepted && proved_symbol_count > 0,
+            "operational_entry_formally_proved" => verdict_accepted && entry_body_formally_proved,
+            _ => true,
+        };
+        if allow {
+            claims.push(claim.clone());
+        }
+    }
+    if verdict_accepted
+        && proved_symbol_count > 0
+        && !claims
+            .iter()
+            .any(|claim| claim == "certificate_includes_formal_proof")
+    {
+        claims.push("certificate_includes_formal_proof".to_string());
+    }
+    if verdict_accepted
+        && entry_body_formally_proved
+        && !claims
+            .iter()
+            .any(|claim| claim == "operational_entry_formally_proved")
+    {
+        claims.push("operational_entry_formally_proved".to_string());
+    }
+    claims
 }
 
 fn collect_imported_summary_inventory(doc: &Value) -> Vec<TrustCertificateImportedSummary> {
@@ -5339,11 +5575,14 @@ fn build_prove_evidence(
             )?
         };
 
-        let proof_object_ref = report_doc
+        let proof_object_path = report_doc
             .pointer("/artifacts/proof_object_path")
             .and_then(Value::as_str)
             .map(|raw| resolve_report_artifact_path(&report_path, cwd, raw))
             .filter(|path| path.is_file())
+            .map(|path| path.to_path_buf());
+        let proof_object_ref = proof_object_path
+            .as_ref()
             .map(|path| evidence_ref_for_path(&path))
             .transpose()?;
         if proof_object_ref.is_none() {
@@ -5353,11 +5592,14 @@ fn build_prove_evidence(
             ));
         }
 
-        let proof_check_report_ref = report_doc
+        let proof_check_report_path = report_doc
             .pointer("/artifacts/proof_check_report_path")
             .and_then(Value::as_str)
             .map(|raw| resolve_report_artifact_path(&report_path, cwd, raw))
             .filter(|path| path.is_file())
+            .map(|path| path.to_path_buf());
+        let proof_check_report_ref = proof_check_report_path
+            .as_ref()
             .map(|path| evidence_ref_for_path(&path))
             .transpose()?;
         if proof_check_report_ref.is_none() {
@@ -5367,9 +5609,17 @@ fn build_prove_evidence(
             ));
         }
 
-        let result_kind = proof_summary_path
+        let proof_summary_doc = proof_summary_path
             .as_ref()
-            .and_then(|path| report_common::read_json_file(path).ok())
+            .and_then(|path| report_common::read_json_file(path).ok());
+        let proof_summary_engine = proof_summary_doc
+            .as_ref()
+            .and_then(|doc| doc.get("engine"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let result_kind = proof_summary_doc
+            .as_ref()
             .and_then(|doc| {
                 doc.get("result_kind")
                     .and_then(Value::as_str)
@@ -5382,6 +5632,46 @@ fn build_prove_evidence(
                     "proven".to_string()
                 }
             });
+        let mut proof_check_result = None;
+        let mut proof_check_checker = None;
+        let mut proof_object_digest = None;
+        if let Some(path) = proof_check_report_path.as_ref() {
+            match verify::load_proof_check_report_path(path) {
+                Ok(report) => {
+                    proof_object_digest = Some(report.proof_object_digest.clone());
+                    proof_check_result = Some(report.result.clone());
+                    proof_check_checker = Some(report.checker.clone());
+                    if !proof_summary_engine.is_empty()
+                        && report.verify_engine != proof_summary_engine
+                    {
+                        diagnostics.push(trust_diag(
+                            "X07TC_EPROOF_CHECK_ENGINE_MISMATCH",
+                            format!(
+                                "proof-check report for {symbol:?} used engine {:?}, expected {:?}",
+                                report.verify_engine, proof_summary_engine
+                            ),
+                        ));
+                    }
+                    if !report.ok || report.result != "accepted" {
+                        diagnostics.push(trust_diag(
+                            "X07TC_EPROOF_CHECK_REJECTED",
+                            format!(
+                                "proof-check report for {symbol:?} is not accepted (ok={}, result={})",
+                                report.ok, report.result
+                            ),
+                        ));
+                    }
+                }
+                Err(err) => {
+                    diagnostics.push(trust_diag(
+                        "X07TC_EPROOF_CHECK_SCHEMA_INVALID",
+                        format!(
+                            "proof-check report for {symbol:?} is schema-invalid or unreadable: {err:#}"
+                        ),
+                    ));
+                }
+            }
+        }
 
         inventory.push(TrustCertificateProofInventoryItem {
             symbol: symbol.clone(),
@@ -5391,6 +5681,9 @@ fn build_prove_evidence(
             proof_summary: proof_summary_ref,
             proof_object: proof_object_ref,
             proof_check_report: proof_check_report_ref,
+            proof_check_result,
+            proof_check_checker,
+            proof_object_digest,
         });
     }
     Ok(inventory)
@@ -6449,6 +6742,36 @@ mod tests {
         dir
     }
 
+    fn evidence_ref(path: &str, ch: char) -> EvidenceRef {
+        EvidenceRef {
+            path: path.to_string(),
+            sha256_hex: ch.to_string().repeat(64),
+        }
+    }
+
+    fn proof_inventory_item(
+        symbol: &str,
+        kind: &str,
+        proof_check_result: Option<&str>,
+    ) -> TrustCertificateProofInventoryItem {
+        TrustCertificateProofInventoryItem {
+            symbol: symbol.to_string(),
+            kind: kind.to_string(),
+            result_kind: if kind == "defasync" {
+                "proven_async".to_string()
+            } else {
+                "proven".to_string()
+            },
+            verify_report: evidence_ref("verify.prove.report.json", '1'),
+            proof_summary: evidence_ref("verify.proof-summary.json", '2'),
+            proof_object: Some(evidence_ref("proof.json", '3')),
+            proof_check_report: Some(evidence_ref("proof.check.json", '4')),
+            proof_check_result: proof_check_result.map(str::to_string),
+            proof_check_checker: Some("x07.proof_replay_checker".to_string()),
+            proof_object_digest: Some(format!("sha256:{}", "5".repeat(64))),
+        }
+    }
+
     #[test]
     fn trust_certificate_serialization_keeps_empty_prove_reports() {
         let certificate = TrustCertificate {
@@ -6459,6 +6782,14 @@ mod tests {
             operational_entry_symbol: "app.main".to_string(),
             out_dir: "target/cert".to_string(),
             claims: vec!["human_can_review_certificate_not_source".to_string()],
+            formal_verification_scope: "none".to_string(),
+            proved_symbol_count: 0,
+            proved_defn_count: 0,
+            proved_defasync_count: 0,
+            entry_body_formally_proved: false,
+            operational_entry_proof_inventory_refs: Vec::new(),
+            capsule_boundary_only_symbol_count: 0,
+            runtime_evidence_only_symbol_count: 0,
             async_proof: TrustCertificateAsyncProof {
                 reachable: 0,
                 proved: 0,
@@ -6575,6 +6906,119 @@ mod tests {
         let value = serde_json::to_value(runtime).expect("serialize runtime");
         assert!(value.get("attestation").is_some());
         assert!(value.get("attestation").is_some_and(Value::is_null));
+    }
+
+    #[test]
+    fn collect_formal_verification_scope_summary_reports_entry_body_truth() {
+        let dir = temp_test_dir("formal_verification_scope_entry");
+        let coverage_path = dir.join("verify.coverage.json");
+        std::fs::write(
+            &coverage_path,
+            serde_json::to_vec_pretty(&json!({
+                "functions": [
+                    { "symbol": "example.main", "status": "supported_async" },
+                    { "symbol": "capsule.main", "status": "capsule_boundary" }
+                ]
+            }))
+            .expect("serialize coverage"),
+        )
+        .expect("write coverage");
+
+        let runtime = TrustCertificateRuntime {
+            backend: "vm".to_string(),
+            network_mode: "local_only".to_string(),
+            network_enforcement: "vm".to_string(),
+            weaker_isolation: false,
+            effective_allow_hosts: Vec::new(),
+            policy_digest_bound: true,
+            guest_image_digest_bound: true,
+            attestation: Some(evidence_ref("runtime.attest.json", '6')),
+        };
+        let summary = collect_formal_verification_scope_summary(
+            &[proof_inventory_item(
+                "example.main",
+                "defasync",
+                Some("accepted"),
+            )],
+            &coverage_path,
+            "example.main",
+            Some(&runtime),
+        )
+        .expect("collect scope");
+
+        assert_eq!(summary.formal_verification_scope, "whole_certifiable_graph");
+        assert_eq!(summary.proved_symbol_count, 1);
+        assert_eq!(summary.proved_defn_count, 0);
+        assert_eq!(summary.proved_defasync_count, 1);
+        assert!(summary.entry_body_formally_proved);
+        assert_eq!(summary.operational_entry_proof_inventory_refs.len(), 1);
+        assert_eq!(summary.capsule_boundary_only_symbol_count, 1);
+        assert_eq!(summary.runtime_evidence_only_symbol_count, 0);
+
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn collect_formal_verification_scope_summary_reports_runtime_only_scope() {
+        let dir = temp_test_dir("formal_verification_scope_runtime");
+        let coverage_path = dir.join("missing.verify.coverage.json");
+        let runtime = TrustCertificateRuntime {
+            backend: "vm".to_string(),
+            network_mode: "local_only".to_string(),
+            network_enforcement: "vm".to_string(),
+            weaker_isolation: false,
+            effective_allow_hosts: Vec::new(),
+            policy_digest_bound: true,
+            guest_image_digest_bound: true,
+            attestation: Some(evidence_ref("runtime.attest.json", '7')),
+        };
+
+        let summary = collect_formal_verification_scope_summary(
+            &[],
+            &coverage_path,
+            "example.main",
+            Some(&runtime),
+        )
+        .expect("collect scope");
+
+        assert_eq!(summary.formal_verification_scope, "none");
+        assert_eq!(summary.proved_symbol_count, 0);
+        assert!(!summary.entry_body_formally_proved);
+        assert!(summary.operational_entry_proof_inventory_refs.is_empty());
+        assert_eq!(summary.capsule_boundary_only_symbol_count, 0);
+        assert_eq!(summary.runtime_evidence_only_symbol_count, 1);
+
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn realized_certificate_claims_only_emit_true_formal_claims() {
+        let profile_claims = vec![
+            "human_can_review_certificate_not_source".to_string(),
+            "certificate_includes_formal_proof".to_string(),
+            "operational_entry_formally_proved".to_string(),
+        ];
+
+        assert!(realized_certificate_claims(&profile_claims, false, 1, true).is_empty());
+
+        let proof_only = realized_certificate_claims(&profile_claims, true, 1, false);
+        assert_eq!(
+            proof_only,
+            vec![
+                "human_can_review_certificate_not_source".to_string(),
+                "certificate_includes_formal_proof".to_string(),
+            ]
+        );
+
+        let entry_proved = realized_certificate_claims(&profile_claims, true, 1, true);
+        assert_eq!(
+            entry_proved,
+            vec![
+                "human_can_review_certificate_not_source".to_string(),
+                "certificate_includes_formal_proof".to_string(),
+                "operational_entry_formally_proved".to_string(),
+            ]
+        );
     }
 
     #[test]

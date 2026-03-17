@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-trust.certificate.schema.json",
-  "title": "x07.trust.certificate@0.6.0",
+  "title": "x07.trust.certificate@0.7.0",
   "description": "Source-free trust certificate emitted by `x07 trust certify`.",
   "type": "object",
   "additionalProperties": false,
@@ -13,6 +13,14 @@
     "operational_entry_symbol",
     "out_dir",
     "claims",
+    "formal_verification_scope",
+    "proved_symbol_count",
+    "proved_defn_count",
+    "proved_defasync_count",
+    "entry_body_formally_proved",
+    "operational_entry_proof_inventory_refs",
+    "capsule_boundary_only_symbol_count",
+    "runtime_evidence_only_symbol_count",
     "async_proof",
     "proof_inventory",
     "proof_assumptions",
@@ -29,7 +37,7 @@
     "evidence"
   ],
   "properties": {
-    "schema_version": { "const": "x07.trust.certificate@0.6.0" },
+    "schema_version": { "const": "x07.trust.certificate@0.7.0" },
     "verdict": {
       "type": "string",
       "enum": ["accepted", "rejected"]
@@ -55,6 +63,21 @@
       "items": { "type": "string", "minLength": 1, "maxLength": 256 },
       "default": []
     },
+    "formal_verification_scope": {
+      "type": "string",
+      "enum": ["none", "partial", "entry_body", "whole_certifiable_graph"]
+    },
+    "proved_symbol_count": { "type": "integer", "minimum": 0 },
+    "proved_defn_count": { "type": "integer", "minimum": 0 },
+    "proved_defasync_count": { "type": "integer", "minimum": 0 },
+    "entry_body_formally_proved": { "type": "boolean" },
+    "operational_entry_proof_inventory_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence_ref" },
+      "default": []
+    },
+    "capsule_boundary_only_symbol_count": { "type": "integer", "minimum": 0 },
+    "runtime_evidence_only_symbol_count": { "type": "integer", "minimum": 0 },
     "async_proof": {
       "type": "object",
       "additionalProperties": false,
@@ -398,6 +421,24 @@
         "proof_check_report": {
           "anyOf": [
             { "$ref": "#/$defs/evidence_ref" },
+            { "type": "null" }
+          ]
+        },
+        "proof_check_result": {
+          "anyOf": [
+            { "type": "string", "enum": ["accepted", "rejected"] },
+            { "type": "null" }
+          ]
+        },
+        "proof_check_checker": {
+          "anyOf": [
+            { "type": "string", "minLength": 1, "maxLength": 128 },
+            { "type": "null" }
+          ]
+        },
+        "proof_object_digest": {
+          "anyOf": [
+            { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
             { "type": "null" }
           ]
         }

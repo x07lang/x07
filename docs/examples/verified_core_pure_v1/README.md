@@ -28,8 +28,13 @@ x07 trust certify \
   --out-dir target/cert
 ```
 
-A tracked reference certificate snapshot is kept at `target/cert/certificate.json`.
-The rest of `target/cert/` remains generated local output.
+Re-check the emitted proof object:
+
+```bash
+x07 prove check --proof target/cert/prove/example.main/proof.json
+```
+
+`target/cert/` is generated local output. Review `target/cert/summary.html` and `target/cert/certificate.json`; the accepted certificate should report `entry_body_formally_proved: true` and a non-empty operational-entry proof inventory.
 
 CI example:
 

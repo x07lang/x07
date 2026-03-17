@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://x07.io/spec/x07-verify.report.schema.json",
-  "title": "X07 x07 verify report v0.7.0",
+  "title": "X07 x07 verify report v0.8.0",
   "description": "Machine-readable report emitted by `x07 verify`.",
   "type": "object",
   "additionalProperties": false,
@@ -16,7 +16,7 @@
     "exit_code"
   ],
   "properties": {
-    "schema_version": { "const": "x07.verify.report@0.7.0" },
+    "schema_version": { "const": "x07.verify.report@0.8.0" },
     "mode": { "type": "string", "enum": ["bmc", "smt", "prove", "coverage"] },
     "ok": { "type": "boolean" },
     "entry": { "type": "string", "minLength": 1, "maxLength": 2048 },

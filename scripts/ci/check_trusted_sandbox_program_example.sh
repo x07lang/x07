@@ -97,7 +97,14 @@ echo "[check] trusted_sandbox_program_v1 docs example: certify"
     --out-dir "$tmp_dir/example-cert" \
     >/dev/null
 )
-test -f "$tmp_dir/example-cert/certificate.json"
+cert_path="$tmp_dir/example-cert/certificate.json"
+test -f "$cert_path"
+python3 ./scripts/ci/assert_strict_certificate.py \
+  --cert "$cert_path" \
+  --x07-bin "$x07_bin" \
+  --cwd "$example_dir" \
+  --label trusted_sandbox_program_v1 \
+  --require-entry-formally-proved
 
 scaffold_dir="$tmp_dir/init"
 mkdir -p "$scaffold_dir"
@@ -144,6 +151,13 @@ echo "[check] trusted_sandbox_program_v1 template: certify"
     --out-dir target/cert \
     >/dev/null
 )
-test -f "$scaffold_dir/target/cert/certificate.json"
+cert_path="$scaffold_dir/target/cert/certificate.json"
+test -f "$cert_path"
+python3 ./scripts/ci/assert_strict_certificate.py \
+  --cert "$cert_path" \
+  --x07-bin "$x07_bin" \
+  --cwd "$scaffold_dir" \
+  --label trusted_sandbox_program_v1_template \
+  --require-entry-formally-proved
 
 printf 'OK %s\n' "$(basename "$0")"

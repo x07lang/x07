@@ -135,6 +135,12 @@ run_runtime_checks() {
   fi
 
   test -f "$cert_out/certificate.json"
+  python3 "$root/scripts/ci/assert_strict_certificate.py" \
+    --cert "$cert_out/certificate.json" \
+    --x07-bin "$x07_bin" \
+    --cwd "$work_dir" \
+    --label "$label" \
+    --require-entry-formally-proved
 }
 
 label=""
