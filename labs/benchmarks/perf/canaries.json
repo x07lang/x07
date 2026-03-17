@@ -30,7 +30,7 @@
     "labs/benchmarks/solve-pure/abi-types-smoke.json": {
       "tasks": {
         "canary/std_json_canonicalize_small": {
-          "c_source_size": 347409,
+          "c_source_size": 370343,
           "cases": [
             {
               "fuel_used": 1117,
