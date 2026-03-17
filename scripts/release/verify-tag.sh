@@ -80,9 +80,19 @@ check_equal() {
   fi
 }
 
+require_file() {
+  local path="$1"
+  if [[ ! -f "$path" ]]; then
+    echo "missing required release file: $path" >&2
+    exit 1
+  fi
+}
+
 case "$repo_kind" in
   x07)
     check_equal "x07" "$(read_cargo_version "$ROOT_DIR/crates/x07/Cargo.toml")"
+    require_file "$ROOT_DIR/releases/compat/${version}.json"
+    require_file "$ROOT_DIR/releases/bundles/${version}.input.json"
     ;;
   x07-wasm-backend)
     check_equal "x07-wasm" "$(read_cargo_version "$ROOT_DIR/crates/x07-wasm/Cargo.toml")"
