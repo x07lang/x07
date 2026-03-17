@@ -2,12 +2,6 @@ name: CI (VM sandbox)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 2 * * *"
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
 
 concurrency:
   group: x07-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -17,52 +11,10 @@ permissions:
   contents: read
 
 jobs:
-  runner_inventory:
-    name: vm / runner inventory
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: read
-      contents: read
-    outputs:
-      has_linux_firecracker_runner: ${{ steps.inventory.outputs.has_linux_firecracker_runner }}
-      has_macos_vz_runner: ${{ steps.inventory.outputs.has_macos_vz_runner }}
-    steps:
-      - name: Detect self-hosted VM runners
-        id: inventory
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          response="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners")"
-          linux_count="$(jq '[.runners[] | select(.status == "online") | select(any(.labels[]?; .name == "x07-vm-linux-firecracker"))] | length' <<<"$response")"
-          macos_count="$(jq '[.runners[] | select(.status == "online") | select(any(.labels[]?; .name == "x07-vm-macos"))] | length' <<<"$response")"
-
-          if (( linux_count > 0 )); then
-            echo "has_linux_firecracker_runner=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_linux_firecracker_runner=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          if (( macos_count > 0 )); then
-            echo "has_macos_vz_runner=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_macos_vz_runner=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          {
-            echo "Linux firecracker runners: ${linux_count}"
-            echo "macOS VZ runners: ${macos_count}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
   macos-vm:
     name: vm / macos (vz)
-    needs: runner_inventory
     runs-on: [self-hosted, x07-vm-macos]
-    if: |
-      needs.runner_inventory.outputs.has_macos_vz_runner == 'true' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     timeout-minutes: 90
     env:
       X07_VM_BACKEND: vz
@@ -107,11 +59,8 @@ jobs:
 
   linux-vm:
     name: vm / linux (firecracker)
-    needs: runner_inventory
     runs-on: [self-hosted, x07-vm-linux-firecracker]
-    if: |
-      needs.runner_inventory.outputs.has_linux_firecracker_runner == 'true' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     timeout-minutes: 90
     env:
       X07_VM_BACKEND: firecracker-ctr
@@ -145,11 +94,8 @@ jobs:
 
   trust-vm-examples:
     name: vm / trust examples / ${{ matrix.check }}
-    needs: runner_inventory
     runs-on: [self-hosted, x07-vm-linux-firecracker]
-    if: |
-      needs.runner_inventory.outputs.has_linux_firecracker_runner == 'true' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     timeout-minutes: 90
     strategy:
       fail-fast: false

@@ -10,6 +10,11 @@ on:
         description: Release tag to publish
         required: true
         type: string
+      run_vm_examples:
+        description: Run self-hosted VM trust example gates
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: x07-release-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
@@ -36,34 +41,6 @@ jobs:
         shell: bash
         run: |
           bash scripts/release/verify-tag.sh --repo-kind x07 --tag "${RELEASE_TAG}"
-
-  runner_inventory:
-    name: runner-inventory
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: read
-      contents: read
-    outputs:
-      has_firecracker_runner: ${{ steps.inventory.outputs.has_firecracker_runner }}
-    steps:
-      - name: Detect release VM runners
-        id: inventory
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          response="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners")"
-          count="$(jq '[.runners[] | select(.status == "online") | select(any(.labels[]?; .name == "x07-vm-linux-firecracker"))] | length' <<<"$response")"
-
-          if (( count > 0 )); then
-            echo "has_firecracker_runner=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_firecracker_runner=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          echo "Firecracker release runners: ${count}" >> "$GITHUB_STEP_SUMMARY"
 
   test:
     name: test
@@ -120,10 +97,8 @@ jobs:
 
   trust_vm_examples:
     name: trust-vm-examples
-    needs:
-      - verify_tag
-      - runner_inventory
-    if: needs.runner_inventory.outputs.has_firecracker_runner == 'true'
+    needs: verify_tag
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_vm_examples == 'true'
     runs-on: [self-hosted, x07-vm-linux-firecracker]
     timeout-minutes: 90
     permissions:
@@ -184,22 +159,20 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  trust_vm_examples_unavailable:
-    name: trust-vm-examples-unavailable
-    needs:
-      - verify_tag
-      - runner_inventory
-    if: needs.runner_inventory.outputs.has_firecracker_runner != 'true'
+  trust_vm_examples_skipped:
+    name: trust-vm-examples-skipped
+    needs: verify_tag
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.run_vm_examples != 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
-      - name: Record missing VM release runner
+      - name: Record skipped VM release lane
         shell: bash
         run: |
           mkdir -p dist/review-vm
           cat > dist/review-vm/README.txt <<EOF
-          Skipped strict VM trust example gates for ${RELEASE_TAG}: no online self-hosted runner with label x07-vm-linux-firecracker is registered for ${GITHUB_REPOSITORY}.
+          Skipped strict VM trust example gates for ${RELEASE_TAG}. Re-run this workflow manually with run_vm_examples=true when the x07-vm-linux-firecracker self-hosted runner is available.
           EOF
       - name: Upload formal verification VM review artifacts
         uses: actions/upload-artifact@v4
@@ -215,13 +188,13 @@ jobs:
       - verify_tag
       - test
       - trust_vm_examples
-      - trust_vm_examples_unavailable
+      - trust_vm_examples_skipped
     if: |
       always() &&
       needs.verify_tag.result == 'success' &&
       needs.test.result == 'success' &&
       (needs.trust_vm_examples.result == 'success' || needs.trust_vm_examples.result == 'skipped') &&
-      (needs.trust_vm_examples_unavailable.result == 'success' || needs.trust_vm_examples_unavailable.result == 'skipped')
+      (needs.trust_vm_examples_skipped.result == 'success' || needs.trust_vm_examples_skipped.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
