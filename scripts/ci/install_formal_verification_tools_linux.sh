@@ -18,6 +18,7 @@ cbmc_deb=""
 z3_asset_url=""
 z3_root=""
 z3_binary_path=""
+z3_extract_dir=""
 
 case "$arch" in
   x86_64)
@@ -28,6 +29,7 @@ case "$arch" in
         z3_asset_url="https://files.pythonhosted.org/packages/py3/z/z3-solver/${z3_wheel}"
         z3_root="/usr/local/libexec/${z3_wheel%.whl}"
         z3_binary_path="${z3_root}/z3_solver-${z3_version}.0.data/data/bin/z3"
+        z3_extract_dir="${z3_root}"
         ;;
       *)
         z3_dir="z3-${z3_version}-x64-glibc-2.39"
@@ -35,6 +37,7 @@ case "$arch" in
         z3_asset_url="https://github.com/Z3Prover/z3/releases/download/z3-${z3_version}/${z3_dir}.zip"
         z3_root="/usr/local/libexec/${z3_dir}"
         z3_binary_path="${z3_root}/bin/z3"
+        z3_extract_dir="/usr/local/libexec"
         ;;
     esac
     ;;
@@ -48,6 +51,7 @@ case "$arch" in
     z3_asset_url="https://github.com/Z3Prover/z3/releases/download/z3-${z3_version}/${z3_dir}.zip"
     z3_root="/usr/local/libexec/${z3_dir}"
     z3_binary_path="${z3_root}/bin/z3"
+    z3_extract_dir="/usr/local/libexec"
     ;;
   *)
     echo "error: unsupported architecture for formal verification tool install: $arch" >&2
@@ -85,7 +89,7 @@ curl -fsSL "$z3_asset_url" -o "$z3_download_path"
 "${sudo_cmd[@]}" mkdir -p /usr/local/libexec
 case "$z3_download_path" in
   *.whl | *.zip)
-    "${sudo_cmd[@]}" unzip -q "$z3_download_path" -d "$z3_root"
+    "${sudo_cmd[@]}" unzip -q "$z3_download_path" -d "$z3_extract_dir"
     ;;
   *)
     echo "error: unsupported z3 artifact format: $z3_download_path" >&2
