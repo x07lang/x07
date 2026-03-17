@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -140,6 +141,25 @@ def replace_x07_registry_git_tag_dependency(src: str, *, dep: str, new_tag: str)
     return out, out != src
 
 
+def workspace_lock_is_current(repo_root: Path) -> bool:
+    proc = subprocess.run(
+        ["cargo", "metadata", "--locked", "--format-version", "1", "--no-deps"],
+        cwd=repo_root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return proc.returncode == 0
+
+
+def refresh_workspace_lock(repo_root: Path) -> bool:
+    cargo_lock = repo_root / "Cargo.lock"
+    before = cargo_lock.read_bytes() if cargo_lock.is_file() else None
+    subprocess.run(["cargo", "update", "-w"], cwd=repo_root, check=True)
+    after = cargo_lock.read_bytes() if cargo_lock.is_file() else None
+    return before != after
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", required=True, help="New release tag (for example: v0.0.21)")
@@ -158,6 +178,7 @@ def main(argv: list[str]) -> int:
     old_tag = f"v{old_version}"
 
     changed: list[str] = []
+    crate_manifest_changed = False
 
     crate_tomls = sorted((repo_root / "crates").glob("*/Cargo.toml"))
     for cargo_toml in crate_tomls:
@@ -169,10 +190,17 @@ def main(argv: list[str]) -> int:
                 changed.append(str(cargo_toml.relative_to(repo_root)))
                 continue
             write_text(cargo_toml, out)
+            crate_manifest_changed = True
             changed.append(str(cargo_toml.relative_to(repo_root)))
         else:
             _ = replaced_pkg
             _ = dep_rewrites
+
+    if args.check:
+        if not workspace_lock_is_current(repo_root):
+            changed.append("Cargo.lock")
+    elif crate_manifest_changed and refresh_workspace_lock(repo_root):
+        changed.append("Cargo.lock")
 
     versioned_literal_files = [
         repo_root / "docs" / "getting-started" / "install.md",
