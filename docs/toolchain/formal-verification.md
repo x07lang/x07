@@ -2,11 +2,21 @@
 
 X07 has three related but different verification surfaces:
 
-- `x07 verify --coverage` classifies reachable support posture around one symbol.
-- `x07 verify --prove` emits proof evidence for certifiable reachable symbols.
-- `x07 trust certify` turns those proofs, tests, boundaries, capsule attestations, and runtime evidence into a certificate bundle that reviewers can consume without reading the whole source tree.
+- `x07 verify --coverage` tells you what is reachable and whether x07 has support posture for that reachable graph.
+- `x07 verify --prove` emits proof evidence for the reachable symbols that are in the certifiable subset.
+- `x07 trust certify` turns proofs, tests, boundaries, capsule attestations, dependency attestations, and runtime evidence into a reviewer-facing certificate bundle.
 
-The key point is that X07 does not treat "formal verification" as a single-function theorem in isolation. The public trust claim is tied to a named certification profile, the operational entry that profile is certifying, and the exact evidence required by that profile.
+If you are new to formal verification, the easiest mental model is:
+
+1. Coverage tells you what x07 can reason about.
+2. Proof turns supported contracts into machine-checkable evidence.
+3. Certification binds that proof evidence to the shipped operational entry and the rest of the trust evidence a reviewer needs.
+
+The key point is that X07 does not make a vague promise that "the source is formally verified". The public trust claim is always tied to:
+
+- a named certification profile
+- the operational entry that profile is certifying
+- the exact evidence that profile requires
 
 ## The model
 
@@ -33,6 +43,31 @@ flowchart LR
     M --> N[certificate.json + summary.html]
     N --> O[reviewer reads certificate and review diff]
 ```
+
+## Read this first
+
+### What each command is for
+
+- `x07 verify --coverage` is for planning and review. It does not create proof.
+- `x07 verify --prove` is for generating proof evidence.
+- `x07 verify --prove --emit-proof <dir>` adds a proof object and proof-check report.
+- `x07 prove check` is for independently replaying the proof object against the current source and solver inputs.
+- `x07 trust capsule` is for attesting effectful capsule boundaries.
+- `x07 pkg attest-closure` is for freezing the reviewed dependency closure into deterministic evidence.
+- `x07 trust certify` is for turning all of that into `certificate.json` plus `summary.html`.
+
+### What counts as proof
+
+- Coverage/support summaries are posture artifacts only.
+- Proof summaries are reusable proof evidence for downstream prove runs.
+- Proof objects plus accepted proof-check reports are the strongest proof line and are required by strong trust profiles.
+
+### What strong certification claims
+
+- The claim is about `project.operational_entry_symbol`, not a proof-only helper.
+- Every symbol the active profile expects to be proved must have proof evidence and accepted proof-check results.
+- Developer-only imported stubs, coverage-only imports, and bounded recursion are rejected fail-closed.
+- The certificate makes the proof inventory, assumptions, proof-check results, and formal-verification scope explicit so reviewers can see what was proved and what still depends on capsules or runtime evidence.
 
 ## Tooling
 
@@ -64,24 +99,16 @@ The split matters:
 
 `x07 prove check` is a semantic replay checker, not just an artifact-integrity check. It reloads the project manifest, re-resolves the proved declaration, replays imported proof-summary inputs, re-derives the canonical SMT obligation, validates the async scheduler model when present, and requires the replayed solver result to match the proof object.
 
-Coverage reports use support statuses such as `supported`, `supported_async`, and `imported_proof_summary`. They do not count as proof by themselves.
-For pure recursive certification, self-recursive `defn` targets are accepted when they declare `decreases[]`. Proof artifacts expose `recursion_kind` and `recursion_bound_kind` so bounded recursion cannot be hidden behind a generic success bit.
+Read the current certifiable subset like this:
 
-Direct prove inputs currently accept unbranded `bytes` / `bytes_view` / `vec_u8`, first-order `option_*` and `result_*`, and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
-
-That means schema-derived record and tagged-union documents can now sit directly on the proof boundary as `bytes_view@brand`: the generated verify driver runs the validator first and only then materializes the branded view seen by the proof target. Direct `vec_u8` params/results are now admitted in the same certifiable subset. Owned branded `bytes` and nested result carriers remain outside the current direct prove-input subset.
-
-When a reviewed callee sits outside the currently loaded graph, emit a proof summary from a successful `x07 verify --prove` run and pass it back with `x07 verify --proof-summary <path>`. Coverage/support summaries are rejected anywhere proof evidence is required. The deprecated `--summary <path>` alias still maps to `--proof-summary`.
-
-Imported primitive stubs are developer-only. Proof runs that depend on `imported_stub` assumptions require `--allow-imported-stubs`, and strong trust profiles reject those assumptions even if a prove run succeeded locally.
-
-For async certification, coverage distinguishes:
-
-- `supported_async`
-- `trusted_scheduler_model`
-- `capsule_boundary`
-
-Unsupported shapes are rejected with explicit diagnostics instead of being silently treated as trusted.
+- Coverage statuses such as `supported`, `supported_async`, and `imported_proof_summary` tell you what x07 can analyze. They do not count as proof by themselves.
+- Pure self-recursive `defn` targets are certifiable when they declare `decreases[]`. Proof artifacts expose `recursion_kind` and `recursion_bound_kind`, so bounded recursion cannot hide behind a generic success bit.
+- Direct prove inputs currently accept unbranded `bytes`, `bytes_view`, and `vec_u8`; first-order `option_*` and `result_*`; and branded `bytes_view` carriers whose brand resolves through reachable `meta.brands_v1.validate`.
+- That means schema-derived record and tagged-union documents can sit directly on the proof boundary as `bytes_view@brand`: the generated verify driver validates first and only then materializes the branded view seen by the proof target.
+- Owned branded `bytes` and nested result carriers remain outside the current direct prove-input subset.
+- When a reviewed callee sits outside the currently loaded graph, emit a proof summary from a successful `x07 verify --prove` run and pass it back with `x07 verify --proof-summary <path>`. The deprecated `--summary <path>` alias still maps to `--proof-summary`.
+- Imported primitive stubs are developer-only. Proof runs that depend on `imported_stub` assumptions require `--allow-imported-stubs`, and strong trust profiles reject those assumptions even if a local prove run succeeded.
+- Async coverage distinguishes `supported_async`, `trusted_scheduler_model`, and `capsule_boundary`. Unsupported shapes are rejected with explicit diagnostics instead of being silently treated as trusted.
 
 ### 2. Whole-graph certification
 
