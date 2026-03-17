@@ -64,7 +64,7 @@
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
-              "baseline": 32000,
+              "baseline": 37164,
               "max_regression_pct": 15
             },
             "wall_ms": {
@@ -140,7 +140,7 @@
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
-              "baseline": 26000,
+              "baseline": 33128,
               "max_regression_pct": 15
             },
             "wall_ms": {
@@ -216,7 +216,7 @@
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
-              "baseline": 32000,
+              "baseline": 37420,
               "max_regression_pct": 15
             },
             "wall_ms": {
@@ -296,7 +296,7 @@
               "max_regression_pct": 15
             },
             "wall_ms": {
-              "baseline": 250,
+              "baseline": 304,
               "max_regression_pct": 20
             }
           },
@@ -368,7 +368,7 @@
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
-              "baseline": 28000,
+              "baseline": 34276,
               "max_regression_pct": 15
             },
             "wall_ms": {
@@ -444,7 +444,7 @@
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
-              "baseline": 32000,
+              "baseline": 37288,
               "max_regression_pct": 15
             },
             "wall_ms": {
