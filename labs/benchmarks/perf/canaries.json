@@ -33,7 +33,7 @@
           "c_source_size": 370343,
           "cases": [
             {
-              "fuel_used": 1117,
+              "fuel_used": 1151,
               "heap_used": 84,
               "name": "obj_sort1"
             },
