@@ -8,6 +8,20 @@ repo_root() {
 root="$(repo_root)"
 cd "$root"
 
+copy_review_artifacts() {
+  local label="$1"
+  local variant="$2"
+  local cert_dir="$3"
+  local review_root="${X07_REVIEW_ARTIFACTS_DIR:-}"
+  if [[ -z "$review_root" || ! -d "$cert_dir" ]]; then
+    return
+  fi
+  local dest="$review_root/$label/$variant"
+  rm -rf "$dest"
+  mkdir -p "$(dirname "$dest")"
+  cp -R "$cert_dir" "$dest"
+}
+
 ./scripts/ci/check_tools.sh >/dev/null
 
 export X07_SANDBOX_BACKEND="vm"
@@ -105,6 +119,7 @@ python3 ./scripts/ci/assert_strict_certificate.py \
   --cwd "$example_dir" \
   --label trusted_sandbox_program_v1 \
   --require-entry-formally-proved
+copy_review_artifacts "trusted_sandbox_program_v1" "docs-example" "$tmp_dir/example-cert"
 
 scaffold_dir="$tmp_dir/init"
 mkdir -p "$scaffold_dir"
@@ -159,5 +174,6 @@ python3 ./scripts/ci/assert_strict_certificate.py \
   --cwd "$scaffold_dir" \
   --label trusted_sandbox_program_v1_template \
   --require-entry-formally-proved
+copy_review_artifacts "trusted_sandbox_program_v1" "template" "$scaffold_dir/target/cert"
 
 printf 'OK %s\n' "$(basename "$0")"

@@ -1,4 +1,6 @@
 use std::io::Write as _;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -14,8 +16,9 @@ use x07_contracts::{
     X07_OS_RUNNER_REPORT_SCHEMA_VERSION, X07_PATCHSET_SCHEMA_VERSION,
     X07_PKG_ADVISORY_SCHEMA_VERSION, X07_POLICY_INIT_REPORT_SCHEMA_VERSION,
     X07_REVIEW_DIFF_SCHEMA_VERSION, X07_RUN_REPORT_SCHEMA_VERSION, X07_TRUST_REPORT_SCHEMA_VERSION,
-    X07_VERIFY_COVERAGE_SCHEMA_VERSION, X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION,
-    X07_VERIFY_REPORT_SCHEMA_VERSION, X07_VERIFY_SUMMARY_SCHEMA_VERSION,
+    X07_VERIFY_COVERAGE_SCHEMA_VERSION, X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION,
+    X07_VERIFY_PROOF_SUMMARY_SCHEMA_VERSION, X07_VERIFY_REPORT_SCHEMA_VERSION,
+    X07_VERIFY_SUMMARY_SCHEMA_VERSION,
 };
 use x07_runner_common::sandbox_backend::{ENV_ACCEPT_WEAKER_ISOLATION, ENV_SANDBOX_BACKEND};
 use x07c::json_patch;
@@ -94,6 +97,28 @@ fn run_x07_in_dir(dir: &Path, args: &[&str]) -> std::process::Output {
         .current_dir(dir)
         .env(ENV_SANDBOX_BACKEND, "os")
         .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .args(args)
+        .output()
+        .expect("run x07")
+}
+
+#[cfg(unix)]
+fn run_x07_in_dir_with_path_prefixes(
+    dir: &Path,
+    args: &[&str],
+    path_prefixes: &[PathBuf],
+) -> std::process::Output {
+    ensure_runner_binaries_staged();
+    let exe = env!("CARGO_BIN_EXE_x07");
+    let mut paths = path_prefixes.to_vec();
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    Command::new(exe)
+        .current_dir(dir)
+        .env(ENV_SANDBOX_BACKEND, "os")
+        .env(ENV_ACCEPT_WEAKER_ISOLATION, "1")
+        .env("PATH", std::env::join_paths(paths).expect("join PATH"))
         .args(args)
         .output()
         .expect("run x07")
@@ -264,6 +289,54 @@ fn x07_check_schema_discovery() {
         "x07.tool.check.report@0.1.0"
     );
     assert_eq!(schema["properties"]["command"]["const"], "x07.check");
+}
+
+#[test]
+fn x07_prove_schema_discovery() {
+    let out = run_x07(&["prove", "--json-schema-id"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "x07.tool.prove.report@0.2.0\n"
+    );
+
+    let out = run_x07(&["prove", "--json-schema"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let schema: Value = serde_json::from_slice(&out.stdout).expect("parse schema JSON");
+    assert_eq!(
+        schema["properties"]["schema_version"]["const"],
+        "x07.tool.prove.report@0.2.0"
+    );
+    assert_eq!(schema["properties"]["command"]["const"], "x07.prove");
+}
+
+#[test]
+fn x07_prove_check_schema_discovery() {
+    let out = run_x07(&["prove", "check", "--json-schema-id"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "x07.tool.prove.check.report@0.2.0\n"
+    );
+
+    let out = run_x07(&["prove", "check", "--json-schema"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(
+        out.stderr.is_empty(),
+        "expected empty stderr, got:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let schema: Value = serde_json::from_slice(&out.stdout).expect("parse schema JSON");
+    assert_eq!(
+        schema["properties"]["schema_version"]["const"],
+        "x07.tool.prove.check.report@0.2.0"
+    );
+    assert_eq!(schema["properties"]["command"]["const"], "x07.prove.check");
 }
 
 #[test]
@@ -3046,6 +3119,540 @@ fn x07_verify_prove_rejects_mismatched_imported_summary() {
     assert_eq!(diags[0]["code"], "X07V_SUMMARY_MISMATCH");
 }
 
+#[cfg(unix)]
+#[test]
+fn x07_verify_prove_check_accepts_defn_proof_bundle() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_check_defn");
+    let solver_dir = dir.join("bin");
+    write_fake_prove_solvers(&solver_dir);
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.main"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.main",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": "x"
+                }
+            ]
+        }),
+    );
+
+    let proof_path = dir.join("proof.json");
+    let prove_out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.main",
+            "--project",
+            "x07.json",
+            "--emit-proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir.clone()],
+    );
+    assert_eq!(
+        prove_out.status.code(),
+        Some(0),
+        "stdout:\n{}\n\nstderr:\n{}",
+        String::from_utf8_lossy(&prove_out.stdout),
+        String::from_utf8_lossy(&prove_out.stderr)
+    );
+    let prove_report = parse_json_stdout(&prove_out);
+    assert_eq!(prove_report["result"]["kind"], "proven");
+    assert!(proof_path.is_file(), "missing proof object");
+
+    let out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "prove",
+            "check",
+            "--proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\n\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(
+        v["schema_version"],
+        X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION
+    );
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["result"], "accepted");
+    assert_eq!(v["symbol"], "verify_fixture.main");
+    assert_eq!(v["entry_symbol"], "verify_fixture.main");
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_verify_prove_check_accepts_defasync_proof_bundle() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_check_defasync");
+    let solver_dir = dir.join("bin");
+    write_fake_prove_solvers(&solver_dir);
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.main"]},
+                {
+                    "kind": "defasync",
+                    "name": "verify_fixture.main",
+                    "params": [],
+                    "result": "bytes",
+                    "protocol": {
+                        "await_invariant": [{"id":"a0","expr":["=",0,0]}],
+                        "scope_invariant": [{"id":"s0","expr":["=",0,0]}],
+                        "cancellation_ensures": [
+                            {"id":"c0","expr":["=",["view.len",["bytes.view","__result"]],0]}
+                        ]
+                    },
+                    "body": ["begin", ["task.yield"], ["bytes.alloc", 0]]
+                }
+            ]
+        }),
+    );
+
+    let proof_path = dir.join("proof.json");
+    let prove_out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.main",
+            "--project",
+            "x07.json",
+            "--emit-proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir.clone()],
+    );
+    assert_eq!(
+        prove_out.status.code(),
+        Some(0),
+        "stdout:\n{}\n\nstderr:\n{}",
+        String::from_utf8_lossy(&prove_out.stdout),
+        String::from_utf8_lossy(&prove_out.stderr)
+    );
+
+    let out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "prove",
+            "check",
+            "--proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout:\n{}\n\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = parse_json_stdout(&out);
+    assert_eq!(
+        v["schema_version"],
+        X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION
+    );
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["result"], "accepted");
+    assert_eq!(v["symbol"], "verify_fixture.main");
+    assert!(v["validated_scheduler_model_digest"].as_str().is_some());
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_verify_prove_check_rejects_source_edit_after_proof() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_check_source_edit");
+    let solver_dir = dir.join("bin");
+    write_fake_prove_solvers(&solver_dir);
+
+    write_verify_project_files(&dir);
+    let source_path = dir.join("verify_fixture.x07.json");
+    write_json(
+        &source_path,
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.main"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.main",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": "x"
+                }
+            ]
+        }),
+    );
+
+    let proof_path = dir.join("proof.json");
+    let prove_out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.main",
+            "--project",
+            "x07.json",
+            "--emit-proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir.clone()],
+    );
+    assert_eq!(prove_out.status.code(), Some(0));
+
+    write_json(
+        &source_path,
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.main"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.main",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result",["+","x",1]]}],
+                    "body": ["+","x",1]
+                }
+            ]
+        }),
+    );
+
+    let out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "prove",
+            "check",
+            "--proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"], "rejected");
+    assert_eq!(proof_check_diag_code(&v), "X07PROOF_ESOURCE_REPLAY_FAILED");
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_verify_prove_check_rejects_imported_proof_summary_substitution() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_check_imported_summary_swap");
+    let solver_dir = dir.join("bin");
+    write_fake_prove_solvers(&solver_dir);
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.main","verify_fixture.helper","verify_fixture.helper_alt"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.helper",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": "x"
+                },
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.helper_alt",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r1","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e1","expr":["=","__result",["+","x",1]]}],
+                    "body": ["+","x",1]
+                },
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.main",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r2","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e2","expr":["=","__result","x"]}],
+                    "body": ["verify_fixture.helper","x"]
+                }
+            ]
+        }),
+    );
+
+    let helper_out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.helper",
+            "--project",
+            "x07.json",
+        ],
+        &[solver_dir.clone()],
+    );
+    assert_eq!(helper_out.status.code(), Some(0));
+    let helper_report = parse_json_stdout(&helper_out);
+    let helper_summary_path =
+        prove_report_artifact_path(&helper_report, "verify_proof_summary_path");
+
+    let helper_alt_out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.helper_alt",
+            "--project",
+            "x07.json",
+        ],
+        &[solver_dir.clone()],
+    );
+    assert_eq!(helper_alt_out.status.code(), Some(0));
+    let helper_alt_report = parse_json_stdout(&helper_alt_out);
+    let helper_alt_summary_path =
+        prove_report_artifact_path(&helper_alt_report, "verify_proof_summary_path");
+
+    let proof_path = dir.join("proof.json");
+    let main_out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.main",
+            "--project",
+            "x07.json",
+            "--summary",
+            helper_summary_path
+                .to_str()
+                .expect("utf-8 helper summary path"),
+            "--emit-proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir.clone()],
+    );
+    assert_eq!(main_out.status.code(), Some(0));
+
+    std::fs::copy(
+        &helper_alt_summary_path,
+        bundled_imported_summary_path(&proof_path),
+    )
+    .expect("substitute bundled imported proof summary");
+
+    let out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "prove",
+            "check",
+            "--proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"], "rejected");
+    assert_eq!(
+        proof_check_diag_code(&v),
+        "X07PROOF_EIMPORTED_SUMMARY_MISMATCH"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_verify_prove_check_rejects_primitive_manifest_change() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_check_primitive_manifest");
+    let solver_dir = dir.join("bin");
+    write_fake_prove_solvers(&solver_dir);
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.main"]},
+                {
+                    "kind": "defn",
+                    "name": "verify_fixture.main",
+                    "params": [{"name":"x","ty":"i32"}],
+                    "result": "i32",
+                    "requires": [{"id":"r0","expr":["=","x","x"]}],
+                    "ensures": [{"id":"e0","expr":["=","__result","x"]}],
+                    "body": "x"
+                }
+            ]
+        }),
+    );
+
+    let proof_path = dir.join("proof.json");
+    let prove_out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.main",
+            "--project",
+            "x07.json",
+            "--emit-proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir.clone()],
+    );
+    assert_eq!(prove_out.status.code(), Some(0));
+
+    let mut proof_object: Value =
+        serde_json::from_slice(&std::fs::read(&proof_path).expect("read proof object"))
+            .expect("parse proof object");
+    proof_object["primitive_manifest_digest"] = Value::String(format!("sha256:{}", "0".repeat(64)));
+    write_json(&proof_path, &proof_object);
+
+    let out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "prove",
+            "check",
+            "--proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"], "rejected");
+    assert_eq!(proof_check_diag_code(&v), "X07PROOF_ESOURCE_REPLAY_FAILED");
+}
+
+#[cfg(unix)]
+#[test]
+fn x07_verify_prove_check_rejects_async_scheduler_model_change() {
+    let dir = fresh_os_tmp_dir("x07_verify_prove_check_scheduler_model");
+    let solver_dir = dir.join("bin");
+    write_fake_prove_solvers(&solver_dir);
+
+    write_verify_project_files(&dir);
+    write_json(
+        &dir.join("verify_fixture.x07.json"),
+        &serde_json::json!({
+            "schema_version": X07AST_SCHEMA_VERSION,
+            "kind": "module",
+            "module_id": "verify_fixture",
+            "imports": [],
+            "decls": [
+                {"kind":"export", "names":["verify_fixture.main"]},
+                {
+                    "kind": "defasync",
+                    "name": "verify_fixture.main",
+                    "params": [],
+                    "result": "bytes",
+                    "protocol": {
+                        "await_invariant": [{"id":"a0","expr":["=",0,0]}],
+                        "scope_invariant": [{"id":"s0","expr":["=",0,0]}],
+                        "cancellation_ensures": [
+                            {"id":"c0","expr":["=",["view.len",["bytes.view","__result"]],0]}
+                        ]
+                    },
+                    "body": ["begin", ["task.yield"], ["bytes.alloc", 0]]
+                }
+            ]
+        }),
+    );
+
+    let proof_path = dir.join("proof.json");
+    let prove_out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "verify",
+            "--prove",
+            "--entry",
+            "verify_fixture.main",
+            "--project",
+            "x07.json",
+            "--emit-proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir.clone()],
+    );
+    assert_eq!(prove_out.status.code(), Some(0));
+
+    let mut proof_object: Value =
+        serde_json::from_slice(&std::fs::read(&proof_path).expect("read proof object"))
+            .expect("parse proof object");
+    proof_object["scheduler_model_digest"] = Value::String(format!("sha256:{}", "0".repeat(64)));
+    write_json(&proof_path, &proof_object);
+
+    let out = run_x07_in_dir_with_path_prefixes(
+        &dir,
+        &[
+            "prove",
+            "check",
+            "--proof",
+            proof_path.to_str().expect("utf-8 proof path"),
+        ],
+        &[solver_dir],
+    );
+    assert_eq!(out.status.code(), Some(20));
+    let v = parse_json_stdout(&out);
+    assert_eq!(v["ok"], false);
+    assert_eq!(v["result"], "rejected");
+    assert_eq!(
+        proof_check_diag_code(&v),
+        "X07PROOF_ESCHEDULER_MODEL_MISMATCH"
+    );
+}
+
 #[test]
 fn x07_verify_prove_supports_views_and_result_views() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_rich_signature");
@@ -5096,6 +5703,84 @@ fn write_verify_project_files(dir: &Path) {
             "dependencies": []
         }),
     );
+}
+
+#[cfg(unix)]
+fn write_fake_prove_solvers(bin_dir: &Path) {
+    std::fs::create_dir_all(bin_dir).expect("create fake solver bin dir");
+    let cbmc_path = bin_dir.join("cbmc");
+    let cbmc_src = r#"#!/usr/bin/env python3
+import pathlib
+import sys
+
+args = sys.argv[1:]
+if "--help" in args:
+    print("cbmc help --no-standard-checks")
+    sys.exit(0)
+
+if "--smt2" in args:
+    out = None
+    for i, tok in enumerate(args):
+        if tok == "--outfile" and i + 1 < len(args):
+            out = args[i + 1]
+            break
+    if out is None:
+        print("missing --outfile", file=sys.stderr)
+        sys.exit(4)
+    pathlib.Path(out).write_text(
+        "(set-logic QF_AUFBV)\n(assert true)\n(check-sat)\n",
+        encoding="utf-8",
+    )
+    sys.exit(0)
+
+print("[]")
+"#;
+    write_bytes(&cbmc_path, cbmc_src.as_bytes());
+    std::fs::set_permissions(&cbmc_path, std::fs::Permissions::from_mode(0o755))
+        .expect("chmod fake cbmc");
+
+    let z3_path = bin_dir.join("z3");
+    let z3_src = r#"#!/usr/bin/env python3
+print("unsat")
+"#;
+    write_bytes(&z3_path, z3_src.as_bytes());
+    std::fs::set_permissions(&z3_path, std::fs::Permissions::from_mode(0o755))
+        .expect("chmod fake z3");
+}
+
+#[cfg(unix)]
+fn prove_report_artifact_path(report: &Value, key: &str) -> PathBuf {
+    PathBuf::from(
+        report["artifacts"][key]
+            .as_str()
+            .unwrap_or_else(|| panic!("missing prove artifact path for {key}")),
+    )
+}
+
+#[cfg(unix)]
+fn bundled_imported_summary_path(proof_path: &Path) -> PathBuf {
+    let imported_dir = proof_path
+        .parent()
+        .expect("proof bundle dir")
+        .join("imported_proof_summaries");
+    let mut entries = std::fs::read_dir(&imported_dir)
+        .expect("read imported proof summaries dir")
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .collect::<Vec<_>>();
+    entries.sort();
+    assert_eq!(entries.len(), 1, "expected one imported proof summary");
+    entries.remove(0)
+}
+
+#[cfg(unix)]
+fn proof_check_diag_code(report: &Value) -> &str {
+    report["diagnostics"]
+        .as_array()
+        .and_then(|diags| diags.first())
+        .and_then(|diag| diag["code"].as_str())
+        .expect("proof-check diagnostic code")
 }
 
 fn x07_module_doc(module_id: &str, imports: &[&str], decls: Vec<Value>) -> Value {

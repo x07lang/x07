@@ -8,6 +8,20 @@ repo_root() {
 root="$(repo_root)"
 cd "$root"
 
+copy_review_artifacts() {
+  local label="$1"
+  local variant="$2"
+  local cert_dir="$3"
+  local review_root="${X07_REVIEW_ARTIFACTS_DIR:-}"
+  if [[ -z "$review_root" || ! -d "$cert_dir" ]]; then
+    return
+  fi
+  local dest="$review_root/$label/$variant"
+  rm -rf "$dest"
+  mkdir -p "$(dirname "$dest")"
+  cp -R "$cert_dir" "$dest"
+}
+
 ./scripts/ci/check_tools.sh >/dev/null
 
 cargo build -p x07 -p x07-host-runner >/dev/null
@@ -90,6 +104,7 @@ if [[ "$have_solvers" == "1" ]]; then
     --cwd "$example_dir" \
     --label verified_core_pure_v1 \
     --require-entry-formally-proved
+  copy_review_artifacts "verified_core_pure_v1" "docs-example" "$tmp_dir/example-cert"
 else
   echo "[check] verified_core_pure_v1 docs example: certify skipped (cbmc/z3 unavailable)"
 fi
@@ -139,6 +154,7 @@ if [[ "$have_solvers" == "1" ]]; then
     --cwd "$scaffold_dir" \
     --label verified_core_pure_v1_template \
     --require-entry-formally-proved
+  copy_review_artifacts "verified_core_pure_v1" "template" "$scaffold_dir/target/cert"
 else
   echo "[check] verified_core_pure_v1 template: certify skipped (cbmc/z3 unavailable)"
 fi

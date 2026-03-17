@@ -17,6 +17,20 @@ repo_root() {
   cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd
 }
 
+copy_review_artifacts() {
+  local label="$1"
+  local variant="$2"
+  local cert_dir="$3"
+  local review_root="${X07_REVIEW_ARTIFACTS_DIR:-}"
+  if [[ -z "$review_root" || ! -d "$cert_dir" ]]; then
+    return
+  fi
+  local dest="$review_root/$label/$variant"
+  rm -rf "$dest"
+  mkdir -p "$(dirname "$dest")"
+  cp -R "$cert_dir" "$dest"
+}
+
 resolve_x07_bin() {
   local root="$1"
   local x07_bin="${X07_BIN:-}"
@@ -141,6 +155,16 @@ run_runtime_checks() {
     --cwd "$work_dir" \
     --label "$label" \
     --require-entry-formally-proved
+  local artifact_label="$label"
+  local artifact_variant="cert"
+  if [[ "$label" == *" docs example" ]]; then
+    artifact_label="${label% docs example}"
+    artifact_variant="docs-example"
+  elif [[ "$label" == *" template" ]]; then
+    artifact_label="${label% template}"
+    artifact_variant="template"
+  fi
+  copy_review_artifacts "$artifact_label" "$artifact_variant" "$cert_out"
 }
 
 label=""

@@ -101,8 +101,22 @@ step "generics intrinsics coherence"
 step "cargo clippy --all-targets -- -D warnings"
 cargo clippy --all-targets -- -D warnings
 
+step "verified core pure example release guard"
+X07_REQUIRE_SOLVERS=1 ./scripts/ci/check_verified_core_pure_example.sh
+
 step "verified core fixture release guard"
-./scripts/ci/check_verified_core_fixture.sh
+X07_REQUIRE_SOLVERS=1 ./scripts/ci/check_verified_core_fixture.sh
+
+if [[ -n "${X07_VM_GUEST_IMAGE:-}" || -n "${X07_VM_VZ_GUEST_BUNDLE:-}" ]]; then
+  step "trusted sandbox program example release guard"
+  ./scripts/ci/check_trusted_sandbox_program_example.sh
+
+  step "trusted network service example release guard"
+  ./scripts/ci/check_trusted_network_service_example.sh
+else
+  echo
+  echo "==> trusted example release guards (skipped; set X07_VM_GUEST_IMAGE or X07_VM_VZ_GUEST_BUNDLE to enable)"
+fi
 
 step "stream plugins smoke"
 ./scripts/ci/check_stream_plugins_smoke.sh

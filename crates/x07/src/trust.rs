@@ -5602,12 +5602,6 @@ fn build_prove_evidence(
             .as_ref()
             .map(|path| evidence_ref_for_path(&path))
             .transpose()?;
-        if proof_check_report_ref.is_none() {
-            diagnostics.push(trust_diag(
-                "X07TC_EPROOF_CHECK_MISSING",
-                format!("proof report for {symbol:?} is missing proof_check_report_path"),
-            ));
-        }
 
         let proof_summary_doc = proof_summary_path
             .as_ref()
@@ -5632,46 +5626,12 @@ fn build_prove_evidence(
                     "proven".to_string()
                 }
             });
-        let mut proof_check_result = None;
-        let mut proof_check_checker = None;
-        let mut proof_object_digest = None;
-        if let Some(path) = proof_check_report_path.as_ref() {
-            match verify::load_proof_check_report_path(path) {
-                Ok(report) => {
-                    proof_object_digest = Some(report.proof_object_digest.clone());
-                    proof_check_result = Some(report.result.clone());
-                    proof_check_checker = Some(report.checker.clone());
-                    if !proof_summary_engine.is_empty()
-                        && report.verify_engine != proof_summary_engine
-                    {
-                        diagnostics.push(trust_diag(
-                            "X07TC_EPROOF_CHECK_ENGINE_MISMATCH",
-                            format!(
-                                "proof-check report for {symbol:?} used engine {:?}, expected {:?}",
-                                report.verify_engine, proof_summary_engine
-                            ),
-                        ));
-                    }
-                    if !report.ok || report.result != "accepted" {
-                        diagnostics.push(trust_diag(
-                            "X07TC_EPROOF_CHECK_REJECTED",
-                            format!(
-                                "proof-check report for {symbol:?} is not accepted (ok={}, result={})",
-                                report.ok, report.result
-                            ),
-                        ));
-                    }
-                }
-                Err(err) => {
-                    diagnostics.push(trust_diag(
-                        "X07TC_EPROOF_CHECK_SCHEMA_INVALID",
-                        format!(
-                            "proof-check report for {symbol:?} is schema-invalid or unreadable: {err:#}"
-                        ),
-                    ));
-                }
-            }
-        }
+        let proof_check_evidence = load_proof_check_evidence(
+            symbol,
+            &proof_summary_engine,
+            proof_check_report_path.as_deref(),
+        );
+        diagnostics.extend(proof_check_evidence.diagnostics);
 
         inventory.push(TrustCertificateProofInventoryItem {
             symbol: symbol.clone(),
@@ -5681,12 +5641,78 @@ fn build_prove_evidence(
             proof_summary: proof_summary_ref,
             proof_object: proof_object_ref,
             proof_check_report: proof_check_report_ref,
-            proof_check_result,
-            proof_check_checker,
-            proof_object_digest,
+            proof_check_result: proof_check_evidence.proof_check_result,
+            proof_check_checker: proof_check_evidence.proof_check_checker,
+            proof_object_digest: proof_check_evidence.proof_object_digest,
         });
     }
     Ok(inventory)
+}
+
+struct ProofCheckEvidenceStatus {
+    proof_check_result: Option<String>,
+    proof_check_checker: Option<String>,
+    proof_object_digest: Option<String>,
+    diagnostics: Vec<diagnostics::Diagnostic>,
+}
+
+fn load_proof_check_evidence(
+    symbol: &str,
+    proof_summary_engine: &str,
+    proof_check_report_path: Option<&Path>,
+) -> ProofCheckEvidenceStatus {
+    let Some(path) = proof_check_report_path else {
+        return ProofCheckEvidenceStatus {
+            proof_check_result: None,
+            proof_check_checker: None,
+            proof_object_digest: None,
+            diagnostics: vec![trust_diag(
+                "X07TC_EPROOF_CHECK_MISSING",
+                format!("proof report for {symbol:?} is missing proof_check_report_path"),
+            )],
+        };
+    };
+
+    match verify::load_proof_check_report_path(path) {
+        Ok(report) => {
+            let mut diagnostics = Vec::new();
+            if !proof_summary_engine.is_empty() && report.verify_engine != proof_summary_engine {
+                diagnostics.push(trust_diag(
+                    "X07TC_EPROOF_CHECK_ENGINE_MISMATCH",
+                    format!(
+                        "proof-check report for {symbol:?} used engine {:?}, expected {:?}",
+                        report.verify_engine, proof_summary_engine
+                    ),
+                ));
+            }
+            if !report.ok || report.result != "accepted" {
+                diagnostics.push(trust_diag(
+                    "X07TC_EPROOF_CHECK_REJECTED",
+                    format!(
+                        "proof-check report for {symbol:?} is not accepted (ok={}, result={})",
+                        report.ok, report.result
+                    ),
+                ));
+            }
+            ProofCheckEvidenceStatus {
+                proof_check_result: Some(report.result),
+                proof_check_checker: Some(report.checker),
+                proof_object_digest: Some(report.proof_object_digest),
+                diagnostics,
+            }
+        }
+        Err(err) => ProofCheckEvidenceStatus {
+            proof_check_result: None,
+            proof_check_checker: None,
+            proof_object_digest: None,
+            diagnostics: vec![trust_diag(
+                "X07TC_EPROOF_CHECK_SCHEMA_INVALID",
+                format!(
+                    "proof-check report for {symbol:?} is schema-invalid or unreadable: {err:#}"
+                ),
+            )],
+        },
+    }
 }
 
 fn build_tests_evidence(
@@ -6727,6 +6753,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use x07_contracts::X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION;
 
     fn temp_test_dir(prefix: &str) -> PathBuf {
         let unique = SystemTime::now()
@@ -6770,6 +6797,33 @@ mod tests {
             proof_check_checker: Some("x07.proof_replay_checker".to_string()),
             proof_object_digest: Some(format!("sha256:{}", "5".repeat(64))),
         }
+    }
+
+    fn write_json_file(path: &Path, doc: &Value) {
+        std::fs::write(
+            path,
+            serde_json::to_vec_pretty(doc).expect("serialize JSON"),
+        )
+        .expect("write JSON file");
+    }
+
+    fn valid_proof_check_report(engine: &str, ok: bool, result: &str) -> Value {
+        json!({
+            "schema_version": X07_VERIFY_PROOF_CHECK_REPORT_SCHEMA_VERSION,
+            "ok": ok,
+            "proof_object_digest": format!("sha256:{}", "1".repeat(64)),
+            "checker": "x07.proof_replay_checker",
+            "result": result,
+            "symbol": "example.main",
+            "entry_symbol": "example.main",
+            "verify_engine": engine,
+            "expected_obligation_digest": format!("sha256:{}", "2".repeat(64)),
+            "replayed_obligation_digest": format!("sha256:{}", "2".repeat(64)),
+            "expected_solver_result": "unsat",
+            "replayed_solver_result": "unsat",
+            "validated_imported_proof_summary_digests": [],
+            "diagnostics": []
+        })
     }
 
     #[test]
@@ -6906,6 +6960,72 @@ mod tests {
         let value = serde_json::to_value(runtime).expect("serialize runtime");
         assert!(value.get("attestation").is_some());
         assert!(value.get("attestation").is_some_and(Value::is_null));
+    }
+
+    #[test]
+    fn load_proof_check_evidence_rejects_missing_report() {
+        let status = load_proof_check_evidence("example.main", "cbmc_z3", None);
+        assert!(status.proof_check_result.is_none());
+        assert_eq!(status.diagnostics.len(), 1);
+        assert_eq!(status.diagnostics[0].code, "X07TC_EPROOF_CHECK_MISSING");
+    }
+
+    #[test]
+    fn load_proof_check_evidence_rejects_rejected_report() {
+        let dir = temp_test_dir("proof_check_rejected");
+        let report_path = dir.join("proof.check.json");
+        write_json_file(
+            &report_path,
+            &valid_proof_check_report("cbmc_z3", false, "rejected"),
+        );
+
+        let status = load_proof_check_evidence("example.main", "cbmc_z3", Some(&report_path));
+        assert_eq!(status.proof_check_result.as_deref(), Some("rejected"));
+        assert_eq!(
+            status.proof_check_checker.as_deref(),
+            Some("x07.proof_replay_checker")
+        );
+        assert_eq!(status.diagnostics.len(), 1);
+        assert_eq!(status.diagnostics[0].code, "X07TC_EPROOF_CHECK_REJECTED");
+
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn load_proof_check_evidence_rejects_invalid_schema() {
+        let dir = temp_test_dir("proof_check_schema_invalid");
+        let report_path = dir.join("proof.check.json");
+        write_json_file(&report_path, &json!({}));
+
+        let status = load_proof_check_evidence("example.main", "cbmc_z3", Some(&report_path));
+        assert!(status.proof_check_result.is_none());
+        assert_eq!(status.diagnostics.len(), 1);
+        assert_eq!(
+            status.diagnostics[0].code,
+            "X07TC_EPROOF_CHECK_SCHEMA_INVALID"
+        );
+
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn load_proof_check_evidence_rejects_engine_mismatch() {
+        let dir = temp_test_dir("proof_check_engine_mismatch");
+        let report_path = dir.join("proof.check.json");
+        write_json_file(
+            &report_path,
+            &valid_proof_check_report("z3", true, "accepted"),
+        );
+
+        let status = load_proof_check_evidence("example.main", "cbmc_z3", Some(&report_path));
+        assert_eq!(status.proof_check_result.as_deref(), Some("accepted"));
+        assert_eq!(status.diagnostics.len(), 1);
+        assert_eq!(
+            status.diagnostics[0].code,
+            "X07TC_EPROOF_CHECK_ENGINE_MISMATCH"
+        );
+
+        std::fs::remove_dir_all(dir).expect("cleanup temp dir");
     }
 
     #[test]

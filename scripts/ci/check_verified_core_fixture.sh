@@ -8,6 +8,18 @@ repo_root() {
 root="$(repo_root)"
 cd "$root"
 
+copy_review_artifacts() {
+  local cert_dir="$1"
+  local review_root="${X07_REVIEW_ARTIFACTS_DIR:-}"
+  if [[ -z "$review_root" || ! -d "$cert_dir" ]]; then
+    return
+  fi
+  local dest="$review_root/verified_core_fixture_v1/cert"
+  rm -rf "$dest"
+  mkdir -p "$(dirname "$dest")"
+  cp -R "$cert_dir" "$dest"
+}
+
 ./scripts/ci/check_tools.sh >/dev/null
 
 cargo build -p x07 -p x07-host-runner >/dev/null
@@ -98,6 +110,7 @@ python3 ./scripts/ci/assert_strict_certificate.py \
   --cwd "$fixture_dir" \
   --label X07REL \
   --require-entry-formally-proved
+copy_review_artifacts "$tmp_dir/cert"
 
 surrogate_dir="$tmp_dir/surrogate"
 cp -R "$fixture_dir" "$surrogate_dir"

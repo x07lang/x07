@@ -556,7 +556,7 @@ pub struct MetaDelta {
 #[allow(clippy::too_many_arguments)]
 pub fn build_report<T: Serialize>(
     scope: Option<&str>,
-    report_semver: &str,
+    schema_version: &str,
     started: Instant,
     raw_argv: &[OsString],
     exit_code: u8,
@@ -583,7 +583,7 @@ pub fn build_report<T: Serialize>(
     }
 
     ToolReport {
-        schema_version: schema_id_for_scope(scope, report_semver),
+        schema_version: schema_version.to_string(),
         command: command_id_for_scope(scope),
         ok,
         exit_code,

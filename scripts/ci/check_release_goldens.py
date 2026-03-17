@@ -90,6 +90,43 @@ def assert_text(path: Path, expected: str) -> None:
         raise SystemExit(f"golden mismatch: {path}")
 
 
+def assert_contains(path: Path, needle: str) -> None:
+    actual = path.read_text(encoding="utf-8")
+    if needle not in actual:
+        raise SystemExit(f"missing expected text in {path}: {needle!r}")
+
+
+def formal_verification_release_fixture() -> None:
+    check_all = ROOT / "scripts" / "ci" / "check_all.sh"
+    for needle in [
+        "./scripts/ci/check_verified_core_pure_example.sh",
+        "./scripts/ci/check_verified_core_fixture.sh",
+        "./scripts/ci/check_trusted_sandbox_program_example.sh",
+        "./scripts/ci/check_trusted_network_service_example.sh",
+    ]:
+        assert_contains(check_all, needle)
+
+    for script in [
+        ROOT / "scripts" / "ci" / "check_verified_core_pure_example.sh",
+        ROOT / "scripts" / "ci" / "check_verified_core_fixture.sh",
+        ROOT / "scripts" / "ci" / "check_trusted_sandbox_program_example.sh",
+        ROOT / "scripts" / "ci" / "check_trust_network_example.sh",
+    ]:
+        assert_contains(script, "assert_strict_certificate.py")
+        assert_contains(script, "X07_REVIEW_ARTIFACTS_DIR")
+
+    release_workflow = ROOT / ".github" / "workflows" / "release.yml"
+    for needle in [
+        "X07_REVIEW_ARTIFACTS_DIR",
+        "X07_FORMAL_PERF_REPORT_OUT",
+        "formal-verification-review",
+        "formal-verification-review-vm",
+        "check_trusted_sandbox_program_example.sh",
+        "check_trusted_network_service_example.sh",
+    ]:
+        assert_contains(release_workflow, needle)
+
+
 def core_fixture(tmp_dir: Path) -> None:
     version = "0.1.52"
     tag = f"v{version}"
@@ -412,6 +449,7 @@ def main() -> int:
                 "host_abi_hash=sha256:" + ("6" * 64),
             ],
         )
+        formal_verification_release_fixture()
     print("ok: release script goldens")
     return 0
 

@@ -77,14 +77,88 @@ jobs:
         run: ./scripts/ci/install_formal_verification_tools_linux.sh
       - name: Run release-readiness CI
         shell: bash
+        env:
+          X07_REVIEW_ARTIFACTS_DIR: dist/review
+          X07_FORMAL_PERF_REPORT_OUT: dist/review/formal_verification.perf_report.json
         run: |
           ./scripts/ci/check_release_ready.sh
+      - name: Upload formal verification review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-verification-review
+          path: dist/review
+          if-no-files-found: error
+          retention-days: 7
+
+  trust_vm_examples:
+    name: trust-vm-examples
+    needs: verify_tag
+    runs-on: [self-hosted, x07-vm-linux-firecracker]
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      X07_VM_BACKEND: firecracker-ctr
+      X07_REVIEW_ARTIFACTS_DIR: dist/review-vm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install system deps
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates \
+            clang \
+            build-essential \
+            curl \
+            pkg-config \
+            libcurl4-openssl-dev \
+            liblzma-dev \
+            zlib1g-dev \
+            libsqlite3-dev \
+            unzip
+      - name: Install formal verification tools
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
+      - name: Build and import guest runner image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./scripts/build_guest_runner_image.sh --image x07-guest-runner --tag release-ci
+
+          tmp="$(mktemp -d 2>/dev/null || mktemp -d -t x07_guest_image)"
+          image_tar="${tmp}/guest-runner.tar"
+          docker save "x07-guest-runner:release-ci" -o "$image_tar"
+
+          sock="${X07_VM_FIRECRACKER_CONTAINERD_SOCK:-/run/firecracker-containerd/containerd.sock}"
+          ns="${X07_VM_CONTAINERD_NAMESPACE:-x07}"
+          firecracker-ctr --address "$sock" --namespace "$ns" images import "$image_tar"
+
+          echo "X07_VM_GUEST_IMAGE=x07-guest-runner:release-ci" >> "$GITHUB_ENV"
+      - name: Run strict VM trust example gates
+        shell: bash
+        run: |
+          ./scripts/ci/check_trusted_sandbox_program_example.sh
+          ./scripts/ci/check_trusted_network_service_example.sh
+      - name: Upload formal verification VM review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-verification-review-vm
+          path: dist/review-vm
+          if-no-files-found: error
+          retention-days: 7
 
   build_matrix:
     name: build-${{ matrix.target }}
     needs:
       - verify_tag
       - test
+      - trust_vm_examples
     strategy:
       fail-fast: false
       matrix:
