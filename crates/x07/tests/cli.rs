@@ -124,6 +124,13 @@ fn run_x07_in_dir_with_path_prefixes(
         .expect("run x07")
 }
 
+#[cfg(unix)]
+fn run_x07_in_dir_with_fake_prove_solvers(dir: &Path, args: &[&str]) -> std::process::Output {
+    let solver_dir = dir.join("bin");
+    write_fake_prove_solvers(&solver_dir);
+    run_x07_in_dir_with_path_prefixes(dir, args, &[solver_dir])
+}
+
 fn parse_json_stdout(out: &std::process::Output) -> Value {
     serde_json::from_slice(&out.stdout).expect("parse stdout JSON")
 }
@@ -2485,6 +2492,7 @@ fn x07_verify_prove_without_contracts_emits_unsupported_report() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_prove_simple_contract_returns_proven() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_simple");
@@ -2513,7 +2521,7 @@ fn x07_verify_prove_simple_contract_returns_proven() {
         }),
     );
 
-    let out = run_x07_in_dir(
+    let out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -2545,6 +2553,7 @@ fn x07_verify_prove_simple_contract_returns_proven() {
     assert!(v["artifacts"]["z3_out_path"].as_str().is_some());
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_prove_self_recursive_with_decreases_returns_proven() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_recursive");
@@ -2577,7 +2586,7 @@ fn x07_verify_prove_self_recursive_with_decreases_returns_proven() {
         }),
     );
 
-    let out = run_x07_in_dir(
+    let out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -2860,6 +2869,7 @@ fn x07_verify_prove_self_recursive_without_obvious_decrease_is_unsupported() {
     assert_eq!(diags[0]["code"], "X07V_RECURSION_TERMINATION_FAILED");
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
     let dir = fresh_os_tmp_dir("x07_verify_imported_summary");
@@ -2897,7 +2907,7 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
         }),
     );
 
-    let helper_out = run_x07_in_dir(
+    let helper_out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -3002,6 +3012,7 @@ fn x07_verify_coverage_reuses_imported_summary_and_emits_summary_artifact() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_prove_rejects_mismatched_imported_summary() {
     let dir = fresh_os_tmp_dir("x07_verify_imported_summary_mismatch");
@@ -3037,7 +3048,7 @@ fn x07_verify_prove_rejects_mismatched_imported_summary() {
     });
     write_json(&dir.join("verify_fixture.x07.json"), &initial_module);
 
-    let helper_out = run_x07_in_dir(
+    let helper_out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -3092,7 +3103,7 @@ fn x07_verify_prove_rejects_mismatched_imported_summary() {
         }),
     );
 
-    let out = run_x07_in_dir(
+    let out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -3653,6 +3664,7 @@ fn x07_verify_prove_check_rejects_async_scheduler_model_change() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_prove_supports_views_and_result_views() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_rich_signature");
@@ -3685,7 +3697,7 @@ fn x07_verify_prove_supports_views_and_result_views() {
         }),
     );
 
-    let out = run_x07_in_dir(
+    let out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -3779,6 +3791,7 @@ fn x07_verify_prove_rejects_nested_result_param_with_explicit_diag() {
     assert_eq!(diags[0]["code"], "X07V_UNSUPPORTED_RICH_TYPE");
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_prove_supports_vec_param_and_result_via_std_vec() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_vec_param");
@@ -3809,7 +3822,7 @@ fn x07_verify_prove_supports_vec_param_and_result_via_std_vec() {
         }),
     );
 
-    let out = run_x07_in_dir(
+    let out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -3841,6 +3854,7 @@ fn x07_verify_prove_supports_vec_param_and_result_via_std_vec() {
     assert_eq!(v["diagnostics_count"], 0);
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_prove_supports_schema_record_brand_view_param() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_schema_record_brand");
@@ -3909,7 +3923,7 @@ fn x07_verify_prove_supports_schema_record_brand_view_param() {
         }),
     );
 
-    let out = run_x07_in_dir(
+    let out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -3941,6 +3955,7 @@ fn x07_verify_prove_supports_schema_record_brand_view_param() {
     assert_eq!(v["diagnostics_count"], 0);
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_prove_supports_schema_variant_brand_view_param() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_schema_variant_brand");
@@ -4025,7 +4040,7 @@ fn x07_verify_prove_supports_schema_variant_brand_view_param() {
         }),
     );
 
-    let out = run_x07_in_dir(
+    let out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -4057,6 +4072,7 @@ fn x07_verify_prove_supports_schema_variant_brand_view_param() {
     assert_eq!(v["diagnostics_count"], 0);
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_prove_defasync_protocol_returns_proven() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_defasync");
@@ -4090,7 +4106,7 @@ fn x07_verify_prove_defasync_protocol_returns_proven() {
         }),
     );
 
-    let out = run_x07_in_dir(
+    let out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
@@ -5458,6 +5474,7 @@ fn x07_verify_coverage_walks_reachable_functions_and_primitives() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn x07_verify_prove_stubs_trusted_imported_primitives_in_generated_c() {
     let dir = fresh_os_tmp_dir("x07_verify_prove_trusted_stub");
@@ -5489,7 +5506,7 @@ fn x07_verify_prove_stubs_trusted_imported_primitives_in_generated_c() {
     .expect("serialize x07AST module");
     write_bytes(&dir.join("verify_fixture.x07.json"), &module);
 
-    let out = run_x07_in_dir(
+    let out = run_x07_in_dir_with_fake_prove_solvers(
         &dir,
         &[
             "verify",
