@@ -5583,7 +5583,7 @@ fn build_prove_evidence(
             .map(|path| path.to_path_buf());
         let proof_object_ref = proof_object_path
             .as_ref()
-            .map(|path| evidence_ref_for_path(&path))
+            .map(|path| evidence_ref_for_path(path))
             .transpose()?;
         if proof_object_ref.is_none() {
             diagnostics.push(trust_diag(
@@ -5600,7 +5600,7 @@ fn build_prove_evidence(
             .map(|path| path.to_path_buf());
         let proof_check_report_ref = proof_check_report_path
             .as_ref()
-            .map(|path| evidence_ref_for_path(&path))
+            .map(|path| evidence_ref_for_path(path))
             .transpose()?;
 
         let proof_summary_doc = proof_summary_path

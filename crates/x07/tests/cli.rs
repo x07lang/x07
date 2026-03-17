@@ -3162,7 +3162,7 @@ fn x07_verify_prove_check_accepts_defn_proof_bundle() {
             "--emit-proof",
             proof_path.to_str().expect("utf-8 proof path"),
         ],
-        &[solver_dir.clone()],
+        std::slice::from_ref(&solver_dir),
     );
     assert_eq!(
         prove_out.status.code(),
@@ -3251,7 +3251,7 @@ fn x07_verify_prove_check_accepts_defasync_proof_bundle() {
             "--emit-proof",
             proof_path.to_str().expect("utf-8 proof path"),
         ],
-        &[solver_dir.clone()],
+        std::slice::from_ref(&solver_dir),
     );
     assert_eq!(
         prove_out.status.code(),
@@ -3333,7 +3333,7 @@ fn x07_verify_prove_check_rejects_source_edit_after_proof() {
             "--emit-proof",
             proof_path.to_str().expect("utf-8 proof path"),
         ],
-        &[solver_dir.clone()],
+        std::slice::from_ref(&solver_dir),
     );
     assert_eq!(prove_out.status.code(), Some(0));
 
@@ -3434,7 +3434,7 @@ fn x07_verify_prove_check_rejects_imported_proof_summary_substitution() {
             "--project",
             "x07.json",
         ],
-        &[solver_dir.clone()],
+        std::slice::from_ref(&solver_dir),
     );
     assert_eq!(helper_out.status.code(), Some(0));
     let helper_report = parse_json_stdout(&helper_out);
@@ -3451,7 +3451,7 @@ fn x07_verify_prove_check_rejects_imported_proof_summary_substitution() {
             "--project",
             "x07.json",
         ],
-        &[solver_dir.clone()],
+        std::slice::from_ref(&solver_dir),
     );
     assert_eq!(helper_alt_out.status.code(), Some(0));
     let helper_alt_report = parse_json_stdout(&helper_alt_out);
@@ -3475,7 +3475,7 @@ fn x07_verify_prove_check_rejects_imported_proof_summary_substitution() {
             "--emit-proof",
             proof_path.to_str().expect("utf-8 proof path"),
         ],
-        &[solver_dir.clone()],
+        std::slice::from_ref(&solver_dir),
     );
     assert_eq!(main_out.status.code(), Some(0));
 
@@ -3548,7 +3548,7 @@ fn x07_verify_prove_check_rejects_primitive_manifest_change() {
             "--emit-proof",
             proof_path.to_str().expect("utf-8 proof path"),
         ],
-        &[solver_dir.clone()],
+        std::slice::from_ref(&solver_dir),
     );
     assert_eq!(prove_out.status.code(), Some(0));
 
@@ -3623,7 +3623,7 @@ fn x07_verify_prove_check_rejects_async_scheduler_model_change() {
             "--emit-proof",
             proof_path.to_str().expect("utf-8 proof path"),
         ],
-        &[solver_dir.clone()],
+        std::slice::from_ref(&solver_dir),
     );
     assert_eq!(prove_out.status.code(), Some(0));
 

@@ -1182,15 +1182,12 @@ fn cmd_verify_inner(
         }
     } else {
         let compile_module_roots = module_roots.clone();
-        let c_src = match compile_driver_to_c(
+        let c_src = compile_driver_to_c(
             driver_src
                 .as_deref()
                 .expect("driver source for non-prove modes"),
             &compile_module_roots,
-        ) {
-            Ok(v) => v,
-            Err(err) => return Err(err),
-        };
+        )?;
         let harness_src = build_c_harness(bounds.input_len_bytes);
         format!("{c_src}\n\n{harness_src}\n")
     };
@@ -5490,6 +5487,7 @@ fn accepted_proof_check_report(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn rejected_proof_check_report_for_object(
     object: &VerifyProofObject,
     proof_object_digest: String,
