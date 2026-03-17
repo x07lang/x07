@@ -60,10 +60,15 @@ jobs:
             zlib1g-dev \
             libsqlite3-dev
 
+      - name: Install formal verification tools (Ubuntu)
+        if: startsWith(matrix.os, 'ubuntu-')
+        shell: bash
+        run: ./scripts/ci/install_formal_verification_tools_linux.sh
+
       - name: Install deps (macOS)
         if: startsWith(matrix.os, 'macos-')
         run: |
-          brew install openssl@3 pkg-config
+          brew install cbmc openssl@3 pkg-config z3
 
       - name: CI gate
         shell: bash
