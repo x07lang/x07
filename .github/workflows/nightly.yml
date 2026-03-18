@@ -198,7 +198,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: archives-${{ matrix.target }}
-          path: dist/release/*
+          path: |
+            ${{ steps.pack.outputs.toolchain_path }}
+            ${{ steps.pack.outputs.x07up_path }}
           if-no-files-found: error
           retention-days: 7
 
@@ -218,9 +220,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Prepare nightly asset workspace
+        shell: bash
+        run: |
+          rm -rf dist/release
+          mkdir -p dist/release
       - name: Download nightly artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: archives-*
           path: dist/release
           merge-multiple: true
       - name: Generate nightly metadata
