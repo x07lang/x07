@@ -51,6 +51,18 @@ if [[ ! -f "$bin_path" ]]; then
 fi
 [[ -f "$bin_path" ]] || { echo "missing built binary: $bin_path" >&2; exit 1; }
 
+if [[ "$target" == *-apple-darwin ]]; then
+  while IFS= read -r lib; do
+    case "$lib" in
+      /usr/lib/*|/System/Library/*|/Library/Apple/System/Library/*|@rpath/*|@loader_path/*|@executable_path/*) ;;
+      *)
+        echo "x07up must not depend on non-system macOS libraries: $lib" >&2
+        exit 1
+        ;;
+    esac
+  done < <(otool -L "$bin_path" | tail -n +2 | awk '{print $1}')
+fi
+
 mkdir -p "$out_dir"
 archive_path="${out_dir}/x07up-v${version}-${target}.${archive_ext}"
 stage_dir="${out_dir}/.stage/x07up-v${version}-${target}"

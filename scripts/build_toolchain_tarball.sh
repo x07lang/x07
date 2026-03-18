@@ -131,6 +131,19 @@ install_bin() {
   touch -t 200001010000.00 "$dst" 2>/dev/null || true
 }
 
+reject_non_system_macos_links() {
+  local bin="$1"
+  while IFS= read -r lib; do
+    case "$lib" in
+      /usr/lib/*|/System/Library/*|/Library/Apple/System/Library/*|@rpath/*|@loader_path/*|@executable_path/*) ;;
+      *)
+        echo "ERROR: macOS release binary must not depend on non-system libraries: $bin -> $lib" >&2
+        exit 1
+        ;;
+    esac
+  done < <(otool -L "$bin" | tail -n +2 | awk '{print $1}')
+}
+
 for bin in x07 x07c x07-host-runner x07-os-runner x07-vm-launcher x07-vm-reaper x07import-cli; do
   install_bin "$bin"
 done
@@ -141,6 +154,13 @@ if [[ "$platform" == "macOS" ]]; then
   else
     echo "warn: missing x07-vz-helper at $target_dir/release/x07-vz-helper (vz backend will be unavailable)" >&2
   fi
+fi
+
+if [[ "$platform" == "macOS" ]]; then
+  for bin in "$stage_root"/bin/*; do
+    [[ -f "$bin" ]] || continue
+    reject_non_system_macos_links "$bin"
+  done
 fi
 
 stdlib_src="$root/stdlib/os/0.2.0/modules"
