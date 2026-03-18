@@ -10,6 +10,7 @@ cd "$root"
 
 export X07_SANDBOX_BACKEND="${X07_SANDBOX_BACKEND:-os}"
 export X07_I_ACCEPT_WEAKER_ISOLATION="${X07_I_ACCEPT_WEAKER_ISOLATION:-1}"
+export X07_REQUIRE_SOLVERS="${X07_REQUIRE_SOLVERS:-0}"
 
 step() {
   echo
@@ -102,10 +103,10 @@ step "cargo clippy --all-targets -- -D warnings"
 cargo clippy --all-targets -- -D warnings
 
 step "verified core pure example release guard"
-X07_REQUIRE_SOLVERS=1 ./scripts/ci/check_verified_core_pure_example.sh
+./scripts/ci/check_verified_core_pure_example.sh
 
 step "verified core fixture release guard"
-X07_REQUIRE_SOLVERS=1 ./scripts/ci/check_verified_core_fixture.sh
+./scripts/ci/check_verified_core_fixture.sh
 
 if [[ -n "${X07_VM_GUEST_IMAGE:-}" || -n "${X07_VM_VZ_GUEST_BUNDLE:-}" ]]; then
   step "trusted sandbox program example release guard"

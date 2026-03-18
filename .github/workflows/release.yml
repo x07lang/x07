@@ -83,6 +83,7 @@ jobs:
       - name: Run release-readiness CI
         shell: bash
         env:
+          X07_REQUIRE_SOLVERS: "1"
           X07_REVIEW_ARTIFACTS_DIR: dist/review
           X07_FORMAL_PERF_REPORT_OUT: dist/review/formal_verification.perf_report.json
         run: |
