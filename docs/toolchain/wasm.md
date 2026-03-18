@@ -177,7 +177,7 @@ The canonical `std-web-ui` package, browser host assets, and WIT contracts live 
 
 ```sh
 x07 pkg versions std-web-ui
-x07 pkg add std-web-ui@0.1.9 --sync
+x07 pkg add std-web-ui@0.2.6 --sync
 ```
 
 If `std-web-ui` is locked under `.x07/deps/...` but missing on disk, `x07 test`, `x07 build`, `x07 run`, `x07 wasm web-ui build`, and `x07 wasm device build` auto-sync the package before they continue. Keep `x07 pkg lock --project x07.json --check` in CI when you want that state drift to fail hard instead.

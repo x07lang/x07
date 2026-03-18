@@ -9,8 +9,8 @@
   "dependencies": [
     {
       "name": "std-web-ui",
-      "path": ".x07/deps/std-web-ui/0.1.8",
-      "version": "0.1.8"
+      "path": ".x07/deps/std-web-ui/0.2.6",
+      "version": "0.2.6"
     }
   ]
 }
