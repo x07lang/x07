@@ -36,6 +36,8 @@ jobs:
     steps:
       - name: Resolve tag and options
         id: vars
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -46,9 +48,9 @@ jobs:
               published_at_utc="$(jq -r '.inputs.published_at_utc // ""' "$GITHUB_EVENT_PATH")"
               ;;
             workflow_run)
-              tag="$(jq -r '.workflow_run.head_branch' "$GITHUB_EVENT_PATH")"
+              tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
               set_latest="true"
-              published_at_utc=""
+              published_at_utc="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.published_at // ""')"
               ;;
             release)
               tag="$(jq -r '.release.tag_name' "$GITHUB_EVENT_PATH")"
