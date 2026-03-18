@@ -33,6 +33,8 @@ jobs:
     env:
       X07_BOT_TOKEN: ${{ secrets.X07_BOT_TOKEN }}
       X07_BOT_SSH_SIGNING_KEY: ${{ secrets.X07_BOT_SSH_SIGNING_KEY }}
+      X07_BOT_COMMIT_NAME: ${{ secrets.X07_BOT_COMMIT_NAME }}
+      X07_BOT_COMMIT_EMAIL: ${{ secrets.X07_BOT_COMMIT_EMAIL }}
     steps:
       - name: Resolve tag and options
         id: vars
@@ -146,8 +148,8 @@ jobs:
           fi
 
           git status --porcelain
-          git config user.name "x07-bot"
-          git config user.email "x07-bot@users.noreply.github.com"
+          git config user.name "${X07_BOT_COMMIT_NAME:-x07-bot}"
+          git config user.email "${X07_BOT_COMMIT_EMAIL:-x07-bot@users.noreply.github.com}"
           if [ -n "${X07_BOT_SSH_SIGNING_KEY:-}" ]; then
             key_file="$HOME/.ssh/x07-bot-signing-key"
             mkdir -p "$(dirname "$key_file")"
