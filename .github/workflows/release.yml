@@ -309,7 +309,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: archives-${{ matrix.target }}
-          path: dist/release/*
+          path: |
+            ${{ steps.pack.outputs.toolchain_path }}
+            ${{ steps.pack.outputs.x07up_path }}
           if-no-files-found: error
           retention-days: 7
 
