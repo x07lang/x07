@@ -153,8 +153,10 @@ jobs:
             mkdir -p "$(dirname "$key_file")"
             printf '%s' "$X07_BOT_SSH_SIGNING_KEY" > "$key_file"
             chmod 600 "$key_file"
+            ssh-keygen -y -f "$key_file" > "${key_file}.pub"
+            chmod 644 "${key_file}.pub"
             git config gpg.format ssh
-            git config user.signingkey "$key_file"
+            git config user.signingkey "${key_file}.pub"
             git config commit.gpgsign true
           fi
           git add -A
