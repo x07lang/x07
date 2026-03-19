@@ -249,6 +249,28 @@
       "status": "experimental"
     },
     {
+      "id": "obj.core",
+      "summary": "Object storage core: canonical object metadata, request envelopes, and driver interface.",
+      "canonical": {
+        "name": "ext-obj-core",
+        "version": "0.1.0"
+      },
+      "status": "experimental"
+    },
+    {
+      "id": "obj.s3",
+      "summary": "S3-compatible object storage driver for X07 services.",
+      "canonical": {
+        "name": "ext-obj-s3",
+        "version": "0.1.0"
+      },
+      "worlds": [
+        "run-os",
+        "run-os-sandboxed"
+      ],
+      "status": "experimental"
+    },
+    {
       "id": "data.model",
       "summary": "Typed DataModel values and deterministic codecs (JSON/TOML/YAML).",
       "canonical": {
@@ -621,6 +643,11 @@
     "queue": "msg.core",
     "kafka": "msg.kafka",
     "amqp": "msg.amqp",
+    "object-store": "obj.core",
+    "object-storage": "obj.core",
+    "storage.obj": "obj.core",
+    "storage.s3": "obj.s3",
+    "s3": "obj.s3",
     "metrics": "obs.metrics",
     "otel": "obs.metrics",
     "migrate": "db.migrate",

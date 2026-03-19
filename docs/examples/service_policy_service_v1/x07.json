@@ -1,0 +1,33 @@
+{
+  "schema_version": "x07.project@0.4.0",
+  "default_profile": "sandbox",
+  "world": "run-os-sandboxed",
+  "entry": "src/main.x07.json",
+  "operational_entry_symbol": "example.main",
+  "module_roots": ["src", "tests"],
+  "lockfile": "x07.lock.json",
+  "profiles": {
+    "sandbox": {
+      "policy": "policy/run-os.json",
+      "world": "run-os-sandboxed"
+    }
+  },
+  "dependencies": [
+    {
+      "name": "ext-net",
+      "version": "0.1.10"
+    },
+    {
+      "name": "ext-data-model",
+      "version": "0.1.10"
+    },
+    {
+      "name": "ext-db-core",
+      "version": "0.1.11"
+    },
+    {
+      "name": "ext-db-postgres",
+      "version": "0.1.5"
+    }
+  ]
+}

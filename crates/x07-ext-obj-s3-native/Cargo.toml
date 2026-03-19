@@ -1,0 +1,12 @@
+[package]
+name = "x07-ext-obj-s3-native"
+version = "0.1.91"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+x07-ext-obj-native-core = { path = "../x07-ext-obj-native-core" }

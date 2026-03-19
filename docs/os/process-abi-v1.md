@@ -102,7 +102,9 @@ Notes:
 - `cwd_len=0` means “inherit current working directory”.
 - `cwd_len>0` sets the child working directory to `cwd`:
   - `run-os`: `cwd` is treated as a path string (no NUL bytes).
-  - `run-os-sandboxed`: requires `policy.process.allow_cwd=true` and resolves `cwd` as a **safe relative path** joined against `policy.process.allow_cwd_roots` (first root that `chdir()` succeeds with is used).
+  - `run-os-sandboxed`: requires `policy.process.allow_cwd=true`.
+    - Safe relative `cwd` values are joined against `policy.process.allow_cwd_roots`.
+    - Absolute `cwd` values are accepted only when they are rooted beneath one of `policy.process.allow_cwd_roots`; the matching root prefix is stripped first, then the remaining safe relative path is resolved against that root.
 
 ## Resource Caps (`ProcCapsV1`)
 

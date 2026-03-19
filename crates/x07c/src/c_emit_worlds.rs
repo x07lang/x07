@@ -3865,6 +3865,24 @@ static bytes_t rt_os_strip_root_prefix(bytes_t path, const char* root, size_t ro
   return out;
 }
 
+static uint32_t rt_os_rel_under_root(bytes_t path, const char* root, size_t root_len, bytes_t* out_rel) {
+  size_t trimmed = root_len;
+  while (trimmed > 0 && (root[trimmed - 1] == '/' || root[trimmed - 1] == '\\')) trimmed--;
+  if (trimmed == 0) return UINT32_C(0);
+  if ((uint32_t)trimmed > path.len) return UINT32_C(0);
+  if (memcmp(path.ptr, root, trimmed) != 0) return UINT32_C(0);
+  if ((uint32_t)trimmed == path.len) {
+    out_rel->ptr = path.ptr + path.len;
+    out_rel->len = 0;
+    return UINT32_C(1);
+  }
+  if (path.ptr[trimmed] != (uint8_t)'/') return UINT32_C(0);
+
+  out_rel->ptr = path.ptr + trimmed + 1;
+  out_rel->len = path.len - (uint32_t)(trimmed + 1);
+  return UINT32_C(1);
+}
+
 static bytes_t rt_os_fs_read_file(ctx_t* ctx, bytes_t path) {
   rt_os_policy_init(ctx);
 
@@ -4858,7 +4876,7 @@ static int32_t rt_os_process_spawn_impl(ctx_t* ctx, bytes_t req, bytes_t caps, u
   }
   envp[env_count] = NULL;
 
-  // cwd override (v1 currently requires cwd_len=0).
+  // cwd override.
   if (off > req.len || req.len - off < UINT32_C(4)) {
     err = RT_OS_PROC_CODE_INVALID_REQUEST;
     goto cleanup;
@@ -4884,6 +4902,24 @@ static int32_t rt_os_process_spawn_impl(ctx_t* ctx, bytes_t req, bytes_t caps, u
       if (!rt_os_proc_allow_cwd_roots || !*rt_os_proc_allow_cwd_roots) {
         err = RT_OS_PROC_CODE_POLICY_DENIED;
         goto cleanup;
+      }
+      if (cwd_view.len != 0 && (cwd_view.ptr[0] == (uint8_t)'/' || cwd_view.ptr[0] == (uint8_t)'\\')) {
+        uint32_t matched = 0;
+        const char* cur = rt_os_proc_allow_cwd_roots;
+        const char* root = NULL;
+        size_t root_len = 0;
+        while (rt_os_split_next(&cur, &root, &root_len)) {
+          bytes_t rel = rt_bytes_empty(ctx);
+          if (rt_os_rel_under_root(cwd_view, root, root_len, &rel)) {
+            cwd_view = rel;
+            matched = 1;
+            break;
+          }
+        }
+        if (!matched) {
+          err = RT_OS_PROC_CODE_POLICY_DENIED;
+          goto cleanup;
+        }
       }
       bytes_view_t path_view = rt_bytes_view(ctx, cwd_view);
       if (!rt_fs_is_safe_rel_path(path_view)) {

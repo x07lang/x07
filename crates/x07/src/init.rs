@@ -41,6 +41,11 @@ pub enum InitTemplate {
     SqliteApp,
     PostgresClient,
     Worker,
+    ApiCell,
+    EventConsumer,
+    ScheduledJob,
+    PolicyService,
+    WorkflowService,
     #[value(help = "Certifiable solve-pure project with strict arch/trust scaffolding")]
     VerifiedCorePure,
     #[value(help = "Sandboxed async trusted-program project with capsule evidence")]
@@ -218,6 +223,30 @@ fn template_base_capabilities(template: InitTemplate) -> &'static [&'static str]
         InitTemplate::SqliteApp => &["db.core", "db.sqlite", "data.model", "fs.io"],
         InitTemplate::PostgresClient => &["db.core", "db.postgres", "data.model"],
         InitTemplate::Worker => &["log.basic"],
+        InitTemplate::ApiCell => &[
+            "net.http",
+            "data.model",
+            "db.core",
+            "db.postgres",
+            "obj.core",
+            "obj.s3",
+        ],
+        InitTemplate::EventConsumer => &[
+            "msg.core",
+            "msg.amqp",
+            "data.model",
+            "db.core",
+            "db.postgres",
+        ],
+        InitTemplate::ScheduledJob => &["data.model", "db.core", "db.postgres"],
+        InitTemplate::PolicyService => &["net.http", "data.model", "db.core", "db.postgres"],
+        InitTemplate::WorkflowService => &[
+            "msg.core",
+            "msg.amqp",
+            "data.model",
+            "db.core",
+            "db.postgres",
+        ],
         InitTemplate::VerifiedCorePure => &[],
         InitTemplate::TrustedSandboxProgram => &[],
         InitTemplate::TrustedNetworkService => &[],
@@ -238,7 +267,12 @@ fn template_default_profile(template: InitTemplate) -> &'static str {
         | InitTemplate::FsTool
         | InitTemplate::SqliteApp
         | InitTemplate::PostgresClient
-        | InitTemplate::Worker => "sandbox",
+        | InitTemplate::Worker
+        | InitTemplate::ApiCell
+        | InitTemplate::EventConsumer
+        | InitTemplate::ScheduledJob
+        | InitTemplate::PolicyService
+        | InitTemplate::WorkflowService => "sandbox",
         InitTemplate::VerifiedCorePure => "os",
         InitTemplate::TrustedSandboxProgram => "sandbox",
         InitTemplate::TrustedNetworkService => "sandbox",
@@ -260,6 +294,11 @@ fn init_template_policy_template(template: InitTemplate) -> crate::policy::Polic
         InitTemplate::SqliteApp => crate::policy::PolicyTemplate::SqliteApp,
         InitTemplate::PostgresClient => crate::policy::PolicyTemplate::PostgresClient,
         InitTemplate::Worker => crate::policy::PolicyTemplate::Worker,
+        InitTemplate::ApiCell
+        | InitTemplate::EventConsumer
+        | InitTemplate::ScheduledJob
+        | InitTemplate::PolicyService
+        | InitTemplate::WorkflowService => crate::policy::PolicyTemplate::Worker,
         InitTemplate::VerifiedCorePure => crate::policy::PolicyTemplate::Worker,
         InitTemplate::TrustedSandboxProgram => crate::policy::PolicyTemplate::Worker,
         InitTemplate::TrustedNetworkService => crate::policy::PolicyTemplate::Worker,
@@ -286,7 +325,12 @@ fn template_program_bytes(template: InitTemplate) -> Result<(Vec<u8>, Vec<u8>)> 
         InitTemplate::FsTool
         | InitTemplate::SqliteApp
         | InitTemplate::PostgresClient
-        | InitTemplate::Worker => Ok((app_module_bytes()?, main_entry_bytes()?)),
+        | InitTemplate::Worker
+        | InitTemplate::ApiCell
+        | InitTemplate::EventConsumer
+        | InitTemplate::ScheduledJob
+        | InitTemplate::PolicyService
+        | InitTemplate::WorkflowService => Ok((app_module_bytes()?, main_entry_bytes()?)),
         InitTemplate::VerifiedCorePure => Ok((
             ensure_trailing_newline(TEMPLATE_VERIFIED_CORE_PURE_SRC_EXAMPLE),
             ensure_trailing_newline(TEMPLATE_VERIFIED_CORE_PURE_SRC_MAIN),
@@ -1382,6 +1426,181 @@ fn cmd_init_mcp_template(root: &Path, template: InitTemplate) -> Result<std::pro
     Ok(std::process::ExitCode::SUCCESS)
 }
 
+fn service_template_name(template: InitTemplate) -> Option<&'static str> {
+    match template {
+        InitTemplate::ApiCell => Some("service_api_cell_v1"),
+        InitTemplate::EventConsumer => Some("service_event_consumer_v1"),
+        InitTemplate::ScheduledJob => Some("service_scheduled_job_v1"),
+        InitTemplate::PolicyService => Some("service_policy_service_v1"),
+        InitTemplate::WorkflowService => Some("service_workflow_service_v1"),
+        _ => None,
+    }
+}
+
+fn collect_created_paths(root: &Path, path: &Path, created: &mut Vec<String>) -> Result<()> {
+    if path.is_file() {
+        created.push(rel(root, path));
+        return Ok(());
+    }
+
+    if path.is_dir() {
+        let mut entries: Vec<_> = std::fs::read_dir(path)
+            .with_context(|| format!("read dir: {}", path.display()))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .with_context(|| format!("read dir entries: {}", path.display()))?;
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            collect_created_paths(root, &entry.path(), created)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_init_service_template(
+    root: &Path,
+    template: InitTemplate,
+) -> Result<std::process::ExitCode> {
+    let template_name =
+        service_template_name(template).context("internal error: missing service template name")?;
+    let template_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/examples")
+        .join(template_name);
+    let agent_paths = AgentKitPaths::new(root);
+    let mut conflicts = Vec::new();
+    for rel in [
+        "README.md",
+        "x07.json",
+        "x07.lock.json",
+        "src",
+        "tests",
+        "arch",
+        "policy",
+    ] {
+        let abs = root.join(rel);
+        if abs.exists() {
+            conflicts.push(rel.to_string());
+        }
+    }
+    for p in [
+        &agent_paths.toolchain_toml,
+        &agent_paths.agent_docs_dir,
+        &agent_paths.agent_md,
+        &agent_paths.agent_skills_dir,
+    ] {
+        if p.exists() {
+            conflicts.push(rel(root, p));
+        }
+    }
+    if !conflicts.is_empty() {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created: Vec::new(),
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_EXISTS".to_string(),
+                message: format!(
+                    "refusing to overwrite existing paths: {}",
+                    conflicts.join(", ")
+                ),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    copy_dir_recursive_filtered(&template_root, root).with_context(|| {
+        format!(
+            "copy service template {} into {}",
+            template_root.display(),
+            root.display()
+        )
+    })?;
+
+    let mut created = Vec::new();
+    for rel_path in [
+        "README.md",
+        "x07.json",
+        "x07.lock.json",
+        "src",
+        "tests",
+        "arch",
+        "policy",
+    ] {
+        let abs = root.join(rel_path);
+        if abs.exists() {
+            collect_created_paths(root, &abs, &mut created)?;
+        }
+    }
+
+    match ensure_gitignore(&root.join(".gitignore")) {
+        Ok(true) => created.push(".gitignore".to_string()),
+        Ok(false) => {}
+        Err(err) => {
+            let report = InitReport {
+                ok: false,
+                command: "init",
+                root: root.display().to_string(),
+                created,
+                notes: Vec::new(),
+                next_steps: Vec::new(),
+                error: Some(InitError {
+                    code: "X07INIT_IO".to_string(),
+                    message: format!("update .gitignore: {err:#}"),
+                }),
+            };
+            println!("{}", serde_json::to_string(&report)?);
+            return Ok(std::process::ExitCode::from(20));
+        }
+    }
+
+    if let Err(err) = init_agent_kit(root, &agent_paths, &mut created) {
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created,
+            notes: Vec::new(),
+            next_steps: Vec::new(),
+            error: Some(InitError {
+                code: "X07INIT_AGENT".to_string(),
+                message: format!("{err:#}"),
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(std::process::ExitCode::from(20));
+    }
+
+    let mut notes = vec![format!(
+        "Generated the {} service scaffold from docs/examples/{}.",
+        template_name, template_name
+    )];
+    if template == InitTemplate::WorkflowService {
+        notes.push(
+            "workflow-service is scaffold-only until workload packaging and runtime orchestration mature."
+                .to_string(),
+        );
+    }
+
+    let report = InitReport {
+        ok: true,
+        command: "init",
+        root: root.display().to_string(),
+        created,
+        notes,
+        next_steps: vec![
+            "x07 service validate --manifest arch/service/index.x07service.json".to_string(),
+            "x07 test --manifest tests/tests.json".to_string(),
+        ],
+        error: None,
+    };
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
 pub fn cmd_init(
     _machine: &crate::reporting::MachineArgs,
     args: InitArgs,
@@ -1442,6 +1661,9 @@ pub fn cmd_init(
         }
         if template == InitTemplate::CertifiedNetworkCapsule {
             return cmd_init_certified_network_capsule_template(&root);
+        }
+        if service_template_name(template).is_some() {
+            return cmd_init_service_template(&root, template);
         }
         if is_mcp_template(template) {
             return cmd_init_mcp_template(&root, template);

@@ -3190,6 +3190,65 @@ mod tests {
         assert_eq!(read_u32_le(&doc, 1), 1, "expected POLICY_DENIED");
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn run_capture_run_os_sandboxed_accepts_absolute_cwd_within_allowed_root() {
+        let _lock = os_test_lock();
+        let compile = compile_external_os_program(
+            WorldId::RunOsSandboxed,
+            "tests/external_os/process_cwd_abs/src/main.x07.json",
+        );
+        assert_compile_ok(&compile);
+
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("unix time")
+            .as_nanos();
+        let root = workspace_root();
+        let temp_dir = root
+            .join("target")
+            .join("process-cwd-tests")
+            .join(format!("abs-cwd-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir).expect("create temp cwd dir");
+
+        let pol = policy_base(policy::Process {
+            enabled: true,
+            allow_spawn: true,
+            max_live: 10,
+            max_spawns: 10,
+            allow_execs: vec!["/bin/pwd".to_string()],
+            allow_cwd: true,
+            allow_cwd_roots: vec![root.display().to_string()],
+            ..process_defaults()
+        });
+        pol.validate_basic().expect("policy validate");
+
+        let input = temp_dir.display().to_string();
+        let res = run_compiled_program(
+            WorldId::RunOsSandboxed,
+            &compile,
+            Some(&pol),
+            input.as_bytes(),
+            5_000,
+        );
+        std::fs::remove_dir_all(&temp_dir).expect("remove temp cwd dir");
+
+        assert!(res.ok, "trap={:?} stderr={:?}", res.trap, res.stderr);
+        assert_eq!(res.exit_status, 0);
+
+        let doc = res.solve_output;
+        assert_proc_ok_doc(&doc);
+        assert_eq!(doc[0], 1, "expected ok doc, got tag={}", doc[0]);
+        assert_eq!(doc[1], 1, "expected ProcRespV1 ver=1, got {}", doc[1]);
+        assert_eq!(read_u32_le(&doc, 2), 0, "exit_code != 0");
+        let stdout_len = read_u32_le(&doc, 10) as usize;
+        assert!(doc.len() >= 18 + stdout_len, "doc too short for stdout");
+
+        let mut want = input.into_bytes();
+        want.push(b'\n');
+        assert_eq!(&doc[14..14 + stdout_len], want.as_slice());
+    }
+
     #[test]
     fn spawn_join_run_os_echoes_input() {
         let _lock = os_test_lock();

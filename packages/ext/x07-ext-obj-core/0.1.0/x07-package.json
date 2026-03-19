@@ -1,0 +1,25 @@
+{
+  "schema_version": "x07.package@0.1.0",
+  "name": "ext-obj-core",
+  "version": "0.1.0",
+  "description": "Object storage core: canonical object metadata, request/response envelopes, and logical driver interface.",
+  "docs": "Object storage core for X07 services.\n\nModules:\n- std.obj\n- std.obj.spec\n\nUsage:\n- Add dependency: x07 pkg add ext-obj-core@0.1.0\n- Bind logical object stores like obj.documents in the service manifest.\n",
+  "module_root": "modules",
+  "modules": [
+    "std.obj",
+    "std.obj.spec"
+  ],
+  "meta": {
+    "determinism_tier": "mixed",
+    "worlds_allowed": [
+      "solve-pure",
+      "solve-fs",
+      "solve-rr",
+      "solve-full",
+      "run-os",
+      "run-os-sandboxed"
+    ],
+    "import_mode": "handwritten",
+    "visibility": "canonical"
+  }
+}

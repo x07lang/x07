@@ -1,0 +1,52 @@
+{
+  "schema_version": "x07.arch.manifest@0.3.0",
+  "repo": { "id": "svc_api_cell_v1", "root": "." },
+  "externals": {
+    "allowed_import_prefixes": ["std."],
+    "allowed_exact": ["std.test"]
+  },
+  "nodes": [
+    {
+      "id": "service_code",
+      "match": {
+        "module_prefixes": ["example", "main"],
+        "path_globs": ["src/**/*.x07.json"]
+      },
+      "world": "run-os-sandboxed",
+      "trust_zone": "untrusted",
+      "visibility": { "mode": "public", "visible_to": [] },
+      "imports": {
+        "deny_prefixes": ["tests."],
+        "allow_prefixes": ["example", "main", "std."]
+      }
+    },
+    {
+      "id": "tests",
+      "match": {
+        "module_prefixes": ["tests."],
+        "path_globs": ["tests/**/*.x07.json"]
+      },
+      "world": "run-os-sandboxed",
+      "trust_zone": "test_only",
+      "visibility": { "mode": "restricted", "visible_to": [] },
+      "imports": {
+        "deny_prefixes": [],
+        "allow_prefixes": ["example", "std.", "tests."]
+      }
+    }
+  ],
+  "rules": [
+    { "kind": "deny_cycles_v1", "id": "deny_cycles.nodes_v1", "scope": "nodes" }
+  ],
+  "checks": {
+    "deny_cycles": true,
+    "deny_orphans": true,
+    "enforce_visibility": true,
+    "enforce_world_caps": true,
+    "allowlist_mode": {
+      "enabled": true,
+      "default_allow_external": false,
+      "default_allow_internal": false
+    }
+  }
+}

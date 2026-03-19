@@ -2942,6 +2942,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "x07-ext-obj-native-core"
+version = "0.1.91"
+
+[[package]]
+name = "x07-ext-obj-s3-native"
+version = "0.1.91"
+dependencies = [
+ "x07-ext-obj-native-core",
+]
+
+[[package]]
 name = "x07-ext-rand-native"
 version = "0.1.91"
 dependencies = [

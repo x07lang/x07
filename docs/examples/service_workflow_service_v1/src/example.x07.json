@@ -1,0 +1,1 @@
+{"decls":[{"kind":"defasync","name":"example.main","params":[{"name":"input","ty":"bytes"}],"result":"bytes","body":["bytes.alloc",0]},{"kind":"export","names":["example.main"]}],"imports":[],"kind":"module","module_id":"example","schema_version":"x07.x07ast@0.8.0"}

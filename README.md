@@ -132,6 +132,21 @@ Use the matching template for the trust claim you want:
 - `x07 init --template certified-capsule`
 - `x07 init --template certified-network-capsule`
 
+For service-oriented backend work, use the built-in service scaffolds:
+
+- `x07 init --template api-cell`
+- `x07 init --template event-consumer`
+- `x07 init --template scheduled-job`
+- `x07 init --template policy-service`
+- `x07 init --template workflow-service`
+
+Service authoring and constrained generation are exposed through:
+
+- `x07 service archetypes`
+- `x07 service genpack schema --archetype <id>`
+- `x07 service genpack grammar --archetype <id>`
+- `x07 service validate --manifest arch/service/index.x07service.json`
+
 Canonical certificate-first examples live in:
 
 - `docs/examples/verified_core_pure_v1/`

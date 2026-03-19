@@ -50,6 +50,9 @@ mod review;
 mod rr;
 mod run;
 mod schema;
+mod service;
+mod service_genpack;
+mod service_validate;
 mod sm;
 mod tool_api;
 mod tool_report_schemas;
@@ -113,6 +116,8 @@ enum Command {
     Build(toolchain::BuildArgs),
     /// Check a project (lint + typecheck + backend-check; no emit).
     Check(toolchain::CheckArgs),
+    /// Service authoring, archetype discovery, and validation.
+    Service(service::ServiceArgs),
     /// Work with CLI specrows schemas and tooling.
     Cli(cli::CliArgs),
     /// Manage packages and lockfiles.
@@ -416,6 +421,20 @@ fn try_main() -> Result<std::process::ExitCode> {
             Some(Command::Fix(_)) => vec!["fix"],
             Some(Command::Build(_)) => vec!["build"],
             Some(Command::Check(_)) => vec!["check"],
+            Some(Command::Service(args)) => match &args.cmd {
+                None => vec!["service"],
+                Some(service::ServiceCommand::Archetypes(_)) => vec!["service", "archetypes"],
+                Some(service::ServiceCommand::Genpack(args)) => match &args.cmd {
+                    None => vec!["service", "genpack"],
+                    Some(service_genpack::ServiceGenpackCommand::Schema(_)) => {
+                        vec!["service", "genpack", "schema"]
+                    }
+                    Some(service_genpack::ServiceGenpackCommand::Grammar(_)) => {
+                        vec!["service", "genpack", "grammar"]
+                    }
+                },
+                Some(service::ServiceCommand::Validate(_)) => vec!["service", "validate"],
+            },
             Some(Command::Cli(args)) => match &args.cmd {
                 None => vec!["cli"],
                 Some(cli::CliCommand::Spec(args)) => match &args.cmd {
@@ -516,6 +535,7 @@ fn try_main() -> Result<std::process::ExitCode> {
         Command::Fix(args) => toolchain::cmd_fix(&cli.machine, args),
         Command::Build(args) => toolchain::cmd_build(&cli.machine, args),
         Command::Check(args) => toolchain::cmd_check(&cli.machine, args),
+        Command::Service(args) => service::cmd_service(&cli.machine, args),
         Command::Cli(args) => cli::cmd_cli(&cli.machine, args),
         Command::Pkg(args) => pkg::cmd_pkg(&cli.machine, args),
         Command::Prove(args) => prove::cmd_prove(&cli.machine, args),

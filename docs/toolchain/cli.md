@@ -21,6 +21,20 @@ X07 ships multiple small CLIs with JSON-first contracts so both humans and agent
   - Creates a minimal certified-capsule project with capsule contract/effect-log/attestation surfaces plus a self-hosted VM certification workflow.
 - `x07 init --template certified-network-capsule`
   - Creates a standalone network capsule project under `trusted_program_sandboxed_net_v1`, with peer-policy evidence, effect-log attestations, a loopback TCP smoke harness, and a self-hosted VM certification workflow.
+- `x07 init --template api-cell|event-consumer|scheduled-job|policy-service|workflow-service`
+  - Copies the matching service scaffold from `docs/examples/service_*_v1/`, including `arch/service/index.x07service.json`, sandbox policy defaults, and a starter test harness.
+  - `workflow-service` is scaffold-only for now; use it to define the authoring shape and bindings before workload packaging is finalized.
+
+### Service tooling
+
+- `x07 service archetypes`
+  - Emits the built-in service archetype catalog, including default capabilities and package defaults pinned to the current published package lines.
+- `x07 service genpack schema --archetype <id>`
+  - Emits an archetype-specific JSON Schema for constrained service generation.
+- `x07 service genpack grammar --archetype <id>`
+  - Emits an archetype-specific CFG-style grammar for constrained service generation.
+- `x07 service validate --manifest <path>`
+  - Validates `arch/service/index.x07service.json` and checks it against a built-in archetype when one matches the service shape.
 
 ### MCP kit tooling
 

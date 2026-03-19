@@ -1,0 +1,51 @@
+{
+  "schema_version": "x07.service.manifest@0.1.0",
+  "service_id": "svc_workflow_service_v1",
+  "display_name": "Svc Workflow Service V1",
+  "domain_pack": {
+    "id": "svc_workflow_service_v1",
+    "display_name": "Svc Workflow Service V1"
+  },
+  "cells": [
+    {
+      "cell_key": "primary",
+      "cell_kind": "workflow-service",
+      "entry_symbol": "example.main",
+      "ingress_kind": "workflow",
+      "runtime_class": "native-worker",
+      "scale_class": "singleton-orchestrator",
+      "binding_refs": [
+        "db.primary",
+        "msg.orders"
+      ],
+      "topology_group": "primary"
+    }
+  ],
+  "topology_profiles": [
+    {
+      "id": "dev",
+      "target_kind": "hosted",
+      "placement": "co-located",
+      "notes": "single deployable for local and hosted dev"
+    },
+    {
+      "id": "prod",
+      "target_kind": "k8s",
+      "placement": "split-by-cell",
+      "notes": "allow independent scale later"
+    }
+  ],
+  "resource_bindings": [
+    {
+      "name": "db.primary",
+      "kind": "postgres",
+      "required": true
+    },
+    {
+      "name": "msg.orders",
+      "kind": "amqp",
+      "required": true
+    }
+  ],
+  "default_trust_profile": "sandboxed_service_v1"
+}
