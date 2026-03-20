@@ -147,6 +147,11 @@ Service authoring and constrained generation are exposed through:
 - `x07 service genpack grammar --archetype <id>`
 - `x07 service validate --manifest arch/service/index.x07service.json`
 
+Canonical service deployment guidance lives in:
+
+- [`docs/guides/provider-agnostic-services.md`](docs/guides/provider-agnostic-services.md)
+- [`docs/guides/scaling-retry-idempotency.md`](docs/guides/scaling-retry-idempotency.md)
+
 Canonical certificate-first examples live in:
 
 - `docs/examples/verified_core_pure_v1/`

@@ -94,6 +94,12 @@ When you need real OS resources (real network, real disk, real time), you switch
   - [Property-based testing](toolchain/pbt.md)
   - [Formal verification & certification](toolchain/formal-verification.md)
   - [Review & trust artifacts](toolchain/review-trust.md)
+- Guides:
+  - [Building web services](guides/web-apps.md)
+  - [Databases](guides/databases.md)
+  - [Messaging and event streaming](guides/messaging.md)
+  - [Provider-agnostic service runtimes and bindings](guides/provider-agnostic-services.md)
+  - [Scaling, retry, and idempotency for services](guides/scaling-retry-idempotency.md)
 - Packages:
   - [Workspaces, packages, lockfiles](packages/index.md)
   - [Publishing](packages/publishing.md)
