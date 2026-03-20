@@ -106,7 +106,8 @@ jobs:
           mkdir -p dist
           gh release download "$tag" --pattern "channels.json" --dir dist
           mkdir -p dist/channels
-          for asset in stable.json beta.json nightly.json; do
+          gh release download "$tag" --pattern "stable.json" --dir dist/channels
+          for asset in beta.json nightly.json; do
             gh release download "$tag" --pattern "$asset" --dir dist/channels || true
           done
 

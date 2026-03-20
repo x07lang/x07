@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -43,6 +44,82 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ap.add_argument("--set-latest", action="store_true")
     ap.add_argument("--check", action="store_true", help="Validate without writing files")
     return ap.parse_args(argv)
+
+
+def load_json_object(path: Path, *, label: str) -> dict:
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # pragma: no cover - surfaced to caller
+        raise ValueError(f"failed to parse {label}: {path}: {exc}") from exc
+    if not isinstance(doc, dict):
+        raise ValueError(f"{label} must be a JSON object: {path}")
+    return doc
+
+
+def normalize_version_tag(raw: str) -> str:
+    return raw if raw.startswith("v") else f"v{raw}"
+
+
+def validate_install_manifests(*, toolchain_version: str, channels_path: Path, channels_dir: Path) -> None:
+    expected_tag = f"v{toolchain_version}"
+    channels_doc = load_json_object(channels_path, label="channels manifest")
+
+    channels = channels_doc.get("channels")
+    if not isinstance(channels, dict):
+        raise ValueError(f"channels manifest missing channels map: {channels_path}")
+    stable_ref = channels.get("stable")
+    if not isinstance(stable_ref, dict):
+        raise ValueError(f"channels manifest missing stable channel entry: {channels_path}")
+
+    stable_toolchain = stable_ref.get("toolchain")
+    if stable_toolchain != expected_tag:
+        raise ValueError(
+            f"stable toolchain mismatch in {channels_path}: expected {expected_tag}, found {stable_toolchain!r}"
+        )
+
+    stable_x07up = stable_ref.get("x07up")
+    if stable_x07up != expected_tag:
+        raise ValueError(
+            f"stable x07up mismatch in {channels_path}: expected {expected_tag}, found {stable_x07up!r}"
+        )
+
+    stable_bundle_path = channels_dir / "stable.json"
+    if not stable_bundle_path.is_file():
+        raise ValueError(f"missing stable channel bundle: {stable_bundle_path}")
+
+    stable_bundle = load_json_object(stable_bundle_path, label="stable channel bundle")
+    if stable_bundle.get("channel") != "stable":
+        raise ValueError(f"stable bundle has unexpected channel: {stable_bundle_path}")
+
+    min_x07up_version = stable_bundle.get("min_x07up_version")
+    if normalize_version_tag(str(min_x07up_version)) != expected_tag:
+        raise ValueError(
+            f"stable bundle x07up mismatch in {stable_bundle_path}: expected {toolchain_version}, found {min_x07up_version!r}"
+        )
+
+    x07_core = stable_bundle.get("x07_core")
+    if not isinstance(x07_core, dict):
+        raise ValueError(f"stable bundle missing x07_core object: {stable_bundle_path}")
+
+    core_tag = x07_core.get("tag")
+    if core_tag != expected_tag:
+        raise ValueError(
+            f"stable bundle toolchain tag mismatch in {stable_bundle_path}: expected {expected_tag}, found {core_tag!r}"
+        )
+
+    core_version = x07_core.get("version")
+    if core_version != toolchain_version:
+        raise ValueError(
+            f"stable bundle toolchain version mismatch in {stable_bundle_path}: expected {toolchain_version}, found {core_version!r}"
+        )
+
+    release_manifest_url = x07_core.get("release_manifest_url")
+    expected_release_suffix = f"/releases/download/{expected_tag}/x07-{toolchain_version}-release.json"
+    if not isinstance(release_manifest_url, str) or not release_manifest_url.endswith(expected_release_suffix):
+        raise ValueError(
+            "stable bundle toolchain release manifest URL mismatch in "
+            f"{stable_bundle_path}: expected suffix {expected_release_suffix!r}, found {release_manifest_url!r}"
+        )
 
 
 def main(argv: list[str]) -> int:
@@ -108,23 +185,32 @@ def main(argv: list[str]) -> int:
     subprocess.check_call(cmd)
 
     try:
-        sync_file(
-            src=toolchain_repo / "dist" / "install" / "install.sh",
-            dst=website_root / "site" / "static" / "install.sh",
-        )
-
         channels_path = args.channels_json
         if channels_path is None:
             channels_path = toolchain_repo / "dist" / "channels.json"
-        sync_file(
-            src=channels_path.resolve(),
-            dst=website_root / "site" / "static" / "install" / "channels.json",
-        )
+        channels_path = channels_path.resolve()
 
         channels_dir = args.channels_dir
         if channels_dir is None:
             channels_dir = toolchain_repo / "dist" / "channels"
         channels_dir = channels_dir.resolve()
+
+        validate_install_manifests(
+            toolchain_version=toolchain_version,
+            channels_path=channels_path,
+            channels_dir=channels_dir,
+        )
+
+        sync_file(
+            src=toolchain_repo / "dist" / "install" / "install.sh",
+            dst=website_root / "site" / "static" / "install.sh",
+        )
+
+        sync_file(
+            src=channels_path,
+            dst=website_root / "site" / "static" / "install" / "channels.json",
+        )
+
         if channels_dir.is_dir():
             for src in sorted(channels_dir.glob("*.json")):
                 sync_file(
