@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import subprocess
 import sys
@@ -125,6 +126,132 @@ def formal_verification_release_fixture() -> None:
         "check_trusted_network_service_example.sh",
     ]:
         assert_contains(release_workflow, needle)
+
+
+def website_propagation_fixture(tmp_dir: Path) -> None:
+    workflow = ROOT / ".github" / "workflows" / "propagate-website.yml"
+    assert_contains(workflow, 'gh release download "$tag" --pattern "stable.json" --dir dist/channels')
+
+    module_path = ROOT / "scripts" / "open_pr_website_update.py"
+    spec = importlib.util.spec_from_file_location("open_pr_website_update", module_path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"failed to import {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    version = "0.1.52"
+    tag = f"v{version}"
+    good_root = tmp_dir / "install-manifests-good"
+    good_root.mkdir(parents=True)
+    good_channels_dir = good_root / "channels"
+    good_channels_dir.mkdir()
+    write_json(
+        good_root / "channels.json",
+        {
+            "schema_version": "x07.install.channels@0.1.0",
+            "channels": {"stable": {"toolchain": tag, "x07up": tag}},
+            "toolchains": {tag: {"assets": {}, "min_required": {"x07up": tag}}},
+            "x07up": {tag: {"assets": {}}},
+        },
+    )
+    write_json(
+        good_channels_dir / "stable.json",
+        {
+            "schema_version": "x07.release.bundle@0.1.0",
+            "channel": "stable",
+            "published_at_utc": "2026-03-05T00:20:00Z",
+            "min_x07up_version": version,
+            "x07_core": {
+                "version": version,
+                "tag": tag,
+                "release_manifest_url": f"https://github.com/x07lang/x07/releases/download/{tag}/x07-{version}-release.json",
+                "release_manifest_sha256": "sha256:" + ("0" * 64),
+            },
+            "x07_wasm": {
+                "version": version,
+                "tag": tag,
+                "release_manifest_url": f"https://example.invalid/{tag}/x07-wasm-release.json",
+                "release_manifest_sha256": "sha256:" + ("1" * 64),
+            },
+            "x07_web_ui_host": {
+                "version": version,
+                "tag": tag,
+                "release_manifest_url": f"https://example.invalid/{tag}/x07-web-ui-host-release.json",
+                "release_manifest_sha256": "sha256:" + ("2" * 64),
+            },
+            "x07_device_host": {
+                "version": version,
+                "tag": tag,
+                "release_manifest_url": f"https://example.invalid/{tag}/x07-device-host-release.json",
+                "release_manifest_sha256": "sha256:" + ("3" * 64),
+            },
+            "packages": {"std_web_ui": "0.1.5"},
+        },
+    )
+    module.validate_install_manifests(
+        toolchain_version=version,
+        channels_path=good_root / "channels.json",
+        channels_dir=good_channels_dir,
+    )
+
+    bad_root = tmp_dir / "install-manifests-bad"
+    bad_root.mkdir(parents=True)
+    bad_channels_dir = bad_root / "channels"
+    bad_channels_dir.mkdir()
+    write_json(
+        bad_root / "channels.json",
+        {
+            "schema_version": "x07.install.channels@0.1.0",
+            "channels": {"stable": {"toolchain": tag, "x07up": tag}},
+            "toolchains": {tag: {"assets": {}, "min_required": {"x07up": tag}}},
+            "x07up": {tag: {"assets": {}}},
+        },
+    )
+    write_json(
+        bad_channels_dir / "stable.json",
+        {
+            "schema_version": "x07.release.bundle@0.1.0",
+            "channel": "stable",
+            "published_at_utc": "2026-03-05T00:20:00Z",
+            "min_x07up_version": "0.1.40",
+            "x07_core": {
+                "version": version,
+                "tag": tag,
+                "release_manifest_url": f"https://github.com/x07lang/x07/releases/download/{tag}/x07-{version}-release.json",
+                "release_manifest_sha256": "sha256:" + ("0" * 64),
+            },
+            "x07_wasm": {
+                "version": version,
+                "tag": tag,
+                "release_manifest_url": f"https://example.invalid/{tag}/x07-wasm-release.json",
+                "release_manifest_sha256": "sha256:" + ("1" * 64),
+            },
+            "x07_web_ui_host": {
+                "version": version,
+                "tag": tag,
+                "release_manifest_url": f"https://example.invalid/{tag}/x07-web-ui-host-release.json",
+                "release_manifest_sha256": "sha256:" + ("2" * 64),
+            },
+            "x07_device_host": {
+                "version": version,
+                "tag": tag,
+                "release_manifest_url": f"https://example.invalid/{tag}/x07-device-host-release.json",
+                "release_manifest_sha256": "sha256:" + ("3" * 64),
+            },
+            "packages": {"std_web_ui": "0.1.5"},
+        },
+    )
+    try:
+        module.validate_install_manifests(
+            toolchain_version=version,
+            channels_path=bad_root / "channels.json",
+            channels_dir=bad_channels_dir,
+        )
+    except ValueError as exc:
+        if "stable bundle x07up mismatch" not in str(exc):
+            raise SystemExit(f"unexpected website propagation validation error: {exc}")
+    else:
+        raise SystemExit("expected website propagation validation to fail for mismatched stable bundle")
 
 
 def core_fixture(tmp_dir: Path) -> None:
@@ -450,6 +577,7 @@ def main() -> int:
             ],
         )
         formal_verification_release_fixture()
+        website_propagation_fixture(tmp_dir)
     print("ok: release script goldens")
     return 0
 
