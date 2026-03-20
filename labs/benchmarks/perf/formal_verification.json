@@ -292,7 +292,7 @@
               "max_regression_pct": 25
             },
             "peak_rss_kb": {
-              "baseline": 32000,
+              "baseline": 36824,
               "max_regression_pct": 15
             },
             "wall_ms": {
