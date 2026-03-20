@@ -1867,6 +1867,8 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         schema_bumped = true;
     }
 
+    let mut normalized_specs = normalize_project_doc_deps(&mut doc)?;
+
     let manifest = {
         let bytes = serde_json::to_vec(&doc)?;
         project::parse_project_manifest_bytes(&bytes, &project_path)
@@ -1890,7 +1892,11 @@ fn pkg_lock_report(args: &LockArgs) -> Result<(std::process::ExitCode, PkgReport
         }
     }
 
-    let mut updated_specs = apply_patch_overrides_to_project_doc_deps(&mut doc, &manifest.patch)?;
+    let mut updated_specs = std::mem::take(&mut normalized_specs);
+    updated_specs.extend(apply_patch_overrides_to_project_doc_deps(
+        &mut doc,
+        &manifest.patch,
+    )?);
 
     let mut fetched = Vec::new();
     let mut index_used: Option<String> = None;
@@ -2459,6 +2465,59 @@ fn apply_patch_overrides_to_project_doc_deps(
     }
 
     Ok(updated)
+}
+
+fn normalize_project_doc_deps(doc: &mut Value) -> Result<Vec<String>> {
+    let obj = doc
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("project must be a JSON object"))?;
+    let Some(deps_val) = obj.get_mut("dependencies") else {
+        return Ok(Vec::new());
+    };
+    let Some(deps) = deps_val.as_array_mut() else {
+        anyhow::bail!("project.dependencies must be an array");
+    };
+
+    let mut normalized: Vec<String> = Vec::new();
+    for dep in deps.iter_mut() {
+        let Some(dep_obj) = dep.as_object_mut() else {
+            continue;
+        };
+        let name = dep_obj
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let version = dep_obj
+            .get("version")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if name.is_empty() || version.is_empty() {
+            continue;
+        }
+        let path = dep_obj
+            .get("path")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        if !path.is_empty() {
+            continue;
+        }
+        dep_obj.insert(
+            "path".to_string(),
+            Value::String(format!(".x07/deps/{name}/{version}")),
+        );
+        normalized.push(format!("{name}@{version}"));
+    }
+
+    if !normalized.is_empty() {
+        sort_project_deps(deps);
+    }
+
+    Ok(normalized)
 }
 
 fn lockfiles_equal_core(a: &project::Lockfile, b: &project::Lockfile) -> bool {

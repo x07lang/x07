@@ -8425,6 +8425,55 @@ fn x07_init_template_lock_failure_has_next_steps() {
 }
 
 #[test]
+fn x07_init_service_template_writes_locked_dependencies() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_init_service_template_locked");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init", "--template", "api-cell"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    let report = parse_json_stdout(&out);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["command"], "init");
+
+    let proj: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.json")).unwrap())
+        .expect("parse x07.json");
+    let deps = proj["dependencies"].as_array().expect("dependencies[]");
+    assert!(
+        !deps.is_empty(),
+        "expected service template dependencies in x07.json"
+    );
+    assert!(
+        deps.iter()
+            .all(|dep| dep["path"].as_str().is_some_and(|s| !s.is_empty())),
+        "expected every dependency to have a resolved path after init:\n{}",
+        serde_json::to_string_pretty(&proj).unwrap()
+    );
+
+    let lock: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("x07.lock.json")).unwrap())
+            .expect("parse x07.lock.json");
+    let lock_deps = lock["dependencies"]
+        .as_array()
+        .expect("lock.dependencies[]");
+    assert!(
+        !lock_deps.is_empty(),
+        "expected non-empty lockfile after service template init:\n{}",
+        serde_json::to_string_pretty(&lock).unwrap()
+    );
+}
+
+#[test]
 fn x07_pkg_add_updates_project_manifest() {
     let root = repo_root();
     let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_add");
@@ -9029,6 +9078,65 @@ fn x07_pkg_lock_patch_overrides_transitive_requires_packages() {
     assert_eq!(c_dep["version"], "1.0.1");
     assert_eq!(c_dep["overridden_by"], "c");
     assert_eq!(c_dep["yanked"], false);
+}
+
+#[test]
+fn x07_pkg_lock_normalizes_missing_dependency_paths() {
+    let root = repo_root();
+    let dir = fresh_tmp_dir(&root, "tmp_x07_pkg_lock_normalize_missing_paths");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).expect("remove old tmp dir");
+    }
+    std::fs::create_dir_all(&dir).expect("create tmp dir");
+
+    let out = run_x07_in_dir(&dir, &["init"]);
+    assert_eq!(out.status.code(), Some(0));
+
+    let deps_root = dir.join(".x07").join("deps");
+    write_minimal_pkg_manifest(&deps_root.join("demo/1.0.0"), "demo", "1.0.0", &[]);
+
+    let proj_path = dir.join("x07.json");
+    let mut doc: Value = serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json"))
+        .expect("parse x07.json");
+    let obj = doc.as_object_mut().expect("x07.json must be object");
+    obj.insert(
+        "dependencies".to_string(),
+        Value::Array(vec![serde_json::json!({
+            "name": "demo",
+            "version": "1.0.0"
+        })]),
+    );
+    write_bytes(
+        &proj_path,
+        serde_json::to_vec_pretty(&doc).unwrap().as_slice(),
+    );
+
+    let out = run_x07_in_dir(&dir, &["pkg", "lock", "--offline"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr:\n{}\nstdout:\n{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    let updated: Value =
+        serde_json::from_slice(&std::fs::read(&proj_path).expect("read x07.json after lock"))
+            .expect("parse x07.json after lock");
+    let deps = updated["dependencies"].as_array().expect("dependencies[]");
+    assert_eq!(deps.len(), 1);
+    assert_eq!(deps[0]["name"], "demo");
+    assert_eq!(deps[0]["version"], "1.0.0");
+    assert_eq!(deps[0]["path"], ".x07/deps/demo/1.0.0");
+
+    let lock: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.lock.json")).unwrap())
+        .expect("parse x07.lock.json");
+    let lock_deps = lock["dependencies"]
+        .as_array()
+        .expect("lock.dependencies[]");
+    assert_eq!(lock_deps.len(), 1);
+    assert_eq!(lock_deps[0]["name"], "demo");
+    assert_eq!(lock_deps[0]["path"], ".x07/deps/demo/1.0.0");
 }
 
 #[test]

@@ -1574,6 +1574,40 @@ fn cmd_init_service_template(
         return Ok(std::process::ExitCode::from(20));
     }
 
+    let lock_args = crate::pkg::LockArgs {
+        project: root.join("x07.json"),
+        index: None,
+        check: false,
+        offline: false,
+        allow_yanked: false,
+        allow_advisories: false,
+    };
+    let (code, err_msg) = crate::pkg::pkg_lock_for_init(&lock_args)?;
+    if let Some(msg) = err_msg {
+        let mut next_steps = Vec::new();
+        next_steps.push("x07 pkg lock --project x07.json".to_string());
+        next_steps.push(format!(
+            "If you want a clean slate, delete the created paths: {}",
+            created.join(", ")
+        ));
+        next_steps.push("If this is a template, the registry/index may be missing required package versions; update/publish packages or pin to available versions.".to_string());
+
+        let report = InitReport {
+            ok: false,
+            command: "init",
+            root: root.display().to_string(),
+            created,
+            notes: Vec::new(),
+            next_steps,
+            error: Some(InitError {
+                code: "X07INIT_PKG_LOCK".to_string(),
+                message: msg,
+            }),
+        };
+        println!("{}", serde_json::to_string(&report)?);
+        return Ok(code);
+    }
+
     let mut notes = vec![format!(
         "Generated the {} service scaffold from docs/examples/{}.",
         template_name, template_name

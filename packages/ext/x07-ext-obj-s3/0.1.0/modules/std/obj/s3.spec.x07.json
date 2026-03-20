@@ -1,1 +1,0 @@
-{"decls":[{"kind":"export","names":["std.obj.s3.spec.flags_none_v1"]},{"body":0,"kind":"defconst","name":"std.obj.s3.spec.flags_none_v1","ty":"i32"}],"imports":[],"kind":"module","module_id":"std.obj.s3.spec","schema_version":"x07.x07ast@0.3.0"}
