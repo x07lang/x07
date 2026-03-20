@@ -206,6 +206,24 @@ pub(crate) fn tool_report_schema_bytes(scope: Option<&OsStr>) -> Option<&'static
         Some("schema.derive") => Some(include_bytes!(
             "../../../spec/x07-tool-schema-derive.report.schema.json"
         )),
+        Some("service") => Some(include_bytes!(
+            "../../../spec/x07-tool-service.report.schema.json"
+        )),
+        Some("service.archetypes") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-archetypes.report.schema.json"
+        )),
+        Some("service.genpack") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-genpack.report.schema.json"
+        )),
+        Some("service.genpack.grammar") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-genpack-grammar.report.schema.json"
+        )),
+        Some("service.genpack.schema") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-genpack-schema.report.schema.json"
+        )),
+        Some("service.validate") => Some(include_bytes!(
+            "../../../spec/x07-tool-service-validate.report.schema.json"
+        )),
         Some("sm") => Some(include_bytes!(
             "../../../spec/x07-tool-sm.report.schema.json"
         )),

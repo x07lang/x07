@@ -362,6 +362,7 @@ fn is_top_level_command(cmd: &str) -> bool {
             | "fix"
             | "build"
             | "check"
+            | "service"
             | "cli"
             | "pkg"
             | "prove"
@@ -424,6 +425,8 @@ fn nested_commands(scope: &str) -> &'static [&'static str] {
         "trust.profile" => &["check"],
         "trust.capsule" => &["check", "attest"],
         "schema" => &["derive"],
+        "service" => &["archetypes", "genpack", "validate"],
+        "service.genpack" => &["schema", "grammar"],
         "sm" => &["check", "gen"],
         "rr" => &["record"],
         "patch" => &["apply"],

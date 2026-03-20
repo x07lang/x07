@@ -8460,9 +8460,8 @@ fn x07_init_service_template_writes_locked_dependencies() {
         serde_json::to_string_pretty(&proj).unwrap()
     );
 
-    let lock: Value =
-        serde_json::from_slice(&std::fs::read(dir.join("x07.lock.json")).unwrap())
-            .expect("parse x07.lock.json");
+    let lock: Value = serde_json::from_slice(&std::fs::read(dir.join("x07.lock.json")).unwrap())
+        .expect("parse x07.lock.json");
     let lock_deps = lock["dependencies"]
         .as_array()
         .expect("lock.dependencies[]");

@@ -274,3 +274,11 @@ The first scaffolded archetypes should be:
 
 This document freezes the vocabulary and the public intent.  
 It does **not** claim that every downstream CLI, runtime, and platform surface is already stable.
+
+## Expert notes
+
+Use the architecture vocabulary to separate authoring from deployment pressure.
+
+- keep Domain Packs small enough that agents can review them as one unit
+- split Operational Cells when ingress, trust, or scaling policies diverge
+- postpone topology choices until operator evidence forces a more concrete deployment shape

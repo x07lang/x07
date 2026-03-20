@@ -106,6 +106,14 @@ x07 service genpack grammar --archetype api-cell
 - topology decisions are data, not hard-coded branches in application code
 - retries and idempotency are handled in the shell around the pure kernel
 
+## Expert notes
+
+Keep provider-specific escape hatches at the topology and adapter layer.
+
+- add a target-specific binding only when the logical binding no longer preserves the contract you need
+- keep the service manifest stable even if one target needs more operational metadata than another
+- treat hosted, Kubernetes, and wasmCloud mappings as deployment policy, not application identity
+
 ## Related docs
 
 - [X07 service architecture v1](x07-service-architecture-v1.md)

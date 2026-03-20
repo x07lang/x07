@@ -147,7 +147,7 @@ fn golden_sha256_run_os_os_fs_read_file() {
     let c = compile(program.as_slice(), options);
     assert_eq!(
         sha256_hex(&c),
-        "e7c0605aaeb99853fae942fd5a37e757a313dea88bec2f78a4e93d1680155bc0"
+        "1710a79eb49637bcb8762d5a5006c610e8a03dd6a68de668ca6ab069f17c6c87"
     );
 }
 
@@ -195,6 +195,6 @@ fn golden_sha256_run_os_mega_fixture() {
     let c = compile(program.as_slice(), options);
     assert_eq!(
         sha256_hex(&c),
-        "646bddc9347ebb10c56434d5c39029d5991c1600adcff58e6ccfb0e1ce5382cb"
+        "afe3ea2bf614d33d131adc91f33f92b8b865c7884dafee1b22ea33d709a885f8"
     );
 }

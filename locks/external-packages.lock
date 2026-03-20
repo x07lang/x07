@@ -8330,6 +8330,50 @@
       "import_mode": "handwritten",
       "modules": [
         {
+          "module_id": "std.obj.spec",
+          "path": "packages/ext/x07-ext-obj-core/0.1.0/modules/std/obj/spec.x07.json",
+          "sha256": "6290b1f56d2da4799e14a73ce7411dee24354dae34daaeebedcab3c9e4569531",
+          "size_bytes": 364
+        },
+        {
+          "module_id": "std.obj",
+          "path": "packages/ext/x07-ext-obj-core/0.1.0/modules/std/obj.x07.json",
+          "sha256": "f95e01a9fae5d589e6fc42d61fbbdba6c142fe65c9477fe6d81267ed61a8b0c8",
+          "size_bytes": 1061
+        }
+      ],
+      "name": "ext-obj-core",
+      "package_manifest_sha256": "27a70be00aba34e1be7852483a5c6e5ed71e29e6f3265f67827d3f412e86bb26",
+      "path": "packages/ext/x07-ext-obj-core/0.1.0",
+      "version": "0.1.0"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.obj.s3.spec",
+          "path": "packages/ext/x07-ext-obj-s3/0.1.0/modules/std/obj/s3/spec.x07.json",
+          "sha256": "edb430598a27a2c82857044e98c250646853b29856c34c153fe50c5c25237f04",
+          "size_bytes": 258
+        },
+        {
+          "module_id": "std.obj.s3",
+          "path": "packages/ext/x07-ext-obj-s3/0.1.0/modules/std/obj/s3.x07.json",
+          "sha256": "175e0055ce2d2c67cfcb7d19681cd1a83de272245191c5b6f739de78be613339",
+          "size_bytes": 1116
+        }
+      ],
+      "name": "ext-obj-s3",
+      "package_manifest_sha256": "70f185f28272d38fd6406c1e955b1b2e9044617aa4ab0e935b38ad7b14b700c9",
+      "path": "packages/ext/x07-ext-obj-s3/0.1.0",
+      "version": "0.1.0"
+    },
+    {
+      "determinism_tier": "mixed",
+      "import_mode": "handwritten",
+      "modules": [
+        {
           "module_id": "std.obs.export",
           "path": "packages/ext/x07-ext-obs/0.1.0/modules/std/obs/export.x07.json",
           "sha256": "663ffc1d3bb5dc02403e21b9479e4acf94f88dccb1be9d312ff187163e1d6b54",
@@ -12937,6 +12981,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "1c9186535577a98598db37e9258898ca202115fdd46539738fdfbd214ba2b973",
+  "packages_hash": "8109daf057d065a97d1942a837b9f60d80061bb48f81e472d47f21bd0c7de211",
   "packages_root": "packages/ext"
 }

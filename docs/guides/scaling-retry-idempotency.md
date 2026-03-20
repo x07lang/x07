@@ -24,6 +24,15 @@ Use the scale class that matches the work:
 
 If two parts of a service need different retry or scaling rules, split them into separate cells.
 
+## Canonical flow
+
+The default retry flow is:
+
+1. compute intent in the pure kernel
+2. assign or receive an idempotency key
+3. perform the effect
+4. record completion before acknowledging success upstream
+
 ## Retry rules
 
 Retry only around effectful boundaries.
@@ -40,13 +49,6 @@ Bad retry targets:
 - pure validation
 - deterministic state transitions
 - code paths that already committed an irreversible external effect without an idempotency key
-
-Canonical rule:
-
-1. compute intent in the pure kernel
-2. assign or receive an idempotency key
-3. perform the effect
-4. record completion before acknowledging success upstream
 
 ## Idempotency rules
 
@@ -105,6 +107,14 @@ For `scheduled-job` workloads:
 - the idempotency key survives process restarts and rollout restarts
 - duplicate delivery is a tested case
 - success is recorded before the upstream ack when replay is possible
+
+## Expert notes
+
+Treat retries, leases, and partitioning as separate controls.
+
+- increase replicas only after the idempotency boundary is proven safe under duplicate delivery
+- use partition keys when order matters more than raw throughput
+- move non-idempotent fan-out behind a durable outbox before turning up concurrency
 
 ## Related docs
 
