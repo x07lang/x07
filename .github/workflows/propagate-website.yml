@@ -104,11 +104,11 @@ jobs:
           set -euo pipefail
           tag="${{ steps.vars.outputs.tag }}"
           mkdir -p dist
-          gh release download "$tag" --pattern "channels.json" --dir dist
+          gh release download "$tag" --pattern "channels.json" --dir dist --clobber
           mkdir -p dist/channels
-          gh release download "$tag" --pattern "stable.json" --dir dist/channels
+          gh release download "$tag" --pattern "stable.json" --dir dist/channels --clobber
           for asset in beta.json nightly.json; do
-            gh release download "$tag" --pattern "$asset" --dir dist/channels || true
+            gh release download "$tag" --pattern "$asset" --dir dist/channels --clobber || true
           done
 
       - name: Checkout (x07-website)
