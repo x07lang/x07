@@ -2,7 +2,7 @@
 
 Use this guide when a service still depends on provider-specific object-store, queue, or secret wiring and you want one manifest that can move across hosted, Kubernetes, and wasmCloud targets.
 
-## What to change
+## Canonical migration flow
 
 Move provider identity out of service code and into binding materialization.
 
@@ -20,13 +20,15 @@ After:
 
 ## Object-store migration
 
-The canonical first object-store wedge is `ext-obj-core@0.1.1` plus `ext-obj-s3@0.1.1`.
+The canonical first object-store wedge is `ext-obj-core@VERSION` plus
+`ext-obj-s3@VERSION`. Pick the concrete versions from the capability map or the
+registry catalog before you add them to a project.
 
 1. Add the packages:
 
 ```bash
-x07 pkg add ext-obj-core@0.1.1
-x07 pkg add ext-obj-s3@0.1.1
+x07 pkg add ext-obj-core@VERSION
+x07 pkg add ext-obj-s3@VERSION
 ```
 
 2. Replace provider-specific storage calls with `std.obj.*` or `std.obj.s3.*`.
@@ -66,6 +68,15 @@ That split keeps the workload portable while still exposing enough runtime inten
 - target-specific secrets or endpoints live outside the service repo
 - examples still validate with `x07 service validate`
 - object-store reads and writes decode responses with `std.obj.spec.*`
+
+## Expert notes
+
+- keep provider credentials, bucket names, bus subjects, and secret-manager ids in
+  target profiles or operator wiring rather than committing them into the service repo
+- when migrating incrementally, move one resource family at a time and keep the
+  logical binding name stable so rollout diffs stay reviewable
+- if a target needs native S3 variables during migration, inject them from the
+  deploy layer and keep the service manifest limited to logical `binding_refs`
 
 ## Reference patterns
 
