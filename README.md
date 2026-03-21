@@ -138,6 +138,7 @@ For service-oriented backend work, use the built-in service scaffolds:
 - `x07 init --template event-consumer`
 - `x07 init --template scheduled-job`
 - `x07 init --template policy-service`
+- `ext-obj-core@0.1.1` and `ext-obj-s3@0.1.1` are the canonical first object-store wedge for service projects; use `std.obj.*` or `std.obj.s3.*` together with `std.obj.spec.*` response helpers on `run-os` or `run-os-sandboxed`
 - `x07 init --template workflow-service`
 
 Service authoring and constrained generation are exposed through:
@@ -146,6 +147,13 @@ Service authoring and constrained generation are exposed through:
 - `x07 service genpack schema --archetype <id>`
 - `x07 service genpack grammar --archetype <id>`
 - `x07 service validate --manifest arch/service/index.x07service.json`
+
+Service manifests now carry runtime hints for:
+
+- probe definitions for API, worker, and policy cells
+- bus or consumer metadata for `event-consumer`
+- cron and retry metadata for `scheduled-job`
+- rollout and autoscaling hints for the first supported runtime wedge
 
 Canonical service deployment guidance lives in:
 

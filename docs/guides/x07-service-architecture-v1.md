@@ -150,6 +150,7 @@ It describes:
 - topology profiles
 - binding declarations
 - trust defaults
+- runtime hints for probes, consumer metadata, schedules, rollout, and autoscaling
 
 This is intentionally separate from `x07.json`:
 - `x07.json` stays the project/toolchain manifest
@@ -177,7 +178,15 @@ One Domain Pack can expose multiple Operational Cells without turning topology i
       "runtime_class": "native-http",
       "scale_class": "replicated-http",
       "binding_refs": ["db.primary", "obj.documents"],
-      "topology_group": "frontdoor"
+      "topology_group": "frontdoor",
+      "runtime": {
+        "probes": {
+          "readiness": { "probe_kind": "http", "path": "/readyz", "port": 8080 },
+          "liveness": { "probe_kind": "http", "path": "/livez", "port": 8080 }
+        },
+        "rollout": { "strategy": "rolling", "max_unavailable": "25%", "max_surge": "25%" },
+        "autoscaling": { "min_replicas": 2, "max_replicas": 6, "target_cpu_utilization": 70 }
+      }
     },
     {
       "cell_key": "events",
@@ -187,7 +196,21 @@ One Domain Pack can expose multiple Operational Cells without turning topology i
       "runtime_class": "native-worker",
       "scale_class": "partitioned-consumer",
       "binding_refs": ["db.primary", "msg.orders"],
-      "topology_group": "async"
+      "topology_group": "async",
+      "runtime": {
+        "event": {
+          "binding_ref": "msg.orders",
+          "topic": "orders.created",
+          "consumer_group": "orders-workers",
+          "ack_mode": "manual"
+        },
+        "probes": {
+          "readiness": { "probe_kind": "exec", "command": ["check-consumer", "--ready"] },
+          "liveness": { "probe_kind": "exec", "command": ["check-consumer", "--alive"] }
+        },
+        "rollout": { "strategy": "rolling", "max_unavailable": "1" },
+        "autoscaling": { "min_replicas": 1, "max_replicas": 8, "target_inflight": 64 }
+      }
     },
     {
       "cell_key": "settlement",
@@ -197,7 +220,15 @@ One Domain Pack can expose multiple Operational Cells without turning topology i
       "runtime_class": "native-worker",
       "scale_class": "burst-batch",
       "binding_refs": ["db.primary"],
-      "topology_group": "async"
+      "topology_group": "async",
+      "runtime": {
+        "schedule": {
+          "cron": "0 */6 * * *",
+          "timezone": "UTC",
+          "concurrency_policy": "forbid",
+          "retry_limit": 3
+        }
+      }
     }
   ]
 }
@@ -217,6 +248,14 @@ Each cell should declare:
 - `scale_class`
 - `binding_refs`
 - `topology_group`
+- `runtime`
+
+`runtime` stays additive and target-agnostic:
+
+- `runtime.probes` describes HTTP or exec probes without baking in a provider object model
+- `runtime.event` carries the logical bus binding plus topic and consumer-group data for `event-consumer`
+- `runtime.schedule` carries cron, retry, and concurrency hints for `scheduled-job`
+- `runtime.rollout` and `runtime.autoscaling` describe first-wedge rollout and scaling hints for runtimes such as Kubernetes
 
 ## Scale classes
 

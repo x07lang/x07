@@ -4747,6 +4747,39 @@ impl<'a> Emitter<'a> {
                         self.line(state, format!("goto st_{cont};"));
                         return Ok(());
                     }
+                    "os.obj.s3.dispatch_v1" => {
+                        self.require_native_backend(
+                            native::BACKEND_ID_EXT_OBJ_S3,
+                            native::ABI_MAJOR_V1,
+                            head,
+                        )?;
+                        if !self.options.world.is_standalone_only() {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Unsupported,
+                                "os.obj.s3.dispatch_v1 is only available in standalone worlds (run-os, run-os-sandboxed)".to_string(),
+                            ));
+                        }
+                        if args.len() != 2
+                            || dest.ty != Ty::Bytes
+                            || args[0].ty != Ty::Bytes
+                            || args[1].ty != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.obj.s3.dispatch_v1 expects (bytes req, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        self.line(
+                            state,
+                            format!(
+                                "{} = x07_obj_s3_dispatch_v1({}, {});",
+                                dest.c_name, args[0].c_name, args[1].c_name
+                            ),
+                        );
+                        self.line(state, format!("goto st_{cont};"));
+                        return Ok(());
+                    }
                     "os.db.mysql.open_v1" => {
                         self.require_native_backend(
                             native::BACKEND_ID_EXT_DB_MYSQL,

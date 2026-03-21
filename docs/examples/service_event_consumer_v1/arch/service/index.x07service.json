@@ -18,7 +18,44 @@
         "db.primary",
         "msg.orders"
       ],
-      "topology_group": "primary"
+      "topology_group": "primary",
+      "runtime": {
+        "event": {
+          "binding_ref": "msg.orders",
+          "topic": "orders.created",
+          "consumer_group": "svc-event-consumer-v1",
+          "ack_mode": "manual",
+          "max_in_flight": 32,
+          "drain_timeout_seconds": 30
+        },
+        "probes": {
+          "readiness": {
+            "probe_kind": "exec",
+            "command": [
+              "/bin/check-consumer",
+              "--ready"
+            ],
+            "period_seconds": 10
+          },
+          "liveness": {
+            "probe_kind": "exec",
+            "command": [
+              "/bin/check-consumer",
+              "--alive"
+            ],
+            "period_seconds": 15
+          }
+        },
+        "rollout": {
+          "strategy": "rolling",
+          "max_unavailable": "1"
+        },
+        "autoscaling": {
+          "min_replicas": 1,
+          "max_replicas": 8,
+          "target_inflight": 64
+        }
+      }
     }
   ],
   "topology_profiles": [

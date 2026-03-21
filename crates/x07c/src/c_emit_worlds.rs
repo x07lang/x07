@@ -1857,6 +1857,8 @@ impl<'a> Emitter<'a> {
             Some(native::BACKEND_ID_EXT_DB_MYSQL)
         } else if builtin.starts_with("os.db.redis.") {
             Some(native::BACKEND_ID_EXT_DB_REDIS)
+        } else if builtin.starts_with("os.obj.s3.") {
+            Some(native::BACKEND_ID_EXT_OBJ_S3)
         } else {
             None
         };
@@ -2109,6 +2111,21 @@ impl<'a> Emitter<'a> {
         self.emit_os_db_call_bytes_v1_to(
             "os.db.redis.close_v1",
             "x07_ext_db_redis_close_v1",
+            args,
+            dest_ty,
+            dest,
+        )
+    }
+
+    pub(super) fn emit_os_obj_s3_dispatch_v1_to(
+        &mut self,
+        args: &[Expr],
+        dest_ty: Ty,
+        dest: &str,
+    ) -> Result<(), CompilerError> {
+        self.emit_os_db_call_bytes_v1_to(
+            "os.obj.s3.dispatch_v1",
+            "x07_obj_s3_dispatch_v1",
             args,
             dest_ty,
             dest,

@@ -8348,6 +8348,28 @@
       "version": "0.1.0"
     },
     {
+      "determinism_tier": "mixed",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.obj.spec",
+          "path": "packages/ext/x07-ext-obj-core/0.1.1/modules/std/obj/spec.x07.json",
+          "sha256": "6120fc4d38dfd65a2135bbd9aa041fcccf0e18872d9ae338d13701a4780b6df6",
+          "size_bytes": 5311
+        },
+        {
+          "module_id": "std.obj",
+          "path": "packages/ext/x07-ext-obj-core/0.1.1/modules/std/obj.x07.json",
+          "sha256": "7d6bdd6e2baf67d73bb280bf2cf0fb54a220d554c7fc3f187984b00e6d51493e",
+          "size_bytes": 1369
+        }
+      ],
+      "name": "ext-obj-core",
+      "package_manifest_sha256": "522e14477f437fdfcd31a442e83bf52ccb7b4ba02db5891603e31a3cbbd99980",
+      "path": "packages/ext/x07-ext-obj-core/0.1.1",
+      "version": "0.1.1"
+    },
+    {
       "determinism_tier": "os-world-only",
       "import_mode": "handwritten",
       "modules": [
@@ -8368,6 +8390,28 @@
       "package_manifest_sha256": "70f185f28272d38fd6406c1e955b1b2e9044617aa4ab0e935b38ad7b14b700c9",
       "path": "packages/ext/x07-ext-obj-s3/0.1.0",
       "version": "0.1.0"
+    },
+    {
+      "determinism_tier": "os-world-only",
+      "import_mode": "handwritten",
+      "modules": [
+        {
+          "module_id": "std.obj.s3.spec",
+          "path": "packages/ext/x07-ext-obj-s3/0.1.1/modules/std/obj/s3/spec.x07.json",
+          "sha256": "3a887fcd4cc55d337c61399ec20feb5e8700ec691db5c130e7140512dba8c959",
+          "size_bytes": 1276
+        },
+        {
+          "module_id": "std.obj.s3",
+          "path": "packages/ext/x07-ext-obj-s3/0.1.1/modules/std/obj/s3.x07.json",
+          "sha256": "f1a28b3e3d70c6e2ca7354bfd1f341ed33b19da4a6e911fcc58cf7924fa2f989",
+          "size_bytes": 973
+        }
+      ],
+      "name": "ext-obj-s3",
+      "package_manifest_sha256": "9f302369aae61da9b25414c004b3c851f840afd538f7e16b4f3ce37126636f75",
+      "path": "packages/ext/x07-ext-obj-s3/0.1.1",
+      "version": "0.1.1"
     },
     {
       "determinism_tier": "mixed",
@@ -12981,6 +13025,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "8109daf057d065a97d1942a837b9f60d80061bb48f81e472d47f21bd0c7de211",
+  "packages_hash": "311d81a253ea1e9a4a9513b105274449fcdae6461dc9345e05f0cd4c4c82390c",
   "packages_root": "packages/ext"
 }

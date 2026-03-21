@@ -18,7 +18,35 @@
         "db.primary",
         "obj.documents"
       ],
-      "topology_group": "primary"
+      "topology_group": "primary",
+      "runtime": {
+        "probes": {
+          "readiness": {
+            "probe_kind": "http",
+            "path": "/readyz",
+            "port": 8080,
+            "period_seconds": 5,
+            "failure_threshold": 3
+          },
+          "liveness": {
+            "probe_kind": "http",
+            "path": "/livez",
+            "port": 8080,
+            "period_seconds": 10,
+            "failure_threshold": 3
+          }
+        },
+        "rollout": {
+          "strategy": "rolling",
+          "max_unavailable": "25%",
+          "max_surge": "25%"
+        },
+        "autoscaling": {
+          "min_replicas": 2,
+          "max_replicas": 6,
+          "target_cpu_utilization": 70
+        }
+      }
     }
   ],
   "topology_profiles": [

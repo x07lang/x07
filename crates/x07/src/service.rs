@@ -125,6 +125,36 @@ impl ScaleClass {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
+pub enum ProbeKind {
+    Http,
+    Exec,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum EventAckMode {
+    Auto,
+    Manual,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum RolloutStrategy {
+    Rolling,
+    CanaryLite,
+    Recreate,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ScheduleConcurrencyPolicy {
+    Allow,
+    Forbid,
+    Replace,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
 pub enum BindingKind {
     Postgres,
     Mysql,
@@ -153,6 +183,107 @@ impl BindingKind {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CellRuntime {
+    #[serde(default)]
+    pub event: Option<CellEventRuntime>,
+    #[serde(default)]
+    pub schedule: Option<CellScheduleRuntime>,
+    #[serde(default)]
+    pub probes: Option<CellProbeSet>,
+    #[serde(default)]
+    pub rollout: Option<CellRollout>,
+    #[serde(default)]
+    pub autoscaling: Option<CellAutoscaling>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CellEventRuntime {
+    pub binding_ref: String,
+    pub topic: String,
+    pub consumer_group: String,
+    #[serde(default)]
+    pub ack_mode: Option<EventAckMode>,
+    #[serde(default)]
+    pub max_in_flight: Option<u32>,
+    #[serde(default)]
+    pub drain_timeout_seconds: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CellScheduleRuntime {
+    pub cron: String,
+    #[serde(default)]
+    pub timezone: Option<String>,
+    #[serde(default)]
+    pub concurrency_policy: Option<ScheduleConcurrencyPolicy>,
+    #[serde(default)]
+    pub retry_limit: Option<u32>,
+    #[serde(default)]
+    pub start_deadline_seconds: Option<u32>,
+    #[serde(default)]
+    pub suspend: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CellProbeSet {
+    #[serde(default)]
+    pub startup: Option<CellProbe>,
+    #[serde(default)]
+    pub readiness: Option<CellProbe>,
+    #[serde(default)]
+    pub liveness: Option<CellProbe>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CellProbe {
+    pub probe_kind: ProbeKind,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub command: Vec<String>,
+    #[serde(default)]
+    pub initial_delay_seconds: Option<u32>,
+    #[serde(default)]
+    pub period_seconds: Option<u32>,
+    #[serde(default)]
+    pub timeout_seconds: Option<u32>,
+    #[serde(default)]
+    pub success_threshold: Option<u32>,
+    #[serde(default)]
+    pub failure_threshold: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CellRollout {
+    pub strategy: RolloutStrategy,
+    #[serde(default)]
+    pub max_unavailable: Option<String>,
+    #[serde(default)]
+    pub max_surge: Option<String>,
+    #[serde(default)]
+    pub canary_percent: Option<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CellAutoscaling {
+    pub min_replicas: u32,
+    pub max_replicas: u32,
+    #[serde(default)]
+    pub target_cpu_utilization: Option<u8>,
+    #[serde(default)]
+    pub target_inflight: Option<u32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResourceBindingDecl {
@@ -176,6 +307,8 @@ pub struct OperationalCell {
     #[serde(default)]
     pub binding_refs: Vec<String>,
     pub topology_group: String,
+    #[serde(default)]
+    pub runtime: CellRuntime,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -461,6 +594,7 @@ pub fn validate_service_manifest(manifest: &ServiceManifest) -> Result<()> {
                 );
             }
         }
+        validate_cell_runtime(cell, &binding_names)?;
     }
 
     if let Some(default_trust_profile) = manifest.default_trust_profile.as_deref() {
@@ -469,6 +603,267 @@ pub fn validate_service_manifest(manifest: &ServiceManifest) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn validate_cell_runtime(
+    cell: &OperationalCell,
+    binding_names: &BTreeMap<String, String>,
+) -> Result<()> {
+    match cell.ingress_kind {
+        IngressKind::Event => {
+            let event = cell.runtime.event.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "cell {:?} requires runtime.event for event ingress",
+                    cell.cell_key
+                )
+            })?;
+            validate_event_runtime(cell, event, binding_names)?;
+        }
+        _ => {
+            if cell.runtime.event.is_some() {
+                anyhow::bail!(
+                    "cell {:?} must not declare runtime.event unless ingress_kind is event",
+                    cell.cell_key
+                );
+            }
+        }
+    }
+
+    match cell.ingress_kind {
+        IngressKind::Schedule => {
+            let schedule = cell.runtime.schedule.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "cell {:?} requires runtime.schedule for schedule ingress",
+                    cell.cell_key
+                )
+            })?;
+            validate_schedule_runtime(cell, schedule)?;
+        }
+        _ => {
+            if cell.runtime.schedule.is_some() {
+                anyhow::bail!(
+                    "cell {:?} must not declare runtime.schedule unless ingress_kind is schedule",
+                    cell.cell_key
+                );
+            }
+        }
+    }
+
+    if let Some(probes) = cell.runtime.probes.as_ref() {
+        for (label, probe) in [
+            ("startup", probes.startup.as_ref()),
+            ("readiness", probes.readiness.as_ref()),
+            ("liveness", probes.liveness.as_ref()),
+        ] {
+            if let Some(probe) = probe {
+                validate_probe(cell, label, probe)?;
+            }
+        }
+    }
+
+    if let Some(rollout) = cell.runtime.rollout.as_ref() {
+        validate_rollout(cell, rollout)?;
+    }
+
+    if let Some(autoscaling) = cell.runtime.autoscaling.as_ref() {
+        validate_autoscaling(cell, autoscaling)?;
+    }
+
+    Ok(())
+}
+
+fn validate_event_runtime(
+    cell: &OperationalCell,
+    event: &CellEventRuntime,
+    binding_names: &BTreeMap<String, String>,
+) -> Result<()> {
+    if event.binding_ref.trim().is_empty() {
+        anyhow::bail!(
+            "cell {:?} runtime.event.binding_ref must not be empty",
+            cell.cell_key
+        );
+    }
+    if !cell
+        .binding_refs
+        .iter()
+        .any(|binding_ref| binding_ref == &event.binding_ref)
+    {
+        anyhow::bail!(
+            "cell {:?} runtime.event.binding_ref {:?} must appear in binding_refs",
+            cell.cell_key,
+            event.binding_ref
+        );
+    }
+    match binding_names.get(&event.binding_ref).map(String::as_str) {
+        Some("amqp") | Some("kafka") => {}
+        Some(kind) => anyhow::bail!(
+            "cell {:?} runtime.event.binding_ref {:?} must reference an amqp or kafka binding, got {}",
+            cell.cell_key,
+            event.binding_ref,
+            kind
+        ),
+        None => anyhow::bail!(
+            "cell {:?} runtime.event.binding_ref {:?} references an unknown binding",
+            cell.cell_key,
+            event.binding_ref
+        ),
+    }
+    if event.topic.trim().is_empty() {
+        anyhow::bail!(
+            "cell {:?} runtime.event.topic must not be empty",
+            cell.cell_key
+        );
+    }
+    if event.consumer_group.trim().is_empty() {
+        anyhow::bail!(
+            "cell {:?} runtime.event.consumer_group must not be empty",
+            cell.cell_key
+        );
+    }
+    Ok(())
+}
+
+fn validate_schedule_runtime(cell: &OperationalCell, schedule: &CellScheduleRuntime) -> Result<()> {
+    if schedule.cron.trim().is_empty() {
+        anyhow::bail!(
+            "cell {:?} runtime.schedule.cron must not be empty",
+            cell.cell_key
+        );
+    }
+    if let Some(timezone) = schedule.timezone.as_deref() {
+        if timezone.trim().is_empty() {
+            anyhow::bail!(
+                "cell {:?} runtime.schedule.timezone must not be empty when provided",
+                cell.cell_key
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_probe(cell: &OperationalCell, label: &str, probe: &CellProbe) -> Result<()> {
+    match probe.probe_kind {
+        ProbeKind::Http => {
+            let path = probe.path.as_deref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "cell {:?} runtime.probes.{} requires path for http probes",
+                    cell.cell_key,
+                    label
+                )
+            })?;
+            if path.trim().is_empty() || !path.starts_with('/') {
+                anyhow::bail!(
+                    "cell {:?} runtime.probes.{} path must start with '/'",
+                    cell.cell_key,
+                    label
+                );
+            }
+            if !probe.command.is_empty() {
+                anyhow::bail!(
+                    "cell {:?} runtime.probes.{} must not set command for http probes",
+                    cell.cell_key,
+                    label
+                );
+            }
+        }
+        ProbeKind::Exec => {
+            if probe.command.is_empty() || probe.command.iter().any(|part| part.trim().is_empty()) {
+                anyhow::bail!(
+                    "cell {:?} runtime.probes.{} command must contain non-empty entries for exec probes",
+                    cell.cell_key,
+                    label
+                );
+            }
+            if probe.path.is_some() || probe.port.is_some() {
+                anyhow::bail!(
+                    "cell {:?} runtime.probes.{} must not set path or port for exec probes",
+                    cell.cell_key,
+                    label
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_rollout(cell: &OperationalCell, rollout: &CellRollout) -> Result<()> {
+    if rollout.strategy == RolloutStrategy::CanaryLite
+        && !matches!(cell.ingress_kind, IngressKind::Http | IngressKind::Event)
+    {
+        anyhow::bail!(
+            "cell {:?} only supports canary-lite rollout for http or event ingress",
+            cell.cell_key
+        );
+    }
+    if let Some(value) = rollout.max_unavailable.as_deref() {
+        validate_rollout_step_value(cell, "max_unavailable", value)?;
+    }
+    if let Some(value) = rollout.max_surge.as_deref() {
+        validate_rollout_step_value(cell, "max_surge", value)?;
+    }
+    if let Some(percent) = rollout.canary_percent {
+        if percent == 0 || percent > 100 {
+            anyhow::bail!(
+                "cell {:?} runtime.rollout.canary_percent must be between 1 and 100",
+                cell.cell_key
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_rollout_step_value(cell: &OperationalCell, label: &str, value: &str) -> Result<()> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        anyhow::bail!(
+            "cell {:?} runtime.rollout.{} must not be empty",
+            cell.cell_key,
+            label
+        );
+    }
+    let valid = if let Some(percent) = trimmed.strip_suffix('%') {
+        !percent.is_empty() && percent.chars().all(|ch| ch.is_ascii_digit())
+    } else {
+        trimmed.chars().all(|ch| ch.is_ascii_digit())
+    };
+    if !valid {
+        anyhow::bail!(
+            "cell {:?} runtime.rollout.{} must be a decimal count or percentage string",
+            cell.cell_key,
+            label
+        );
+    }
+    Ok(())
+}
+
+fn validate_autoscaling(cell: &OperationalCell, autoscaling: &CellAutoscaling) -> Result<()> {
+    if !matches!(cell.ingress_kind, IngressKind::Http | IngressKind::Event) {
+        anyhow::bail!(
+            "cell {:?} only supports autoscaling hints for http or event ingress",
+            cell.cell_key
+        );
+    }
+    if autoscaling.min_replicas > autoscaling.max_replicas {
+        anyhow::bail!(
+            "cell {:?} runtime.autoscaling min_replicas must be <= max_replicas",
+            cell.cell_key
+        );
+    }
+    if autoscaling.target_cpu_utilization.is_none() && autoscaling.target_inflight.is_none() {
+        anyhow::bail!(
+            "cell {:?} runtime.autoscaling must define target_cpu_utilization or target_inflight",
+            cell.cell_key
+        );
+    }
+    if let Some(target) = autoscaling.target_cpu_utilization {
+        if target == 0 || target > 100 {
+            anyhow::bail!(
+                "cell {:?} runtime.autoscaling target_cpu_utilization must be between 1 and 100",
+                cell.cell_key
+            );
+        }
+    }
     Ok(())
 }
 
@@ -521,5 +916,164 @@ fn expected_ingress_kind(cell_kind: &CellKind) -> IngressKind {
         CellKind::ScheduledJob => IngressKind::Schedule,
         CellKind::WorkflowService => IngressKind::Workflow,
         CellKind::McpTool => IngressKind::Mcp,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_manifest() -> ServiceManifest {
+        ServiceManifest {
+            schema_version: SERVICE_MANIFEST_SCHEMA_VERSION.to_string(),
+            service_id: "orders".to_string(),
+            display_name: "Orders".to_string(),
+            domain_pack: DomainPackRef {
+                id: "orders".to_string(),
+                display_name: "Orders".to_string(),
+            },
+            cells: vec![
+                OperationalCell {
+                    cell_key: "api".to_string(),
+                    cell_kind: CellKind::ApiCell,
+                    entry_symbol: "orders.api.main".to_string(),
+                    ingress_kind: IngressKind::Http,
+                    runtime_class: RuntimeClass::NativeHttp,
+                    scale_class: ScaleClass::ReplicatedHttp,
+                    binding_refs: vec!["db.primary".to_string()],
+                    topology_group: "frontdoor".to_string(),
+                    runtime: CellRuntime {
+                        probes: Some(CellProbeSet {
+                            readiness: Some(CellProbe {
+                                probe_kind: ProbeKind::Http,
+                                path: Some("/readyz".to_string()),
+                                port: Some(8080),
+                                command: Vec::new(),
+                                initial_delay_seconds: None,
+                                period_seconds: Some(5),
+                                timeout_seconds: None,
+                                success_threshold: None,
+                                failure_threshold: Some(3),
+                            }),
+                            liveness: Some(CellProbe {
+                                probe_kind: ProbeKind::Http,
+                                path: Some("/livez".to_string()),
+                                port: Some(8080),
+                                command: Vec::new(),
+                                initial_delay_seconds: None,
+                                period_seconds: Some(10),
+                                timeout_seconds: None,
+                                success_threshold: None,
+                                failure_threshold: Some(3),
+                            }),
+                            startup: None,
+                        }),
+                        rollout: Some(CellRollout {
+                            strategy: RolloutStrategy::Rolling,
+                            max_unavailable: Some("25%".to_string()),
+                            max_surge: Some("25%".to_string()),
+                            canary_percent: None,
+                        }),
+                        autoscaling: Some(CellAutoscaling {
+                            min_replicas: 2,
+                            max_replicas: 6,
+                            target_cpu_utilization: Some(70),
+                            target_inflight: None,
+                        }),
+                        ..CellRuntime::default()
+                    },
+                },
+                OperationalCell {
+                    cell_key: "events".to_string(),
+                    cell_kind: CellKind::EventConsumer,
+                    entry_symbol: "orders.events.main".to_string(),
+                    ingress_kind: IngressKind::Event,
+                    runtime_class: RuntimeClass::NativeWorker,
+                    scale_class: ScaleClass::PartitionedConsumer,
+                    binding_refs: vec!["db.primary".to_string(), "msg.orders".to_string()],
+                    topology_group: "async".to_string(),
+                    runtime: CellRuntime {
+                        event: Some(CellEventRuntime {
+                            binding_ref: "msg.orders".to_string(),
+                            topic: "orders.created".to_string(),
+                            consumer_group: "orders-workers".to_string(),
+                            ack_mode: Some(EventAckMode::Manual),
+                            max_in_flight: Some(32),
+                            drain_timeout_seconds: Some(30),
+                        }),
+                        ..CellRuntime::default()
+                    },
+                },
+                OperationalCell {
+                    cell_key: "settlement".to_string(),
+                    cell_kind: CellKind::ScheduledJob,
+                    entry_symbol: "orders.settlement.main".to_string(),
+                    ingress_kind: IngressKind::Schedule,
+                    runtime_class: RuntimeClass::NativeWorker,
+                    scale_class: ScaleClass::BurstBatch,
+                    binding_refs: vec!["db.primary".to_string()],
+                    topology_group: "async".to_string(),
+                    runtime: CellRuntime {
+                        schedule: Some(CellScheduleRuntime {
+                            cron: "0 */6 * * *".to_string(),
+                            timezone: Some("UTC".to_string()),
+                            concurrency_policy: Some(ScheduleConcurrencyPolicy::Forbid),
+                            retry_limit: Some(3),
+                            start_deadline_seconds: Some(600),
+                            suspend: None,
+                        }),
+                        ..CellRuntime::default()
+                    },
+                },
+            ],
+            topology_profiles: vec![TopologyProfile {
+                id: "prod".to_string(),
+                target_kind: Some("k8s".to_string()),
+                placement: "split-by-cell".to_string(),
+                notes: None,
+            }],
+            resource_bindings: vec![
+                ResourceBindingDecl {
+                    name: "db.primary".to_string(),
+                    kind: BindingKind::Postgres,
+                    required: true,
+                    notes: None,
+                },
+                ResourceBindingDecl {
+                    name: "msg.orders".to_string(),
+                    kind: BindingKind::Amqp,
+                    required: true,
+                    notes: None,
+                },
+            ],
+            default_trust_profile: Some("sandboxed_service_v1".to_string()),
+        }
+    }
+
+    #[test]
+    fn service_manifest_accepts_runtime_hints() {
+        validate_service_manifest(&sample_manifest()).expect("manifest should validate");
+    }
+
+    #[test]
+    fn event_consumer_requires_runtime_event() {
+        let mut manifest = sample_manifest();
+        manifest.cells[1].runtime.event = None;
+        let err =
+            validate_service_manifest(&manifest).expect_err("event runtime should be required");
+        assert!(err
+            .to_string()
+            .contains("requires runtime.event for event ingress"));
+    }
+
+    #[test]
+    fn scheduled_job_requires_runtime_schedule() {
+        let mut manifest = sample_manifest();
+        manifest.cells[2].runtime.schedule = None;
+        let err =
+            validate_service_manifest(&manifest).expect_err("schedule runtime should be required");
+        assert!(err
+            .to_string()
+            .contains("requires runtime.schedule for schedule ingress"));
     }
 }

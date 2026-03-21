@@ -130,25 +130,25 @@
     },
     {
       "name": "ext-obj-core",
-      "version": "0.1.0",
-      "path": ".x07/deps/ext-obj-core/0.1.0",
-      "package_manifest_sha256": "27a70be00aba34e1be7852483a5c6e5ed71e29e6f3265f67827d3f412e86bb26",
+      "version": "0.1.1",
+      "path": ".x07/deps/ext-obj-core/0.1.1",
+      "package_manifest_sha256": "522e14477f437fdfcd31a442e83bf52ccb7b4ba02db5891603e31a3cbbd99980",
       "module_root": "modules",
       "modules_sha256": {
-        "std.obj": "f95e01a9fae5d589e6fc42d61fbbdba6c142fe65c9477fe6d81267ed61a8b0c8",
-        "std.obj.spec": "6290b1f56d2da4799e14a73ce7411dee24354dae34daaeebedcab3c9e4569531"
+        "std.obj": "e29d20a1c8593571b7a7af8c8888b3defe42ce5cf637d6aa036c5c81b9ab46db",
+        "std.obj.spec": "4b2f45ce7567cf3b3ef7cbdb0447344695b1535360ee1734bccd5ece3db8cfc2"
       },
       "yanked": false
     },
     {
       "name": "ext-obj-s3",
-      "version": "0.1.0",
-      "path": ".x07/deps/ext-obj-s3/0.1.0",
-      "package_manifest_sha256": "70f185f28272d38fd6406c1e955b1b2e9044617aa4ab0e935b38ad7b14b700c9",
+      "version": "0.1.1",
+      "path": ".x07/deps/ext-obj-s3/0.1.1",
+      "package_manifest_sha256": "9f302369aae61da9b25414c004b3c851f840afd538f7e16b4f3ce37126636f75",
       "module_root": "modules",
       "modules_sha256": {
-        "std.obj.s3": "175e0055ce2d2c67cfcb7d19681cd1a83de272245191c5b6f739de78be613339",
-        "std.obj.s3.spec": "edb430598a27a2c82857044e98c250646853b29856c34c153fe50c5c25237f04"
+        "std.obj.s3": "b66966c7d13f52ac682a33e38f9a6232e451282fd980ff2d4a3249abf7c624a5",
+        "std.obj.s3.spec": "0c5838090058d240c9ca9824735c9737b830431cbbbe9331f77bceadeebb003d"
       },
       "yanked": false
     },

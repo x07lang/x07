@@ -2219,6 +2219,24 @@ impl InferCtx {
                         }
                         Ok(Ty::Bytes.into())
                     }
+                    "os.obj.s3.dispatch_v1" => {
+                        self.require_standalone_only(head)?;
+                        if args.len() != 2 {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Parse,
+                                "os.obj.s3.dispatch_v1 expects 2 args".to_string(),
+                            ));
+                        }
+                        if self.infer(&args[0])? != Ty::Bytes || self.infer(&args[1])? != Ty::Bytes
+                        {
+                            return Err(CompilerError::new(
+                                CompileErrorKind::Typing,
+                                "os.obj.s3.dispatch_v1 expects (bytes req, bytes caps)"
+                                    .to_string(),
+                            ));
+                        }
+                        Ok(Ty::Bytes.into())
+                    }
                     "os.env.get" => {
                         self.require_standalone_only(head)?;
                         if args.len() != 1 {

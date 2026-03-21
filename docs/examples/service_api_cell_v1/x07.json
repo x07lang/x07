@@ -43,13 +43,13 @@
     },
     {
       "name": "ext-obj-core",
-      "path": ".x07/deps/ext-obj-core/0.1.0",
-      "version": "0.1.0"
+      "path": ".x07/deps/ext-obj-core/0.1.1",
+      "version": "0.1.1"
     },
     {
       "name": "ext-obj-s3",
-      "path": ".x07/deps/ext-obj-s3/0.1.0",
-      "version": "0.1.0"
+      "path": ".x07/deps/ext-obj-s3/0.1.1",
+      "version": "0.1.1"
     },
     {
       "name": "ext-sockets-c",

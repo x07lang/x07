@@ -17,7 +17,16 @@
       "binding_refs": [
         "db.primary"
       ],
-      "topology_group": "primary"
+      "topology_group": "primary",
+      "runtime": {
+        "schedule": {
+          "cron": "0 */6 * * *",
+          "timezone": "UTC",
+          "concurrency_policy": "forbid",
+          "retry_limit": 3,
+          "start_deadline_seconds": 600
+        }
+      }
     }
   ],
   "topology_profiles": [

@@ -2436,6 +2436,9 @@ bytes_t x07_ext_db_redis_open_v1(bytes_t req, bytes_t caps);
 bytes_t x07_ext_db_redis_cmd_v1(bytes_t req, bytes_t caps);
 bytes_t x07_ext_db_redis_close_v1(bytes_t req, bytes_t caps);
 
+// Native ext-obj-s3 backend entrypoint (linked from deps/x07/libx07_ext_obj_s3.*).
+bytes_t x07_obj_s3_dispatch_v1(bytes_t req, bytes_t caps);
+
 // Native ext-regex backend entrypoints (linked from deps/x07/libx07_ext_regex.*).
 bytes_t x07_ext_regex_compile_opts_v1(bytes_t pat, int32_t opts_u32);
 bytes_t x07_ext_regex_exec_from_v1(bytes_t compiled, bytes_t text, int32_t start_i32);

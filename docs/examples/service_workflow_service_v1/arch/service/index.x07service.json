@@ -18,7 +18,28 @@
         "db.primary",
         "msg.orders"
       ],
-      "topology_group": "primary"
+      "topology_group": "primary",
+      "runtime": {
+        "probes": {
+          "readiness": {
+            "probe_kind": "exec",
+            "command": [
+              "/bin/check-workflow",
+              "--ready"
+            ]
+          },
+          "liveness": {
+            "probe_kind": "exec",
+            "command": [
+              "/bin/check-workflow",
+              "--alive"
+            ]
+          }
+        },
+        "rollout": {
+          "strategy": "recreate"
+        }
+      }
     }
   ],
   "topology_profiles": [

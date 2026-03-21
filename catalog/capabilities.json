@@ -253,7 +253,7 @@
       "summary": "Object storage core: canonical object metadata, request envelopes, and driver interface.",
       "canonical": {
         "name": "ext-obj-core",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "status": "experimental"
     },
@@ -262,7 +262,7 @@
       "summary": "S3-compatible object storage driver for X07 services.",
       "canonical": {
         "name": "ext-obj-s3",
-        "version": "0.1.0"
+        "version": "0.1.1"
       },
       "worlds": [
         "run-os",
