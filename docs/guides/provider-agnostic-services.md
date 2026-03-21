@@ -79,6 +79,8 @@ Decode operation results with `std.obj.spec.resp_is_ok_v1`, `std.obj.spec.resp_o
 
 This keeps the application boundary stable while the operator changes infrastructure.
 
+When you are converting an existing service from direct provider wiring to logical bindings, use the migration checklist in [Guide: Migrating services to logical bindings](service-binding-migration.md).
+
 ## Canonical project flow
 
 1. Start from a service scaffold:
@@ -128,3 +130,4 @@ Keep provider-specific escape hatches at the topology and adapter layer.
 - [Platform for agents](../agent/platform.md)
 - [Guide: Messaging and event streaming](messaging.md)
 - [Guide: Databases](databases.md)
+- [Guide: Migrating services to logical bindings](service-binding-migration.md)

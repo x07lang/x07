@@ -449,3 +449,187 @@ pub unsafe extern "C" fn x07_obj_s3_dispatch_v1(req: ev_bytes, _caps: ev_bytes) 
         Err((code, msg)) => error_bytes(op, code, msg),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::sync::mpsc::{self, Receiver};
+    use std::thread;
+    use std::time::Duration;
+
+    #[derive(Debug)]
+    struct CapturedRequest {
+        method: String,
+        path: String,
+        headers: HashMap<String, String>,
+        body: Vec<u8>,
+    }
+
+    fn test_policy(endpoint: Url) -> Policy {
+        Policy {
+            enabled: true,
+            s3_enabled: true,
+            endpoint,
+            default_bucket: "demo-bucket".to_string(),
+            access_key: "minio".to_string(),
+            secret_key: "minio123".to_string(),
+            key_prefix: Some("services/demo".to_string()),
+            max_req_bytes: MAX_REQ_BYTES_DEFAULT,
+            max_put_bytes: MAX_PUT_BYTES_DEFAULT,
+            max_resp_bytes: MAX_RESP_BYTES_DEFAULT,
+        }
+    }
+
+    fn start_http_server(
+        responses: Vec<&'static str>,
+    ) -> (Url, Receiver<CapturedRequest>, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        let addr = listener.local_addr().expect("server address");
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            for response in responses {
+                let (mut stream, _) = listener.accept().expect("accept test request");
+                let captured = read_request(&mut stream).expect("read test request");
+                tx.send(captured).expect("send captured request");
+                stream
+                    .write_all(response.as_bytes())
+                    .expect("write test response");
+            }
+        });
+        let endpoint = Url::parse(&format!("http://{}", addr)).expect("endpoint url");
+        (endpoint, rx, handle)
+    }
+
+    fn read_request(stream: &mut TcpStream) -> std::io::Result<CapturedRequest> {
+        stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+        let mut buffer = Vec::new();
+        let mut chunk = [0u8; 1024];
+        let mut header_end = None;
+        let mut content_length = 0usize;
+        loop {
+            let read = stream.read(&mut chunk)?;
+            if read == 0 {
+                break;
+            }
+            buffer.extend_from_slice(&chunk[..read]);
+            if header_end.is_none() {
+                if let Some(index) = find_header_end(&buffer) {
+                    header_end = Some(index + 4);
+                    let header_text = String::from_utf8_lossy(&buffer[..index]);
+                    for line in header_text.lines().skip(1) {
+                        if let Some((name, value)) = line.split_once(':') {
+                            if name.eq_ignore_ascii_case("content-length") {
+                                content_length = value.trim().parse::<usize>().unwrap_or(0);
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some(header_end) = header_end {
+                if buffer.len() >= header_end + content_length {
+                    break;
+                }
+            }
+        }
+
+        let header_end = header_end.expect("request headers");
+        let header_text = String::from_utf8_lossy(&buffer[..header_end - 4]);
+        let mut lines = header_text.lines();
+        let request_line = lines.next().expect("request line");
+        let mut parts = request_line.split_whitespace();
+        let method = parts.next().unwrap_or_default().to_string();
+        let path = parts.next().unwrap_or_default().to_string();
+        let mut headers = HashMap::new();
+        for line in lines {
+            if let Some((name, value)) = line.split_once(':') {
+                headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
+            }
+        }
+        let body = buffer[header_end..header_end + content_length].to_vec();
+        Ok(CapturedRequest {
+            method,
+            path,
+            headers,
+            body,
+        })
+    }
+
+    fn find_header_end(buffer: &[u8]) -> Option<usize> {
+        buffer.windows(4).position(|window| window == b"\r\n\r\n")
+    }
+
+    #[test]
+    fn parse_target_supports_relative_and_s3_uris() {
+        let endpoint = Url::parse("http://127.0.0.1:9000").expect("endpoint");
+        let policy = test_policy(endpoint);
+
+        let default_target = parse_target(&policy, b"documents/report.json").expect("default");
+        assert_eq!(default_target.bucket, "demo-bucket");
+        assert_eq!(default_target.key, "services/demo/documents/report.json");
+
+        let explicit_target =
+            parse_target(&policy, b"s3://alt-bucket/archive/item.json").expect("explicit");
+        assert_eq!(explicit_target.bucket, "alt-bucket");
+        assert_eq!(explicit_target.key, "services/demo/archive/item.json");
+    }
+
+    #[test]
+    fn signed_request_round_trips_against_local_http_server() {
+        let (endpoint, requests, handle) = start_http_server(vec![
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nETag: \"etag-demo\"\r\n\r\n",
+            "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\npong",
+            "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n",
+        ]);
+        let policy = test_policy(endpoint);
+        let target = parse_target(&policy, b"documents/report.json").expect("target");
+
+        let put_response = signed_request(
+            &policy,
+            "PUT",
+            &target,
+            b"ping",
+            Some("application/octet-stream"),
+        )
+        .expect("put response");
+        assert!(put_response.status().is_success());
+        let put_request = requests.recv().expect("captured put request");
+        assert_eq!(put_request.method, "PUT");
+        assert_eq!(
+            put_request.path,
+            "/demo-bucket/services/demo/documents/report.json"
+        );
+        assert_eq!(put_request.body, b"ping");
+        assert!(put_request.headers.contains_key("authorization"));
+        assert!(put_request.headers.contains_key("x-amz-content-sha256"));
+        assert!(put_request.headers.contains_key("x-amz-date"));
+
+        let head_response =
+            signed_request(&policy, "HEAD", &target, &[], None).expect("head response");
+        assert!(head_response.status().is_success());
+        let head_payload = build_head_payload(&head_response);
+        let head_text = String::from_utf8(head_payload).expect("head payload utf8");
+        assert!(head_text.contains("\"exists\":true"));
+        assert!(head_text.contains("etag-demo"));
+        let head_request = requests.recv().expect("captured head request");
+        assert_eq!(head_request.method, "HEAD");
+        assert!(head_request.body.is_empty());
+
+        let get_response = signed_request(&policy, "GET", &target, &[], None).expect("get");
+        let get_body = get_response.bytes().expect("get body");
+        assert_eq!(get_body.as_ref(), b"pong");
+        let get_request = requests.recv().expect("captured get request");
+        assert_eq!(get_request.method, "GET");
+
+        let delete_response =
+            signed_request(&policy, "DELETE", &target, &[], None).expect("delete");
+        assert_eq!(delete_response.status().as_u16(), 204);
+        let delete_request = requests.recv().expect("captured delete request");
+        assert_eq!(delete_request.method, "DELETE");
+
+        handle.join().expect("join test server");
+    }
+}

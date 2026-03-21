@@ -99,6 +99,7 @@ When you need real OS resources (real network, real disk, real time), you switch
   - [Databases](guides/databases.md)
   - [Messaging and event streaming](guides/messaging.md)
   - [Provider-agnostic service runtimes and bindings](guides/provider-agnostic-services.md)
+  - [Migrating services to logical bindings](guides/service-binding-migration.md)
   - [Scaling, retry, and idempotency for services](guides/scaling-retry-idempotency.md)
 - Packages:
   - [Workspaces, packages, lockfiles](packages/index.md)

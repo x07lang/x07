@@ -158,6 +158,7 @@ Service manifests now carry runtime hints for:
 Canonical service deployment guidance lives in:
 
 - [`docs/guides/provider-agnostic-services.md`](docs/guides/provider-agnostic-services.md)
+- [`docs/guides/service-binding-migration.md`](docs/guides/service-binding-migration.md)
 - [`docs/guides/scaling-retry-idempotency.md`](docs/guides/scaling-retry-idempotency.md)
 
 Canonical certificate-first examples live in:

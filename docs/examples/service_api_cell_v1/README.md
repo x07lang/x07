@@ -31,3 +31,15 @@ export X07_OS_OBJ_S3_BUCKET=svc-api-cell
 export X07_OS_OBJ_S3_ACCESS_KEY=minio
 export X07_OS_OBJ_S3_SECRET_KEY=minio123
 ```
+
+Reference pattern:
+
+- keep API state on `db.primary`
+- keep optional document or asset storage on `obj.documents`
+- decode object-store responses with `std.obj.spec.*`
+- keep probe, rollout, and autoscaling intent in the service manifest rather than in provider-specific YAML
+
+Related guides:
+
+- [Guide: Provider-agnostic service runtimes and bindings](../../guides/provider-agnostic-services.md)
+- [Guide: Migrating services to logical bindings](../../guides/service-binding-migration.md)
