@@ -8343,7 +8343,7 @@
         }
       ],
       "name": "ext-obj-core",
-      "package_manifest_sha256": "27a70be00aba34e1be7852483a5c6e5ed71e29e6f3265f67827d3f412e86bb26",
+      "package_manifest_sha256": "757c3b5ddab897ea5291a2cd800e38653f197d1d983b6d58eeb10faeccbcadf7",
       "path": "packages/ext/x07-ext-obj-core/0.1.0",
       "version": "0.1.0"
     },
@@ -13025,6 +13025,6 @@
       "version": "0.1.5"
     }
   ],
-  "packages_hash": "311d81a253ea1e9a4a9513b105274449fcdae6461dc9345e05f0cd4c4c82390c",
+  "packages_hash": "c2f62ec322c1d43d4e9a87cefaa2e1e317b24a04273472d86cdfd7138f0db5b5",
   "packages_root": "packages/ext"
 }

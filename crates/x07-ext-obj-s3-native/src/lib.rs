@@ -116,15 +116,29 @@ fn parse_request(req: &[u8]) -> Result<ObjRequest<'_>, (u32, Vec<u8>)> {
         return Err((objcore::OBJ_ERR_BAD_REQ, b"short object request".to_vec()));
     }
     if &req[0..4] != REQ_MAGIC {
-        return Err((objcore::OBJ_ERR_BAD_REQ, b"bad object request magic".to_vec()));
+        return Err((
+            objcore::OBJ_ERR_BAD_REQ,
+            b"bad object request magic".to_vec(),
+        ));
     }
-    let version = read_u32_le(req, 4)
-        .ok_or_else(|| (objcore::OBJ_ERR_BAD_REQ, b"missing request version".to_vec()))?;
+    let version = read_u32_le(req, 4).ok_or_else(|| {
+        (
+            objcore::OBJ_ERR_BAD_REQ,
+            b"missing request version".to_vec(),
+        )
+    })?;
     if version != REQ_VERSION {
-        return Err((objcore::OBJ_ERR_BAD_REQ, b"unsupported object request version".to_vec()));
+        return Err((
+            objcore::OBJ_ERR_BAD_REQ,
+            b"unsupported object request version".to_vec(),
+        ));
     }
-    let op = read_u32_le(req, 8)
-        .ok_or_else(|| (objcore::OBJ_ERR_BAD_REQ, b"missing object operation".to_vec()))?;
+    let op = read_u32_le(req, 8).ok_or_else(|| {
+        (
+            objcore::OBJ_ERR_BAD_REQ,
+            b"missing object operation".to_vec(),
+        )
+    })?;
     let uri_len = read_u32_le(req, 12)
         .ok_or_else(|| (objcore::OBJ_ERR_BAD_REQ, b"missing uri length".to_vec()))?
         as usize;
@@ -139,7 +153,10 @@ fn parse_request(req: &[u8]) -> Result<ObjRequest<'_>, (u32, Vec<u8>)> {
         .checked_add(body_len)
         .ok_or_else(|| (objcore::OBJ_ERR_BAD_REQ, b"body length overflow".to_vec()))?;
     if body_end != req.len() {
-        return Err((objcore::OBJ_ERR_BAD_REQ, b"malformed object request".to_vec()));
+        return Err((
+            objcore::OBJ_ERR_BAD_REQ,
+            b"malformed object request".to_vec(),
+        ));
     }
     Ok(ObjRequest {
         op,
@@ -307,10 +324,10 @@ fn build_head_payload(response: &Response) -> Vec<u8> {
         .and_then(|value| value.to_str().ok())
         .map(|value| value.replace('"', "\\\""));
     match etag {
-        Some(etag) => format!(
-            "{{\"exists\":true,\"content_length\":{content_length},\"etag\":\"{etag}\"}}"
-        )
-        .into_bytes(),
+        Some(etag) => {
+            format!("{{\"exists\":true,\"content_length\":{content_length},\"etag\":\"{etag}\"}}")
+                .into_bytes()
+        }
         None => format!("{{\"exists\":true,\"content_length\":{content_length}}}").into_bytes(),
     }
 }
@@ -332,10 +349,18 @@ pub unsafe extern "C" fn x07_obj_s3_dispatch_v1(req: ev_bytes, _caps: ev_bytes) 
         Err((code, msg)) => return error_bytes(op, code, msg),
     };
     if !policy.enabled || !policy.s3_enabled {
-        return error_bytes(op, objcore::OBJ_ERR_POLICY_DENIED, b"s3 backend disabled".to_vec());
+        return error_bytes(
+            op,
+            objcore::OBJ_ERR_POLICY_DENIED,
+            b"s3 backend disabled".to_vec(),
+        );
     }
     if req.len() as u32 > policy.max_req_bytes {
-        return error_bytes(op, objcore::OBJ_ERR_TOO_LARGE, b"request too large".to_vec());
+        return error_bytes(
+            op,
+            objcore::OBJ_ERR_TOO_LARGE,
+            b"request too large".to_vec(),
+        );
     }
     let target = match parse_target(&policy, parsed.uri) {
         Ok(target) => target,
@@ -343,8 +368,8 @@ pub unsafe extern "C" fn x07_obj_s3_dispatch_v1(req: ev_bytes, _caps: ev_bytes) 
     };
 
     let result = match op {
-        objcore::OP_HEAD_V1 => signed_request(&policy, "HEAD", &target, &[], None).and_then(
-            |response| {
+        objcore::OP_HEAD_V1 => {
+            signed_request(&policy, "HEAD", &target, &[], None).and_then(|response| {
                 if response.status().is_success() {
                     Ok(build_head_payload(&response))
                 } else if response.status().as_u16() == 404 {
@@ -355,10 +380,10 @@ pub unsafe extern "C" fn x07_obj_s3_dispatch_v1(req: ev_bytes, _caps: ev_bytes) 
                         format!("object store HEAD failed: {}", response.status()).into_bytes(),
                     ))
                 }
-            },
-        ),
-        objcore::OP_GET_V1 => signed_request(&policy, "GET", &target, &[], None).and_then(
-            |response| {
+            })
+        }
+        objcore::OP_GET_V1 => {
+            signed_request(&policy, "GET", &target, &[], None).and_then(|response| {
                 if response.status().as_u16() == 404 {
                     return Err((objcore::OBJ_ERR_NOT_FOUND, b"object not found".to_vec()));
                 }
@@ -376,8 +401,8 @@ pub unsafe extern "C" fn x07_obj_s3_dispatch_v1(req: ev_bytes, _caps: ev_bytes) 
                     return Err((objcore::OBJ_ERR_TOO_LARGE, b"response too large".to_vec()));
                 }
                 Ok(body)
-            },
-        ),
+            })
+        }
         objcore::OP_PUT_V1 => {
             if parsed.body.len() as u32 > policy.max_put_bytes {
                 Err((objcore::OBJ_ERR_TOO_LARGE, b"put body too large".to_vec()))
@@ -401,8 +426,8 @@ pub unsafe extern "C" fn x07_obj_s3_dispatch_v1(req: ev_bytes, _caps: ev_bytes) 
                 })
             }
         }
-        objcore::OP_DELETE_V1 => signed_request(&policy, "DELETE", &target, &[], None).and_then(
-            |response| {
+        objcore::OP_DELETE_V1 => {
+            signed_request(&policy, "DELETE", &target, &[], None).and_then(|response| {
                 if response.status().is_success() || response.status().as_u16() == 404 {
                     Ok(Vec::new())
                 } else {
@@ -411,8 +436,8 @@ pub unsafe extern "C" fn x07_obj_s3_dispatch_v1(req: ev_bytes, _caps: ev_bytes) 
                         format!("object store DELETE failed: {}", response.status()).into_bytes(),
                     ))
                 }
-            },
-        ),
+            })
+        }
         other => Err((
             objcore::OBJ_ERR_BAD_REQ,
             format!("unsupported object op: {other}").into_bytes(),

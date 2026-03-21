@@ -73,7 +73,7 @@ Examples:
 - `msg.orders` can stay the logical bus binding while `runtime.event.topic` and `runtime.event.consumer_group` describe how an `event-consumer` cell should attach to that binding
 - `obj.documents` can stay the logical object-store binding while target/binding materialization chooses the concrete S3-compatible endpoint
 
-The first supported object-store wedge is the `ext-obj-core@0.1.1` plus `ext-obj-s3@0.1.1` line.
+The first supported object-store wedge is the `ext-obj-core` plus `ext-obj-s3` line.
 Those packages keep the binding logical in service code while the runtime materializes `X07_OS_OBJ_S3_ENDPOINT`, `X07_OS_OBJ_S3_BUCKET`, `X07_OS_OBJ_S3_ACCESS_KEY`, and `X07_OS_OBJ_S3_SECRET_KEY` for the native S3 backend.
 Decode operation results with `std.obj.spec.resp_is_ok_v1`, `std.obj.spec.resp_ok_payload_v1`, `std.obj.s3.spec.resp_err_code_v1`, and `std.obj.s3.spec.resp_err_msg_v1`.
 

@@ -4766,8 +4766,7 @@ impl<'a> Emitter<'a> {
                         {
                             return Err(CompilerError::new(
                                 CompileErrorKind::Typing,
-                                "os.obj.s3.dispatch_v1 expects (bytes req, bytes caps)"
-                                    .to_string(),
+                                "os.obj.s3.dispatch_v1 expects (bytes req, bytes caps)".to_string(),
                             ));
                         }
                         self.line(
