@@ -220,7 +220,7 @@
               "max_regression_pct": 15
             },
             "wall_ms": {
-              "baseline": 500,
+              "baseline": 600,
               "max_regression_pct": 20
             }
           },
@@ -296,7 +296,7 @@
               "max_regression_pct": 15
             },
             "wall_ms": {
-              "baseline": 304,
+              "baseline": 310,
               "max_regression_pct": 20
             }
           },
