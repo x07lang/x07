@@ -92,6 +92,11 @@ docs/examples/**/target/cert/
 /deps/x07/x07_ext_jsonschema.lib
 /deps/x07/include/x07_ext_jsonschema_abi_v1.h
 
+# Native ext-obj-s3 backend artifacts (built by scripts/build_ext_obj_s3.sh)
+/deps/x07/libx07_ext_obj_s3.a
+/deps/x07/x07_ext_obj_s3.lib
+/deps/x07/include/x07_ext_obj_s3_abi_v1.h
+
 # Native ext-db-sqlite backend artifacts (built by scripts/build_ext_db_sqlite.sh)
 /deps/x07/libx07_ext_db_sqlite.a
 /deps/x07/x07_ext_db_sqlite.lib
