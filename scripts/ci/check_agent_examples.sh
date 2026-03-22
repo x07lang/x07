@@ -569,11 +569,11 @@ pkg_lock_check "$proto_work"
 fmt_check_all "$proto_work"
 lint_check_one "$proto_work" "run-os-sandboxed" "src/main.x07.json"
 
-wrapped_13="$(run_x07_run "protos-framing-loopback" "$proto_work" \
-  --profile sandbox \
-  --allow-host "127.0.0.1:18081" \
-  --cpu-time-limit-seconds 60 \
-)"
+	wrapped_13="$(run_x07_run "protos-framing-loopback" "$proto_work" \
+	  --profile sandbox \
+	  --allow-host "127.0.0.1:18082" \
+	  --cpu-time-limit-seconds 60 \
+	)"
 unwrap_and_check_wrapped_report "protos-framing-loopback" "$wrapped_13" "$proto_work/tmp/runner.json" "os" "run-os-sandboxed" "true"
 
 expected_13='{"grpc":"ping","ok":true,"ws":"hello"}'$'\n'
