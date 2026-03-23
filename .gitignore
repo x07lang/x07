@@ -42,6 +42,7 @@ tmp/
 dist/*.tar.gz
 dist/channels.json
 dist/.tmp_toolchain_*
+dist/manual-*/
 dist/release-manifest.json
 
 # Package artifacts (generated locally)
