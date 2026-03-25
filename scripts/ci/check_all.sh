@@ -111,6 +111,9 @@ step "verified core pure example release guard"
 step "verified core fixture release guard"
 ./scripts/ci/check_verified_core_fixture.sh
 
+step "service bench harness dry smoke"
+./scripts/ci/check_service_bench_harnesses.sh
+
 if [[ -n "${X07_VM_GUEST_IMAGE:-}" || -n "${X07_VM_VZ_GUEST_BUNDLE:-}" ]]; then
   step "trusted sandbox program example release guard"
   ./scripts/ci/check_trusted_sandbox_program_example.sh
