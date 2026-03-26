@@ -10,10 +10,10 @@
     "version": "0.2.5"
   },
   "x07_wasm": {
-    "release_manifest_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    "release_manifest_url": "https://github.com/x07lang/x07-wasm-backend/releases/download/v0.2.11/x07-wasm-0.2.11-release.json",
-    "tag": "v0.2.11",
-    "version": "0.2.11"
+    "release_manifest_sha256": "sha256:c600354f209dc2966cd2320e4a0071af1b627dc71b0159f6c72b0bf11b9019f8",
+    "release_manifest_url": "https://github.com/x07lang/x07-wasm-backend/releases/download/v0.2.12/x07-wasm-0.2.12-release.json",
+    "tag": "v0.2.12",
+    "version": "0.2.12"
   },
   "x07_web_ui_host": {
     "release_manifest_sha256": "sha256:e9844460f5e814946b9d683a5d03ab1ebf0949f8343634480fe5b5c11ec2b7f8",
