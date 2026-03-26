@@ -44,6 +44,7 @@ ALLOWED_TRACKED_ROOT_ENTRIES = {
 
     # production content
     "arch",
+    "bench",
     "branding",
     "catalog",
     "ci",

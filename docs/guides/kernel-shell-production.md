@@ -46,7 +46,7 @@ Shell errors should carry transport and dependency details:
 
 The shell maps kernel errors to the external contract (HTTP status, message nack, etc).
 
-## Observability contract (M7 baseline)
+## Observability contract
 
 Production support depends on consistent correlation fields.
 
