@@ -35,7 +35,8 @@ The `x07` repo is the entrypoint, but the public ecosystem is intentionally spli
 
 - **MCP kit + official MCP server**: [`x07-mcp`](https://github.com/x07lang/x07-mcp) gives you templates for building MCP servers in X07 and ships the official `io.x07/x07lang-mcp` server for agent runtimes. Start with [MCP kit](toolchain/mcp-kit.md).
 - **WASM, web UI, and device apps**: [`x07-wasm-backend`](https://github.com/x07lang/x07-wasm-backend), [`x07-web-ui`](https://github.com/x07lang/x07-web-ui), [`x07-device-host`](https://github.com/x07lang/x07-device-host), and [`x07-wasi`](https://github.com/x07lang/x07-wasi) cover browser UI, WASM services, packaged desktop/mobile apps, and WASI-facing contracts. Start with [WASM tooling](toolchain/wasm.md).
-- **Lifecycle platform**: [`x07-platform`](https://github.com/x07lang/x07-platform) and [`x07-platform-contracts`](https://github.com/x07lang/x07-platform-contracts) cover sealed artifacts, deploy plans, incidents, regressions, and device release control. Start with [Platform for agents](agent/platform.md).
+- **Lifecycle platform**: [`x07-platform`](https://github.com/x07lang/x07-platform) and [`x07-platform-contracts`](https://github.com/x07lang/x07-platform-contracts) cover public workload delivery, bindings, releases, incidents, regressions, and device-release control through `x07lp`. Start with [Platform for agents](agent/platform.md).
+- **Managed control layer**: x07 Sentinel builds on that public split; its private implementation repo is `x07-platform-cloud`.
 - **Packages and docs**: [`x07-registry`](https://github.com/x07lang/x07-registry) powers package publishing, [`x07-registry-web`](https://github.com/x07lang/x07-registry-web) serves [x07.io](https://x07.io), and [`x07-website`](https://github.com/x07lang/x07-website) serves [x07lang.org](https://x07lang.org).
 
 ## What makes X07 different?

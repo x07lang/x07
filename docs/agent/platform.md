@@ -1,34 +1,35 @@
 # Platform (x07lp)
 
-The x07 Platform (x07-LP) is a contract-first lifecycle engine for sealed X07 artifacts. It consumes `x07.app.pack@0.1.0` plus the related policy, SLO, provenance, incident, and regression artifacts, then produces deterministic deploy, query, control, incident, and regression outputs.
+The x07 Platform (x07-LP) is the public runtime and control-plane surface for X07 workloads and release operations. In the current split, `x07` owns authoring and service scaffolds, `x07-wasm` emits workload, app, and device artifacts, and `x07lp` operates workloads, bindings, releases, incidents, and regressions through the public `lp.*` contracts. The managed control layer built on top of that split is sold as x07 Sentinel; the private repo that implements it is `x07-platform-cloud`.
 
 ## Vision
 
-- Turn X07 delivery into a contract-first, machine-readable loop from change request through deploy, incident capture, and regression generation.
-- Keep the same CLI and sealed artifacts usable across local development, self-hosted remote targets, and the future hosted platform.
-- Let creators focus on making things while operators keep control through auditable artifacts, policy gates, and explicit control actions.
+- Turn X07 delivery into a contract-first, machine-readable loop from workload packaging through release, deploy, incident capture, and regression generation.
+- Lead with governed backend workloads on Kubernetes while keeping the same public contracts usable for local demos, self-hosted targets, and hosted review flows.
+- Keep authoring, packaging, and operations visibly separate: `x07` writes software, `x07-wasm` packages it, and `x07lp` operates it.
 
 ## Audience
 
-- creators who want a default ship-and-operate path without learning provider-specific infrastructure
-- operators who need deterministic reports, policy and SLO gates, and a clear query and control surface
+- service authors who want a default path for API, event-consumer, and scheduled-job cells without hard-coding provider details
+- operators and platform teams who need deterministic reports, policy and SLO gates, release evidence, and a clear query and control surface
 
 ## Current goals
 
-- maintain a strong public OSS baseline for local and self-hosted remote deploys
-- keep provider support behind adapter and conformance surfaces instead of baking cloud logic into the engine
-- preserve the public/private split so hosted-only account, tenancy, metering, and billing work can evolve without forking the public platform
+- maintain a strong public OSS baseline for local, self-hosted, and Kubernetes-backed workload delivery
+- keep provider support behind workload, binding, target, and conformance surfaces instead of baking cloud logic into the engine
+- preserve the public/private split so hosted-only Sentinel concerns such as account, tenancy, metering, billing, and approvals evolve without forking the public platform
 
 Repos:
 - `x07lang/x07-platform-contracts`
 - `x07lang/x07-platform`
-- `x07lang/x07-platform-cloud`
+- `x07lang/x07-platform-cloud` (private repo for the managed Sentinel layer)
 
 CLI: `x07lp`  
 MCP namespace: `lp.*`
 
 ## Current contract line
 
+- workload, topology, binding, target-health, and release contracts are the current public backend-delivery line
 - public platform contracts for device release, incident, and regression run on the `0.2.0` line
 - deploy, environment, control, and inventory contracts remain on their current public `0.1.x` lines
 - the official MCP lifecycle path is `io.x07/x07lang-mcp` via `lp.query_v1` and `lp.control_v1`
@@ -63,6 +64,11 @@ MCP namespace: `lp.*`
   - `lp.remote.capabilities.response@0.1.0`
   - `lp.adapter.capabilities@0.1.0`
   - `lp.adapter.conformance.report@0.1.0`
+- workload delivery contracts:
+  - `lp.workload.*`
+  - `lp.topology.*`
+  - `lp.binding.*`
+  - `lp.release.*`
 - control and inventory contracts:
   - `lp.control.action.result@0.1.0`
   - `lp.app.list.result@0.1.0`
@@ -120,13 +126,13 @@ This is the intended M5 boundary in `x07`: the core toolchain and docs point cli
 
 `x07-platform` provides:
 
-- `x07lp` commands for `change`, `deploy`, `target`, `adapter`, `incident`, `regress`, `app`, `platform`, `ui`, and `schema`
-- deterministic local execution with candidate/stable slots, weighted routing, signed control actions, incident capture, regression generation, and query/index rebuilds
+- `x07lp` commands for hosted login and scope selection (`login`, `whoami`, `org`, `project`, `env`, `context`), hosted release and binding review (`release-submit`, `release-query`, `release-explain`, `release-rollback`, `binding-status`), and workload runtime control (`workload accept|run|query|reconcile|bindings|stop`)
+- deterministic local execution with candidate/stable slots, weighted routing, signed control actions, incident capture, regression generation, deploy query rebuilds, and a Kubernetes workload lane for HTTP, event-consumer, and scheduled-job cells
 - self-hosted remote deploy parity through `x07lpd`
 - a shared Rust driver (`x07lp-driver`) used by the CLI, MCP layer, and daemon so local and remote flows share one execution path
-- native-aware device release flows where `release-create` freezes package-derived `native_summary`, `release-observe` correlates native telemetry into linked incidents, `regress from-incident` can drive native replay generation, and Command Center exposes the same normalized release/incident/regression state
+- secondary app and device-release flows remain available for deploy, incident, regression, and native release supervision when that broader lifecycle loop is needed
 
-The current self-hosted reference target is the wasmCloud stack under `x07-platform/examples/targets/wasmcloud/`. The verified creator-facing path uses:
+The current first backend-delivery lane is the Kubernetes workload path under `x07.workload.pack@0.1.0`. The older self-hosted remote reference target still exists under `x07-platform/examples/targets/wasmcloud/`, and the verified remote path uses:
 
 - HTTPS control-plane ingress on `https://localhost:17443`
 - authenticated HTTPS OCI registry publishing on `https://localhost:15443`
@@ -139,6 +145,6 @@ The default server-side secret adapter stays on the same public adapter id, but 
 
 - `x07-platform-contracts`: authoritative public schemas, examples, compatibility waivers, and registry export helpers
 - `x07-platform`: public engine, CLI, daemon, MCP, reference adapters, examples, fixtures, and CI
-- `x07-platform-cloud`: private hosted-product layer for identity, tenancy, billing, metering, and other multi-tenant service concerns
+- `x07-platform-cloud`: private hosted-product layer that powers the managed Sentinel offering, including identity, tenancy, billing, metering, and other multi-tenant service concerns
 
 `x07-platform` consumes `x07-platform-contracts` through the `contracts/` submodule. `x07-platform-cloud` consumes both `contracts/` and `platform/` so the hosted layer builds on the public engine instead of forking it.

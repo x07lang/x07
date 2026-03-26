@@ -184,13 +184,14 @@ X07 is not just a compiler. The public ecosystem is organized into focused repos
 - [`x07lang/x07-web-ui`](https://github.com/x07lang/x07-web-ui): the official reducer-style web UI contracts and browser host.
 - [`x07lang/x07-device-host`](https://github.com/x07lang/x07-device-host): the desktop and mobile WebView host that runs the same X07 UI reducer across platforms.
 - [`x07lang/x07-wasi`](https://github.com/x07lang/x07-wasi): canonical `std.wasi.*` packages for WASI-facing X07 programs.
-- [`x07lang/x07-platform`](https://github.com/x07lang/x07-platform): the lifecycle platform for sealed artifacts, deploy plans, incidents, regressions, and device releases.
-- [`x07lang/x07-platform-contracts`](https://github.com/x07lang/x07-platform-contracts): the public `lp.*` contracts shared by the platform CLI, UI, APIs, and MCP tools.
+- [`x07lang/x07-platform`](https://github.com/x07lang/x07-platform): the public runtime and control plane for workload delivery, release review, incidents, regressions, and device-release supervision through `x07lp`.
+- [`x07lang/x07-platform-contracts`](https://github.com/x07lang/x07-platform-contracts): the public `lp.*` contracts for workloads, topology, bindings, targets, releases, and lifecycle state shared by the platform CLI, UI, APIs, and MCP tools.
+- `x07lang/x07-platform-cloud`: the private repo behind x07 Sentinel, the managed control layer built on the public platform split.
 - [`x07lang/x07-registry`](https://github.com/x07lang/x07-registry): the package registry backend.
 - [`x07lang/x07-registry-web`](https://github.com/x07lang/x07-registry-web): the public package registry UI at [x07.io](https://x07.io).
 - [`x07lang/x07-website`](https://github.com/x07lang/x07-website): the documentation website at [x07lang.org](https://x07lang.org).
 
-For end users, that means one language with an official path for package distribution, WASM delivery, browser and device UI, MCP-based agent tooling, and production lifecycle control.
+For end users, that means one language with an official path for package distribution, WASM delivery, browser and device UI, MCP-based agent tooling, governed backend delivery through x07 Platform, and a managed Sentinel layer when teams need hosted control.
 
 ---
 
